@@ -8,7 +8,6 @@ import { PROBE_DEBOUNCE_MS } from "../../../constants";
 import Dialog from "../../../components/Dialog";
 import type { IOProfile, ConnectionFieldValue } from "../../../hooks/useSettings";
 import { isProfileKind } from "../../../hooks/useSettings";
-import { useSettingsStore } from "../stores/settingsStore";
 import SerialPortPicker from "../components/SerialPortPicker";
 import GsUsbDevicePicker from "../components/GsUsbDevicePicker";
 import LinuxCanSetupHelper from "../components/LinuxCanSetupHelper";
@@ -47,6 +46,7 @@ import { tlog } from "../../../api/settings";
 import { getPlatform, isWindows, isLinux, isMacOS } from "../../../utils/platform";
 import { getAvailableProfileKinds, type Platform, type ProfileKind } from "../../../utils/profileTraits";
 import type { GvretInterfaceConfig } from "../../../hooks/useSettings";
+import { useCatalogList } from "../../../hooks/useCatalogList";
 
 export type MqttFormatKind = "json" | "savvycan" | "decode";
 export type MqttFormatField = "topic" | "enabled";
@@ -86,7 +86,7 @@ export default function IOProfileDialog({
 }: Props) {
   const { t } = useTranslation("settings");
   // Catalog list for preferred decoder picker
-  const catalogs = useSettingsStore((s) => s.catalogs.list);
+  const catalogs = useCatalogList();
 
   // Check password storage status (only mqtt and postgres have password fields)
   const conn = profileForm.connection;

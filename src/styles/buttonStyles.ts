@@ -418,11 +418,11 @@ export const resetButtonSmall =
 export const resetButtonIcon = `${iconButtonHoverCompact} text-[color:var(--text-secondary)]`;
 
 /**
- * Dialog option button - for multi-choice dialog buttons
- * Use for: Option buttons in picker dialogs
+ * Dialog action button - bordered surface chip for a dialog's footer actions
+ * Use for: the non-accent actions beside a primaryButtonBase one in a panelFooter
  */
-export const dialogOptionButton =
-  "flex items-center justify-center gap-2 flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 transition-all";
+export const dialogActionButton =
+  `flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95 ${buttonPress}`;
 
 // =============================================================================
 // Launcher Button Styles (for dashboard watermark)

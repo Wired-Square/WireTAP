@@ -46,6 +46,20 @@ tokio = { version = "1", features = ["net", "io-util", "macros", "sync", "time",
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 once_cell = "1"
 hex = "0.4"
+# Catalogue sharing: sha1 computes git blob hashes locally, so "is my copy
+# committed?" is answered without a network round trip.
+sha1 = "0.10"
+# Catalogue sharing transport: a real libgit2 clone per saved repository, so pull
+# is a fetch and push is a commit plus push rather than an emulation of them over
+# the GitHub contents API. Vendored so no libgit2 is required on the build host.
+# `ssh` is deliberately off: HTTPS with the keychain token covers every supported
+# host today, and libssh2 is build weight we would carry to four platforms for
+# nothing. See docs/catalog-sharing.md.
+#
+# TLS backend is chosen by libgit2-sys per target: SecureTransport on Apple, WinHTTP
+# on Windows, OpenSSL on other unixes. Only Linux actually calls OpenSSL — see the
+# per-target overrides below for why the Apple targets still have to carry it.
+git2 = { version = "0.21", default-features = false, features = ["https", "vendored-libgit2"] }
 chrono = "0.4"
 async-trait = "0.1"
 toml = "0.8"
@@ -100,10 +114,26 @@ notify = "6"
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
+# Same dead-weight OpenSSL as iOS, and for the same reason — see the iOS block. macOS
+# does not *fail* without this (openssl-sys finds a system OpenSSL it then ignores),
+# but that makes the build depend on the host having a discoverable OpenSSL for a
+# library libgit2 never calls. Homebrew's openssl@3 is keg-only, so that discovery is
+# exactly the kind of thing that works on a dev machine and fails on a CI runner.
+git2 = { version = "0.21", default-features = false, features = ["https", "vendored-libgit2", "vendored-openssl"] }
 
 # iOS
 [target.'cfg(target_os = "ios")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+# libgit2 uses SecureTransport on every Apple target (libgit2-sys picks the backend
+# on `target.contains("apple")`), so OpenSSL is never called here. It is vendored
+# anyway because libgit2-sys declares openssl-sys under a blanket `cfg(unix)`, which
+# catches iOS: without this, openssl-sys's build script hunts for a host OpenSSL via
+# pkg-config and fails the cross-compile outright. Dead weight — nothing references
+# the symbols, so the linker drops them — but the alternative is no iOS build.
+#
+# The real fix belongs upstream: that cfg should be `all(unix, not(target_vendor =
+# "apple"))`. Drop both Apple `vendored-openssl` overrides if libgit2-sys narrows it.
+git2 = { version = "0.21", default-features = false, features = ["https", "vendored-libgit2", "vendored-openssl"] }
 tauri-plugin-keep-screen-on = "0.1"
 tauri-plugin-safe-area-insets-css = "0.1"
 
@@ -126,6 +156,11 @@ optional = true
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
 keyring = { version = "3", features = ["sync-secret-service"] }
+# libgit2 talks HTTPS through OpenSSL on Linux (macOS/iOS use SecureTransport,
+# Windows uses WinHTTP, neither of which needs this). Vendored so the deb/rpm/
+# AppImage carry their own libssl instead of depending on whatever the build host
+# and the user's distro happen to ship.
+git2 = { version = "0.21", default-features = false, features = ["https", "vendored-libgit2", "vendored-openssl"] }
 # nusb — used by the STM32 DFU flasher (dfu-nusb). Already a dep on
 # macOS/Windows; added here for Linux parity.
 nusb = { version = "0.2", features = ["tokio"] }

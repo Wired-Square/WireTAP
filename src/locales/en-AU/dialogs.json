@@ -191,7 +191,22 @@
   },
   "catalogPicker": {
     "title": "Select Catalog",
-    "empty": "No catalogs found. Add TOML catalog files to your decoder directory."
+    "empty": "No catalogs found. Add TOML catalog files to your decoder directory.",
+    "noMatches": "No catalogs match that search.",
+    "search": "Search catalogs…",
+    "actions": {
+      "new": "New",
+      "import": "Import",
+      "repository": "Repository"
+    },
+    "actionTitles": {
+      "new": "New catalog",
+      "import": "Import from file",
+      "repository": "Browse catalog repositories"
+    },
+    "errors": {
+      "import": "Import failed: {{message}}"
+    }
   },
   "framePicker": {
     "title": "Select Frames"

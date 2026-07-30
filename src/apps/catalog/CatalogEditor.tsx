@@ -33,7 +33,9 @@ import { isFrameFieldsValid } from "./views/frameEditUtils";
 import { CATALOG_SEARCH_INPUT_ID } from "./components/FindBar";
 import TextFindBar from "./components/TextFindBar";
 import CatalogDialogs from "./components/CatalogDialogs";
-import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
+import CatalogPickerDialog from "../../dialogs/catalog-picker";
+import { useCatalogShareDialogs } from "./components/CatalogShareDialogs";
+import { useCatalogShareStore } from "../../stores/catalogShareStore";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
 
@@ -90,8 +92,9 @@ function CatalogEditorInner() {
   const openTextFind = useCatalogEditorStore((s) => s.openTextFind);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
   const openSuccessMigrated = useCatalogEditorStore((s) => s.openSuccessMigrated);
-  const migration = useCatalogEditorStore((s) => s.status.migration);
-  const dismissMigration = useCatalogEditorStore((s) => s.dismissMigration);
+  const openSuccessRemote = useCatalogEditorStore((s) => s.openSuccessRemote);
+  const banner = useCatalogEditorStore((s) => s.status.banner);
+  const dismissBanner = useCatalogEditorStore((s) => s.dismissBanner);
   const openDialog = useCatalogEditorStore((s) => s.openDialog);
   const decoderDir = useCatalogEditorStore((s) => s.file.decoderDir);
   const treeScrollTop = useCatalogEditorStore((s) => s.ui.treeScrollTop);
@@ -297,6 +300,35 @@ function CatalogEditorInner() {
     }
   }, [openSuccess, openSuccessMigrated]);
 
+  // An import from the picker arrives as a normal selection, so it opens through
+  // the migration-aware path above like any other catalogue.
+  const shareDialogs = useCatalogShareDialogs({ decoderDir });
+
+  // The open catalogue's tracked source, when upstream has something to review.
+  const trackedSources = useCatalogShareStore((s) => s.tracked);
+  const updatableSourceId = useMemo(() => {
+    const filename = catalogPath?.split(/[/\\]/).pop()?.toLowerCase();
+    if (!filename) return null;
+    const source = trackedSources.find((t) => t.localFilename.toLowerCase() === filename);
+    return source && (source.remoteState === "upstreamAhead" || source.remoteState === "diverged")
+      ? source.id
+      : null;
+  }, [catalogPath, trackedSources]);
+
+  // An update handed over from another panel (Settings, typically) lands here as a
+  // reviewable, saveable diff — the same buffer-vs-baseline shape a schema migration
+  // uses — so nothing is written behind the user's back.
+  const pendingRemoteUpdate = useCatalogEditorStore((s) => s.pendingRemoteUpdate);
+  const setPendingRemoteUpdate = useCatalogEditorStore((s) => s.setPendingRemoteUpdate);
+  useEffect(() => {
+    if (!pendingRemoteUpdate) return;
+    const { path, localToml, remoteToml, source } = pendingRemoteUpdate;
+    setPendingRemoteUpdate(null);
+    openSuccessRemote(path, localToml, remoteToml, source);
+    setMode("text");
+    setTextView("diff");
+  }, [pendingRemoteUpdate, setPendingRemoteUpdate, openSuccessRemote, setMode, setTextView]);
+
   // Parse the catalogue (in Rust, the canonical parser) and build the editor
   // tree from the resolved model. Async + debounced + cancellable so rapid
   // edits don't race; mirrors the diff effect's pattern.
@@ -482,6 +514,13 @@ function CatalogEditorInner() {
           onValidate={handlers.handleValidate}
           onToggleMode={() => setMode(editMode === "ui" ? "text" : "ui")}
           onEditConfig={() => openDialog("config")}
+          onReviewUpdate={
+            updatableSourceId ? () => shareDialogs.openUpdate(updatableSourceId) : undefined
+          }
+          onPublish={() =>
+            // The saved file is the unit of publishing, not the editor buffer.
+            catalogPath && shareDialogs.openPublish(catalogPath.split(/[/\\]/).pop()!)
+          }
         />
       }
     >
@@ -517,14 +556,16 @@ function CatalogEditorInner() {
         )}
 
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {migration && (
+          {/* One banner for both cases where the buffer came from somewhere other
+              than the file on disk — a schema upgrade, or an upstream update
+              pulled in for review. Either way it is an unsaved, diffable change. */}
+          {banner && (
             <div className={`flex items-start gap-3 px-4 py-2.5 border-b ${borderWarning} ${bgWarning}`}>
               <div className="flex-1 text-xs">
                 <p className={`font-medium ${textWarning}`}>
-                  {t(
-                    "editor.migrationBanner",
-                    "Upgraded this catalogue to the latest format on load. Save to apply, or review the",
-                  )}{" "}
+                  {banner.kind === "remoteUpdate"
+                    ? t("editor.remoteUpdateBanner", { source: banner.source })
+                    : t("editor.migrationBanner")}{" "}
                   <button
                     type="button"
                     onClick={() => {
@@ -537,9 +578,9 @@ function CatalogEditorInner() {
                   </button>
                   .
                 </p>
-                {migration.summary.length > 0 && (
+                {banner.kind === "migration" && banner.summary.length > 0 && (
                   <ul className="mt-1 list-disc list-inside text-[color:var(--text-muted)]">
-                    {migration.summary.map((line, i) => (
+                    {banner.summary.map((line, i) => (
                       <li key={i}>{line}</li>
                     ))}
                   </ul>
@@ -547,7 +588,7 @@ function CatalogEditorInner() {
               </div>
               <button
                 type="button"
-                onClick={dismissMigration}
+                onClick={dismissBanner}
                 aria-label={t("common.dismiss", "Dismiss")}
                 className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
               >
@@ -824,14 +865,12 @@ function CatalogEditorInner() {
       <CatalogPickerDialog
         isOpen={showCatalogPicker}
         onClose={() => setShowCatalogPicker(false)}
-        catalogs={catalogs}
         selectedPath={catalogPath}
-        decoderDir={decoderDir}
         onSelect={handleSelectCatalog}
-        onImport={(path, content) => openSuccess(path, content)}
-        onImportError={(message) => setValidation([{ field: "import", message }])}
         onNewCatalog={handlers.handleNewCatalog}
       />
+
+      {shareDialogs.element}
     </AppLayout>
   );
 }

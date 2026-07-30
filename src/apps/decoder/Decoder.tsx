@@ -30,7 +30,7 @@ import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { getCaptureMetadata, type CaptureMetadata } from "../../api/capture";
 import SpeedPickerDialog from "../../dialogs/SpeedPickerDialog";
-import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
+import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import FlashNotification from "../../components/FlashNotification";
 import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
@@ -1309,7 +1309,6 @@ function DecoderInner() {
       <CatalogPickerDialog
         isOpen={dialogs.catalogPicker.isOpen}
         onClose={() => dialogs.catalogPicker.close()}
-        catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={(path: string) => {
           // Set the path; the load/attach effect parses + binds it once.

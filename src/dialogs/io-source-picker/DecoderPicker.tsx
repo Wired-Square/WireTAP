@@ -8,21 +8,21 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText, X } from "lucide-react";
-import type { CatalogMetadata } from "../../api/catalog";
 import { borderDefault, paddingCard, caption, textMedium } from "../../styles";
 import { sectionHeader } from "../../styles/typography";
 import { iconMd, iconXs } from "../../styles/spacing";
-import CatalogPickerDialog from "../CatalogPickerDialog";
+import CatalogPickerDialog from "../catalog-picker";
+import { useCatalogList } from "../../hooks/useCatalogList";
 import { findCatalogByPath } from "../../utils/catalogUtils";
 
 interface Props {
-  catalogs: CatalogMetadata[];
   catalogPath: string | null;
   onSelect: (path: string | null) => void;
 }
 
-export default function DecoderPicker({ catalogs, catalogPath, onSelect }: Props) {
+export default function DecoderPicker({ catalogPath, onSelect }: Props) {
   const { t } = useTranslation("dialogs");
+  const catalogs = useCatalogList();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const selected = findCatalogByPath(catalogs, catalogPath);
@@ -76,7 +76,6 @@ export default function DecoderPicker({ catalogs, catalogPath, onSelect }: Props
       <CatalogPickerDialog
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={(path) => onSelect(path)}
         title={t("ioSourcePicker.decoder.pickerTitle")}

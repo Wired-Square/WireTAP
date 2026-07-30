@@ -1,6 +1,6 @@
 // ui/src/apps/catalog/layout/CatalogToolbar.tsx
 
-import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
+import { Check, ChevronDown, Download, FileText, Glasses, RefreshCw, RotateCcw, Save, Settings, UploadCloud, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { disabledState } from "../../../styles";
@@ -26,6 +26,10 @@ export type CatalogToolbarProps = {
   onValidate: () => void;
   onToggleMode: () => void;
   onEditConfig: () => void;
+  /** Publish to a Git repository. Publishes the saved bytes, so unsaved blocks it. */
+  onPublish?: () => void;
+  /** Review an upstream update to the open catalogue. Absent when it isn't tracked. */
+  onReviewUpdate?: () => void;
 };
 
 export default function CatalogToolbar({
@@ -41,6 +45,8 @@ export default function CatalogToolbar({
   onValidate,
   onToggleMode,
   onEditConfig,
+  onPublish,
+  onReviewUpdate,
 }: CatalogToolbarProps) {
   const { t } = useTranslation("catalog");
   // Get catalog display info
@@ -138,6 +144,32 @@ export default function CatalogToolbar({
       >
         <Download className={iconMd} />
       </button>
+
+      {/* Publish to Git — the saved file is what gets published, so unsaved
+          changes disable it rather than silently publishing stale bytes. */}
+      {onPublish && (
+        <button
+          onClick={onPublish}
+          disabled={!catalogPath || hasUnsavedChanges}
+          title={hasUnsavedChanges ? t("toolbar.publishUnsaved") : t("toolbar.publish")}
+          className={iconButtonBase}
+        >
+          <UploadCloud className={iconMd} />
+        </button>
+      )}
+
+      {/* Review an upstream update — only offered for a tracked catalogue that
+          actually has one waiting. */}
+      {onReviewUpdate && (
+        <button
+          onClick={onReviewUpdate}
+          disabled={!catalogPath}
+          title={t("toolbar.reviewUpdate")}
+          className={iconButtonBase}
+        >
+          <RefreshCw className={iconMd} />
+        </button>
+      )}
 
       {/* Text mode toggle */}
       <button

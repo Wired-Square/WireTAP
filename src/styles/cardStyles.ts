@@ -14,6 +14,9 @@ export const cardBase = "rounded-lg border";
  * Use for: Content panels, form sections
  * Uses CSS variables for cross-platform dark mode support
  */
+/** A bordered card at the compact padding the dialogs use. */
+export const cardCompact = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)] p-3`;
+
 export const cardDefault = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)]`;
 
 /**

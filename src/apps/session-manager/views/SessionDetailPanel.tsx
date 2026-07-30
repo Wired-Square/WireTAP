@@ -13,6 +13,7 @@ import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { emptyStateText } from "../../../styles/typography";
 import { tlog } from "../../../api/settings";
+import { useCatalogList } from "../../../hooks/useCatalogList";
 
 interface SessionDetailPanelProps {
   sessions: ActiveSessionInfo[];
@@ -738,7 +739,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
 // Apps sharing the session will see the change via their cross-app sync effects.
 function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
   const { t } = useTranslation("sessionManager");
-  const catalogs = useSettingsStore((s) => s.catalogs.list);
+  const catalogs = useCatalogList();
   const sessionCatalogPath = useSessionStore(
     (s) => s.sessions[session.sessionId]?.catalogPath ?? null
   );

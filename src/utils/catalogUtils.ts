@@ -15,6 +15,12 @@ export function findCatalogByPath(
   return catalogs.find((c) => normalisePath(c.path) === target);
 }
 
+/** A catalogue file's name without its directory or `.toml`/`.dbc` extension. */
+export function catalogBaseName(filePath: string): string {
+  const filename = normalisePath(filePath).split("/").pop() ?? "";
+  return filename.replace(/\.(toml|dbc)$/i, "");
+}
+
 /**
  * Build a catalog path from decoder_dir and filename.
  * Handles both absolute paths and relative paths.

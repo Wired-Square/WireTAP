@@ -5,7 +5,6 @@ import {
   loadSettings as loadSettingsApi,
   saveSettings as saveSettingsApi,
   validateDirectory as validateDirectoryApi,
-  listCatalogs,
   setWakeSettings as setWakeSettingsApi,
   setLogLevel as setLogLevelApi,
 } from '../../../api';
@@ -185,11 +184,6 @@ interface SettingsState {
     defaultWriteProfiles: string[];
   };
 
-  // Catalogs
-  catalogs: {
-    list: CatalogFile[];
-  };
-
   // Bookmarks
   bookmarks: TimeRangeFavorite[];
 
@@ -270,7 +264,6 @@ interface SettingsState {
 
   // Actions - Loading
   loadSettings: () => Promise<void>;
-  loadCatalogs: () => Promise<void>;
   loadBookmarks: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
   loadDashboardLayouts: () => Promise<void>;
@@ -301,7 +294,6 @@ interface SettingsState {
   setDefaultWriteProfiles: (ids: string[]) => void;
 
   // Actions - Catalogs
-  setCatalogList: (catalogs: CatalogFile[]) => void;
 
   // Actions - Bookmarks
   setBookmarks: (bookmarks: TimeRangeFavorite[]) => void;
@@ -553,10 +545,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     defaultWriteProfiles: [],
   },
 
-  catalogs: {
-    list: [],
-  },
-
   bookmarks: [],
 
   selectionSets: [],
@@ -700,9 +688,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           defaultReadProfile: normalized.default_read_profile || null,
           defaultWriteProfiles: normalized.default_write_profiles || [],
         },
-        catalogs: {
-          ...get().catalogs,
-        },
         display: {
           frameIdFormat: normalized.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
           saveFrameIdFormat: normalized.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
@@ -808,21 +793,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Set iOS screen wake state on startup (no-op on other platforms)
       setIOSScreenWake(normalized.keep_display_awake ?? false).catch(console.error);
 
-      // Load catalogs after we have the decoder dir
-      get().loadCatalogs();
     } catch (error) {
       console.error('Failed to load settings:', error);
-    }
-  },
-
-  loadCatalogs: async () => {
-    try {
-      const catalogList = await listCatalogs();
-      set((state) => ({
-        catalogs: { ...state.catalogs, list: catalogList },
-      }));
-    } catch (error) {
-      console.error('Failed to load catalogs:', error);
     }
   },
 
@@ -1025,11 +997,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }));
     scheduleSave(get().saveSettings);
   },
-
-  // Catalog actions
-  setCatalogList: (catalogs) => set((state) => ({
-    catalogs: { ...state.catalogs, list: catalogs },
-  })),
 
   // Bookmark actions
   setBookmarks: (bookmarks) => set({ bookmarks }),

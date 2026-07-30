@@ -36,7 +36,7 @@ import ResultsPanel from "./views/ResultsPanel";
 import StatsPanel from "./views/StatsPanel";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import ErrorDialog from "../../dialogs/ErrorDialog";
-import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
+import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import AddBookmarkDialog from "../../dialogs/AddBookmarkDialog";
 
 function QueryInner() {
@@ -462,7 +462,6 @@ function QueryInner() {
       <CatalogPickerDialog
         isOpen={dialogs.catalogPicker.isOpen}
         onClose={() => dialogs.catalogPicker.close()}
-        catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={(path: string) => {
           handlers.handleCatalogChange(path);

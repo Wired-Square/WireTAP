@@ -31,7 +31,6 @@ export function useSettingsCatalogHandlers({
   const dialogPayload = useSettingsStore((s) => s.ui.dialogPayload);
 
   // Store actions
-  const loadCatalogs = useSettingsStore((s) => s.loadCatalogs);
   const openDialog = useSettingsStore((s) => s.openDialog);
   const closeDialog = useSettingsStore((s) => s.closeDialog);
   const setDialogPayload = useSettingsStore((s) => s.setDialogPayload);
@@ -50,7 +49,6 @@ export function useSettingsCatalogHandlers({
 
     try {
       await duplicateCatalogApi(catalog.path, catalogName, catalogFilename);
-      await loadCatalogs();
       closeDialog('duplicateCatalog');
       setDialogPayload({ catalogToDuplicate: null });
       resetCatalogForm();
@@ -80,7 +78,6 @@ export function useSettingsCatalogHandlers({
 
     try {
       await renameCatalogApi(catalog.path, catalogName, catalogFilename);
-      await loadCatalogs();
 
       closeDialog('editCatalog');
       setDialogPayload({ catalogToEdit: null });
@@ -110,7 +107,6 @@ export function useSettingsCatalogHandlers({
 
     try {
       await deleteCatalogApi(catalog.path);
-      await loadCatalogs();
 
       closeDialog('deleteCatalog');
       setDialogPayload({ catalogToDelete: null });

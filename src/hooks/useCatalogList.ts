@@ -8,41 +8,25 @@
 //
 // We treat that push as a re-sync signal and reconcile from `list_catalogs`
 // (served from the warm cache, so effectively instant), keeping Rust the single
-// source of truth. The initial fetch on mount means no startup race where the
-// picker shows empty; re-syncing on reconnect catches changes missed while the
-// socket was down. Mirrors useOpenAppsSync.
+// source of truth. The when-to-resync rule lives in `useWsResync` so every
+// derived view reconciles on the same triggers. Mirrors useOpenAppsSync.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { listCatalogs, type CatalogMetadata } from "../api/catalog";
-import { wsTransport } from "../services/wsTransport";
+import { useWsResync } from "./useWsResync";
 import { MsgType } from "../services/wsProtocol";
 
 export function useCatalogList(): CatalogMetadata[] {
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const reconcile = () => {
-      listCatalogs()
-        .then((list) => {
-          if (!cancelled) setCatalogs(list);
-        })
-        .catch((e) => console.error("Failed to load catalog list:", e));
-    };
-
-    reconcile(); // initial sync — populates before the first push
-    const unlistenChanged = wsTransport.onGlobalMessage(
-      MsgType.CatalogListChanged,
-      reconcile
-    );
-    const unlistenReconnect = wsTransport.onReconnect(reconcile);
-
-    return () => {
-      cancelled = true;
-      unlistenChanged();
-      unlistenReconnect();
-    };
-  }, []);
+  // No unmount guard: a setState after unmount is a no-op in React 18, and a
+  // ref-based guard is actively wrong under StrictMode's setup→cleanup→setup, which
+  // would latch it closed and leave the list permanently empty in dev.
+  useWsResync(MsgType.CatalogListChanged, () => {
+    listCatalogs()
+      .then(setCatalogs)
+      .catch((e) => console.error("Failed to load catalog list:", e));
+  });
 
   return catalogs;
 }

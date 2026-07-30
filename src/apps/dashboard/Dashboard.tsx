@@ -22,7 +22,7 @@ import AppLayout from "../../components/AppLayout";
 import DashboardTopBar from "./views/DashboardTopBar";
 import DashboardGrid from "./views/DashboardGrid";
 import CodeView from "../../components/CodeView";
-import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
+import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import SignalPickerDialog from "./dialogs/SignalPickerDialog";
 import PanelConfigDialog from "./dialogs/PanelConfigDialog";
@@ -541,7 +541,6 @@ function DashboardInner() {
       <CatalogPickerDialog
         isOpen={dialogs.catalogPicker.isOpen}
         onClose={() => dialogs.catalogPicker.close()}
-        catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={handleCatalogChange}
         title={t("catalogPicker.title")}

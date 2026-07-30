@@ -231,6 +231,16 @@ export async function listCatalogs(): Promise<CatalogMetadata[]> {
 }
 
 /**
+ * Write an outside catalogue into the decoder directory, returning its new path.
+ *
+ * Rust owns the naming: `filename` is sanitised and, if it is taken, given the
+ * next free `-N` suffix rather than overwriting.
+ */
+export async function importCatalog(filename: string, content: string): Promise<string> {
+  return await invoke<string>("import_catalog", { filename, content });
+}
+
+/**
  * Duplicate a catalog with a new name
  */
 export async function duplicateCatalog(sourcePath: string, newName: string, newFilename: string): Promise<void> {

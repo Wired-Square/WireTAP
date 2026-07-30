@@ -15,7 +15,6 @@ import {
   roundedDefault,
 } from "../styles";
 import { getReaderProtocols, useSettings, type IOProfile } from "../hooks/useSettings";
-import { listCatalogs, type CatalogMetadata } from "../api/catalog";
 import { buildCatalogPath } from "../utils/catalogUtils";
 import { buildDefaultBusMappings, isMultiBusProfile } from "../utils/profileTraits";
 import { useSessionStore } from "../stores/sessionStore";
@@ -262,8 +261,7 @@ export default function IoSourcePickerDialog({
   // Source tab (Captures | Devices) — smart default set on open
   const [activeTab, setActiveTab] = useState<SourceTab>("devices");
 
-  // Decoder picker: catalogue list + the catalogue to attach to the new session
-  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  // Decoder picker: the catalogue to attach to the new session
   const [selectedCatalogPath, setSelectedCatalogPath] = useState<string | null>(defaultCatalogPath);
   // Once the user picks or clears a decoder, stop auto-filling from a source's
   // preferred catalogue (so a deliberate clear isn't undone). Reset on open.
@@ -561,12 +559,6 @@ export default function IoSourcePickerDialog({
   // changes, which would re-collapse the picker after the user clicks Change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  // Fetch available catalogues for the decoder picker when the dialog opens.
-  useEffect(() => {
-    if (!isOpen) return;
-    listCatalogs().then(setCatalogs).catch(console.error);
-  }, [isOpen, settings?.decoder_dir]);
 
   // Record a manual tab pick so the Sessions auto-default stops fighting the user.
   const handleTabChange = useCallback((tab: SourceTab) => {
@@ -1881,11 +1873,7 @@ export default function IoSourcePickerDialog({
           )}
         </div>
 
-        <DecoderPicker
-          catalogs={catalogs}
-          catalogPath={selectedCatalogPath}
-          onSelect={handleCatalogSelect}
-        />
+        <DecoderPicker catalogPath={selectedCatalogPath} onSelect={handleCatalogSelect} />
 
         <ActionButtons
           mode={mode}

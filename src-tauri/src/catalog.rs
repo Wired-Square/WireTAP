@@ -19,8 +19,7 @@ pub async fn open_catalog(path: String) -> Result<String, String> {
 /// Save catalog to TOML file
 #[tauri::command]
 pub async fn save_catalog(app: AppHandle, path: String, content: String) -> Result<(), String> {
-    std::fs::write(&path, content)
-        .map_err(|e| format!("Failed to write catalog file: {}", e))?;
+    write_file_atomically(Path::new(&path), content.as_bytes())?;
     refresh_catalog_cache(&app);
     Ok(())
 }
@@ -185,9 +184,31 @@ fn diff_row(kind: &str, text: &str, old_line: Option<usize>, new_line: Option<us
     serde_json::json!({ "kind": kind, "text": text, "oldLine": old_line, "newLine": new_line })
 }
 
-/// Longest-common-subsequence line diff. O(n·m) — fine for catalogue-sized files.
+/// Above this many `n * m` cells the LCS table costs more than the diff is worth
+/// (4 bytes per cell, so 25M cells ≈ 100 MB). Catalogues are a few thousand lines
+/// at most; anything past this is pathological or hostile — an imported file, an
+/// MCP write, or a paste into text mode — so degrade instead of allocating.
+const MAX_LCS_CELLS: usize = 25_000_000;
+
+/// Longest-common-subsequence line diff. O(n·m) in time and memory, so bounded
+/// by [`MAX_LCS_CELLS`]; beyond that it falls back to remove-all/add-all, which
+/// is a truthful (if coarse) diff rather than an out-of-memory abort.
 fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<serde_json::Value> {
     let (n, m) = (a.len(), b.len());
+    if n.saturating_mul(m) > MAX_LCS_CELLS {
+        let mut rows = Vec::with_capacity(n + m);
+        rows.extend(
+            a.iter()
+                .enumerate()
+                .map(|(i, line)| diff_row("remove", line, Some(i + 1), None)),
+        );
+        rows.extend(
+            b.iter()
+                .enumerate()
+                .map(|(j, line)| diff_row("add", line, None, Some(j + 1))),
+        );
+        return rows;
+    }
     let mut dp = vec![vec![0u32; m + 1]; n + 1];
     for i in (0..n).rev() {
         for j in (0..m).rev() {
@@ -249,7 +270,7 @@ pub async fn test_decode_frame(
         .map_err(|e| format!("Failed to write temp frame file: {}", e))?;
 
     let output = Command::new("wiretap")
-        .args(&[
+        .args([
             "decode",
             "--catalog", &catalog_path,
             "--input", temp_file.to_str().unwrap(),
@@ -389,11 +410,7 @@ fn scan_catalogs(decoder_dir: &Path) -> Vec<CatalogFile> {
 /// Resolve the decoder directory from settings (synchronously). Returns `None`
 /// when settings can't be read or the directory doesn't exist.
 fn resolve_decoder_dir(app: &AppHandle) -> Option<PathBuf> {
-    let settings = crate::settings::load_settings_sync(app)
-        .map_err(|e| tlog!("[catalog] Could not load settings for decoder dir: {}", e))
-        .ok()?;
-    let dir = PathBuf::from(&settings.decoder_dir);
-    dir.exists().then_some(dir)
+    decoder_dir(app).filter(|dir| dir.exists())
 }
 
 /// Rebuild the catalogue cache from the current decoder directory, store it, and
@@ -545,6 +562,106 @@ fn extract_catalog_name(content: &str) -> Option<String> {
     None
 }
 
+/// Reject a filename that is not a bare, visible name.
+///
+/// Shared by every path that turns outside input into a file under a
+/// user-data directory — catalogues here, dashboards in `dashboard.rs` — so the
+/// traversal guard has one implementation rather than one per suffix.
+pub fn reject_unsafe_filename(filename: &str) -> Result<&str, String> {
+    let name = filename.trim();
+    if name.is_empty() {
+        return Err("Filename is empty".to_string());
+    }
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err(format!(
+            "Invalid filename '{name}' — must be a bare name with no path separators"
+        ));
+    }
+    // A leading dot would hide the file from the directory scanners.
+    if name.starts_with('.') {
+        return Err(format!("Invalid filename '{name}' — must not start with a dot"));
+    }
+    Ok(name)
+}
+
+/// Reduce an untrusted name to a bare `*.toml` filename.
+///
+/// The single implementation for every path that names a file in the decoder
+/// directory: the MCP write tools, the git import, and the duplicate/rename
+/// commands below.
+pub fn sanitise_catalog_filename(filename: &str) -> Result<String, String> {
+    let name = reject_unsafe_filename(filename)?;
+    if name.to_lowercase().ends_with(".toml") {
+        Ok(name.to_string())
+    } else {
+        Ok(format!("{name}.toml"))
+    }
+}
+
+/// Write a file via a temp name plus rename, so no reader can observe a partial
+/// file.
+///
+/// Matters for anything in the decoder directory: the `notify` watcher fires on
+/// create/modify, and `scan_catalogs` swallows read failures and falls back to
+/// the filename — so a torn read shows up as a catalogue with the wrong name
+/// rather than as an error.
+pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let tmp = path.with_extension("tmp-write");
+    std::fs::write(&tmp, bytes).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("Failed to replace {}: {e}", path.display())
+    })
+}
+
+/// First unused `name-N.toml` beside `name.toml`, for a non-destructive save.
+pub fn next_free_catalog_filename(dir: &Path, desired: &str) -> String {
+    let stem = desired.strip_suffix(".toml").unwrap_or(desired);
+    (2..1000)
+        .map(|n| format!("{stem}-{n}.toml"))
+        .find(|candidate| !dir.join(candidate).exists())
+        .unwrap_or_else(|| format!("{stem}-{}.toml", chrono::Utc::now().timestamp()))
+}
+
+/// The configured decoder directory, whether or not it exists yet.
+pub fn decoder_dir(app: &AppHandle) -> Option<PathBuf> {
+    crate::settings::load_settings_sync(app)
+        .ok()
+        .map(|s| PathBuf::from(s.decoder_dir))
+}
+
+/// Land an outside catalogue in the decoder directory, returning its new path.
+///
+/// The frontend picks the file (and converts DBC to TOML on the way), but naming
+/// stays here with the other writers: one sanitiser and one non-destructive
+/// collision rule cover every path into that directory, resolved against the
+/// directory itself rather than a list the frontend happens to be holding.
+///
+/// Deliberately unvalidated, unlike the git import — a file the user picked
+/// themselves is often a broken catalogue on its way to the editor to be fixed.
+#[tauri::command]
+pub async fn import_catalog(
+    app: AppHandle,
+    filename: String,
+    content: String,
+) -> Result<String, String> {
+    let dir = decoder_dir(&app).ok_or_else(|| "No decoder directory is set".to_string())?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create {}: {e}", dir.display()))?;
+
+    let desired = sanitise_catalog_filename(&filename)?;
+    let free = if dir.join(&desired).exists() {
+        next_free_catalog_filename(&dir, &desired)
+    } else {
+        desired
+    };
+
+    let path = dir.join(free);
+    write_file_atomically(&path, content.as_bytes())?;
+    refresh_catalog_cache(&app);
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Duplicate a catalog file
 #[tauri::command]
 pub async fn duplicate_catalog(
@@ -556,7 +673,7 @@ pub async fn duplicate_catalog(
     let source = PathBuf::from(&source_path);
     let parent_dir = source.parent()
         .ok_or_else(|| "Invalid source path".to_string())?;
-    let dest = parent_dir.join(&new_filename);
+    let dest = parent_dir.join(sanitise_catalog_filename(&new_filename)?);
 
     // Read source content
     let mut content = std::fs::read_to_string(&source)
@@ -590,6 +707,7 @@ pub async fn rename_catalog(
     let old_path_buf = PathBuf::from(&old_path);
     let parent_dir = old_path_buf.parent()
         .ok_or_else(|| "Invalid path".to_string())?;
+    let new_filename = sanitise_catalog_filename(&new_filename)?;
     let new_path = parent_dir.join(&new_filename);
 
     // Read content
@@ -606,7 +724,7 @@ pub async fn rename_catalog(
     }
 
     // If filename changed, move the file
-    if old_path != new_path.to_string_lossy().to_string() {
+    if old_path != new_path.to_string_lossy() {
         // Write to new location
         std::fs::write(&new_path, &content)
             .map_err(|e| format!("Failed to write renamed catalog: {}", e))?;
@@ -620,6 +738,12 @@ pub async fn rename_catalog(
             .map_err(|e| format!("Failed to update catalog: {}", e))?;
     }
 
+    // Carry any git provenance across to the new filename, so a rename doesn't
+    // silently detach the catalogue from the repository it came from.
+    if let Some(old_name) = old_path_buf.file_name().and_then(|n| n.to_str()) {
+        crate::catalog_share::registry::on_catalog_renamed(&app, old_name, &new_filename);
+    }
+
     refresh_catalog_cache(&app);
     Ok(())
 }
@@ -629,6 +753,11 @@ pub async fn rename_catalog(
 pub async fn delete_catalog(app: AppHandle, path: String) -> Result<(), String> {
     std::fs::remove_file(&path)
         .map_err(|e| format!("Failed to delete catalog: {}", e))?;
+
+    if let Some(name) = PathBuf::from(&path).file_name().and_then(|n| n.to_str()) {
+        crate::catalog_share::registry::on_catalog_deleted(&app, name);
+    }
+
     refresh_catalog_cache(&app);
     Ok(())
 }

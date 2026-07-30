@@ -8,6 +8,7 @@ mod capturequery;
 mod capture_store;
 mod captures;
 mod catalog;
+mod catalog_share;
 mod apiclient;
 mod dashboard;
 mod checksums;
@@ -1153,7 +1154,11 @@ pub fn run() {
 
             Ok(())
         })
-        .manage(SettingsWindowState(Mutex::new(None)));
+        .manage(SettingsWindowState(Mutex::new(None)))
+        // Git-sharing provenance: which remote each local catalogue came from.
+        // Loaded lazily on first access; managed here so the rename/delete hooks
+        // in catalog.rs can always reach it.
+        .manage(catalog_share::registry::CatalogSourceRegistry::default());
 
     // Add menu state management (platform-specific types)
     #[cfg(not(target_os = "ios"))]
@@ -1183,9 +1188,37 @@ pub fn run() {
             catalog::save_binary_file,
             catalog::test_decode_frame,
             catalog::list_catalogs,
+            catalog::import_catalog,
             catalog::duplicate_catalog,
             catalog::rename_catalog,
             catalog::delete_catalog,
+            // Catalogue sharing: a real libgit2 clone per repository for the transport,
+            // GitHub REST only for what git has no concept of (forks, pull requests).
+            catalog_share::parse_catalog_source_url,
+            catalog_share::browse_catalog_repo,
+            catalog_share::resolve_remote_catalogs,
+            catalog_share::import_remote_catalogs,
+            catalog_share::list_catalog_sources,
+            catalog_share::forget_catalog_source,
+            catalog_share::save_catalog_repo,
+            catalog_share::forget_catalog_repo,
+            catalog_share::set_favourite_catalog_repo,
+            catalog_share::refresh_pr_status,
+            catalog_share::check_catalog_updates,
+            catalog_share::fetch_remote_catalog,
+            catalog_share::apply_catalog_update,
+            catalog_share::pull_catalog,
+            catalog_share::repo_status,
+            // Sharing: GitHub account (token lives in the keychain, never crosses IPC)
+            catalog_share::auth::set_git_token,
+            catalog_share::auth::get_git_identity,
+            catalog_share::auth::verify_git_token,
+            catalog_share::auth::clear_git_token,
+            catalog_share::auth::git_token_setup_url,
+            // Sharing: publish as a branch plus pull request
+            catalog_share::publish::preflight_publish,
+            catalog_share::publish::publish_catalog,
+            catalog_share::publish::create_catalog_repo,
             dashboard::list_dashboards,
             dashboard::open_dashboard,
             dashboard::save_dashboard,

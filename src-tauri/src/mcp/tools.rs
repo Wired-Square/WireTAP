@@ -90,20 +90,7 @@ fn resolve_catalog_path(
     app: &tauri::AppHandle,
     filename: &str,
 ) -> Result<(std::path::PathBuf, bool), McpError> {
-    let name = filename.trim();
-    if name.is_empty() {
-        return Err(err("Catalog filename is empty"));
-    }
-    if name.contains('/') || name.contains('\\') || name.contains("..") {
-        return Err(err(format!(
-            "Invalid catalog filename '{name}' — must be a bare name with no path separators"
-        )));
-    }
-    let name = if name.to_lowercase().ends_with(".toml") {
-        name.to_string()
-    } else {
-        format!("{name}.toml")
-    };
+    let name = crate::catalog::sanitise_catalog_filename(filename).map_err(err)?;
     let settings = crate::settings::load_settings_sync(app).map_err(err)?;
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();

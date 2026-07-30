@@ -26,6 +26,23 @@ export interface SerialHeaderFieldEntry {
 }
 
 // State types
+/**
+ * An upstream catalogue update handed to the editor from another panel.
+ *
+ * Carries the bytes rather than an id so the editor needs no second fetch, and so the
+ * diff it shows is exactly what the reviewer saw.
+ */
+export interface PendingCatalogUpdate {
+  /** Absolute path of the local catalogue. */
+  path: string;
+  /** The local file as it was when reviewed — becomes the diff baseline. */
+  localToml: string;
+  /** Upstream content — becomes the working buffer. */
+  remoteToml: string;
+  /** Repository label, for the banner. */
+  source: string;
+}
+
 export interface CatalogEditorState {
   // File state
   file: {
@@ -160,10 +177,14 @@ export interface CatalogEditorState {
     isLoading: boolean;
     isSaving: boolean;
     lastError?: string;
-    /** Set when a catalogue was upgraded to the current schema on load (the
-     * working buffer holds the migrated text, the baseline the on-disk original).
-     * `null` once dismissed, saved, or when no migration occurred. */
-    migration: { summary: string[] } | null;
+    /** Set when the working buffer was loaded from something other than the file
+     * on disk, so the difference shows as an unsaved, diffable change: either a
+     * schema upgrade applied on load, or an upstream update pulled in for review.
+     * `null` once dismissed, saved, or when neither happened. */
+    banner:
+      | { kind: "migration"; summary: string[] }
+      | { kind: "remoteUpdate"; source: string }
+      | null;
   };
 
   // Actions - File operations
@@ -173,12 +194,25 @@ export interface CatalogEditorState {
    * working buffer is the migrated text while the diff baseline stays the
    * on-disk original, so the upgrade shows as an unsaved, diffable change. */
   openSuccessMigrated: (path: string, originalToml: string, migratedToml: string, summary: string[]) => void;
+  /** Like {@link openSuccessMigrated} but the buffer is an upstream update: the
+   * remote text loads as the working buffer with the on-disk copy as the diff
+   * baseline, so the update is reviewed and saved rather than written behind the
+   * user's back. */
+  openSuccessRemote: (path: string, localToml: string, remoteToml: string, source: string) => void;
   openError: (error: string) => void;
   saveStart: () => void;
   saveSuccess: (toml: string) => void;
   saveError: (error: string) => void;
-  /** Dismiss the load-time migration banner. */
-  dismissMigration: () => void;
+  /** Dismiss the load-time banner. */
+  dismissBanner: () => void;
+
+  /**
+   * An upstream update handed over from another panel, waiting for the editor to
+   * mount and load it. Set by `sendUpdateToCatalogEditor`; the editor consumes it
+   * once and clears it.
+   */
+  pendingRemoteUpdate: PendingCatalogUpdate | null;
+  setPendingRemoteUpdate: (update: PendingCatalogUpdate | null) => void;
 
   // Actions - Content
   setMode: (mode: EditMode) => void;
@@ -394,7 +428,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   },
 
   validation: { errors: [], isValid: null },
-  status: { isLoading: false, isSaving: false, migration: null },
+  status: { isLoading: false, isSaving: false, banner: null },
+  pendingRemoteUpdate: null,
 
   // File operations
   setDecoderDir: (dir) =>
@@ -427,7 +462,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
         dialogPayload: { ...initialDialogPayload },
       },
       validation: { errors: [], isValid: null },
-      status: { ...get().status, isLoading: false, lastError: undefined, migration: null },
+      status: { ...get().status, isLoading: false, lastError: undefined, banner: null },
     });
   },
 
@@ -438,17 +473,30 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     get().openSuccess(path, migratedToml);
     set((state) => ({
       content: { ...state.content, lastSavedToml: originalToml },
-      status: { ...state.status, migration: { summary } },
+      status: { ...state.status, banner: { kind: "migration", summary } },
+    }));
+  },
+
+  openSuccessRemote: (path, localToml, remoteToml, source) => {
+    // Same buffer-vs-baseline trick as a migration: the remote text is what you
+    // are reviewing, the on-disk copy is what it is being compared against, and
+    // nothing touches disk until Save.
+    get().openSuccess(path, remoteToml);
+    set((state) => ({
+      content: { ...state.content, lastSavedToml: localToml },
+      status: { ...state.status, banner: { kind: "remoteUpdate", source } },
     }));
   },
 
   openError: (error) =>
     set((state) => ({
-      status: { ...state.status, isLoading: false, lastError: error, migration: null },
+      status: { ...state.status, isLoading: false, lastError: error, banner: null },
     })),
 
-  dismissMigration: () =>
-    set((state) => ({ status: { ...state.status, migration: null } })),
+  dismissBanner: () =>
+    set((state) => ({ status: { ...state.status, banner: null } })),
+
+  setPendingRemoteUpdate: (pendingRemoteUpdate) => set({ pendingRemoteUpdate }),
 
   saveStart: () =>
     set((state) => ({
@@ -458,7 +506,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   saveSuccess: (toml) => {
     set((state) => ({
       content: { ...state.content, toml, lastSavedToml: toml, diff: null },
-      status: { ...state.status, isSaving: false, migration: null },
+      status: { ...state.status, isSaving: false, banner: null },
     }));
 
     // Emit catalog-saved event for inter-window communication

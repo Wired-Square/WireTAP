@@ -24,6 +24,8 @@ import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from "./views/LocationsView";
 import DisplayView from "./views/DisplayView";
 import CatalogsView from "./views/CatalogsView";
+import { useCatalogShareDialogs } from "../catalog/components/CatalogShareDialogs";
+import RepositoryDialog from "../../dialogs/catalog-share/RepositoryDialog";
 import DataIOView from "./views/DataIOView";
 import GeneralView from "./views/GeneralView";
 import CapturesView from "./views/CapturesView";
@@ -181,8 +183,6 @@ export default function Settings() {
   );
   const timeRangeCapableProfiles = getTimeRangeCapableProfiles(ioProfiles);
 
-  // Catalogs
-  const catalogs = useSettingsStore((s) => s.catalogs.list);
 
   // Bookmarks
   const bookmarks = useSettingsStore((s) => s.bookmarks);
@@ -226,6 +226,10 @@ export default function Settings() {
 
   // Sidebar collapsed state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Catalogue sharing — this is the settings home for the feature. The
+  // repositories dialog stands alone (the catalogue picker mounts its own).
+  const shareDialogs = useCatalogShareDialogs({ decoderDir });
+  const [repositoriesOpen, setRepositoriesOpen] = useState(false);
 
   // Platform detection for iOS-specific UI hiding
   const [isIOSPlatform, setIsIOSPlatform] = useState(false);
@@ -406,11 +410,15 @@ export default function Settings() {
           {/* Catalogs Section */}
           {currentSection === "catalogs" && (
             <CatalogsView
-              catalogs={catalogs}
               decoderDir={decoderDir}
               onDuplicateCatalog={handlers.handleDuplicateCatalog}
               onEditCatalog={handlers.handleEditCatalog}
               onDeleteCatalog={handlers.handleDeleteCatalog}
+              onOpenRepositories={() => setRepositoriesOpen(true)}
+              onManageAccount={shareDialogs.openAccount}
+              onPublishCatalog={(catalog) => shareDialogs.openPublish(catalog.filename)}
+              onReviewUpdate={shareDialogs.openUpdate}
+              isIOS={isIOSPlatform}
             />
           )}
 
@@ -615,6 +623,13 @@ export default function Settings() {
         onCancel={handlers.handleCancelDeleteDashboardLayout}
         onConfirm={handlers.handleConfirmDeleteDashboardLayout}
       />
+
+      {/* Catalogue sharing over Git */}
+      {shareDialogs.element}
+
+      {repositoriesOpen && (
+        <RepositoryDialog isOpen onClose={() => setRepositoriesOpen(false)} />
+      )}
     </AppLayout>
   );
 }
