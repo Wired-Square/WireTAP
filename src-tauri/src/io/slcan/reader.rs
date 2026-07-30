@@ -730,6 +730,7 @@ pub async fn run_source(
     // Read loop (blocking) — owns the original serial port handle directly
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();
+    let port_name = port_path.clone();
 
     let blocking_handle = tokio::task::spawn_blocking(move || {
         let mut line_buf = String::with_capacity(256);
@@ -779,10 +780,7 @@ pub async fn run_source(
                     // Timeout — continue
                 }
                 Err(e) => {
-                    let _ = tx_clone.blocking_send(SourceMessage::Error(
-                        source_idx,
-                        format!("Read error: {}", e),
-                    ));
+                    serial_utils::send_serial_read_error(&tx_clone, source_idx, &port_name, &e);
                     return;
                 }
             }

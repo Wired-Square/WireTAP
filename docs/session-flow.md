@@ -82,6 +82,15 @@ wrapper over `tokio::net::lookup_host`. New TCP transports must resolve through
 that helper — parsing `"host:port"` straight into a `SocketAddr` accepts only
 numeric IPs and rejects any DNS name with "invalid socket address syntax".
 
+**Device errors.** The serial-family read loops (serial, slcan, gvret_usb) route
+read failures through `IoError` via one
+[`serial::utils::send_serial_read_error`](../src-tauri/src/io/serial/utils.rs)
+helper, which probes port presence (`serialport::available_ports`) to classify
+access-denied as *in use* vs *disconnected* and emits a device-identified,
+actionable message rather than a raw `os error`. Stream errors are shown once,
+centrally, by the `SessionError` handler in `sessionStore.ts` — per-app `onError`
+handlers only log (they must not raise their own dialog, or Sentry double-reports).
+
 ---
 
 ## 2. Source selection

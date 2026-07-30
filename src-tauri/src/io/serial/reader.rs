@@ -121,6 +121,7 @@ pub async fn run_source(
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();
     let serial_port_clone = serial_port.clone();
+    let port_name = port_path.clone();
 
     // Check if we have actual framing (not Raw mode)
     let has_framing = !matches!(framing_encoding, FramingEncoding::Raw);
@@ -274,10 +275,7 @@ pub async fn run_source(
                     // Timeout - continue
                 }
                 Err(e) => {
-                    let _ = tx_clone.blocking_send(SourceMessage::Error(
-                        source_idx,
-                        format!("Read error: {}", e),
-                    ));
+                    super::utils::send_serial_read_error(&tx_clone, source_idx, &port_name, &e);
                     return;
                 }
             }

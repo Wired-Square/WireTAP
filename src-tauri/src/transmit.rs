@@ -334,6 +334,9 @@ fn is_permanent_error(error: &str) -> bool {
         || error_lower.contains("no device")
         || error_lower.contains("permission denied")
         || error_lower.contains("access denied")
+        // Windows renders ERROR_ACCESS_DENIED as "Access is denied." — the "is"
+        // means the "access denied" needle above never matches it.
+        || error_lower.contains("access is denied")
 }
 
 /// Simple transmit - no retry logic.
@@ -733,4 +736,29 @@ pub async fn io_stop_all_group_repeats() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_permanent_error;
+
+    #[test]
+    fn windows_access_denied_is_permanent() {
+        // The exact string serialport surfaces on Windows ERROR_ACCESS_DENIED.
+        assert!(is_permanent_error("Read error: Access is denied. (os error 5)"));
+        assert!(is_permanent_error("Failed to open COM5: Access is denied."));
+    }
+
+    #[test]
+    fn existing_permanent_needles_still_match() {
+        assert!(is_permanent_error("device not found"));
+        assert!(is_permanent_error("Serial port disconnected"));
+        assert!(is_permanent_error("Permission denied"));
+    }
+
+    #[test]
+    fn transient_error_is_not_permanent() {
+        assert!(!is_permanent_error("timed out"));
+        assert!(!is_permanent_error("bus off"));
+    }
 }

@@ -307,8 +307,11 @@ function DiscoveryInner() {
   }, [addSerialBytes, incrementBackendByteCount]);
 
   const handleError = useCallback((error: string) => {
-    showAppError(t("errors.streamTitle"), t("errors.streamMessage"), error);
-  }, [showAppError]);
+    // Stream errors are shown centrally via sessionStore's global IO error dialog
+    // (the SessionError handler), so this only logs — showing one here too would
+    // double-report to Sentry. Matches the Decoder pattern.
+    console.error("Discovery stream error:", error);
+  }, []);
 
   const handleTimeUpdate = useCallback((position: PlaybackPosition) => {
     // Update local store for backward compatibility (components that still read from store)

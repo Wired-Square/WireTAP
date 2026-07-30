@@ -218,6 +218,7 @@ pub async fn run_source(
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();
     let serial_port_clone = serial_port.clone();
+    let port_name = port.clone();
 
     // Spawn blocking task for serial reading
     let blocking_handle = tokio::task::spawn_blocking(move || {
@@ -269,10 +270,9 @@ pub async fn run_source(
                     // Timeout - continue
                 }
                 Err(e) => {
-                    let _ = tx_clone.blocking_send(SourceMessage::Error(
-                        source_idx,
-                        format!("Read error: {}", e),
-                    ));
+                    crate::io::serial::utils::send_serial_read_error(
+                        &tx_clone, source_idx, &port_name, &e,
+                    );
                     return;
                 }
             }

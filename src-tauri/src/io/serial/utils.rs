@@ -5,9 +5,42 @@
 
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, Parity as SpParity, StopBits};
+use tokio::sync::mpsc;
 
 use super::framer::{FrameIdConfig, FramingEncoding};
+use crate::io::error::{DevicePresence, IoError};
+use crate::io::types::SourceMessage;
 use crate::settings::IOProfile;
+
+// ============================================================================
+// Device error reporting (shared by the serial-family read loops)
+// ============================================================================
+
+/// Probe whether a serial port still enumerates on the host, so an access-denied
+/// failure can be told apart as "in use" (still present) vs "disconnected/reset"
+/// (gone).
+fn probe_serial_presence(port_name: &str) -> DevicePresence {
+    match serialport::available_ports() {
+        Ok(ports) if ports.iter().any(|p| p.port_name == port_name) => DevicePresence::Present,
+        Ok(_) => DevicePresence::Absent,
+        Err(_) => DevicePresence::Unknown,
+    }
+}
+
+/// Classify a serial read failure (probing the port's presence to distinguish
+/// "in use" from "disconnected") and send it as a `SourceMessage::Error`. Call
+/// from the terminal error arm of a serial-family blocking read loop — probing
+/// and classifying together is the only correct usage, so it lives in one place.
+pub(crate) fn send_serial_read_error(
+    tx: &mpsc::Sender<SourceMessage>,
+    source_idx: usize,
+    port_name: &str,
+    err: &std::io::Error,
+) {
+    let presence = probe_serial_presence(port_name);
+    let msg = IoError::device_stream_error_message(port_name, err, presence);
+    let _ = tx.blocking_send(SourceMessage::Error(source_idx, msg));
+}
 
 // ============================================================================
 // Types

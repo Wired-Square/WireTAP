@@ -2,6 +2,16 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Serial/CAN device errors showed a raw OS error instead of anything actionable**: a mid-stream read failure surfaced as `Read error: Access is denied. (os error 5)` (Windows `ERROR_ACCESS_DENIED`) with no hint of what to do — the source of the two most common unresolved errors in the field. The serial-family read loops (serial, slcan, gvret_usb) now classify the failure through the `IoError` taxonomy and, by probing whether the port still enumerates, distinguish *in use / no permission* from *disconnected / reset* — producing a device-identified, actionable message (e.g. "COM5 is unavailable — it may be in use by another application (including another WireTAP window)… Close any program using it, then try again. (os error 5)" or "COM5 stopped responding — it may have been unplugged or reset. Reconnect the device, then try again."). The three read loops share one `send_serial_read_error` helper, and `is_permanent_error` now recognises the Windows `"Access is denied."` string (the embedded "is" defeated the old `"access denied"` needle). [src-tauri/src/io/error.rs](src-tauri/src/io/error.rs), [src-tauri/src/io/serial/utils.rs](src-tauri/src/io/serial/utils.rs), [src-tauri/src/io/serial/reader.rs](src-tauri/src/io/serial/reader.rs), [src-tauri/src/io/slcan/reader.rs](src-tauri/src/io/slcan/reader.rs), [src-tauri/src/io/gvret/usb.rs](src-tauri/src/io/gvret/usb.rs), [src-tauri/src/transmit.rs](src-tauri/src/transmit.rs).
+
+### Changed
+
+- **Stream-error dialogs are now shown once, centrally**: the Discovery app was the last source still raising its own "Stream Error" dialog on top of the global one, which double-reported to Sentry (a distinct issue per app) and showed the generic "An error occurred while streaming." The global session-error handler is now the single authority — it shows the backend's actionable device message directly and tags a stable Sentry fingerprint so device-varying messages group as one issue; Discovery's handler is reduced to logging, matching the Decoder/Dashboard/Transmit pattern. [src/stores/sessionStore.ts](src/stores/sessionStore.ts), [src/apps/discovery/Discovery.tsx](src/apps/discovery/Discovery.tsx).
+
 ## [0.9.1] - 2026-07-25
 
 ### Fixed

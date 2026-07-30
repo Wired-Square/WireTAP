@@ -149,7 +149,8 @@ export function isCaptureProfileId(profileId: string | null): boolean {
 let getEventListeners: (() => Record<string, SessionEventSubscribers>) | null = null;
 
 /** Getter for showAppError - set after store is created */
-let getGlobalShowAppError: (() => ((title: string, message: string, details?: string) => void) | null) | null = null;
+// Type derived from the store so it can't drift from showAppError's signature.
+let getGlobalShowAppError: (() => SessionStore["showAppError"] | null) | null = null;
 
 // ============================================================================
 // Types
@@ -417,8 +418,15 @@ export interface SessionStore {
     message: string;
     details: string | null;
   };
-  /** Show the global app error dialog */
-  showAppError: (title: string, message: string, details?: string) => void;
+  /** Show the global app error dialog. `fingerprint` sets a stable Sentry grouping
+   * key so device-identified messages (which vary by port/OS code) still group as
+   * one issue. */
+  showAppError: (
+    title: string,
+    message: string,
+    details?: string,
+    fingerprint?: string
+  ) => void;
   /** Close the global app error dialog */
   closeAppError: () => void;
   /** Set the decoder catalog path for a session (frontend-only, shared across apps) */
@@ -572,7 +580,12 @@ async function setupSessionEventSubscribers(
             if (typeof getGlobalShowAppError === "function") {
               const showAppError = getGlobalShowAppError();
               if (showAppError) {
-                showAppError("Stream Error", "An error occurred while streaming.", error);
+                // The backend now sends an actionable, device-identified message
+                // (e.g. "COM5 stopped responding … reconnect and try again"), so
+                // show it directly rather than a generic sentence. A stable
+                // fingerprint keeps these grouped as one Sentry issue despite the
+                // device name / OS code varying.
+                showAppError("Stream Error", error, undefined, "stream-error");
               }
             }
             updateSession(sessionId, {
@@ -1803,10 +1816,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     ),
 
   // ---- Global App Error Dialog ----
-  showAppError: (title, message, details) => {
+  showAppError: (title, message, details, fingerprint) => {
     Sentry.captureMessage(message, {
       level: "error",
       extra: { title, details },
+      fingerprint: fingerprint ? [fingerprint] : undefined,
     });
     set({
       appErrorDialog: {

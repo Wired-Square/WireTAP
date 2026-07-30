@@ -38,8 +38,6 @@
     "filteredCount_other": "{{count}} filtered"
   },
   "errors": {
-    "streamTitle": "Stream Error",
-    "streamMessage": "An error occurred while streaming CAN data.",
     "scanTitle": "Scan Error",
     "modbusRegisterScanMessage": "An error occurred during Modbus register scan.",
     "modbusUnitScanMessage": "An error occurred during Modbus unit ID scan."
