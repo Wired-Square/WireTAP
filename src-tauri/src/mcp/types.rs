@@ -185,6 +185,21 @@ pub struct OpenSessionParams {
     /// Optional explicit session id; generated (prefixed by data type) if omitted.
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Recorded sources only: RFC3339 lower bound (inclusive). Without one the
+    /// source replays from the start of its archive. Overrides the profile's
+    /// own `start` without modifying the profile.
+    #[serde(default)]
+    pub start_time: Option<String>,
+    /// Recorded sources only: RFC3339 upper bound (exclusive).
+    #[serde(default)]
+    pub end_time: Option<String>,
+    /// Recorded sources only: replay speed multiplier. `0` (the default) means
+    /// as fast as the source allows — pace it to watch a window unfold.
+    #[serde(default)]
+    pub speed: Option<f64>,
+    /// Recorded sources only: stop after this many frames.
+    #[serde(default)]
+    pub limit: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

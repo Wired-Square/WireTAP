@@ -828,14 +828,20 @@ impl WireTapTools {
 #[tool_router(router = session_control_router)]
 impl WireTapTools {
     #[tool(
-        description = "Open (create + start) a session for an IO profile. For Modbus profiles, poll groups are built from the profile's preferred catalog so it polls immediately. Returns the new session_id.",
+        description = "Open (create + start) a session for an IO profile, binding the profile's preferred catalog so the stream decodes (Modbus also gets its poll groups from it). A recorded source replays its whole archive from the head unless bounded — pass start_time/end_time, and speed to pace it. Returns { session_id, state, catalog_path, capabilities }.",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
     )]
     async fn open_session(
         &self,
         Parameters(p): Parameters<OpenSessionParams>,
     ) -> Result<CallToolResult, McpError> {
-        let result = super::session::open(self.app.clone(), p.profile_id, p.session_id)
+        let window = super::session::Window {
+            start: p.start_time,
+            end: p.end_time,
+            speed: p.speed,
+            limit: p.limit,
+        };
+        let result = super::session::open(self.app.clone(), p.profile_id, p.session_id, window)
             .await
             .map_err(err)?;
         ok_json(result)
