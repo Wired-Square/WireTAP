@@ -1,6 +1,6 @@
 [meta]
 name = "SBRXXX"
-version = 8
+version = 10
 
 [meta.can]
 default_byte_order = "little"
@@ -29,6 +29,23 @@ mirror_of = "0x704"
 [frame.can."0x005"]
 length = 8
 mirror_of = "0x705"
+
+[[frame.can."0x005".signals]]
+name = "Status_Battery_End_Stop"
+start_bit = 8
+bit_length = 8
+signed = false
+format = "enum"
+confidence = "high"
+notes = "Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h)."
+
+[frame.can."0x005".signals.enum]
+0 = "Normal"
+1 = "Full"
+2 = "Empty"
+3 = "Suspended"
+16 = "Maintenance"
+17 = "Maintenance, Full"
 
 [frame.can."0x006"]
 length = 8
@@ -239,13 +256,50 @@ notes = "NOBATT"
 [frame.can."0x106"]
 length = 8
 transmitter = "Inverter"
+notes = "Carries the inverter's maintenance-mode command in byte 6, seen bounding five maintenance sessions across 28.7 M samples. No frame on this bus carries the SoC that maintenance discharges towards — the inverter appears to hold that target itself and simply discharge until the reported SoC arrives."
 
 [[frame.can."0x106".signals]]
-name = "106"
+name = "106_Unknown_1"
 start_bit = 0
-bit_length = 64
+bit_length = 16
 signed = false
-format = "hex"
+confidence = "none"
+
+[[frame.can."0x106".signals]]
+name = "106_Unknown_2"
+start_bit = 16
+bit_length = 16
+signed = false
+confidence = "low"
+notes = "Constant 1000 across every sampled maintenance session."
+
+[[frame.can."0x106".signals]]
+name = "106_Maintenance_Param"
+start_bit = 32
+bit_length = 16
+signed = false
+confidence = "low"
+notes = "Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude."
+
+[[frame.can."0x106".signals]]
+name = "Cmd_Maintenance_Mode"
+start_bit = 48
+bit_length = 8
+signed = false
+format = "enum"
+confidence = "high"
+notes = "Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz."
+
+[frame.can."0x106".signals.enum]
+0 = "Off"
+1 = "On"
+
+[[frame.can."0x106".signals]]
+name = "106_Padding"
+start_bit = 56
+bit_length = 8
+signed = false
+confidence = "medium"
 
 [frame.can."0x108"]
 length = 8
@@ -371,7 +425,7 @@ notes = "Confirmed completely static on a real SBR224: 3,539,015 frames over ~41
 [frame.can."0x500"]
 length = 8
 transmitter = "BMS"
-notes = "Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of Bendigo's 3-to-7 module change (Jan vs Jul 2026)."
+notes = "Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of an observed 3-to-7 module change."
 
 [[frame.can."0x500".signals]]
 name = "500_Unknown_0"
@@ -616,11 +670,12 @@ confidence = "high"
 2 = "Run"
 
 [[frame.can."0x705".signals]]
-name = "705_Always_0"
+name = "705_End_Stop"
 start_bit = 8
 bit_length = 8
 signed = false
 confidence = "low"
+notes = "The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror."
 
 [[frame.can."0x705".signals]]
 name = "705_Always_1"
@@ -863,7 +918,7 @@ bit_length = 16
 unit = "W"
 signed = false
 confidence = "high"
-notes = "Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — in July this held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed."
+notes = "Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — it held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed."
 
 [[frame.can."0x70F".mux."0".signals]]
 name = "Info_Battery_Max_Power_2"
@@ -872,7 +927,7 @@ bit_length = 16
 unit = "W"
 signed = false
 confidence = "high"
-notes = "Second copy of the static 1920 W x module_count rating. Invariant across every sampled window (late-Jan, 5-20 Feb and 10-24 Jul 2026) — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701."
+notes = "Second copy of the static 1920 W x module_count rating. Invariant across every sampled window — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701."
 
 [[frame.can."0x70F".mux."1".signals]]
 name = "70F_Mux1_Padding"
@@ -928,7 +983,7 @@ factor = 0.01
 unit = "%"
 signed = false
 confidence = "low"
-notes = "Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three windows (late Jan, Feb, Jul 2026) — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: in July this held constant at 9990 while SoC cycled 25.6 % to 100 %."
+notes = "Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three separate windows — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: it held constant at 9990 while SoC cycled 25.6 % to 100 %."
 
 [[frame.can."0x70F".mux."4".signals]]
 bit_length = 8
