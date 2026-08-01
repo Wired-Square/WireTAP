@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -13,11 +14,16 @@ use tokio_modbus::prelude::*;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo};
-use rmcp::{ErrorData as McpError, ServerHandler, tool, tool_handler, tool_router};
+use rmcp::model::{
+    CacheScope, CallToolResult, ContentBlock, DiscoverResult, Implementation, ListToolsResult,
+    PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, ToolAnnotations,
+};
+use rmcp::service::RequestContext;
+use rmcp::{ErrorData as McpError, RoleServer, ServerHandler, tool, tool_handler, tool_router};
 use serde_json::json;
 
 use super::types::*;
+use super::McpRunningConfig;
 use crate::analysis::QuerySource;
 
 /// Counter for generating unique replay IDs without a clock/RNG.
@@ -29,38 +35,54 @@ const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 #[derive(Clone)]
 pub struct WireTapTools {
     app: tauri::AppHandle,
-    tool_router: ToolRouter<WireTapTools>,
+    tool_router: Arc<ToolRouter<WireTapTools>>,
 }
 
+/// How long a client may treat `tools/list` as fresh. The set only changes when
+/// the permission gates change, which forces an explicit server restart.
+const TOOL_LIST_TTL_MS: u64 = 300_000;
+
+/// Protocol revisions this server implements. Narrower than rmcp's default
+/// (which advertises every version it knows, back to 2024-11-05) — this is the
+/// list `server/discover` publishes and the bound on `initialize` negotiation.
+const SUPPORTED_VERSIONS: &[ProtocolVersion] = &[
+    ProtocolVersion::V_2026_07_28,
+    ProtocolVersion::V_2025_11_25,
+    ProtocolVersion::V_2025_06_18,
+];
+
 impl WireTapTools {
-    pub fn new(
-        app: tauri::AppHandle,
-        allow_control: bool,
-        allow_session_control: bool,
-        allow_catalog_write: bool,
-        allow_catalog_modify: bool,
-        allow_dashboard_write: bool,
-        allow_ui_control: bool,
-    ) -> Self {
-        let mut tool_router = Self::read_router();
-        if allow_control {
-            tool_router = tool_router + Self::control_router();
+    /// Build the tool router for a set of permission gates. Built once when the
+    /// server starts and shared per request: under the stateless 2026-07-28
+    /// transport `StreamableHttpService` runs its service factory on *every*
+    /// request, so assembling seven routers there would be per-call work.
+    pub fn router(cfg: McpRunningConfig) -> ToolRouter<WireTapTools> {
+        let mut router = Self::read_router();
+        // Read-only-ness is a property of *being in* `read_router`, so it is
+        // stamped on here rather than repeated on all 27 tools — where one
+        // omission would silently ship a read tool with no hint. The write
+        // routers annotate per tool, because destructive/idempotent genuinely
+        // differ between them.
+        for route in router.map.values_mut() {
+            route.attr.annotations = Some(ToolAnnotations::new().read_only(true));
         }
-        if allow_session_control {
-            tool_router = tool_router + Self::session_control_router();
+        for extra in [
+            cfg.control.then(Self::control_router),
+            cfg.session_control.then(Self::session_control_router),
+            cfg.catalog_write.then(Self::catalog_write_router),
+            cfg.catalog_modify.then(Self::catalog_modify_router),
+            cfg.dashboard_write.then(Self::dashboard_write_router),
+            cfg.ui_control.then(Self::ui_control_router),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            router += extra;
         }
-        if allow_catalog_write {
-            tool_router = tool_router + Self::catalog_write_router();
-        }
-        if allow_catalog_modify {
-            tool_router = tool_router + Self::catalog_modify_router();
-        }
-        if allow_dashboard_write {
-            tool_router = tool_router + Self::dashboard_write_router();
-        }
-        if allow_ui_control {
-            tool_router = tool_router + Self::ui_control_router();
-        }
+        router
+    }
+
+    pub fn new(app: tauri::AppHandle, tool_router: Arc<ToolRouter<WireTapTools>>) -> Self {
         Self { app, tool_router }
     }
 }
@@ -69,8 +91,24 @@ fn err(message: impl Into<String>) -> McpError {
     McpError::internal_error(message.into(), None)
 }
 
+/// Every tool answers through here. `CallToolResult::structured` emits the value
+/// as `structuredContent` *and* as a serialised text block — the latter is the
+/// backwards-compatibility path the spec asks for, and is what pre-2026-07-28
+/// clients read.
+///
+/// Non-object values are sent as the text block alone. SEP-2106 widened
+/// `structuredContent` to any JSON value for `2026-07-28`, but it was
+/// object-only before that and clients still enforce the old rule — a top-level
+/// array (`list_sessions`, `list_catalogs`, …) is rejected outright as a
+/// malformed result. Nothing is lost by omitting it: the text block carries
+/// every result either way.
 fn ok_json<T: serde::Serialize>(value: T) -> Result<CallToolResult, McpError> {
-    Ok(CallToolResult::success(vec![Content::json(value)?]))
+    let value = serde_json::to_value(value)
+        .map_err(|e| err(format!("Failed to serialise tool result: {e}")))?;
+    if value.is_object() {
+        return Ok(CallToolResult::structured(value));
+    }
+    Ok(CallToolResult::success(vec![ContentBlock::text(value.to_string())]))
 }
 
 /// Convert an optional RFC3339 time bound to capture-timeline microseconds.
@@ -573,7 +611,10 @@ impl WireTapTools {
 
 #[tool_router(router = control_router)]
 impl WireTapTools {
-    #[tool(description = "Transmit a CAN frame through a session. Requires a transmit-capable session.")]
+    #[tool(
+        description = "Transmit a CAN frame through a session. Requires a transmit-capable session.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn transmit_frame(
         &self,
         Parameters(p): Parameters<TransmitFrameParams>,
@@ -604,7 +645,10 @@ impl WireTapTools {
         ok_json(result)
     }
 
-    #[tool(description = "Start a repeating frame transmit through a session at a fixed interval — the same cadence engine that backs the Transmit app's repeat. Returns a queue_id; pass it to repeat_transmit_stop. A frame sent to a serial bus is framed onto that interface, like transmit_frame. interval_ms 250 ≈ 4 Hz.")]
+    #[tool(
+        description = "Start a repeating frame transmit through a session at a fixed interval — the same cadence engine that backs the Transmit app's repeat. Returns a queue_id; pass it to repeat_transmit_stop. A frame sent to a serial bus is framed onto that interface, like transmit_frame. interval_ms 250 ≈ 4 Hz.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn repeat_transmit_start(
         &self,
         Parameters(p): Parameters<RepeatTransmitStartParams>,
@@ -660,7 +704,10 @@ impl WireTapTools {
         ok_json(json!({ "queue_id": queue_id, "interval_ms": p.interval_ms }))
     }
 
-    #[tool(description = "Stop a repeating transmit started by repeat_transmit_start, by its queue_id.")]
+    #[tool(
+        description = "Stop a repeating transmit started by repeat_transmit_start, by its queue_id.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
     async fn repeat_transmit_stop(
         &self,
         Parameters(p): Parameters<RepeatTransmitStopParams>,
@@ -677,7 +724,10 @@ impl WireTapTools {
         ok_json(json!({ "stopped": p.queue_id }))
     }
 
-    #[tool(description = "Replay all CAN frames from a capture through a session with original timing. Returns a replay_id.")]
+    #[tool(
+        description = "Replay all CAN frames from a capture through a session with original timing. Returns a replay_id.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn replay_capture(
         &self,
         Parameters(p): Parameters<ReplayCaptureParams>,
@@ -726,7 +776,10 @@ impl WireTapTools {
         ok_json(json!({ "replay_id": replay_id, "frame_count": count }))
     }
 
-    #[tool(description = "Stop a running replay by its replay_id.")]
+    #[tool(
+        description = "Stop a running replay by its replay_id.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
     async fn stop_replay(
         &self,
         Parameters(p): Parameters<ReplayIdParams>,
@@ -735,7 +788,10 @@ impl WireTapTools {
         ok_json(json!({ "stopped": p.replay_id }))
     }
 
-    #[tool(description = "Live Modbus write to holding registers or coils on a session's configured device. Returns success or the exact device exception. Opens a transient connection — may contend with the running poller.")]
+    #[tool(
+        description = "Live Modbus write to holding registers or coils on a session's configured device. Returns success or the exact device exception. Opens a transient connection — may contend with the running poller.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn modbus_write(
         &self,
         Parameters(p): Parameters<ModbusWriteParams>,
@@ -772,7 +828,10 @@ impl WireTapTools {
 
 #[tool_router(router = session_control_router)]
 impl WireTapTools {
-    #[tool(description = "Open (create + start) a session for an IO profile. For Modbus profiles, poll groups are built from the profile's preferred catalog so it polls immediately. Returns the new session_id.")]
+    #[tool(
+        description = "Open (create + start) a session for an IO profile. For Modbus profiles, poll groups are built from the profile's preferred catalog so it polls immediately. Returns the new session_id.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
+    )]
     async fn open_session(
         &self,
         Parameters(p): Parameters<OpenSessionParams>,
@@ -783,7 +842,10 @@ impl WireTapTools {
         ok_json(result)
     }
 
-    #[tool(description = "Stop (and destroy) a running IO session.")]
+    #[tool(
+        description = "Stop (and destroy) a running IO session.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = true)
+    )]
     async fn stop_session(
         &self,
         Parameters(p): Parameters<SessionIdParams>,
@@ -792,7 +854,10 @@ impl WireTapTools {
         ok_json(state)
     }
 
-    #[tool(description = "Surface an existing session in a source-aware tab so a human can see it. Opens or focuses the given tab (discovery, decoder, transmit, query, or dashboard) and points it at the session, replacing any source it is currently showing.")]
+    #[tool(
+        description = "Surface an existing session in a source-aware tab so a human can see it. Opens or focuses the given tab (discovery, decoder, transmit, query, or dashboard) and points it at the session, replacing any source it is currently showing.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
     async fn attach_source(
         &self,
         Parameters(p): Parameters<AttachSourceParams>,
@@ -816,7 +881,10 @@ impl WireTapTools {
 
 #[tool_router(router = catalog_write_router)]
 impl WireTapTools {
-    #[tool(description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Requires the catalog-write MCP permission.")]
+    #[tool(
+        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Requires the catalog-write MCP permission.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
+    )]
     async fn create_catalog(
         &self,
         Parameters(p): Parameters<CreateCatalogParams>,
@@ -840,7 +908,10 @@ impl WireTapTools {
 
 #[tool_router(router = catalog_modify_router)]
 impl WireTapTools {
-    #[tool(description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Requires the catalog-modify MCP permission.")]
+    #[tool(
+        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Requires the catalog-modify MCP permission.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn update_catalog(
         &self,
         Parameters(p): Parameters<UpdateCatalogParams>,
@@ -893,7 +964,10 @@ fn validate_dashboard_or_reject(content: &str) -> Result<(), McpError> {
 
 #[tool_router(router = dashboard_write_router)]
 impl WireTapTools {
-    #[tool(description = "Create or overwrite a dashboard artifact (*.dashboard.json, schema \"wiretap.dashboard/1\") in the dashboards directory. Validates the JSON shape and that every panel type is a known widget. Any embedded custom-widget code is stored opaque and only ever runs later inside the frontend's sandboxed worker — it is NOT executed here. Requires the dashboard-write MCP permission.")]
+    #[tool(
+        description = "Create or overwrite a dashboard artifact (*.dashboard.json, schema \"wiretap.dashboard/1\") in the dashboards directory. Validates the JSON shape and that every panel type is a known widget. Any embedded custom-widget code is stored opaque and only ever runs later inside the frontend's sandboxed worker — it is NOT executed here. Requires the dashboard-write MCP permission.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
     async fn create_dashboard(
         &self,
         Parameters(p): Parameters<DashboardParams>,
@@ -910,7 +984,10 @@ impl WireTapTools {
 
 #[tool_router(router = ui_control_router)]
 impl WireTapTools {
-    #[tool(description = "Open (or focus) an app/panel in the running WireTAP window, e.g. \"dashboard\", \"discovery\", \"decoder\", \"query\". Pass args like { \"dashboardPath\": \"…\" } to load a dashboard before opening it. Requires an open WireTAP window and the ui-control MCP permission.")]
+    #[tool(
+        description = "Open (or focus) an app/panel in the running WireTAP window, e.g. \"dashboard\", \"discovery\", \"decoder\", \"query\". Pass args like { \"dashboardPath\": \"…\" } to load a dashboard before opening it. Requires an open WireTAP window and the ui-control MCP permission.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
     async fn open_app(
         &self,
         Parameters(p): Parameters<OpenAppParams>,
@@ -925,6 +1002,11 @@ impl ServerHandler for WireTapTools {
         // ServerInfo is #[non_exhaustive]; build from Default and set fields.
         let mut info = ServerInfo::default();
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
+        // Must be set explicitly: the `Implementation::default()` behind
+        // `ServerInfo::default()` reads the *rmcp* crate's build env, so leaving
+        // it alone makes the server introduce itself to clients as "rmcp".
+        info.server_info = Implementation::new("wiretap", env!("CARGO_PKG_VERSION"))
+            .with_title("WireTAP");
         info.instructions = Some(
             "WireTAP runtime introspection and control for CAN-bus reverse \
              engineering and development. Read tools expose live sessions, captures, \
@@ -939,5 +1021,36 @@ impl ServerHandler for WireTapTools {
                 .to_string(),
         );
         info
+    }
+
+    fn supported_protocol_versions(&self) -> std::borrow::Cow<'static, [ProtocolVersion]> {
+        std::borrow::Cow::Borrowed(SUPPORTED_VERSIONS)
+    }
+
+    /// Overridden only to add the freshness hint — `from_server_info` derives
+    /// everything else wanted from `get_info()` (including a private cache
+    /// scope) but leaves `ttlMs` at zero. Nothing it reports can change without
+    /// a server restart, so it is safe to let a client hold onto it.
+    async fn discover(
+        &self,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<DiscoverResult, McpError> {
+        Ok(DiscoverResult::from_server_info(SUPPORTED_VERSIONS.to_vec(), self.get_info())
+            .with_ttl_ms(TOOL_LIST_TTL_MS))
+    }
+
+    /// Hand-written so the result can carry the SEP-2549 cache hints — the
+    /// `#[tool_handler]` macro only generates `list_tools` when the impl doesn't
+    /// already define one. `Private` because the tool set varies with the
+    /// permission gates and the endpoint is bearer-gated, so no shared
+    /// intermediary may cache it.
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListToolsResult, McpError> {
+        Ok(ListToolsResult::with_all_items(self.tool_router.list_all())
+            .with_ttl_ms(TOOL_LIST_TTL_MS)
+            .with_cache_scope(CacheScope::Private))
     }
 }

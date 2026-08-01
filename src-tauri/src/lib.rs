@@ -911,16 +911,7 @@ impl McpStatus {
     fn current(app: &AppHandle) -> Self {
         let restart_pending = settings::load_settings_sync(app)
             .map(|s| {
-                let desired = crate::mcp::McpRunningConfig {
-                    port: s.mcp_server_port,
-                    control: s.mcp_allow_control,
-                    session_control: s.mcp_allow_session_control,
-                    catalog_write: s.mcp_allow_catalog_write,
-                    catalog_modify: s.mcp_allow_catalog_modify,
-                    dashboard_write: s.mcp_allow_dashboard_write,
-                    ui_control: s.mcp_allow_ui_control,
-                    token_set: !s.mcp_server_token.is_empty(),
-                };
+                let desired = crate::mcp::McpRunningConfig::from_settings(&s);
                 crate::mcp::restart_pending(s.mcp_server_enabled, desired, &s.mcp_server_token)
             })
             .unwrap_or(false);
@@ -947,13 +938,7 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
         let s = settings::load_settings_sync(&app)?;
         crate::mcp::start(
             app.clone(),
-            s.mcp_server_port,
-            s.mcp_allow_control,
-            s.mcp_allow_session_control,
-            s.mcp_allow_catalog_write,
-            s.mcp_allow_catalog_modify,
-            s.mcp_allow_dashboard_write,
-            s.mcp_allow_ui_control,
+            crate::mcp::McpRunningConfig::from_settings(&s),
             s.mcp_server_token.clone(),
         )?;
     }
@@ -1103,13 +1088,7 @@ pub fn run() {
                 Ok(s) if s.mcp_server_enabled => {
                     if let Err(e) = mcp::start(
                         app.handle().clone(),
-                        s.mcp_server_port,
-                        s.mcp_allow_control,
-                        s.mcp_allow_session_control,
-                        s.mcp_allow_catalog_write,
-                        s.mcp_allow_catalog_modify,
-                        s.mcp_allow_dashboard_write,
-                        s.mcp_allow_ui_control,
+                        mcp::McpRunningConfig::from_settings(&s),
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);

@@ -70,10 +70,11 @@ reqwest = { version = "0.12", features = ["json"] }
 # frontend @sentry/react SDK. Needs >= 0.42 for structured logs.
 sentry = { version = "0.42", features = ["logs"] }
 rumqttc = "0.24"
-# MCP server — exposes live runtime state to an external Claude client over a
+# MCP server — exposes live runtime state to an external MCP client over a
 # localhost streamable-HTTP transport (opt-in via settings). axum hosts the
 # transport; tokio-util provides the graceful-shutdown token.
-rmcp = { version = "1.7", features = ["server", "macros", "transport-streamable-http-server"] }
+# 3.x implements MCP 2026-07-28 while still answering the 2025-11-25 handshake.
+rmcp = { version = "3.1", features = ["server", "macros", "transport-streamable-http-server"] }
 axum = "0.8"
 schemars = "1"
 tokio-util = "0.7"

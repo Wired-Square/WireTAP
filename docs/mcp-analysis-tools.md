@@ -12,6 +12,39 @@ Implementation: [src-tauri/src/analysis.rs](../src-tauri/src/analysis.rs)
 [src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs), wired as MCP tools in
 [src-tauri/src/mcp/tools.rs](../src-tauri/src/mcp/tools.rs).
 
+## Protocol
+
+The server speaks **MCP `2026-07-28`** (via `rmcp` 3.x) over Streamable HTTP at
+`http://127.0.0.1:<mcp_server_port>/mcp`, default port 8787. It is **dual-era**:
+`supported_protocol_versions()` in
+[src-tauri/src/mcp/tools.rs](../src-tauri/src/mcp/tools.rs) advertises
+`2026-07-28`, `2025-11-25` and `2025-06-18`, so a client that still opens with the
+legacy `initialize` handshake keeps working alongside one that sends stateless
+per-request `_meta`. `server/discover` is answered from `get_info()`.
+
+Consequences worth knowing when reading results:
+
+- **Every tool returns `structuredContent`** as well as the serialised JSON text
+  block — both come from the single `ok_json` helper.
+- **Tools are annotated.** Read tools carry `readOnlyHint`; the permission-gated
+  tools carry `destructiveHint` / `idempotentHint`. Clients use these to decide
+  what to auto-approve.
+- **`tools/list` carries `ttlMs` (5 min) and `cacheScope: private`.** The set only
+  changes when a permission gate does, which forces a server restart.
+- **There are no protocol sessions** under `2026-07-28`, so the Session Manager's
+  MCP connect/disconnect entries come from a 90-second activity window
+  ([src-tauri/src/mcp/mod.rs](../src-tauri/src/mcp/mod.rs)), not a handshake. A
+  legacy client's explicit `DELETE` still disconnects it immediately; everything
+  else — every stateless client, and any legacy client that just exits — is
+  expired by the window. Expect a disconnect entry to lag the client leaving.
+
+Not implemented, deliberately: resources, prompts, sampling, roots, elicitation /
+MRTR, the Tasks extension, `subscriptions/listen`, and OAuth. Auth is a single
+optional bearer token; the transport binds to loopback and validates `Origin`.
+
+Client setup for Claude Code, Claude Desktop, LM Studio and Ollama is in the
+project vault (`Reference/mcp-client-setup.md`).
+
 ## Source addressing
 
 Every analysis tool takes **exactly one** of:

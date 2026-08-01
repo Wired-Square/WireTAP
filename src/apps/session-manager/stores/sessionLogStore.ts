@@ -115,14 +115,20 @@ export const useSessionLogStore = create<SessionLogState>((set) => ({
     };
 
     set((state) => {
-      // Dedupe: skip if we have a recent entry with same sessionId, eventType, and appName (within 100ms)
-      // This handles React StrictMode double-mounting and multiple sources logging the same event
+      // Dedupe: skip if we have a recent entry with same sessionId, eventType,
+      // appName and details (within 100ms). This handles React StrictMode
+      // double-mounting and multiple sources logging the same event.
+      // `details` is part of the key because not every event identifies its
+      // subject through `sessionId` — MCP connect/disconnect carries the client's
+      // id in `details` and always has a null `sessionId`, so without this two
+      // different MCP clients connecting in the same tick collapsed into one.
       const recent = state.entries[state.entries.length - 1];
       if (
         recent &&
         recent.sessionId === newEntry.sessionId &&
         recent.eventType === newEntry.eventType &&
         recent.appName === newEntry.appName &&
+        recent.details === newEntry.details &&
         newEntry.timestamp - recent.timestamp < 100
       ) {
         return state; // Skip duplicate
