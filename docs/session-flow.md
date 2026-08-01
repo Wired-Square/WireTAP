@@ -253,6 +253,37 @@ Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
    playback manually. See [sessionStore.ts:992-999](../src/stores/sessionStore.ts#L992-L999).
 7. Create/update the `Session` entry in the Zustand store and return.
 
+### Headless open — the MCP path
+
+[src-tauri/src/mcp/session.rs](../src-tauri/src/mcp/session.rs) is the Rust-native
+equivalent of the flow above, for `open_session` with no window open. It calls the
+same `create_reader_session`, then does the three things the frontend would have
+done:
+
+- **Starts the source.** `create_reader_session` leaves recorded sources stopped so
+  the frontend can register its frame listener before frames flow (step 5.5 above is
+  the frontend half). Headless there is no listener to race, so `open` starts it
+  itself — only when `Stopped`, since `start_session` is idempotent for `Running`
+  but would restart a `Paused` one, which an explicit `session_id` can reach. If the
+  start fails the session is destroyed rather than left holding the profile open.
+- **Binds the profile's `preferred_catalog`** via `ws::dispatch::attach_catalog`,
+  before the start, so frames decode from the first one. This is what puts a value
+  on `ActiveSessionInfo.catalog_path` — which every session-aware panel mirrors
+  one-way through `useSessionCatalog` — so a session later surfaced by
+  `attach_source` arrives **decoded** in Decoder/Dashboard/Query rather than as a
+  raw stream. A catalogue that fails to parse is logged and skipped; the session
+  still opens.
+- **Passes a time window through.** `start_time` / `end_time` / `speed` / `limit`
+  reach `create_reader_session`'s existing parameters, each overriding the profile's
+  own `connection` value without modifying the profile
+  ([sessions.rs](../src-tauri/src/sessions.rs) — `start_time.or(start_from_profile)`).
+  Without them a recorded source replays its entire archive from the head, which on
+  a long-term store is rarely what an agent wants; `speed` defaults to `0` (as fast
+  as the source allows).
+
+A keepalive task then touches the MCP subscriber every 10 s so the heartbeat
+watchdog doesn't reap a session with no window attached.
+
 ---
 
 ## 4. Rust session lifecycle
