@@ -506,7 +506,7 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
   `send_new_frames` decodes the same batch via `decode_by_id` (applying
   `frame_id_mask`) and pushes a parallel JSON message
-  (`[{ frameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress }]`).
+  (`[{ frameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress, mirror? }]`).
   Each entry carries `bytes` — the raw payload decode ran on — so the Decoder can
   render a hex/ASCII byte row **per mux value** (stored as `rawBytesByMux`); the
   frame-level `rawBytes` from the `FrameData` path is last-writer-wins, so a
@@ -522,9 +522,61 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   would leave them showing "No signals decoded". Raw `FrameData` keeps flowing for
   Discovery/Analysis/raw-hex/Calculator. **Decoder and Graph** both
   consume the decoded stream — there is no longer a TypeScript decode engine.
-  The Decoder keeps its mirror-validation byte-compare on the raw `FrameData`
-  path (it needs the raw bytes + frame timing). Attachments auto-detach on final
-  unsubscribe.
+  Attachments auto-detach on final unsubscribe.
+
+### Mirror validation
+
+`mirror` rides the same 0x14 entry, on mirror frames only —
+`{ sourceFrameId, isValid, timeDeltaMs, mismatchedByteIndices[] }`. Absent means
+"not a mirror"; `isValid: null` means no comparison has run yet.
+
+State is a `wiretap_catalog::mirror::MirrorTracker` per session, held in
+`ws/dispatch.rs` beside `ATTACHED_CATALOGS` and **built at `catalog.attach`,
+dropped at `catalog.detach`** — so a verdict, and the inherited byte set behind
+it, can never outlive the catalogue that produced it. (It used to live in
+`decoderStore` and was never cleared: a latched Mismatch survived catalogue
+reload, session restart, replay and clear-frames until the window was reloaded.)
+`reset_frame_offset` also calls `MirrorTracker::reset` — same moment, same
+meaning: without it the retained samples re-assert a verdict the user just
+cleared, and after a replay rewind the timestamps sit outside the fuzz window
+so it could never be compared away.
+
+The tracker is an `Arc<Mutex<_>>` in the map for the same reason
+`ATTACHED_CATALOGS` holds an `Arc` — the per-batch work happens outside the
+map's lock, so one session's frames never block another's. It reads the
+frame-id mask once at construction, so the streaming path never touches the
+catalogue and cannot be paired with the wrong one.
+
+Three rules the comparison depends on:
+
+- **Only inherited bytes are compared.** A signal the mirror declares at the
+  same `start_bit:bit_length` as its source *overrides* the inherited one
+  (`parse::resolve_mirror_inheritance`) and drops out of the comparison — that
+  is how a catalogue says "this byte is legitimately different here", as
+  `sbrxxx.toml` does for `0x504`'s sign-inverted current and `0x005`'s
+  end-stop flag.
+- **Every delivered frame is observed**, before the filter that skips frames
+  with nothing decoded. A mirror can only be judged if its source is seen too,
+  and the source may carry no signals the view asked for. This replaced a
+  frontend force-include (`sourceIdsForValidation`) that pushed unselected
+  mirror sources through the decode path just to keep the comparison fed.
+- **A mirror with no inherited bytes is not tracked at all.** An inherited mux
+  is copied wholesale and its case signals carry no per-signal inheritance flag,
+  so a mirror of a mux-only frame (`sbrxxx.toml`'s `0x008`/`0x00a`) inherits an
+  empty set. Since an empty mismatch set means "all compared bytes agree", such
+  a frame would otherwise show an unconditional green **Match** for a check that
+  never ran — `MirrorTracker::new` skips it so the badge shows nothing instead.
+
+A comparison runs only when the two samples are within the source frame's
+catalogue interval (else `[meta.can].default_interval`, else 1000 ms) **× 2**;
+outside that the previous verdict stands. Three consecutive failing comparisons
+latch invalid — one differing sample is usually skew on a moving signal.
+
+The offline equivalents (`db_query_mirror_validation`,
+`capture_query_mirror_validation`, and the `apiclient` passthrough) take a
+`compare_byte_indices` argument carrying the same inherited byte set, so the
+Query app agrees with the Decoder's badge. Omitted or empty, they compare the
+whole payload — the right answer for a caller with no catalogue.
 
 Decoding lives entirely in the crate, and so does parsing: the frontend's
 `catalogParser.ts` no longer parses TOML — `loadCatalog` calls `catalog.parse`

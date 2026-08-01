@@ -206,7 +206,7 @@ function DecoderInner() {
   // We store all frames (not just latest per ID) to ensure mux cases aren't lost
   // Note: sessionStore also throttles frame delivery at 10Hz, this provides additional
   // batching for expensive decode/store operations within each callback
-  const pendingFramesRef = useRef<Array<{ frameId: number; bytes: number[]; sourceAddress?: number; timestamp: number }>>([]);
+  const pendingFramesRef = useRef<Array<{ frameId: number; bytes: number[] }>>([]);
   const pendingUnmatchedRef = useRef<Array<{ frameId: number; bytes: number[]; timestamp: number; sourceAddress?: number }>>([]);
   const pendingFilteredRef = useRef<Array<{ frameId: number; bytes: number[]; timestamp: number; sourceAddress?: number; reason: 'too_short' | 'id_filter' }>>([]);
   const pendingTimeRef = useRef<number | null>(null);
@@ -287,17 +287,6 @@ function DecoderInner() {
       ? storeState.canConfig?.frame_id_mask
       : storeState.serialConfig?.frame_id_mask;
 
-    // Build a set of source frame IDs that need to be processed for mirror validation
-    // (sources of selected mirror frames)
-    const mirrorSourceMap = storeState.mirrorSourceMap;
-    const catalogProtocol = storeState.protocol;
-    const sourceIdsForValidation = new Set<number>();
-    for (const [mirrorId, sourceId] of mirrorSourceMap) {
-      if (currentSelectedFrames.has(frameKey(catalogProtocol, mirrorId))) {
-        sourceIdsForValidation.add(sourceId);
-      }
-    }
-
     // Get frame ID extraction config from serialConfig for frontend re-extraction
     // This allows correct frame ID extraction even if catalog was loaded after streaming started
     const frameIdConfig = storeState.serialConfig;
@@ -346,15 +335,15 @@ function DecoderInner() {
       const maskedFrameId = frameIdMask !== undefined ? (frameId & frameIdMask) : frameId;
 
       // Check if frame exists in catalog (using composite key with masked ID)
-      const maskedKey = frameKey(catalogProtocol, maskedFrameId);
+      const maskedKey = frameKey(currentProtocol, maskedFrameId);
       if (catalogFrames.has(maskedKey)) {
-        // Frame exists in catalog - decode if selected (check both raw and masked IDs)
-        // Also process source frames for mirror validation even if not selected
-        const rawKey = frameKey(catalogProtocol, frameId);
-        const isSelected = currentSelectedFrames.has(maskedKey) || currentSelectedFrames.has(rawKey);
-        const isSourceForSelectedMirror = sourceIdsForValidation.has(maskedFrameId);
-        if (isSelected || isSourceForSelectedMirror) {
-          pendingFramesRef.current.push({ frameId, bytes: f.bytes, sourceAddress: f.source_address, timestamp });
+        // Frame exists in catalog - keep its bytes if selected (check both raw
+        // and masked IDs). An unselected mirror *source* no longer has to be
+        // pushed through: the mirror comparison runs in Rust over every frame
+        // the session delivers, not over what this view happens to be showing.
+        const rawKey = frameKey(currentProtocol, frameId);
+        if (currentSelectedFrames.has(maskedKey) || currentSelectedFrames.has(rawKey)) {
+          pendingFramesRef.current.push({ frameId, bytes: f.bytes });
         }
       } else {
         // Frame not in catalog - add to unmatched

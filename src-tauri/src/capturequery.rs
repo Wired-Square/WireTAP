@@ -249,6 +249,9 @@ pub fn capture_query_frame_changes(
 ///
 /// Finds timestamps where a mirror frame's payload doesn't match its source frame
 /// within the given tolerance window (in microseconds).
+/// `compare_byte_indices` restricts the comparison to those payload byte
+/// indices — the mirror's inherited bytes. Omit (or pass empty) to compare
+/// the whole payload.
 #[tauri::command]
 pub fn capture_query_mirror_validation(
     capture_id: String,
@@ -259,9 +262,11 @@ pub fn capture_query_mirror_validation(
     start_time_us: Option<i64>,
     end_time_us: Option<i64>,
     limit: Option<i64>,
+    compare_byte_indices: Option<Vec<u8>>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let query_start = std::time::Instant::now();
     let result_limit = limit.unwrap_or(10000);
+    let compare = crate::dbquery::compare_index_set(compare_byte_indices);
 
     tlog!(
         "[capturequery] mirror_validation: capture_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",
@@ -355,28 +360,24 @@ pub fn capture_query_mirror_validation(
         }
 
         if let Some((source_ts, source_payload)) = best_match {
-            // Compare payloads
-            if mirror_payload != source_payload {
-                let mismatch_indices: Vec<usize> = {
-                    let max_len = mirror_payload.len().max(source_payload.len());
-                    (0..max_len)
-                        .filter(|&i| {
-                            mirror_payload.get(i) != source_payload.get(i)
-                        })
-                        .collect()
-                };
+            let mismatch_indices = crate::dbquery::differing_byte_indices(
+                mirror_payload,
+                source_payload,
+                compare.as_ref(),
+            );
+            if mismatch_indices.is_empty() {
+                continue;
+            }
 
-                results.push(MirrorValidationResult {
-                    mirror_timestamp_us: *mirror_ts,
-                    source_timestamp_us: source_ts,
-                    mirror_payload: mirror_payload.clone(),
-                    source_payload: source_payload.clone(),
-                    mismatch_indices,
-                });
-
-                if results.len() >= result_limit as usize {
-                    break;
-                }
+            results.push(MirrorValidationResult {
+                mirror_timestamp_us: *mirror_ts,
+                source_timestamp_us: source_ts,
+                mirror_payload: mirror_payload.clone(),
+                source_payload: source_payload.clone(),
+                mismatch_indices,
+            });
+            if results.len() >= result_limit as usize {
+                break;
             }
         }
     }

@@ -258,6 +258,23 @@ export interface DecodedHeaderField {
   format: string;
 }
 
+/**
+ * Live `mirror_of` verdict, computed in Rust
+ * (`wiretap_catalog::mirror::MirrorTracker`). Present only on frames the
+ * catalogue declares as mirrors, so an absent field means "not a mirror" rather
+ * than "no verdict yet".
+ */
+export interface DecodedMirrorVerdict {
+  /** Catalogue frame id this mirror is compared against. */
+  sourceFrameId: number;
+  /** true = match, false = mismatch, null = no comparison has run yet. */
+  isValid: boolean | null;
+  /** Gap between the two most recent samples (ms). */
+  timeDeltaMs: number;
+  /** Inherited byte indices that differed at the last comparison. */
+  mismatchedByteIndices: number[];
+}
+
 export interface DecodedFrameMsg {
   frameId: number;
   bus: number;
@@ -271,6 +288,8 @@ export interface DecodedFrameMsg {
   sourceAddress?: number | null;
   /** Raw payload of the frame this decode came from (for per-mux byte rows). */
   bytes?: number[];
+  /** Mirror comparison verdict; absent when this frame is not a mirror. */
+  mirror?: DecodedMirrorVerdict;
 }
 
 const wsJsonDecoder = new TextDecoder();

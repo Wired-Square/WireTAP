@@ -5,7 +5,7 @@
 // Each function mirrors a dbquery command and returns the SAME result struct,
 // so callers (the Query app, MCP tools, analysis) are agnostic to the backend.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::LazyLock;
 
 use serde::de::DeserializeOwned;
@@ -223,6 +223,7 @@ pub async fn mirror_validation(
     end_time: Option<String>,
     limit: Option<u32>,
     query_id: String,
+    compare: Option<BTreeSet<usize>>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let api = resolve(profile)?;
     let body = json!({
@@ -235,7 +236,28 @@ pub async fn mirror_validation(
         "limit": limit,
         "query_id": query_id,
     });
-    post_query(&api, "/query/mirror-validation", body, &query_id).await
+    let mut out: MirrorValidationQueryResult =
+        post_query(&api, "/query/mirror-validation", body, &query_id).await?;
+
+    // The gateway compares whole payloads and has no catalogue, so narrowing to
+    // the mirror's inherited bytes happens here. Note this filters *after* the
+    // remote applied `limit`, so `limit` counts whole-payload differences and
+    // you get the subset of those that also differ on an inherited byte — the
+    // local Postgres path has the same shape, whereas a capture query limits
+    // the filtered rows. `stats` still describes the remote's pre-filter work
+    // apart from `results_count`.
+    if let Some(compare) = compare {
+        out.results.retain_mut(|r| {
+            r.mismatch_indices = crate::dbquery::differing_byte_indices(
+                &r.mirror_payload,
+                &r.source_payload,
+                Some(&compare),
+            );
+            !r.mismatch_indices.is_empty()
+        });
+        out.stats.results_count = out.results.len();
+    }
+    Ok(out)
 }
 
 #[allow(clippy::too_many_arguments)]

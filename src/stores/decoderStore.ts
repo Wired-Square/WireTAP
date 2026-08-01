@@ -12,6 +12,15 @@ import {
 /** Maximum number of unique values to track per header field */
 const MAX_HEADER_FIELD_VALUES = 256;
 
+/** Reset the mutable decode buffers to empty at the configured limits. */
+function resetDecodeBuffers() {
+  const limits = getDecoderLimits();
+  _decoded = new LRUMap(limits.maxDecoded);
+  _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
+  _unmatchedFrames = [];
+  _filteredFrames = [];
+}
+
 /** Read current decoder buffer limits from the settings store. */
 function getDecoderLimits() {
   const { buffers } = useSettingsStore.getState();
@@ -45,11 +54,11 @@ import { saveCatalog } from '../api';
 import { buildFramesToml, type SerialFrameConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
 import type { FrameDetail, SignalDef } from '../types/decoder';
-import type { DecodedFrameMsg } from '../services/wsProtocol';
+import type { DecodedFrameMsg, DecodedMirrorVerdict } from '../services/wsProtocol';
 import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
-import { loadCatalog as loadCatalogFromPath, attachAndResolve, parseCanId, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
+import { loadCatalog as loadCatalogFromPath, attachAndResolve, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
 import { type ModbusPollGroup } from '../api/catalog';
 import { frameKey } from '../utils/frameKey';
 
@@ -117,7 +126,6 @@ export type FrameMetadata = {
 /** CAN config from [frame.can.config] - used for frame ID masking and header field extraction */
 export type CanConfig = {
   default_byte_order?: 'little' | 'big';
-  default_interval?: number;
   /** Mask applied to frame_id before catalog matching (e.g., 0x1FFFFF00 for J1939) */
   frame_id_mask?: number;
   /** Header fields extracted from CAN ID (e.g., source_address, priority, pgn) */
@@ -145,25 +153,14 @@ export type FilteredFrame = {
   reason: 'too_short' | 'id_filter';
 };
 
-/** Mirror validation entry - tracks comparison between mirror and source frames */
-export type MirrorValidationEntry = {
-  sourceFrameId: number;
-  mirrorFrameId: number;
-  lastMirrorBytes: number[];
-  lastMirrorTimestamp: number;
-  lastSourceBytes: number[];
-  lastSourceTimestamp: number;
-  /** true = match, false = mismatch, null = unknown/waiting */
-  isValid: boolean | null;
-  /** Time delta between mirror and source frame arrival (ms) */
-  timeDeltaMs: number;
-  /** Byte indices to compare (inherited signal bytes) */
-  inheritedByteIndices: Set<number>;
-  /** Byte indices that don't match between mirror and source (for per-signal display) */
-  mismatchedByteIndices: Set<number>;
-  /** Consecutive mismatch count for hysteresis (only flip to Mismatch after several bad validations) */
-  consecutiveMismatches: number;
-};
+/**
+ * Mirror validation result for one mirror frame — the wire type verbatim.
+ *
+ * Computed in Rust (`wiretap_catalog::mirror::MirrorTracker`) and delivered on
+ * the DecodedSignals stream: the byte comparison, the fuzz window and the
+ * mismatch latch all live there, so the frontend only stores what it is told.
+ */
+export type MirrorValidationEntry = DecodedMirrorVerdict;
 
 interface DecoderState {
   // Catalog and frames (Map/Set keys are composite frame keys, e.g. "can:256")
@@ -177,12 +174,8 @@ interface DecoderState {
   canConfig: CanConfig | null;
   /** Serial config from [frame.serial.config] - used for frame ID/source address extraction */
   serialConfig: SerialFrameConfig | null;
-  /** Map of mirror frame ID to source frame ID for mirror validation */
-  mirrorSourceMap: Map<number, number>;
-  /** Mirror validation results - keyed by mirror frame ID */
+  /** Mirror validation results from the Rust stream - keyed by mirror frame ID */
   mirrorValidation: Map<number, MirrorValidationEntry>;
-  /** Fuzz window for mirror validation (ms) - frames must arrive within this window to compare */
-  mirrorFuzzWindowMs: number;
 
   // Modbus polling config — populated only when the catalog protocol is 'modbus'.
   // The register data itself flows through the normal decode pipeline (_decoded);
@@ -261,7 +254,7 @@ interface DecoderState {
   // Actions - Decoding
   /** Batch decode multiple frames in a single state update (for high-speed playback) */
   decodeSignalsBatch: (
-    framesToDecode: Array<{ frameId: number; bytes: number[]; sourceAddress?: number; timestamp?: number }>,
+    framesToDecode: Array<{ frameId: number; bytes: number[] }>,
     unmatchedFrames: UnmatchedFrame[],
     filteredFrames: FilteredFrame[]
   ) => void;
@@ -317,9 +310,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   protocol: 'can',
   canConfig: null,
   serialConfig: null,
-  mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
-  mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
   pollGroups: [],
   modbusPollsJson: null,
   modbusConfig: null,
@@ -414,7 +405,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
         canConfig = {
           default_byte_order: catalog.canConfig.default_byte_order,
-          default_interval: catalog.canConfig.default_interval,
           frame_id_mask: catalog.canConfig.frame_id_mask,
           fields,
         };
@@ -473,17 +463,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         newSelected = new Set(Array.from(frameMap.keys()));
       }
 
-      // Build mirror source map for validation
-      const mirrorSourceMap = new Map<number, number>();
-      for (const [id, frame] of catalog.frames) {
-        if (frame.mirrorOf) {
-          const sourceId = parseCanId(frame.mirrorOf);
-          if (sourceId !== null) {
-            mirrorSourceMap.set(id, sourceId);
-          }
-        }
-      }
-
       // Apply Modbus default_word_order to signals that don't have an explicit word_order
       if (catalog.modbusConfig?.default_word_order) {
         const defaultWo = catalog.modbusConfig.default_word_order;
@@ -515,7 +494,10 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         protocol: catalog.protocol,
         canConfig,
         serialConfig,
-        mirrorSourceMap,
+        // Verdicts describe the catalogue that produced them; the Rust tracker
+        // is rebuilt on attach, so drop the old ones rather than let a stale
+        // Match/Mismatch survive the rebind.
+        mirrorValidation: new Map(),
         pollGroups,
         modbusPollsJson,
         modbusConfig: catalog.modbusConfig,
@@ -588,62 +570,35 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   clearFrames: () => {
     // Only clear session/buffer data, NOT the catalog frames
-    const limits = getDecoderLimits();
-    _decoded = new LRUMap(limits.maxDecoded);
-    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
-    _unmatchedFrames = [];
-    _filteredFrames = [];
-    set({
-      seenIds: new Set(),
-      decodedVersion: get().decodedVersion + 1,
-      seenHeaderFieldValues: new Map(),
-      headerFieldFilters: new Map(),
-      streamStartTimeSeconds: null,
-    });
+    get().clearDecoded();
+    set({ seenIds: new Set() });
   },
 
   clearDecoded: () => {
-    const limits = getDecoderLimits();
-    _decoded = new LRUMap(limits.maxDecoded);
-    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
-    _unmatchedFrames = [];
-    _filteredFrames = [];
+    resetDecodeBuffers();
     set({
       decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: new Map(),
       headerFieldFilters: new Map(),
       streamStartTimeSeconds: null,
+      mirrorValidation: new Map(),
     });
   },
 
-  // Store raw frame bytes + run mirror validation. Signal decoding moved to
-  // Rust: decoded values arrive via applyDecodedBatch (the DecodedSignals
-  // stream). This keeps the raw byte view and the mirror-validation byte
-  // compare (which needs the raw bytes + frame timing) on the frame path.
+  // Store raw frame bytes. Everything derived from a payload — signal decode,
+  // header fields, mux selectors and the mirror comparison — is computed in
+  // Rust and arrives via applyDecodedBatch (the DecodedSignals stream); this
+  // keeps only the raw byte view the UI renders alongside it.
   decodeSignalsBatch: (framesToDecode, unmatchedToAdd, filteredToAdd) => {
     if (framesToDecode.length === 0 && unmatchedToAdd.length === 0 && filteredToAdd.length === 0) {
       return;
     }
 
-    const { frames, protocol, canConfig, serialConfig, mirrorSourceMap, mirrorValidation, mirrorFuzzWindowMs } = get();
+    const { frames, protocol, canConfig, serialConfig } = get();
 
     const nextDecoded = _decoded;
-    const nextMirrorValidation = new Map(mirrorValidation);
 
-    // Pre-build reverse mirror map: sourceId → mirrorIds[]
-    const reverseMirrorMap = new Map<number, number[]>();
-    for (const [mirrorId, sourceId] of mirrorSourceMap) {
-      const existing = reverseMirrorMap.get(sourceId);
-      if (existing) {
-        existing.push(mirrorId);
-      } else {
-        reverseMirrorMap.set(sourceId, [mirrorId]);
-      }
-    }
-
-    const now = Date.now() / 1000;
-
-    for (const { frameId, bytes, timestamp } of framesToDecode) {
+    for (const { frameId, bytes } of framesToDecode) {
       // Apply frame_id_mask before catalog lookup (header fields + signal decode
       // now come from the Rust stream).
       let maskedFrameId = frameId;
@@ -653,95 +608,13 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         maskedFrameId = frameId & serialConfig.frame_id_mask;
       }
 
-      const frame = frames.get(frameKey(protocol, maskedFrameId));
-      if (!frame) continue;
+      if (!frames.has(frameKey(protocol, maskedFrameId))) continue;
 
       // Store raw bytes, preserving any decoded values already received.
       const existing = nextDecoded.get(maskedFrameId);
       nextDecoded.set(maskedFrameId, existing
         ? { ...existing, rawBytes: bytes }
         : { signals: [], rawBytes: bytes, headerFields: [], sourceAddress: undefined, muxSelectors: undefined });
-
-      // Mirror validation: compare bytes between mirror and source frames
-      const mirrorSourceId = mirrorSourceMap.get(maskedFrameId);
-      const mirrorsOfThisSource = reverseMirrorMap.get(maskedFrameId) ?? [];
-
-      if (mirrorSourceId !== undefined || mirrorsOfThisSource.length > 0) {
-        const updateValidationEntry = (validationKey: number, sourceFrameId: number, mirrorFrameId: number, isMirrorFrame: boolean) => {
-          const sourceFrame = frames.get(frameKey(protocol, sourceFrameId));
-          const frameInterval = sourceFrame?.interval ?? canConfig?.default_interval ?? mirrorFuzzWindowMs;
-          const effectiveFuzzWindow = frameInterval * 2;
-
-          let entry = nextMirrorValidation.get(validationKey);
-          if (!entry) {
-            const mirrorFrame = frames.get(frameKey(protocol, mirrorFrameId));
-            const inheritedByteIndices = new Set<number>();
-            if (mirrorFrame) {
-              for (const signal of mirrorFrame.signals) {
-                if (signal._inherited && signal.start_bit !== undefined && signal.bit_length !== undefined) {
-                  const startByte = Math.floor(signal.start_bit / 8);
-                  const endByte = Math.floor((signal.start_bit + signal.bit_length - 1) / 8);
-                  for (let i = startByte; i <= endByte; i++) {
-                    inheritedByteIndices.add(i);
-                  }
-                }
-              }
-            }
-            entry = {
-              sourceFrameId, mirrorFrameId,
-              lastMirrorBytes: [], lastMirrorTimestamp: 0,
-              lastSourceBytes: [], lastSourceTimestamp: 0,
-              isValid: null, timeDeltaMs: 0,
-              inheritedByteIndices,
-              mismatchedByteIndices: new Set(),
-              consecutiveMismatches: 0,
-            };
-          }
-
-          const validationTimestamp = timestamp ?? now;
-          if (isMirrorFrame) {
-            entry.lastMirrorBytes = [...bytes];
-            entry.lastMirrorTimestamp = validationTimestamp;
-          } else {
-            entry.lastSourceBytes = [...bytes];
-            entry.lastSourceTimestamp = validationTimestamp;
-          }
-
-          const timeDelta = Math.abs(entry.lastMirrorTimestamp - entry.lastSourceTimestamp) * 1000;
-          entry.timeDeltaMs = timeDelta;
-
-          if (entry.lastMirrorBytes.length > 0 && entry.lastSourceBytes.length > 0) {
-            if (timeDelta <= effectiveFuzzWindow) {
-              const mismatched = new Set<number>();
-              for (const idx of entry.inheritedByteIndices) {
-                if (entry.lastMirrorBytes[idx] !== entry.lastSourceBytes[idx]) {
-                  mismatched.add(idx);
-                }
-              }
-              entry.mismatchedByteIndices = mismatched;
-
-              if (mismatched.size === 0) {
-                entry.consecutiveMismatches = 0;
-                entry.isValid = true;
-              } else {
-                entry.consecutiveMismatches++;
-                if (entry.consecutiveMismatches >= 3) {
-                  entry.isValid = false;
-                }
-              }
-            }
-          }
-
-          nextMirrorValidation.set(validationKey, entry);
-        };
-
-        if (mirrorSourceId !== undefined) {
-          updateValidationEntry(maskedFrameId, mirrorSourceId, maskedFrameId, true);
-        }
-        for (const mirrorId of mirrorsOfThisSource) {
-          updateValidationEntry(mirrorId, maskedFrameId, mirrorId, false);
-        }
-      }
     }
 
     // Add unmatched frames in place (with limit)
@@ -761,10 +634,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }
     }
 
-    set({
-      decodedVersion: get().decodedVersion + 1,
-      mirrorValidation: nextMirrorValidation,
-    });
+    set({ decodedVersion: get().decodedVersion + 1 });
   },
 
   // Apply decoded signals from the Rust DecodedSignals stream — signals (merged
@@ -774,10 +644,11 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   applyDecodedBatch: (decoded: DecodedFrameMsg[]) => {
     if (decoded.length === 0) return;
 
-    const { protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds } = get();
+    const { protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorValidation } = get();
     const nextDecoded = _decoded;
     const nextDecodedPerSource = _decodedPerSource;
     const nextSeenValues = new Map(seenHeaderFieldValues);
+    const nextMirrorValidation = new Map(mirrorValidation);
     let newStreamStartTime = streamStartTimeSeconds;
     const now = Date.now() / 1000;
     if (newStreamStartTime === null) newStreamStartTime = now;
@@ -792,6 +663,10 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       } else if (protocol === 'serial' && serialConfig?.frame_id_mask !== undefined) {
         maskedFrameId = msg.frameId & serialConfig.frame_id_mask;
       }
+
+      // Mirror verdicts are computed in Rust and only ride frames the catalogue
+      // declares as mirrors.
+      if (msg.mirror) nextMirrorValidation.set(maskedFrameId, msg.mirror);
 
       const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({
         name: h.name,
@@ -871,6 +746,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: nextSeenValues,
       streamStartTimeSeconds: newStreamStartTime,
+      mirrorValidation: nextMirrorValidation,
     });
   },
 
@@ -903,12 +779,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   },
 
   setIoProfile: (profile) => {
-    const limits = getDecoderLimits();
-    _decoded = new LRUMap(limits.maxDecoded);
-    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
-    _unmatchedFrames = [];
-    _filteredFrames = [];
-    set({ ioProfile: profile, decodedVersion: get().decodedVersion + 1 });
+    resetDecodeBuffers();
+    set({ ioProfile: profile, decodedVersion: get().decodedVersion + 1, mirrorValidation: new Map() });
   },
 
   toggleShowRawBytes: () => set((state) => ({ showRawBytes: !state.showRawBytes })),

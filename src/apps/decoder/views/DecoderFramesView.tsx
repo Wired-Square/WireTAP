@@ -30,27 +30,7 @@ import { bytesToHex, byteToHex, byteToAscii, bytesToAscii } from "../../../utils
 import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
-
-/**
- * Get the byte indices that a signal covers based on start_bit and bit_length.
- * Returns a Set of byte indices (0-indexed).
- */
-function getSignalByteIndices(signal: SignalDef): Set<number> {
-  const indices = new Set<number>();
-  const startBit = signal.start_bit ?? 0;
-  const bitLength = signal.bit_length ?? 8;
-
-  // Calculate which bytes this signal spans
-  const startByte = Math.floor(startBit / 8);
-  const endBit = startBit + bitLength - 1;
-  const endByte = Math.floor(endBit / 8);
-
-  for (let i = startByte; i <= endByte; i++) {
-    indices.add(i);
-  }
-
-  return indices;
-}
+import { signalByteIndices } from "../../../utils/mirrorBytes";
 
 type Props = {
   frames: FrameDetail[];
@@ -479,7 +459,7 @@ function FrameCard({
   // Check if any of a signal's bytes are currently bright
   const signalHasBrightBytes = (signal: SignalDef): boolean => {
     if (brightByteIndices.size === 0) return false;
-    const signalBytes = getSignalByteIndices(signal);
+    const signalBytes = signalByteIndices(signal);
     for (const byteIdx of signalBytes) {
       if (brightByteIndices.has(byteIdx)) {
         return true;
@@ -507,7 +487,7 @@ function FrameCard({
   // If multiple signals cover a byte, use the first one found (priority based on definition order)
   const byteColourMap = new Map<number, string | undefined>();
   for (const signal of allSignals) {
-    const byteIndices = getSignalByteIndices(signal);
+    const byteIndices = signalByteIndices(signal);
     const colour = colourForConfidence(signal.confidence);
     for (const idx of byteIndices) {
       if (!byteColourMap.has(idx)) {
@@ -732,9 +712,9 @@ function FrameCard({
             // If frame shows Match, all signals show as matching (green checkmark)
             if (mirrorValidation.isValid === true) return false;
             // Frame shows Mismatch - check which specific signals have mismatched bytes
-            const signalBytes = getSignalByteIndices(signal);
+            const signalBytes = signalByteIndices(signal);
             for (const byteIdx of signalBytes) {
-              if (mirrorValidation.mismatchedByteIndices.has(byteIdx)) {
+              if (mirrorValidation.mismatchedByteIndices.includes(byteIdx)) {
                 return true; // Has mismatch
               }
             }

@@ -68,6 +68,10 @@ export async function queryFrameChangesCapture(
  * Query for mirror validation mismatches within a capture.
  *
  * Tolerance is in microseconds (frontend converts from ms).
+ *
+ * `compareByteIndices` restricts the comparison to the mirror's inherited bytes
+ * so the result agrees with the Decoder's live Match/Mismatch badge; omit it to
+ * compare the whole payload.
  */
 export async function queryMirrorValidationCapture(
   captureId: string,
@@ -78,6 +82,7 @@ export async function queryMirrorValidationCapture(
   startTimeUs?: number,
   endTimeUs?: number,
   limit?: number,
+  compareByteIndices?: number[],
 ): Promise<MirrorValidationQueryResult> {
   return invoke("capture_query_mirror_validation", {
     captureId: captureId,
@@ -88,6 +93,7 @@ export async function queryMirrorValidationCapture(
     startTimeUs,
     endTimeUs,
     limit,
+    compareByteIndices,
   });
 }
 

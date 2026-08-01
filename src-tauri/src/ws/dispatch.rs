@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -29,18 +29,53 @@ static ATTACHED_CATALOGS: Lazy<
     RwLock<HashMap<String, (Option<String>, Arc<wiretap_catalog::Catalog>)>>,
 > = Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Live `mirror_of` comparison state, one tracker per session. Built from the
+/// catalogue at attach and dropped at detach, so a verdict — and the inherited
+/// byte set behind it — can never outlive the catalogue that produced it.
+/// Sessions whose catalogue declares no comparable mirrors get no entry.
+///
+/// `Arc<Mutex<_>>` for the same reason `ATTACHED_CATALOGS` holds an `Arc`: the
+/// per-batch work happens outside the map's lock, so one session's frame batch
+/// never blocks another's.
+type SharedMirrorTracker = Arc<Mutex<wiretap_catalog::MirrorTracker>>;
+static MIRROR_TRACKERS: Lazy<RwLock<HashMap<String, SharedMirrorTracker>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
 /// Attach a parsed catalogue to a session, enabling the decoded stream. `path` is
 /// the source file path when known — the authoritative decoder path for the session.
 pub fn attach_catalog(session_id: &str, path: Option<String>, catalog: wiretap_catalog::Catalog) {
+    let tracker = wiretap_catalog::MirrorTracker::new(&catalog);
+    // Catalogue first, then tracker: a batch landing between the two writes
+    // should see the old pair, not a new tracker judging against the old
+    // catalogue.
     if let Ok(mut m) = ATTACHED_CATALOGS.write() {
         m.insert(session_id.to_string(), (path, Arc::new(catalog)));
     }
+    if let Ok(mut m) = MIRROR_TRACKERS.write() {
+        // Replace wholesale: re-attaching is how the decoder rebinds a changed
+        // catalogue, and the old verdicts describe a catalogue that is gone.
+        if tracker.is_empty() {
+            m.remove(session_id);
+        } else {
+            m.insert(session_id.to_string(), Arc::new(Mutex::new(tracker)));
+        }
+    }
+}
+
+fn mirror_tracker(session_id: &str) -> Option<SharedMirrorTracker> {
+    MIRROR_TRACKERS
+        .read()
+        .ok()
+        .and_then(|m| m.get(session_id).cloned())
 }
 
 /// Detach a session's catalogue (decoded stream stops). Called explicitly and
 /// on final unsubscribe.
 pub fn detach_catalog(session_id: &str) {
     if let Ok(mut m) = ATTACHED_CATALOGS.write() {
+        m.remove(session_id);
+    }
+    if let Ok(mut m) = MIRROR_TRACKERS.write() {
         m.remove(session_id);
     }
 }
@@ -61,10 +96,58 @@ pub fn attached_catalog_path(session_id: &str) -> Option<String> {
         .and_then(|m| m.get(session_id).and_then(|(path, _)| path.clone()))
 }
 
+/// Result of running a frame batch through the session's mirror tracker: the
+/// batch-final verdict per mirror, keyed by **masked** frame id and pre-encoded
+/// so a mirror seen many times in the batch is serialised once.
+struct MirrorVerdicts {
+    tracker: SharedMirrorTracker,
+    by_masked_id: HashMap<u32, serde_json::Value>,
+}
+
+impl MirrorVerdicts {
+    fn get(&self, raw_frame_id: u32) -> Option<&serde_json::Value> {
+        if self.by_masked_id.is_empty() {
+            return None;
+        }
+        let masked = self.tracker.lock().ok()?.mask_id(raw_frame_id);
+        self.by_masked_id.get(&masked)
+    }
+}
+
+/// Run a frame batch through the session's mirror tracker and collect the
+/// resulting verdicts.
+///
+/// Every frame is observed, including the ones [`encode_decoded_batch`] goes on
+/// to skip: a mirror can only be judged when its source is seen too, and the
+/// source may carry no signals the UI has asked for. Reading the verdicts back
+/// costs one entry per mirror, not one per frame.
+fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVerdicts> {
+    let shared = mirror_tracker(session_id)?;
+    let by_masked_id = {
+        let mut tracker = shared.lock().ok()?;
+        for f in frames {
+            let seconds = f.timestamp_us as f64 / 1_000_000.0;
+            tracker.observe(f.frame_id, &f.bytes, seconds);
+        }
+        tracker
+            .verdicts()
+            .filter_map(|(id, v)| Some((id, serde_json::to_value(v).ok()?)))
+            .collect()
+    };
+    Some(MirrorVerdicts {
+        tracker: shared,
+        by_masked_id,
+    })
+}
+
 /// Decode a frame batch against `catalog` into the `DecodedSignals` JSON
 /// payload (one entry per frame that has a matching catalogue frame). Returns
 /// an empty vec when nothing decoded, so the caller can skip the send.
-fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Catalog) -> Vec<u8> {
+fn encode_decoded_batch(
+    frames: &[FrameMessage],
+    catalog: &wiretap_catalog::Catalog,
+    verdicts: Option<&MirrorVerdicts>,
+) -> Vec<u8> {
     let mut out: Vec<serde_json::Value> = Vec::new();
     for f in frames {
         // decode_by_id applies frame_id_mask, looks up the frame, decodes
@@ -119,7 +202,7 @@ fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Cata
                 })
             })
             .collect();
-        out.push(serde_json::json!({
+        let mut entry = serde_json::json!({
             "frameId": f.frame_id,
             "bus": f.bus,
             "t": f.timestamp_us,
@@ -131,7 +214,13 @@ fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Cata
             // hex/ASCII byte row per mux group (each mux occurrence has its own
             // payload; a single per-frame rawBytes would be last-writer-wins).
             "bytes": f.bytes,
-        }));
+        });
+        // Only mirrors carry this key, so the frontend can treat its absence as
+        // "not a mirror" rather than "no verdict yet".
+        if let Some(verdict) = verdicts.and_then(|v| v.get(f.frame_id)) {
+            entry["mirror"] = verdict.clone();
+        }
+        out.push(entry);
     }
     if out.is_empty() {
         return Vec::new();
@@ -185,7 +274,8 @@ pub fn send_new_frames(session_id: &str) {
     // If a catalogue is attached, decode the same batch once (in Rust) and push
     // it as a parallel DecodedSignals message — the frontend stops re-decoding.
     if let Some(catalog) = attached_catalog(session_id) {
-        let decoded = encode_decoded_batch(&frames, &catalog);
+        let verdicts = mirror_verdicts(session_id, &frames);
+        let decoded = encode_decoded_batch(&frames, &catalog, verdicts.as_ref());
         if !decoded.is_empty() {
             let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
             server.send_to_channel(channel, dmsg);
@@ -215,6 +305,16 @@ pub fn reset_frame_offset(session_id: &str) {
 
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {
         offsets.insert(session_id.to_string(), count);
+    }
+
+    // Same moment, same meaning — start from here. Without this the tracker
+    // keeps its pre-clear samples and latch, so the next batch re-asserts the
+    // verdict the user just cleared (and on a replay restart, timestamps jump
+    // backwards past the fuzz window and it can never be re-compared away).
+    if let Some(tracker) = mirror_tracker(session_id) {
+        if let Ok(mut tracker) = tracker.lock() {
+            tracker.reset();
+        }
     }
 }
 
@@ -250,7 +350,8 @@ pub fn redecode_delivered(session_id: &str) {
 
     let (frames, _indices, _total) =
         crate::capture_store::get_capture_frames_paginated(&capture_id, 0, offset);
-    let decoded = encode_decoded_batch(&frames, &catalog);
+    let verdicts = mirror_verdicts(session_id, &frames);
+    let decoded = encode_decoded_batch(&frames, &catalog, verdicts.as_ref());
     if !decoded.is_empty() {
         let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
         server.send_to_channel(channel, dmsg);

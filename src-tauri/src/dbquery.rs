@@ -4,7 +4,7 @@
 // against PostgreSQL data sources to find historical patterns and changes.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
 use tauri::AppHandle;
 use tokio::sync::Mutex;
@@ -157,6 +157,32 @@ pub struct MirrorValidationResult {
 pub struct MirrorValidationQueryResult {
     pub results: Vec<MirrorValidationResult>,
     pub stats: QueryStats,
+}
+
+/// Byte indices where two payloads differ, restricted to `compare` when the
+/// caller supplied one. A payload shorter than the other is read as zero-padded.
+///
+/// `None` compares the whole payload — what a frame-to-frame change query wants,
+/// and the only sensible answer for a mirror query with no catalogue to consult.
+/// When a set *is* given it must be the mirror frame's inherited bytes
+/// (`wiretap_catalog::mirror::inherited_byte_indices`), which is what the live
+/// Decoder compares: a byte covered by a signal the mirror declares itself is
+/// deliberately different data, not a fault, and reporting it here would
+/// contradict the badge in the Decoder.
+pub fn differing_byte_indices(a: &[u8], b: &[u8], compare: Option<&BTreeSet<usize>>) -> Vec<usize> {
+    (0..a.len().max(b.len()))
+        .filter(|i| compare.is_none_or(|set| set.contains(i)))
+        .filter(|&i| a.get(i).copied().unwrap_or(0) != b.get(i).copied().unwrap_or(0))
+        .collect()
+}
+
+/// Normalise the frontend's `compare_byte_indices` argument into a lookup set.
+/// An empty list is treated as "no restriction", so a caller that has no
+/// catalogue loaded behaves exactly as before.
+pub fn compare_index_set(indices: Option<Vec<u8>>) -> Option<BTreeSet<usize>> {
+    indices
+        .filter(|v| !v.is_empty())
+        .map(|v| v.into_iter().map(usize::from).collect())
 }
 
 /// Statistics for a single byte position within a mux case
@@ -1001,17 +1027,7 @@ pub async fn db_query_frame_changes(
         let prev_data: Vec<u8> = row.get("prev_data");
         let data_bytes: Vec<u8> = row.get("data_bytes");
 
-        // Find changed indices
-        let mut changed_indices = Vec::new();
-        let max_len = prev_data.len().max(data_bytes.len());
-
-        for i in 0..max_len {
-            let prev_byte = prev_data.get(i).copied().unwrap_or(0);
-            let curr_byte = data_bytes.get(i).copied().unwrap_or(0);
-            if prev_byte != curr_byte {
-                changed_indices.push(i);
-            }
-        }
+        let changed_indices = differing_byte_indices(&prev_data, &data_bytes, None);
 
         results.push(FrameChangeResult {
             timestamp_us: timestamp_us as i64,
@@ -1042,6 +1058,9 @@ pub async fn db_query_frame_changes(
 /// Compares payloads between mirror and source frames at matching timestamps
 /// (within tolerance). Returns timestamps where payloads differ.
 /// If `is_extended` is None, queries both standard and extended frames.
+/// `compare_byte_indices` restricts the comparison to those payload byte
+/// indices — the mirror's inherited bytes. Omit (or pass empty) to compare
+/// the whole payload.
 #[tauri::command]
 pub async fn db_query_mirror_validation(
     app: AppHandle,
@@ -1054,8 +1073,10 @@ pub async fn db_query_mirror_validation(
     end_time: Option<String>,
     limit: Option<u32>,
     query_id: Option<String>,
+    compare_byte_indices: Option<Vec<u8>>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let query_start = std::time::Instant::now();
+    let compare = compare_index_set(compare_byte_indices);
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("mirror_validation_{}", query_start.elapsed().as_nanos()));
 
@@ -1072,7 +1093,7 @@ pub async fn db_query_mirror_validation(
         profile.id, profile.kind, profile.name);
 
     if profile.kind == "wiretap" {
-        return crate::apiclient::mirror_validation(&profile, mirror_frame_id, source_frame_id, is_extended, tolerance_ms, start_time, end_time, limit, query_id).await;
+        return crate::apiclient::mirror_validation(&profile, mirror_frame_id, source_frame_id, is_extended, tolerance_ms, start_time, end_time, limit, query_id, compare).await;
     }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
@@ -1215,15 +1236,13 @@ pub async fn db_query_mirror_validation(
         let mirror_payload: Vec<u8> = row.get("mirror_payload");
         let source_payload: Vec<u8> = row.get("source_payload");
 
-        // Compute mismatch indices
-        let mut mismatch_indices = Vec::new();
-        let max_len = mirror_payload.len().max(source_payload.len());
-        for i in 0..max_len {
-            let mirror_byte = mirror_payload.get(i).copied().unwrap_or(0);
-            let source_byte = source_payload.get(i).copied().unwrap_or(0);
-            if mirror_byte != source_byte {
-                mismatch_indices.push(i);
-            }
+        // The SQL only knows the payloads differ somewhere; restricting to the
+        // inherited bytes can leave nothing, in which case this row is not a
+        // mismatch at all.
+        let mismatch_indices =
+            differing_byte_indices(&mirror_payload, &source_payload, compare.as_ref());
+        if mismatch_indices.is_empty() {
+            continue;
         }
 
         results.push(MirrorValidationResult {
