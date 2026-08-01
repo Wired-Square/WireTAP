@@ -443,7 +443,7 @@ fn rebuild_and_watch(app: &AppHandle) -> Vec<CatalogFile> {
 }
 
 /// Warm the cache and start watching the decoder directory. Call once during
-/// app setup, after example decoders are installed.
+/// app setup, after settings have resolved.
 pub fn start_catalog_cache(app: &AppHandle) {
     let list = rebuild_and_watch(app);
     tlog!("[catalog] Cache warmed: {} decoder(s)", list.len());

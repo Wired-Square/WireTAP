@@ -1098,10 +1098,9 @@ pub fn run() {
                 Err(e) => tlog!("[mcp] Could not load settings to start server: {}", e),
             }
 
-            // Seed bundled example decoders synchronously, before the webview loads.
-            // The frontend's first list_catalogs() must read a populated decoder
-            // directory, otherwise it silently shows an empty catalog list (the copy
-            // used to race the read as a fire-and-forget task).
+            // Resolve settings synchronously, before the catalogue cache warms below —
+            // the cache scans decoder_dir, so that directory has to exist and be known
+            // by then.
             //
             // load_settings (not load_settings_sync) is required: on first run it
             // resolves decoder_dir via with_defaults(), creates the directory, and
@@ -1109,24 +1108,20 @@ pub fn run() {
             // plain synchronous file IO, so block_on does no real async work.
             match tauri::async_runtime::block_on(settings::load_settings(app.handle().clone())) {
                 Ok(app_settings) => {
-                    if let Err(e) = settings::install_example_decoders(app.handle(), &app_settings.decoder_dir) {
-                        tlog!("[setup] Failed to install example decoders: {}", e);
-                    }
-
                     // Drain pre-rebrand keyring entries into the current namespace.
                     // Deliberately off this blocking path: keyring access is OS IPC
                     // (and can prompt), while nothing needs it before first paint —
                     // get_credential migrates any secret on its way to being used.
-                    let profiles = app_settings.io_profiles.clone();
+                    let profiles = app_settings.io_profiles;
                     tauri::async_runtime::spawn_blocking(move || {
                         credentials::migrate_legacy_io_profile_credentials(&profiles);
                     });
                 }
-                Err(e) => tlog!("[setup] Failed to load settings for example decoder installation: {}", e),
+                Err(e) => tlog!("[setup] Failed to load settings during startup: {}", e),
             }
 
             // Warm the backend-owned catalogue cache (and start watching the
-            // decoder dir) now that the directory is populated, so the frontend's
+            // decoder dir) now that settings have resolved, so the frontend's
             // first list_catalogs() is served from memory instead of racing a scan.
             app.manage(catalog::CatalogCache::default());
             catalog::start_catalog_cache(app.handle());

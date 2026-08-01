@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 
 import { tomlParse } from "../apps/catalog/toml";
 
-// Use the example decoder from src-tauri as the test fixture (single source of truth)
-const fixturePath = resolve(__dirname, "../../src-tauri/examples/sbrxxx.toml");
+// Retained catalogue sample, kept purely as a parser fixture — nothing ships it
+const fixturePath = resolve(__dirname, "fixtures/sbrxxx.toml");
 
 describe("sbrxxx.toml", () => {
   it("parses without throwing", () => {

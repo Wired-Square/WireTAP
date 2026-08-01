@@ -261,26 +261,34 @@ format = "hex"
 [frame.can."0x109"]
 length = 8
 transmitter = "Inverter"
+notes = "Inverter telemetry broadcast. Byte 0 is a constant 0xAA marker, bytes 1-2 a 16-bit LE power value, bytes 3-7 always zero."
 
 [[frame.can."0x109".signals]]
-name = "109_Unknown_1"
+name = "109_Marker"
 start_bit = 0
 bit_length = 8
 signed = false
 format = "hex"
+confidence = "high"
+notes = "Constant 0xAA in every sample. Frame marker / protocol tag, not data."
 
 [[frame.can."0x109".signals]]
-name = "109_Unknown_2"
+name = "Status_PV_Power"
 start_bit = 8
 bit_length = 16
+unit = "W"
 signed = false
+confidence = "high"
+notes = "The inverter's total DC (PV) input — matches the \"Total DC power\" it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive."
 
 [[frame.can."0x109".signals]]
-name = "109_Unknown_3"
+name = "109_Padding"
 start_bit = 24
 bit_length = 40
 signed = false
 format = "hex"
+confidence = "high"
+notes = "Always zero across every sampled window."
 
 [frame.can."0x191"]
 length = 8
@@ -363,6 +371,7 @@ notes = "Confirmed completely static on a real SBR224: 3,539,015 frames over ~41
 [frame.can."0x500"]
 length = 8
 transmitter = "BMS"
+notes = "Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of Bendigo's 3-to-7 module change (Jan vs Jul 2026)."
 
 [[frame.can."0x500".signals]]
 name = "500_Unknown_0"

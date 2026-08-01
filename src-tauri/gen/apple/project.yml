@@ -32,9 +32,6 @@ targets:
       - path: Assets.xcassets
       - path: Externals
       - path: wiretap_iOS
-      - path: assets
-        buildPhase: resources
-        type: folder
       - path: LaunchScreen.storyboard
     info:
       path: wiretap_iOS/Info.plist

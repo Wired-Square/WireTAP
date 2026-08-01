@@ -21,7 +21,6 @@
 		CEA968D0EDEF82EA8294C0D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3516036D1D2770E3E90CC676 /* Assets.xcassets */; };
 		DF2C33F4F6EE91F09044004B /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = 11BF096B354744CBA1A0CEC3 /* libapp.a */; };
 		F6C055E4660A0F338AAF836A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 275CF7D7FF08AB4C3B36055A /* WebKit.framework */; };
-		F9FC3FE0FF8B17E43F078CCD /* assets in Resources */ = {isa = PBXBuildFile; fileRef = AA98AA9223B26C6C438521AB /* assets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,7 +79,6 @@
 		E2B3C4D5F6071829A3B4C5D6 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		A54A6D0D692CC0B59C4636DF /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
 		A553AE357AD3BBC16C55655B /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		AA98AA9223B26C6C438521AB /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		AAE962706392E588D4780B12 /* reader.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = reader.rs; sourceTree = "<group>"; };
 		ABB1950749A36AC3DFA897FA /* checksums.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = checksums.rs; sourceTree = "<group>"; };
 		AD56A1AC30E8A348CB8F0B32 /* framing.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = framing.rs; sourceTree = "<group>"; };
@@ -264,7 +262,6 @@
 		85656E58F685FD3C2EA3DE95 = {
 			isa = PBXGroup;
 			children = (
-				AA98AA9223B26C6C438521AB /* assets */,
 				3516036D1D2770E3E90CC676 /* Assets.xcassets */,
 				940AFB78671A52B07487E822 /* LaunchScreen.storyboard */,
 				112DD6F7428EA979DC42306A /* Externals */,
@@ -434,7 +431,6 @@
 			files = (
 				CEA968D0EDEF82EA8294C0D5 /* Assets.xcassets in Resources */,
 				5713C5528D0195F036E87B86 /* LaunchScreen.storyboard in Resources */,
-				F9FC3FE0FF8B17E43F078CCD /* assets in Resources */,
 				DF2C33F4F6EE91F09044004B /* libapp.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

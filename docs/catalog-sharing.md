@@ -3,7 +3,7 @@
 How WireTAP pulls decoder catalogues from a repository someone shared, and pushes
 yours back. This is the canonical reference for `src-tauri/src/catalog_share/`.
 
-For how catalogues are seeded, cached and watched locally, see
+For how catalogues are loaded, cached and watched locally, see
 [catalog-and-decoder-loading in the docs vault] — the local cache
 (`CatalogCache`, the `notify` watcher, the `CatalogListChanged` WS push) is
 described alongside `src-tauri/src/catalog.rs`.

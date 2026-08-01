@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager, path::BaseDirectory};
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IOProfile {
@@ -661,88 +661,6 @@ fn initialize_directories(settings: &AppSettings) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// Install bundled example decoders to the user's decoder directory.
-/// Only copies files that don't already exist (never overwrites).
-pub fn install_example_decoders(app: &AppHandle, decoder_dir: &str) -> Result<u32, String> {
-    let decoder_path = PathBuf::from(decoder_dir);
-    tlog!("[settings] Decoder directory: {:?}", decoder_path);
-
-    // Try to resolve the bundled examples directory
-    // First try BaseDirectory::Resource (works on desktop)
-    let examples_dir = match app.path().resolve("examples", BaseDirectory::Resource) {
-        Ok(path) => {
-            tlog!("[settings] Resolved examples via Resource: {:?}", path);
-            path
-        }
-        Err(e) => {
-            tlog!("[settings] Failed to resolve via Resource: {}", e);
-            // Fallback: try resource_dir directly (for iOS)
-            match app.path().resource_dir() {
-                Ok(resource_dir) => {
-                    let path = resource_dir.join("examples");
-                    tlog!("[settings] Trying resource_dir fallback: {:?}", path);
-                    path
-                }
-                Err(e2) => {
-                    return Err(format!("Failed to resolve examples directory: {} / {}", e, e2));
-                }
-            }
-        }
-    };
-
-    // If examples directory doesn't exist (dev mode without resources), skip silently
-    if !examples_dir.exists() {
-        tlog!("[settings] Examples directory not found at {:?}, skipping installation", examples_dir);
-        return Ok(0);
-    }
-
-    let mut installed_count = 0u32;
-
-    // Read all .toml files from the examples directory
-    let entries = std::fs::read_dir(&examples_dir)
-        .map_err(|e| format!("Failed to read examples directory: {}", e))?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
-        let path = entry.path();
-
-        // Only process .toml files
-        if path.extension().and_then(|s| s.to_str()) != Some("toml") {
-            continue;
-        }
-
-        // Get the filename
-        let filename = match path.file_name().and_then(|s| s.to_str()) {
-            Some(name) => name,
-            None => continue,
-        };
-
-        // Check if file already exists in destination
-        let dest_path = decoder_path.join(filename);
-        if dest_path.exists() {
-            tlog!("[settings] Skipping '{}' - already exists in decoder directory", filename);
-            continue;
-        }
-
-        // Copy the file
-        match std::fs::copy(&path, &dest_path) {
-            Ok(_) => {
-                tlog!("[settings] Installed example decoder: {}", filename);
-                installed_count += 1;
-            }
-            Err(e) => {
-                tlog!("[settings] Failed to install '{}': {}", filename, e);
-            }
-        }
-    }
-
-    if installed_count > 0 {
-        tlog!("[settings] Installed {} example decoder(s)", installed_count);
-    }
-
-    Ok(installed_count)
 }
 
 /// Clamp numeric settings into the ranges the UI enforces (kept in step with

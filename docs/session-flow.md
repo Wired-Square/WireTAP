@@ -574,10 +574,10 @@ The decoder-picker list (what `list_catalogs` returns — the `.toml` files in
 `decoder_dir`, distinct from the *attached* catalogue above) is **owned by the
 backend**, not re-scanned per call. A `CatalogCache` in managed state
 ([catalog.rs](../src-tauri/src/catalog.rs)) is **warmed once during `setup`**
-(`start_catalog_cache`, right after the example decoders are seeded), so the
-frontend's first `list_catalogs` is served from memory — no startup race where
-the picker shows empty until settings resolve, and no re-walking the directory
-(or re-logging the duplicate-display-name warning) once per consumer.
+(`start_catalog_cache`, right after settings resolve), so the frontend's first
+`list_catalogs` is served from memory — no startup race where the picker shows
+empty until settings resolve, and no re-walking the directory (or re-logging
+the duplicate-display-name warning) once per consumer.
 
 The cache is kept fresh by `refresh_catalog_cache`, called when a catalogue
 mutation command runs (`save`/`duplicate`/`rename`/`delete_catalog`), when
