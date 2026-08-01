@@ -1505,14 +1505,6 @@ fn local_filenames(app: &AppHandle) -> Vec<String> {
         .collect()
 }
 
-/// HTTPS clone URL for a stored repository.
-///
-/// Rebuilt from the identity rather than persisted, so repositories tracked before
-/// clones existed need no migration and a host change cannot leave a stale URL behind.
-fn clone_url(repo: &RepoEntry) -> String {
-    format!("https://{}/{}/{}", repo.host, repo.owner, repo.repo)
-}
-
 fn repo_entry(source: &CatalogSource, repo: &RepoInfo) -> RepoEntry {
     RepoEntry {
         id: source.repo_id(),
