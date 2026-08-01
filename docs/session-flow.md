@@ -75,12 +75,28 @@ with `multi_source: false` cannot be combined with others.
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 
-**Host resolution.** TCP-based sources (GVRET TCP, MQTT, Modbus TCP, FrameLink)
-accept either a hostname or a literal IP for their host. The host is resolved
-through [`io/net.rs::resolve_host_port`](../src-tauri/src/io/net.rs), a thin
-wrapper over `tokio::net::lookup_host`. New TCP transports must resolve through
-that helper — parsing `"host:port"` straight into a `SocketAddr` accepts only
-numeric IPs and rejects any DNS name with "invalid socket address syntax".
+**Host resolution.** TCP-based sources accept either a hostname or a literal IP
+for their host. GVRET TCP, Modbus TCP and FrameLink resolve through
+[`io/net.rs::resolve_host_port`](../src-tauri/src/io/net.rs), a wrapper over
+`tokio::net::lookup_host` that bounds the lookup with `DNS_TIMEOUT` and classifies
+failures as `IoError::DnsResolution`. New TCP transports must resolve through that
+helper — parsing `"host:port"` straight into a `SocketAddr` accepts only numeric
+IPs and rejects any DNS name with "invalid socket address syntax".
+
+MQTT, PostgreSQL and the WireTAP backend API are the exceptions: their client
+libraries (rumqttc, tokio-postgres, reqwest) resolve internally, so the helper
+cannot wrap them. None currently sets a library-level connect timeout either, so
+a DNS outage on those three can still hang.
+
+**Resolve first, then connect to the returned `SocketAddr`.** Passing a
+`(host, port)` tuple to `TcpStream::connect` resolves *inside* the connect
+future, so a DNS failure is indistinguishable from an unreachable host. That is
+not hypothetical: `getaddrinfo` does not fail fast when the resolver itself is
+unreachable (a VPN dropping, say) — it blocks until libc gives up. Before this
+was bounded, GVRET TCP reported `[gvret_tcp(host:23)] connect timed out` for a
+DNS outage, and FrameLink — which resolved *outside* its 5s timeout — hung
+indefinitely with no message at all. A hostname problem and a connectivity
+problem have different fixes, so they must read differently.
 
 **Device errors.** The serial-family read loops (serial, slcan, gvret_usb) route
 read failures through `IoError` via one
@@ -90,6 +106,16 @@ access-denied as *in use* vs *disconnected* and emits a device-identified,
 actionable message rather than a raw `os error`. Stream errors are shown once,
 centrally, by the `SessionError` handler in `sessionStore.ts` — per-app `onError`
 handlers only log (they must not raise their own dialog, or Sentry double-reports).
+
+That central handler suppresses a small set of *expected* errors without a
+dialog. Keep the predicate narrow and anchored (`EXPECTED_MISSING_ENTITY` matches
+only a `Session`/`Capture` that has already gone — a teardown race). It was once
+a bare `includes("not found")`, which also swallowed real faults on this channel:
+SocketCAN's "pkexec not found", gs_usb's "Device not found" and FrameLink's
+"Device '…' not found via discovery" all reached the error state with nothing
+shown. When adding an error message, check it cannot be caught by that filter by
+accident — and note the sibling `includes("Modbus read error")` clause is still an
+unanchored substring test.
 
 ---
 

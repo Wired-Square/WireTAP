@@ -48,9 +48,9 @@ pub async fn probe_framelink(
     timeout_sec: f64,
 ) -> Result<FrameLinkProbeResult, String> {
     // Check if this address already has a cached probe
-    let addr: std::net::SocketAddr = crate::io::net::resolve_host_port(host, port)
+    let addr = crate::io::net::resolve_host_port(host, port)
         .await
-        .map_err(|e| format!("Invalid address {}:{}: {}", host, port, e))?;
+        .map_err(|e| e.user_message())?;
 
     if let Some(cached) = shared::find_probe_by_address(addr).await {
         tlog!(

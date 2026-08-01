@@ -14,7 +14,6 @@
 
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::net::SocketAddr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -140,9 +139,9 @@ impl IOSource for ModbusTcpSource {
         self.cancel_flag.store(false, Ordering::Relaxed);
 
         // Resolve server address (accepts a hostname or an IP literal)
-        let addr: SocketAddr = crate::io::net::resolve_host_port(&self.config.host, self.config.port)
+        let addr = crate::io::net::resolve_host_port(&self.config.host, self.config.port)
             .await
-            .map_err(|e| format!("Invalid server address: {}", e))?;
+            .map_err(|e| e.user_message())?;
 
         // Connect to the Modbus TCP server
         let slave = Slave(self.config.unit_id);

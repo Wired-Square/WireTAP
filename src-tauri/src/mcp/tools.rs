@@ -4,7 +4,6 @@
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
 use std::collections::HashSet;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -213,9 +212,9 @@ async fn connect_session_modbus(
         .get("unit_id")
         .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_i64().map(|n| n as u8)))
         .unwrap_or(1);
-    let addr: SocketAddr = crate::io::net::resolve_host_port(host, port)
+    let addr = crate::io::net::resolve_host_port(host, port)
         .await
-        .map_err(|e| err(format!("Invalid Modbus address {host}:{port}: {e}")))?;
+        .map_err(|e| err(e.user_message()))?;
     tcp::connect_slave(addr, Slave(unit_id))
         .await
         .map_err(|e| err(format!("Connect to {addr} (unit {unit_id}) failed: {e}")))

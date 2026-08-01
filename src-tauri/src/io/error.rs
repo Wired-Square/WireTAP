@@ -15,6 +15,14 @@ pub enum IoError {
     /// Connection failure (TCP connect, serial open, USB claim)
     Connection { device: String, details: String },
 
+    /// Hostname could not be resolved — no such name, or the resolver itself was
+    /// unreachable. Kept distinct from [`Connection`]/[`Timeout`] because the fix
+    /// is a network/VPN one, not a device one.
+    ///
+    /// [`Connection`]: IoError::Connection
+    /// [`Timeout`]: IoError::Timeout
+    DnsResolution { host: String, details: String },
+
     /// Operation timed out
     Timeout { device: String, operation: String },
 
@@ -57,6 +65,14 @@ impl IoError {
         Self::Timeout {
             device: device.into(),
             operation: operation.into(),
+        }
+    }
+
+    /// Create a hostname resolution error
+    pub fn dns_resolution(host: impl Into<String>, details: impl Into<String>) -> Self {
+        Self::DnsResolution {
+            host: host.into(),
+            details: details.into(),
         }
     }
 
@@ -126,6 +142,7 @@ impl IoError {
         match self {
             Self::Connection { device, .. } => Some(device),
             Self::Timeout { device, .. } => Some(device),
+            Self::DnsResolution { host, .. } => Some(host),
             Self::Protocol { device, .. } => Some(device),
             Self::Transmission { device, .. } => Some(device),
             Self::Configuration { .. } => None,
@@ -146,6 +163,9 @@ impl fmt::Display for IoError {
             }
             Self::Timeout { device, operation } => {
                 write!(f, "[{}] {} timed out", device, operation)
+            }
+            Self::DnsResolution { host, details } => {
+                write!(f, "[{}] cannot resolve hostname: {}", host, details)
             }
             Self::Protocol { device, details } => {
                 write!(f, "[{}] protocol error: {}", device, details)
@@ -288,6 +308,14 @@ impl IoError {
             Self::DeviceNotFound { device } => format!(
                 "{device} could not be found — check that it is connected, then try again."
             ),
+            // Deliberately avoids the substring "not found". sessionStore's
+            // expected-error filter used to drop any message containing it, which is
+            // how faults like SocketCAN's "pkexec not found" reached the error state
+            // with no dialog. The filter is anchored now; the wording stays defensive.
+            Self::DnsResolution { host, details } => format!(
+                "Cannot resolve the hostname {host} — {details}. Check the name is spelled \
+                 correctly, and that you are connected to the network or VPN that serves it."
+            ),
             other => other.to_string(),
         }
     }
@@ -399,6 +427,35 @@ mod tests {
         let io_err = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "refused");
         let err = IoError::from_io_error("device", "connect", io_err);
         assert!(matches!(err, IoError::Connection { .. }));
+    }
+
+    #[test]
+    fn test_dns_message_names_the_host_and_points_at_the_network() {
+        // The VPN-down case. It used to surface as "[gvret_tcp(host:23)] connect timed
+        // out", which pointed at the device instead of the network. The message must
+        // also avoid "not found", which sessionStore's filter once dropped wholesale.
+        let err = IoError::dns_resolution("pi4.example.com", "the DNS resolver did not respond");
+        let msg = err.user_message();
+        assert!(msg.contains("pi4.example.com"));
+        assert!(msg.contains("the DNS resolver did not respond"));
+        assert!(msg.contains("VPN"));
+        assert!(!msg.contains("not found"));
+        assert!(!err.to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_dns_resolution_display_is_distinct_from_timeout() {
+        // The whole point of the variant: these two must not read alike.
+        let dns = IoError::dns_resolution("host.example.com", "the DNS resolver did not respond");
+        let connect = IoError::timeout("gvret_tcp(host.example.com:23)", "connect");
+        assert_eq!(
+            dns.to_string(),
+            "[host.example.com] cannot resolve hostname: the DNS resolver did not respond"
+        );
+        assert_eq!(
+            connect.to_string(),
+            "[gvret_tcp(host.example.com:23)] connect timed out"
+        );
     }
 
     #[test]

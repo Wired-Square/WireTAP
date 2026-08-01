@@ -74,6 +74,21 @@ import {
   decodeScopedSessionLifecycle,
 } from "../services/wsProtocol";
 
+/**
+ * A session or capture that has already been torn down — a benign race, not a
+ * fault, so it is not worth a dialog.
+ *
+ * Anchored to the entity kind because this replaced a bare `includes("not found")`
+ * that also swallowed genuine faults on this channel — SocketCAN's "pkexec not
+ * found", gs_usb's "Device not found", FrameLink's "Device '…' not found via
+ * discovery" — leaving the session in an error state with nothing shown.
+ *
+ * Note these `Session`/`Capture` messages are Tauri *command* rejections, so on the
+ * SessionError channel this clause is defensive rather than load-bearing; the paths
+ * that do see them are the catch blocks in `useIOSession`.
+ */
+const EXPECTED_MISSING_ENTITY = /^(Session|Capture)\b.*\bnot found$/;
+
 // ============================================================================
 // Visibility: Log changes and send immediate heartbeats on wake.
 // When the display sleeps, WKWebView may throttle/suspend timers.
@@ -573,7 +588,7 @@ async function setupSessionEventSubscribers(
         if (error) {
           const isExpectedError =
             error === "No IO profile configured" ||
-            error.includes("not found") ||
+            EXPECTED_MISSING_ENTITY.test(error) ||
             error.includes("Modbus read error");
           if (!isExpectedError) {
             invokeCallbacks(eventListeners, "onError", error);

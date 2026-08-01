@@ -1623,9 +1623,11 @@ pub async fn probe_gvret_device(
                 .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
                 .unwrap_or(5.0);
 
+            // user_message(), not String::from — the latter renders Display, which for
+            // a DNS failure drops the "check your network or VPN" half of the message.
             probe_gvret_tcp(host, port, timeout_sec)
                 .await
-                .map_err(String::from)
+                .map_err(|e| e.user_message())
         }
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" | "gvret-usb" => {
@@ -1796,7 +1798,7 @@ pub async fn probe_device(
                     primary_info: None,
                     secondary_info: None,
                     supports_fd: None,
-                    error: Some(e.to_string()),
+                    error: Some(e.user_message()),
                 }),
             }
         }
@@ -2047,9 +2049,29 @@ pub async fn probe_device(
                 .unwrap_or(5.0);
 
             let addr = format!("{}:{}", host, port);
+
+            // Resolve before connecting, like every other Modbus TCP path — passing
+            // the "host:port" string to connect() resolves inside the timeout, which
+            // reports a DNS failure as a connection one.
+            let sock_addr = match crate::io::net::resolve_host_port(host, port).await {
+                Ok(a) => a,
+                Err(e) => {
+                    return Ok(DeviceProbeResult {
+                        success: false,
+                        source_type: "modbus_tcp".to_string(),
+                        is_multi_bus: false,
+                        bus_count: 0,
+                        primary_info: None,
+                        secondary_info: Some(addr),
+                        supports_fd: None,
+                        error: Some(e.user_message()),
+                    });
+                }
+            };
+
             match tokio::time::timeout(
                 std::time::Duration::from_secs_f64(timeout_sec),
-                tokio::net::TcpStream::connect(&addr),
+                tokio::net::TcpStream::connect(sock_addr),
             ).await {
                 Ok(Ok(_stream)) => Ok(DeviceProbeResult {
                     success: true,

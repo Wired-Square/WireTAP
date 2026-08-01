@@ -1001,7 +1001,7 @@ async fn run_modbus_tcp_client(
             let _ = tx
                 .send(SourceMessage::Error(
                     source_idx,
-                    format!("Invalid Modbus server address {}:{}: {}", host, port, e),
+                    e.user_message(),
                 ))
                 .await;
             return;

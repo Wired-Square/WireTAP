@@ -11,7 +11,6 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
@@ -179,9 +178,9 @@ pub async fn modbus_scan_registers(
     );
 
     // Connect to the Modbus TCP server
-    let addr: SocketAddr = crate::io::net::resolve_host_port(&config.host, config.port)
+    let addr = crate::io::net::resolve_host_port(&config.host, config.port)
         .await
-        .map_err(|e| format!("Invalid server address: {}", e))?;
+        .map_err(|e| e.user_message())?;
 
     let slave = Slave(config.unit_id);
     let mut ctx = tcp::connect_slave(addr, slave)
@@ -391,9 +390,9 @@ pub async fn modbus_scan_unit_ids(
     );
 
     // Resolve server address
-    let addr: SocketAddr = crate::io::net::resolve_host_port(&config.host, config.port)
+    let addr = crate::io::net::resolve_host_port(&config.host, config.port)
         .await
-        .map_err(|e| format!("Invalid server address: {}", e))?;
+        .map_err(|e| e.user_message())?;
 
     let mut found_count: u32 = 0;
     // Track whether the first unit supports FC43 to skip it for subsequent units

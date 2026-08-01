@@ -87,9 +87,9 @@ pub(crate) async fn connect_by_address(
     port: u16,
     timeout_sec: f64,
 ) -> Result<String, String> {
-    let addr: SocketAddr = crate::io::net::resolve_host_port(host, port)
+    let addr = crate::io::net::resolve_host_port(host, port)
         .await
-        .map_err(|e| format!("Invalid address {}:{}: {}", host, port, e))?;
+        .map_err(|e| e.user_message())?;
 
     let race_key = format!("addr:{}:{}", host, port);
 

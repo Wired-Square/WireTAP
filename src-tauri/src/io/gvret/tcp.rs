@@ -25,6 +25,35 @@ use super::common::{
 /// This function connects to the device, queries the number of available buses,
 /// and returns device information. The connection is closed after probing.
 ///
+/// The device label both the probe and the streaming path identify themselves by.
+fn gvret_tcp_device(host: &str, port: u16) -> String {
+    format!("gvret_tcp({}:{})", host, port)
+}
+
+/// Resolve, then connect within `timeout_sec`.
+///
+/// Resolving separately is what keeps a DNS failure distinguishable from an
+/// unreachable host — see [`crate::io::net::resolve_host_port`]. Shared by the probe
+/// and the streaming path so the two cannot drift in how they classify or label a
+/// connect failure; they previously reported the same failure differently.
+async fn connect_gvret_tcp(host: &str, port: u16, timeout_sec: f64) -> Result<TcpStream, IoError> {
+    let addr = crate::io::net::resolve_host_port(host, port).await?;
+
+    match tokio::time::timeout(
+        Duration::from_secs_f64(timeout_sec),
+        TcpStream::connect(addr),
+    )
+    .await
+    {
+        Ok(Ok(stream)) => Ok(stream),
+        Ok(Err(e)) => Err(IoError::connection(
+            gvret_tcp_device(host, port),
+            e.to_string(),
+        )),
+        Err(_) => Err(IoError::timeout(gvret_tcp_device(host, port), "connect")),
+    }
+}
+
 /// Returns `IoError` for typed error handling. Use `.map_err(String::from)` if
 /// you need a String error for backwards compatibility.
 pub async fn probe_gvret_tcp(
@@ -37,23 +66,10 @@ pub async fn probe_gvret_tcp(
         host, port, timeout_sec
     );
 
-    // Connect with timeout
-    let connect_res = tokio::time::timeout(
-        Duration::from_secs_f64(timeout_sec),
-        TcpStream::connect((host, port)),
-    )
-    .await;
+    let device = gvret_tcp_device(host, port);
 
-    let device = format!("gvret_tcp({}:{})", host, port);
-
-    let mut stream = match connect_res {
-        Ok(Ok(s)) => {
-            tlog!("[probe_gvret_tcp] Connected to {}:{}", host, port);
-            s
-        }
-        Ok(Err(e)) => return Err(IoError::connection(&device, e.to_string())),
-        Err(_) => return Err(IoError::timeout(&device, "connect")),
-    };
+    let mut stream = connect_gvret_tcp(host, port, timeout_sec).await?;
+    tlog!("[probe_gvret_tcp] Connected to {}:{}", host, port);
 
     // Enter binary mode
     stream
@@ -141,30 +157,11 @@ pub async fn run_source(
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    // Connect with timeout
-    let connect_result = tokio::time::timeout(
-        Duration::from_secs_f64(timeout_sec),
-        TcpStream::connect((host.as_str(), port)),
-    )
-    .await;
-
-    let stream = match connect_result {
-        Ok(Ok(s)) => s,
-        Ok(Err(e)) => {
+    let stream = match connect_gvret_tcp(&host, port, timeout_sec).await {
+        Ok(stream) => stream,
+        Err(e) => {
             let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Connection failed: {}", e),
-                ))
-                .await;
-            return;
-        }
-        Err(_) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    "Connection timed out".to_string(),
-                ))
+                .send(SourceMessage::Error(source_idx, e.user_message()))
                 .await;
             return;
         }
