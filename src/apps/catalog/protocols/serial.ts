@@ -2,54 +2,12 @@
 // Serial/RS-485 protocol handler
 
 import type { SerialConfig } from "../types";
-import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
-import { readFrameInterval } from "./index";
+import type { ProtocolHandler } from "./index";
 
 const serialHandler: ProtocolHandler<SerialConfig> = {
   type: "serial",
   displayName: "Serial (RS-485)",
   icon: "Cable",
-
-  parseFrame: (
-    key: string,
-    value: any,
-    defaults: ProtocolDefaults,
-    _allFrames?: Record<string, any>
-  ): ParsedFrame<SerialConfig> => {
-    // Interval can be inherited from catalog defaults
-    let interval = readFrameInterval(value);
-    let intervalInherited = false;
-
-    if (interval === undefined && defaults.default_interval !== undefined) {
-      interval = defaults.default_interval;
-      intervalInherited = true;
-    }
-
-    // NOTE: Encoding comes from [frame.serial.config], not per-frame
-    // It's passed via defaults.serialEncoding for reference only
-
-    const signals = value.signals || value.signal || [];
-
-    return {
-      base: {
-        length: value.length ?? 0,
-        transmitter: value.transmitter,
-        interval,
-        notes: value.notes,
-        signals,
-        mux: value.mux,
-      },
-      config: {
-        protocol: "serial",
-        frame_id: key,
-        delimiter: value.delimiter,
-        // encoding NOT stored here - comes from [frame.serial.config]
-      },
-      inherited: {
-        interval: intervalInherited,
-      },
-    };
-  },
 
   serializeFrame: (_key, base, config, omitInherited) => {
     const obj: Record<string, any> = {};

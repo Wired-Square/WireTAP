@@ -170,25 +170,6 @@ export function parseCanId(id: string): number | null {
   return null;
 }
 
-/**
- * Find a frame in allFrames by its numeric ID value (case-insensitive for hex).
- */
-export function findFrameByNumericId(
-  targetId: string,
-  allFrames: Record<string, any>
-): any | undefined {
-  const targetNum = parseCanId(targetId);
-  if (targetNum === null) return undefined;
-
-  for (const key of Object.keys(allFrames)) {
-    const keyNum = parseCanId(key);
-    if (keyNum === targetNum) {
-      return allFrames[key];
-    }
-  }
-  return undefined;
-}
-
 // =============================================================================
 // Adapter: Rust `Catalog` (camelCase) → legacy `ParsedCatalog` (snake_case)
 // =============================================================================

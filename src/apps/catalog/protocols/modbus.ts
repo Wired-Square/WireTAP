@@ -2,8 +2,7 @@
 // Modbus protocol handler
 
 import type { ModbusConfig } from "../types";
-import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
-import { readFrameInterval } from "./index";
+import type { ProtocolHandler } from "./index";
 import { parseCanIdToNumber } from "../utils";
 
 /** True when a frame key is itself a register address (decimal or 0x-hex). */
@@ -25,52 +24,6 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   type: "modbus",
   displayName: "Modbus",
   icon: "Server",
-
-  parseFrame: (
-    _key: string,
-    value: any,
-    defaults: ProtocolDefaults,
-    _allFrames?: Record<string, any>
-  ): ParsedFrame<ModbusConfig> => {
-    // The device address now lives on the register's node, not the frame.
-
-    // Register base comes from [frame.modbus.config] - per-frame override not allowed
-    const registerBase = defaults.modbusRegisterBase;
-    const registerBaseInherited = registerBase !== undefined;
-
-    // Interval can be inherited from catalog defaults
-    let interval = readFrameInterval(value);
-    let intervalInherited = false;
-
-    if (interval === undefined && defaults.modbusDefaultInterval !== undefined) {
-      interval = defaults.modbusDefaultInterval;
-      intervalInherited = true;
-    }
-
-    const signals = value.signals || value.signal || [];
-
-    return {
-      base: {
-        length: value.length ?? 1, // Default to 1 register
-        transmitter: value.transmitter,
-        interval,
-        notes: value.notes,
-        signals,
-        mux: value.mux,
-      },
-      config: {
-        protocol: "modbus",
-        register_number: value.register_number,
-        node_address: value.node_address,
-        register_type: value.register_type ?? "holding",
-        register_base: registerBase,
-      },
-      inherited: {
-        interval: intervalInherited,
-        registerBase: registerBaseInherited,
-      },
-    };
-  },
 
   serializeFrame: (_key, base, config, omitInherited) => {
     const obj: Record<string, any> = {};

@@ -8,42 +8,6 @@ import type {
 } from "../types";
 
 /**
- * Defaults passed to protocol handlers during parsing
- */
-export interface ProtocolDefaults {
-  default_interval?: number;
-  default_endianness?: "little" | "big";
-  // CAN config from [meta.can]
-  default_extended?: boolean;
-  default_fd?: boolean;
-  // Modbus config from [meta.modbus]
-  modbusDeviceAddress?: number;
-  modbusRegisterBase?: 0 | 1;
-  modbusDefaultInterval?: number;
-  modbusDefaultByteOrder?: "big" | "little";
-  modbusDefaultWordOrder?: "big" | "little";
-  // Serial encoding from [meta.serial]
-  serialEncoding?: "slip" | "cobs" | "raw" | "length_prefixed";
-}
-
-/**
- * Result of parsing a frame from TOML
- */
-export interface ParsedFrame<T extends ProtocolConfig = ProtocolConfig> {
-  base: BaseFrameFields;
-  config: T;
-  inherited: {
-    length?: boolean;
-    transmitter?: boolean;
-    interval?: boolean;
-    extended?: boolean;      // CAN-specific
-    fd?: boolean;            // CAN-specific
-    deviceAddress?: boolean; // Modbus-specific
-    registerBase?: boolean;  // Modbus-specific
-  };
-}
-
-/**
  * Protocol handler interface - each protocol implements this
  */
 export interface ProtocolHandler<T extends ProtocolConfig = ProtocolConfig> {
@@ -55,20 +19,6 @@ export interface ProtocolHandler<T extends ProtocolConfig = ProtocolConfig> {
 
   /** Icon name (lucide-react icon) */
   icon: string;
-
-  /**
-   * Parse a frame from TOML data
-   * @param key - The TOML key (e.g., "0x123" for CAN, "battery_voltage" for Modbus)
-   * @param value - The TOML value object
-   * @param defaults - Default values from catalog meta
-   * @param allFrames - All frames in this protocol section (for copy/inheritance)
-   */
-  parseFrame: (
-    key: string,
-    value: any,
-    defaults: ProtocolDefaults,
-    allFrames?: Record<string, any>
-  ) => ParsedFrame<T>;
 
   /**
    * Serialize a frame back to TOML-compatible object
@@ -159,12 +109,6 @@ class ProtocolRegistry {
 
 /** Global protocol registry instance */
 export const protocolRegistry = new ProtocolRegistry();
-
-/** A frame's poll/tx interval: the canonical top-level `interval_ms`/`interval`,
- *  falling back to the legacy `tx.interval_ms`/`tx.interval`. */
-export function readFrameInterval(value: any): number | undefined {
-  return value?.interval_ms ?? value?.interval ?? value?.tx?.interval_ms ?? value?.tx?.interval;
-}
 
 // Import handlers - they export their handler objects but don't self-register
 import canHandler from "./can";
