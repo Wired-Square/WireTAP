@@ -28,8 +28,8 @@ use error::{ShareError, ShareErrorKind};
 use git::TreeBlob;
 use github::{GitHubClient, RepoInfo};
 use registry::{
-    catalog_entry_id, git_blob_sha, CatalogEntry, CatalogSourceRegistry, LocalState, RemoteState,
-    RepoEntry, SavedRepo,
+    catalog_entry_id, git_blob_sha, CatalogEntry, CatalogSourceRegistry, LocalState,
+    RepoEntry, SavedRepo, SyncStatus,
 };
 use url::{parse_catalog_source, CatalogSource};
 
@@ -490,8 +490,12 @@ pub struct TrackedCatalog {
     pub repo_label: String,
     pub remote_path: String,
     pub git_ref: String,
-    pub local_state: LocalState,
-    pub remote_state: RemoteState,
+    /// Where this catalogue stands against its repository.
+    ///
+    /// The collapse, not its two inputs: shipping `local_state` and `remote_state`
+    /// beside it invites a consumer to re-derive rather than ask, which is the exact
+    /// drift `SyncStatus::collapse` exists to make impossible.
+    pub sync_status: SyncStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -535,7 +539,15 @@ pub async fn list_catalog_sources(app: AppHandle) -> Result<CatalogSourcesView, 
     if let Some(dir) = decoder_dir.as_deref() {
         // write_if: reconcile usually changes nothing, and rewriting the registry on
         // every listing would be pure churn.
-        state.write_if(&app, |r| r.reconcile(dir));
+        //
+        // The guard is also what makes the refresh safe. A relink moves a tracked
+        // filename, so two rows' statuses are now wrong — but the refresh broadcasts
+        // `CatalogListChanged`, which the frontend answers with `loadSources` → this
+        // command. Refreshing unconditionally would therefore loop across the IPC
+        // boundary. `reconcile` is a fixed point (see `reconcile_is_a_fixed_point`):
+        // its relink target came from the present-files list, so the next pass finds
+        // nothing missing and returns false, terminating in one extra round trip.
+        write_and_refresh(&app, |r| r.reconcile(dir));
     }
 
     Ok(state.read(&app, |r| CatalogSourcesView {
@@ -557,9 +569,12 @@ fn project_tracked(
         .iter()
         .map(|entry| {
             let repo = r.repo(&entry.repo_id);
-            let local_state = decoder_dir
-                .map(|dir| entry.local_state(dir))
-                .unwrap_or(LocalState::Missing);
+            // Hashed once: the disk-reading forms read the same file up to twice per
+            // entry. `None` — no decoder directory — reads as a missing file, which
+            // is what it is.
+            let local_sha = decoder_dir.and_then(|dir| {
+                registry::git_blob_sha_of_file(&dir.join(&entry.local_filename))
+            });
             TrackedCatalog {
                 id: entry.id.clone(),
                 local_filename: entry.local_filename.clone(),
@@ -569,8 +584,7 @@ fn project_tracked(
                     .unwrap_or_else(|| strip_host_prefix(&entry.repo_id).to_string()),
                 remote_path: entry.remote_path.clone(),
                 git_ref: entry.git_ref.clone(),
-                local_state,
-                remote_state: entry.remote_state(local_state, decoder_dir),
+                sync_status: entry.sync_status_of(local_sha.as_deref()),
                 web_url: repo.and_then(|r| r.web_url.clone()),
                 pr_url: entry.publish.as_ref().and_then(|p| p.pr_url.clone()),
                 pr_number: entry.publish.as_ref().and_then(|p| p.pr_number),
@@ -797,7 +811,7 @@ pub async fn check_catalog_updates(
     }
 
     // Everything the check learned, in one write.
-    state.write_if(&app, |r| {
+    write_and_refresh(&app, |r| {
         let mut changed = false;
         for outcome in &outcomes {
             for (id, sha) in &outcome.shas {
@@ -815,10 +829,10 @@ pub async fn check_catalog_updates(
     let updates_available = catalogs
         .iter()
         .filter(|c| {
-            matches!(
-                c.remote_state,
-                RemoteState::UpstreamAhead | RemoteState::Diverged
-            )
+            // The same question `hasRemoteChanges` answers in the UI, over the same
+            // label. A tracked file that has gone missing now reads `Missing` and
+            // stops counting — it had no pullable update either way.
+            matches!(c.sync_status, SyncStatus::RemoteAhead | SyncStatus::Diverged)
         })
         .count();
 
@@ -1046,14 +1060,24 @@ pub async fn pull_catalog(app: AppHandle, catalog_id: String) -> Result<PullOutc
     };
 
     // Record what upstream holds whatever happens next, so the badge is right even
-    // when the pull itself declines to write.
-    state.write_if(&app, |r| r.set_remote_sha(&catalog_id, &remote.sha));
+    // when the pull declines to write.
+    let recorded = state.write_if(&app, |r| r.set_remote_sha(&catalog_id, &remote.sha));
 
+    // The refresh belongs on the paths that return without touching the decoder
+    // directory. The applied path falls through to `install_update`, which refreshes
+    // once with the new bytes and the new sha both in place — doing it here as well
+    // would cost a second full scan and a second broadcast fan-out per pull.
+    let mut decline = |outcome| {
+        if recorded {
+            crate::catalog::refresh_catalog_cache(&app);
+        }
+        Ok(outcome)
+    };
     if remote.sha == snap.synced_sha {
-        return Ok(PullOutcome::UpToDate);
+        return decline(PullOutcome::UpToDate);
     }
     if snap.local_state == LocalState::Modified {
-        return Ok(PullOutcome::NeedsReview);
+        return decline(PullOutcome::NeedsReview);
     }
 
     vet_catalogue(&remote.text)
@@ -1190,6 +1214,9 @@ pub fn forget_catalog_source(app: AppHandle, catalog_id: String) -> Result<(), S
             "That catalogue is no longer being tracked",
         ));
     }
+    // Forgetting provenance turns the row `localOnly`, and nothing on disk changed,
+    // so no watcher event would do this for us.
+    crate::catalog::refresh_catalog_cache(&app);
     Ok(())
 }
 
@@ -1370,6 +1397,20 @@ fn open_source(input: &str) -> Result<(CatalogSource, GitHubClient), ShareError>
     github::require_supported_host(&source)?;
     let client = GitHubClient::new(auth::stored_token(&source.host));
     Ok((source, client))
+}
+
+/// Mutate the registry and, when the closure reports a change, rebuild the catalogue
+/// cache.
+///
+/// The catalogue list carries each file's sync status, so a registry write that never
+/// touches the decoder directory leaves every row stale — no filesystem event will
+/// invalidate it. Gated on the write reporting a change so an idle call emits nothing.
+fn write_and_refresh(app: &AppHandle, f: impl FnOnce(&mut registry::Registry) -> bool) -> bool {
+    let changed = app.state::<CatalogSourceRegistry>().write_if(app, f);
+    if changed {
+        crate::catalog::refresh_catalog_cache(app);
+    }
+    changed
 }
 
 /// Bring the clone for a source up to date, and hand back where it is.

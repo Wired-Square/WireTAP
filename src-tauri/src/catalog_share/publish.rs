@@ -26,6 +26,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::error::{ShareError, ShareErrorKind};
 use super::github::{self, GitHubClient, NewRepo, RepoInfo};
+use crate::catalog::DiffKind;
 use super::registry::{CatalogSourceRegistry, ForkRef, PublishState};
 use super::secrets::{self, SecretFinding};
 use super::{auth, git, url::CatalogSource};
@@ -94,6 +95,22 @@ pub struct PublishPlan {
     /// Putting a request-dependent field on the plan would stale it on every click and
     /// force a network round trip per toggle.
     pub suggested_branch: String,
+    /// Every branch in the clone, for the dialog's branch picker. Free — the clone is
+    /// already open here — and it replaces a `matching-refs` request per keystroke.
+    /// Empty when the refs could not be read: a picker with no suggestions still lets
+    /// the user type a new branch name, which is the primary use.
+    pub branches: Vec<String>,
+    /// Git blob SHA of the bytes that would be committed.
+    pub local_blob_sha: String,
+    /// The same path's blob SHA on `base_branch`, so the dialog can say "nothing to
+    /// push" without asking for the file text. `None` — the path is not there yet, so
+    /// this push creates it.
+    ///
+    /// Deliberately against `base_branch` rather than `branch`: the plan is not
+    /// re-fetched when the branch field moves, so a verdict about some other branch
+    /// would go stale the moment it was useful. The push dialog's `publish_diff`
+    /// answers for the branch actually chosen.
+    pub base_blob_sha: Option<String>,
     /// True when the account cannot push to the upstream, so the commit lands on a
     /// fork. `can_push_upstream` used to sit beside this as its literal negation; the
     /// only thing that ever read it was the commit-to-base checkbox this replaced.
@@ -108,6 +125,58 @@ pub struct PublishPlan {
     /// Set when this catalogue already has a pull request open.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub existing_pr_url: Option<String>,
+}
+
+/// What to compare, for the push dialog's diff tab.
+///
+/// Everything is named explicitly rather than re-derived. The caller already holds a
+/// [`PublishPlan`], and re-deriving would mean the `get_repo` request and the fetch
+/// that [`resolve`] does — the exact round trip this command exists to avoid.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishDiffRequest {
+    /// Local catalogue filename in the decoder directory. The bytes are read from
+    /// disk, never from the editor buffer, so the comparison is against what a push
+    /// would actually send.
+    pub filename: String,
+    pub repo_url: String,
+    pub target_path: String,
+    /// The branch that would actually be committed to.
+    pub branch: String,
+    /// What that branch would be created off, when it does not exist yet.
+    pub base_branch: String,
+}
+
+/// What a push would change upstream, ready to render.
+///
+/// Carries the rendered diff rather than the two texts. Both are already in hand here,
+/// and the diff is the same crate's `catalog::diff_lines` — returning the texts instead
+/// would ship them to the frontend and straight back over the WebSocket to be diffed by
+/// the function that was one call away.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishDiff {
+    /// The ref actually read. Echoed so the tab can label the comparison honestly when
+    /// it fell back from a branch that does not exist yet.
+    pub compared_ref: String,
+    pub branch_exists: bool,
+    pub target_path: String,
+    /// Unified diff rows, upstream → local, so an `add` is what this push would add.
+    /// Empty when `identical`, which the tab renders as a banner rather than a page of
+    /// unchanged lines.
+    pub lines: Vec<crate::catalog::DiffRow>,
+    pub added: usize,
+    pub removed: usize,
+    /// False when this push would add the file rather than change it.
+    pub exists: bool,
+    /// Byte-identical, so the commit would be empty.
+    pub identical: bool,
+    /// Upstream has moved on from the `synced_sha` this catalogue was imported at, so
+    /// pushing replaces a change that was never pulled.
+    pub upstream_moved: bool,
+    /// The last upstream commit to touch this path. `None` when it is not upstream yet
+    /// or the walk found nothing within its bound.
+    pub last_change: Option<git::FileCommit>,
 }
 
 /// A resolved plan plus everything the publish path needs, so it does not repeat the
@@ -276,7 +345,104 @@ pub async fn preflight_publish(
     app: AppHandle,
     req: PublishRequest,
 ) -> Result<PublishPlan, ShareError> {
-    Ok(resolve(&app, &req).await?.plan)
+    Ok(enrich_for_dialog(resolve(&app, &req).await?).await.plan)
+}
+
+/// Fill the plan fields only the dialog reads.
+///
+/// Separate from [`resolve`], which the publish path shares: the branch list, the local
+/// hash and the base hash exist for the branch picker and the "nothing to push"
+/// verdict, and filling them there cost every push two repository opens and a full ref
+/// enumeration for values it drops unserialised.
+async fn enrich_for_dialog(mut resolved: Resolved) -> Resolved {
+    let plan = &mut resolved.plan;
+    plan.branches = git::branches(&resolved.clone_dir).await.unwrap_or_default();
+    plan.local_blob_sha = super::registry::git_blob_sha(resolved.content.as_bytes());
+    // The tree entry id, not the file: this only feeds an equality test, so inflating
+    // up to 2 MB to hash it would be work thrown away. Absent for a path that is not
+    // upstream yet, which the dialog reads as "this push adds the file".
+    plan.base_blob_sha = git::blob_sha(&resolved.clone_dir, &plan.base_branch, &plan.target_path)
+        .await
+        .ok()
+        .flatten();
+    resolved
+}
+
+/// The upstream copy of the file this push would land on, beside the local bytes.
+///
+/// Deliberately **not** part of [`PublishPlan`]. The plan is fetched on every target
+/// change, so putting up to 2 MB of TOML on it would make a tab the user may never open
+/// a mandatory cost on the path that has to stay fast. It is also deliberately not
+/// re-planned when the branch and path controls move (see [`PublishPlan::suggested_branch`]),
+/// whereas the right baseline for a diff *is* a function of exactly those controls.
+///
+/// Answered entirely from the clone [`preflight_publish`] already fetched: this parses
+/// the URL and reads the object database, and touches no network at all.
+#[tauri::command(rename_all = "camelCase")]
+pub async fn publish_diff(
+    app: AppHandle,
+    req: PublishDiffRequest,
+) -> Result<PublishDiff, ShareError> {
+    // Parsed and host-checked, and no further. `open_source` would also read the
+    // keychain to build a GitHubClient — synchronous OS IPC, on the async runtime,
+    // once per debounced keystroke — for a client nothing on this path can use.
+    let source = super::url::parse_catalog_source(&req.repo_url)
+        .map_err(|e| ShareError::invalid(e.message()))?;
+    github::require_supported_host(&source)?;
+    let repo_id = source.repo_id();
+    let dir = git::clone_dir(&app, &repo_id)?;
+
+    let local_toml = read_local_catalogue(&app, &req.filename)?;
+    let local_blob_sha = super::registry::git_blob_sha(local_toml.as_bytes());
+
+    // One open, one ref resolution, serving the blob read and the history walk both.
+    let upstream = git::path_at_ref(&dir, &req.branch, &req.base_branch, &req.target_path).await?;
+    let remote_sha = upstream.blob.as_ref().map(|b| b.sha.as_str());
+    let exists = remote_sha.is_some();
+    let identical = remote_sha == Some(local_blob_sha.as_str());
+
+    // "Upstream moved" is only answerable for a catalogue tracked against *this*
+    // repository: `synced_sha` records the bytes last exchanged with it, so comparing
+    // it to an unrelated repository's blob would be noise. Scoped the same way
+    // `resolve` scopes provenance, and for the same reason.
+    let upstream_moved = app
+        .state::<CatalogSourceRegistry>()
+        .read(&app, |r| {
+            r.catalog_by_filename(&req.filename)
+                .filter(|c| c.repo_id == repo_id)
+                .map(|c| c.synced_sha.clone())
+        })
+        .zip(remote_sha)
+        .is_some_and(|(synced, remote)| synced != remote);
+
+    // Skipped when identical: the tab says so in one line rather than rendering the
+    // whole catalogue as unchanged context, so computing an O(n·m) LCS to produce rows
+    // nothing draws would be the most expensive no-op in the dialog.
+    let lines = if identical {
+        Vec::new()
+    } else {
+        let remote_toml = upstream.blob.as_ref().map(|b| b.text.as_str()).unwrap_or("");
+        crate::catalog::diff_lines(remote_toml, &local_toml)
+    };
+    // One pass: asking twice walks the rows twice for two numbers read side by side.
+    let (added, removed) = lines.iter().fold((0, 0), |(add, rm), row| match row.kind {
+        DiffKind::Add => (add + 1, rm),
+        DiffKind::Remove => (add, rm + 1),
+        DiffKind::Context => (add, rm),
+    });
+
+    Ok(PublishDiff {
+        compared_ref: upstream.resolved_ref,
+        branch_exists: upstream.used_preferred,
+        target_path: req.target_path,
+        last_change: upstream.last_change,
+        lines,
+        added,
+        removed,
+        exists,
+        identical,
+        upstream_moved,
+    })
 }
 
 /// Publish the catalogue: commit, push, and optionally open a pull request.
@@ -527,11 +693,14 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
 
     // Push back to the ref this catalogue came from, not blindly to the repository
     // default: a decoder pulled from `v2-dev` belongs on `v2-dev`. Only a branch can
-    // be a push target, so a catalogue pinned to a tag or a commit falls back.
+    // be a push target, so a catalogue pinned to a tag or a commit falls back. The
+    // lookup sits inside the guard so the common case — no provenance, or provenance
+    // already on the default branch — touches the repository not at all.
     let provenance_ref = provenance.as_ref().map(|(_, git_ref, _)| git_ref.clone());
     let base_branch = match provenance_ref {
         Some(git_ref)
-            if git_ref != upstream.default_branch && git::is_branch(&clone_dir, &git_ref).await =>
+            if git_ref != upstream.default_branch
+                && git::has_branch(&clone_dir, &git_ref).await =>
         {
             git_ref
         }
@@ -574,6 +743,11 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
         branch,
         base_branch,
         suggested_branch,
+        // Filled by `enrich_for_dialog`, which only the preflight runs. `resolve` is
+        // shared with the publish path, and that path reads none of the three.
+        branches: Vec::new(),
+        local_blob_sha: String::new(),
+        base_blob_sha: None,
         fork_needed: !upstream.can_push,
         target_is_public: !upstream.private,
         content_bytes: content.len(),
@@ -649,6 +823,10 @@ fn persist_publish_state(
             r.set_fork(repo_id, fork);
         }
     });
+    // A push moves `synced_sha` without writing to the decoder directory, so the
+    // catalogue list's sync status would stay on "local ahead" until something else
+    // happened to invalidate the cache.
+    crate::catalog::refresh_catalog_cache(app);
 }
 
 /// `catalog/{slug}` from the filename stem.

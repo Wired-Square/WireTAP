@@ -9,10 +9,9 @@ export { default as ActionButtons } from "./ActionButtons";
 export { default as LoadStatus } from "./LoadStatus";
 export { default as DeviceBusConfig } from "./DeviceBusConfig";
 export { default as SingleBusConfig } from "./SingleBusConfig";
-export { default as SourceTabs } from "./SourceTabs";
 export { default as DecoderPicker } from "./DecoderPicker";
 
-export type { SourceTab } from "./SourceTabs";
+export type { SourceTab } from "./types";
 export type { FramingConfig } from "./FramingOptions";
 export type { BusMappingWithProtocol } from "./DeviceBusConfig";
 export type { InterfaceFramingConfig } from "./SingleBusConfig";

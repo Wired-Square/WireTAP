@@ -13,8 +13,10 @@
 
 import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, FilePlus, GitBranch, Import, Search, X } from "lucide-react";
+import { Check, Search, X } from "lucide-react";
+import * as ShareIcon from "../../components/catalogIcons";
 import Dialog from "../../components/Dialog";
+import { CatalogSyncIcon } from "../../components/catalogSyncPresentation";
 import Input from "../../components/forms/Input";
 import { openCatalog, importCatalog, importDbcWs } from "../../api/catalog";
 import { pickFileToOpen } from "../../api/dialogs";
@@ -151,6 +153,11 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                         : "hover:bg-[var(--hover-bg)] border border-transparent"
                     }`}
                   >
+                    {/* Leading, not trailing: the trailing slot holds the tick, which
+                        renders only when selected, so a status icon beside it would
+                        shift on every click. A left column also scans vertically past
+                        variable-length names. */}
+                    <CatalogSyncIcon status={catalog.syncStatus} />
                     <div className="flex-1 min-w-0">
                       <span className={`${textMedium} truncate`}>{catalog.name}</span>
                       <div className={`${caption} truncate`}>{catalog.filename}</div>
@@ -177,7 +184,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
               title={t("catalogPicker.actionTitles.new")}
               className={action(true)}
             >
-              <FilePlus className={iconMd} />
+              <ShareIcon.NewCatalog className={iconMd} />
               {t("catalogPicker.actions.new")}
             </button>
           )}
@@ -186,7 +193,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
             title={t("catalogPicker.actionTitles.import")}
             className={action(!onNewCatalog)}
           >
-            <Import className={iconMd} />
+            <ShareIcon.ImportCatalog className={iconMd} />
             {t("catalogPicker.actions.import")}
           </button>
           <button
@@ -194,7 +201,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
             title={t("catalogPicker.actionTitles.repository")}
             className={action(false)}
           >
-            <GitBranch className={iconMd} />
+            <ShareIcon.Repository className={iconMd} />
             {t("catalogPicker.actions.repository")}
           </button>
         </div>

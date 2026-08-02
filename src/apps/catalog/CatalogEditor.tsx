@@ -36,6 +36,7 @@ import CatalogDialogs from "./components/CatalogDialogs";
 import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import { useCatalogShareDialogs } from "./components/CatalogShareDialogs";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
+import { hasRemoteChanges } from "../../utils/catalogSync";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
 
@@ -310,9 +311,9 @@ function CatalogEditorInner() {
     const filename = catalogPath?.split(/[/\\]/).pop()?.toLowerCase();
     if (!filename) return null;
     const source = trackedSources.find((t) => t.localFilename.toLowerCase() === filename);
-    return source && (source.remoteState === "upstreamAhead" || source.remoteState === "diverged")
-      ? source.id
-      : null;
+    // The same predicate the settings row's menu uses, over the same backend-derived
+    // status — open-coding the two remote states here is how the two drift apart.
+    return source && hasRemoteChanges(source.syncStatus) ? source.id : null;
   }, [catalogPath, trackedSources]);
 
   // An update handed over from another panel (Settings, typically) lands here as a

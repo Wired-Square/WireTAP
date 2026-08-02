@@ -6,7 +6,8 @@ import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
-import SourceTabs, { type SourceTab } from "./SourceTabs";
+import TabStrip from "../../components/TabStrip";
+import type { SourceTab } from "./types";
 import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple, badgeSmallInfo } from "../../styles/badgeStyles";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
@@ -287,19 +288,19 @@ export default function SourceList({
       id: "sessions" as const,
       label: t("ioSourcePicker.tabs.sessions"),
       icon: <Play className={iconXs} />,
-      count: joinableSessions.length,
+      badge: joinableSessions.length,
     },
     {
       id: "captures" as const,
       label: t("ioSourcePicker.tabs.captures"),
       icon: <Database className={iconXs} />,
-      count: captureCount + recordedProfiles.length,
+      badge: captureCount + recordedProfiles.length,
     },
     {
       id: "devices" as const,
       label: t("ioSourcePicker.tabs.devices"),
       icon: <Wifi className={iconXs} />,
-      count: realtimeProfiles.length,
+      badge: realtimeProfiles.length,
     },
   ].filter((tab) => availableTabs.includes(tab.id));
 
@@ -503,7 +504,7 @@ export default function SourceList({
     <div className={borderDivider}>
       {/* Tabs (only when more than one tab is relevant) */}
       {tabDefs.length > 1 && (
-        <SourceTabs tabs={tabDefs} activeTab={effectiveTab} onTabChange={onTabChange} />
+        <TabStrip tabs={tabDefs} activeTab={effectiveTab} onTabChange={onTabChange} sticky />
       )}
 
       {/* Tab body — collapsed selected-source card, or the active tab's list */}

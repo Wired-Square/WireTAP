@@ -168,20 +168,56 @@ pub async fn dispatch_catalog_command(
     }
 }
 
-/// A unified line diff (baseline → current) plus a `dirty` flag, as JSON for the
-/// editor. Full-context: every line is emitted as `context` | `add` | `remove`
-/// with 1-based old/new line numbers for the gutter.
-fn diff_lines_json(baseline: &str, current: &str) -> serde_json::Value {
+/// What a diff row says happened to its line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiffKind {
+    Context,
+    Add,
+    Remove,
+}
+
+/// One row of a unified diff, with 1-based line numbers for the gutter.
+///
+/// A struct rather than `serde_json::Value` because two commands return these and one
+/// of them counts them by kind: `row["kind"] == "add"` on untyped JSON compiles just
+/// as happily when the string is wrong, and reports zero.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DiffRow {
+    pub kind: DiffKind,
+    pub text: String,
+    pub old_line: Option<usize>,
+    pub new_line: Option<usize>,
+}
+
+/// A unified line diff (baseline → current). Full-context: every line is emitted as
+/// context, add or remove.
+///
+/// Exposed for callers that already hold both texts — the push dialog's `publish_diff`
+/// reads them out of the git clone, so routing them back through the `catalog.diff`
+/// command would ship both files to the frontend and straight back again.
+pub(crate) fn diff_lines(baseline: &str, current: &str) -> Vec<DiffRow> {
     let a: Vec<&str> = baseline.split('\n').collect();
     let b: Vec<&str> = current.split('\n').collect();
+    lcs_diff(&a, &b)
+}
+
+/// [`diff_lines`] plus a `dirty` flag, as JSON for the editor.
+fn diff_lines_json(baseline: &str, current: &str) -> serde_json::Value {
     serde_json::json!({
         "dirty": baseline != current,
-        "lines": lcs_diff(&a, &b),
+        "lines": diff_lines(baseline, current),
     })
 }
 
-fn diff_row(kind: &str, text: &str, old_line: Option<usize>, new_line: Option<usize>) -> serde_json::Value {
-    serde_json::json!({ "kind": kind, "text": text, "oldLine": old_line, "newLine": new_line })
+fn diff_row(kind: DiffKind, text: &str, old_line: Option<usize>, new_line: Option<usize>) -> DiffRow {
+    DiffRow {
+        kind,
+        text: text.to_string(),
+        old_line,
+        new_line,
+    }
 }
 
 /// Above this many `n * m` cells the LCS table costs more than the diff is worth
@@ -193,29 +229,33 @@ const MAX_LCS_CELLS: usize = 25_000_000;
 /// Longest-common-subsequence line diff. O(n·m) in time and memory, so bounded
 /// by [`MAX_LCS_CELLS`]; beyond that it falls back to remove-all/add-all, which
 /// is a truthful (if coarse) diff rather than an out-of-memory abort.
-fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<serde_json::Value> {
+fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<DiffRow> {
     let (n, m) = (a.len(), b.len());
     if n.saturating_mul(m) > MAX_LCS_CELLS {
         let mut rows = Vec::with_capacity(n + m);
         rows.extend(
             a.iter()
                 .enumerate()
-                .map(|(i, line)| diff_row("remove", line, Some(i + 1), None)),
+                .map(|(i, line)| diff_row(DiffKind::Remove, line, Some(i + 1), None)),
         );
         rows.extend(
             b.iter()
                 .enumerate()
-                .map(|(j, line)| diff_row("add", line, None, Some(j + 1))),
+                .map(|(j, line)| diff_row(DiffKind::Add, line, None, Some(j + 1))),
         );
         return rows;
     }
-    let mut dp = vec![vec![0u32; m + 1]; n + 1];
+    // One flat allocation rather than `vec![vec![]; n + 1]`: the nested form is n+1
+    // separate heap blocks for the same bytes, and a contiguous row keeps the inner
+    // loop's reads adjacent.
+    let stride = m + 1;
+    let mut dp = vec![0u32; (n + 1) * stride];
     for i in (0..n).rev() {
         for j in (0..m).rev() {
-            dp[i][j] = if a[i] == b[j] {
-                dp[i + 1][j + 1] + 1
+            dp[i * stride + j] = if a[i] == b[j] {
+                dp[(i + 1) * stride + j + 1] + 1
             } else {
-                dp[i + 1][j].max(dp[i][j + 1])
+                dp[(i + 1) * stride + j].max(dp[i * stride + j + 1])
             };
         }
     }
@@ -223,28 +263,28 @@ fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<serde_json::Value> {
     let (mut i, mut j, mut oln, mut nln) = (0, 0, 1usize, 1usize);
     while i < n && j < m {
         if a[i] == b[j] {
-            rows.push(diff_row("context", a[i], Some(oln), Some(nln)));
+            rows.push(diff_row(DiffKind::Context, a[i], Some(oln), Some(nln)));
             i += 1;
             j += 1;
             oln += 1;
             nln += 1;
-        } else if dp[i + 1][j] >= dp[i][j + 1] {
-            rows.push(diff_row("remove", a[i], Some(oln), None));
+        } else if dp[(i + 1) * stride + j] >= dp[i * stride + j + 1] {
+            rows.push(diff_row(DiffKind::Remove, a[i], Some(oln), None));
             i += 1;
             oln += 1;
         } else {
-            rows.push(diff_row("add", b[j], None, Some(nln)));
+            rows.push(diff_row(DiffKind::Add, b[j], None, Some(nln)));
             j += 1;
             nln += 1;
         }
     }
     while i < n {
-        rows.push(diff_row("remove", a[i], Some(oln), None));
+        rows.push(diff_row(DiffKind::Remove, a[i], Some(oln), None));
         i += 1;
         oln += 1;
     }
     while j < m {
-        rows.push(diff_row("add", b[j], None, Some(nln)));
+        rows.push(diff_row(DiffKind::Add, b[j], None, Some(nln)));
         j += 1;
         nln += 1;
     }
@@ -317,11 +357,22 @@ use tauri::{AppHandle, Manager};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use crate::catalog_share::registry::{CatalogSourceRegistry, SyncIndex, SyncStatus};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CatalogFile {
     pub name: String,
     pub filename: String,
     pub path: String,
+    /// How this catalogue stands against its repository.
+    ///
+    /// Resolved here rather than joined in the frontend: the picker is mounted by
+    /// five panels that otherwise never touch the sharing store, and making each of
+    /// them import it to answer one question would put the whole share subtree in
+    /// their bundles. The scan already reads every file, so this is a hash over bytes
+    /// already in hand.
+    pub sync_status: SyncStatus,
 }
 
 /// Backend-owned, always-warm cache of the decoder-directory catalogue list.
@@ -354,7 +405,10 @@ struct CatalogCacheState {
 /// Walk the decoder directory and build the catalogue list. Pure (no shared
 /// state); the duplicate-name warning is logged here so it fires once per
 /// rebuild rather than once per consumer fetch.
-fn scan_catalogs(decoder_dir: &Path) -> Vec<CatalogFile> {
+///
+/// `index` supplies the git provenance, snapshotted by the caller so the registry
+/// lock is not held across a directory walk and N file reads.
+fn scan_catalogs(decoder_dir: &Path, index: &SyncIndex) -> Vec<CatalogFile> {
     let mut catalogs = Vec::new();
 
     let entries = match std::fs::read_dir(decoder_dir) {
@@ -375,14 +429,21 @@ fn scan_catalogs(decoder_dir: &Path) -> Vec<CatalogFile> {
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_string();
-        let name = match std::fs::read_to_string(&path) {
-            Ok(content) => extract_catalog_name(&content).unwrap_or_else(|| filename.clone()),
-            Err(_) => filename.clone(),
-        };
+        // One read serves both the display name and the sync status: hashing bytes
+        // already in memory is what keeps the status free. Raw bytes rather than
+        // `read_to_string`, so a catalogue that is not valid UTF-8 still hashes
+        // correctly instead of reading as a missing file.
+        let bytes = std::fs::read(&path).ok();
+        let name = bytes
+            .as_deref()
+            .and_then(|b| extract_catalog_name(&String::from_utf8_lossy(b)))
+            .unwrap_or_else(|| filename.clone());
+        let sync_status = index.status_for(&filename, bytes.as_deref());
         catalogs.push(CatalogFile {
             name,
             filename,
             path: path.to_string_lossy().to_string(),
+            sync_status,
         });
     }
 
@@ -420,7 +481,7 @@ pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
         Some(d) => d,
         None => return Vec::new(),
     };
-    let catalogs = scan_catalogs(&dir);
+    let catalogs = scan_catalogs(&dir, &sync_index(app));
     {
         let cache = app.state::<CatalogCache>();
         let mut st = cache.state.lock().unwrap();
@@ -430,6 +491,18 @@ pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
     // Signal every connected WS client; each reconciles via list_catalogs.
     crate::ws::dispatch::send_catalog_list_changed(&catalogs);
     catalogs
+}
+
+/// The provenance registry, snapshotted for the scan's join.
+///
+/// `try_state` rather than `state`: this runs from `start_catalog_cache` inside the
+/// setup hook, and `lib.rs` registers some state on the builder and some inside that
+/// hook. Builder state does land first today, but degrading to "nothing is tracked"
+/// costs nothing and does not make catalogue listing depend on that ordering.
+fn sync_index(app: &AppHandle) -> SyncIndex {
+    app.try_state::<CatalogSourceRegistry>()
+        .map(|registry| registry.read(app, |r| r.sync_index()))
+        .unwrap_or_default()
 }
 
 /// Rebuild the cache for the current decoder directory and (re)point the
@@ -760,4 +833,110 @@ pub async fn delete_catalog(app: AppHandle, path: String) -> Result<(), String> 
 
     refresh_catalog_cache(&app);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog_share::registry::{git_blob_sha, Registry};
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "wiretap-catalog-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    fn write(dir: &Path, name: &str, body: &str) {
+        std::fs::write(dir.join(name), body).expect("write catalogue");
+    }
+
+    /// The scan labels each row from the registry as it walks, using the bytes it read
+    /// for the display name. Testable at all only because `scan_catalogs` takes a
+    /// snapshot rather than an `AppHandle`.
+    #[test]
+    fn scan_labels_tracked_and_untracked_catalogues() {
+        let dir = temp_dir("scan-labels");
+        let tracked_body = "[meta]\nname = \"Tracked\"\n";
+        write(&dir, "tracked.toml", tracked_body);
+        write(&dir, "local.toml", "[meta]\nname = \"Local\"\n");
+        write(&dir, "edited.toml", "[meta]\nname = \"Edited\"\n");
+
+        let mut registry = Registry::default();
+        // Byte-identical to what was last exchanged, but no check has run.
+        registry
+            .catalogs
+            .push(tracked_entry("tracked.toml", &git_blob_sha(tracked_body.as_bytes())));
+        // Tracked against bytes that are not what is on disk.
+        registry
+            .catalogs
+            .push(tracked_entry("edited.toml", "some-other-sha"));
+
+        let found = scan_catalogs(&dir, &registry.sync_index());
+        let status = |name: &str| {
+            found
+                .iter()
+                .find(|c| c.filename == name)
+                .unwrap_or_else(|| panic!("{name} missing from the scan"))
+                .sync_status
+        };
+
+        assert_eq!(status("tracked.toml"), SyncStatus::Unchecked);
+        assert_eq!(status("local.toml"), SyncStatus::LocalOnly);
+        assert_eq!(status("edited.toml"), SyncStatus::LocalAhead);
+
+        // The display name still comes from [meta], and the sort is still by filename.
+        assert_eq!(
+            found.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+            ["Edited", "Local", "Tracked"]
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A tracked catalogue whose file has gone reads as missing — but it only appears
+    /// at all if something else in the directory is there, since the scan walks files.
+    #[test]
+    fn a_tracked_file_that_is_gone_never_reaches_the_scan() {
+        let dir = temp_dir("scan-missing");
+        write(&dir, "present.toml", "[meta]\nname = \"Present\"\n");
+
+        let mut registry = Registry::default();
+        registry.catalogs.push(tracked_entry("gone.toml", "aaa"));
+
+        let found = scan_catalogs(&dir, &registry.sync_index());
+        assert_eq!(found.len(), 1, "the scan lists files, not registry entries");
+        assert_eq!(found[0].filename, "present.toml");
+        // `missing` is therefore the settings list's answer, not the picker's — the
+        // picker cannot show a row for a file it never walked.
+        assert_eq!(
+            registry.sync_index().status_for("gone.toml", None),
+            SyncStatus::Missing
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn tracked_entry(filename: &str, sha: &str) -> crate::catalog_share::registry::CatalogEntry {
+        let remote_path = format!("catalogs/{filename}");
+        crate::catalog_share::registry::CatalogEntry {
+            id: crate::catalog_share::registry::catalog_entry_id(
+                "gh:owner/repo",
+                &remote_path,
+                "main",
+            ),
+            repo_id: "gh:owner/repo".to_string(),
+            remote_path,
+            git_ref: "main".to_string(),
+            synced_sha: sha.to_string(),
+            local_filename: filename.to_string(),
+            imported_at: "2026-08-02T00:00:00Z".to_string(),
+            remote_sha: None,
+            publish: None,
+        }
+    }
 }

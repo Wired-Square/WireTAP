@@ -1191,6 +1191,7 @@ pub fn run() {
             catalog_share::auth::git_token_setup_url,
             // Sharing: publish as a branch plus pull request
             catalog_share::publish::preflight_publish,
+            catalog_share::publish::publish_diff,
             catalog_share::publish::publish_catalog,
             catalog_share::publish::create_catalog_repo,
             dashboard::list_dashboards,

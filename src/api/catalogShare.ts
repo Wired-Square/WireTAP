@@ -8,6 +8,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import type { DiffLine } from "./catalog";
 
 /** What a shared URL pointed at within the repository. */
 export type SourceKind = "repo" | "directory" | "file";
@@ -186,8 +187,23 @@ export interface ImportResult {
 /** Local file versus the bytes last exchanged with the remote. No network needed. */
 export type LocalState = "untracked" | "committed" | "modified" | "missing";
 
-/** Remote versus what we last synced. Only meaningful after an update check. */
-export type RemoteState = "unknown" | "inSync" | "upstreamAhead" | "diverged";
+/**
+ * {@link LocalState} and its remote counterpart collapsed into the one label every list
+ * shows, computed in Rust (`catalog_share::registry::SyncStatus::collapse`).
+ *
+ * Derived there rather than here so the catalogue picker can render it without
+ * subscribing to the sharing store, and so the picker's icon and the settings badge
+ * cannot drift apart. `hasLocalChanges` / `hasRemoteChanges` in `utils/catalogSync`
+ * are predicates *over* this — they answer a UI question and stay in TypeScript.
+ */
+export type CatalogSyncStatus =
+  | "localOnly"
+  | "inSync"
+  | "localAhead"
+  | "remoteAhead"
+  | "diverged"
+  | "missing"
+  | "unchecked";
 
 export interface TrackedCatalog {
   id: string;
@@ -196,8 +212,7 @@ export interface TrackedCatalog {
   repoLabel: string;
   remotePath: string;
   gitRef: string;
-  localState: LocalState;
-  remoteState: RemoteState;
+  syncStatus: CatalogSyncStatus;
   webUrl?: string;
   prUrl?: string;
   prNumber?: number;
@@ -499,8 +514,23 @@ export interface PublishPlan {
    * which is why the plan carries no `willOpenPr`. Derive that locally instead.
    */
   suggestedBranch: string;
-  /** The account can push to the upstream directly, so no fork is needed. */
-  canPushUpstream: boolean;
+  /**
+   * Every branch in the local clone, for the branch picker. Free — the clone is
+   * already open during preflight — and it replaces a `matching-refs` request.
+   * Empty when the refs could not be read; typing a new branch name still works.
+   */
+  branches: string[];
+  /** Git blob SHA of the bytes that would be committed. */
+  localBlobSha: string;
+  /**
+   * The same path's blob SHA on `baseBranch`, so "nothing to push" is answerable
+   * without asking for the file text. `null` — this push creates the file.
+   *
+   * Against `baseBranch` specifically: the plan is not re-fetched when the branch
+   * field moves, so a verdict about any other branch would go stale. Use
+   * {@link publishDiff} for the branch actually chosen.
+   */
+  baseBlobSha: string | null;
   forkNeeded: boolean;
   /** Content becomes public and permanent; drives the exposure warning. */
   targetIsPublic: boolean;
@@ -550,6 +580,65 @@ export async function preflightPublish(req: PublishRequest): Promise<PublishPlan
 /** Publish: branch, commit, and (unless commit-only) open or update a pull request. */
 export async function publishCatalog(req: PublishRequest): Promise<PublishResult> {
   return await invoke<PublishResult>("publish_catalog", { req });
+}
+
+/** One commit, as much of it as a provenance line needs. */
+export interface FileCommit {
+  /** Abbreviated — shown, never resolved. */
+  sha: string;
+  author: string;
+  /** Unix seconds, UTC. Formatted here, because the frontend owns the locale. */
+  timestamp: number;
+  summary: string;
+}
+
+/** What to compare. Named explicitly so the backend does not have to re-derive it. */
+export interface PublishDiffRequest {
+  filename: string;
+  repoUrl: string;
+  targetPath: string;
+  /** The branch that would actually be committed to. */
+  branch: string;
+  /** What that branch would be created off, when it does not exist yet. */
+  baseBranch: string;
+}
+
+/**
+ * What a push would change upstream, ready to render.
+ *
+ * Carries the rendered diff rather than the two texts: both are already in hand in
+ * Rust, so returning them would ship the files here and straight back over the
+ * WebSocket to be diffed by the same function.
+ */
+export interface PublishDiff {
+  /** The ref actually read — it falls back to the base when `branch` is new. */
+  comparedRef: string;
+  branchExists: boolean;
+  targetPath: string;
+  /** Unified rows, upstream → local, so an `add` is what this push adds. Empty when
+   *  `identical`, which renders as a banner rather than a page of unchanged lines. */
+  lines: DiffLine[];
+  added: number;
+  removed: number;
+  /** False when this push would add the file rather than change it. */
+  exists: boolean;
+  /** Byte-identical, so the commit would be empty. */
+  identical: boolean;
+  /** Upstream moved on since this catalogue was imported. */
+  upstreamMoved: boolean;
+  lastChange: FileCommit | null;
+}
+
+/**
+ * What a push would change upstream.
+ *
+ * Answered entirely from the clone `preflightPublish` already fetched, so this is
+ * free to call as the branch and path controls move. Separate from the plan because
+ * the plan deliberately does not re-run for those controls, and because the file
+ * text is far too large to ship on something fetched this often.
+ */
+export async function publishDiff(req: PublishDiffRequest): Promise<PublishDiff> {
+  return await invoke<PublishDiff>("publish_diff", { req });
 }
 
 /** What to create a repository as. Private unless deliberately made public. */

@@ -9,13 +9,15 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Globe, Loader2, Lock } from "lucide-react";
+import { Globe, Lock } from "lucide-react";
+import * as ShareIcon from "../../../components/catalogIcons";
+import Alert from "../../../components/Alert";
 import Dialog from "../../../components/Dialog";
 import { FormField, Input, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import SettingRadioGroup from "../../settings/components/rows/SettingRadioGroup";
 import { iconMd, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, caption, h2, textDanger, textWarning } from "../../../styles";
-import { alertDanger, alertWarning, panelFooter } from "../../../styles/cardStyles";
+import { bgSurface, borderDivider, caption, h2, textDanger } from "../../../styles";
+import { alertDanger, panelFooter } from "../../../styles/cardStyles";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 
 type Props = {
@@ -108,10 +110,9 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
           />
 
           {!isPrivate && (
-            <div className={`${alertWarning} flex items-start gap-2`}>
-              <AlertTriangle className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
+            <Alert tone="warning">
               <p className={caption}>{t("createRepo.publicWarning")}</p>
-            </div>
+            </Alert>
           )}
 
           {!hasToken && <p className={`${caption} ${textDanger}`}>{t("createRepo.needsToken")}</p>}
@@ -129,7 +130,7 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
             onClick={() => void handleCreate()}
             disabled={!name.trim() || !hasToken || account.busy}
           >
-            {account.busy && <Loader2 className={`${iconMd} animate-spin`} />}
+            {account.busy && <ShareIcon.Busy className={`${iconMd} animate-spin`} />}
             {t("createRepo.create")}
           </PrimaryButton>
         </div>

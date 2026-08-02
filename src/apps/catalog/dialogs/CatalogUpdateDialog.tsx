@@ -16,15 +16,14 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Download, GitBranch, Loader2, Pencil, Radio, XCircle } from "lucide-react";
+import * as ShareIcon from "../../../components/catalogIcons";
+import Alert from "../../../components/Alert";
 import Dialog from "../../../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 import DiffView from "../views/DiffView";
 import { diffCatalog, type DiffLine } from "../../../api/catalog";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import {
-  alertDanger,
-  alertWarning,
   badgeMetadata,
   bgSurface,
   borderDefault,
@@ -125,7 +124,7 @@ export default function CatalogUpdateDialog({
           <h2 className={h2}>{t("update.title")}</h2>
           {review && (
             <p className={caption}>
-              {review.localFilename} · <GitBranch className={`${iconSm} inline`} />{" "}
+              {review.localFilename} · <ShareIcon.Branch className={`${iconSm} inline`} />{" "}
               {review.repoLabel}
             </p>
           )}
@@ -134,16 +133,15 @@ export default function CatalogUpdateDialog({
         <div className="p-4 space-y-3">
           {updates.loadingReview && (
             <div className="flex items-center gap-2">
-              <Loader2 className={`${iconMd} ${textSecondary} animate-spin`} />
+              <ShareIcon.Busy className={`${iconMd} ${textSecondary} animate-spin`} />
               <span className={caption}>{t("update.loading")}</span>
             </div>
           )}
 
           {updates.reviewError && (
-            <div className={`${alertDanger} flex items-start gap-2`}>
-              <XCircle className={`${iconMd} ${textDanger} flex-shrink-0 mt-0.5`} />
+            <Alert tone="danger">
               <p className={caption}>{updates.reviewError.message}</p>
-            </div>
+            </Alert>
           )}
 
           {review && (
@@ -153,29 +151,25 @@ export default function CatalogUpdateDialog({
                 <span className={badgeMetadata}>{review.remoteBlobSha.slice(0, 7)}</span>
                 {review.transmitFrameCount > 0 && (
                   <span className={`${caption} ${textWarning} inline-flex items-center gap-1`}>
-                    <Radio className={iconSm} />
+                    <ShareIcon.TransmitRisk className={iconSm} />
                     {t("update.transmitFrames", { count: review.transmitFrameCount })}
                   </span>
                 )}
               </div>
 
               {blocked && (
-                <div className={`${alertDanger} flex items-start gap-2`}>
-                  <XCircle className={`${iconMd} ${textDanger} flex-shrink-0 mt-0.5`} />
-                  <div>
-                    <p className={textMedium}>{t("update.invalid")}</p>
-                    <p className={caption}>{review.validationErrors.join("; ")}</p>
-                  </div>
-                </div>
+                <Alert tone="danger">
+                  <p className={textMedium}>{t("update.invalid")}</p>
+                  <p className={caption}>{review.validationErrors.join("; ")}</p>
+                </Alert>
               )}
 
               {/* A diverged file is never overwritten — that is the whole point of
                   routing it through the editor instead. */}
               {diverged && (
-                <div className={`${alertWarning} flex items-start gap-2`}>
-                  <AlertTriangle className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
+                <Alert tone="warning">
                   <p className={caption}>{t("update.divergedWarning")}</p>
-                </div>
+                </Alert>
               )}
 
               <div>
@@ -196,7 +190,7 @@ export default function CatalogUpdateDialog({
           <SecondaryButton onClick={onClose}>{t("update.cancel")}</SecondaryButton>
           {review && decoderDir && (
             <SecondaryButton onClick={handleOpenInEditor}>
-              <Pencil className={iconMd} />
+              <ShareIcon.Edit className={iconMd} />
               {t("update.openInEditor")}
             </SecondaryButton>
           )}
@@ -207,9 +201,9 @@ export default function CatalogUpdateDialog({
               disabled={blocked || updates.applying}
             >
               {updates.applying ? (
-                <Loader2 className={`${iconMd} animate-spin`} />
+                <ShareIcon.Busy className={`${iconMd} animate-spin`} />
               ) : (
-                <Download className={iconMd} />
+                <ShareIcon.Pull className={iconMd} />
               )}
               {t("update.apply")}
             </PrimaryButton>

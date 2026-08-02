@@ -68,6 +68,28 @@ impl TreeListing {
     }
 }
 
+/// One commit, as much of it as a provenance line needs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileCommit {
+    /// Abbreviated to [`SHORT_SHA_LEN`] — this is shown, never resolved.
+    pub sha: String,
+    pub author: String,
+    /// Unix seconds, UTC. Formatted by the frontend, which owns the locale.
+    pub timestamp: i64,
+    pub summary: String,
+}
+
+/// How far back [`walk_for_path`] goes before giving up.
+///
+/// A bound rather than a full walk: the answer is decoration on a dialog, and a
+/// catalogue that has not changed in five hundred commits is one nobody is waiting to
+/// read a date for. Hitting it yields `None`, which the UI renders as nothing at all.
+const MAX_HISTORY_WALK: usize = 500;
+
+/// Length of an abbreviated commit id, matching git's own default.
+const SHORT_SHA_LEN: usize = 7;
+
 /// Tauri event carrying clone/fetch progress. A Tauri event rather than a WebSocket
 /// push for the same reason publish progress is: it is window-scoped modal UI, and the
 /// WS surface has a 10-second timeout a clone would blow straight through.
@@ -500,10 +522,21 @@ pub async fn read_blob(dir: &Path, git_ref: &str, path: &str) -> Result<BlobText
 
 fn read_blob_blocking(dir: &Path, git_ref: &str, path: &str) -> Result<BlobText, ShareError> {
     let repo = Repository::open(dir).map_err(map_err)?;
-    let tree = tree_at(&repo, git_ref)?;
-    let entry = tree
+    let entry = tree_at(&repo, git_ref)?
         .get_path(Path::new(path))
         .map_err(|_| ShareError::not_found(format!("{path} is not in this repository")))?;
+    blob_text(&repo, &entry, path)
+}
+
+/// A tree entry's text, size-capped and checked for UTF-8.
+///
+/// Shared so the cap and both of its messages have one home: a second copy is how a
+/// limit and the sentence describing it drift apart.
+fn blob_text(
+    repo: &Repository,
+    entry: &git2::TreeEntry<'_>,
+    path: &str,
+) -> Result<BlobText, ShareError> {
     let blob = repo.find_blob(entry.id()).map_err(map_err)?;
     if blob.size() as u64 > MAX_CATALOG_BYTES {
         return Err(ShareError::invalid(format!(
@@ -519,6 +552,29 @@ fn read_blob_blocking(dir: &Path, git_ref: &str, path: &str) -> Result<BlobText,
         text,
         sha: entry.id().to_string(),
     })
+}
+
+/// Blob SHA of `path` at `origin/{git_ref}`, without loading the object.
+///
+/// The id is in the tree entry, so a "have these bytes changed?" verdict costs a tree
+/// walk rather than an inflate plus two full-size allocations — the same discipline
+/// [`list_blocking`] follows for sizes. `None` when the path is not in that tree.
+pub async fn blob_sha(
+    dir: &Path,
+    git_ref: &str,
+    path: &str,
+) -> Result<Option<String>, ShareError> {
+    let (dir, git_ref, path) = (dir.to_path_buf(), git_ref.to_string(), path.to_string());
+    blocking(move || {
+        let repo = Repository::open(&dir).map_err(map_err)?;
+        let tree = tree_at(&repo, &git_ref)?;
+        let sha = tree
+            .get_path(Path::new(&path))
+            .ok()
+            .map(|entry| entry.id().to_string());
+        Ok(sha)
+    })
+    .await
 }
 
 /// How far the local branch is ahead of and behind `origin`.
@@ -577,14 +633,32 @@ fn head_of(repo: &Repository, git_ref: &str) -> Result<String, ShareError> {
 
 /// Is `git_ref` a branch in this already-synced clone?
 ///
-/// Used to decide whether a catalogue's provenance ref can be a push target. Treats
-/// any failure as "no": this only ever selects between a preferred base branch and the
+/// A direct reference lookup rather than a scan of [`branches`]: this asks about one
+/// name. A tag cannot live under `refs/remotes/origin/`, so it also keeps "only a
+/// branch can be a push target" without consulting the ref list at all. Treats any
+/// failure as "no" — this only ever selects between a preferred base branch and the
 /// repository default, so a transient error must degrade to the safe default rather
 /// than fail the whole preflight.
-pub async fn is_branch(dir: &Path, git_ref: &str) -> bool {
-    known_refs(dir)
-        .await
-        .is_ok_and(|refs| refs.iter().any(|name| name == git_ref))
+pub async fn has_branch(dir: &Path, git_ref: &str) -> bool {
+    let (dir, git_ref) = (dir.to_path_buf(), git_ref.to_string());
+    blocking(move || {
+        let repo = Repository::open(&dir).map_err(map_err)?;
+        let found = repo
+            .find_reference(&format!("refs/remotes/origin/{git_ref}"))
+            .is_ok();
+        Ok(found)
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// Short names of every branch the clone knows about, sorted.
+///
+/// Distinct from [`known_refs`], which folds tags in: a tag is readable but is never a
+/// legal push target, so offering one in the publish branch picker would build a
+/// request the push path has to turn down.
+pub async fn branches(dir: &Path) -> Result<Vec<String>, ShareError> {
+    ref_names(dir, RefKind::Branches).await
 }
 
 /// Short names of every branch and tag the clone knows about.
@@ -593,24 +667,209 @@ pub async fn is_branch(dir: &Path, git_ref: &str) -> bool {
 /// are already local, and answering from them works for any host rather than only for
 /// the one API we implemented.
 pub async fn known_refs(dir: &Path) -> Result<Vec<String>, ShareError> {
+    ref_names(dir, RefKind::BranchesAndTags).await
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RefKind {
+    Branches,
+    BranchesAndTags,
+}
+
+async fn ref_names(dir: &Path, kind: RefKind) -> Result<Vec<String>, ShareError> {
     let dir = dir.to_path_buf();
-    blocking(move || {
-        let repo = Repository::open(&dir).map_err(map_err)?;
-        let mut names = Vec::new();
-        for reference in repo.references().map_err(map_err)?.flatten() {
-            let Ok(name) = reference.name() else { continue };
-            // `origin/HEAD` is a symbolic alias, not a ref anyone can ask for by name.
-            if let Some(branch) = name.strip_prefix("refs/remotes/origin/") {
-                if branch != "HEAD" {
-                    names.push(branch.to_string());
-                }
-            } else if let Some(tag) = name.strip_prefix("refs/tags/") {
+    blocking(move || ref_names_blocking(&dir, kind)).await
+}
+
+fn ref_names_blocking(dir: &Path, kind: RefKind) -> Result<Vec<String>, ShareError> {
+    let repo = Repository::open(dir).map_err(map_err)?;
+    let mut names = Vec::new();
+    for reference in repo.references().map_err(map_err)?.flatten() {
+        let Ok(name) = reference.name() else { continue };
+        // `origin/HEAD` is a symbolic alias, not a ref anyone can ask for by name.
+        if let Some(branch) = name.strip_prefix("refs/remotes/origin/") {
+            if branch != "HEAD" {
+                names.push(branch.to_string());
+            }
+        } else if kind == RefKind::BranchesAndTags {
+            if let Some(tag) = name.strip_prefix("refs/tags/") {
                 names.push(tag.to_string());
             }
         }
-        Ok(names)
+    }
+    // Reference order is the packed-refs layout, which is not meaningful to anyone.
+    names.sort();
+    Ok(names)
+}
+
+/// One path as a ref holds it, with the commit that last changed it.
+#[derive(Debug, Clone)]
+pub struct PathAtRef {
+    /// The ref actually read: `prefer` when it exists, else `fallback`.
+    pub resolved_ref: String,
+    /// True when `prefer` was the one used.
+    pub used_preferred: bool,
+    /// `None` when the path is not on that ref.
+    pub blob: Option<BlobText>,
+    pub last_change: Option<FileCommit>,
+}
+
+/// Read a path at whichever of two refs exists, with its history.
+///
+/// One function rather than three because those would be four `Repository::open` calls
+/// across three thread-pool hops to answer one question, and because resolving the ref
+/// once lets the blob read and the history walk share both it and the tree entry.
+/// Nothing here touches the network — the clone was fetched during preflight.
+///
+/// `prefer` missing is not an error: a push names the branch it would *create*, and the
+/// honest baseline for that is what `fallback` holds.
+pub async fn path_at_ref(
+    dir: &Path,
+    prefer: &str,
+    fallback: &str,
+    path: &str,
+) -> Result<PathAtRef, ShareError> {
+    let (dir, prefer, fallback, path) = (
+        dir.to_path_buf(),
+        prefer.to_string(),
+        fallback.to_string(),
+        path.to_string(),
+    );
+    blocking(move || {
+        let repo = Repository::open(&dir).map_err(|_| {
+            // Preflight always syncs before the diff tab can be reached, so this only
+            // fires if the app data directory was purged mid-dialog. Reported rather
+            // than repaired: cloning here would be the round trip this path avoids.
+            ShareError::not_found(
+                "This repository has not been fetched yet. Close the dialog and open it again.",
+            )
+        })?;
+
+        // A direct lookup, not a scan of every ref: this asks about one name. Peeled
+        // here rather than sent back through `commit_at`, which would resolve the same
+        // name a second time. A tag cannot live under `refs/remotes/origin/`, so this
+        // also keeps "only a branch is a push target" without consulting the ref list.
+        let preferred = repo.find_reference(&format!("refs/remotes/origin/{prefer}"));
+        let used_preferred = preferred.is_ok();
+        let (resolved_ref, commit) = match preferred {
+            Ok(reference) => (prefer, reference.peel_to_commit().map_err(map_err)?),
+            Err(_) => (fallback.clone(), commit_at(&repo, &fallback)?),
+        };
+
+        let entry = commit
+            .tree()
+            .map_err(map_err)?
+            .get_path(Path::new(&path))
+            .ok();
+        let entry_id = entry.as_ref().map(|e| e.id());
+        let blob = entry
+            .map(|entry| blob_text(&repo, &entry, &path))
+            .transpose()?;
+
+        // Only when the file is actually on this ref. An absent path has no entry to
+        // compare against, so the walk could only prove `None == None` up to
+        // MAX_HISTORY_WALK times and return nothing — and "not upstream yet" is the
+        // common case here, since that is the push this dialog exists to preview.
+        // The entry id is handed over so the first step does not repeat the lookup.
+        let last_change = entry_id.and_then(|id| walk_for_path(commit, &path, Some(id)));
+
+        Ok(PathAtRef {
+            resolved_ref,
+            used_preferred,
+            blob,
+            last_change,
+        })
     })
     .await
+}
+
+/// Walk back from `start` for the commit that last changed `path`.
+///
+/// Answers "when did this file last move upstream, and who moved it" out of the object
+/// database — the clone is already fetched, so this costs no network. Compares tree
+/// entry **ids** against the first parent's and never loads a blob, the same discipline
+/// [`list_blocking`] follows.
+///
+/// `start_entry` is `path`'s entry id in `start`'s own tree when the caller already
+/// knows it; `None` means "look it up". Returns `None` when the path is not on that
+/// ref, when it has never changed within [`MAX_HISTORY_WALK`], or when there is no
+/// history to walk. There is no error case by construction — every lookup here has a
+/// meaningful "absent" answer, and a missing result is a line the UI omits.
+fn walk_for_path(
+    start: git2::Commit<'_>,
+    path: &str,
+    start_entry: Option<git2::Oid>,
+) -> Option<FileCommit> {
+    let path = Path::new(path);
+
+    // Entry id of `path` in a commit's tree, or None when the file is not in it. A
+    // missing path is a legitimate state on both sides of the comparison: absent →
+    // present is the commit that added the file.
+    let entry_id = |commit: &git2::Commit| -> Option<git2::Oid> {
+        commit
+            .tree()
+            .ok()
+            .and_then(|tree| tree.get_path(path).ok())
+            .map(|entry| entry.id())
+    };
+
+    let mut commit = start;
+    let mut current = start_entry.or_else(|| entry_id(&commit));
+    for _ in 0..MAX_HISTORY_WALK {
+        // First parent only. A merge's other parents are already reachable through it,
+        // and following them would report a commit that is not on this branch's spine.
+        let Ok(parent) = commit.parent(0) else {
+            // A root commit that holds the file is the commit that introduced it.
+            return current.map(|_| describe(&commit));
+        };
+        // Carried into the next iteration rather than re-derived: each call loads the
+        // commit's tree and every tree along `path`, so re-deriving doubles the walk.
+        let in_parent = entry_id(&parent);
+        if current != in_parent {
+            return Some(describe(&commit));
+        }
+        commit = parent;
+        current = in_parent;
+    }
+    None
+}
+
+/// [`walk_for_path`] from a ref, opening the repository for itself.
+///
+/// Only the tests reach this — `path_at_ref` walks from a commit it already has — but
+/// it keeps them expressing the question as "what changed this path on this ref"
+/// rather than hand-rolling an open and a ref resolution.
+#[cfg(test)]
+fn last_commit_blocking(
+    dir: &Path,
+    git_ref: &str,
+    path: &str,
+) -> Result<Option<FileCommit>, ShareError> {
+    let repo = Repository::open(dir).map_err(map_err)?;
+    let start = commit_at(&repo, git_ref)?;
+    Ok(walk_for_path(start, path, None))
+}
+
+fn describe(commit: &git2::Commit) -> FileCommit {
+    let author = commit.author();
+    FileCommit {
+        sha: commit
+            .id()
+            .to_string()
+            .chars()
+            .take(SHORT_SHA_LEN)
+            .collect(),
+        author: author.name().unwrap_or("unknown").to_string(),
+        timestamp: author.when().seconds(),
+        // Non-UTF-8 commit messages are legal in git; an unreadable one degrades to a
+        // blank summary rather than losing the date and author beside it.
+        summary: commit
+            .summary()
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+            .to_string(),
+    }
 }
 
 // ── Write ────────────────────────────────────────────────────────────────────
@@ -696,6 +955,19 @@ fn push_blocking(
         .head()
         .and_then(|h| h.peel_to_commit())
         .map_err(map_err)?;
+
+    // Enforced here rather than only in the dialog, which cannot see every branch it
+    // has not diffed against: an unchanged tree means the commit would say nothing and
+    // the push would report success for a no-op. Both ids are already in hand, so this
+    // costs nothing. Publishing a catalogue is the only thing that reaches this, and
+    // it never wants an empty commit.
+    if tree.id() == parent.tree_id() {
+        return Err(ShareError::invalid(format!(
+            "{} on '{}' is already identical — there is nothing to commit.",
+            spec.path, spec.branch
+        )));
+    }
+
     let commit = repo
         .commit(
             Some("HEAD"),
@@ -1097,6 +1369,232 @@ mod tests {
             main_tree.get_path(Path::new("catalogs/new.toml")).is_err(),
             "a named branch must not also write to the base"
         );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A tag is readable but is never a legal push target, so it must not appear where
+    /// a branch is being chosen. The base-branch check was built on `known_refs`,
+    /// which folds tags in — a catalogue pinned to a tag was accepted as a push target.
+    #[test]
+    fn branches_lists_branches_and_not_tags() {
+        let root = std::env::temp_dir().join("wiretap-git-branches");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let url = seed_remote(&root);
+
+        // Tag the seed commit on the remote, then clone: the initial clone takes every
+        // ref, so the tag is definitely local by the time `branches` is asked.
+        let bare = Repository::open_bare(root.join("remote.git")).expect("open bare");
+        let head = bare
+            .find_reference("refs/heads/main")
+            .and_then(|r| r.peel_to_commit())
+            .expect("remote head");
+        bare.tag_lightweight("v1.0.0", head.as_object(), false)
+            .expect("tag the seed commit");
+
+        let dir = root.join("clone");
+        sync_blocking(
+            None,
+            &dir,
+            &RepoSpec {
+                repo_id: "gh:test/refs".into(),
+                clone_url: url,
+                git_ref: "main".into(),
+                token: None,
+            },
+        )
+        .expect("clone");
+
+        let branches = ref_names_blocking(&dir, RefKind::Branches).expect("branches");
+        assert_eq!(branches, vec!["main".to_string()]);
+
+        let all = ref_names_blocking(&dir, RefKind::BranchesAndTags).expect("known refs");
+        assert!(
+            all.contains(&"v1.0.0".to_string()),
+            "known_refs still carries tags for the callers that want them"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The "nothing to push" verdict is blob-SHA equality, so libgit2's tree entry id
+    /// and our own `git_blob_sha` must agree. Asserted offline: the network test that
+    /// covers the same ground only runs by hand.
+    #[test]
+    fn a_seeded_blob_hashes_to_its_tree_entry_id() {
+        let root = std::env::temp_dir().join("wiretap-git-blobsha");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let url = seed_remote(&root);
+
+        let dir = root.join("clone");
+        sync_blocking(
+            None,
+            &dir,
+            &RepoSpec {
+                repo_id: "gh:test/blobsha".into(),
+                clone_url: url,
+                git_ref: "main".into(),
+                token: None,
+            },
+        )
+        .expect("clone");
+
+        let blob = read_blob_blocking(&dir, "main", "catalogs.md").expect("read the seed file");
+        assert_eq!(blob.text, "seed\n");
+        assert_eq!(blob.sha, super::super::registry::git_blob_sha(b"seed\n"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The provenance line must name the commit that touched *this* file, not whatever
+    /// happens to be at HEAD.
+    #[test]
+    fn last_commit_for_path_finds_the_change_not_the_head() {
+        let root = std::env::temp_dir().join("wiretap-git-lastchange");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let url = seed_remote(&root);
+
+        let dir = root.join("clone");
+        sync_blocking(
+            None,
+            &dir,
+            &RepoSpec {
+                repo_id: "gh:test/lastchange".into(),
+                clone_url: url,
+                git_ref: "main".into(),
+                token: None,
+            },
+        )
+        .expect("clone");
+
+        // Two more commits on the remote: one touching the file we ask about, then one
+        // touching something else. The second is HEAD, so a naive answer returns it.
+        let target = push_blocking(
+            None,
+            "gh:test/lastchange",
+            &dir,
+            &PushSpec {
+                branch: "main".into(),
+                base: "main".into(),
+                path: "catalogs/target.toml".into(),
+                content: b"[meta]\nname = \"target\"\n".to_vec(),
+                message: "add the target".into(),
+                author_name: "Author One".into(),
+                author_email: "one@example.invalid".into(),
+                push_url: None,
+            },
+            None,
+        )
+        .expect("commit the target file");
+
+        push_blocking(
+            None,
+            "gh:test/lastchange",
+            &dir,
+            &PushSpec {
+                branch: "main".into(),
+                base: "main".into(),
+                path: "catalogs/other.toml".into(),
+                content: b"[meta]\nname = \"other\"\n".to_vec(),
+                message: "add something else".into(),
+                author_name: "Author Two".into(),
+                author_email: "two@example.invalid".into(),
+                push_url: None,
+            },
+            None,
+        )
+        .expect("commit an unrelated file");
+
+        // Re-sync so the clone's remote-tracking ref carries both commits.
+        sync_blocking(
+            None,
+            &dir,
+            &RepoSpec {
+                repo_id: "gh:test/lastchange".into(),
+                clone_url: format!("file://{}", root.join("remote.git").to_string_lossy()),
+                git_ref: "main".into(),
+                token: None,
+            },
+        )
+        .expect("re-fetch");
+
+        let found = last_commit_blocking(&dir, "main", "catalogs/target.toml")
+            .expect("walk")
+            .expect("the target file has a commit");
+        assert_eq!(found.summary, "add the target");
+        assert_eq!(found.author, "Author One");
+        assert_eq!(found.sha.len(), SHORT_SHA_LEN);
+        assert!(
+            target.commit.starts_with(&found.sha),
+            "the short sha must abbreviate the commit that wrote the file"
+        );
+
+        // A path that is not there at all has no answer, and that is not an error.
+        assert!(last_commit_blocking(&dir, "main", "catalogs/absent.toml")
+            .expect("walk")
+            .is_none());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Committing content that is already there would push a commit saying nothing and
+    /// report success for a no-op. The dialog warns first, but it can only warn about
+    /// branches it has diffed against — the invariant belongs here.
+    #[test]
+    fn an_unchanged_file_is_refused_rather_than_committed() {
+        let root = std::env::temp_dir().join("wiretap-git-empty");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let url = seed_remote(&root);
+
+        let dir = root.join("clone");
+        let spec = RepoSpec {
+            repo_id: "gh:test/empty".into(),
+            clone_url: url,
+            git_ref: "main".into(),
+            token: None,
+        };
+        sync_blocking(None, &dir, &spec).expect("clone");
+
+        let push = |content: &[u8]| {
+            push_blocking(
+                None,
+                &spec.repo_id,
+                &dir,
+                &PushSpec {
+                    branch: "main".into(),
+                    base: "main".into(),
+                    path: "catalogs/new.toml".into(),
+                    content: content.to_vec(),
+                    message: "add new".into(),
+                    author_name: "WireTAP".into(),
+                    author_email: "wiretap@example.invalid".into(),
+                    push_url: None,
+                },
+                None,
+            )
+        };
+
+        push(b"[meta]\nname = \"new\"\n").expect("the first push is a real change");
+        let err = push(b"[meta]\nname = \"new\"\n").expect_err("the same bytes must be refused");
+        assert_eq!(err.kind, ShareErrorKind::Invalid);
+        assert!(err.message.contains("nothing to commit"), "{}", err.message);
+
+        // Refusing must not leave a commit behind: the remote still has exactly the
+        // seed commit plus the one real push.
+        let remote = Repository::open_bare(root.join("remote.git")).expect("open bare");
+        let head = remote
+            .find_reference("refs/heads/main")
+            .and_then(|r| r.peel_to_commit())
+            .expect("remote head");
+        assert_eq!(head.parent_count(), 1, "one real commit on top of the seed");
+
+        // A genuine edit still goes through, so the guard is on sameness, not on
+        // having pushed before.
+        push(b"[meta]\nname = \"newer\"\n").expect("an actual change still commits");
 
         let _ = std::fs::remove_dir_all(&root);
     }

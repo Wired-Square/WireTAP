@@ -274,15 +274,6 @@
     "updateSummary_one": "{{count}} update available across {{repos}} repositories.",
     "updateSummaryNone": "Everything is up to date ({{repos}} repositories checked).",
     "updateFailures": "{{count}} could not be reached",
-    "status": {
-      "localOnly": "Local only",
-      "inSync": "In sync",
-      "localAhead": "Local ahead",
-      "remoteAhead": "Remote ahead",
-      "diverged": "Diverged",
-      "missing": "File missing",
-      "unchecked": "Not checked"
-    },
     "goneUpstream": "That catalogue is no longer in the repository. Use “Stop tracking the Git source” to unlink it, or push your copy back.",
     "notCloned": "Nothing is cloned for that repository yet. Pull it, or browse it from Repository, and try again."
   },

@@ -20,7 +20,7 @@
 //! | `remote_sha != synced_sha`          | upstream has moved             |
 //! | both differ, and remote != local    | diverged, needs review         |
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -70,6 +70,31 @@ pub enum RemoteState {
     InSync,
     UpstreamAhead,
     Diverged,
+}
+
+/// How a local catalogue stands against its repository, as one answer.
+///
+/// [`LocalState`] and [`RemoteState`] are orthogonal on purpose — they are what blob
+/// SHAs can prove without guessing — but every surface that lists catalogues wants a
+/// single label, and the picker and the settings row must never disagree about which
+/// one it is. So the collapse happens exactly once, in [`CatalogEntry::sync_status_of`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SyncStatus {
+    /// Not tracked against any repository — a purely local catalogue.
+    LocalOnly,
+    /// Local and remote both match the bytes last exchanged.
+    InSync,
+    /// Edited locally since the last exchange; the repository has not moved.
+    LocalAhead,
+    /// The repository has moved; the local copy has no edits of its own.
+    RemoteAhead,
+    /// Both sides moved. The only state that needs a decision.
+    Diverged,
+    /// Tracked, but the file is gone from the decoder directory.
+    Missing,
+    /// Tracked, but no update check has run, so the remote side is unknown.
+    Unchecked,
 }
 
 /// The repository half of a subscription.
@@ -240,25 +265,41 @@ impl CatalogEntry {
     }
 
     /// Local sync state, by hashing the file on disk.
+    pub fn local_state(&self, decoder_dir: &Path) -> LocalState {
+        let sha = git_blob_sha_of_file(&decoder_dir.join(&self.local_filename));
+        self.local_state_of(sha.as_deref())
+    }
+
+    /// Local sync state from an already-computed blob SHA. `None` means the file is
+    /// not there.
+    ///
+    /// Split from [`Self::local_state`] so a caller that already holds the bytes —
+    /// the decoder-directory scan reads every catalogue in full to pull its display
+    /// name out — hashes them once instead of asking the disk again.
     ///
     /// Bytes matching `remote_sha` count as committed too — that is how accepting an
     /// upstream update reads, whichever route wrote the file (the editor's ordinary
     /// save, a copy in Finder, anything). Derived rather than promoted on write for
     /// exactly that reason, and it mirrors the "your bytes landed" rule
-    /// [`Self::remote_state`] already applies. `synced_sha` is left alone because
+    /// [`Self::remote_state_of`] already applies. `synced_sha` is left alone because
     /// publish and `reconcile` both key off it.
-    pub fn local_state(&self, decoder_dir: &Path) -> LocalState {
-        match git_blob_sha_of_file(&decoder_dir.join(&self.local_filename)) {
+    pub fn local_state_of(&self, local_sha: Option<&str>) -> LocalState {
+        match local_sha {
             None => LocalState::Missing,
             Some(sha) if sha == self.synced_sha => LocalState::Committed,
-            Some(sha) if self.remote_sha.as_deref() == Some(sha.as_str()) => LocalState::Committed,
+            Some(sha) if self.remote_sha.as_deref() == Some(sha) => LocalState::Committed,
             Some(_) => LocalState::Modified,
         }
     }
 
-    /// Remote sync state. `remote_sha` is only populated by an update check, so this
-    /// reports `Unknown` until one has run.
-    pub fn remote_state(&self, local: LocalState, decoder_dir: Option<&Path>) -> RemoteState {
+    /// Remote sync state from an already-computed blob SHA. `remote_sha` is only
+    /// populated by an update check, so this reports `Unknown` until one has run.
+    ///
+    /// Takes the SHA rather than a directory, which is what removed a second read of a
+    /// file [`Self::local_state_of`] had just hashed. The local state is derived here
+    /// rather than passed in: every caller computed it from this same SHA, and a pair
+    /// that could disagree is a pair that eventually will.
+    pub fn remote_state_of(&self, local_sha: Option<&str>) -> RemoteState {
         let Some(remote_sha) = self.remote_sha.as_deref() else {
             return RemoteState::Unknown;
         };
@@ -267,17 +308,88 @@ impl CatalogEntry {
         }
         // Upstream moved. Whether that is a clean fast-forward or a divergence
         // depends on whether we also have local edits.
-        if local != LocalState::Modified {
-            return RemoteState::UpstreamAhead;
-        }
-        // If upstream happens to match our local bytes, the work has landed.
-        let local_sha = decoder_dir
-            .and_then(|dir| git_blob_sha_of_file(&dir.join(&self.local_filename)));
-        if local_sha.as_deref() == Some(remote_sha) {
-            RemoteState::InSync
-        } else {
+        //
+        // "Upstream happens to match our local bytes, so the work landed" needs no arm
+        // here: `local_state_of` already answers that case with `Committed`, so it
+        // returns above. A second test for it was unreachable — reaching this point
+        // requires the local sha to differ from the remote one.
+        if self.local_state_of(local_sha) == LocalState::Modified {
             RemoteState::Diverged
+        } else {
+            RemoteState::UpstreamAhead
         }
+    }
+
+    /// This catalogue's one status label, from bytes the caller already hashed.
+    ///
+    /// Pure — no filesystem access — so the decoder-directory scan, which already
+    /// holds every file's bytes, labels a row without reading it again.
+    pub fn sync_status_of(&self, local_sha: Option<&str>) -> SyncStatus {
+        SyncStatus::collapse(
+            self.local_state_of(local_sha),
+            self.remote_state_of(local_sha),
+        )
+    }
+}
+
+impl SyncStatus {
+    /// Collapse the two orthogonal comparisons into one label.
+    ///
+    /// Arm order is load-bearing. A missing file outranks everything: there is
+    /// nothing to compare, and every action offered for it would fail. Divergence
+    /// outranks the one-way answers because it is the only state needing a decision.
+    /// And "never checked" stays distinct from "checked and genuinely in sync" —
+    /// `remote_sha` is only populated by an update check, so a freshly imported
+    /// catalogue would otherwise claim a clean bill of health nobody verified.
+    ///
+    /// Deliberately exhaustive with no `_` arm: adding a variant to either input must
+    /// be a compile error here, not a silently wrong label.
+    pub fn collapse(local: LocalState, remote: RemoteState) -> Self {
+        match (local, remote) {
+            (LocalState::Untracked, _) => Self::LocalOnly,
+            (LocalState::Missing, _) => Self::Missing,
+            (_, RemoteState::Diverged) => Self::Diverged,
+            // The "never offer a one-click pull over local edits" rule is enforced by
+            // `remote_state_of`, which already returns Diverged for that case;
+            // repeating it here would be a lower-authority copy.
+            (_, RemoteState::UpstreamAhead) => Self::RemoteAhead,
+            (LocalState::Modified, _) => Self::LocalAhead,
+            (_, RemoteState::Unknown) => Self::Unchecked,
+            (_, RemoteState::InSync) => Self::InSync,
+        }
+    }
+}
+
+/// What the registry knows about tracked filenames, lifted out of the lock so a
+/// directory scan can label its rows without holding it.
+///
+/// An owned snapshot rather than a borrow because `CatalogSourceRegistry::read` drops
+/// its guard when the closure returns — and because the scan that consumes this reads
+/// files, which has no business happening inside the registry mutex.
+#[derive(Debug, Clone, Default)]
+pub struct SyncIndex {
+    /// Keyed by [`filename_key`], so the lookup folds case exactly as
+    /// [`filename_eq`] does.
+    by_filename: HashMap<String, CatalogEntry>,
+}
+
+impl SyncIndex {
+    /// Status for one file, given bytes the caller already read. `None` means it could
+    /// not be read at all.
+    ///
+    /// Hashes only when something is actually tracking the file, so a directory of
+    /// purely local catalogues costs no SHA-1 at all.
+    pub fn status_for(&self, filename: &str, bytes: Option<&[u8]>) -> SyncStatus {
+        // Nothing is tracked at all — the common case for anyone who has never used
+        // the sharing feature — so skip the key allocation for every file in the
+        // directory, not just the miss.
+        if self.by_filename.is_empty() {
+            return SyncStatus::LocalOnly;
+        }
+        let Some(entry) = self.by_filename.get(&filename_key(filename)) else {
+            return SyncStatus::LocalOnly;
+        };
+        entry.sync_status_of(bytes.map(git_blob_sha).as_deref())
     }
 }
 
@@ -619,12 +731,34 @@ impl Registry {
         }
         changed
     }
+
+    /// Snapshot the tracked entries for labelling a directory scan.
+    pub fn sync_index(&self) -> SyncIndex {
+        SyncIndex {
+            by_filename: self
+                .catalogs
+                .iter()
+                .map(|c| (filename_key(&c.local_filename), c.clone()))
+                .collect(),
+        }
+    }
 }
 
 /// Filenames compare case-insensitively — macOS is case-insensitive, so
 /// `Catalog.toml` and `catalog.toml` are the same file there.
 fn filename_eq(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
+    filename_key(a) == filename_key(b)
+}
+
+/// The same rule as [`filename_eq`], as a map key.
+///
+/// One owner, two shapes: a lookup that precomputes the key must not encode the
+/// fold a second time, or the two drift the moment this learns anything — Unicode
+/// folding, or the NFC/NFD normalisation macOS actually needs for an accented
+/// filename. A drifted key reverts a badge to `localOnly`, which reads as a
+/// perfectly plausible local file rather than as a fault.
+fn filename_key(s: &str) -> String {
+    s.to_ascii_lowercase()
 }
 
 /// Names of every `*.toml` at the top level of the decoder dir. Names only: the
@@ -1177,7 +1311,7 @@ mod tests {
     fn remote_state_is_unknown_until_a_check_has_run() {
         let e = entry("x.toml", "aaa");
         assert_eq!(
-            e.remote_state(LocalState::Committed, None),
+            e.remote_state_of(None),
             RemoteState::Unknown
         );
     }
@@ -1187,18 +1321,106 @@ mod tests {
         let mut e = entry("x.toml", "aaa");
         e.remote_sha = Some("aaa".into());
         assert_eq!(
-            e.remote_state(LocalState::Committed, None),
+            e.remote_state_of(None),
             RemoteState::InSync
         );
 
         e.remote_sha = Some("bbb".into());
         assert_eq!(
-            e.remote_state(LocalState::Committed, None),
+            e.remote_state_of(None),
             RemoteState::UpstreamAhead
         );
         assert_eq!(
-            e.remote_state(LocalState::Modified, None),
+            e.remote_state_of(Some("local-edit")),
             RemoteState::Diverged
+        );
+    }
+
+    /// The seven-way collapse, including every precedence pair that makes the order
+    /// load-bearing. Ported from the TypeScript this replaced, which was the only
+    /// thing keeping the picker's icon and the settings badge telling one story.
+    #[test]
+    fn sync_status_collapses_the_two_states_exactly_once() {
+        use LocalState as L;
+        use RemoteState as R;
+        let cases = [
+            // An untracked file is local only, whatever the remote column says.
+            ((L::Untracked, R::Unknown), SyncStatus::LocalOnly),
+            ((L::Untracked, R::InSync), SyncStatus::LocalOnly),
+            // A missing file outranks everything: nothing to compare, and every
+            // action offered for it would fail.
+            ((L::Missing, R::Diverged), SyncStatus::Missing),
+            ((L::Missing, R::UpstreamAhead), SyncStatus::Missing),
+            ((L::Missing, R::InSync), SyncStatus::Missing),
+            // Divergence outranks a one-way move — it is the only state needing a
+            // decision, so it must not read as a safe push.
+            ((L::Modified, R::Diverged), SyncStatus::Diverged),
+            ((L::Committed, R::UpstreamAhead), SyncStatus::RemoteAhead),
+            ((L::Modified, R::UpstreamAhead), SyncStatus::RemoteAhead),
+            // Local edits with nothing known upstream is a push, not "not checked".
+            ((L::Modified, R::Unknown), SyncStatus::LocalAhead),
+            ((L::Modified, R::InSync), SyncStatus::LocalAhead),
+            // Clean but never checked is not the same as checked and clean.
+            ((L::Committed, R::Unknown), SyncStatus::Unchecked),
+            ((L::Committed, R::InSync), SyncStatus::InSync),
+        ];
+        for ((local, remote), want) in cases {
+            assert_eq!(
+                SyncStatus::collapse(local, remote),
+                want,
+                "collapse({local:?}, {remote:?})"
+            );
+        }
+    }
+
+    /// The wire strings, which are the only thing pinning this enum to the union the
+    /// frontend renders icons from. Same spirit as the `git hash-object` parity test:
+    /// a rename here would silently un-badge every row.
+    #[test]
+    fn sync_status_serialises_as_the_ui_union() {
+        let pairs = [
+            (SyncStatus::LocalOnly, "\"localOnly\""),
+            (SyncStatus::InSync, "\"inSync\""),
+            (SyncStatus::LocalAhead, "\"localAhead\""),
+            (SyncStatus::RemoteAhead, "\"remoteAhead\""),
+            (SyncStatus::Diverged, "\"diverged\""),
+            (SyncStatus::Missing, "\"missing\""),
+            (SyncStatus::Unchecked, "\"unchecked\""),
+        ];
+        for (status, want) in pairs {
+            assert_eq!(serde_json::to_string(&status).unwrap(), want);
+        }
+    }
+
+    /// The purity the whole scan design rests on: given the bytes, the answer must not
+    /// depend on the file being there. `scan_catalogs` hands over bytes it already
+    /// read, and re-reading per row is the cost this avoids.
+    #[test]
+    fn sync_status_reads_nothing_from_disk() {
+        let mut e = entry("nowhere-near-a-real-file.toml", "aaa");
+        assert_eq!(e.sync_status_of(Some("aaa")), SyncStatus::Unchecked);
+        assert_eq!(e.sync_status_of(Some("bbb")), SyncStatus::LocalAhead);
+        assert_eq!(e.sync_status_of(None), SyncStatus::Missing);
+
+        e.remote_sha = Some("aaa".into());
+        assert_eq!(e.sync_status_of(Some("aaa")), SyncStatus::InSync);
+    }
+
+    /// An untracked filename has no provenance, so it is local only — and the lookup
+    /// must fold case, or a catalogue saved as `Sbrxxx.toml` silently loses its badge.
+    #[test]
+    fn the_sync_index_matches_filenames_case_insensitively() {
+        let mut r = Registry::default();
+        r.catalogs.push(entry("Catalog.toml", "aaa"));
+        let index = r.sync_index();
+
+        assert_eq!(
+            index.status_for("catalog.toml", Some(b"anything")),
+            SyncStatus::LocalAhead
+        );
+        assert_eq!(
+            index.status_for("other.toml", Some(b"anything")),
+            SyncStatus::LocalOnly
         );
     }
 
@@ -1242,20 +1464,43 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// A merged PR shows up as upstream matching our local bytes exactly.
+    /// A merged PR shows up as upstream matching our local bytes exactly: the local
+    /// side reads as committed — the work landed — even though `synced_sha` is stale.
+    /// The remote side still reports a move, because pulling would refresh that stale
+    /// record; it just would not change a byte.
     #[test]
-    fn remote_state_reconciles_when_upstream_matches_local_bytes() {
-        let dir = temp_dir("landed");
-        let content = b"[meta]\nname = \"X\"\n";
-        let local_sha = git_blob_sha(content);
-        std::fs::write(dir.join("x.toml"), content).expect("write");
-
+    fn upstream_matching_local_bytes_reads_as_landed() {
+        let local_sha = git_blob_sha(b"[meta]\nname = \"X\"\n");
         let mut e = entry("x.toml", "old-synced");
-        e.remote_sha = Some(local_sha);
-        assert_eq!(
-            e.remote_state(LocalState::Modified, Some(&dir)),
-            RemoteState::InSync
+        e.remote_sha = Some(local_sha.clone());
+
+        assert_eq!(e.local_state_of(Some(&local_sha)), LocalState::Committed);
+        assert_eq!(e.remote_state_of(Some(&local_sha)), RemoteState::UpstreamAhead);
+        // Not `Diverged`: there is nothing of ours left unsent.
+        assert_eq!(e.sync_status_of(Some(&local_sha)), SyncStatus::RemoteAhead);
+    }
+
+    /// `list_catalog_sources` refreshes the catalogue cache when `reconcile` reports a
+    /// change, and that refresh broadcasts an event the frontend answers by calling
+    /// `list_catalog_sources` again. Termination rests entirely on reconcile being a
+    /// fixed point after one application — so assert it, rather than leaving the
+    /// argument in a comment beside a cross-process loop.
+    #[test]
+    fn reconcile_is_a_fixed_point() {
+        let dir = temp_dir("fixed-point");
+        let content = b"[meta]\nname = \"X\"\n";
+        std::fs::write(dir.join("renamed.toml"), content).expect("write");
+
+        let mut r = Registry::default();
+        r.upsert_catalog(entry("original.toml", &git_blob_sha(content)));
+
+        assert!(r.reconcile(&dir), "the rename is followed by content hash");
+        assert_eq!(r.catalogs[0].local_filename, "renamed.toml");
+        assert!(
+            !r.reconcile(&dir),
+            "a second pass must report no change, or the IPC refresh loops forever"
         );
+
         std::fs::remove_dir_all(&dir).ok();
     }
 

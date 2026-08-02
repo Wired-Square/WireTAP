@@ -354,7 +354,7 @@ impl WireTapTools {
         ok_json(json!({ "available": true, "path": path.to_string_lossy(), "lines": tail }))
     }
 
-    #[tool(description = "List the decoder catalogs (TOML) in the decoder directory, with name, filename and path.")]
+    #[tool(description = "List the decoder catalogs (TOML) in the decoder directory, with name, filename, path and git sync status.")]
     async fn list_catalogs(&self) -> Result<CallToolResult, McpError> {
         ok_json(crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?)
     }

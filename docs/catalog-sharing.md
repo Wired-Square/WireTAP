@@ -58,10 +58,18 @@ than repaired; that one rule is what makes every one of those cases recover with
 special handling.
 
 Only the push path checks the working tree out. Every read — `list_catalogues`,
-`read_blob`, `known_refs`, `ahead_behind` — resolves from `refs/remotes/origin/{ref}`
-in the object database, so `align_branch` moves the ref and stops there. Checking out
-on every sync meant a whole-tree diff, and on a branch switch a rewrite of every file,
-for work that was then thrown away.
+`read_blob`, `blob_sha`, `branches`, `known_refs`, `has_branch`, `path_at_ref`,
+`ahead_behind` — resolves from `refs/remotes/origin/{ref}` in the object database, so
+`align_branch` moves the ref and stops there. Checking out on every sync meant a
+whole-tree diff, and on a branch switch a rewrite of every file, for work that was
+then thrown away.
+
+Two of those exist to avoid work rather than to answer a new question. `blob_sha`
+returns the tree entry id without loading the object, because a "have these bytes
+changed?" verdict does not need an inflate plus two full-size allocations.
+`branches` is branch names only, unlike `known_refs`, which folds tags in — a tag
+resolves to a commit but can never be a push target, and answering "yes" for one
+produced a plan the push path had to reject.
 
 ### The clone is transport and mirror, not a workspace
 
@@ -97,13 +105,17 @@ settings or keychain), and its 10 s timeout would be blown by a fork poll.
 | `catalog_share/error.rs` | `ShareError` / `ShareErrorKind` — the module's error type |
 
 Frontend: `src/api/catalogShare.ts` (wrappers + TS mirrors),
-`src/stores/catalogShareStore.ts`, `src/apps/catalog/dialogs/{PublishCatalog,
-GitHubToken,CreateCatalogRepo,CatalogUpdate}Dialog.tsx`,
+`src/stores/catalogShareStore.ts`, `src/apps/catalog/dialogs/publish/` (the tabbed
+push dialog — shell, one file per tab, plus the pure `publishBlockers`/`publishTabs`
+derivations), `src/apps/catalog/dialogs/{GitHubToken,CreateCatalogRepo,CatalogUpdate}Dialog.tsx`,
 `src/apps/catalog/components/CatalogShareDialogs.tsx` (those four, which
 interlink, shared by the Catalog editor and Settings → Catalogs), and
 `src/dialogs/catalog-share/RepositoryDialog.tsx` — mounted by whoever offers the
 button (the shared catalogue picker, and Settings → Catalogs), because unlike the
 other four it hands off to none of them. Also
+`src/components/catalogIcons.ts` — the icon vocabulary (see below) — with
+`src/components/catalogSyncPresentation.tsx` rendering its status table for the
+catalogue picker and Settings → Catalogs, and
 `src/hooks/useCatalogSources.ts` — the catalogue list joined with its provenance,
 both reconciled off the same `CatalogListChanged` push via the shared
 `src/hooks/useWsResync.ts` primitive (also used by `useCatalogList`,
@@ -148,9 +160,9 @@ difference is what people want to see.
 ### One status for the UI
 
 The two states above are orthogonal and both are needed to be honest about what is
-knowable without a network call. The UI wants a single label, so
-`src/utils/catalogSync.ts` collapses them exactly once, and both the badge and the
-row's menu read that — they cannot disagree about which state a catalogue is in.
+knowable without a network call. Every surface that lists catalogues wants a single
+label, so `SyncStatus::collapse` in `registry.rs` collapses them **exactly once, in
+Rust**, and every consumer reads that one field.
 
 | Status | Meaning |
 |---|---|
@@ -165,12 +177,92 @@ row's menu read that — they cannot disagree about which state a catalogue is i
 Two subtleties worth keeping: `missing` outranks everything, because with nothing on
 disk every other label would be fiction; and `unchecked` is kept distinct from
 `inSync`, because "no check has run" and "checked, and current" are different claims.
+`collapse` matches on the `(LocalState, RemoteState)` tuple with **no `_` arm**, so
+adding a variant to either input is a compile error rather than a silently wrong label.
+
+**Why Rust rather than the frontend.** The status rides on `CatalogFile` (from
+`list_catalogs`) as well as `TrackedCatalog`, so the catalogue picker can draw it
+without importing the sharing store — that picker is mounted by five panels that
+otherwise never touch it, and a frontend join would have put the whole share subtree
+in all five bundles. It is also nearly free where it is computed: `scan_catalogs`
+already reads every `.toml` in full to extract its `[meta].name`, so the status costs
+one SHA-1 over bytes already in memory. `CatalogEntry::sync_status_of` is **pure** —
+it takes an already-computed blob SHA and touches no disk — which is what lets the
+scan label a row without re-reading the file it just read.
+
+`TrackedCatalog` deliberately ships the collapse and **not** its two inputs. Sending
+`localState` and `remoteState` alongside it is an invitation to re-derive rather than
+ask, which is the drift the single collapse exists to prevent — and it had already
+happened twice before they were removed.
 
 The rule that a one-click pull never runs over local edits is enforced in **Rust**,
-twice — `CatalogEntry::remote_state` weighs the local state and returns `Diverged`
-rather than `UpstreamAhead`, and `pull_catalog` refuses again before writing. The TS
-collapse deliberately does *not* re-implement it: a second, lower-authority copy would
-mask a regression in the first rather than catch it.
+twice — `CatalogEntry::remote_state_of` weighs the local state and returns `Diverged`
+rather than `UpstreamAhead`, and `pull_catalog` refuses again before writing.
+`remote_state_of` derives the local state from the same SHA rather than taking it as a
+parameter, so a caller cannot pass an inconsistent pair.
+
+`src/utils/catalogSync.ts` keeps only `hasLocalChanges` / `hasRemoteChanges` —
+predicates *over* the status that answer a UI question ("is Push worth offering?").
+Presentation lives in `src/components/catalogSyncPresentation.tsx`, over the
+`SYNC_STATUS_DRESS` record in `catalogIcons.ts`: one row per status carrying its icon,
+glyph colour and pill class, rendered as `CatalogSyncIcon` (the picker's glyph) and
+`CatalogSyncBadge` (the settings row, which shows the glyph *and* the label so one
+surface teaches the other). The two stay separate components — a fast selector is not a
+management list — but they cannot dress the same status differently.
+
+### The icon vocabulary
+
+`src/components/catalogIcons.ts` owns every glyph the journey uses, on one rule:
+
+> **One family per axis.** A glyph answers either *where things stand* or *what this
+> button does*, never both.
+
+- **State is a noun → arrows.** `↑` local ahead, `↓` remote ahead, `↕` diverged. They
+  are literally what "ahead" and "behind" mean, and they match the labels' own words.
+- **Transfer is a verb → clouds.** `CloudUpload` push, `CloudDownload` pull *and*
+  apply-an-update, so one idea reads as one glyph from the status through to the button
+  that resolves it. `RefreshCw` means only "check for updates" — a poll that writes
+  nothing.
+- **Repository objects → git marks.** `FolderGit2` is a repository, `GitBranch` is only
+  ever a branch or ref, `FolderOpen` reveals the clone.
+- **One alert glyph.** Severity is carried by tone, so `src/components/Alert.tsx` owns
+  `TriangleAlert` and takes no `icon` prop — a per-caller glyph is exactly how this
+  journey accumulated four of them for one job. `SecretFindings` keeps `ShieldAlert` as
+  the single deliberate exception: a security finding is a section, not an alert box.
+
+**Why a file rather than a convention.** The rule exists because it was broken: the
+"Local ahead" status and the "Push" action were the *same component*. lucide re-exports
+`UploadCloud` as an alias of `CloudUpload`, so two different names produced one picture
+— invisible to grep, invisible to the compiler, total on screen. `src/tests/catalogIcons.test.ts`
+asserts no two names resolve to one glyph and that no state wears a transfer glyph; it
+is the only check that can see through a lucide alias.
+
+Import through the vocabulary (`import * as ShareIcon from ".../catalogIcons"`), not
+from lucide directly. The exports are deliberately *not* tree-shaken — the file records
+the measurement and the trade.
+
+### Keeping the cached status fresh
+
+`list_catalogs` serves from `CatalogCache`, which is rebuilt by the decoder-directory
+watcher and by save/import/rename/delete. But a **registry** write changes a status
+without touching a single file, and no filesystem event will ever fire for it. Those
+paths therefore rebuild the cache explicitly, via `write_and_refresh` in `mod.rs`:
+
+| Command | What moves | Why nothing else catches it |
+|---|---|---|
+| `check_catalog_updates` | `remote_sha` | the command that turns `unchecked` into a real answer |
+| `pull_catalog` | `remote_sha` | on the decline paths; the applied path refreshes via `install_update` |
+| `forget_catalog_source` | entry removed | the row becomes `localOnly` |
+| `persist_publish_state` | `synced_sha` | a push flips `localAhead` → `inSync` |
+| `list_catalog_sources` | `local_filename` | a relink moves two rows' statuses |
+
+The last one is the delicate one. `refresh_catalog_cache` broadcasts
+`CatalogListChanged`, which the frontend answers by calling `list_catalog_sources`
+again — so refreshing unconditionally there would loop across the IPC boundary. It is
+gated on `reconcile` reporting a relink, and `reconcile` is a fixed point after one
+application (its relink target came from the present-files list, so the next pass finds
+nothing missing). That termination argument is pinned by
+`reconcile_is_a_fixed_point`, not left to this paragraph.
 
 `repo_status` additionally reports true `ahead`/`behind` commit counts from
 `graph_ahead_behind` — the honest per-repository version of the same question, which
@@ -311,6 +403,7 @@ git_token_setup_url() -> String
 
 // Publish — publish.rs
 preflight_publish(app, req) -> PublishPlan                // nothing written
+publish_diff(app, req: PublishDiffRequest) -> PublishDiff // no network at all
 publish_catalog(app, req) -> PublishResult
 create_catalog_repo(req: NewRepo) -> RepoInfo
 ```
@@ -514,6 +607,43 @@ failure risks destroying someone's work.
    reads as in sync. The branch is recorded, and reused by a later publish while
    its PR is open and unmerged, so a second edit adds a commit to the review under
    way instead of opening a rival PR the branch-keyed lookup would never find.
+
+An **unchanged tree is refused** at step 4, in `push_blocking`, where both the new
+tree id and the parent's are already in hand. Committing bytes that are already there
+would push a commit saying nothing and report success for a no-op. The dialog warns
+first, but the invariant belongs where commits are made: the dialog can only warn
+about a branch it has diffed against.
+
+### Reviewing the change before pushing
+
+`publish_diff` answers "what would this push change upstream?" and is what the push
+dialog's **Changes** tab renders. It touches **no network**: preflight has already
+fetched the clone, so this parses the URL and reads the object database. It
+deliberately does not call `resolve` — that does a `get_repo` request and a fetch,
+the exact round trip it exists to avoid — and it does not build a `GitHubClient`
+either, because doing so reads the keychain, which is synchronous OS IPC, once per
+debounced keystroke.
+
+`git::path_at_ref` answers it in one `Repository::open`: it resolves the branch the
+push would land on (falling back to the base branch when that branch does not exist
+yet, which is the honest baseline for a branch about to be created), reads the blob,
+and walks first-parent history for the commit that last touched the path — sharing
+the resolved ref and the tree entry across all three. The walk is skipped entirely
+when the path is not on that ref, which is the common case for a first push.
+
+The diff itself is computed in Rust by `catalog::diff_lines` — the same LCS the
+editor's diff view uses — and `PublishDiff` carries the **rendered rows**, not the two
+texts. Returning the texts would ship both files to the frontend and straight back
+over the WebSocket to be diffed by the function that was one call away. Rows are
+skipped altogether when the two blobs hash the same: the tab says so in one line
+rather than rendering a whole catalogue of unchanged context.
+
+`PublishPlan` also carries `branches` (the clone's real branch names, so the branch
+field offers suggestions without a `matching-refs` request), `localBlobSha` and
+`baseBlobSha` — the last two so the dialog can say "nothing to push" for the default
+direct push without asking for any file text. Those three are filled by
+`enrich_for_dialog`, which only the preflight runs: `resolve` is shared with the
+publish path, and that path reads none of them.
 
 ---
 

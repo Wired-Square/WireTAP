@@ -10,22 +10,9 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Copy,
-  Download,
-  FolderGit2,
-  GitBranch,
-  Info,
-  Loader2,
-  Lock,
-  Radio,
-  Search,
-  Star,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Copy, Lock, Search } from "lucide-react";
+import * as ShareIcon from "../../components/catalogIcons";
+import Alert from "../../components/Alert";
 import Dialog from "../../components/Dialog";
 import OverflowMenu from "../../components/OverflowMenu";
 import { FormField, Input, PrimaryButton, SecondaryButton, Select } from "../../components/forms";
@@ -45,7 +32,7 @@ import {
   textSuccess,
   textWarning,
 } from "../../styles";
-import { alertDanger, alertWarning, panelFooter } from "../../styles/cardStyles";
+import { alertWarning, panelFooter } from "../../styles/cardStyles";
 import { iconButtonHoverCompact, iconButtonHoverSmall } from "../../styles/buttonStyles";
 import { badgeMetadata } from "../../styles/badgeStyles";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
@@ -114,7 +101,7 @@ function CandidateRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span className={textMedium}>{meta?.name ?? entry.filename}</span>
           {meta?.protocol && <span className={badgeMetadata}>{meta.protocol}</span>}
-          {meta?.valid && <CheckCircle2 className={`${iconSm} ${textSuccess}`} />}
+          {meta?.valid && <ShareIcon.Success className={`${iconSm} ${textSuccess}`} />}
           {disabled && (
             <span className={`${caption} ${textDanger}`}>{t("repository.invalid")}</span>
           )}
@@ -132,7 +119,7 @@ function CandidateRow({
             {meta.transmitFrameCount > 0 && (
               <span className={textWarning}>
                 {" · "}
-                <Radio className={`${iconSm} inline`} />{" "}
+                <ShareIcon.TransmitRisk className={`${iconSm} inline`} />{" "}
                 {t("repository.transmitFrames", { count: meta.transmitFrameCount })}
               </span>
             )}
@@ -169,20 +156,20 @@ function SavedRepoRow({
   const items = [
     {
       label: t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite"),
-      icon: Star,
+      icon: ShareIcon.Favourite,
       onClick: onToggleFavourite,
     },
     // No file manager to reveal into on iOS.
     showReveal && {
       label: t("repository.saved.revealClone"),
-      icon: FolderGit2,
+      icon: ShareIcon.RevealClone,
       disabled: !repo.cloned,
       hint: repo.cloned ? undefined : t("repository.saved.revealCloneHint"),
       onClick: () => void revealRepoClone(repo.id),
     },
-    { label: t("repository.saved.properties"), icon: Info, onClick: onProperties },
+    { label: t("repository.saved.properties"), icon: ShareIcon.Properties, onClick: onProperties },
     { separator: true } as const,
-    { label: t("repository.saved.remove"), icon: Trash2, danger: true, onClick: onRemove },
+    { label: t("repository.saved.remove"), icon: ShareIcon.Delete, danger: true, onClick: onRemove },
   ];
 
   return (
@@ -192,7 +179,7 @@ function SavedRepoRow({
         className={`${iconButtonHoverCompact} flex-shrink-0`}
         title={t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite")}
       >
-        <Star
+        <ShareIcon.Favourite
           className={`${iconMd} ${isFavourite ? "fill-yellow-500 text-yellow-500" : `${textSecondary} opacity-60`}`}
         />
       </button>
@@ -517,7 +504,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
             </div>
             <SecondaryButton onClick={() => void runBrowse()} disabled={browse.loading}>
               {browse.loading ? (
-                <Loader2 className={`${iconMd} animate-spin`} />
+                <ShareIcon.Busy className={`${iconMd} animate-spin`} />
               ) : (
                 <Search className={iconMd} />
               )}
@@ -527,7 +514,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               onClick={() => void saveRepo(browse.url.trim())}
               disabled={!parsed || alreadySaved}
             >
-              <Star className={iconMd} />
+              <ShareIcon.SaveRepository className={iconMd} />
               {alreadySaved ? t("repository.saved.saved") : t("repository.saved.save")}
             </SecondaryButton>
           
@@ -543,19 +530,16 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
 </div>
 
           {browse.error && (
-            <div className={`${alertDanger} flex items-start gap-2`}>
-              <XCircle className={`${iconMd} ${textDanger} flex-shrink-0 mt-0.5`} />
-              <div className="min-w-0">
-                <p className={textMedium}>{browse.error.message}</p>
-                {hintKey && <p className={caption}>{t(hintKey)}</p>}
-              </div>
-            </div>
+            <Alert tone="danger">
+              <p className={textMedium}>{browse.error.message}</p>
+              {hintKey && <p className={caption}>{t(hintKey)}</p>}
+            </Alert>
           )}
 
           {browse.result && (
             <div className={`${cardCompact} space-y-2`}>
               <div className="flex items-center gap-2 flex-wrap">
-                <GitBranch className={`${iconSm} ${textSecondary}`} />
+                <ShareIcon.Branch className={`${iconSm} ${textSecondary}`} />
                 <span className={textMedium}>{browse.result.repo.fullName}</span>
                 <span className={badgeMetadata}>{browse.result.gitRef}</span>
                 {browse.result.repo.private && (
@@ -569,7 +553,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
                 )}
               </div>
               <div className="flex items-start gap-2">
-                <AlertTriangle className={`${iconSm} ${textWarning} flex-shrink-0 mt-0.5`} />
+                <ShareIcon.Alert className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
                 <p className={caption}>
                   {t("repository.unreviewedWarning", { repo: browse.result.repo.fullName })}
                 </p>
@@ -624,7 +608,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
           {/* The one genuinely physical risk: an imported catalogue can define bus traffic. */}
           {totalTransmitFrames > 0 && (
             <div className={`${alertWarning} flex items-start gap-2`}>
-              <Radio className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
+              <ShareIcon.TransmitRisk className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
               <p className={caption}>
                 {t("repository.transmitWarning", { count: totalTransmitFrames })}
               </p>
@@ -652,11 +636,11 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
                 return (
                   <div key={r.path} className="flex items-start gap-2">
                     {failed ? (
-                      <AlertTriangle
+                      <ShareIcon.Alert
                         className={`${iconSm} ${textWarning} flex-shrink-0 mt-0.5`}
                       />
                     ) : (
-                      <CheckCircle2
+                      <ShareIcon.Success
                         className={`${iconSm} ${textSuccess} flex-shrink-0 mt-0.5`}
                       />
                     )}
@@ -687,9 +671,9 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
             disabled={selection.length === 0 || importState.inFlight}
           >
             {importState.inFlight ? (
-              <Loader2 className={`${iconMd} animate-spin`} />
+              <ShareIcon.Busy className={`${iconMd} animate-spin`} />
             ) : (
-              <Download className={iconMd} />
+              <ShareIcon.ImportCatalog className={iconMd} />
             )}
             {t("repository.import", { count: selection.length })}
           </PrimaryButton>

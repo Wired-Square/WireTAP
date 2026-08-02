@@ -82,7 +82,7 @@ export {
   type ImportResult,
   type ImportOutcome,
   type LocalState,
-  type RemoteState,
+  type CatalogSyncStatus,
   type TrackedCatalog,
   type CatalogSourcesView,
   saveCatalogRepo,

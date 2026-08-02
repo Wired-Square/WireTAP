@@ -1,37 +1,17 @@
 // ui/src/apps/settings/views/CatalogsView.tsx
-import {
-  BookOpen,
-  Copy,
-  Edit2,
-  ExternalLink,
-  FolderGit2,
-  GitBranch,
-  GitPullRequestArrow,
-  Github,
-  Loader2,
-  RefreshCw,
-  Trash2,
-  Unlink,
-  UploadCloud,
-} from "lucide-react";
+import { BookOpen } from "lucide-react";
+import * as ShareIcon from "../../../components/catalogIcons";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { iconSm, flexRowGap2 } from "../../../styles/spacing";
+import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import {
   emptyStateText,
   emptyStateHeading,
   emptyStateDescription,
 } from "../../../styles/typography";
-import {
-  badgeMetadata,
-  badgeSmallNeutral,
-  badgeSmallSuccess,
-  badgeSmallWarning,
-  badgeSmallInfo,
-  badgeSmallDanger,
-} from "../../../styles/badgeStyles";
+import { badgeMetadata } from "../../../styles/badgeStyles";
 import { caption, textDanger } from "../../../styles";
 import { SecondaryButton } from "../../../components/forms";
 import OverflowMenu, { type OverflowMenuItem } from "../../../components/OverflowMenu";
@@ -39,12 +19,9 @@ import type { CatalogFile } from "../stores/settingsStore";
 import { revealRepoClone } from "../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 import { useCatalogSources, type CatalogWithSource } from "../../../hooks/useCatalogSources";
-import {
-  catalogSyncStatus,
-  hasLocalChanges,
-  hasRemoteChanges,
-  type CatalogSyncStatus,
-} from "../../../utils/catalogSync";
+import { hasLocalChanges, hasRemoteChanges } from "../../../utils/catalogSync";
+import { CatalogSyncBadge } from "../../../components/catalogSyncPresentation";
+import type { CatalogSyncStatus } from "../../../api/catalogShare";
 
 type CatalogsViewProps = {
   decoderDir: string;
@@ -62,26 +39,6 @@ type CatalogsViewProps = {
   /** iOS has no file manager to reveal a clone into, so that action is hidden. */
   isIOS?: boolean;
 };
-
-/**
- * How each sync status is dressed. One badge replaces the old scatter of
- * provenance, sync and update pills — the row says one thing about where the
- * catalogue stands, and the menu offers the action that follows from it.
- */
-const BADGE: Record<CatalogSyncStatus, string> = {
-  localOnly: badgeSmallNeutral,
-  inSync: badgeSmallSuccess,
-  localAhead: badgeSmallInfo,
-  remoteAhead: badgeSmallWarning,
-  diverged: badgeSmallDanger,
-  missing: badgeSmallDanger,
-  unchecked: badgeSmallNeutral,
-};
-
-function StatusBadge({ status }: { status: CatalogSyncStatus }) {
-  const { t } = useTranslation("settings");
-  return <span className={BADGE[status]}>{t(`catalogs.status.${status}`)}</span>;
-}
 
 export default function CatalogsView({
   decoderDir,
@@ -142,7 +99,7 @@ export default function CatalogsView({
         label: hasRemoteChanges(status)
           ? t("catalogs.actions.pullAvailable")
           : t("catalogs.actions.pull"),
-        icon: isPulling ? Loader2 : RefreshCw,
+        icon: isPulling ? ShareIcon.Busy : ShareIcon.Pull,
         disabled: isPulling,
         onClick: () => void handlePull(source.id),
       },
@@ -150,19 +107,19 @@ export default function CatalogsView({
         label: hasLocalChanges(status)
           ? t("catalogs.actions.pushChanges")
           : t("catalogs.actions.push"),
-        icon: UploadCloud,
+        icon: ShareIcon.Push,
         // Nothing to send is not a reason to hide it — pushing an in-sync catalogue
         // to a *different* repository is a normal thing to want.
         onClick: () => onPublishCatalog(catalog),
       },
       source?.webUrl && {
         label: t("catalogs.actions.openRepo"),
-        icon: ExternalLink,
+        icon: ShareIcon.GitHub,
         onClick: () => void openUrl(source.webUrl!),
       },
       source?.prNumber && {
         label: t("catalogs.actions.viewPr", { number: source.prNumber }),
-        icon: GitPullRequestArrow,
+        icon: ShareIcon.PullRequest,
         onClick: () => {
           void checkPrStatus(source.id);
           if (source.prUrl) void openUrl(source.prUrl);
@@ -172,7 +129,7 @@ export default function CatalogsView({
       source &&
         !isIOS && {
           label: t("catalogs.actions.revealClone"),
-          icon: FolderGit2,
+          icon: ShareIcon.RevealClone,
           // Says so rather than appearing to do nothing when nothing is cloned.
           onClick: () =>
             void revealRepoClone(source.repoId).then((revealed) => {
@@ -182,18 +139,18 @@ export default function CatalogsView({
       { separator: true },
       {
         label: t("catalogs.actions.duplicate"),
-        icon: Copy,
+        icon: ShareIcon.Duplicate,
         onClick: () => onDuplicateCatalog(catalog),
       },
-      { label: t("catalogs.actions.edit"), icon: Edit2, onClick: () => onEditCatalog(catalog) },
+      { label: t("catalogs.actions.edit"), icon: ShareIcon.Edit, onClick: () => onEditCatalog(catalog) },
       source && {
         label: t("catalogs.actions.forget"),
-        icon: Unlink,
+        icon: ShareIcon.Forget,
         onClick: () => void forgetSource(source.id),
       },
       {
         label: t("catalogs.actions.delete"),
-        icon: Trash2,
+        icon: ShareIcon.Delete,
         danger: true,
         onClick: () => onDeleteCatalog(catalog),
       },
@@ -209,23 +166,23 @@ export default function CatalogsView({
         <div className={flexRowGap2}>
           {onOpenRepositories && (
             <SecondaryButton onClick={onOpenRepositories}>
-              <GitBranch className={iconSm} />
+              <ShareIcon.Repository className={iconMd} />
               {t("catalogs.repository")}
             </SecondaryButton>
           )}
           {tracked.length > 0 && (
             <SecondaryButton onClick={() => void runUpdateCheck()} disabled={updates.checking}>
               {updates.checking ? (
-                <Loader2 className={`${iconSm} animate-spin`} />
+                <ShareIcon.Busy className={`${iconMd} animate-spin`} />
               ) : (
-                <RefreshCw className={iconSm} />
+                <ShareIcon.CheckUpdates className={iconMd} />
               )}
               {t("catalogs.checkUpdates")}
             </SecondaryButton>
           )}
           {onManageAccount && (
             <SecondaryButton onClick={onManageAccount}>
-              <Github className={iconSm} />
+              <ShareIcon.GitHub className={iconMd} />
               {hasToken && login
                 ? t("catalogs.account.connected", { login })
                 : t("catalogs.account.connect")}
@@ -276,7 +233,7 @@ export default function CatalogsView({
         <div className="space-y-3">
           {catalogs.map((catalog) => {
             const { source } = catalog;
-            const status = catalogSyncStatus(source);
+            const status = catalog.syncStatus;
             return (
               <div
                 key={catalog.path}
@@ -288,7 +245,7 @@ export default function CatalogsView({
                       {catalog.name}
                     </h3>
                     <span className={badgeMetadata}>{catalog.filename}</span>
-                    <StatusBadge status={status} />
+                    <CatalogSyncBadge status={status} />
                   </div>
                   {source && (
                     <div className={`${caption} truncate mt-0.5`}>

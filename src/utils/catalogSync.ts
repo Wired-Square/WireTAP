@@ -1,48 +1,19 @@
 // ui/src/utils/catalogSync.ts
 /**
- * One derived answer to "how does my copy compare with the repository?".
+ * Questions a UI asks *about* a catalogue's sync status.
  *
- * The backend reports two orthogonal facts — how the local file compares with the
- * bytes last exchanged (`localState`), and how the remote compares with them
- * (`remoteState`) — because that is what the blob-SHA model can prove without
- * guessing. The UI wants a single label, and the badge and the row's menu must never
- * disagree about which one it is, so the collapse happens exactly once, here.
+ * The status itself is no longer derived here. The backend reports two orthogonal
+ * facts — how the local file compares with the bytes last exchanged, and how the
+ * remote compares with them — and collapses them into one label in
+ * `catalog_share::registry::SyncStatus::collapse`, which arrives on every catalogue.
+ * That move is what lets the catalogue picker render an icon without subscribing to
+ * the sharing store, and it is why there is no second collapse to drift from the
+ * first. Do not reintroduce one here.
+ *
+ * What belongs in TypeScript is below: these are presentation questions, not
+ * provenance ones.
  */
-import type { TrackedCatalog } from "../api/catalogShare";
-
-export type CatalogSyncStatus =
-  /** Not tracked against any repository — a purely local catalogue. */
-  | "localOnly"
-  /** Local and remote both match the bytes last exchanged. */
-  | "inSync"
-  /** Edited locally since the last exchange; the repository has not moved. */
-  | "localAhead"
-  /** The repository has moved; the local copy has no edits of its own. */
-  | "remoteAhead"
-  /** Both sides moved. This is the only state that needs a decision. */
-  | "diverged"
-  /** Tracked, but the file is gone from the decoder directory. */
-  | "missing"
-  /** Tracked, but no update check has run, so the remote side is unknown. */
-  | "unchecked";
-
-export function catalogSyncStatus(source?: TrackedCatalog): CatalogSyncStatus {
-  if (!source) return "localOnly";
-  // A missing file outranks everything: there is nothing to compare, and every
-  // action offered for it would fail.
-  if (source.localState === "missing") return "missing";
-  if (source.remoteState === "diverged") return "diverged";
-  // The "never offer a one-click pull over local edits" rule is enforced in Rust —
-  // `CatalogEntry::remote_state` already weighs the local state and returns Diverged
-  // for that case, and `pull_catalog` refuses a second time before writing. Repeating
-  // it here would be a lower-authority copy that masks a regression rather than
-  // catching one.
-  if (source.remoteState === "upstreamAhead") return "remoteAhead";
-  if (source.localState === "modified") return "localAhead";
-  // Nothing local to push and nothing known upstream. `unknown` means no check has
-  // run yet, which is worth distinguishing from a checked, genuinely in-sync copy.
-  return source.remoteState === "unknown" ? "unchecked" : "inSync";
-}
+import type { CatalogSyncStatus } from "../api/catalogShare";
 
 /** Is there anything to send upstream? Drives whether Push is worth offering. */
 export function hasLocalChanges(status: CatalogSyncStatus): boolean {

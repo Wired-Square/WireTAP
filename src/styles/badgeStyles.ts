@@ -126,6 +126,17 @@ export const badgeDarkPanelCyan = `${badgeDarkPanelBase} bg-[var(--status-cyan-b
  */
 export const badgeMetadata = "px-2 py-1 text-xs font-medium bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded";
 
+/**
+ * Metadata badge carrying a leading icon.
+ *
+ * Built on `badgeNeutral` rather than `badgeMetadata` because the two render the same
+ * colours and `badgeNeutral` already brings the `inline-flex items-center` that keeps
+ * the glyph on the label's baseline — which is the whole reason this variant exists.
+ * (That `badgeMetadata` is `badgeNeutral` minus the flex is a pre-existing duplicate,
+ * not something to fix from here.)
+ */
+export const badgeMetadataIcon = `${badgeNeutral} gap-1`;
+
 // ============================================================================
 // Manufacturer Badges - chip family identification in the flash UI.
 // Each chip family gets its own colour so the user can tell at a glance

@@ -4,11 +4,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { wsTransport } from "../services/wsTransport";
 import type { Catalog } from "../types/catalogModel";
+// Type-only: erased at build time, so the catalogue picker gets this field without
+// the sharing store's runtime subtree landing in every panel that mounts it.
+import type { CatalogSyncStatus } from "./catalogShare";
 
 export interface CatalogMetadata {
   name: string;
   filename: string;
   path: string;
+  /** How this catalogue stands against its repository. Joined in Rust. */
+  syncStatus: CatalogSyncStatus;
 }
 
 /**

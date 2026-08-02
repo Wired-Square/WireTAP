@@ -12,7 +12,7 @@
 // nothing, and the catalogue picker mounts it directly so every app can reach it.
 
 import { useState } from "react";
-import PublishCatalogDialog from "../dialogs/PublishCatalogDialog";
+import PublishCatalogDialog from "../dialogs/publish/PublishCatalogDialog";
 import GitHubTokenDialog from "../dialogs/GitHubTokenDialog";
 import CreateCatalogRepoDialog from "../dialogs/CreateCatalogRepoDialog";
 import CatalogUpdateDialog from "../dialogs/CatalogUpdateDialog";

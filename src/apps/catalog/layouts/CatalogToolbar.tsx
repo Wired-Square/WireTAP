@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/layout/CatalogToolbar.tsx
 
-import { Check, ChevronDown, Download, FileText, Glasses, RefreshCw, RotateCcw, Save, Settings, UploadCloud, X } from "lucide-react";
+import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
+import * as ShareIcon from "../../../components/catalogIcons";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { disabledState } from "../../../styles";
@@ -154,7 +155,7 @@ export default function CatalogToolbar({
           title={hasUnsavedChanges ? t("toolbar.publishUnsaved") : t("toolbar.publish")}
           className={iconButtonBase}
         >
-          <UploadCloud className={iconMd} />
+          <ShareIcon.Push className={iconMd} />
         </button>
       )}
 
@@ -167,7 +168,7 @@ export default function CatalogToolbar({
           title={t("toolbar.reviewUpdate")}
           className={iconButtonBase}
         >
-          <RefreshCw className={iconMd} />
+          <ShareIcon.Diff className={iconMd} />
         </button>
       )}
 
