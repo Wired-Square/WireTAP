@@ -56,6 +56,10 @@ function generateCaptureSessionId(): string {
   return `b_${shortId}`;
 }
 
+/** Orphaned-capture fallback hops tolerated before an app gives up and shows No source. */
+const CAPTURE_ADOPTION_LIMIT = 3;
+const CAPTURE_ADOPTION_WINDOW_MS = 2000;
+
 /** Reason for session reconfiguration */
 export type SessionReconfigurationReason = "bookmark" | "time_range_change";
 
@@ -523,6 +527,10 @@ export function useIOSessionManager(
     onStreamEnded?.(payload);
   }, [appName, onStreamEnded]);
 
+  // Adoption timestamps, not capture IDs: every hop of the loop this caps has a
+  // *different* capture ID, so tracking IDs would never trip.
+  const captureAdoptionsRef = useRef<number[]>([]);
+
   // Handle external session destruction (e.g., destroyed from Sessions app)
   // Switches to capture mode if orphaned captures are available, otherwise clears state
   const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[], userInitiated: boolean) => {
@@ -545,18 +553,30 @@ export function useIOSessionManager(
 
     if (userInitiated) {
       // Deliberate destroy → clean slate, skip the capture fallback.
+      captureAdoptionsRef.current = [];
       setIoProfile(null);
     } else {
       // External destroy → switch to the orphaned capture if there is one.
-      if (orphanedCaptureIds.length > 0) {
-        const captureId = orphanedCaptureIds[0];
-        setIoProfile(captureId);
-        setSourceProfileId(captureId);
+      const now = Date.now();
+      const recent = captureAdoptionsRef.current.filter((t) => now - t < CAPTURE_ADOPTION_WINDOW_MS);
+      const adopt = orphanedCaptureIds.length > 0 && recent.length < CAPTURE_ADOPTION_LIMIT;
+      captureAdoptionsRef.current = adopt ? [...recent, now] : recent;
+
+      if (adopt) {
+        setIoProfile(orphanedCaptureIds[0]);
+        setSourceProfileId(orphanedCaptureIds[0]);
       } else {
+        if (recent.length >= CAPTURE_ADOPTION_LIMIT) {
+          tlog.info(
+            `[IOSessionManager:${appName}] Capture fallback looped ${recent.length}× in ${CAPTURE_ADOPTION_WINDOW_MS}ms — returning to No source`
+          );
+        }
         setIoProfile(null);
       }
-      // Notify app with orphaned capture IDs so it can set up capture mode.
-      onSessionDestroyed?.(orphanedCaptureIds);
+      // Notify app with orphaned capture IDs so it can set up capture mode — but only
+      // the ones actually adopted, or the app would set up capture mode for a capture
+      // this hook just declined to switch to.
+      onSessionDestroyed?.(adopt ? orphanedCaptureIds : []);
     }
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 

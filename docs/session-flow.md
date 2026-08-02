@@ -402,6 +402,26 @@ is the backstop for a frontend leave that loses a race when an app switches sour
 — because the rule lives in Rust under the locks, no frontend timing can orphan a
 session.
 
+**No registry entry outlives its session.** Every teardown path calls
+`detach_all_from_session`, which clears `session_id` on every instance pointing at
+the session being destroyed (keeping the instances — their panels are still open).
+`destroy_session` does this too, and unconditionally, since a stale attachment must
+go even when the session had already been removed. This is load-bearing, not
+hygiene: the subscriber count is *derived*, so a leftover entry reports a phantom
+subscriber, and it becomes the `prev_session_id` that the next `register_subscriber`
+evicts and tears down all over again.
+
+**`reset` distinguishes a deliberate move from an external death.** It rides the
+`destroyed` event: `reset: false` tells apps to fall back to the session's orphaned
+capture, `reset: true` tells them to return to "No source". Teardown paths pass it
+according to intent — the attach-elsewhere eviction and the same-id recreate in
+`create_multi_source_session` pass `true` (the subscriber chose a different session,
+or the session is about to come straight back), while a plain leave, a panel unmount
+and a window close pass `false`. Getting this wrong is what turned one teardown into
+a loop: adopting the orphaned capture makes that capture id the app's *next session
+id* (`effectiveSessionId = multiSessionId ?? ioProfile`), which re-enters the same
+teardown and mints a fresh capture every hop.
+
 **Cross-window roster.** Any registry mutation calls `emit_open_apps_changed`,
 which broadcasts exactly like `session-lifecycle`: a Tauri `app.emit("open-apps-changed", …)`
 **and** a WS channel-0 `OpenAppsChanged` (0x17). Each window reconciles its

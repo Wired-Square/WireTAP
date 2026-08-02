@@ -37,8 +37,10 @@ export interface UseIOSourcePickerHandlersOptions {
   manager: UseIOSessionManagerResult;
   /** Close the IO picker dialog */
   closeDialog: () => void;
-  /** Optional callback to merge app-specific options (e.g., catalog serial config) */
-  mergeOptions?: (options: DialogLoadOptions) => ManagerLoadOptions;
+  /** Optional callback to merge app-specific options (e.g. catalog serial config).
+   *  `profileIds` are the sources about to start, so app state that only applies to
+   *  some source kinds (e.g. Modbus poll groups) can be gated on them. */
+  mergeOptions?: (options: DialogLoadOptions, profileIds: string[]) => ManagerLoadOptions;
   /** Optional callback when multi-bus mode is set */
   onMultiBusSet?: (profileIds: string[]) => void;
   /** Optional callback when joining a session */
@@ -114,7 +116,7 @@ export function useIOSourcePickerHandlers({
           // Merge AFTER onBeforeStart so app-specific setup it performs (e.g.
           // loading a Modbus catalogue to build poll groups) is reflected in the
           // merged options — the session then starts WITH polls, not pollless.
-          const mergedOptions = mergeOptions ? mergeOptions(options) : options;
+          const mergedOptions = mergeOptions ? mergeOptions(options, profileIds) : options;
 
           if (closeDialogFlag) {
             await watchSource(profileIds, mergedOptions);

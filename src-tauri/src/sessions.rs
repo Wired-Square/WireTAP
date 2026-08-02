@@ -2432,8 +2432,12 @@ pub async fn create_multi_source_session(
     // Always destroy any existing session with this ID first.
     // This ensures we use the fresh bus mappings provided by the frontend.
     // Without this, a stopped session would be reused with stale mappings.
+    // `reset: true` — the session is about to be recreated under this same id, so
+    // apps must not treat the teardown as an external death and adopt the orphaned
+    // capture. Doing so made the capture the app's next session id, which re-entered
+    // this path and churned the session in a loop.
     if get_session_state(&session_id).await.is_some() {
-        let _ = destroy_session(&session_id, false).await;
+        let _ = destroy_session(&session_id, true).await;
     }
 
     // Create the multi-source reader (validates interface trait compatibility)

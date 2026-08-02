@@ -880,6 +880,33 @@ pub fn detach_app(instance_id: &str) {
     });
 }
 
+/// Clear the session attachment of every instance on `session_id`, keeping the
+/// instances themselves (their panels are still open). Every teardown path calls
+/// this so the registry invariant holds: no entry may reference a session that is
+/// no longer in `IO_SESSIONS`. A stale attachment is not cosmetic — it makes
+/// `subscriber_count_for_session` report a phantom count, and it becomes the
+/// `prev_session_id` that `register_subscriber` then evicts and tears down again.
+fn detach_all_from_session(session_id: &str) {
+    let detached = {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        let mut n = 0usize;
+        for a in reg.values_mut().filter(|a| a.session_id.as_deref() == Some(session_id)) {
+            a.session_id = None;
+            a.is_active = false;
+            n += 1;
+        }
+        n
+    };
+    // Log and broadcast outside the lock — `tlog!` writes to stderr and an unbuffered
+    // file, and `APP_REGISTRY` is taken inside `register_subscriber`'s `IO_SESSIONS`
+    // critical section, so blocking here would extend the async session mutex.
+    if detached == 0 {
+        return;
+    }
+    tlog!("[reader] Session '{}' detached {} stale subscriber(s)", session_id, detached);
+    emit_open_apps_changed();
+}
+
 /// Set an app instance's active flag (frames flowing or not). No-op if unknown.
 pub fn set_app_active(instance_id: &str, is_active: bool) {
     update_app(instance_id, |a| a.is_active = is_active);
@@ -897,7 +924,7 @@ pub async fn unregister_app(instance_id: &str) {
     let Some(inst) = removed else { return };
     emit_open_apps_changed();
     if let Some(sid) = inst.session_id {
-        teardown_session_if_empty(&sid).await;
+        teardown_session_if_empty(&sid, false).await;
     }
 }
 
@@ -923,25 +950,32 @@ pub async fn prune_window_sessions(window_label: &str) {
     for sid in removed.into_iter().filter_map(|a| a.session_id) {
         if !seen.contains(&sid) {
             seen.push(sid.clone());
-            teardown_session_if_empty(&sid).await;
+            teardown_session_if_empty(&sid, false).await;
         }
     }
 }
 
 /// If `session_id` has no attached subscribers left, extract and destroy it (same
 /// cascade as the last subscriber leaving). Otherwise emit the updated joiner count.
-async fn teardown_session_if_empty(session_id: &str) {
+/// `reset` marks a deliberate move away from this session (see `destroy_session`);
+/// it rides the `destroyed` event so apps return to "No source" instead of adopting
+/// the orphaned capture.
+async fn teardown_session_if_empty(session_id: &str, reset: bool) {
     let count = subscriber_count_for_session(session_id);
     if count == 0 {
         let extracted = { IO_SESSIONS.lock().await.remove(session_id) };
         if let Some(session) = extracted {
             tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
             emit_joiner_count_change(session_id, 0, None, None, Some("left"));
-            destroy_extracted_session(session_id, session).await;
+            destroy_extracted_session(session_id, session, reset).await;
         }
-    } else {
+    } else if session_exists(session_id).await {
         emit_joiner_count_change(session_id, count, None, None, Some("left"));
     }
+    // Otherwise the count is phantom — subscribers still point at a session that is
+    // gone. Don't broadcast a "left" for it, and don't detach either: this is also the
+    // window `reinitialize_session` runs in, where the attachment is retained on
+    // purpose because the session comes straight back under the same id.
 }
 
 /// Broadcast the full open-app roster to every window (Tauri emit + WS channel-0),
@@ -2634,6 +2668,9 @@ pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String
         sessions.remove(session_id)
     };
     // Lock released — perform slow operations outside the critical section
+    // Detach unconditionally: stale attachments must go even if the session had
+    // already been removed (see `detach_all_from_session`).
+    detach_all_from_session(session_id);
     if let Some(mut session) = removed {
         // Stop the reader first
         let _ = session.source.stop().await;
@@ -2933,10 +2970,11 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
     // Lock released here
 
     // If the subscriber moved off a different session, tear that session down if it's
-    // now empty (same cascade as the last subscriber leaving).
+    // now empty (same cascade as the last subscriber leaving). `reset: true` — the
+    // subscriber chose this new session; see `teardown_session_if_empty`.
     if let Some(prev) = prev_session_id {
         if prev != session_id {
-            teardown_session_if_empty(&prev).await;
+            teardown_session_if_empty(&prev, true).await;
         }
     }
 
@@ -2948,8 +2986,10 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
 /// the source and emitting lifecycle events can be slow. Shared by the two "last
 /// subscriber left" paths: an explicit unregister, and the one-subscriber-one-session
 /// eviction that fires when a subscriber registers on a different session.
-async fn destroy_extracted_session(session_id: &str, mut session: IOSession) {
+async fn destroy_extracted_session(session_id: &str, mut session: IOSession, reset: bool) {
     let _ = session.source.stop().await;
+    // Nothing may still claim this session — see `detach_all_from_session`.
+    detach_all_from_session(session_id);
     // Orphan captures and store IDs in post-session cache before lifecycle event.
     let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
     emit_capture_orphaned_as_changed(session_id, orphaned);
@@ -2963,7 +3003,7 @@ async fn destroy_extracted_session(session_id: &str, mut session: IOSession) {
         subscriber_count: 0,
         source_profile_ids,
         creator_subscriber_id: None,
-        reset: false,
+        reset,
     });
     // Clear any closing flag
     clear_session_closing(session_id);
@@ -2992,7 +3032,9 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
     );
 
     // Emit the updated count and destroy the session if that was the last subscriber.
-    teardown_session_if_empty(session_id).await;
+    // `reset: false` — a plain leave is an ordinary end-of-session, so any app still
+    // on it keeps the existing orphaned-capture fallback.
+    teardown_session_if_empty(session_id, false).await;
 
     Ok(remaining)
 }
@@ -3367,4 +3409,48 @@ pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_act
     );
     set_app_active(subscriber_id, is_active);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The registry invariant: after a session is torn down nothing may still claim
+    /// it, but the instances themselves survive — their panels are still open, they
+    /// just become unconnected app nodes.
+    #[test]
+    fn detach_all_from_session_clears_attachments_but_keeps_instances() {
+        let session = "test_detach_all";
+        register_app("w_decoder_detach", "decoder_ab12", "decoder", "main");
+        attach_app("w_decoder_detach", "decoder", session);
+        attach_app("w_discovery_detach", "discovery", session);
+        assert_eq!(subscriber_count_for_session(session), 2);
+
+        detach_all_from_session(session);
+
+        assert_eq!(subscriber_count_for_session(session), 0);
+        assert_eq!(current_session_of_app("w_discovery_detach"), None);
+
+        let reg = APP_REGISTRY.lock().unwrap();
+        let entry = reg.get("w_decoder_detach").expect("instance should survive");
+        assert_eq!(entry.session_id, None);
+        assert!(!entry.is_active);
+        assert_eq!(entry.display_id, "decoder_ab12");
+    }
+
+    /// Detaching one session must not disturb another — the sweep is filtered by
+    /// `session_id`, not a blanket clear.
+    #[test]
+    fn detach_all_from_session_leaves_other_sessions_alone() {
+        attach_app("w_decoder_scoped", "decoder", "test_scoped_a");
+        attach_app("w_discovery_scoped", "discovery", "test_scoped_b");
+
+        detach_all_from_session("test_scoped_a");
+
+        assert_eq!(current_session_of_app("w_decoder_scoped"), None);
+        assert_eq!(
+            current_session_of_app("w_discovery_scoped").as_deref(),
+            Some("test_scoped_b")
+        );
+    }
 }

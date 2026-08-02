@@ -44,6 +44,20 @@ import type { PlaybackSpeed, PlaybackState } from "../../components/TimeControll
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
+/** True if any of these profiles is a Modbus source — the only kind polls apply to. */
+function anyModbusProfile(profileIds: string[]): boolean {
+  const profiles = useSettingsStore.getState().ioProfiles.profiles;
+  return profileIds.some((id) => profiles.find((p) => p.id === id)?.kind === "modbus_tcp");
+}
+
+/** The loaded catalogue's poll groups, but only for sources they actually apply to.
+ *  A Modbus catalogue left loaded from an earlier session would otherwise carry its
+ *  polls into an unrelated CAN/serial session, whose reconnect then churns it. */
+function modbusPollsFor(profileIds: string[]): string | null {
+  const json = useDecoderStore.getState().modbusPollsJson;
+  return json && anyModbusProfile(profileIds) ? json : null;
+}
+
 function DecoderInner() {
   const { t } = useTranslation("decoder");
   const { settings } = useSettings();
@@ -758,7 +772,7 @@ function DecoderInner() {
     if (useDecoderStore.getState().modbusPollsJson) return; // polls already built
     const path = optionCatalogPath
       ?? useDecoderStore.getState().catalogPath
-      ?? (profile.preferred_catalog ? buildCatalogPath(profile.preferred_catalog, decoderDir) : null);
+      ?? (profile?.preferred_catalog ? buildCatalogPath(profile.preferred_catalog, decoderDir) : null);
     if (!path) return; // no catalogue yet — user must load one before polling can start
     try {
       await loadCatalog(path);
@@ -773,14 +787,12 @@ function DecoderInner() {
     closeDialog: () => dialogs.ioSessionPicker.close(),
     onBeforeStart: (profileId, options) => ensureModbusPolls(profileId, options.catalogPath),
     onBeforeMultiStart: (profileIds, options) => ensureModbusPolls(profileIds[0], options.catalogPath),
-    mergeOptions: (options) => {
-      const state = useDecoderStore.getState();
-      const merged = mergeSerialConfigForWatch(state.serialConfig, options);
+    mergeOptions: (options, profileIds) => {
+      const merged = mergeSerialConfigForWatch(useDecoderStore.getState().serialConfig, options);
       // Modbus catalogues drive polling: inject the catalogue-derived poll groups
       // so the backend starts polling registers (otherwise no frames arrive).
-      return state.modbusPollsJson
-        ? { ...merged, modbusPollsJson: state.modbusPollsJson }
-        : merged;
+      const polls = modbusPollsFor(profileIds);
+      return polls ? { ...merged, modbusPollsJson: polls } : merged;
     },
   });
 
@@ -1014,15 +1026,33 @@ function DecoderInner() {
     if (isStreaming) setIsPolling(true);
   }, [isStreaming]);
 
+  // The sources polling would target — same resolution `reconnectWithPolls` uses.
+  const pollProfileIds = ioProfiles.length > 0
+    ? ioProfiles
+    : sourceProfileId ? [sourceProfileId] : lastProfileIdsRef.current;
+  // The Modbus toolbar is driven by the loaded *catalogue*'s protocol, which lags a
+  // catalogue swap: switching a Modbus decoder to a CAN source leaves `protocol` on
+  // 'modbus' until the new catalogue finishes parsing, so the poll badge and the
+  // Pause/Resume/Start controls render over a CAN session and their handlers address
+  // a source that has no polls. Suppress them once we know the running source is not
+  // Modbus — but only while streaming, so "load a Modbus catalogue, then start a
+  // Modbus source" still offers Start polling from a stopped state.
+  const pollsApplyToSession = !(isStreaming && !anyModbusProfile(pollProfileIds));
+  const canStartPolling = modbusPollsFor(pollProfileIds) !== null;
+
   // Re-issue watchSource with the current poll groups — used to start polling
   // from a stopped state and to reconnect after a catalogue change.
   const reconnectWithPolls = useCallback(async () => {
-    const { modbusPollsJson: json, playbackSpeed: speed } = useDecoderStore.getState();
-    if (!json) return;
+    const { playbackSpeed: speed } = useDecoderStore.getState();
     const profileIds = ioProfiles.length > 0
       ? ioProfiles
       : sourceProfileId ? [sourceProfileId] : lastProfileIdsRef.current;
     if (profileIds.length === 0) return;
+    // Same gate as mergeOptions — re-watching destroys and recreates the session, so
+    // a non-Modbus source must never be re-watched just because a Modbus catalogue
+    // happens to still be loaded.
+    const json = modbusPollsFor(profileIds);
+    if (!json) return;
     try {
       // Reuse the current session id so the backend reinitialises THIS modbus
       // session with the poll groups (its "catalog reinitialise" path —
@@ -1163,14 +1193,14 @@ function DecoderInner() {
             onToggleRawBytes={toggleShowRawBytes}
             onClear={handlers.handleClear}
             viewMode={viewMode}
-            onToggleViewMode={isModbus ? undefined : toggleViewMode}
-            modbus={isModbus ? {
+            onToggleViewMode={isModbus && pollsApplyToSession ? undefined : toggleViewMode}
+            modbus={isModbus && pollsApplyToSession ? {
               pollGroupCount: pollGroups.length,
               registerCount: totalRegisters,
               isPolling,
               onPause: handlePausePolling,
               onResume: handleResumePolling,
-              onStart: reconnectWithPolls,
+              onStart: canStartPolling ? reconnectWithPolls : undefined,
             } : undefined}
             minFrameLength={serialConfig?.min_frame_length ?? 0}
             onOpenFilterDialog={() => dialogs.filter.open()}
