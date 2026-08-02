@@ -21,6 +21,7 @@ function plan(over: Partial<PublishPlan> = {}): PublishPlan {
     forkNeeded: false,
     targetIsPublic: false,
     contentBytes: 31391,
+    metaVersion: 3,
     validationErrors: [],
     secretFindings: [],
     transmitFrameCount: 0,

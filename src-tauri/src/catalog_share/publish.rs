@@ -19,6 +19,7 @@
 //! again. There is deliberately **no rollback**: deleting a branch or fork on failure
 //! risks destroying someone's work.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -70,6 +71,15 @@ pub struct PublishRequest {
     /// pushing to your own fork without opening a PR is a legitimate way to park work.
     #[serde(default)]
     pub open_pr: bool,
+    /// Increment `[meta].version` in the committed bytes, and write the bumped file
+    /// back locally once the push has succeeded.
+    ///
+    /// **Off by the serde default while the dialog's checkbox is on**, and that
+    /// asymmetry is the point: this is the one request field that rewrites a file in
+    /// the user's decoder directory, so a caller that predates it — or any caller that
+    /// is not the push dialog — must not do so by omission.
+    #[serde(default)]
+    pub bump_version: bool,
     /// Acknowledged secret-scan findings, so the confirm step can be explicit.
     #[serde(default)]
     pub accept_secret_findings: bool,
@@ -118,6 +128,12 @@ pub struct PublishPlan {
     /// The content becomes public and permanent; drives the exposure warning.
     pub target_is_public: bool,
     pub content_bytes: usize,
+    /// `[meta].version` as the parser sees it — 1 when the key is absent, matching
+    /// `Meta`'s own default. A fact about the local file, like `content_bytes` beside
+    /// it, so it cannot go stale as checkboxes move; it is what lets the bump checkbox
+    /// name the numbers ("3 → 4") before it is ticked, which is what makes a
+    /// default-on checkbox defensible.
+    pub meta_version: u32,
     /// Empty when the catalogue is valid; publishing is blocked otherwise.
     pub validation_errors: Vec<String>,
     pub secret_findings: Vec<SecretFinding>,
@@ -206,6 +222,21 @@ pub enum PublishAction {
     Committed,
 }
 
+/// What a version bump did, when one was applied.
+///
+/// One struct rather than three fields on [`PublishResult`], so "from", "to" and
+/// "did it reach the disk" cannot be reported apart.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionBump {
+    pub from: u32,
+    pub to: u32,
+    /// False when the local file changed while the push was in flight, so the bumped
+    /// bytes are upstream but not on disk. The catalogue then reads as locally ahead,
+    /// which is honest — those local edits really are not upstream.
+    pub written_locally: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishResult {
@@ -219,6 +250,11 @@ pub struct PublishResult {
     pub head_owner: String,
     pub branch: String,
     pub reused_branch: bool,
+    /// `None` means no bump was asked for. A bump that was asked for but *withheld*
+    /// because the push would have changed nothing never reaches a result at all —
+    /// `push_blocking` refuses the unchanged tree first.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_bump: Option<VersionBump>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -512,6 +548,40 @@ pub async fn publish_catalog(
         emit(&app, &req.request_id, "branch", Some(plan.branch.clone()));
     }
 
+    let saved_sha = super::registry::git_blob_sha(content.as_bytes());
+    // Only worth an open when a bump was actually asked for. Read against the same
+    // parent `push_blocking` commits onto, so the two cannot disagree about whether
+    // this push is a no-op. A read failure degrades to no bump rather than failing the
+    // publish: `commit_and_push` is about to open the same repository and would report
+    // the real problem.
+    let parent_sha = match req.bump_version {
+        false => None,
+        true => git::blob_sha_at_push_parent(
+            &clone_dir,
+            &plan.branch,
+            &plan.base_branch,
+            &plan.target_path,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            tlog!("[catalog_share] could not read the push parent: {}", e.message);
+            None
+        }),
+    };
+    // Withheld when the push would change nothing on its own — see `bump_applies` —
+    // and silently skipped when the file cannot carry one. A bump is a convenience; it
+    // must never fail the push it is decorating.
+    let bump = bump_applies(req.bump_version, &saved_sha, parent_sha.as_deref())
+        .then(|| match wiretap_catalog::edit::bump_meta_version(&content) {
+            Ok(bumped) => Some(bumped),
+            Err(e) => {
+                tlog!("[catalog_share] no version bump for {}: {}", req.filename, e);
+                None
+            }
+        })
+        .flatten();
+    let content = bump.as_ref().map_or(content, |b| b.text.clone());
+
     emit(&app, &req.request_id, "commit", None);
     let pushed = git::commit_and_push(
         &app,
@@ -581,6 +651,16 @@ pub async fn publish_catalog(
         (PublishAction::Committed, None)
     };
 
+    // The bumped bytes go to disk only now the push has succeeded, so a failed push
+    // leaves the file alone. Ordered before `persist_publish_state`, which rebuilds the
+    // catalogue cache: refreshing first would cache a row computed from the old bytes,
+    // and on iOS there is no watcher to correct it.
+    let version_bump = bump.map(|bump| VersionBump {
+        from: bump.from,
+        to: bump.to,
+        written_locally: write_bumped_file(&app, &req.filename, &saved_sha, &bump.text),
+    });
+
     // The committed blob sha becomes synced_sha, which is what immediately makes the
     // local file read as in sync rather than locally ahead — and, when this push is
     // the first thing to link the file to this repository, records the subscription
@@ -617,6 +697,7 @@ pub async fn publish_catalog(
         head_owner: head.owner,
         branch: plan.branch,
         reused_branch: creating_branch && !pushed.created_branch,
+        version_bump,
     })
 }
 
@@ -754,6 +835,7 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
         fork_needed: !upstream.can_push,
         target_is_public: !upstream.private,
         content_bytes: content.len(),
+        meta_version: described.meta_version,
         validation_errors,
         secret_findings: secrets::scan(&content),
         transmit_frame_count: described.transmit_frame_count,
@@ -771,14 +853,56 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
     })
 }
 
-/// Read the catalogue from disk — never the editor buffer, so what is published is
-/// what was saved. There is no code path by which the buffer could reach here.
-fn read_local_catalogue(app: &AppHandle, filename: &str) -> Result<String, ShareError> {
+/// Where a catalogue lives, through the shared sanitiser.
+///
+/// One owner for the read and the write both, so the bytes a bump was derived from and
+/// the file it is written back to can never resolve differently.
+fn local_catalogue_path(app: &AppHandle, filename: &str) -> Result<PathBuf, ShareError> {
     let name = crate::catalog::sanitise_catalog_filename(filename).map_err(ShareError::invalid)?;
     let dir = crate::catalog::decoder_dir(app)
         .ok_or_else(|| ShareError::invalid("The decoder directory is not available"))?;
-    std::fs::read_to_string(dir.join(&name))
-        .map_err(|e| ShareError::not_found(format!("Could not read {name}: {e}")))
+    Ok(dir.join(name))
+}
+
+/// Read the catalogue from disk — never the editor buffer, so what is published is
+/// what was saved. There is no code path by which the buffer could reach here.
+fn read_local_catalogue(app: &AppHandle, filename: &str) -> Result<String, ShareError> {
+    let path = local_catalogue_path(app, filename)?;
+    std::fs::read_to_string(&path)
+        .map_err(|e| ShareError::not_found(format!("Could not read {}: {e}", path.display())))
+}
+
+/// Write the bumped catalogue back, but only over the exact bytes it was derived from.
+///
+/// The same unconditional compare `apply_catalog_update` makes before overwriting a
+/// reviewed file: a catalogue edited while the push was in flight is left entirely
+/// alone. A refused write costs a version number; clobbering costs work.
+///
+/// No backup, unlike `install_update`: a backup exists to protect work an upstream copy
+/// is about to destroy, and what is written here is the bytes already on disk plus one
+/// integer — which the guard has just proved.
+///
+/// Reports whether it landed. Never an error: the push has already succeeded, and
+/// failing here would invite a retry that the unchanged-tree rule would then refuse,
+/// which is a confusing way to say "your file changed".
+fn write_bumped_file(app: &AppHandle, filename: &str, expected_sha: &str, bumped: &str) -> bool {
+    let Ok(path) = local_catalogue_path(app, filename) else {
+        return false;
+    };
+    if super::registry::git_blob_sha_of_file(&path).as_deref() != Some(expected_sha) {
+        tlog!(
+            "[catalog_share] {} changed while publishing; the version bump was not written back",
+            filename
+        );
+        return false;
+    }
+    match crate::catalog::write_file_atomically(&path, bumped.as_bytes()) {
+        Ok(()) => true,
+        Err(e) => {
+            tlog!("[catalog_share] could not write the bumped {}: {}", filename, e);
+            false
+        }
+    }
 }
 
 async fn auth_login(
@@ -888,6 +1012,21 @@ fn persist_publish_state(app: &AppHandle, spec: Published<'_>) {
     });
 }
 
+/// Is a version bump warranted for this push?
+///
+/// **A bump alone is not a pushable change.** A commit whose entire diff is
+/// `version = 3 → 4` says nothing, and `git::push_blocking` is right to refuse an
+/// unchanged tree — so the bump must not be the thing that rescues a push from that
+/// refusal. Withholding it here is what keeps that invariant alive: bump
+/// unconditionally and the tree always differs by one line, and the refusal can never
+/// fire again.
+///
+/// `parent_blob_sha` is `None` when the path is not upstream yet, which is a genuine
+/// change.
+fn bump_applies(requested: bool, local_blob_sha: &str, parent_blob_sha: Option<&str>) -> bool {
+    requested && parent_blob_sha != Some(local_blob_sha)
+}
+
 /// `catalog/{slug}` from the filename stem.
 fn default_branch_name(filename: &str) -> String {
     let stem = filename
@@ -933,6 +1072,28 @@ mod tests {
         assert!(req.branch.is_none(), "no branch means the base branch");
         assert!(!req.open_pr, "a pull request must be opt-in");
         assert!(!req.draft);
+        // The one field that rewrites a file in the decoder directory. The dialog ticks
+        // its checkbox on; the *wire* default must stay off, so a caller that predates
+        // the field cannot bump by omission.
+        assert!(!req.bump_version, "a version bump must be opt-in");
+    }
+
+    /// A commit whose entire diff is `version = 3 → 4` says nothing, and
+    /// `push_blocking` refuses an unchanged tree. Bump unconditionally and that refusal
+    /// can never fire again, because the tree always differs by one line — so the bump
+    /// has to be withheld exactly when the push would otherwise be a no-op.
+    #[test]
+    fn a_bump_is_not_a_pushable_change() {
+        assert!(
+            !bump_applies(true, "abc", Some("abc")),
+            "the parent already holds these bytes, so there is nothing to push"
+        );
+        assert!(bump_applies(true, "abc", Some("def")), "real content change");
+        assert!(
+            bump_applies(true, "abc", None),
+            "the path is not upstream yet, which is a real change"
+        );
+        assert!(!bump_applies(false, "abc", Some("def")), "not asked for");
     }
 
     fn source() -> CatalogSource {

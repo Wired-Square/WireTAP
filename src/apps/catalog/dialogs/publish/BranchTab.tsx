@@ -12,13 +12,13 @@ import { helpText } from "../../../../styles/inputStyles";
 import { CheckboxField, FormField, Input, Textarea } from "../../../../components/forms";
 import type { PublishPlan } from "../../../../api/catalogShare";
 import { tabScroll } from "./parts";
-import type { BranchForm, T } from "./types";
+import type { PublishForm, T } from "./types";
 
 type Props = {
   t: T;
   plan: PublishPlan;
-  form: BranchForm;
-  onChange: <K extends keyof BranchForm>(key: K, value: BranchForm[K]) => void;
+  form: PublishForm;
+  onChange: <K extends keyof PublishForm>(key: K, value: PublishForm[K]) => void;
   /** A push in flight no longer reads any of this. */
   disabled: boolean;
 };

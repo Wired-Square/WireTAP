@@ -8,6 +8,7 @@
 // than a one-line reason.
 
 import { caption } from "../../../../styles";
+import { CheckboxField } from "../../../../components/forms";
 import type { PublishPlan } from "../../../../api/catalogShare";
 import { PlanAlert, PlanSummary, SecretFindings, TabMessage, tabScroll } from "./parts";
 import type { T } from "./types";
@@ -17,9 +18,26 @@ type Props = {
   plan: PublishPlan | null;
   secretsAcknowledged: boolean;
   onAcknowledgeSecrets: (checked: boolean) => void;
+  /** Whether this push will actually bump — already false when the editor is dirty. */
+  bumpVersion: boolean;
+  onBumpVersion: (checked: boolean) => void;
+  /**
+   * Set when the Catalog editor holds this catalogue with unsaved changes, which
+   * disables the bump. Publishing sends the *saved* bytes, so bumping would put a new
+   * version on disk that the editor's next save writes straight back over.
+   */
+  editorIsDirty: boolean;
 };
 
-export default function PushTab({ t, plan, secretsAcknowledged, onAcknowledgeSecrets }: Props) {
+export default function PushTab({
+  t,
+  plan,
+  secretsAcknowledged,
+  onAcknowledgeSecrets,
+  bumpVersion,
+  onBumpVersion,
+  editorIsDirty,
+}: Props) {
   if (!plan) return <TabMessage>{t("publish.tabsNeedRepo")}</TabMessage>;
 
   return (
@@ -31,6 +49,19 @@ export default function PushTab({ t, plan, secretsAcknowledged, onAcknowledgeSec
       )}
 
       <PlanSummary plan={plan} t={t} />
+
+      {/* Under the summary, because this changes *what is committed* rather than where
+          it lands — which is what separates it from the Branch tab's controls. */}
+      <CheckboxField
+        checked={bumpVersion}
+        disabled={editorIsDirty}
+        onChange={onBumpVersion}
+        label={
+          editorIsDirty
+            ? t("publish.bumpVersionDirty")
+            : t("publish.bumpVersion", { from: plan.metaVersion, to: plan.metaVersion + 1 })
+        }
+      />
 
       {plan.targetIsPublic && (
         <PlanAlert tone="warning">

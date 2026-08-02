@@ -81,6 +81,10 @@ pub struct RemoteCatalog {
     pub valid: bool,
     pub errors: Vec<String>,
     pub frame_count: usize,
+    /// `[meta].version` — the author's revision counter, defaulting to 1 when the key
+    /// is absent, exactly as the parser reads it. Nothing decodes on this value; it is
+    /// carried so the push dialog can offer to increment it.
+    pub meta_version: u32,
     /// Frames carrying a transmit interval. Surfaced prominently because an imported
     /// catalogue can define traffic that would be written to a live bus.
     pub transmit_frame_count: usize,
@@ -218,6 +222,7 @@ pub async fn resolve_remote_catalogs(
                 valid: false,
                 errors: vec![e.message],
                 frame_count: 0,
+                meta_version: 1,
                 transmit_frame_count: 0,
                 protocol: None,
             },
@@ -1653,7 +1658,7 @@ fn describe_catalog(path: &str, blob_sha: &str, text: &str) -> RemoteCatalog {
         .collect();
 
     let parsed = wiretap_catalog::Catalog::parse(text).ok();
-    let (name, frame_count, transmit_frame_count, protocol) = match &parsed {
+    let (name, frame_count, transmit_frame_count, protocol, meta_version) = match &parsed {
         Some(cat) => (
             // `Meta` defaults `name` to an empty string, so a non-catalogue TOML
             // parses with a blank name rather than failing. Treat blank as absent so
@@ -1664,8 +1669,11 @@ fn describe_catalog(path: &str, blob_sha: &str, text: &str) -> RemoteCatalog {
             cat.frames.len(),
             cat.frames.iter().filter(|f| f.interval.is_some()).count(),
             Some(cat.protocol),
+            cat.meta.version,
         ),
-        None => (None, 0, 0, None),
+        // 1 rather than 0 for the unparseable case: it is what `Meta` itself defaults
+        // to, so no consumer has to special-case "we could not tell".
+        None => (None, 0, 0, None, 1),
     };
 
     RemoteCatalog {
@@ -1675,6 +1683,7 @@ fn describe_catalog(path: &str, blob_sha: &str, text: &str) -> RemoteCatalog {
         valid: findings.is_empty() && parsed.is_some(),
         errors,
         frame_count,
+        meta_version,
         transmit_frame_count,
         protocol,
     }

@@ -32,26 +32,35 @@ export type Blocker = {
 };
 
 /**
- * The fields the Branch tab edits.
+ * The fields the tabs edit — mostly the Branch tab's, plus `bumpVersion` from the Push
+ * tab.
  *
- * One object rather than six `useState` atoms: the shell owns them because it builds
+ * One object rather than seven `useState` atoms: the shell owns them because it builds
  * the publish request, but every one of them was costing a state, a prop pair and a
  * destructure to add.
  */
-export type BranchForm = {
+export type PublishForm = {
   targetPath: string;
   branch: string;
   openPr: boolean;
   prTitle: string;
   prBody: string;
   draft: boolean;
+  /**
+   * Increment `[meta].version` in what is committed. **On by default here and off on
+   * the wire** — the backend must not bump for a caller that says nothing, but the
+   * moment a decoder goes to a repository other people pull from is exactly the moment
+   * its revision number is easiest to forget.
+   */
+  bumpVersion: boolean;
 };
 
-export const EMPTY_BRANCH_FORM: BranchForm = {
+export const EMPTY_PUBLISH_FORM: PublishForm = {
   targetPath: "",
   branch: "",
   openPr: false,
   prTitle: "",
   prBody: "",
   draft: false,
+  bumpVersion: true,
 };

@@ -52,6 +52,7 @@ import {
   type PublishResult,
 } from "../../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../../stores/catalogShareStore";
+import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import { sourcesFor } from "../../../../hooks/useCatalogSources";
 import { CatalogSyncBadge } from "../../../../components/catalogSyncPresentation";
 import RepoPicker from "./RepoPicker";
@@ -63,7 +64,7 @@ import { stepsFor } from "./publishSteps";
 import { publishTabs } from "./publishTabs";
 import { publishBlockers } from "./publishBlockers";
 import { usePublishDiff } from "./usePublishDiff";
-import { EMPTY_BRANCH_FORM, type BranchForm, type PublishTab, type T } from "./types";
+import { EMPTY_PUBLISH_FORM, type PublishForm, type PublishTab, type T } from "./types";
 
 type Props = {
   isOpen: boolean;
@@ -107,7 +108,7 @@ export default function PublishCatalogDialog({
   const [commitMessage, setCommitMessage] = useState(
     filename ? t("publish.defaultMessage", { filename }) : "",
   );
-  const [form, setForm] = useState<BranchForm>(EMPTY_BRANCH_FORM);
+  const [form, setForm] = useState<PublishForm>(EMPTY_PUBLISH_FORM);
   const [tab, setTab] = useState<PublishTab>("push");
   // Latched, not derived from `tab`: leaving and returning must not re-fetch, but a
   // branch or path edited while the tab is open must.
@@ -118,7 +119,7 @@ export default function PublishCatalogDialog({
   const requestId = useRef("");
 
   const setField = useCallback(
-    <K extends keyof BranchForm>(key: K, value: BranchForm[K]) =>
+    <K extends keyof PublishForm>(key: K, value: PublishForm[K]) =>
       setForm((f) => ({ ...f, [key]: value })),
     [],
   );
@@ -165,6 +166,18 @@ export default function PublishCatalogDialog({
   const selectedRepo = savedRepos.find((r) => r.id === repoId) ?? null;
   const trackedInSelected = trackedHere.find((c) => c.repoId === repoId) ?? null;
 
+  // Does the Catalog editor hold *this* catalogue with unsaved changes? Its own Push
+  // button is already disabled while dirty, so this can only be true when publishing
+  // from Settings → Catalogs — but that is exactly the case where a bump would be
+  // written to disk and then silently reverted by the editor's next save.
+  const editorIsDirty = useCatalogEditorStore(
+    (s) => s.file.path?.split(/[/\\]/).pop() === filename && s.hasUnsavedChanges(),
+  );
+  const adoptOnDiskChange = useCatalogEditorStore((s) => s.adoptOnDiskChange);
+  // Derived once, so the checkbox, the Changes tab's note and the request itself
+  // cannot disagree about whether this push will bump.
+  const willBump = form.bumpVersion && !editorIsDirty;
+
   const buildRequest = (id: string): PublishRequest => ({
     filename: filename ?? "",
     repoUrl: selectedRepo?.url ?? "",
@@ -181,6 +194,7 @@ export default function PublishCatalogDialog({
     targetPath: form.targetPath.trim() || undefined,
     openPr: form.openPr,
     draft: form.draft,
+    bumpVersion: willBump,
     requestId: id,
   });
 
@@ -200,6 +214,12 @@ export default function PublishCatalogDialog({
 
   const handlePublish = async () => {
     const result = await runPublish(buildRequest(requestId.current));
+    // The bump rewrote the file on disk. Nothing else tells the editor a file changed
+    // underneath it, so a buffer left holding the old number would write it straight
+    // back on the next save.
+    if (result?.versionBump?.writtenLocally && filename) {
+      await adoptOnDiskChange(filename);
+    }
     if (result?.prUrl) await openUrl(result.prUrl);
   };
 
@@ -357,6 +377,9 @@ export default function PublishCatalogDialog({
               plan={plan}
               secretsAcknowledged={publishState.secretsAcknowledged}
               onAcknowledgeSecrets={acknowledgeSecrets}
+              bumpVersion={willBump}
+              onBumpVersion={(checked) => setField("bumpVersion", checked)}
+              editorIsDirty={editorIsDirty}
             />
           )}
           {tab === "branch" && plan && (
@@ -369,7 +392,13 @@ export default function PublishCatalogDialog({
             />
           )}
           {tab === "diff" && (
-            <DiffTab t={t} state={diffState} requestedBranch={form.branch} />
+            <DiffTab
+              t={t}
+              state={diffState}
+              requestedBranch={form.branch}
+              bumpVersion={willBump}
+              metaVersion={plan?.metaVersion}
+            />
           )}
         </div>
 
@@ -509,6 +538,15 @@ function PublishSuccess({
             {result.headOwner} · {result.branch}
             {result.reusedBranch ? ` · ${t("publish.reusedBranch")}` : ""}
           </p>
+          {result.versionBump && (
+            <p className={caption}>
+              {/* Two sentences, because the failed-guard case is not a footnote: the
+                  bump is upstream but not on disk, so the catalogue now reads as
+                  locally ahead and the user needs to know why. */}
+              {t("publish.bumpedTo", { to: result.versionBump.to })}
+              {!result.versionBump.writtenLocally && ` ${t("publish.bumpNotWritten")}`}
+            </p>
+          )}
           <div className="flex gap-2 pt-1">
             {result.prUrl && (
               <SecondaryButton onClick={() => void openUrl(result.prUrl!)}>

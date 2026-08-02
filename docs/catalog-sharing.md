@@ -674,13 +674,19 @@ The default is a direct commit to the base branch: no branch created, no pull
 request opened. Most publishing is a decoder going back to a repository the user
 owns, where a branch and a PR are ceremony around a one-file change.
 
-`PublishRequest` carries exactly two knobs, replacing the three overlapping ones
-(`mode`, `commit_to_base`, `branch`) the REST design needed:
+`PublishRequest` carries exactly two knobs about *where* the commit goes, replacing
+the three overlapping ones (`mode`, `commit_to_base`, `branch`) the REST design needed:
 
 - `branch: Option<String>` — `None` pushes to the base branch; naming one creates
   it off the base.
 - `open_pr: bool` — off by default, and **never forced**, not even when a fork is
   involved: pushing to your own fork and stopping is a legitimate way to park work.
+
+One further knob is about *what* is committed — `bump_version: bool`, see
+[§ Version bumps](#version-bumps). It is **off by the serde default while the dialog's
+checkbox is on**, and that asymmetry is deliberate: it is the only request field that
+rewrites a file in the user's decoder directory, so a caller that predates it, or any
+caller that is not the push dialog, must not do so by omission.
 
 Opening a PR without naming a branch uses `catalog/{slug}`; a PR against the branch
 it would be opened from is refused, since GitHub cannot merge a branch into itself.
@@ -707,10 +713,12 @@ failure risks destroying someone's work.
    `POST /forks`. The fork's **`full_name` comes from the response** because
    GitHub appends `-1` when you already own a repository of that name. Forking is
    eventually consistent, so it polls immediately then backs off.
-4. **Commit and push** — `git::commit_and_push` syncs the clone, creates the
-   branch off `origin/{base}` if it does not exist, writes the file into the
-   working tree, stages, commits and pushes. When a fork is the target it pushes
-   to an **anonymous remote** so a renamed or deleted fork cannot leave a stale
+4. **Commit and push** — the bytes committed are the saved file, plus a
+   `[meta].version` increment when one was asked for **and** the push would change the
+   file anyway ([§ Version bumps](#version-bumps)). `git::commit_and_push` then syncs
+   the clone, creates the branch off `origin/{base}` if it does not exist, writes the
+   file into the working tree, stages, commits and pushes. When a fork is the target it
+   pushes to an **anonymous remote** so a renamed or deleted fork cannot leave a stale
    entry in the user's `git remote -v`.
 
    libgit2 reports a server-side rejection through the `push_update_reference`
@@ -748,11 +756,70 @@ failure risks destroying someone's work.
    `PublishState` wholesale dropped `pr_number`, after which `open_pulls` stopped
    polling and the merge — the thing the user is waiting to see — was never noticed.
 
+   A version bump reaches the local file **here**, between the push and this write, and
+   only when the file still hashes to the bytes it was derived from — see
+   [§ Version bumps](#version-bumps) for why that ordering and that guard.
+
 An **unchanged tree is refused** at step 4, in `push_blocking`, where both the new
 tree id and the parent's are already in hand. Committing bytes that are already there
 would push a commit saying nothing and report success for a no-op. The dialog warns
 first, but the invariant belongs where commits are made: the dialog can only warn
 about a branch it has diffed against.
+
+**A version bump does not retire that refusal**, and keeping it alive is why the bump
+is withheld when the parent already holds these bytes. Bump unconditionally and the
+tree always differs by one line, so the refusal could never fire again — a no-op push
+would silently become a commit whose entire diff is a version number.
+
+### Version bumps
+
+`[meta].version` is the author's revision counter. Nothing decodes on it: it is read in
+exactly two places — the parser, which stores it and never consults it again, and a
+`>= 1` floor in validation. `migrate.rs` does not mention it at all, because migration
+is shape-driven and does not stamp a version. So incrementing it is safe, and the only
+question is when.
+
+The push dialog offers it, **on by default**, because publishing to a repository other
+people pull from is the moment the number matters most and is easiest to forget. A
+local save never bumps.
+
+Two rules, neither obvious from any one call site:
+
+- **A bump alone is not a pushable change.** `bump_applies` withholds it when the push
+  parent already holds these bytes, which is what leaves the unchanged-tree refusal
+  above able to fire. The comparison uses `git::blob_sha_at_push_parent`, which resolves
+  the same parent `push_blocking` commits onto — `refs/heads/{branch}` when it exists,
+  else `origin/{base}` — because two answers to "would this push change anything?" would
+  eventually disagree, and the case where they would is real: `git::sync` aligns only
+  the repository *default* branch.
+- **A failed push leaves the local file untouched.** The bumped bytes go to disk only
+  after the push succeeds, guarded by the same unconditional hash compare
+  `apply_catalog_update` makes, so a catalogue edited while the push was in flight is
+  left entirely alone. A refused write costs a version number; clobbering costs work.
+  `synced_sha` is the pushed blob sha in **both** outcomes — that is what was exchanged
+  — so a refused write reads as `localAhead`, which is honest: those local edits really
+  are not upstream.
+
+The increment itself is a **byte splice over the integer's own span**, in
+`wiretap_catalog::edit::bump_meta_version`, deliberately *not* an `EditOp`. Every op
+round-trips a `toml_edit::DocumentMut`, which re-formats the key it replaces (taking the
+comment block above it, which the parser folds into that key's decor), drops a trailing
+comment on the value, and re-emits every line with a bare `\n` — so a CRLF catalogue
+comes back rewritten end to end. This path hashes exact bytes, so all three would turn a
+one-line bump into a whole-file diff. That is measured against `SetTable`, not assumed,
+and pinned by tests that assert whole documents rather than `contains`.
+
+An absent `version` key is written as `2`: absent and `= 1` are the same claim, so 2 is
+the honest increment for a file whose author never wrote the key.
+
+**The editor.** Nothing tells the Catalog editor a file changed underneath it, so a
+buffer left holding the old number would write it straight back on the next save. A
+clean buffer therefore **adopts** the bump silently (`adoptOnDiskChange`) — it and disk
+were identical a moment ago, so adopting is the definition of staying clean. A dirty
+buffer is never touched; instead the checkbox is **disabled**, because the push carries
+the *saved* bytes and renumbering a file that is not what the user is looking at is
+worse than not renumbering it. The editor's own Push is already blocked while dirty, so
+that case only arises publishing from Settings → Catalogs.
 
 ### Reviewing the change before pushing
 
@@ -763,6 +830,12 @@ deliberately does not call `resolve` — that does a `get_repo` request and a fe
 the exact round trip it exists to avoid — and it does not build a `GitHubClient`
 either, because doing so reads the keychain, which is synchronous OS IPC, once per
 debounced keystroke.
+
+It compares the **unbumped** saved file, and that is deliberate: the same call answers
+`identical`, which drives the "nothing to push" blocker, so folding a pending version
+bump into the rows would make an otherwise-identical file claim a change. The tab names
+the bump in a line instead — and the *absence* of that line when the tab says identical
+is the visible form of "a bump alone is not a pushable change".
 
 `git::path_at_ref` answers it in one `Repository::open`: it resolves the branch the
 push would land on (falling back to the base branch when that branch does not exist
@@ -939,6 +1012,13 @@ must keep working with the field empty.
 
 ## Not built yet
 
+- **The editor does not notice a file changing underneath it.** Nothing routes a
+  decoder-directory change to the Catalog editor's buffer — the watcher and
+  `CatalogListChanged` reach the picker only. A publish version bump works around it by
+  calling `adoptOnDiskChange` directly, and `pull_catalog` applying an update has the
+  same gap today. The general fix is a watcher-driven reconcile against the buffer, with
+  a decision about what a *dirty* buffer should be offered; it should be designed for
+  that whole problem rather than bolted onto this one.
 - **Honest status after a push to a fork or a pull-request branch.**
   `mark_exchanged` sets `remote_sha = synced_sha`, so the row reads `inSync` — but a
   push to `catalog/x` on a fork means the upstream base branch does *not* hold those

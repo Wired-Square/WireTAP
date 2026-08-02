@@ -577,6 +577,47 @@ pub async fn blob_sha(
     .await
 }
 
+/// Blob SHA of `path` in the commit a push would land *on top of*.
+///
+/// Deliberately not [`blob_sha`] against `origin/{branch}`: this has to answer about
+/// the exact parent [`push_blocking`] picks — `refs/heads/{branch}` when that branch
+/// already exists locally, else `refs/remotes/origin/{base}` — because the one caller
+/// is deciding whether a push would change anything, and `push_blocking` refuses an
+/// unchanged tree. Two answers to that question would eventually disagree, and the
+/// case where they would is real: `git::sync` aligns only the repository *default*
+/// branch, so a catalogue based on `v2-dev` can have a local head the remote ref does
+/// not match.
+///
+/// `None` means the path is not there yet, which is a genuine change.
+pub async fn blob_sha_at_push_parent(
+    dir: &Path,
+    branch: &str,
+    base: &str,
+    path: &str,
+) -> Result<Option<String>, ShareError> {
+    let (dir, branch, base, path) = (
+        dir.to_path_buf(),
+        branch.to_string(),
+        base.to_string(),
+        path.to_string(),
+    );
+    blocking(move || {
+        let repo = Repository::open(&dir).map_err(map_err)?;
+        let parent = match repo.find_reference(&format!("refs/heads/{branch}")) {
+            Ok(reference) => reference.peel_to_commit().map_err(map_err)?,
+            Err(_) => commit_at(&repo, &base)?,
+        };
+        let sha = parent
+            .tree()
+            .map_err(map_err)?
+            .get_path(Path::new(&path))
+            .ok()
+            .map(|entry| entry.id().to_string());
+        Ok(sha)
+    })
+    .await
+}
+
 /// How far the local branch is ahead of and behind `origin`.
 ///
 /// The honest version of the question the sync badge asks. `(0, 0)` means in sync.

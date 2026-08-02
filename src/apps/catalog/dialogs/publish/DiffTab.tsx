@@ -23,9 +23,18 @@ type Props = {
   state: PublishDiffResult;
   /** The branch the user asked for, which may not exist upstream yet. */
   requestedBranch: string;
+  /** Whether the push will also increment `[meta].version`, and from what. */
+  bumpVersion: boolean;
+  metaVersion?: number;
 };
 
-export default function DiffTab({ t, state, requestedBranch }: Props) {
+export default function DiffTab({
+  t,
+  state,
+  requestedBranch,
+  bumpVersion,
+  metaVersion,
+}: Props) {
   const { diff, loading, error, reload } = state;
 
   // Only when there is nothing to show. Keeping the previous rows up while the next
@@ -83,6 +92,17 @@ export default function DiffTab({ t, state, requestedBranch }: Props) {
       {!diff.branchExists && requestedBranch.trim() && (
         <p className={caption}>
           {t("publish.diffBranchNew", { branch: requestedBranch.trim(), base: diff.comparedRef })}
+        </p>
+      )}
+
+      {/* The bump is applied at push time, so it is not in these rows. Said rather
+          than folded in: `identical` comes from this same call and drives the "nothing
+          to push" blocker, so a bumped comparison would make an otherwise-identical
+          file claim a change. Note its *absence* below when the tab says identical —
+          that is the visible form of "a bump alone is not a pushable change". */}
+      {bumpVersion && metaVersion !== undefined && !diff.identical && (
+        <p className={caption}>
+          {t("publish.diffPlusBump", { from: metaVersion, to: metaVersion + 1 })}
         </p>
       )}
 

@@ -510,6 +510,15 @@ export interface PublishRequest {
   draft?: boolean;
   /** Open a pull request after pushing. Off by default. */
   openPr?: boolean;
+  /**
+   * Increment `[meta].version` in the committed bytes, and write the bumped file back
+   * locally once the push has succeeded.
+   *
+   * Omitting it means **no bump** — the backend's serde default is off, deliberately,
+   * because this is the one request field that rewrites a file in the decoder
+   * directory. The push dialog's checkbox defaults on and sends `true` explicitly.
+   */
+  bumpVersion?: boolean;
   /** Set once the user has reviewed the secret-scan findings. */
   acceptSecretFindings?: boolean;
   requestId?: string;
@@ -557,6 +566,11 @@ export interface PublishPlan {
   /** Content becomes public and permanent; drives the exposure warning. */
   targetIsPublic: boolean;
   contentBytes: number;
+  /**
+   * `[meta].version` as the parser sees it — 1 when the key is absent. A fact about
+   * the file, so the bump checkbox can name both numbers before it is ticked.
+   */
+  metaVersion: number;
   /** Non-empty blocks publishing. */
   validationErrors: string[];
   secretFindings: SecretFinding[];
@@ -566,6 +580,17 @@ export interface PublishPlan {
 
 export type PublishAction = "created" | "updated" | "committed";
 
+/** What a version bump did, when one was applied. */
+export interface VersionBump {
+  from: number;
+  to: number;
+  /**
+   * False when the local file changed while the push was in flight, so the bumped
+   * bytes are upstream but not on disk — the catalogue then reads as locally ahead.
+   */
+  writtenLocally: boolean;
+}
+
 export interface PublishResult {
   action: PublishAction;
   prUrl?: string;
@@ -574,6 +599,12 @@ export interface PublishResult {
   headOwner: string;
   branch: string;
   reusedBranch: boolean;
+  /**
+   * Absent when no bump was asked for. A bump that was asked for but *withheld*
+   * because the push would have changed nothing never reaches a result — the
+   * unchanged tree is refused first.
+   */
+  versionBump?: VersionBump;
 }
 
 /** Tauri event name for step-by-step publish progress. */

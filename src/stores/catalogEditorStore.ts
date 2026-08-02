@@ -7,6 +7,7 @@ import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
 import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
+import { openCatalog } from '../api/catalog';
 import type { CatalogDiff } from '../api/catalog';
 
 /** CAN header field form entry - name + field settings */
@@ -202,6 +203,16 @@ export interface CatalogEditorState {
   openError: (error: string) => void;
   saveStart: () => void;
   saveSuccess: (toml: string) => void;
+  /**
+   * The file on disk was rewritten by something other than a save — a publish version
+   * bump. Adopt it **only when the buffer is clean**, in which case buffer and disk
+   * were identical a moment ago and adopting is the definition of staying clean.
+   *
+   * Goes through `saveSuccess` rather than `openSuccess`: it has to move `toml` *and*
+   * `lastSavedToml` together, and `openSuccess` would wipe the tree selection and
+   * expansion for a one-integer change. A no-op when a different catalogue is open.
+   */
+  adoptOnDiskChange: (filename: string) => Promise<void>;
   saveError: (error: string) => void;
   /** Dismiss the load-time banner. */
   dismissBanner: () => void;
@@ -519,6 +530,26 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       emit(WINDOW_EVENTS.CATALOG_SAVED, payload).catch((err) =>
         tlog.info(`[catalogEditorStore] Failed to emit catalog-saved event: ${err}`)
       );
+    }
+  },
+
+  adoptOnDiskChange: async (filename) => {
+    const { file, hasUnsavedChanges, saveSuccess } = get();
+    if (file.path?.split(/[/\\]/).pop() !== filename) return;
+    // A dirty buffer is the user's work and is never touched. The push dialog already
+    // refuses to bump in that case, so reaching here dirty means the file changed for
+    // some other reason — and there is no merge to make, deliberately.
+    if (hasUnsavedChanges()) return;
+    try {
+      const toml = await openCatalog(file.path);
+      // Re-checked after the await: an edit landing mid-read would otherwise be
+      // overwritten by bytes that predate it.
+      if (get().hasUnsavedChanges()) return;
+      saveSuccess(toml);
+    } catch (error) {
+      // Nothing to recover: the buffer still holds what it held, which is what was on
+      // disk a moment ago. The next open picks up the new bytes.
+      tlog.info(`[catalogEditorStore] could not adopt ${filename} from disk: ${error}`);
     }
   },
 
