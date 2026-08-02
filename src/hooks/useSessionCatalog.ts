@@ -46,9 +46,15 @@ export function useSessionCatalog({
   // parse: catalog.attach returns the resolved catalogue.
   useEffect(() => {
     if (!catalogPath) return;
+    // Bind only what the session has settled on. Until its decoder is decided,
+    // `catalogPath` still holds the *previous* source's — and because every attach
+    // writes Rust's authoritative path, which returns through the roster into the
+    // mirror above, binding it makes the two values chase each other (a decoder
+    // visibly flickering between the old catalogue and the right one).
+    if (sessionId && sessionCatalogPath !== catalogPath) return;
     const run = sessionId
       ? loadCatalogForSession(sessionId, catalogPath)
       : loadCatalog(catalogPath);
     run.catch((e) => tlog.debug(`[${label}] catalog load/attach failed: ${e}`));
-  }, [label, sessionId, catalogPath, loadCatalogForSession, loadCatalog]);
+  }, [label, sessionId, catalogPath, sessionCatalogPath, loadCatalogForSession, loadCatalog]);
 }

@@ -599,9 +599,11 @@ export default function IoSourcePickerDialog({
       ids.map((id) => readProfiles.find((p) => p.id === id)?.preferred_catalog).filter(Boolean)
     )] as string[];
     if (preferred.length === 1) {
-      // Fill only when nothing is set yet — the functional updater reads the
-      // current value without depending on it, so it never fights a manual clear.
-      setSelectedCatalogPath((cur) => cur ?? buildCatalogPath(preferred[0], decoderDir));
+      // The source's own preference beats the seed, which is only the host app's
+      // currently loaded decoder — i.e. the last source's. Filling just the empty
+      // slot showed a Modbus decoder for a CAN source and never offered SBRXXX.
+      // A manual pick or clear still wins, via the `decoderUserTouched` guard.
+      setSelectedCatalogPath(buildCatalogPath(preferred[0], decoderDir));
     }
   }, [checkedSourceId, checkedSourceIds, readProfiles, settings?.decoder_dir]);
 
