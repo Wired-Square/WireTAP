@@ -1178,6 +1178,8 @@ pub fn run() {
             catalog_share::save_catalog_repo,
             catalog_share::forget_catalog_repo,
             catalog_share::set_favourite_catalog_repo,
+            catalog_share::community::save_community_repo,
+            catalog_share::community::forget_community_repo,
             catalog_share::refresh_pr_status,
             catalog_share::check_catalog_updates,
             catalog_share::fetch_remote_catalog,

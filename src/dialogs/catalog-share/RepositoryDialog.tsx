@@ -1,7 +1,14 @@
 // ui/src/dialogs/catalog-share/RepositoryDialog.tsx
 //
-// The repositories catalogues are shared through: a saved list with one starred
-// as the default publish target, plus browse-and-import from any URL.
+// The repositories catalogues are shared through, in two tabs:
+//
+//   Mine       — the user's own. One is starred as the default publish target.
+//   Community  — other people's. Browse and import only, never a publish target.
+//                Some ship with WireTAP and cannot be edited or removed.
+//
+// Only the list changes with the tab. The URL field, the candidate list and the
+// Import footer below it are the browse-and-import workspace and are common to
+// both — including Save, which adds to whichever list is on show.
 //
 // The listing comes from one recursive tree request (which carries a blob SHA per
 // file), so names and validity are resolved by a second, per-file fetch. That split
@@ -14,7 +21,8 @@ import { Copy, Lock, Search } from "lucide-react";
 import * as ShareIcon from "../../components/catalogIcons";
 import Alert from "../../components/Alert";
 import Dialog from "../../components/Dialog";
-import OverflowMenu from "../../components/OverflowMenu";
+import OverflowMenu, { type OverflowMenuItems } from "../../components/OverflowMenu";
+import TabStrip, { type TabDef } from "../../components/TabStrip";
 import { FormField, Input, PrimaryButton, SecondaryButton, Select } from "../../components/forms";
 import { iconMd, iconSm } from "../../styles/spacing";
 import {
@@ -42,7 +50,6 @@ import type {
   GitProgress,
   RemoteCatalog,
   RemoteEntry,
-  SavedRepo,
   SavedRepoView,
   ShareErrorKind,
 } from "../../api/catalogShare";
@@ -55,6 +62,11 @@ type Props = {
   /** Called with the imported file's name so the editor can open it. */
   onImported?: (filename: string) => void;
 };
+
+type RepoTab = "mine" | "community";
+
+/** A row from either list. `builtin` is set only on shipped community entries. */
+type ListedRepo = SavedRepoView & { builtin?: boolean };
 
 /**
  * Guidance per error kind — what the user can actually do about it. Keyed rather
@@ -133,8 +145,14 @@ function CandidateRow({
   );
 }
 
-/** One saved repository: browse it, star it, or reach the rest through the menu. */
-function SavedRepoRow({
+/**
+ * One repository: browse it, and reach the rest through the menu.
+ *
+ * The star and Remove render only where they mean something, which is what tells
+ * the three kinds of row apart without the row knowing which list it is in — a
+ * shipped community repository is simply the one given neither.
+ */
+function RepoRow({
   repo,
   isFavourite,
   showReveal,
@@ -143,18 +161,20 @@ function SavedRepoRow({
   onProperties,
   onRemove,
 }: {
-  repo: SavedRepoView;
-  isFavourite: boolean;
+  repo: ListedRepo;
+  isFavourite?: boolean;
   showReveal: boolean;
   onBrowse: () => void;
-  onToggleFavourite: () => void;
+  /** Omitted where the repository cannot be a publish target. */
+  onToggleFavourite?: () => void;
   onProperties: () => void;
-  onRemove: () => void;
+  /** Omitted where the entry is not the user's to remove. */
+  onRemove?: () => void;
 }) {
   const { t } = useTranslation("catalog");
 
-  const items = [
-    {
+  const items: OverflowMenuItems = [
+    !!onToggleFavourite && {
       label: t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite"),
       icon: ShareIcon.Favourite,
       onClick: onToggleFavourite,
@@ -168,21 +188,28 @@ function SavedRepoRow({
       onClick: () => void revealRepoClone(repo.id),
     },
     { label: t("repository.saved.properties"), icon: ShareIcon.Properties, onClick: onProperties },
-    { separator: true } as const,
-    { label: t("repository.saved.remove"), icon: ShareIcon.Delete, danger: true, onClick: onRemove },
+    !!onRemove && { separator: true },
+    !!onRemove && {
+      label: t("repository.saved.remove"),
+      icon: ShareIcon.Delete,
+      danger: true,
+      onClick: onRemove,
+    },
   ];
 
   return (
     <div className={`${cardCompact} flex items-center gap-2`}>
-      <button
-        onClick={onToggleFavourite}
-        className={`${iconButtonHoverCompact} flex-shrink-0`}
-        title={t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite")}
-      >
-        <ShareIcon.Favourite
-          className={`${iconMd} ${isFavourite ? "fill-yellow-500 text-yellow-500" : `${textSecondary} opacity-60`}`}
-        />
-      </button>
+      {onToggleFavourite && (
+        <button
+          onClick={onToggleFavourite}
+          className={`${iconButtonHoverCompact} flex-shrink-0`}
+          title={t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite")}
+        >
+          <ShareIcon.Favourite
+            className={`${iconMd} ${isFavourite ? "fill-yellow-500 text-yellow-500" : `${textSecondary} opacity-60`}`}
+          />
+        </button>
+      )}
 
       <button onClick={onBrowse} className="flex-1 min-w-0 text-left" title={t("repository.saved.browse")}>
         <p className={`${textMedium} truncate`}>{savedRepoName(repo)}</p>
@@ -194,6 +221,9 @@ function SavedRepoRow({
           {repo.directory && <span className={badgeMetadata}>{repo.directory}</span>}
           {isFavourite && (
             <span className={caption}>· {t("repository.saved.isFavourite")}</span>
+          )}
+          {repo.builtin && (
+            <span className={caption}>· {t("repository.community.builtin")}</span>
           )}
         </div>
       </button>
@@ -243,21 +273,23 @@ function PropertyRow({
 }
 
 /**
- * A saved repository's details: what it is and where its clone lives, over the
- * editable display name, ref and directory.
+ * A repository's details: what it is and where its clone lives, over the editable
+ * display name, ref and directory.
  *
  * Saving re-runs the same command as an initial save, so the backend keeps one
- * definition of what an entry looks like.
+ * definition of what an entry looks like. Without `onSave` the panel is read-only,
+ * which is how a repository that ships with WireTAP shows its facts without
+ * offering edits the backend would refuse.
  */
 function RepoPropertiesDialog({
   repo,
   onClose,
   onSave,
 }: {
-  repo: SavedRepoView;
+  repo: ListedRepo;
   onClose: () => void;
   /** Resolves false when the backend refused, which keeps the dialog open. */
-  onSave: (fields: { label: string; gitRef: string; directory: string }) => Promise<boolean>;
+  onSave?: (fields: { label: string; gitRef: string; directory: string }) => Promise<boolean>;
 }) {
   const { t, i18n } = useTranslation("catalog");
   const [label, setLabel] = useState(repo.label ?? "");
@@ -280,10 +312,12 @@ function RepoPropertiesDialog({
             value={`${repo.owner}/${repo.repo}`}
           />
           <PropertyRow label={t("repository.saved.urlLabel")} value={repo.url} copy />
-          <PropertyRow
-            label={t("repository.saved.savedLabel")}
-            value={new Date(repo.savedAt).toLocaleString(i18n.language)}
-          />
+          {repo.savedAt && (
+            <PropertyRow
+              label={t("repository.saved.savedLabel")}
+              value={new Date(repo.savedAt).toLocaleString(i18n.language)}
+            />
+          )}
           {/* The path shows either way — unfetched, it is where the clone will go. */}
           <PropertyRow
             label={t("repository.saved.clonePathLabel")}
@@ -296,51 +330,57 @@ function RepoPropertiesDialog({
           )}
         </div>
 
-        <div className="p-4 space-y-3">
-          <FormField label={t("repository.saved.labelLabel")}>
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={t("repository.saved.labelPlaceholder", {
-                owner: repo.owner,
-                repo: repo.repo,
-              })}
-            />
-          </FormField>
-          <FormField label={t("repository.saved.branchLabel")}>
-            <Input
-              value={gitRef}
-              onChange={(e) => setGitRef(e.target.value)}
-              placeholder={t("repository.saved.branchPlaceholder")}
-            />
-          </FormField>
-          <FormField label={t("repository.saved.directoryLabel")}>
-            <Input
-              value={directory}
-              onChange={(e) => setDirectory(e.target.value)}
-              placeholder={t("repository.saved.directoryPlaceholder")}
-            />
-          </FormField>
-          <p className={caption}>{t("repository.saved.editHint")}</p>
-        </div>
+        {onSave && (
+          <div className="p-4 space-y-3">
+            <FormField label={t("repository.saved.labelLabel")}>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("repository.saved.labelPlaceholder", {
+                  owner: repo.owner,
+                  repo: repo.repo,
+                })}
+              />
+            </FormField>
+            <FormField label={t("repository.saved.branchLabel")}>
+              <Input
+                value={gitRef}
+                onChange={(e) => setGitRef(e.target.value)}
+                placeholder={t("repository.saved.branchPlaceholder")}
+              />
+            </FormField>
+            <FormField label={t("repository.saved.directoryLabel")}>
+              <Input
+                value={directory}
+                onChange={(e) => setDirectory(e.target.value)}
+                placeholder={t("repository.saved.directoryPlaceholder")}
+              />
+            </FormField>
+            <p className={caption}>{t("repository.saved.editHint")}</p>
+          </div>
+        )}
         {/* A rejected directory would otherwise close the dialog and lose the edits,
             leaving the reason as small red text in the list behind it. */}
         {saveError && <p className={`${caption} ${textDanger} px-4`}>{saveError}</p>}
         <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>{t("repository.cancel")}</SecondaryButton>
-          <PrimaryButton
-            disabled={saving}
-            onClick={() => {
-              setSaving(true);
-              setSaveError(null);
-              void onSave({ label, gitRef, directory }).then((ok) => {
-                setSaving(false);
-                if (!ok) setSaveError(t("repository.saved.saveFailed"));
-              });
-            }}
-          >
-            {t("repository.saved.apply")}
-          </PrimaryButton>
+          <SecondaryButton onClick={onClose}>
+            {onSave ? t("repository.cancel") : t("repository.close")}
+          </SecondaryButton>
+          {onSave && (
+            <PrimaryButton
+              disabled={saving}
+              onClick={() => {
+                setSaving(true);
+                setSaveError(null);
+                void onSave({ label, gitRef, directory }).then((ok) => {
+                  setSaving(false);
+                  if (!ok) setSaveError(t("repository.saved.saveFailed"));
+                });
+              }}
+            >
+              {t("repository.saved.apply")}
+            </PrimaryButton>
+          )}
         </div>
       </div>
     </Dialog>
@@ -358,9 +398,13 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   const importState = useCatalogShareStore((s) => s.importState);
   const savedRepos = useCatalogShareStore((s) => s.savedRepos);
   const favouriteRepoId = useCatalogShareStore((s) => s.favouriteRepoId);
+  const communityRepos = useCatalogShareStore((s) => s.communityRepos);
   const saveRepo = useCatalogShareStore((s) => s.saveRepo);
   const forgetRepo = useCatalogShareStore((s) => s.forgetRepo);
+  const saveCommunityRepo = useCatalogShareStore((s) => s.saveCommunityRepo);
+  const forgetCommunityRepo = useCatalogShareStore((s) => s.forgetCommunityRepo);
   const reposError = useCatalogShareStore((s) => s.reposError);
+  const sourcesLoading = useCatalogShareStore((s) => s.sourcesLoading);
   const setFavouriteRepo = useCatalogShareStore((s) => s.setFavouriteRepo);
   const setUrl = useCatalogShareStore((s) => s.setUrl);
   const validateUrl = useCatalogShareStore((s) => s.validateUrl);
@@ -372,6 +416,9 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   const runImport = useCatalogShareStore((s) => s.runImport);
   const loadSources = useCatalogShareStore((s) => s.loadSources);
 
+  // Null until the user picks one; the tab shown is derived until then, so an
+  // in-flight load cannot land after a click and move it out from under them.
+  const [picked, setPicked] = useState<RepoTab | null>(null);
   // Held by id, not by value: the record is re-read from the list on every render
   // so the properties panel cannot show facts a save or browse has moved on from.
   const [properties, setProperties] = useState<string | null>(null);
@@ -398,14 +445,28 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   }, [browse.loading]);
 
   // Reset on open so a previous session's results don't linger, and load the
-  // saved list so it is there before the first render settles.
+  // lists so they are there before the first render settles.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setPicked(null);
+      return;
+    }
     clearBrowse();
     void loadSources();
   }, [isOpen, clearBrowse, loadSources]);
 
-  const propertiesRepo = savedRepos.find((r) => r.id === properties);
+  // Mine, falling back to Community when the user has nothing of their own — the
+  // list that always has something. Waiting on the load matters: an empty saved
+  // list means "not loaded yet" just as often as it means "none saved".
+  const mine = picked ? picked === "mine" : sourcesLoading || savedRepos.length > 0;
+
+  const repos: ListedRepo[] = mine ? savedRepos : communityRepos;
+  // Which list Save and Remove act on follows the tab, so no call site below has
+  // to ask again.
+  const saveActive = mine ? saveRepo : saveCommunityRepo;
+  const forgetActive = mine ? forgetRepo : forgetCommunityRepo;
+
+  const propertiesRepo = repos.find((r) => r.id === properties);
   const entries = browse.result?.entries ?? [];
   const selectableCount = entries.filter((e) => browse.resolved[e.path]?.valid).length;
   const anyCollisions = entries.some((e) => e.nameCollides);
@@ -419,10 +480,11 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   // anyway, and an enabled button that always errors is worse than a disabled one.
   const parsed = browse.parseError ? null : browse.parsed;
   // `repoId` is the backend's own identity key, so "already saved" cannot drift
-  // from what a save would actually collide with.
-  const alreadySaved = !!parsed && savedRepos.some((r) => r.id === parsed.repoId);
+  // from what a save would actually collide with. Checked against the list on
+  // show, since that is the one Save would add to.
+  const alreadySaved = !!parsed && repos.some((r) => r.id === parsed.repoId);
 
-  const handleBrowseSaved = async (repo: SavedRepo) => {
+  const handleBrowseRepo = async (repo: ListedRepo) => {
     // Ref and directory go as arguments, not folded into a `/tree/…` URL: that
     // grammar cannot express "default branch, but this directory", and re-parsing
     // one would cost an extra request to disambiguate a split we already know.
@@ -432,6 +494,11 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
     // just changed and the list is what carries it.
     void loadSources();
   };
+
+  const tabs: TabDef<RepoTab>[] = [
+    { id: "mine", label: t("repository.tabs.mine"), badge: savedRepos.length },
+    { id: "community", label: t("repository.tabs.community"), badge: communityRepos.length },
+  ];
 
   const handleImport = async () => {
     const results = await runImport();
@@ -449,31 +516,44 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
           <p className={caption}>{t("repository.subtitle")}</p>
         </div>
 
+        <TabStrip tabs={tabs} activeTab={mine ? "mine" : "community"} onTabChange={setPicked} />
+
         <div className="p-4 space-y-3">
           <div className="space-y-2">
-            <p className={textMedium}>{t("repository.saved.heading")}</p>
+            <p className={caption}>
+              {t(mine ? "repository.saved.hint" : "repository.community.hint")}
+            </p>
             {reposError && (
               <p className={`${caption} ${textDanger}`}>{reposError.message}</p>
             )}
-            {savedRepos.length === 0 ? (
+            {repos.length === 0 ? (
               <div className={`${cardCompact} text-center py-4`}>
-                <p className={emptyStateText}>{t("repository.saved.empty")}</p>
+                <p className={emptyStateText}>
+                  {t(mine ? "repository.saved.empty" : "repository.community.empty")}
+                </p>
                 <p className={emptyStateHint}>{t("repository.saved.emptyHint")}</p>
               </div>
             ) : (
               <div className="space-y-1">
-                {savedRepos.map((repo) => (
-                  <SavedRepoRow
+                {repos.map((repo) => (
+                  <RepoRow
                     key={repo.id}
                     repo={repo}
-                    isFavourite={repo.id === favouriteRepoId}
                     showReveal={showReveal}
-                    onBrowse={() => handleBrowseSaved(repo)}
-                    onToggleFavourite={() =>
-                      void setFavouriteRepo(repo.id === favouriteRepoId ? null : repo.id)
+                    isFavourite={mine && repo.id === favouriteRepoId}
+                    onBrowse={() => handleBrowseRepo(repo)}
+                    // Only a repository of the user's own can be the publish
+                    // default, and only their own entry is theirs to remove. The
+                    // star is gated on the tab, not just the id: a repository in
+                    // both lists would otherwise light up under Community too.
+                    onToggleFavourite={
+                      mine
+                        ? () =>
+                            void setFavouriteRepo(repo.id === favouriteRepoId ? null : repo.id)
+                        : undefined
                     }
                     onProperties={() => setProperties(repo.id)}
-                    onRemove={() => void forgetRepo(repo.id)}
+                    onRemove={repo.builtin ? undefined : () => void forgetActive(repo.id)}
                   />
                 ))}
               </div>
@@ -510,14 +590,21 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               )}
               {t("repository.browse")}
             </SecondaryButton>
+            {/* Adds to the list on show — the only way into Community, whose rows
+                are not otherwise the user's to change. */}
             <SecondaryButton
-              onClick={() => void saveRepo(browse.url.trim())}
+              onClick={() => void saveActive(browse.url.trim())}
               disabled={!parsed || alreadySaved}
             >
               <ShareIcon.SaveRepository className={iconMd} />
-              {alreadySaved ? t("repository.saved.saved") : t("repository.saved.save")}
+              {/* Worded per tab rather than tooltipped: which list this adds to is
+                  the one thing that changes, so it belongs on the button's face. */}
+              {mine
+                ? t(alreadySaved ? "repository.saved.saved" : "repository.saved.save")
+                : t(alreadySaved ? "repository.community.added" : "repository.community.add")}
             </SecondaryButton>
-          
+          </div>
+
           {browse.loading && gitProgress && (
             <p className={caption}>
               {t(`repository.git.${gitProgress.phase}`, {
@@ -527,7 +614,6 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               })}
             </p>
           )}
-</div>
 
           {browse.error && (
             <Alert tone="danger">
@@ -684,13 +770,20 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
         <RepoPropertiesDialog
           repo={propertiesRepo}
           onClose={() => setProperties(null)}
-          onSave={async (fields) => {
-            // Re-save by URL: the backend owns what an entry looks like, and the
-            // id is derived from the URL, so this updates in place.
-            const saved = await saveRepo(propertiesRepo.url, fields);
-            if (saved) setProperties(null);
-            return !!saved;
-          }}
+          // A shipped entry has nothing the backend would accept an edit to, so
+          // its panel is read-only. `builtin` only ever reaches a community row,
+          // so a repository saved to both lists stays editable under Mine.
+          onSave={
+            propertiesRepo.builtin
+              ? undefined
+              : async (fields) => {
+                  // Re-save by URL: the backend owns what an entry looks like, and
+                  // the id is derived from the URL, so this updates in place.
+                  const saved = await saveActive(propertiesRepo.url, fields);
+                  if (saved) setProperties(null);
+                  return !!saved;
+                }
+          }
         />
       )}
     </Dialog>

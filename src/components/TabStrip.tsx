@@ -3,9 +3,9 @@
 // The underlined tab strip used inside dialogs.
 //
 // Generic over the tab id so each caller keeps its own exhaustively-checked union —
-// the strip never sees a bare string. Two callers today, and they must stay in visual
-// lockstep, which is the whole reason this is one component rather than two copies of
-// the same six Tailwind strings.
+// the strip never sees a bare string. Three callers today, and they must stay in
+// visual lockstep, which is the whole reason this is one component rather than three
+// copies of the same six Tailwind strings.
 
 import type { ReactNode } from "react";
 

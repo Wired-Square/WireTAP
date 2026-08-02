@@ -521,6 +521,11 @@ pub struct Registry {
     /// than a per-entry flag, matching `default_read_profile` in `AppSettings`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub favourite_repo_id: Option<String>,
+    /// Community repositories the user added themselves. The ones that ship with
+    /// WireTAP are compiled in (see `community::BUILTIN`) and never stored here,
+    /// so a shipped entry can be retired without leaving a stale copy behind.
+    #[serde(default)]
+    pub community_repos: Vec<SavedRepo>,
     #[serde(default)]
     pub repos: Vec<RepoEntry>,
     #[serde(default)]
@@ -538,6 +543,7 @@ impl Default for Registry {
             identity: None,
             saved_repos: Vec::new(),
             favourite_repo_id: None,
+            community_repos: Vec::new(),
             repos: Vec::new(),
             catalogs: Vec::new(),
         }
@@ -691,20 +697,13 @@ impl Registry {
     ///
     /// The first save becomes the favourite: a one-entry list with nothing
     /// starred would leave the publish dropdown with no default for no reason.
-    pub fn save_repo(&mut self, mut entry: SavedRepo) {
-        match self.saved_repos.iter_mut().find(|r| r.id == entry.id) {
-            Some(existing) => {
-                // Keep when it was first saved; this is an edit, not a re-add.
-                entry.saved_at = existing.saved_at.clone();
-                *existing = entry;
-            }
-            None => {
-                if self.saved_repos.is_empty() {
-                    self.favourite_repo_id = Some(entry.id.clone());
-                }
-                self.saved_repos.push(entry);
-            }
+    pub fn save_repo(&mut self, entry: SavedRepo) {
+        // An empty list can only be an insert, so the star is settled before the
+        // upsert rather than reported back out of it.
+        if self.saved_repos.is_empty() {
+            self.favourite_repo_id = Some(entry.id.clone());
         }
+        upsert_by_id(&mut self.saved_repos, entry);
     }
 
     /// Drop a saved repository. Returns whether anything was removed.
@@ -712,13 +711,24 @@ impl Registry {
     /// Clears the favourite when it was the one removed — otherwise the publish
     /// dropdown defaults to an id that is no longer in the list.
     pub fn forget_saved_repo(&mut self, repo_id: &str) -> bool {
-        let before = self.saved_repos.len();
-        self.saved_repos.retain(|r| r.id != repo_id);
-        let removed = self.saved_repos.len() != before;
+        let removed = remove_by_id(&mut self.saved_repos, repo_id);
         if removed && self.favourite_repo_id.as_deref() == Some(repo_id) {
             self.favourite_repo_id = None;
         }
         removed
+    }
+
+    /// Add a community repository, or update the one already held under the same id.
+    ///
+    /// Unlike [`Registry::save_repo`] there is no favourite to seed: community
+    /// repositories are an import source, never a publish target.
+    pub fn save_community_repo(&mut self, entry: SavedRepo) {
+        upsert_by_id(&mut self.community_repos, entry);
+    }
+
+    /// Drop a community repository. Returns whether anything was removed.
+    pub fn forget_community_repo(&mut self, repo_id: &str) -> bool {
+        remove_by_id(&mut self.community_repos, repo_id)
     }
 
     /// Star one saved repository, or clear the star with `None`. Reports whether it
@@ -899,6 +909,29 @@ fn filename_eq(a: &str, b: &str) -> bool {
 /// perfectly plausible local file rather than as a fault.
 fn filename_key(s: &str) -> String {
     s.to_ascii_lowercase()
+}
+
+/// Add a repository to a curated list, or update the one already under its id.
+///
+/// Named for the mechanism rather than the list, so it does not read as a second
+/// [`Registry::upsert_repo`] — that one owns the provenance `repos`. One owner for
+/// both curated lists, because the rule that `saved_at` survives an edit — an edit
+/// is not a re-add — is the sort of thing that drifts when written twice.
+fn upsert_by_id(list: &mut Vec<SavedRepo>, mut entry: SavedRepo) {
+    match list.iter_mut().find(|r| r.id == entry.id) {
+        Some(existing) => {
+            entry.saved_at = existing.saved_at.clone();
+            *existing = entry;
+        }
+        None => list.push(entry),
+    }
+}
+
+/// Drop a repository from a curated list. Returns whether anything was removed.
+fn remove_by_id(list: &mut Vec<SavedRepo>, repo_id: &str) -> bool {
+    let before = list.len();
+    list.retain(|r| r.id != repo_id);
+    list.len() != before
 }
 
 /// Names of every `*.toml` at the top level of the decoder dir. Names only: the
@@ -1209,6 +1242,7 @@ mod tests {
         registry.upsert_repo(repo());
         registry.upsert_catalog(entry("x.toml", "abc"));
         registry.save_repo(saved("gh:owner/repo"));
+        registry.save_community_repo(saved("gh:someone/shared"));
 
         let json = serde_json::to_string(&registry).expect("serialises");
         let parsed: Registry = serde_json::from_str(&json).expect("deserialises");
@@ -1219,6 +1253,7 @@ mod tests {
         assert_eq!(parsed.repos.len(), 1);
         assert_eq!(parsed.saved_repos, vec![saved("gh:owner/repo")]);
         assert_eq!(parsed.favourite_repo_id.as_deref(), Some("gh:owner/repo"));
+        assert_eq!(parsed.community_repos, vec![saved("gh:someone/shared")]);
     }
 
     #[test]
@@ -1228,6 +1263,10 @@ mod tests {
         assert!(parsed.catalogs.is_empty());
         assert!(parsed.saved_repos.is_empty());
         assert!(parsed.favourite_repo_id.is_none());
+        assert!(
+            parsed.community_repos.is_empty(),
+            "a registry written before community repos existed must still load"
+        );
     }
 
     #[test]
@@ -1514,6 +1553,30 @@ mod tests {
         registry.save_repo(saved("gh:c/three"));
         assert!(registry.forget_saved_repo("gh:c/three"));
         assert_eq!(registry.favourite_repo_id.as_deref(), Some("gh:a/one"));
+    }
+
+    /// Community repositories are an import source, so they must not disturb the
+    /// publish target — the whole reason the two lists are separate.
+    #[test]
+    fn community_repos_are_a_separate_list_with_no_favourite() {
+        let mut registry = Registry::default();
+        registry.save_community_repo(saved("gh:someone/shared"));
+        assert!(registry.saved_repos.is_empty());
+        assert!(registry.favourite_repo_id.is_none());
+
+        let mut edited = saved("gh:someone/shared");
+        edited.label = Some("Someone's decoders".into());
+        edited.saved_at = "2030-01-01T00:00:00Z".into();
+        registry.save_community_repo(edited);
+        assert_eq!(registry.community_repos.len(), 1, "same id updates in place");
+        assert_eq!(
+            registry.community_repos[0].saved_at, "2026-01-01T00:00:00Z",
+            "an edit is not a re-add"
+        );
+
+        assert!(registry.forget_community_repo("gh:someone/shared"));
+        assert!(!registry.forget_community_repo("gh:someone/shared"));
+        assert!(registry.community_repos.is_empty());
     }
 
     #[test]

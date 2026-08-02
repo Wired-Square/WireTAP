@@ -144,7 +144,21 @@ export interface SaveRepoResult extends SavedReposView {
   saved: SavedRepo;
 }
 
-/** What to show for a saved repository in a list or dropdown. */
+/**
+ * Someone else's repository: browsed and imported from, never published to.
+ * Either ships with WireTAP or was added by the user — `builtin` says which, and
+ * a shipped entry carries an empty `savedAt` because it was never added.
+ */
+export interface CommunityRepoView extends SavedRepoView {
+  builtin: boolean;
+}
+
+/** The community list after a mutation. */
+export interface CommunityReposView {
+  communityRepos: CommunityRepoView[];
+}
+
+/** What to show for a repository in a list or dropdown. */
 export function savedRepoName(repo: SavedRepo): string {
   return repo.label?.trim() || `${repo.owner}/${repo.repo}`;
 }
@@ -223,6 +237,7 @@ export interface CatalogSourcesView {
   catalogs: TrackedCatalog[];
   savedRepos: SavedRepoView[];
   favouriteRepoId?: string;
+  communityRepos: CommunityRepoView[];
   hasToken: boolean;
   login?: string;
 }
@@ -324,6 +339,29 @@ export async function forgetCatalogRepo(repoId: string): Promise<SavedReposView>
 /** Star one saved repository as the default publish target, or `null` to clear. */
 export async function setFavouriteCatalogRepo(repoId: string | null): Promise<SavedReposView> {
   return await invoke<SavedReposView>("set_favourite_catalog_repo", { repoId });
+}
+
+// ── Community repositories ───────────────────────────────────────────────────
+
+/**
+ * Add a community repository, or update the one already held under the same id.
+ * Same inference from the URL as `saveCatalogRepo`.
+ */
+export async function saveCommunityRepo(
+  input: string,
+  opts: { label?: string; gitRef?: string; directory?: string } = {},
+): Promise<CommunityReposView> {
+  return await invoke<CommunityReposView>("save_community_repo", {
+    input,
+    label: opts.label ?? null,
+    gitRef: opts.gitRef ?? null,
+    directory: opts.directory ?? null,
+  });
+}
+
+/** Drop a community repository the user added. Rejected for a built-in. */
+export async function forgetCommunityRepo(repoId: string): Promise<CommunityReposView> {
+  return await invoke<CommunityReposView>("forget_community_repo", { repoId });
 }
 
 // ── Updates ──────────────────────────────────────────────────────────────────

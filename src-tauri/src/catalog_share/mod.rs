@@ -12,6 +12,7 @@
 //! existing side-effecting catalogue command is already an `invoke` command.
 
 pub mod auth;
+pub mod community;
 pub mod error;
 pub mod git;
 pub mod github;
@@ -518,6 +519,9 @@ pub struct CatalogSourcesView {
     pub catalogs: Vec<TrackedCatalog>,
     pub saved_repos: Vec<SavedRepoView>,
     pub favourite_repo_id: Option<String>,
+    /// Other people's repositories — the ones that ship with WireTAP plus any the
+    /// user added. Never a publish target; see `community`.
+    pub community_repos: Vec<community::CommunityRepoView>,
     /// Whether a token is stored. The token itself never leaves Rust.
     pub has_token: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -552,6 +556,7 @@ pub async fn list_catalog_sources(app: AppHandle) -> Result<CatalogSourcesView, 
         catalogs: project_tracked(r, decoder_dir.as_deref()),
         saved_repos: saved_repo_views(&app, r),
         favourite_repo_id: r.favourite_repo_id.clone(),
+        community_repos: community::community_repo_views(&app, r),
         has_token,
         login: r.identity.as_ref().map(|i| i.login.clone()),
     }))
@@ -1326,18 +1331,23 @@ pub struct SavedRepoView {
     pub cloned: bool,
 }
 
+/// One repository with its clone location attached. Shared with the community
+/// list, so both answer "is this one fetched?" the same way.
+fn repo_view(app: &AppHandle, repo: SavedRepo) -> SavedRepoView {
+    let dir = git::clone_dir(app, &repo.id).ok();
+    SavedRepoView {
+        cloned: dir.as_deref().is_some_and(git::is_usable),
+        clone_path: dir.map(|d| d.to_string_lossy().to_string()).unwrap_or_default(),
+        repo,
+    }
+}
+
 /// The saved list with each entry's clone location attached.
 fn saved_repo_views(app: &AppHandle, r: &registry::Registry) -> Vec<SavedRepoView> {
     r.saved_repos
         .iter()
-        .map(|repo| {
-            let dir = git::clone_dir(app, &repo.id).ok();
-            SavedRepoView {
-                cloned: dir.as_deref().is_some_and(git::is_usable),
-                clone_path: dir.map(|d| d.to_string_lossy().to_string()).unwrap_or_default(),
-                repo: repo.clone(),
-            }
-        })
+        .cloned()
+        .map(|repo| repo_view(app, repo))
         .collect()
 }
 

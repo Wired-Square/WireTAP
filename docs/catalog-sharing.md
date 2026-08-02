@@ -98,7 +98,8 @@ settings or keychain), and its 10 s timeout would be blown by a fork poll.
 | `catalog_share/url.rs` | `CatalogSource`, `parse_catalog_source` — every accepted URL form |
 | `catalog_share/git.rs` | The git transport — the only module that knows `git2` exists |
 | `catalog_share/github.rs` | REST client for forks, pull requests and repository metadata |
-| `catalog_share/registry.rs` | Provenance registry: entries, blob SHAs, sync state, saved repositories |
+| `catalog_share/registry.rs` | Provenance registry: entries, blob SHAs, sync state, saved and community repositories |
+| `catalog_share/community.rs` | The community list — the repositories that ship with WireTAP, plus the user's own additions |
 | `catalog_share/publish.rs` | The publish step machine: resolve, fork if needed, commit, push, optional PR |
 | `catalog_share/secrets.rs` | Pre-publish credential scan |
 | `catalog_share/auth.rs` | Keychain token resolution and the account commands |
@@ -360,6 +361,9 @@ browses in Finder and has nowhere for repo-level state.
     "savedAt": "…"
   }],
   "favouriteRepoId": "gh:owner/repo", // the one starred as the publish default
+  // Community repositories the user added, same shape as savedRepos. The ones
+  // that ship with WireTAP are compiled in and never written here.
+  "communityRepos": [{ "id": "gh:someone/shared", "url": "…", "owner": "…", "repo": "…", "savedAt": "…" }],
   "repos": [{
     "id": "gh:owner/repo",            // host-derived, so GHE/GitLab cannot collide
     "host": "github.com", "owner": "…", "repo": "…",
@@ -393,12 +397,28 @@ registry rather than a per-entry flag, matching `default_read_profile` in
 `AppSettings`; `forget_saved_repo` clears it when the starred entry goes, or the
 publish dropdown would default to something no longer in the list.
 
-Saved repositories are the one part of this file the user typed, so the three
-commands that mutate them go through `write_checked` and **report a failed
-write** — unlike the provenance paths, which log and continue because a lost
-`syncedSha` is re-derived on the next browse. `set_favourite_repo` likewise
-reports a refused id rather than ignoring it, because the UI stars optimistically
-and needs the error to roll back.
+Saved repositories are the one part of this file the user typed, so the five
+commands that mutate the two curated lists go through `write_checked` and
+**report a failed write** — unlike the provenance paths, which log and continue
+because a lost `syncedSha` is re-derived on the next browse. `set_favourite_repo`
+likewise reports a refused id rather than ignoring it, because the UI stars
+optimistically and needs the error to roll back.
+
+`communityRepos` is the same shape but a different job: other people's
+repositories, browsed and imported from and never a publish target — which is why
+they are a second list rather than a flag, and why nothing there can be starred.
+The entries that ship with WireTAP live in `community::BUILTIN` and are merged in
+at listing time rather than seeded on first run: seeding would leave a copy in
+every existing install, so retiring a shipped repository would never actually
+retire it. `save_community_repo` and `forget_community_repo` refuse a built-in id
+for the same reason — but `forget` refuses only after trying the removal, so an
+entry a user added before we shipped that repository can still be deleted rather
+than stranded in a file it no longer appears in.
+
+Which list a repository is in is what makes it a publish target: `RepoPicker`
+offers `savedRepos` and `set_favourite_repo` refuses an id absent from it, so
+"community is never published to" is a backend rule rather than a UI habit. The
+same split is why the "Mine" tab and the star exist at all.
 
 Keyed on **filename**, not absolute path: the decoder dir is a user setting
 (`handle_decoder_dir_change`) and iOS container UUIDs go stale
@@ -462,6 +482,13 @@ import_remote_catalogs(app, req: ImportRequest) -> Vec<ImportResult>
 save_catalog_repo(app, input, label?, gitRef?, directory?) -> SaveRepoResult
 forget_catalog_repo(app, repoId) -> SavedReposView        // NotFound if unsaved
 set_favourite_catalog_repo(app, repoId: Option<String>) -> SavedReposView
+
+// Community repositories — community.rs. Same idea, second list; a shipped entry
+// is refused by both, since it is not the user's to change. Every row is a
+// CommunityRepoView: a SavedRepoView plus `builtin`, with an empty `savedAt` on a
+// shipped entry — it was never added, and that is what the UI hides its date on.
+save_community_repo(app, input, label?, gitRef?, directory?) -> CommunityReposView
+forget_community_repo(app, repoId) -> CommunityReposView
 
 // Tracked sources — mod.rs
 list_catalog_sources(app) -> CatalogSourcesView          // includes LocalState

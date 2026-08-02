@@ -17,6 +17,7 @@ import {
   pullCatalog,
   forgetCatalogRepo,
   forgetCatalogSource,
+  forgetCommunityRepo,
   linkCatalogSource,
   getGitIdentity,
   importRemoteCatalogs,
@@ -27,11 +28,13 @@ import {
   refreshPrStatus,
   resolveRemoteCatalogs,
   saveCatalogRepo,
+  saveCommunityRepo,
   setFavouriteCatalogRepo,
   setGitToken,
   verifyGitToken,
   type CatalogSource,
   type CollisionPolicy,
+  type CommunityRepoView,
   type GitIdentity,
   type ImportResult,
   type PublishPlan,
@@ -138,8 +141,10 @@ interface CatalogShareState {
   tracked: TrackedCatalog[];
   savedRepos: SavedRepoView[];
   favouriteRepoId: string | null;
-  /** Last saved-repo failure. Its own field because both dialogs mutate the list,
-   *  and `browse.error` is only rendered by one of them. */
+  /** Other people's repositories: the shipped ones plus any the user added. */
+  communityRepos: CommunityRepoView[];
+  /** Last repository-list failure, saved or community. Its own field because both
+   *  dialogs mutate the lists, and `browse.error` is only rendered by one of them. */
   reposError: ShareError | null;
   hasToken: boolean;
   login: string | null;
@@ -170,6 +175,13 @@ interface CatalogShareState {
   forgetRepo: (repoId: string) => Promise<void>;
   /** Star one saved repository as the default publish target, or `null` to clear. */
   setFavouriteRepo: (repoId: string | null) => Promise<void>;
+  /** Add a community repository (or update the one with the same id). */
+  saveCommunityRepo: (
+    input: string,
+    opts?: { label?: string; gitRef?: string; directory?: string },
+  ) => Promise<boolean>;
+  /** Drop a community repository the user added. Refused for a shipped one. */
+  forgetCommunityRepo: (repoId: string) => Promise<void>;
   checkPrStatus: (catalogId: string) => Promise<void>;
 
   /** Check tracked repositories for upstream changes. */
@@ -276,6 +288,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
   tracked: [],
   savedRepos: [],
   favouriteRepoId: null,
+  communityRepos: [],
   reposError: null,
   hasToken: false,
   login: null,
@@ -428,6 +441,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
         tracked: view.catalogs,
         savedRepos: view.savedRepos,
         favouriteRepoId: view.favouriteRepoId ?? null,
+        communityRepos: view.communityRepos,
         hasToken: view.hasToken,
         login: view.login ?? null,
         sourcesLoading: false,
@@ -464,6 +478,26 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
     try {
       const { savedRepos, favouriteRepoId } = await forgetCatalogRepo(repoId);
       set({ savedRepos, favouriteRepoId: favouriteRepoId ?? null, reposError: null });
+    } catch (error) {
+      set({ reposError: asShareError(error) });
+    }
+  },
+
+  saveCommunityRepo: async (input, opts) => {
+    try {
+      const { communityRepos } = await saveCommunityRepo(input, opts);
+      set({ communityRepos, reposError: null });
+      return true;
+    } catch (error) {
+      set({ reposError: asShareError(error) });
+      return false;
+    }
+  },
+
+  forgetCommunityRepo: async (repoId) => {
+    try {
+      const { communityRepos } = await forgetCommunityRepo(repoId);
+      set({ communityRepos, reposError: null });
     } catch (error) {
       set({ reposError: asShareError(error) });
     }

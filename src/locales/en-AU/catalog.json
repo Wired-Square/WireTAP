@@ -675,9 +675,20 @@
   },
   "repository": {
     "title": "Repositories",
-    "subtitle": "Save the repositories you share catalogues with, then browse one to import.",
+    "subtitle": "Browse a repository to import catalogues from it, and save the ones you come back to.",
+    "tabs": {
+      "mine": "Mine",
+      "community": "Community"
+    },
+    "community": {
+      "hint": "Other people's repositories. Import from these; publishing always targets one of yours.",
+      "empty": "No community repositories",
+      "builtin": "Ships with WireTAP",
+      "add": "Add",
+      "added": "Added"
+    },
     "saved": {
-      "heading": "Saved repositories",
+      "hint": "Your own repositories. The starred one is where publishing goes by default.",
       "empty": "No saved repositories yet",
       "emptyHint": "Paste a repository URL below and save it to keep it here.",
       "save": "Save",
@@ -747,6 +758,7 @@
     "import": "Import {{count}}",
     "import_zero": "Import",
     "cancel": "Cancel",
+    "close": "Close",
     "done": "Done",
     "git": {
       "clone": "Cloning for the first time — {{received}} of {{total}} objects ({{kb}} KB)…",

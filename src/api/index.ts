@@ -88,10 +88,14 @@ export {
   saveCatalogRepo,
   forgetCatalogRepo,
   setFavouriteCatalogRepo,
+  saveCommunityRepo,
+  forgetCommunityRepo,
   savedRepoName,
   type SavedRepo,
   type SavedReposView,
   type SaveRepoResult,
+  type CommunityRepoView,
+  type CommunityReposView,
 } from "./catalogShare";
 
 // Dialog API
