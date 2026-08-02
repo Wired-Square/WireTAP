@@ -48,8 +48,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.9.1
-        CFBundleVersion: "0.9.1"
+        CFBundleShortVersionString: 0.10.0
+        CFBundleVersion: "0.10.0"
     entitlements:
       path: wiretap_iOS/wiretap_iOS.entitlements
     scheme:
