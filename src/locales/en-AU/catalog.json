@@ -14,7 +14,8 @@
     "publishUnsaved": "Save your changes first — publishing sends the saved file",
     "switchToText": "Switch to Text Mode",
     "switchToGui": "Switch to GUI Mode",
-    "reviewUpdate": "Review the upstream update"
+    "reviewUpdateFrom": "Review the update from {{repo}}",
+    "reviewUpdateChoose": "Review an update ({{count}} repositories)"
   },
   "tree": {
     "addNode": "Add new node",
@@ -848,6 +849,10 @@
     "openPrLabel": "Open a pull request",
     "pushAction": "Push",
     "pushAndPrAction": "Push and open pull request",
+    "linkAction": "Link",
+    "linkHint": "Track this catalogue against the file already in the repository, without pushing anything.",
+    "notTrackedHere": "Not tracked in this repository yet — pushing will start tracking it.",
+    "notTrackedButPresent": "Not tracked in this repository yet, but the file is already there. Link it, or push to overwrite it.",
     "prNeedsBranch": "A pull request needs its own branch — “{{branch}}” is what it would be opened against. Name a different branch, or turn off the pull request to push straight to it."
   },
   "createRepo": {

@@ -271,6 +271,28 @@ export async function listCatalogSources(): Promise<CatalogSourcesView> {
   return await invoke<CatalogSourcesView>("list_catalog_sources");
 }
 
+/**
+ * Adopt a file that is already upstream as this catalogue's provenance, pushing
+ * nothing.
+ *
+ * The way out of the one dead end in the journey: a catalogue nothing tracks whose
+ * bytes upstream already match cannot be pushed (there is no commit to make), so
+ * without this there is no route to being tracked at all.
+ */
+export async function linkCatalogSource(
+  filename: string,
+  repoUrl: string,
+  remotePath: string,
+  gitRef?: string,
+): Promise<TrackedCatalog> {
+  return await invoke<TrackedCatalog>("link_catalog_source", {
+    filename,
+    repoUrl,
+    remotePath,
+    gitRef: gitRef ?? null,
+  });
+}
+
 /** Stop tracking a catalogue. Does not delete the file. */
 export async function forgetCatalogSource(catalogId: string): Promise<void> {
   await invoke("forget_catalog_source", { catalogId });

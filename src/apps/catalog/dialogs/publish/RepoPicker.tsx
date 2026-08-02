@@ -7,6 +7,7 @@
 // means hidden and `""` means showing and empty.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FormField,
   Input,
@@ -15,7 +16,8 @@ import {
   Select,
 } from "../../../../components/forms";
 import { caption, textDanger } from "../../../../styles";
-import { savedRepoName } from "../../../../api/catalogShare";
+import { savedRepoName, type TrackedCatalog } from "../../../../api/catalogShare";
+import { syncStatusLabel } from "../../../../components/catalogSyncPresentation";
 import { useCatalogShareStore } from "../../../../stores/catalogShareStore";
 import type { T } from "./types";
 
@@ -31,15 +33,22 @@ type Props = {
   value: string | null;
   onPick: (id: string | null) => void;
   onCreateRepo: () => void;
+  /** This catalogue's subscriptions, so each option can say how it stands there. */
+  trackedHere: TrackedCatalog[];
 };
 
-export default function RepoPicker({ t, value, onPick, onCreateRepo }: Props) {
+export default function RepoPicker({ t, value, onPick, onCreateRepo, trackedHere }: Props) {
+  // `common`, not `catalog`: the status words belong to the shared sync vocabulary,
+  // and an option reading a different word from the badge below it would be worse
+  // than no word at all.
+  const { t: tCommon } = useTranslation("common");
   const savedRepos = useCatalogShareStore((s) => s.savedRepos);
   const favouriteRepoId = useCatalogShareStore((s) => s.favouriteRepoId);
   const saveRepo = useCatalogShareStore((s) => s.saveRepo);
   const reposError = useCatalogShareStore((s) => s.reposError);
 
   const [addingUrl, setAddingUrl] = useState<string | null>(null);
+  const statusByRepo = new Map(trackedHere.map((c) => [c.repoId, c.syncStatus]));
 
   const handleAdd = async (url: string) => {
     const saved = await saveRepo(url.trim());
@@ -66,12 +75,18 @@ export default function RepoPicker({ t, value, onPick, onCreateRepo }: Props) {
               }}
             >
               <option value="">{t("publish.repoPlaceholder")}</option>
-              {savedRepos.map((repo) => (
-                <option key={repo.id} value={repo.id}>
-                  {savedRepoName(repo)}
-                  {repo.id === favouriteRepoId ? " ★" : ""}
-                </option>
-              ))}
+              {savedRepos.map((repo) => {
+                const status = statusByRepo.get(repo.id);
+                return (
+                  <option key={repo.id} value={repo.id}>
+                    {savedRepoName(repo)}
+                    {repo.id === favouriteRepoId ? " ★" : ""}
+                    {/* Text, because an <option> holds nothing else — hence the badge's
+                        own label function rather than a second route to the words. */}
+                    {status ? ` · ${syncStatusLabel(tCommon, status)}` : ""}
+                  </option>
+                );
+              })}
               <option value={ADD_REPO_OPTION}>{t("publish.repoAddOption")}</option>
             </Select>
           </FormField>

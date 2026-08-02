@@ -36,7 +36,8 @@ import CatalogDialogs from "./components/CatalogDialogs";
 import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import { useCatalogShareDialogs } from "./components/CatalogShareDialogs";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
-import { hasRemoteChanges } from "../../utils/catalogSync";
+import { hasRemoteChanges, needsDecision } from "../../utils/catalogSync";
+import { sourcesFor } from "../../hooks/useCatalogSources";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
 
@@ -305,16 +306,25 @@ function CatalogEditorInner() {
   // the migration-aware path above like any other catalogue.
   const shareDialogs = useCatalogShareDialogs({ decoderDir });
 
-  // The open catalogue's tracked source, when upstream has something to review.
+  // Every repository holding the open catalogue that has something to review — all of
+  // them, because a decoder tracked against two can have an update waiting in each.
   const trackedSources = useCatalogShareStore((s) => s.tracked);
-  const updatableSourceId = useMemo(() => {
-    const filename = catalogPath?.split(/[/\\]/).pop()?.toLowerCase();
-    if (!filename) return null;
-    const source = trackedSources.find((t) => t.localFilename.toLowerCase() === filename);
-    // The same predicate the settings row's menu uses, over the same backend-derived
-    // status — open-coding the two remote states here is how the two drift apart.
-    return source && hasRemoteChanges(source.syncStatus) ? source.id : null;
-  }, [catalogPath, trackedSources]);
+  const updatableSources = useMemo(
+    () =>
+      sourcesFor(trackedSources, catalogPath?.split(/[/\\]/).pop())
+        // The same predicates the settings row's menu uses, over the same
+        // backend-derived status — open-coding the states here is how the two drift
+        // apart.
+        .filter((t) => hasRemoteChanges(t.syncStatus))
+        // Decisions before clean fast-forwards, then alphabetical, so the menu order
+        // does not shuffle with whatever the registry happened to return.
+        .sort(
+          (a, b) =>
+            Number(needsDecision(b.syncStatus)) - Number(needsDecision(a.syncStatus)) ||
+            a.repoLabel.localeCompare(b.repoLabel),
+        ),
+    [catalogPath, trackedSources],
+  );
 
   // An update handed over from another panel (Settings, typically) lands here as a
   // reviewable, saveable diff — the same buffer-vs-baseline shape a schema migration
@@ -515,9 +525,8 @@ function CatalogEditorInner() {
           onValidate={handlers.handleValidate}
           onToggleMode={() => setMode(editMode === "ui" ? "text" : "ui")}
           onEditConfig={() => openDialog("config")}
-          onReviewUpdate={
-            updatableSourceId ? () => shareDialogs.openUpdate(updatableSourceId) : undefined
-          }
+          updatableSources={updatableSources}
+          onReviewUpdate={shareDialogs.openUpdate}
           onPublish={() =>
             // The saved file is the unit of publishing, not the editor buffer.
             catalogPath && shareDialogs.openPublish(catalogPath.split(/[/\\]/).pop()!)

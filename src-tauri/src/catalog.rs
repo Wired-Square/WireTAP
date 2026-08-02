@@ -365,7 +365,8 @@ pub struct CatalogFile {
     pub name: String,
     pub filename: String,
     pub path: String,
-    /// How this catalogue stands against its repository.
+    /// How this catalogue stands across **every** repository tracking it, folded by
+    /// `registry::aggregate_status`.
     ///
     /// Resolved here rather than joined in the frontend: the picker is mounted by
     /// five panels that otherwise never touch the sharing store, and making each of
@@ -373,6 +374,15 @@ pub struct CatalogFile {
     /// their bundles. The scan already reads every file, so this is a hash over bytes
     /// already in hand.
     pub sync_status: SyncStatus,
+    /// How many repositories track this file — `0` exactly when `sync_status` is
+    /// `LocalOnly`.
+    ///
+    /// The count and not the list: the per-repository rows already have a home on
+    /// `TrackedCatalog`, and reproducing them here would make the directory scan
+    /// resolve repository *labels*, coupling it to a table it deliberately does not
+    /// know about. A summary glyph with no hint that it summarises more than one
+    /// answer is the dishonest part, and a `Vec::len()` already in hand fixes that.
+    pub tracked_repo_count: usize,
 }
 
 /// Backend-owned, always-warm cache of the decoder-directory catalogue list.
@@ -438,12 +448,13 @@ fn scan_catalogs(decoder_dir: &Path, index: &SyncIndex) -> Vec<CatalogFile> {
             .as_deref()
             .and_then(|b| extract_catalog_name(&String::from_utf8_lossy(b)))
             .unwrap_or_else(|| filename.clone());
-        let sync_status = index.status_for(&filename, bytes.as_deref());
+        let sync = index.status_for(&filename, bytes.as_deref());
         catalogs.push(CatalogFile {
             name,
             filename,
             path: path.to_string_lossy().to_string(),
-            sync_status,
+            sync_status: sync.status,
+            tracked_repo_count: sync.tracked_repos,
         });
     }
 
@@ -914,7 +925,7 @@ mod tests {
         // `missing` is therefore the settings list's answer, not the picker's — the
         // picker cannot show a row for a file it never walked.
         assert_eq!(
-            registry.sync_index().status_for("gone.toml", None),
+            registry.sync_index().status_for("gone.toml", None).status,
             SyncStatus::Missing
         );
 

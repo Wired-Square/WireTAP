@@ -249,6 +249,8 @@
       "diverged": "Diverged",
       "missing": "File missing",
       "unchecked": "Not checked"
-    }
+    },
+    "repos_one": "{{count}} repository",
+    "repos_other": "{{count}} repositories"
   }
 }

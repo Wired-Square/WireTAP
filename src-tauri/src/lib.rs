@@ -1173,6 +1173,7 @@ pub fn run() {
             catalog_share::resolve_remote_catalogs,
             catalog_share::import_remote_catalogs,
             catalog_share::list_catalog_sources,
+            catalog_share::link_catalog_source,
             catalog_share::forget_catalog_source,
             catalog_share::save_catalog_repo,
             catalog_share::forget_catalog_repo,

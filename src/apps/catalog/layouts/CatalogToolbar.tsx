@@ -10,6 +10,7 @@ import type { EditMode } from "../types";
 import type { CatalogMetadata } from "../../../api/catalog";
 import { findCatalogByPath } from "../../../utils/catalogUtils";
 import AppTopBar from "../../../components/AppTopBar";
+import OverflowMenu from "../../../components/OverflowMenu";
 
 export type CatalogToolbarProps = {
   editMode: EditMode;
@@ -29,8 +30,16 @@ export type CatalogToolbarProps = {
   onEditConfig: () => void;
   /** Publish to a Git repository. Publishes the saved bytes, so unsaved blocks it. */
   onPublish?: () => void;
-  /** Review an upstream update to the open catalogue. Absent when it isn't tracked. */
-  onReviewUpdate?: () => void;
+  /**
+   * Repositories with an update waiting for the open catalogue. Empty when it is not
+   * tracked, or when every repository holding it is current.
+   *
+   * A list rather than one id: a catalogue tracked against two repositories can have
+   * two updates waiting, and picking whichever came first would review one of them at
+   * random and leave no way to reach the other.
+   */
+  updatableSources?: { id: string; repoLabel: string }[];
+  onReviewUpdate?: (catalogId: string) => void;
 };
 
 export default function CatalogToolbar({
@@ -47,6 +56,7 @@ export default function CatalogToolbar({
   onToggleMode,
   onEditConfig,
   onPublish,
+  updatableSources = [],
   onReviewUpdate,
 }: CatalogToolbarProps) {
   const { t } = useTranslation("catalog");
@@ -160,17 +170,30 @@ export default function CatalogToolbar({
       )}
 
       {/* Review an upstream update — only offered for a tracked catalogue that
-          actually has one waiting. */}
-      {onReviewUpdate && (
-        <button
-          onClick={onReviewUpdate}
-          disabled={!catalogPath}
-          title={t("toolbar.reviewUpdate")}
-          className={iconButtonBase}
-        >
-          <ShareIcon.Diff className={iconMd} />
-        </button>
-      )}
+          actually has one waiting. One repository acts straight away; several offer
+          the choice behind the same glyph, so the button never changes its meaning. */}
+      {onReviewUpdate &&
+        updatableSources.length > 0 &&
+        (updatableSources.length === 1 ? (
+          <button
+            onClick={() => onReviewUpdate(updatableSources[0].id)}
+            title={t("toolbar.reviewUpdateFrom", { repo: updatableSources[0].repoLabel })}
+            className={iconButtonBase}
+          >
+            <ShareIcon.Diff className={iconMd} />
+          </button>
+        ) : (
+          <OverflowMenu
+            title={t("toolbar.reviewUpdateChoose", { count: updatableSources.length })}
+            trigger={<ShareIcon.Diff className={iconMd} />}
+            className={iconButtonBase}
+            items={updatableSources.map((source) => ({
+              label: t("toolbar.reviewUpdateFrom", { repo: source.repoLabel }),
+              icon: ShareIcon.Diff,
+              onClick: () => onReviewUpdate(source.id),
+            }))}
+          />
+        ))}
 
       {/* Text mode toggle */}
       <button

@@ -116,20 +116,24 @@ other four it hands off to none of them. Also
 `src/components/catalogIcons.ts` — the icon vocabulary (see below) — with
 `src/components/catalogSyncPresentation.tsx` rendering its status table for the
 catalogue picker and Settings → Catalogs, and
-`src/hooks/useCatalogSources.ts` — the catalogue list joined with its provenance,
-both reconciled off the same `CatalogListChanged` push via the shared
-`src/hooks/useWsResync.ts` primitive (also used by `useCatalogList`,
-`useOpenAppsSync` and `useSessionRosterSync`).
+`src/hooks/useCatalogSources.ts` — the catalogue list joined with **all** of a file's
+provenance rows (`joinCatalogSources`, pure and separately tested, because a
+one-to-one map kept whichever subscription came last; `sourcesFor` is the same
+question for a surface that has only one file, and `filenameKey` is the one owner of
+the case fold on this side of the wire), both reconciled off the same
+`CatalogListChanged` push via the shared `src/hooks/useWsResync.ts` primitive (also
+used by `useCatalogList`, `useOpenAppsSync` and `useSessionRosterSync`).
 
 ---
 
 ## The sync-state model
 
-The load-bearing idea. For every tracked catalogue the registry stores the **git
-blob SHA-1 of the exact bytes last exchanged with the remote** —
-`sha1("blob {len}\0" + bytes)`, which is what `git hash-object` computes and what
-GitHub returns in its trees and contents responses. One stored value therefore
-answers both questions, and the local one needs **no network call**:
+The load-bearing idea. For every **subscription** — one local file against one
+repository — the registry stores the **git blob SHA-1 of the exact bytes last
+exchanged with that remote** — `sha1("blob {len}\0" + bytes)`, which is what
+`git hash-object` computes and what GitHub returns in its trees and contents
+responses. One stored value therefore answers both questions, and the local one
+needs **no network call**:
 
 | Comparison | Meaning |
 |---|---|
@@ -149,6 +153,13 @@ Because the hash is over *exact bytes*, CRLF and trailing-newline differences
 change it — correctly, since they would be a real diff on GitHub too. **Import
 and publish must therefore preserve bytes verbatim and never normalise line
 endings.**
+
+**A local file may hold several subscriptions**, one per repository, each with its
+own `syncedSha`. That is not an edge case: a decoder pushed to your fork and also
+tracked against the upstream it came from has genuinely exchanged different bytes
+with each, and the two answers must not be averaged into one. The table above stays
+per subscription; folding them into the single label every list wants is the next
+section.
 
 Distinct from all of the above is *"has my work landed upstream?"* — a merged PR.
 That is tracked separately (`PublishState.pr_number` + `refresh_pr_status`),
@@ -180,20 +191,64 @@ disk every other label would be fiction; and `unchecked` is kept distinct from
 `collapse` matches on the `(LocalState, RemoteState)` tuple with **no `_` arm**, so
 adding a variant to either input is a compile error rather than a silently wrong label.
 
+### Folding several repositories into that one label
+
+A file with several subscriptions has several of those pairs. `aggregate_status`
+folds the **two inputs** across them and then calls `collapse` **once**, so there is
+still exactly one function that turns a pair of states into a label. The rejected
+alternative is ranking the seven labels: that would be a second model of `collapse`'s
+own arm order, and two rankings maintained by hand drift.
+
+One rule, in both directions: **a known, actionable answer outranks an unknown one,
+which outranks a known nothing-to-do.**
+
+```rust
+LocalState:  Missing > Modified > Committed > Untracked
+RemoteState: Diverged > UpstreamAhead > Unknown > InSync
+```
+
+`UpstreamAhead > Unknown` is the load-bearing half — a repository with a real,
+pullable update must not be hidden behind one nobody has checked — and
+`Unknown > InSync` is its mirror, so an unverified claim of currency is never
+laundered into a verified one. Both ranks are exhaustive matches with no `_` arm, for
+the same reason `collapse` is.
+
+The fold is the **identity** for a single subscription, over every reachable
+combination of the three shas — that is what makes it a generalisation rather than a
+second answer, and `the_aggregate_is_the_single_subscription_over_every_combination`
+pins it rather than this paragraph.
+
+`localOnly` is now precisely the zero-subscription case, which is what
+`CatalogFile.trackedRepoCount` reports as `0`.
+
 **Why Rust rather than the frontend.** The status rides on `CatalogFile` (from
 `list_catalogs`) as well as `TrackedCatalog`, so the catalogue picker can draw it
 without importing the sharing store — that picker is mounted by five panels that
 otherwise never touch it, and a frontend join would have put the whole share subtree
-in all five bundles. It is also nearly free where it is computed: `scan_catalogs`
+in all five bundles. Doubly true now: the frontend cannot fold what it cannot see.
+It is also nearly free where it is computed: `scan_catalogs`
 already reads every `.toml` in full to extract its `[meta].name`, so the status costs
 one SHA-1 over bytes already in memory. `CatalogEntry::sync_status_of` is **pure** —
 it takes an already-computed blob SHA and touches no disk — which is what lets the
 scan label a row without re-reading the file it just read.
 
-`TrackedCatalog` deliberately ships the collapse and **not** its two inputs. Sending
-`localState` and `remoteState` alongside it is an invitation to re-derive rather than
-ask, which is the drift the single collapse exists to prevent — and it had already
-happened twice before they were removed.
+`CatalogFile` carries `trackedRepoCount` and **not** the per-repository list. Note the
+bundle argument does *not* apply to the list — `src/api/catalog.ts` imports
+`CatalogSyncStatus` as a type-only import, erased at build, and a `TrackedCatalog[]`
+field would erase the same way. The reasons are different and still decisive:
+`scan_catalogs` would need repository *labels*, coupling the directory scan to a table
+it deliberately does not know about; it would duplicate `list_catalog_sources`'
+projection into the command every panel calls; and it would put N objects on the wire
+for five panels that render one glyph. The count needs no lookup at all — it is a
+`Vec::len()` already in hand — and it is what makes a summary glyph legible, since a
+glyph giving no sign it is summarising is the dishonest part.
+
+`TrackedCatalog` is one row **per subscription**, and deliberately ships the collapse
+and **not** its two inputs. Sending `localState` and `remoteState` alongside it is an
+invitation to re-derive rather than ask, which is the drift the single collapse exists
+to prevent — and it had already happened twice before they were removed. Settings
+renders the aggregate badge *and* the per-repository badges it was folded from on one
+card, so the fold is derivable by eye rather than taken on trust.
 
 The rule that a one-click pull never runs over local edits is enforced in **Rust**,
 twice — `CatalogEntry::remote_state_of` weighs the local state and returns `Diverged`
@@ -225,6 +280,9 @@ management list — but they cannot dress the same status differently.
   nothing.
 - **Repository objects → git marks.** `FolderGit2` is a repository, `GitBranch` is only
   ever a branch or ref, `FolderOpen` reveals the clone.
+- **Provenance is a chain link.** `Link` adopts an upstream file, `Unlink` (as
+  `Forget`) stops tracking one. Deliberately not clouds: neither moves a byte, and the
+  two are exact inverses, so they wear inverse glyphs.
 - **One alert glyph.** Severity is carried by tone, so `src/components/Alert.tsx` owns
   `TriangleAlert` and takes no `icon` prop — a per-caller glyph is exactly how this
   journey accumulated four of them for one job. `SecretFindings` keeps `ShieldAlert` as
@@ -246,22 +304,28 @@ the measurement and the trade.
 `list_catalogs` serves from `CatalogCache`, which is rebuilt by the decoder-directory
 watcher and by save/import/rename/delete. But a **registry** write changes a status
 without touching a single file, and no filesystem event will ever fire for it. Those
-paths therefore rebuild the cache explicitly, via `write_and_refresh` in `mod.rs`:
+paths therefore rebuild the cache explicitly, via `write_and_refresh` in `mod.rs` —
+or `write_then_refresh`, its sibling for a write that always changes something and has
+a value to hand back (the two that create a subscription):
 
 | Command | What moves | Why nothing else catches it |
 |---|---|---|
 | `check_catalog_updates` | `remote_sha` | the command that turns `unchecked` into a real answer |
 | `pull_catalog` | `remote_sha` | on the decline paths; the applied path refreshes via `install_update` |
-| `forget_catalog_source` | entry removed | the row becomes `localOnly` |
-| `persist_publish_state` | `synced_sha` | a push flips `localAhead` → `inSync` |
-| `list_catalog_sources` | `local_filename` | a relink moves two rows' statuses |
+| `forget_catalog_source` | entry removed | the row loses one repository, or becomes `localOnly` |
+| `link_catalog_source` | entry created | adopting an upstream file writes no file at all |
+
+| `persist_publish_state` | `synced_sha`, and the entry itself | a push flips `localAhead` → `inSync`, or creates the subscription outright |
+| `list_catalog_sources` | `local_filename` | a relink moves every subscription of the renamed file |
 
 The last one is the delicate one. `refresh_catalog_cache` broadcasts
 `CatalogListChanged`, which the frontend answers by calling `list_catalog_sources`
 again — so refreshing unconditionally there would loop across the IPC boundary. It is
 gated on `reconcile` reporting a relink, and `reconcile` is a fixed point after one
 application (its relink target came from the present-files list, so the next pass finds
-nothing missing). That termination argument is pinned by
+nothing missing). Relinking a filename *group* atomically is what keeps that argument
+whole: relinking one subscription while a sibling stayed missing would leave something
+for the next pass to find, and the loop would not terminate. That argument is pinned by
 `reconcile_is_a_fixed_point`, not left to this paragraph.
 
 `repo_status` additionally reports true `ahead`/`behind` commit counts from
@@ -305,6 +369,10 @@ browses in Finder and has nowhere for repo-level state.
     // one shared field would be overwritten by whichever ref was checked last.
     "headCommits": [{ "gitRef": "main", "commit": "…" }]
   }],
+  // One entry per **subscription**: a local file against one repository. Several may
+  // share a `localFilename` — a decoder tracked against a fork and its upstream — each
+  // with its own `syncedSha`. Both `id` and `(localFilename, repoId)` are unique, and
+  // `upsert_catalog` is the one place either is enforced.
   "catalogs": [{
     "id": "cs_…",                     // from repo+path+ref, so it survives a rename
     "repoId": "gh:owner/repo",
@@ -337,28 +405,43 @@ Keyed on **filename**, not absolute path: the decoder dir is a user setting
 (`paths_are_stale`). Resolved as `decoder_dir.join(localFilename)`.
 
 **Do not hand-roll entry lookup.** `registry::filename_eq` owns the
-case-insensitivity rule (macOS is case-insensitive); go through
-`catalog_by_filename` / `update_catalog_by_filename` / `_by_id`. A publish path
-that misses its entry silently opens a *rival* pull request against a fresh path
+case-insensitivity rule (macOS is case-insensitive); go through `catalog_for`
+(filename **and** repository), `catalog_for_remote`, or the `_by_id` pair. A publish
+path that misses its entry silently opens a *rival* pull request against a fresh path
 instead of adding a commit to the existing one.
+
+The unscoped filename lookup was **deleted, not deprecated**. With several
+subscriptions per file it would return an arbitrary repository's entry, which is
+precisely how that rival pull request gets opened — so the mistake is now not
+expressible rather than merely discouraged.
 
 ### Following renames — three layers, each covering what the previous cannot
 
 1. **In-app rename** → `catalog.rs::rename_catalog` calls
-   `registry::on_catalog_renamed`. This is the only layer that can follow a
-   rename of a *modified* file, because `syncedSha` describes the last-exchanged
-   bytes rather than what is on disk.
-2. **Out-of-app rename** → `Registry::reconcile` matches a missing entry against
-   unclaimed files by content hash, and only relinks on exactly one match.
-   Hashing is lazy: with every tracked file present, nothing is read beyond the
-   directory listing.
+   `registry::on_catalog_renamed`, which moves **every** subscription to that
+   filename. This is the only layer that can follow a rename of a *modified* file,
+   because `syncedSha` describes the last-exchanged bytes rather than what is on disk.
+2. **Out-of-app rename** → `Registry::reconcile` matches by content hash, per
+   filename **group** rather than per entry: two subscriptions to one file hold
+   legitimately different `syncedSha`s, so a per-entry loop relinked whichever
+   happened to match the disk and orphaned its sibling as permanently missing. The
+   group relinks as a unit, on any of its shas. Hashing is lazy: with every tracked
+   file present, nothing is read beyond the directory listing.
 3. **Neither worked** → the entry reports `LocalState::Missing` and the user can
    forget it.
 
-In-app **delete** forgets the entry outright (explicit intent); an out-of-app
-delete leaves it reporting missing. `duplicate_catalog` deliberately does *not*
-copy provenance — two local files claiming one upstream path would make
-publishing ambiguous.
+`reconcile` refuses to guess in **both** directions. Several candidate files for one
+group is the original rule. Several groups wanting one file is the new one, and it is
+load-bearing: without it both would take that file, leaving two subscriptions to one
+repository for one filename — the pair `upsert_catalog` exists to prevent, after which
+`catalog_for` is ambiguous again. It also makes the outcome independent of the order
+`catalogs` happens to be in.
+
+In-app **delete** forgets every subscription to that file outright (explicit intent);
+an out-of-app delete leaves them reporting missing. `duplicate_catalog` deliberately
+does *not* copy provenance — two local files claiming one upstream path would make
+publishing ambiguous, and that pair is now refused by `upsert_catalog` rather than
+merely avoided here.
 
 ---
 
@@ -382,6 +465,7 @@ set_favourite_catalog_repo(app, repoId: Option<String>) -> SavedReposView
 
 // Tracked sources — mod.rs
 list_catalog_sources(app) -> CatalogSourcesView          // includes LocalState
+link_catalog_source(app, filename, repoUrl, remotePath, gitRef?) -> TrackedCatalog
 forget_catalog_source(app, catalogId) -> ()
 refresh_pr_status(app, catalogId) -> Option<TrackedPr>    // open, or merged
 
@@ -549,6 +633,39 @@ fixed. DBC conversion happens first, in the frontend, over the existing
 
 ---
 
+## Linking: adopting what is already upstream
+
+`link_catalog_source` records a subscription without pushing anything. It exists
+because the journey had a dead end: a catalogue nothing had ever tracked, whose bytes
+upstream already matched — pushed before publishing recorded provenance, or copied in
+by hand — could not be pushed, since an unchanged tree is refused all the way down in
+`push_blocking`. The only action that could have created the tracking was the one
+being refused.
+
+`synced_sha` takes the **remote** blob sha, not the local one. Nothing was exchanged,
+so neither is literally true — but that pair of hashes is what makes both outcomes
+read honestly with no new state:
+
+| Local file vs upstream | Reads as | Why that is right |
+|---|---|---|
+| identical | `inSync` | it is; and the dead end is gone |
+| differs | `localAhead` | there really is something to push now |
+
+It refuses when the path is not on the ref (there is nothing to adopt — that is a
+push) and when the file is already tracked against that repository. The URL is parsed
+in Rust, never taken from the frontend, for the same reason publishing does it: this
+decides which repository a file is bound to. It fetches before reading the sha, so
+what is recorded is what upstream holds now rather than whatever a previous browse
+happened to see.
+
+The push dialog offers **Link** whenever the chosen repository already holds the file
+and does not yet track it — `PublishPlan.baseBlobSha` is exactly that question, and
+the plan always answers it, so no Changes tab need be opened. Deliberately not the
+Changes tab's `exists`, which is about the *chosen* branch: a pull-request branch is
+not what a subscription would record.
+
+---
+
 ## Publish
 
 ### Branches and pull requests are optional
@@ -604,9 +721,32 @@ failure risks destroying someone's work.
    filters on **`base` as well as `head`**, because the base now varies with a
    catalogue's provenance and an open PR against a different base is not this one.
 6. **Persist** — the pushed blob sha becomes `synced_sha`, so the file immediately
-   reads as in sync. The branch is recorded, and reused by a later publish while
-   its PR is open and unmerged, so a second edit adds a commit to the review under
-   way instead of opening a rival PR the branch-keyed lookup would never find.
+   reads as in sync; and the **subscription is created** — along with the `RepoEntry`
+   — when this push is the first thing to link the file to that repository. That was
+   a real bug: `persist_publish_state` only ever *updated*, silently doing nothing for
+   a catalogue no import had tracked, so a successful push left the picker showing
+   `localOnly` for ever. `RepoEntry` was likewise only ever born of a browse, so a
+   push to a saved-but-never-browsed repository had nothing to record its fork on.
+
+   The subscription records the **base branch**, not the branch pushed to. A
+   pull-request branch is ephemeral and may exist only on the user's fork, so it is
+   not on `refs/remotes/origin/{ref}` of the upstream clone the update check reads —
+   an entry naming one would never see an update again. `resolve` also reads
+   `git_ref` back as the *next* publish's base, which would then trip the "a pull
+   request needs its own branch" refusal. The branch is already recorded in
+   `PublishState.branch`, where the next publish reuses it while its PR is open and
+   unmerged, so a second edit adds a commit to the review under way instead of opening
+   a rival PR the branch-keyed lookup would never find; a copy in `git_ref` would be
+   the lower-authority one.
+
+   A corollary: publishing a catalogue pinned to a **tag** re-points its subscription
+   to the branch the commit landed on. Only a branch can be a push target, and
+   `synced_sha` must describe a ref we can read back — previously the tag survived
+   while `synced_sha` silently began describing a different ref, which is worse.
+
+   An open pull request survives a push that did not ask for one. Overwriting
+   `PublishState` wholesale dropped `pr_number`, after which `open_pulls` stopped
+   polling and the merge — the thing the user is waiting to see — was never noticed.
 
 An **unchanged tree is refused** at step 4, in `push_blocking`, where both the new
 tree id and the parent's are already in hand. Committing bytes that are already there
@@ -799,6 +939,15 @@ must keep working with the field empty.
 
 ## Not built yet
 
+- **Honest status after a push to a fork or a pull-request branch.**
+  `mark_exchanged` sets `remote_sha = synced_sha`, so the row reads `inSync` — but a
+  push to `catalog/x` on a fork means the upstream base branch does *not* hold those
+  bytes, and Settings now shows that claim beside a "PR #42 open" chip saying the
+  opposite. The naive fix is worse: leaving `remote_sha` alone makes the row read
+  `remoteAhead` and offer a one-click pull that reverts the user's own work. An honest
+  answer needs a third state — *these bytes are on a branch awaiting review* — that the
+  two-SHA model cannot express. The fold is at least robust to it: `InSync` is the
+  weakest remote rank, so it can never mask another repository's real state.
 - **SSH transport** — enable git2's `ssh` feature and honour the user's agent and
   `~/.ssh/config`. Now a Cargo feature and a credential callback rather than a whole
   second backend, which is what the retired `PublishBackend` trait existed to allow.

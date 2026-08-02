@@ -52,6 +52,8 @@ import {
   type PublishResult,
 } from "../../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../../stores/catalogShareStore";
+import { sourcesFor } from "../../../../hooks/useCatalogSources";
+import { CatalogSyncBadge } from "../../../../components/catalogSyncPresentation";
 import RepoPicker from "./RepoPicker";
 import PushTab from "./PushTab";
 import BranchTab from "./BranchTab";
@@ -89,6 +91,8 @@ export default function PublishCatalogDialog({
   const login = useCatalogShareStore((s) => s.login);
   const savedRepos = useCatalogShareStore((s) => s.savedRepos);
   const favouriteRepoId = useCatalogShareStore((s) => s.favouriteRepoId);
+  const tracked = useCatalogShareStore((s) => s.tracked);
+  const linkSource = useCatalogShareStore((s) => s.linkSource);
   const saveRepo = useCatalogShareStore((s) => s.saveRepo);
   const planPublish = useCatalogShareStore((s) => s.planPublish);
   const runPublish = useCatalogShareStore((s) => s.runPublish);
@@ -149,8 +153,17 @@ export default function PublishCatalogDialog({
     };
   }, [notePublishProgress]);
 
-  const repoId = pickedRepoId ?? favouriteRepoId;
+  // Every repository already holding this catalogue, and its status against each.
+  const trackedHere = sourcesFor(tracked, filename);
+
+  // The starred repository is the default, but a catalogue that lives in exactly one
+  // repository defaults to that one instead: a push now leaves a permanent record —
+  // a subscription, a repository entry and a clone — so defaulting to the star for a
+  // decoder that plainly belongs somewhere else makes a wrong click expensive.
+  const repoId =
+    pickedRepoId ?? (trackedHere.length === 1 ? trackedHere[0].repoId : favouriteRepoId);
   const selectedRepo = savedRepos.find((r) => r.id === repoId) ?? null;
+  const trackedInSelected = trackedHere.find((c) => c.repoId === repoId) ?? null;
 
   const buildRequest = (id: string): PublishRequest => ({
     filename: filename ?? "",
@@ -188,6 +201,17 @@ export default function PublishCatalogDialog({
   const handlePublish = async () => {
     const result = await runPublish(buildRequest(requestId.current));
     if (result?.prUrl) await openUrl(result.prUrl);
+  };
+
+  const handleLink = async () => {
+    if (!filename || !selectedRepo) return;
+    const linked = await linkSource(
+      filename,
+      selectedRepo.url,
+      effectivePath,
+      plan?.baseBranch,
+    );
+    if (linked) onClose();
   };
 
   // What the push will actually do, computed locally and named once. The plan
@@ -236,6 +260,11 @@ export default function PublishCatalogDialog({
   }
 
   const canPublish = !!plan && blockers.length === 0 && !publishState.inFlight;
+  // Adopting what is already upstream, rather than pushing to it. `baseBlobSha` is
+  // exactly "the file exists on the base branch", which the plan always answers — the
+  // Changes tab's `exists` is about the *chosen* branch, and a pull-request branch is
+  // not what a subscription would record.
+  const canLink = !!plan && !trackedInSelected && plan.baseBlobSha !== null;
   const tabs = publishTabs({ t, plan, blockers, diff: diffState });
 
   // Why Push is off, for the tooltip. The strip covers the blockers; these two are the
@@ -278,7 +307,28 @@ export default function PublishCatalogDialog({
             value={repoId}
             onPick={setPickedRepoId}
             onCreateRepo={() => onNeedRepo?.()}
+            trackedHere={trackedHere}
           />
+
+          {/* Where this catalogue stands against the chosen repository, in the one
+              place markup is allowed — a native <option> holds text and nothing else.
+              Worth saying plainly now that a push leaves a permanent record. */}
+          {selectedRepo && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {trackedInSelected ? (
+                <>
+                  <CatalogSyncBadge status={trackedInSelected.syncStatus} />
+                  <span className={`${caption} truncate`}>
+                    {trackedInSelected.remotePath} · {trackedInSelected.gitRef}
+                  </span>
+                </>
+              ) : (
+                <span className={caption}>
+                  {canLink ? t("publish.notTrackedButPresent") : t("publish.notTrackedHere")}
+                </span>
+              )}
+            </div>
+          )}
 
           <FormField label={t("publish.messageLabel")}>
             <Input value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)} />
@@ -347,6 +397,8 @@ export default function PublishCatalogDialog({
           <div className="px-4 pb-2">
             <PlanAlert tone="danger">
               <p className={caption}>{publishState.error.message}</p>
+              {/* True of both actions here: publishing is idempotent, and linking
+                  writes nothing until the fetch has succeeded. */}
               {publishState.error.kind === "network" && (
                 <p className={caption}>{t("publish.retryHint")}</p>
               )}
@@ -356,6 +408,23 @@ export default function PublishCatalogDialog({
 
         <div className={`${panelFooter} flex justify-end gap-2`}>
           <SecondaryButton onClick={onClose}>{t("publish.cancel")}</SecondaryButton>
+          {/* The way out of the one dead end here: bytes that already match upstream
+              cannot be pushed, so without this there is no route to being tracked. */}
+          {canLink && (
+            <span title={t("publish.linkHint")}>
+              <SecondaryButton
+                onClick={() => void handleLink()}
+                disabled={publishState.linking}
+              >
+                {publishState.linking ? (
+                  <ShareIcon.Busy className={`${iconMd} animate-spin`} />
+                ) : (
+                  <ShareIcon.Link className={iconMd} />
+                )}
+                {t("publish.linkAction")}
+              </SecondaryButton>
+            </span>
+          )}
           {/* Wrapped, because a disabled button does not fire hover events on every
               platform and the tooltip is the last "why is this off?" backstop. */}
           <span title={canPublish ? undefined : disabledReason}>

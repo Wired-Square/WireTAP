@@ -157,7 +157,10 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                         renders only when selected, so a status icon beside it would
                         shift on every click. A left column also scans vertically past
                         variable-length names. */}
-                    <CatalogSyncIcon status={catalog.syncStatus} />
+                    <CatalogSyncIcon
+                      status={catalog.syncStatus}
+                      repoCount={catalog.trackedRepoCount}
+                    />
                     <div className="flex-1 min-w-0">
                       <span className={`${textMedium} truncate`}>{catalog.name}</span>
                       <div className={`${caption} truncate`}>{catalog.filename}</div>

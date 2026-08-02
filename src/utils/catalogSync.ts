@@ -24,3 +24,11 @@ export function hasLocalChanges(status: CatalogSyncStatus): boolean {
 export function hasRemoteChanges(status: CatalogSyncStatus): boolean {
   return status === "remoteAhead" || status === "diverged";
 }
+
+/**
+ * Does resolving this need the user to choose? Both sides moved, so neither a push
+ * nor a pull is safe on its own — which is why it sorts ahead of the rest.
+ */
+export function needsDecision(status: CatalogSyncStatus): boolean {
+  return status === "diverged";
+}

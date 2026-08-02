@@ -12,8 +12,13 @@ export interface CatalogMetadata {
   name: string;
   filename: string;
   path: string;
-  /** How this catalogue stands against its repository. Joined in Rust. */
+  /**
+   * How this catalogue stands across every repository tracking it. Folded in Rust,
+   * so a picker mounted by five panels draws it without the sharing store.
+   */
   syncStatus: CatalogSyncStatus;
+  /** How many repositories track it — `0` exactly when `syncStatus` is `localOnly`. */
+  trackedRepoCount: number;
 }
 
 /**

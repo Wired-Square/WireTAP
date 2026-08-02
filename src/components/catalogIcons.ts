@@ -42,6 +42,7 @@ import {
   HardDrive,
   Import,
   Info,
+  Link as LinkIcon,
   LoaderCircle,
   Pencil,
   Radio,
@@ -130,6 +131,12 @@ export const ImportCatalog: LucideIcon = Import;
 export const Edit: LucideIcon = Pencil;
 export const Duplicate: LucideIcon = Copy;
 export const Delete: LucideIcon = Trash2;
+/**
+ * Adopt a file already upstream as this catalogue's provenance. Writes nothing and
+ * moves no bytes, so it is deliberately not a cloud — it is the exact inverse of
+ * `Forget`, and wears the inverse glyph.
+ */
+export const Link: LucideIcon = LinkIcon;
 /** Stop tracking a catalogue's git provenance. The file itself is untouched. */
 export const Forget: LucideIcon = Unlink;
 export const Properties: LucideIcon = Info;

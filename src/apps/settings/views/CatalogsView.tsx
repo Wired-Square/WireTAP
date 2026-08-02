@@ -4,7 +4,13 @@ import * as ShareIcon from "../../../components/catalogIcons";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { iconMd, flexRowGap2 } from "../../../styles/spacing";
+import {
+  iconMd,
+  flexRowGap2,
+  flexRowGap3,
+  paddingCard,
+  spaceYTight,
+} from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import {
   emptyStateText,
@@ -14,14 +20,14 @@ import {
 import { badgeMetadata } from "../../../styles/badgeStyles";
 import { caption, textDanger } from "../../../styles";
 import { SecondaryButton } from "../../../components/forms";
-import OverflowMenu, { type OverflowMenuItem } from "../../../components/OverflowMenu";
+import OverflowMenu, { type OverflowMenuItems } from "../../../components/OverflowMenu";
 import type { CatalogFile } from "../stores/settingsStore";
 import { revealRepoClone } from "../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
-import { useCatalogSources, type CatalogWithSource } from "../../../hooks/useCatalogSources";
+import { useCatalogSources, type CatalogWithSources } from "../../../hooks/useCatalogSources";
 import { hasLocalChanges, hasRemoteChanges } from "../../../utils/catalogSync";
 import { CatalogSyncBadge } from "../../../components/catalogSyncPresentation";
-import type { CatalogSyncStatus } from "../../../api/catalogShare";
+import type { TrackedCatalog } from "../../../api/catalogShare";
 
 type CatalogsViewProps = {
   decoderDir: string;
@@ -84,40 +90,34 @@ export default function CatalogsView({
     if (outcome?.kind === "goneUpstream") setNotice(t("catalogs.goneUpstream"));
   };
 
-  const menuItems = (
-    catalog: CatalogWithSource,
-    status: CatalogSyncStatus,
-  ): OverflowMenuItem[] => {
-    const { source } = catalog;
-    const isPulling = !!source && pulling.includes(source.id);
+  /**
+   * What can be done to one *subscription*. Every action here names a repository, so
+   * with a catalogue in two of them each row offers its own — a single menu would
+   * have to pick one and would pull from, or forget, whichever came first.
+   */
+  const sourceMenuItems = (source: TrackedCatalog): OverflowMenuItems => {
+    const isPulling = pulling.includes(source.id);
     // Declarative, with `&&` guards filtered out — the shape of the menu is readable
     // at a glance rather than assembled by a run of conditional pushes.
     return [
-      source && {
+      {
         // Labelled from the same derived status the badge shows, so a row reading
         // "Diverged" offers to review rather than promising a clean pull.
-        label: hasRemoteChanges(status)
+        label: hasRemoteChanges(source.syncStatus)
           ? t("catalogs.actions.pullAvailable")
           : t("catalogs.actions.pull"),
         icon: isPulling ? ShareIcon.Busy : ShareIcon.Pull,
         disabled: isPulling,
         onClick: () => void handlePull(source.id),
       },
-      onPublishCatalog && {
-        label: hasLocalChanges(status)
-          ? t("catalogs.actions.pushChanges")
-          : t("catalogs.actions.push"),
-        icon: ShareIcon.Push,
-        // Nothing to send is not a reason to hide it — pushing an in-sync catalogue
-        // to a *different* repository is a normal thing to want.
-        onClick: () => onPublishCatalog(catalog),
-      },
-      source?.webUrl && {
+      // `!!` rather than the bare value: an empty URL or a PR number of 0 would
+      // otherwise make the entry `""` or `0`, which the item type does not model.
+      !!source.webUrl && {
         label: t("catalogs.actions.openRepo"),
         icon: ShareIcon.GitHub,
         onClick: () => void openUrl(source.webUrl!),
       },
-      source?.prNumber && {
+      !!source.prNumber && {
         label: t("catalogs.actions.viewPr", { number: source.prNumber }),
         icon: ShareIcon.PullRequest,
         onClick: () => {
@@ -126,16 +126,36 @@ export default function CatalogsView({
         },
       },
       // Desktop only: there is no file manager to reveal into on iOS.
-      source &&
-        !isIOS && {
-          label: t("catalogs.actions.revealClone"),
-          icon: ShareIcon.RevealClone,
-          // Says so rather than appearing to do nothing when nothing is cloned.
-          onClick: () =>
-            void revealRepoClone(source.repoId).then((revealed) => {
-              if (!revealed) setNotice(t("catalogs.notCloned"));
-            }),
-        },
+      !isIOS && {
+        label: t("catalogs.actions.revealClone"),
+        icon: ShareIcon.RevealClone,
+        // Says so rather than appearing to do nothing when nothing is cloned.
+        onClick: () =>
+          void revealRepoClone(source.repoId).then((revealed) => {
+            if (!revealed) setNotice(t("catalogs.notCloned"));
+          }),
+      },
+      {
+        label: t("catalogs.actions.forget"),
+        icon: ShareIcon.Forget,
+        onClick: () => void forgetSource(source.id),
+      },
+    ];
+  };
+
+  /** What can be done to the *file*, whichever repositories hold it. */
+  const catalogMenuItems = (catalog: CatalogWithSources): OverflowMenuItems =>
+    [
+      onPublishCatalog && {
+        label: hasLocalChanges(catalog.syncStatus)
+          ? t("catalogs.actions.pushChanges")
+          : t("catalogs.actions.push"),
+        icon: ShareIcon.Push,
+        // Nothing to send is not a reason to hide it — pushing an in-sync catalogue
+        // to a *different* repository is a normal thing to want, and is how a second
+        // subscription gets made.
+        onClick: () => onPublishCatalog(catalog),
+      },
       { separator: true },
       {
         label: t("catalogs.actions.duplicate"),
@@ -143,19 +163,13 @@ export default function CatalogsView({
         onClick: () => onDuplicateCatalog(catalog),
       },
       { label: t("catalogs.actions.edit"), icon: ShareIcon.Edit, onClick: () => onEditCatalog(catalog) },
-      source && {
-        label: t("catalogs.actions.forget"),
-        icon: ShareIcon.Forget,
-        onClick: () => void forgetSource(source.id),
-      },
       {
         label: t("catalogs.actions.delete"),
         icon: ShareIcon.Delete,
         danger: true,
         onClick: () => onDeleteCatalog(catalog),
       },
-    ].filter(Boolean) as OverflowMenuItem[];
-  };
+    ];
 
   return (
     <div className="space-y-6">
@@ -231,40 +245,58 @@ export default function CatalogsView({
         </div>
       ) : (
         <div className="space-y-3">
-          {catalogs.map((catalog) => {
-            const { source } = catalog;
-            const status = catalog.syncStatus;
-            return (
-              <div
-                key={catalog.path}
-                className={`flex items-center justify-between p-4 ${cardDefault}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="font-medium text-[color:var(--text-primary)]">
-                      {catalog.name}
-                    </h3>
-                    <span className={badgeMetadata}>{catalog.filename}</span>
-                    <CatalogSyncBadge status={status} />
-                  </div>
-                  {source && (
-                    <div className={`${caption} truncate mt-0.5`}>
-                      {source.repoLabel} · {source.remotePath} · {source.gitRef}
-                    </div>
-                  )}
-                  {source && pullErrors[source.id] && (
-                    <p className={`${caption} ${textDanger} mt-0.5`}>
-                      {pullErrors[source.id].message}
-                    </p>
-                  )}
+          {catalogs.map((catalog) => (
+            <div key={catalog.path} className={`${paddingCard} ${cardDefault}`}>
+              <div className={`${flexRowGap2} justify-between`}>
+                <div className={`${flexRowGap3} flex-wrap min-w-0`}>
+                  <h3 className="font-medium text-[color:var(--text-primary)]">
+                    {catalog.name}
+                  </h3>
+                  <span className={badgeMetadata}>{catalog.filename}</span>
+                  {/* The fold. The per-repository badges below are what it was folded
+                      from, so this card is where a reader learns to read either. */}
+                  <CatalogSyncBadge status={catalog.syncStatus} />
                 </div>
                 <OverflowMenu
                   title={t("catalogs.actions.menu")}
-                  items={menuItems(catalog, status)}
+                  items={catalogMenuItems(catalog)}
                 />
               </div>
-            );
-          })}
+
+              {catalog.sources.length > 0 && (
+                <div className={`mt-2 ${spaceYTight}`}>
+                  {catalog.sources.map((source) => (
+                    <div key={source.id} className={`${flexRowGap2} justify-between`}>
+                      <div className="flex-1 min-w-0">
+                        <div className={`${flexRowGap2} flex-wrap`}>
+                          <CatalogSyncBadge status={source.syncStatus} />
+                          <span className={`${caption} truncate`}>
+                            {source.repoLabel} · {source.remotePath} · {source.gitRef}
+                          </span>
+                          {source.prNumber && (
+                            <span className={badgeMetadata}>
+                              {source.prMerged
+                                ? t("catalogs.prMerged", { number: source.prNumber })
+                                : t("catalogs.prOpen", { number: source.prNumber })}
+                            </span>
+                          )}
+                        </div>
+                        {pullErrors[source.id] && (
+                          <p className={`${caption} ${textDanger} mt-0.5`}>
+                            {pullErrors[source.id].message}
+                          </p>
+                        )}
+                      </div>
+                      <OverflowMenu
+                        title={t("catalogs.actions.sourceMenu", { repo: source.repoLabel })}
+                        items={sourceMenuItems(source)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ import {
   pullCatalog,
   forgetCatalogRepo,
   forgetCatalogSource,
+  linkCatalogSource,
   getGitIdentity,
   importRemoteCatalogs,
   listCatalogSources,
@@ -94,9 +95,16 @@ interface PublishSlice {
   currentStep: PublishStep | null;
   detail: string | null;
   result: PublishResult | null;
+  /**
+   * The last failure, from whichever of the dialog's two actions ran. One slot, not
+   * one per action: only one can be in flight, and two would let a stale publish
+   * failure outrank the link error that just happened.
+   */
   error: ShareError | null;
   /** Set once the user has reviewed any secret-scan findings. */
   secretsAcknowledged: boolean;
+  /** Linking is not a publish, so it needs its own spinner — but not its own error. */
+  linking: boolean;
 }
 
 interface UpdateSlice {
@@ -199,6 +207,13 @@ interface CatalogShareState {
   planPublish: (req: PublishRequest) => Promise<PublishPlan | null>;
   acknowledgeSecrets: () => void;
   runPublish: (req: PublishRequest) => Promise<PublishResult | null>;
+  /** Adopt an upstream file as this catalogue's provenance, pushing nothing. */
+  linkSource: (
+    filename: string,
+    repoUrl: string,
+    remotePath: string,
+    gitRef?: string,
+  ) => Promise<TrackedCatalog | null>;
   /** Applied from the backend's Tauri progress events. */
   notePublishProgress: (step: PublishStep, detail?: string) => void;
   clearPublish: () => void;
@@ -243,6 +258,7 @@ const emptyPublish: PublishSlice = {
   result: null,
   error: null,
   secretsAcknowledged: false,
+  linking: false,
 };
 
 /** Paths with a resolve request in flight, so concurrent callers don't double-fetch. */
@@ -688,6 +704,30 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
       tlog.info(`[catalogShare] publish failed: ${shareError.kind} ${shareError.message}`);
       set((s) => ({
         publishState: { ...s.publishState, inFlight: false, error: shareError },
+      }));
+      return null;
+    }
+  },
+
+  linkSource: async (filename, repoUrl, remotePath, gitRef) => {
+    set((s) => ({ publishState: { ...s.publishState, linking: true, error: null } }));
+    try {
+      const tracked = await linkCatalogSource(filename, repoUrl, remotePath, gitRef);
+      set((s) => ({
+        publishState: { ...s.publishState, linking: false },
+        // Patched from the returned row rather than re-listed, so the dialog is right
+        // immediately. The backend also refreshes the catalogue cache — that is what
+        // carries the picker's glyph off `localOnly` — and wherever Settings is
+        // mounted its `CatalogListChanged` handler re-lists anyway; this just does not
+        // wait for it.
+        tracked: [...s.tracked.filter((c) => c.id !== tracked.id), tracked],
+      }));
+      return tracked;
+    } catch (error) {
+      const shareError = asShareError(error);
+      tlog.info(`[catalogShare] link failed: ${shareError.kind} ${shareError.message}`);
+      set((s) => ({
+        publishState: { ...s.publishState, linking: false, error: shareError },
       }));
       return null;
     }

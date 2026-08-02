@@ -252,6 +252,27 @@ pub fn catalog_entry_id(repo_id: &str, remote_path: &str, git_ref: &str) -> Stri
 }
 
 impl CatalogEntry {
+    /// A new subscription, with its id derived rather than supplied.
+    ///
+    /// The one door, because that derivation is what
+    /// [`Registry::upsert_catalog`]'s uniqueness rules rest on: an id spelled by hand
+    /// would let two local files claim one upstream path, which is exactly the pair
+    /// that makes publishing ambiguous. Callers set `synced_sha` through
+    /// [`Self::mark_exchanged`] and fill `publish` if they have one.
+    pub fn new(repo_id: &str, remote_path: &str, git_ref: &str, local_filename: &str) -> Self {
+        Self {
+            id: catalog_entry_id(repo_id, remote_path, git_ref),
+            repo_id: repo_id.to_string(),
+            remote_path: remote_path.to_string(),
+            git_ref: git_ref.to_string(),
+            synced_sha: String::new(),
+            local_filename: local_filename.to_string(),
+            imported_at: chrono::Utc::now().to_rfc3339(),
+            remote_sha: None,
+            publish: None,
+        }
+    }
+
     /// Does this entry describe the given remote file?
     pub fn matches_remote(&self, repo_id: &str, remote_path: &str, git_ref: &str) -> bool {
         self.repo_id == repo_id && self.remote_path == remote_path && self.git_ref == git_ref
@@ -369,8 +390,21 @@ impl SyncStatus {
 #[derive(Debug, Clone, Default)]
 pub struct SyncIndex {
     /// Keyed by [`filename_key`], so the lookup folds case exactly as
-    /// [`filename_eq`] does.
-    by_filename: HashMap<String, CatalogEntry>,
+    /// [`filename_eq`] does. Several subscriptions per file, one per repository.
+    by_filename: HashMap<String, Vec<CatalogEntry>>,
+}
+
+/// One file's answer for the directory scan: the folded status, and how many
+/// repositories it was folded from.
+///
+/// One struct rather than two lookups, so the scan spends one [`filename_key`]
+/// allocation per file — the same cost-consciousness that put the hash in
+/// `scan_catalogs` in the first place.
+#[derive(Debug, Clone, Copy)]
+pub struct FileSync {
+    pub status: SyncStatus,
+    /// Zero exactly when the status is `LocalOnly`.
+    pub tracked_repos: usize,
 }
 
 impl SyncIndex {
@@ -379,17 +413,85 @@ impl SyncIndex {
     ///
     /// Hashes only when something is actually tracking the file, so a directory of
     /// purely local catalogues costs no SHA-1 at all.
-    pub fn status_for(&self, filename: &str, bytes: Option<&[u8]>) -> SyncStatus {
+    pub fn status_for(&self, filename: &str, bytes: Option<&[u8]>) -> FileSync {
+        let untracked = FileSync {
+            status: SyncStatus::LocalOnly,
+            tracked_repos: 0,
+        };
         // Nothing is tracked at all — the common case for anyone who has never used
         // the sharing feature — so skip the key allocation for every file in the
         // directory, not just the miss.
         if self.by_filename.is_empty() {
-            return SyncStatus::LocalOnly;
+            return untracked;
         }
-        let Some(entry) = self.by_filename.get(&filename_key(filename)) else {
-            return SyncStatus::LocalOnly;
+        let Some(entries) = self.by_filename.get(&filename_key(filename)) else {
+            return untracked;
         };
-        entry.sync_status_of(bytes.map(git_blob_sha).as_deref())
+        FileSync {
+            status: aggregate_status(entries, bytes.map(git_blob_sha).as_deref()),
+            tracked_repos: entries.len(),
+        }
+    }
+}
+
+/// The one status for a local file, across every repository tracking it.
+///
+/// Folds the two orthogonal inputs and calls [`SyncStatus::collapse`] **once**, so
+/// there is still exactly one place that turns a pair of states into a label.
+/// Ranking the seven labels instead would be a second model of `collapse`'s own arm
+/// order, and the two would drift.
+///
+/// One rule, in both directions: **a known, actionable answer outranks an unknown
+/// one, which outranks a known nothing-to-do.** So a repository with a real pullable
+/// update is not hidden behind one that has never been checked, and an unverified
+/// claim of currency is not laundered into a verified one.
+///
+/// The fold is the identity for a single subscription, over every input pair — which
+/// is what makes it a generalisation rather than a second answer, and is pinned by a
+/// test.
+fn aggregate_status<'a>(
+    entries: impl IntoIterator<Item = &'a CatalogEntry>,
+    local_sha: Option<&str>,
+) -> SyncStatus {
+    let mut local = LocalState::Untracked;
+    let mut remote = RemoteState::InSync;
+    for entry in entries {
+        local = std::cmp::max_by_key(local, entry.local_state_of(local_sha), |s| s.rank());
+        remote = std::cmp::max_by_key(remote, entry.remote_state_of(local_sha), |s| s.rank());
+    }
+    SyncStatus::collapse(local, remote)
+}
+
+impl LocalState {
+    /// Rank for the fold. `Missing` is unanimous when it happens — every subscription
+    /// in a group names one file, hence one hash — so its rank is defensive rather
+    /// than discriminating. `Untracked` is the identity: no entries at all folds to
+    /// it, and `collapse`'s first arm answers that with `LocalOnly`.
+    ///
+    /// Exhaustive with no `_` arm, the same property [`SyncStatus::collapse`] has, so
+    /// a new variant is a compile error rather than a silently wrong rank. Deriving
+    /// `Ord` instead would give one a silently wrong rank, and `RemoteState`'s
+    /// declaration order is not its rank order anyway.
+    fn rank(self) -> u8 {
+        match self {
+            Self::Untracked => 0,
+            Self::Committed => 1,
+            Self::Modified => 2,
+            Self::Missing => 3,
+        }
+    }
+}
+
+impl RemoteState {
+    /// Rank for the fold. See [`aggregate_status`] for the rule; exhaustive for the
+    /// same reason as [`LocalState::rank`].
+    fn rank(self) -> u8 {
+        match self {
+            Self::InSync => 0,
+            Self::Unknown => 1,
+            Self::UpstreamAhead => 2,
+            Self::Diverged => 3,
+        }
     }
 }
 
@@ -458,10 +560,18 @@ impl Registry {
             .find(|c| c.matches_remote(repo_id, remote_path, git_ref))
     }
 
-    pub fn catalog_by_filename(&self, filename: &str) -> Option<&CatalogEntry> {
+    /// This file's subscription to one repository.
+    ///
+    /// Unambiguous by the `(local_filename, repo_id)` uniqueness [`upsert_catalog`]
+    /// enforces. There is deliberately no unscoped filename lookup: a file may be
+    /// tracked against several repositories, so an unscoped one would return an
+    /// arbitrary member, and a publish that resolved the wrong entry silently opens
+    /// a rival pull request against a fresh path instead of adding a commit to the
+    /// existing one.
+    pub fn catalog_for(&self, filename: &str, repo_id: &str) -> Option<&CatalogEntry> {
         self.catalogs
             .iter()
-            .find(|c| filename_eq(&c.local_filename, filename))
+            .find(|c| c.repo_id == repo_id && filename_eq(&c.local_filename, filename))
     }
 
     pub fn catalog_by_id(&self, id: &str) -> Option<&CatalogEntry> {
@@ -472,28 +582,8 @@ impl Registry {
         self.catalogs.iter_mut().find(|c| c.id == id)
     }
 
-    pub fn catalog_by_filename_mut(&mut self, filename: &str) -> Option<&mut CatalogEntry> {
-        self.catalogs
-            .iter_mut()
-            .find(|c| filename_eq(&c.local_filename, filename))
-    }
-
     fn repo_mut(&mut self, repo_id: &str) -> Option<&mut RepoEntry> {
         self.repos.iter_mut().find(|r| r.id == repo_id)
-    }
-
-    /// Mutate one entry in place, reporting whether it was found.
-    ///
-    /// Callers must not hand-roll the lookup: `filename_eq` owns the
-    /// case-insensitivity rule (see its comment), and a publish path that misses
-    /// the entry silently opens a rival pull request against a fresh path instead
-    /// of adding a commit to the existing one.
-    pub fn update_catalog_by_filename(
-        &mut self,
-        filename: &str,
-        f: impl FnOnce(&mut CatalogEntry),
-    ) -> bool {
-        self.catalog_by_filename_mut(filename).map(f).is_some()
     }
 
     /// Mutate one entry by id, reporting whether it was found.
@@ -575,17 +665,26 @@ impl Registry {
         true
     }
 
-    /// Insert or replace the catalogue entry, keyed on filename.
+    /// Insert or replace a subscription, and the only place the two uniqueness rules
+    /// are enforced.
+    ///
+    /// * **One subscription per (file, repository)** — the key that used to be the
+    ///   filename alone. Widening it is what lets one decoder be tracked against a
+    ///   fork and its upstream at once, each with its own `synced_sha`.
+    /// * **One local file per remote subscription** — `id` is derived from
+    ///   repository, path and ref, so two local files claiming one upstream path
+    ///   would make publishing ambiguous. `duplicate_catalog` avoids creating that
+    ///   pair; this makes it unrepresentable.
+    ///
+    /// Both are dropped in one pass, and removing two entries is correct: each was a
+    /// claim the new entry supersedes.
     pub fn upsert_catalog(&mut self, entry: CatalogEntry) {
-        if let Some(existing) = self
-            .catalogs
-            .iter()
-            .position(|c| filename_eq(&c.local_filename, &entry.local_filename))
-        {
-            self.catalogs[existing] = entry;
-        } else {
-            self.catalogs.push(entry);
-        }
+        self.catalogs.retain(|c| {
+            c.id != entry.id
+                && !(c.repo_id == entry.repo_id
+                    && filename_eq(&c.local_filename, &entry.local_filename))
+        });
+        self.catalogs.push(entry);
     }
 
     /// Save a repository, or update the one already held under the same id.
@@ -635,7 +734,11 @@ impl Registry {
         known
     }
 
-    /// Drop a catalogue entry by filename. Returns whether anything was removed.
+    /// Drop **every** repository's subscription to a filename. Returns whether
+    /// anything was removed.
+    ///
+    /// Plural on purpose: the caller is an in-app delete, and a subscription to a
+    /// file that no longer exists is dead whichever repository holds it.
     pub fn forget_filename(&mut self, filename: &str) -> bool {
         self.forget(|c| filename_eq(&c.local_filename, filename))
     }
@@ -658,22 +761,27 @@ impl Registry {
         removed
     }
 
-    /// Point an entry at a new filename, following an in-app rename.
+    /// Point a filename's subscriptions at a new name, following an in-app rename.
+    ///
+    /// Moves **all** of them. Moving only the first would leave every other
+    /// repository's subscription naming a file that no longer exists, reporting
+    /// `Missing` for ever — and nothing would ever fix it, because the in-app hook
+    /// is the only layer that can follow a rename of a modified file.
     pub fn rename_filename(&mut self, old: &str, new: &str) -> bool {
-        // If the destination already had an entry, the rename replaces it.
+        // If the destination already had subscriptions, the rename overwrote that
+        // file, so they are dropped.
         self.catalogs
             .retain(|c| !filename_eq(&c.local_filename, new) || filename_eq(&c.local_filename, old));
-        match self
+        let mut moved = false;
+        for entry in self
             .catalogs
             .iter_mut()
-            .find(|c| filename_eq(&c.local_filename, old))
+            .filter(|c| filename_eq(&c.local_filename, old))
         {
-            Some(entry) => {
-                entry.local_filename = new.to_string();
-                true
-            }
-            None => false,
+            entry.local_filename = new.to_string();
+            moved = true;
         }
+        moved
     }
 
     /// Reconcile against the decoder directory, following renames made outside the
@@ -686,61 +794,93 @@ impl Registry {
     /// This complements — and does not duplicate — the in-app rename hook. The hook
     /// covers a rename of a *modified* file, which content matching cannot, because
     /// `synced_sha` describes the last-exchanged bytes rather than what is on disk.
+    ///
+    /// Matching is per **filename group**, not per entry. A file tracked against two
+    /// repositories has two subscriptions whose `synced_sha` values legitimately
+    /// differ — push to one, edit, push to the other — so a per-entry loop would
+    /// relink only the one that happens to match the disk and orphan its sibling.
+    /// The group relinks as a unit, on any of its shas.
     pub fn reconcile(&mut self, decoder_dir: &Path) -> bool {
         let present = list_toml_filenames(decoder_dir);
-        let missing: Vec<usize> = self
-            .catalogs
+        let is_present = |name: &str| present.iter().any(|n| filename_eq(n, name));
+
+        // One grouping answers all three questions below: which filenames are missing,
+        // which are claimed (so not rename candidates), and what shas a group will
+        // accept. Keyed through `filename_key`, which owns the case fold — a second
+        // spelling of it here would drift the moment it learns anything.
+        let mut by_key: HashMap<String, HashSet<&str>> = HashMap::new();
+        for c in &self.catalogs {
+            by_key
+                .entry(filename_key(&c.local_filename))
+                .or_default()
+                .insert(c.synced_sha.as_str());
+        }
+        let missing: Vec<(&String, &HashSet<&str>)> = by_key
             .iter()
-            .enumerate()
-            .filter(|(_, c)| !present.iter().any(|n| filename_eq(n, &c.local_filename)))
-            .map(|(i, _)| i)
+            .filter(|(key, _)| !is_present(key))
             .collect();
         if missing.is_empty() {
             return false;
         }
 
-        // Only now is hashing worth it. Files already claimed by a tracked entry
-        // are not rename candidates.
-        let claimed: HashSet<String> = self
-            .catalogs
-            .iter()
-            .map(|c| c.local_filename.to_lowercase())
-            .collect();
+        // Only now is hashing worth it.
         let unclaimed: Vec<(String, String)> = present
             .iter()
-            .filter(|name| !claimed.contains(&name.to_lowercase()))
+            .filter(|name| !by_key.contains_key(&filename_key(name)))
             .filter_map(|name| {
                 git_blob_sha_of_file(&decoder_dir.join(name)).map(|sha| (name.clone(), sha))
             })
             .collect();
 
-        let mut changed = false;
-        for index in missing {
-            let entry = &self.catalogs[index];
-            let mut matches = unclaimed.iter().filter(|(_, sha)| *sha == entry.synced_sha);
-            // Exactly one match, or we would be guessing.
+        // Resolve every group first, then apply — because the second ambiguity guard
+        // below can only be checked once all the intents are known.
+        let mut intents: Vec<(String, String)> = Vec::new();
+        for (key, shas) in missing {
+            let mut matches = unclaimed.iter().filter(|(_, sha)| shas.contains(sha.as_str()));
+            // Exactly one file for this group, or we would be guessing.
             if let (Some((name, _)), None) = (matches.next(), matches.next()) {
-                tlog!(
-                    "[catalog_share] relinked {} → {} by content hash",
-                    entry.local_filename,
-                    name
-                );
-                self.catalogs[index].local_filename = name.clone();
-                changed = true;
+                intents.push((key.clone(), name.clone()));
             }
         }
-        changed
+        // …and exactly one group per file, for the same reason. Without this, two
+        // missing groups both matching one file would each take it, leaving two
+        // subscriptions to one repository for one filename — the pair
+        // `upsert_catalog` exists to prevent, after which `catalog_for` is ambiguous
+        // again. It also makes the outcome independent of `self.catalogs` ordering.
+        let mut wanted_by: HashMap<String, usize> = HashMap::new();
+        for (_, name) in &intents {
+            *wanted_by.entry(name.clone()).or_default() += 1;
+        }
+        intents.retain(|(_, name)| wanted_by[name] == 1);
+
+        for (key, name) in &intents {
+            for entry in self
+                .catalogs
+                .iter_mut()
+                .filter(|c| filename_key(&c.local_filename) == *key)
+            {
+                tlog!(
+                    "[catalog_share] relinked {} → {} by content hash ({})",
+                    entry.local_filename,
+                    name,
+                    entry.repo_id
+                );
+                entry.local_filename = name.clone();
+            }
+        }
+        !intents.is_empty()
     }
 
-    /// Snapshot the tracked entries for labelling a directory scan.
+    /// Snapshot the tracked subscriptions for labelling a directory scan.
     pub fn sync_index(&self) -> SyncIndex {
-        SyncIndex {
-            by_filename: self
-                .catalogs
-                .iter()
-                .map(|c| (filename_key(&c.local_filename), c.clone()))
-                .collect(),
+        let mut by_filename: HashMap<String, Vec<CatalogEntry>> = HashMap::new();
+        for entry in &self.catalogs {
+            by_filename
+                .entry(filename_key(&entry.local_filename))
+                .or_default()
+                .push(entry.clone());
         }
+        SyncIndex { by_filename }
     }
 }
 
@@ -929,6 +1069,23 @@ mod tests {
         }
     }
 
+    /// The same catalogue tracked against a second repository — the shape the whole
+    /// multi-subscription model exists for.
+    fn entry_in(repo_id: &str, filename: &str, sha: &str) -> CatalogEntry {
+        let remote_path = format!("catalogs/{filename}");
+        CatalogEntry {
+            id: catalog_entry_id(repo_id, &remote_path, "main"),
+            repo_id: repo_id.to_string(),
+            remote_path,
+            git_ref: "main".to_string(),
+            synced_sha: sha.to_string(),
+            local_filename: filename.to_string(),
+            imported_at: "2026-07-30T00:00:00Z".to_string(),
+            remote_sha: None,
+            publish: None,
+        }
+    }
+
     fn repo() -> RepoEntry {
         RepoEntry {
             id: "gh:owner/repo".to_string(),
@@ -1099,6 +1256,21 @@ mod tests {
     }
 
     #[test]
+    fn rename_moves_every_repositorys_subscription() {
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "old.toml", "abc"));
+        registry.upsert_catalog(entry_in("gh:other/fork", "old.toml", "def"));
+        assert!(registry.rename_filename("old.toml", "new.toml"));
+        // Moving only the first would leave the other naming a file that is gone,
+        // reporting `Missing` for ever with nothing able to fix it.
+        assert_eq!(registry.catalogs.len(), 2);
+        assert!(registry
+            .catalogs
+            .iter()
+            .all(|c| c.local_filename == "new.toml"));
+    }
+
+    #[test]
     fn filenames_compare_case_insensitively() {
         let mut registry = Registry::default();
         registry.upsert_catalog(entry("Catalog.toml", "abc"));
@@ -1106,6 +1278,91 @@ mod tests {
         // An upsert of the other casing replaces rather than duplicates.
         registry.upsert_catalog(entry("catalog.toml", "def"));
         assert_eq!(registry.catalogs.len(), 1);
+    }
+
+    /// The relaxation the whole change turns on: one decoder, two repositories, each
+    /// with its own last-exchanged bytes.
+    #[test]
+    fn one_catalogue_can_be_tracked_against_two_repositories() {
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "x.toml", "aaa"));
+        registry.upsert_catalog(entry_in("gh:other/fork", "x.toml", "bbb"));
+
+        assert_eq!(registry.catalogs.len(), 2);
+        assert_eq!(
+            registry.catalog_for("x.toml", "gh:owner/repo").unwrap().synced_sha,
+            "aaa"
+        );
+        assert_eq!(
+            registry.catalog_for("x.toml", "gh:other/fork").unwrap().synced_sha,
+            "bbb"
+        );
+        assert!(registry.catalog_for("x.toml", "gh:nobody/nope").is_none());
+    }
+
+    /// …but only once each. A second push to the same repository moves the same
+    /// subscription rather than accumulating one per target path.
+    #[test]
+    fn a_second_publish_to_the_same_repository_replaces_rather_than_duplicates() {
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "x.toml", "aaa"));
+
+        let mut moved = entry_in("gh:owner/repo", "x.toml", "bbb");
+        moved.remote_path = "decoders/x.toml".to_string();
+        moved.id = catalog_entry_id("gh:owner/repo", &moved.remote_path, "main");
+        registry.upsert_catalog(moved);
+
+        assert_eq!(registry.catalogs.len(), 1);
+        let entry = registry.catalog_for("x.toml", "gh:owner/repo").unwrap();
+        assert_eq!(entry.remote_path, "decoders/x.toml");
+        assert_eq!(entry.synced_sha, "bbb");
+    }
+
+    /// The other half of the key. Two local files claiming one upstream path would
+    /// make publishing ambiguous, which is why `duplicate_catalog` copies no
+    /// provenance — this makes the pair unrepresentable rather than merely avoided.
+    #[test]
+    fn two_local_files_cannot_claim_one_remote_path() {
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry("x.toml", "aaa"));
+
+        let mut copy = entry("x-2.toml", "aaa");
+        copy.remote_path = "catalogs/x.toml".to_string();
+        copy.id = catalog_entry_id("gh:owner/repo", &copy.remote_path, "main");
+        registry.upsert_catalog(copy);
+
+        assert_eq!(registry.catalogs.len(), 1);
+        assert_eq!(registry.catalogs[0].local_filename, "x-2.toml");
+    }
+
+    #[test]
+    fn forgetting_a_filename_forgets_every_repositorys_subscription() {
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "x.toml", "aaa"));
+        registry.upsert_catalog(entry_in("gh:other/fork", "x.toml", "bbb"));
+        // An in-app delete removed the file, and a subscription to a file that is gone
+        // is dead whichever repository holds it.
+        assert!(registry.forget_filename("x.toml"));
+        assert!(registry.catalogs.is_empty());
+    }
+
+    #[test]
+    fn forgetting_one_subscription_keeps_the_others_and_their_repository() {
+        let mut registry = Registry::default();
+        registry.upsert_repo(repo());
+        let kept = entry_in("gh:owner/repo", "x.toml", "aaa");
+        let dropped = entry_in("gh:other/fork", "x.toml", "bbb");
+        let dropped_id = dropped.id.clone();
+        registry.upsert_catalog(kept);
+        registry.upsert_catalog(dropped);
+
+        assert!(registry.forget_id(&dropped_id));
+        assert_eq!(registry.catalogs.len(), 1);
+        assert_eq!(
+            registry.repos.len(),
+            1,
+            "the surviving subscription still references its repository"
+        );
     }
 
     #[test]
@@ -1414,14 +1671,112 @@ mod tests {
         r.catalogs.push(entry("Catalog.toml", "aaa"));
         let index = r.sync_index();
 
+        let found = index.status_for("catalog.toml", Some(b"anything"));
+        assert_eq!(found.status, SyncStatus::LocalAhead);
+        assert_eq!(found.tracked_repos, 1);
+
+        let miss = index.status_for("other.toml", Some(b"anything"));
+        assert_eq!(miss.status, SyncStatus::LocalOnly);
+        assert_eq!(miss.tracked_repos, 0);
+    }
+
+    /// The fold must be a **generalisation** of the single-subscription answer, not a
+    /// second one. Over every reachable combination of the three shas the model has —
+    /// last-exchanged, last-seen-upstream, and what is on disk — one subscription
+    /// aggregated must equal that subscription asked directly.
+    ///
+    /// Exhaustive by construction rather than by taste: the interesting cases are all
+    /// about which shas coincide, so three values plus "absent" covers every distinct
+    /// relationship between them.
+    #[test]
+    fn the_aggregate_is_the_single_subscription_over_every_combination() {
+        let shas = ["aaa", "bbb", "ccc"];
+        let optional = [None, Some("aaa"), Some("bbb"), Some("ccc")];
+        for synced in shas {
+            for remote in optional {
+                for local in optional {
+                    let mut e = entry("x.toml", synced);
+                    e.remote_sha = remote.map(str::to_string);
+                    assert_eq!(
+                        aggregate_status([&e], local),
+                        e.sync_status_of(local),
+                        "synced={synced} remote={remote:?} local={local:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn no_subscriptions_at_all_is_local_only() {
+        assert_eq!(aggregate_status([], Some("aaa")), SyncStatus::LocalOnly);
+    }
+
+    /// In sync with one repository, unpushed against another. There *is* something to
+    /// push, so hiding it behind the repository that happens to be current would make
+    /// the picker's glyph a lie.
+    #[test]
+    fn the_aggregate_reports_local_changes_when_any_repository_lacks_them() {
+        let mut current = entry_in("gh:owner/repo", "x.toml", "aaa");
+        current.remote_sha = Some("aaa".into());
+        let mut behind = entry_in("gh:other/fork", "x.toml", "bbb");
+        behind.remote_sha = Some("bbb".into());
+
+        assert_eq!(current.sync_status_of(Some("aaa")), SyncStatus::InSync);
+        assert_eq!(behind.sync_status_of(Some("aaa")), SyncStatus::LocalAhead);
         assert_eq!(
-            index.status_for("catalog.toml", Some(b"anything")),
+            aggregate_status([&current, &behind], Some("aaa")),
             SyncStatus::LocalAhead
         );
+    }
+
+    /// Both halves of the ranking rule: a real pullable update is not hidden behind a
+    /// repository nobody has checked, and an unverified claim of currency is not
+    /// laundered into a verified one by a repository that *has* been checked.
+    #[test]
+    fn the_aggregate_prefers_a_known_answer_to_an_unknown_one() {
+        let mut moved = entry_in("gh:owner/repo", "x.toml", "aaa");
+        moved.remote_sha = Some("zzz".into());
+        let mut current = entry_in("gh:other/fork", "x.toml", "aaa");
+        current.remote_sha = Some("aaa".into());
+        // Never checked, so `remote_sha` is absent.
+        let unchecked = entry_in("gh:third/copy", "x.toml", "aaa");
+
         assert_eq!(
-            index.status_for("other.toml", Some(b"anything")),
-            SyncStatus::LocalOnly
+            aggregate_status([&moved, &unchecked], Some("aaa")),
+            SyncStatus::RemoteAhead
         );
+        assert_eq!(
+            aggregate_status([&current, &unchecked], Some("aaa")),
+            SyncStatus::Unchecked
+        );
+    }
+
+    #[test]
+    fn the_aggregate_reports_diverged_when_any_repository_has() {
+        let mut diverged = entry_in("gh:owner/repo", "x.toml", "aaa");
+        diverged.remote_sha = Some("zzz".into());
+        let mut current = entry_in("gh:other/fork", "x.toml", "bbb");
+        current.remote_sha = Some("bbb".into());
+
+        // Local is `bbb`: committed to the fork, and differing from what upstream last
+        // took while upstream has moved on.
+        assert_eq!(diverged.sync_status_of(Some("bbb")), SyncStatus::Diverged);
+        assert_eq!(
+            aggregate_status([&current, &diverged], Some("bbb")),
+            SyncStatus::Diverged
+        );
+    }
+
+    /// Unanimous by construction — every subscription in a group names one file, hence
+    /// one hash — but it must outrank everything, because with nothing on disk every
+    /// other label would be fiction.
+    #[test]
+    fn a_missing_file_is_missing_for_every_repository() {
+        let a = entry_in("gh:owner/repo", "x.toml", "aaa");
+        let mut b = entry_in("gh:other/fork", "x.toml", "bbb");
+        b.remote_sha = Some("zzz".into());
+        assert_eq!(aggregate_status([&a, &b], None), SyncStatus::Missing);
     }
 
     /// Accepting an upstream update writes the remote bytes through the ordinary save
@@ -1565,6 +1920,61 @@ mod tests {
         assert!(!registry.reconcile(&dir), "no confident match, no change");
         assert_eq!(registry.catalogs[0].local_filename, "gone.toml");
         assert_eq!(registry.state_of(&dir, "gone.toml"), LocalState::Missing);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Matching is per filename *group*, and the group relinks as a unit.
+    ///
+    /// The two subscriptions hold different `synced_sha`s — legitimately: pushed to
+    /// one, edited, pushed to the other — so only one of them can match the disk. A
+    /// per-entry loop relinked that one and orphaned its sibling as permanently
+    /// missing.
+    #[test]
+    fn reconcile_relinks_every_repositorys_subscription() {
+        let dir = temp_dir("relink-group");
+        let content = b"[meta]\nname = \"X\"\n";
+        std::fs::write(dir.join("renamed.toml"), content).expect("write");
+
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "x.toml", &git_blob_sha(content)));
+        registry.upsert_catalog(entry_in("gh:other/fork", "x.toml", "stale-from-an-older-push"));
+
+        assert!(registry.reconcile(&dir));
+        assert_eq!(registry.catalogs.len(), 2);
+        assert!(registry
+            .catalogs
+            .iter()
+            .all(|c| c.local_filename == "renamed.toml"));
+        assert!(
+            !registry.reconcile(&dir),
+            "a second pass must report no change, or the IPC refresh loops forever"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The second ambiguity guard: one candidate file wanted by two missing groups.
+    ///
+    /// Without it both would take it, leaving two subscriptions to one repository for
+    /// one filename — the pair `upsert_catalog` exists to prevent, after which
+    /// `catalog_for` is ambiguous again. It also makes the outcome independent of the
+    /// order `catalogs` happens to be in.
+    #[test]
+    fn reconcile_relinks_nothing_when_two_missing_groups_want_one_file() {
+        let dir = temp_dir("contested");
+        let content = b"[meta]\nname = \"X\"\n";
+        let sha = git_blob_sha(content);
+        std::fs::write(dir.join("survivor.toml"), content).expect("write");
+
+        let mut registry = Registry::default();
+        registry.upsert_catalog(entry_in("gh:owner/repo", "gone-a.toml", &sha));
+        registry.upsert_catalog(entry_in("gh:owner/repo", "gone-b.toml", &sha));
+
+        assert!(!registry.reconcile(&dir), "no confident match, no change");
+        assert_eq!(registry.catalogs.len(), 2);
+        assert!(registry
+            .catalogs
+            .iter()
+            .all(|c| c.local_filename.starts_with("gone-")));
         std::fs::remove_dir_all(&dir).ok();
     }
 

@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { EllipsisVertical } from "lucide-react";
@@ -50,19 +51,41 @@ export type OverflowMenuItem =
       hint?: string;
     };
 
+/**
+ * What `items` accepts. Exported so a builder can annotate its return type instead of
+ * casting: the annotation is what keeps `{ separator: true }` from widening to
+ * `boolean`, and a `.filter(Boolean) as OverflowMenuItem[]` would suppress checking of
+ * the whole literal to do a job this component already does.
+ */
+export type OverflowMenuItems = (OverflowMenuItem | false | null | undefined)[];
+
 type Props = {
   /** Falsy entries are dropped, so call sites can inline `cond && {…}`. */
-  items: (OverflowMenuItem | false | null | undefined)[];
+  items: OverflowMenuItems;
   /** Tooltip and accessible name for the trigger. */
   title: string;
   className?: string;
+  /**
+   * What the trigger draws, defaulting to the kebab.
+   *
+   * For a toolbar that already speaks in glyphs: the button means the same thing
+   * whether it acts once or offers a choice, so it must keep the same picture rather
+   * than turn into a kebab as soon as there are two options. A node rather than an
+   * icon-plus-size pair, so sizing stays with the glyph at the call site.
+   */
+  trigger?: ReactNode;
 };
 
 /** Gap between the trigger and the menu, and the minimum inset from the viewport. */
 const GAP = 2;
 const MARGIN = 4;
 
-export default function OverflowMenu({ items: rawItems, title, className }: Props) {
+export default function OverflowMenu({
+  items: rawItems,
+  title,
+  className,
+  trigger = <EllipsisVertical className={iconSm} />,
+}: Props) {
   const items = rawItems.filter(Boolean) as OverflowMenuItem[];
   const [open, setOpen] = useState(false);
   // Hidden until measured, so the menu never paints at 0,0 before being positioned.
@@ -129,7 +152,7 @@ export default function OverflowMenu({ items: rawItems, title, className }: Prop
         aria-expanded={open}
         className={`${iconButtonHover} ${className ?? ""}`}
       >
-        <EllipsisVertical className={iconSm} />
+        {trigger}
       </button>
 
       {open &&

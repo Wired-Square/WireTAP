@@ -28,7 +28,7 @@ use error::{ShareError, ShareErrorKind};
 use git::TreeBlob;
 use github::{GitHubClient, RepoInfo};
 use registry::{
-    catalog_entry_id, git_blob_sha, CatalogEntry, CatalogSourceRegistry, LocalState,
+    git_blob_sha, CatalogEntry, CatalogSourceRegistry, LocalState,
     RepoEntry, SavedRepo, SyncStatus,
 };
 use url::{parse_catalog_source, CatalogSource};
@@ -373,17 +373,10 @@ pub async fn import_remote_catalogs(
 
         match write_import(&decoder_dir, blob, &text, existing, req.on_collision) {
             Ok((filename, outcome, name)) => {
-                new_entries.push(CatalogEntry {
-                    id: catalog_entry_id(&repo_id, &blob.path, &req.git_ref),
-                    repo_id: repo_id.clone(),
-                    remote_path: blob.path.clone(),
-                    git_ref: req.git_ref.clone(),
-                    synced_sha: git_blob_sha(text.as_bytes()),
-                    local_filename: filename.clone(),
-                    imported_at: chrono::Utc::now().to_rfc3339(),
-                    remote_sha: Some(blob.sha.clone()),
-                    publish: None,
-                });
+                let mut entry =
+                    CatalogEntry::new(&repo_id, &blob.path, &req.git_ref, &filename);
+                entry.mark_exchanged(git_blob_sha(text.as_bytes()));
+                new_entries.push(entry);
                 results.push(ImportResult::written(&blob.path, outcome, filename, name));
             }
             Err(result) => results.push(result),
@@ -568,30 +561,43 @@ fn project_tracked(
     r.catalogs
         .iter()
         .map(|entry| {
-            let repo = r.repo(&entry.repo_id);
             // Hashed once: the disk-reading forms read the same file up to twice per
-            // entry. `None` — no decoder directory — reads as a missing file, which
-            // is what it is.
+            // entry. `None` — no decoder directory — reads as a missing file, which is
+            // what it is.
             let local_sha = decoder_dir.and_then(|dir| {
                 registry::git_blob_sha_of_file(&dir.join(&entry.local_filename))
             });
-            TrackedCatalog {
-                id: entry.id.clone(),
-                local_filename: entry.local_filename.clone(),
-                repo_id: entry.repo_id.clone(),
-                repo_label: repo
-                    .map(|r| format!("{}/{}", r.owner, r.repo))
-                    .unwrap_or_else(|| strip_host_prefix(&entry.repo_id).to_string()),
-                remote_path: entry.remote_path.clone(),
-                git_ref: entry.git_ref.clone(),
-                sync_status: entry.sync_status_of(local_sha.as_deref()),
-                web_url: repo.and_then(|r| r.web_url.clone()),
-                pr_url: entry.publish.as_ref().and_then(|p| p.pr_url.clone()),
-                pr_number: entry.publish.as_ref().and_then(|p| p.pr_number),
-                pr_merged: entry.publish.as_ref().is_some_and(|p| p.merged),
-            }
+            project_one(r, entry, local_sha.as_deref())
         })
         .collect()
+}
+
+/// One row of that projection, so a command that creates a single subscription can
+/// return it without re-listing (which hashes every tracked catalogue on disk).
+///
+/// Takes the hash rather than a directory: it runs under the registry lock, and
+/// reading a file there is the thing `SyncIndex` exists to avoid.
+fn project_one(
+    r: &registry::Registry,
+    entry: &registry::CatalogEntry,
+    local_sha: Option<&str>,
+) -> TrackedCatalog {
+    let repo = r.repo(&entry.repo_id);
+    TrackedCatalog {
+        id: entry.id.clone(),
+        local_filename: entry.local_filename.clone(),
+        repo_id: entry.repo_id.clone(),
+        repo_label: repo
+            .map(|r| format!("{}/{}", r.owner, r.repo))
+            .unwrap_or_else(|| strip_host_prefix(&entry.repo_id).to_string()),
+        remote_path: entry.remote_path.clone(),
+        git_ref: entry.git_ref.clone(),
+        sync_status: entry.sync_status_of(local_sha),
+        web_url: repo.and_then(|r| r.web_url.clone()),
+        pr_url: entry.publish.as_ref().and_then(|p| p.pr_url.clone()),
+        pr_number: entry.publish.as_ref().and_then(|p| p.pr_number),
+        pr_merged: entry.publish.as_ref().is_some_and(|p| p.merged),
+    }
 }
 
 /// Outcome of checking tracked repositories for upstream changes.
@@ -1067,7 +1073,7 @@ pub async fn pull_catalog(app: AppHandle, catalog_id: String) -> Result<PullOutc
     // directory. The applied path falls through to `install_update`, which refreshes
     // once with the new bytes and the new sha both in place — doing it here as well
     // would cost a second full scan and a second broadcast fan-out per pull.
-    let mut decline = |outcome| {
+    let decline = |outcome| {
         if recorded {
             crate::catalog::refresh_catalog_cache(&app);
         }
@@ -1199,6 +1205,72 @@ pub async fn refresh_pr_status(
         number: pull.number,
         url: pull.html_url,
         merged: pull.merged,
+    }))
+}
+
+/// Adopt a file that is already upstream as this catalogue's provenance, without
+/// pushing anything.
+///
+/// The case that needs it: a catalogue nothing has ever tracked, whose bytes upstream
+/// already match — pushed before provenance was recorded, or copied in by hand. Push
+/// is refused there (an unchanged tree is not a commit), and until this existed the
+/// only path to being tracked was the one being refused.
+///
+/// `synced_sha` takes the **remote** blob sha rather than the local one, which is what
+/// makes both outcomes read honestly with no new state: identical bytes read `inSync`,
+/// and a local copy that differs reads `localAhead` — correctly, since a push then has
+/// something to do. Nothing was exchanged, but the pair of hashes says exactly what is
+/// true of each side.
+#[tauri::command(rename_all = "camelCase")]
+pub async fn link_catalog_source(
+    app: AppHandle,
+    filename: String,
+    repo_url: String,
+    remote_path: String,
+    git_ref: Option<String>,
+) -> Result<TrackedCatalog, ShareError> {
+    // Parsed in Rust, never taken from the frontend — the same rule publishing follows,
+    // and for the same reason: this decides which repository a file is bound to.
+    let (source, client) = open_source(&repo_url)?;
+    let repo_id = source.repo_id();
+    let decoder_dir = crate::catalog::decoder_dir(&app);
+    if app
+        .state::<CatalogSourceRegistry>()
+        .read(&app, |r| r.catalog_for(&filename, &repo_id).is_some())
+    {
+        return Err(ShareError::invalid(format!(
+            "{filename} is already tracked against {}",
+            strip_host_prefix(&repo_id)
+        )));
+    }
+
+    let repo = client.get_repo(&source.owner, &source.repo).await?;
+    let git_ref = git_ref
+        .filter(|r| !r.trim().is_empty())
+        .unwrap_or_else(|| repo.default_branch.clone());
+    // Fetch first, so the sha recorded is what upstream holds now rather than whatever
+    // a previous browse happened to see.
+    let synced = synced_clone(&app, &source, &git_ref).await?;
+    let Some(remote_sha) = git::blob_sha(&synced.dir, &git_ref, &remote_path).await? else {
+        return Err(ShareError::not_found(format!(
+            "{remote_path} is not on {git_ref} — there is nothing to link to. Push it instead."
+        )));
+    };
+
+    let mut entry = registry::CatalogEntry::new(&repo_id, &remote_path, &git_ref, &filename);
+    // Both halves at once: nothing was exchanged, but recording the remote sha as the
+    // last exchange is what makes identical bytes read `inSync` and a differing local
+    // copy read `localAhead` — each true of the side it describes.
+    entry.mark_exchanged(remote_sha);
+
+    // Hashed before taking the lock: reading a file under the registry mutex is the
+    // thing `SyncIndex` exists to avoid.
+    let local_sha = decoder_dir.and_then(|dir| registry::git_blob_sha_of_file(&dir.join(&filename)));
+    // Nothing on disk changed, so no watcher event would carry the row off `localOnly`.
+    Ok(write_then_refresh(&app, |r| {
+        r.upsert_repo(repo_entry(&source, &repo));
+        r.upsert_catalog(entry.clone());
+        project_one(r, &entry, local_sha.as_deref())
     }))
 }
 
@@ -1411,6 +1483,18 @@ fn write_and_refresh(app: &AppHandle, f: impl FnOnce(&mut registry::Registry) ->
         crate::catalog::refresh_catalog_cache(app);
     }
     changed
+}
+
+/// The same rule for a write that always changes something, and has an answer to hand
+/// back: creating a subscription, from a link or from a push.
+///
+/// Separate from [`write_and_refresh`] rather than a generalisation of it, because
+/// making that one carry a value would put a `((), changed)` tuple at all five of its
+/// call sites to serve two that never report "unchanged".
+fn write_then_refresh<T>(app: &AppHandle, f: impl FnOnce(&mut registry::Registry) -> T) -> T {
+    let result = app.state::<CatalogSourceRegistry>().write(app, f);
+    crate::catalog::refresh_catalog_cache(app);
+    result
 }
 
 /// Bring the clone for a source up to date, and hand back where it is.

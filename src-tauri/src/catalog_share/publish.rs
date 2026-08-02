@@ -27,7 +27,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::error::{ShareError, ShareErrorKind};
 use super::github::{self, GitHubClient, NewRepo, RepoInfo};
 use crate::catalog::DiffKind;
-use super::registry::{CatalogSourceRegistry, ForkRef, PublishState};
+use super::registry::{CatalogEntry, CatalogSourceRegistry, ForkRef, PublishState};
 use super::secrets::{self, SecretFinding};
 use super::{auth, git, url::CatalogSource};
 
@@ -403,13 +403,11 @@ pub async fn publish_diff(
 
     // "Upstream moved" is only answerable for a catalogue tracked against *this*
     // repository: `synced_sha` records the bytes last exchanged with it, so comparing
-    // it to an unrelated repository's blob would be noise. Scoped the same way
-    // `resolve` scopes provenance, and for the same reason.
+    // it to an unrelated repository's blob would be noise.
     let upstream_moved = app
         .state::<CatalogSourceRegistry>()
         .read(&app, |r| {
-            r.catalog_by_filename(&req.filename)
-                .filter(|c| c.repo_id == repo_id)
+            r.catalog_for(&req.filename, &repo_id)
                 .map(|c| c.synced_sha.clone())
         })
         .zip(remote_sha)
@@ -584,18 +582,25 @@ pub async fn publish_catalog(
     };
 
     // The committed blob sha becomes synced_sha, which is what immediately makes the
-    // local file read as in sync rather than locally ahead.
+    // local file read as in sync rather than locally ahead — and, when this push is
+    // the first thing to link the file to this repository, records the subscription
+    // that makes it read as anything but `localOnly` at all.
     persist_publish_state(
         &app,
-        &req.filename,
-        &repo_id,
-        &pushed.blob_sha,
-        &plan.branch,
-        pull.as_ref(),
-        head.is_fork.then(|| ForkRef {
-            owner: head.owner.clone(),
-            repo: head.repo.clone(),
-        }),
+        Published {
+            filename: &req.filename,
+            source: &source,
+            upstream: &upstream,
+            target_path: &plan.target_path,
+            base_branch: &plan.base_branch,
+            branch: &plan.branch,
+            blob_sha: &pushed.blob_sha,
+            pull: pull.as_ref(),
+            fork: head.is_fork.then(|| ForkRef {
+                owner: head.owner.clone(),
+                repo: head.repo.clone(),
+            }),
+        },
     );
 
     emit(&app, &req.request_id, "done", None);
@@ -655,13 +660,11 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
     .dir;
     let (provenance, saved_directory) = app.state::<CatalogSourceRegistry>().read(app, |r| {
         (
-            // Scoped to the repository being published to. `catalog_by_filename` alone
-            // matches on filename, so publishing a catalogue tracked against one
-            // repository into a *different* one used to inherit the wrong remote path
-            // — and now that the base branch is taken from the same entry, it would
-            // inherit a wrong commit target too.
-            r.catalog_by_filename(&req.filename)
-                .filter(|c| c.repo_id == repo_id)
+            // Scoped to the repository being published to: a catalogue tracked
+            // against one repository and published into a *different* one must not
+            // inherit the first one's remote path, and — now that the base branch
+            // comes from the same entry — nor its commit target.
+            r.catalog_for(&req.filename, &repo_id)
                 .map(|c| {
                     (
                         c.remote_path.clone(),
@@ -799,34 +802,90 @@ async fn auth_login(
     Ok(login)
 }
 
-fn persist_publish_state(
-    app: &AppHandle,
-    filename: &str,
-    repo_id: &str,
-    blob_sha: &str,
-    branch: &str,
-    pull: Option<&PublishedPull>,
+/// Everything a completed push has to record.
+struct Published<'a> {
+    filename: &'a str,
+    source: &'a CatalogSource,
+    upstream: &'a RepoInfo,
+    /// The path actually committed to.
+    target_path: &'a str,
+    /// The ref the commit landed on, and the one the subscription records.
+    base_branch: &'a str,
+    /// The branch pushed to, which may be a pull-request branch.
+    branch: &'a str,
+    blob_sha: &'a str,
+    pull: Option<&'a PublishedPull>,
     fork: Option<ForkRef>,
-) {
-    app.state::<CatalogSourceRegistry>().write(app, |r| {
-        r.update_catalog_by_filename(filename, |entry| {
-            entry.mark_exchanged(blob_sha.to_string());
-            entry.publish = Some(PublishState {
-                branch: Some(branch.to_string()),
-                pr_number: pull.map(|p| p.number),
-                pr_url: pull.map(|p| p.url.clone()),
-                merged: false,
-            });
-        });
-        // Recorded so the next publish reuses this fork instead of re-probing.
-        if let Some(fork) = fork {
-            r.set_fork(repo_id, fork);
-        }
+}
+
+/// The subscription a push produces, from the one it replaces (if any).
+///
+/// Pure, and split out for exactly that reason: this is the function whose absence
+/// meant a push to an untracked catalogue silently recorded nothing at all.
+///
+/// **`git_ref` is the base branch, not the branch pushed to.** A pull-request branch
+/// is ephemeral and may live only on the user's fork, so it is not on
+/// `refs/remotes/origin/{ref}` of the upstream clone the update check reads — an
+/// entry naming one would never see an update again. It would also come back as the
+/// *next* publish's base (`resolve` reads `git_ref` for that), which then trips the
+/// "a pull request needs its own branch" refusal. The branch is already recorded in
+/// `PublishState.branch`, where the next publish reuses it; a copy in `git_ref` would
+/// be the lower-authority one.
+///
+/// A consequence worth naming: a catalogue pinned to a tag is re-pointed to the
+/// branch the commit landed on, because only a branch can be a push target and
+/// `synced_sha` must describe a ref we can read back.
+fn published_entry(spec: &Published<'_>, previous: Option<&CatalogEntry>) -> CatalogEntry {
+    let mut entry = CatalogEntry::new(
+        &spec.source.repo_id(),
+        spec.target_path,
+        spec.base_branch,
+        spec.filename,
+    );
+    entry.mark_exchanged(spec.blob_sha.to_string());
+    // A push does not reset a subscription's age.
+    if let Some(previous) = previous {
+        entry.imported_at = previous.imported_at.clone();
+    }
+
+    // An open pull request survives a push that did not ask for one. Overwriting it
+    // wholesale dropped `pr_number`, after which `open_pulls` stopped polling and the
+    // merge was never noticed — and a merge is the thing the user is waiting to see.
+    let carried = previous
+        .and_then(|p| p.publish.as_ref())
+        .filter(|p| spec.pull.is_none() && p.branch.as_deref() == Some(spec.branch));
+    entry.publish = Some(PublishState {
+        branch: Some(spec.branch.to_string()),
+        pr_number: spec.pull.map(|p| p.number).or(carried.and_then(|c| c.pr_number)),
+        pr_url: spec
+            .pull
+            .map(|p| p.url.clone())
+            .or(carried.and_then(|c| c.pr_url.clone())),
+        merged: false,
     });
-    // A push moves `synced_sha` without writing to the decoder directory, so the
-    // catalogue list's sync status would stay on "local ahead" until something else
-    // happened to invalidate the cache.
-    crate::catalog::refresh_catalog_cache(app);
+    entry
+}
+
+fn persist_publish_state(app: &AppHandle, spec: Published<'_>) {
+    let repo_id = spec.source.repo_id();
+    // A push moves `synced_sha` — and may create the subscription — without writing to
+    // the decoder directory, so the catalogue list's sync status would stay on
+    // "local ahead" (or "local only") until something else happened to invalidate the
+    // cache.
+    super::write_then_refresh(app, |r| {
+        // The repository entry first: `set_fork` is update-only, and until now a
+        // `RepoEntry` was only ever born of a browse — so a push to a saved but
+        // never-browsed repository had nothing to set the fork on. Through
+        // `repo_entry` rather than hand-rolled, or the row loses `web_url` and with
+        // it Settings' "open the repository" action.
+        r.upsert_repo(super::repo_entry(spec.source, spec.upstream));
+        // Recorded so the next publish reuses this fork instead of re-probing.
+        if let Some(fork) = spec.fork.clone() {
+            r.set_fork(&repo_id, fork);
+        }
+        let previous = r.catalog_for(spec.filename, &repo_id).cloned();
+        r.upsert_catalog(published_entry(&spec, previous.as_ref()));
+    });
 }
 
 /// `catalog/{slug}` from the filename stem.
@@ -848,6 +907,7 @@ fn default_branch_name(filename: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::super::registry::catalog_entry_id;
     use super::*;
 
     #[test]
@@ -873,5 +933,116 @@ mod tests {
         assert!(req.branch.is_none(), "no branch means the base branch");
         assert!(!req.open_pr, "a pull request must be opt-in");
         assert!(!req.draft);
+    }
+
+    fn source() -> CatalogSource {
+        super::super::url::parse_catalog_source("https://github.com/owner/repo")
+            .expect("a plain repository URL parses")
+    }
+
+    fn upstream() -> RepoInfo {
+        RepoInfo {
+            owner: "owner".to_string(),
+            name: "repo".to_string(),
+            full_name: "owner/repo".to_string(),
+            default_branch: "main".to_string(),
+            private: false,
+            fork: false,
+            can_push: true,
+            allow_forking: true,
+            html_url: "https://github.com/owner/repo".to_string(),
+            description: None,
+            parent_full_name: None,
+        }
+    }
+
+    fn published<'a>(
+        source: &'a CatalogSource,
+        upstream: &'a RepoInfo,
+        pull: Option<&'a PublishedPull>,
+    ) -> Published<'a> {
+        Published {
+            filename: "sbrxxx.toml",
+            source,
+            upstream,
+            target_path: "catalogs/sbrxxx.toml",
+            base_branch: "main",
+            branch: "catalog/sbrxxx",
+            blob_sha: "newsha",
+            pull,
+            fork: None,
+        }
+    }
+
+    /// The reported bug, at the level it happened: a push to a catalogue nothing was
+    /// tracking recorded nothing at all, so the picker kept showing `localOnly` for
+    /// ever. Publishing must *create* the subscription, not only update one.
+    ///
+    /// And it must record the **base branch**, not the branch pushed to. A
+    /// pull-request branch may live only on a fork, so it is not on `origin/{ref}` of
+    /// the upstream clone the update check reads — an entry naming one would never see
+    /// an update again — and `resolve` reads `git_ref` back as the next push's base.
+    #[test]
+    fn a_publish_to_an_untracked_repository_records_the_base_branch() {
+        let (source, upstream) = (source(), upstream());
+        let entry = published_entry(&published(&source, &upstream, None), None);
+
+        assert_eq!(entry.git_ref, "main", "the ref pushed to, not the PR branch");
+        assert_eq!(
+            entry.id,
+            catalog_entry_id("gh:owner/repo", "catalogs/sbrxxx.toml", "main")
+        );
+        assert_eq!(entry.repo_id, "gh:owner/repo");
+        assert_eq!(entry.local_filename, "sbrxxx.toml");
+        // Both halves move: the file immediately reads as in sync rather than ahead.
+        assert_eq!(entry.synced_sha, "newsha");
+        assert_eq!(entry.remote_sha.as_deref(), Some("newsha"));
+        // The PR branch is recorded where it belongs, and reused by the next publish.
+        let publish = entry.publish.expect("a push records its branch");
+        assert_eq!(publish.branch.as_deref(), Some("catalog/sbrxxx"));
+        assert!(publish.pr_number.is_none());
+    }
+
+    /// A push does not reset a subscription's age, and — the part that was a real bug —
+    /// does not forget an open pull request just because this push did not ask for one.
+    /// Dropping `pr_number` stops `open_pulls` polling it, and the merge, which is what
+    /// the user is waiting to see, is never noticed.
+    #[test]
+    fn a_second_publish_preserves_imported_at_and_an_open_pull_request() {
+        let (source, upstream) = (source(), upstream());
+        let mut previous = published_entry(&published(&source, &upstream, None), None);
+        previous.imported_at = "2020-01-01T00:00:00Z".to_string();
+        previous.publish = Some(PublishState {
+            branch: Some("catalog/sbrxxx".to_string()),
+            pr_number: Some(42),
+            pr_url: Some("https://github.com/owner/repo/pull/42".to_string()),
+            merged: false,
+        });
+
+        let entry = published_entry(&published(&source, &upstream, None), Some(&previous));
+        assert_eq!(entry.imported_at, "2020-01-01T00:00:00Z");
+        let publish = entry.publish.expect("still recorded");
+        assert_eq!(publish.pr_number, Some(42));
+        assert!(publish.pr_url.is_some());
+    }
+
+    /// …but only for the branch it was opened on. A push to a different branch is not
+    /// that review, and carrying the number over would point the row at a pull request
+    /// this commit never touched.
+    #[test]
+    fn a_publish_to_another_branch_does_not_inherit_the_pull_request() {
+        let (source, upstream) = (source(), upstream());
+        let mut previous = published_entry(&published(&source, &upstream, None), None);
+        previous.publish = Some(PublishState {
+            branch: Some("catalog/older".to_string()),
+            pr_number: Some(42),
+            pr_url: Some("https://github.com/owner/repo/pull/42".to_string()),
+            merged: false,
+        });
+
+        let entry = published_entry(&published(&source, &upstream, None), Some(&previous));
+        let publish = entry.publish.expect("still recorded");
+        assert_eq!(publish.branch.as_deref(), Some("catalog/sbrxxx"));
+        assert!(publish.pr_number.is_none());
     }
 }
