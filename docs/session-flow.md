@@ -651,7 +651,23 @@ file path to `catalog.attach`, which records it; `list_active_sessions` reports 
 local state but must **never write it back** — the dashboard loader doing so (in
 `applyParsedCatalog`) raced the mirror into a ~50 ms attach/reload loop.
 `setSessionCatalogPath` remains an optimistic local echo that the next reconcile
-confirms. Modbus is handled by the Decoder
+confirms.
+
+**Bind only what the session has settled on.** The attach effect keys off
+`sessionId`, but on a source switch `catalogPath` still holds the *previous*
+source's catalogue for the render or two before the new session's own is decided
+(`sessionCatalogPath` is `undefined` until the session reaches the store and `null`
+until auto-select resolves it). Attaching in that window binds a catalogue the
+session immediately disowns — and because the attach writes Rust's authoritative
+path, which returns through the roster into the mirror, the two values then chase
+each other: the visible symptom is a decoder flickering between the old catalogue
+and the right one, with the unmatched list filling from the mismatched protocol.
+The effect therefore returns unless `sessionCatalogPath === catalogPath`, letting
+the mirror bring them into agreement first. Note this is a narrowing, not a cure:
+a session's catalogue path is still written from a dozen call sites *and* adopted
+from Rust, so two writers can still disagree — the durable fix is a single writer.
+
+Modbus is handled by the Decoder
 itself (there is no separate Modbus app): when a Modbus catalogue is involved the
 Decoder fetches its poll groups — built in Rust (`catalog.polls`, surfaced on the
 resolved catalogue by `catalogParser.ts`; the single source of truth shared with
@@ -666,8 +682,12 @@ session id with the new polls.
 footer that attaches a catalogue *as the session is created*: the chosen path rides
 through `LoadOptions.catalogPath` and `useIOSessionManager` sets it on the new
 session via `setSessionCatalogPath` (the cross-app channel), so a decode-aware app's
-`useSessionCatalog` mirror then binds it — no second step. It auto-fills from the
-selected source's `preferred_catalog`, and when the chosen catalogue declares serial
+`useSessionCatalog` mirror then binds it — no second step. The footer is seeded
+from the host app's currently loaded catalogue, but the selected source's
+`preferred_catalog` **overrides that seed** rather than filling only an empty slot:
+the seed is just the previous source's decoder, so the older rule showed a Modbus
+decoder for a CAN source and never offered that source's own. A manual pick or
+clear still wins (`decoderUserTouched`). When the chosen catalogue declares serial
 framing the picker parses it (`loadCatalog`) and reflects that encoding in the
 source's framing dropdown, so the framing is explicit before connecting.
 
