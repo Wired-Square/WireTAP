@@ -21,6 +21,7 @@ mod device_scan;
 mod flashers;
 mod framing;
 mod framing_detect;
+mod hex;
 pub mod io;
 mod profile_tracker;
 mod sessions;

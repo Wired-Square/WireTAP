@@ -592,7 +592,7 @@ pub fn parse_csv_with_mapping(
         } else if let Some(db_col) = data_bytes_col {
             parts
                 .get(db_col)
-                .map(|s| parse_space_separated_hex(s.trim()))
+                .map(|s| crate::hex::parse_bytes_lenient(s))
                 .unwrap_or_default()
         } else if !data_byte_cols.is_empty() {
             data_byte_cols
@@ -1184,19 +1184,6 @@ fn parse_hex_or_decimal_u32(s: &str) -> Option<u32> {
     }
 }
 
-/// Parse space-separated hex bytes: "62 6E 60 77" -> [0x62, 0x6E, 0x60, 0x77]
-fn parse_space_separated_hex(s: &str) -> Vec<u8> {
-    s.split_whitespace()
-        .filter_map(|b| {
-            let stripped = b
-                .strip_prefix("0x")
-                .or_else(|| b.strip_prefix("0X"))
-                .unwrap_or(b);
-            u8::from_str_radix(stripped, 16).ok()
-        })
-        .collect()
-}
-
 /// Parse a timestamp string that may be an integer or a float (with optional parentheses stripped).
 /// Returns the value as f64.
 fn parse_timestamp_string(s: &str) -> Option<f64> {
@@ -1205,19 +1192,6 @@ fn parse_timestamp_string(s: &str) -> Option<f64> {
         return None;
     }
     s.parse::<f64>().ok()
-}
-
-/// Parse concatenated hex bytes: "DEADBEEF" -> [0xDE, 0xAD, 0xBE, 0xEF]
-/// The input must have an even number of hex characters.
-fn parse_concatenated_hex(s: &str) -> Vec<u8> {
-    let s = s.trim();
-    if s.len() % 2 != 0 {
-        return Vec::new();
-    }
-    (0..s.len())
-        .step_by(2)
-        .filter_map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
-        .collect()
 }
 
 /// Parse a combined frame ID + data column (candump format): "689#DEADBEEF"
@@ -1229,7 +1203,7 @@ fn parse_frame_id_data(s: &str) -> Option<(u32, Option<Vec<u8>>)> {
     let data_part = &s[hash_pos + 1..];
 
     let frame_id = u32::from_str_radix(id_part, 16).ok()?;
-    let bytes = parse_concatenated_hex(data_part);
+    let bytes = crate::hex::parse_bytes_lenient(data_part);
     Some((frame_id, Some(bytes)))
 }
 

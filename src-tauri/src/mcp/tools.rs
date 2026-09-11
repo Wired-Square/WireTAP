@@ -1042,19 +1042,10 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<IngestBytesParams>,
     ) -> Result<CallToolResult, McpError> {
-        let hex: String = p.bytes.chars().filter(|c| c.is_ascii_hexdigit()).collect();
-        // `0x` prefixes survive the filter as a stray `0`, so reject anything that
-        // did not come out as whole bytes rather than silently shifting.
-        if hex.is_empty() || !hex.len().is_multiple_of(2) {
-            return Err(err(
-                "bytes must be an even number of hex digits, e.g. \"01 04 4D E2\"".to_string(),
-            ));
+        let data = crate::hex::parse_bytes(&p.bytes).map_err(|e| err(format!("bytes: {e}")))?;
+        if data.is_empty() {
+            return Err(err("bytes is empty"));
         }
-        let data: Vec<u8> = (0..hex.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16))
-            .collect::<Result<_, _>>()
-            .map_err(|e| err(format!("bytes is not valid hex: {e}")))?;
 
         let capture_id = match p.capture_id {
             Some(id) => {

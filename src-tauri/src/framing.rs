@@ -83,21 +83,6 @@ mod desktop {
         pub filtered_capture_id: Option<String>,
     }
 
-    /// Parse hex string to bytes (e.g., "0D0A" -> [0x0D, 0x0A])
-    fn parse_hex_delimiter(hex: &str) -> Result<Vec<u8>, String> {
-        if hex.len() % 2 != 0 {
-            return Err("Hex string must have even length".to_string());
-        }
-        let mut bytes = Vec::with_capacity(hex.len() / 2);
-        for i in (0..hex.len()).step_by(2) {
-            let byte_str = &hex[i..i + 2];
-            let byte = u8::from_str_radix(byte_str, 16)
-                .map_err(|_| format!("Invalid hex byte: {}", byte_str))?;
-            bytes.push(byte);
-        }
-        Ok(bytes)
-    }
-
     /// Build framing encoding from mode and options
     fn build_encoding(cfg: &InterfaceFramingConfig) -> Result<FramingEncoding, String> {
         match cfg.mode.as_str() {
@@ -107,7 +92,7 @@ mod desktop {
             )),
             "raw" => {
                 let delimiter = match cfg.delimiter.as_deref() {
-                    Some(hex) => parse_hex_delimiter(hex)?,
+                    Some(hex) => crate::hex::parse_bytes(hex)?,
                     None => vec![0x0A], // Default LF
                 };
                 Ok(FramingEncoding::Delimiter {

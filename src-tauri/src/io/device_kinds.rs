@@ -346,19 +346,8 @@ pub fn conn_u8_list(profile: &IOProfile, key: &str) -> Option<Vec<u8>> {
         if let Some(arr) = v.as_array() {
             return Some(arr.iter().filter_map(|n| u8::try_from(n.as_i64()?).ok()).collect());
         }
-        Some(parse_u8_list(v.as_str()?))
+        Some(crate::hex::parse_bytes_lenient(v.as_str()?))
     })
-}
-
-/// A hand-written byte list: whitespace- or comma-separated, `0x` optional.
-fn parse_u8_list(text: &str) -> Vec<u8> {
-    text.split([',', ' ', '\t', '\n'])
-        .filter_map(|tok| {
-            let tok = tok.trim();
-            let hex = tok.strip_prefix("0x").or_else(|| tok.strip_prefix("0X"));
-            u8::from_str_radix(hex.unwrap_or(tok), 16).ok()
-        })
-        .collect()
 }
 
 /// What a serial source will actually run with: the framing name, and whether
