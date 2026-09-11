@@ -212,7 +212,7 @@ impl CursorFetcher {
             .bearer_auth(&self.api_key)
             .send()
             .await
-            .map_err(|e| format!("frame fetch failed: {e}"))?;
+            .map_err(|e| format!("frame fetch failed: {}", crate::apiclient::describe(&e)))?;
         if !resp.status().is_success() {
             return Err(format!("frame fetch HTTP {}", resp.status()));
         }

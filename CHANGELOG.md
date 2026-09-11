@@ -18,6 +18,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **A backend connection failure now says why.** "error sending request" was all the message carried; it now ends with the cause — refused, reset, timed out, no route.
+
 - **Framing detection now runs against the real framer.** It used to be a separate implementation that guessed message boundaries by checksum alone, so it could disagree with what you actually got when you applied that framing. It now runs the same framer the port does, which also means frame counts and coverage figures reflect reality — expect them to differ from before, downward where the old scan was inventing messages.
 
 - **Two Modbus exception names now match the current spec** — "Server Device Failure" and "Gateway Target Device Failed To Respond", where the Decoder's Modbus tab previously said "Slave".

@@ -37,6 +37,19 @@ pub fn http() -> &'static reqwest::Client {
     &HTTP
 }
 
+/// A transport error with its cause chain. `reqwest::Error` displays as "error
+/// sending request" and keeps refused, reset or timed out for `source()`.
+pub fn describe(e: &reqwest::Error) -> String {
+    let mut out = e.to_string();
+    let mut source = std::error::Error::source(e);
+    while let Some(s) = source {
+        out.push_str(": ");
+        out.push_str(&s.to_string());
+        source = s.source();
+    }
+    out
+}
+
 /// Queries currently in flight, keyed by `query_id`: what to DELETE to cancel
 /// one, and enough about it to be worth printing in the session status log.
 static API_RUNNING: LazyLock<Mutex<HashMap<String, InFlight>>> =
@@ -142,7 +155,7 @@ async fn get<T: DeserializeOwned>(api: &ApiProfile, path: &str) -> Result<T, Str
         .bearer_auth(&api.api_key)
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     parse(resp).await
 }
 
@@ -171,7 +184,7 @@ async fn post_query<T: DeserializeOwned>(
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("API request failed: {e}"))?;
+            .map_err(|e| format!("API request failed: {}", describe(&e)))?;
         parse(resp).await
     }
     .await;
@@ -463,7 +476,7 @@ pub async fn signal_backend(profile: &IOProfile, pid: i32, terminate: bool) -> R
         .bearer_auth(&api.api_key)
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     Ok(parse::<Ok_>(resp).await?.ok)
 }
 
@@ -541,7 +554,7 @@ pub async fn fetch_frame_payloads(
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     Ok(parse::<Resp>(resp).await?.payloads)
 }
 
@@ -649,7 +662,7 @@ pub async fn api_import_capture(
             .body(body)
             .send()
             .await
-            .map_err(|e| format!("import request failed: {e}"))?;
+            .map_err(|e| format!("import request failed: {}", describe(&e)))?;
         imported_total += parse::<ImportResp>(resp).await?.imported;
 
         offset += frames.len();
@@ -711,7 +724,7 @@ pub async fn api_list_databases(
         .bearer_auth(&api.api_key)
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     Ok(parse::<Resp>(resp).await?.databases)
 }
 
@@ -729,7 +742,7 @@ pub async fn api_create_database(
         .json(&json!({ "name": name }))
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     parse::<Value>(resp).await.map(|_| ())
 }
 
@@ -741,7 +754,7 @@ pub async fn api_test_connection(app: tauri::AppHandle, profile_id: String) -> R
         .get(format!("{}/v1/health", api.base_url))
         .send()
         .await
-        .map_err(|e| format!("API request failed: {e}"))?;
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     Ok(resp.status().is_success())
 }
 
