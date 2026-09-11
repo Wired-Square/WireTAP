@@ -208,6 +208,8 @@
     "modbusRtuDescription": "CRC-16 validation based framing",
     "validateCrc": "Require valid CRC-16",
     "allowBroadcast": "Allow broadcast (address 0)",
+    "anyFunction": "Frame every function code",
+    "anyFunctionHint": "For a line you do not know yet. Costs about one invented message per 260 resyncs — declare the codes instead for a session you will export.",
     "deviceAddressLabel": "Slave address",
     "deviceAddressPlaceholder": "Any (1–247)",
     "vendorFunctionsLabel": "Vendor function codes",

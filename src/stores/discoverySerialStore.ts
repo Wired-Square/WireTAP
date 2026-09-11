@@ -227,6 +227,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
         device_address: framingConfig.deviceAddress,
         vendor_functions: framingConfig.vendorFunctions,
         allow_broadcast: framingConfig.allowBroadcast,
+        any_function: framingConfig.anyFunction,
       },
       min_length: minFrameLength > 0 ? minFrameLength : undefined,
       frame_id_config: frameIdExtractionConfig ? {

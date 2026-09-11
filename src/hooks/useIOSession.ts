@@ -299,6 +299,7 @@ export interface UseIOSessionResult {
       modbusDeviceAddress?: number;
       modbusVendorFunctions?: number[];
       modbusAllowBroadcast?: boolean;
+      modbusAnyFunction?: boolean;
       // Frame ID extraction
       frameIdStartByte?: number;
       frameIdBytes?: number;

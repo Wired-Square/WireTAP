@@ -653,6 +653,7 @@ export interface ModbusRtuOptions {
   validate_crc?: boolean;
   vendor_functions?: number[];
   allow_broadcast?: boolean;
+  any_function?: boolean;
 }
 
 /**

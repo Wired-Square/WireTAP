@@ -6,6 +6,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
+- **The Modbus RTU framer can frame every function code.** A line you don't yet know carries codes nobody has declared, and an undeclared code frames as nothing — on one Sungrow RS-485 line the difference between 9% and 99.97% of bytes framed. The new "Frame every function code" tick beside the vendor-code list turns that on; it costs about one invented message per 260 resyncs, so declare the codes instead for a session you will export.
+
 - **A Modbus RTU line that isn't stock Modbus can now be read.** Real RS-485 buses carry vendor function codes the Modbus spec never defined, and masters that broadcast to address 0 — on one Sungrow logger that is 90% of the traffic, and WireTAP framed none of it. The serial framing options now take a list of vendor function codes and a broadcast tick, and a catalogue can declare the same two for a tunnelled line; set in both places, they combine. Both are off by default, so a stock Modbus line is unchanged.
 
 - **Discovery's Serial Framing tool names the vendor codes it couldn't frame.** Point it at a capture and it reports the function codes standing between you and a readable line, and *Apply* on that result declares them for you. It also counts the broadcasts it couldn't frame and allows them on the same click — an undeclared broadcast swallows the messages behind it, so declaring the codes alone leaves most of such a line unread. Codes you have already declared are not reported again.

@@ -122,6 +122,7 @@ export interface LoadOptions {
   modbusDeviceAddress?: number;
   modbusVendorFunctions?: number[];
   modbusAllowBroadcast?: boolean;
+  modbusAnyFunction?: boolean;
   /** Also emit raw bytes in addition to frames */
   emitRawBytes?: boolean;
   /** Bus mappings per profile (for multi-bus mode) - map from profile ID to bus mappings */
@@ -1205,6 +1206,7 @@ export default function IoSourcePickerDialog({
       opts.modbusDeviceAddress = framingConfig.deviceAddress;
       opts.modbusVendorFunctions = framingConfig.vendorFunctions;
       opts.modbusAllowBroadcast = framingConfig.allowBroadcast;
+      opts.modbusAnyFunction = framingConfig.anyFunction;
     }
 
     // Add filter configuration for serial sources

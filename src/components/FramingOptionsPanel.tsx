@@ -33,6 +33,8 @@ export interface ModbusFramingSettings {
   vendorFunctions?: number[];
   /** Let address 0 start a message, for a broadcasting master */
   allowBroadcast?: boolean;
+  /** Frame every function code, declared or not — for a line not yet known */
+  anyFunction?: boolean;
 }
 
 /** Framing configuration */
@@ -102,6 +104,12 @@ export function ModbusRtuFields({
       )}
       {tick(t("framingOptions.allowBroadcast"), config.allowBroadcast ?? false, (v) =>
         onChange({ allowBroadcast: v }),
+      )}
+      {tick(t("framingOptions.anyFunction"), config.anyFunction ?? false, (v) =>
+        onChange({ anyFunction: v }),
+      )}
+      {config.anyFunction && (
+        <div className={`${captionMuted} -mt-1 ml-6`}>{t("framingOptions.anyFunctionHint")}</div>
       )}
       <div>
         <label className={`block ${caption} mb-1`}>

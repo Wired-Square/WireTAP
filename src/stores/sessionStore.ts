@@ -300,6 +300,7 @@ export interface CreateSessionOptions {
   modbusDeviceAddress?: number;
   modbusVendorFunctions?: number[];
   modbusAllowBroadcast?: boolean;
+  modbusAnyFunction?: boolean;
   /** Minimum frame length to accept */
   minFrameLength?: number;
   /** Bus number override for single-bus devices (0-7) */
@@ -972,6 +973,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         modbusDeviceAddress: options.modbusDeviceAddress,
         modbusVendorFunctions: options.modbusVendorFunctions,
         modbusAllowBroadcast: options.modbusAllowBroadcast,
+        modbusAnyFunction: options.modbusAnyFunction,
         minFrameLength: options.minFrameLength,
         busOverride: options.busOverride,
         subscriberId, // For session logging
@@ -2284,6 +2286,7 @@ export async function createAndStartMultiSourceSession(
       modbusDeviceAddress: interfaceFraming?.deviceAddress,
       modbusVendorFunctions: interfaceFraming?.vendorFunctions,
       modbusAllowBroadcast: interfaceFraming?.allowBroadcast,
+      modbusAnyFunction: interfaceFraming?.anyFunction,
       // Frame ID extraction config (from catalog)
       frameIdStartByte,
       frameIdBytes,

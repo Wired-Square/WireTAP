@@ -192,6 +192,7 @@ export interface CreateIOSessionOptions {
   modbusDeviceAddress?: number;
   modbusVendorFunctions?: number[];
   modbusAllowBroadcast?: boolean;
+  modbusAnyFunction?: boolean;
 
   // Frame ID extraction configuration
   /** Frame ID extraction: start byte position (supports negative indexing from end) */
@@ -240,6 +241,7 @@ interface SerialSettings {
   modbusDeviceAddress?: number;
   modbusVendorFunctions?: number[];
   modbusAllowBroadcast?: boolean;
+  modbusAnyFunction?: boolean;
   frameIdStartByte?: number;
   frameIdBytes?: number;
   frameIdBigEndian?: boolean;
@@ -265,6 +267,7 @@ function serialPayload(source: SerialSettings): Record<string, unknown> {
     modbus_device_address: source.modbusDeviceAddress,
     modbus_vendor_functions: source.modbusVendorFunctions,
     modbus_allow_broadcast: source.modbusAllowBroadcast,
+    modbus_any_function: source.modbusAnyFunction,
     frame_id_start_byte: source.frameIdStartByte,
     frame_id_bytes: source.frameIdBytes,
     frame_id_big_endian: source.frameIdBigEndian,
@@ -1332,6 +1335,7 @@ export interface MultiSourceInput {
   modbusDeviceAddress?: number;
   modbusVendorFunctions?: number[];
   modbusAllowBroadcast?: boolean;
+  modbusAnyFunction?: boolean;
   /** Frame ID extraction: start byte position (0-indexed) */
   frameIdStartByte?: number;
   /** Frame ID extraction: number of bytes (1 or 2) */

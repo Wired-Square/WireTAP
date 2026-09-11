@@ -313,6 +313,7 @@ mod desktop {
                             broadcasts += 1;
                         }
                         if wiretap_catalog::modbus::function_name(func).is_none()
+                            && !options.any_function
                             && !options.vendor_functions.contains(&func)
                         {
                             *tally.entry(func).or_default() += 1;

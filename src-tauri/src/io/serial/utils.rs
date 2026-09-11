@@ -218,6 +218,10 @@ pub fn parse_profile_for_source(
                 .modbus_allow_broadcast
                 .or_else(|| conn_bool(profile, "modbus_allow_broadcast"))
                 .unwrap_or(false),
+            any_function: overrides
+                .modbus_any_function
+                .or_else(|| conn_bool(profile, "modbus_any_function"))
+                .unwrap_or(false),
         }),
         "delimiter" => {
             let delimiter = overrides

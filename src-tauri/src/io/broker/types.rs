@@ -39,6 +39,8 @@ pub struct SerialOverrides {
     pub modbus_vendor_functions: Option<Vec<u8>>,
     /// Whether address 0 may start a Modbus RTU message
     pub modbus_allow_broadcast: Option<bool>,
+    /// Whether every Modbus function code frames, declared or not
+    pub modbus_any_function: Option<bool>,
     /// Frame ID extraction: start byte position (0-indexed)
     pub frame_id_start_byte: Option<i32>,
     /// Frame ID extraction: number of bytes (1 or 2)

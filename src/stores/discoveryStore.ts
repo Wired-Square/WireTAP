@@ -482,6 +482,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           validate_crc: serialStore.framingConfig?.validateCrc,
           vendor_functions: serialStore.framingConfig?.vendorFunctions,
           allow_broadcast: serialStore.framingConfig?.allowBroadcast,
+          any_function: serialStore.framingConfig?.anyFunction,
         });
         return;
       }

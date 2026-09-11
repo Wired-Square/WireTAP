@@ -123,6 +123,10 @@ pub struct ModbusRtuOptions {
     pub vendor_functions: Vec<u8>,
     /// Whether address 0 may start a message, for a master that broadcasts.
     pub allow_broadcast: bool,
+    /// Frame every function code, declared or not. What a tap on an unknown
+    /// line wants, at the cost of a fabricated message about once in 260
+    /// resyncs — see `ModbusRtuStream::frame_any_function`.
+    pub any_function: bool,
 }
 
 /// Stock Modbus: CRC enforced, no vendor codes, no broadcast. Guessing at any of
@@ -134,6 +138,7 @@ impl Default for ModbusRtuOptions {
             validate_crc: true,
             vendor_functions: Vec::new(),
             allow_broadcast: false,
+            any_function: false,
         }
     }
 }
@@ -147,13 +152,16 @@ impl ModbusRtuOptions {
         } else {
             wiretap_catalog::CrcPolicy::Lenient
         };
-        let stream = wiretap_catalog::ModbusRtuStream::with_crc_policy(self.device_address, policy)
-            .with_vendor_functions(&self.vendor_functions);
+        let mut stream =
+            wiretap_catalog::ModbusRtuStream::with_crc_policy(self.device_address, policy)
+                .with_vendor_functions(&self.vendor_functions);
         if self.allow_broadcast {
-            stream.allow_broadcast()
-        } else {
-            stream
+            stream = stream.allow_broadcast();
         }
+        if self.any_function {
+            stream = stream.frame_any_function();
+        }
+        stream
     }
 }
 
@@ -184,6 +192,42 @@ pub type ControlSender = std_mpsc::SyncSender<SetFramingRequest>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rtu(body: &str) -> Vec<u8> {
+        let mut out: Vec<u8> = (0..body.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&body[i..i + 2], 16).unwrap())
+            .collect();
+        out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
+        out
+    }
+
+    /// `any_function` is what lets an undeclared code frame; the codes the RTU
+    /// length rules model must still come out at their spec lengths under it,
+    /// not at whatever boundary a CRC search finds first.
+    #[test]
+    fn any_function_frames_the_undeclared_and_keeps_the_length_rules() {
+        let request = rtu("01044DE20002");
+        let response = rtu("010404CAFEF00D");
+        let vendor = rtu("0165030000010001");
+        let line: Vec<u8> = [&request[..], &response[..], &vendor[..]].concat();
+
+        let stock: Vec<Vec<u8>> = ModbusRtuOptions::default()
+            .stream()
+            .push_bytes(&line)
+            .into_iter()
+            .map(|m| m.raw)
+            .collect();
+        assert_eq!(stock, vec![request.clone(), response.clone()]);
+
+        let any: Vec<Vec<u8>> = ModbusRtuOptions { any_function: true, ..Default::default() }
+            .stream()
+            .push_bytes(&line)
+            .into_iter()
+            .map(|m| m.raw)
+            .collect();
+        assert_eq!(any, vec![request, response, vendor]);
+    }
 
     /// The whole point of the type: exactly one ending is a fault, and the merge
     /// task raises a session error for it. A device pulled mid-session used to

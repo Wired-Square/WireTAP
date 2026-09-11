@@ -35,6 +35,7 @@ function toPanelConfig(config: FramingConfig | null): FramingPanelConfig | null 
     deviceAddress: config.deviceAddress,
     vendorFunctions: config.vendorFunctions,
     allowBroadcast: config.allowBroadcast,
+    anyFunction: config.anyFunction,
   };
 }
 
@@ -60,6 +61,7 @@ function toStoreConfig(panelConfig: FramingPanelConfig | null): FramingConfig | 
         deviceAddress: panelConfig.deviceAddress,
         vendorFunctions: panelConfig.vendorFunctions,
         allowBroadcast: panelConfig.allowBroadcast,
+        anyFunction: panelConfig.anyFunction,
       };
     case 'slip':
       return { mode: 'slip' };

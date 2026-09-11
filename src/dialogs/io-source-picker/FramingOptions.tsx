@@ -65,6 +65,7 @@ function toPanelConfig(config: FramingConfig | null): FramingPanelConfig | null 
     deviceAddress: config.deviceAddress,
     vendorFunctions: config.vendorFunctions,
     allowBroadcast: config.allowBroadcast,
+    anyFunction: config.anyFunction,
   };
 }
 
@@ -87,6 +88,7 @@ function toFramingConfig(panelConfig: FramingPanelConfig | null): FramingConfig 
     config.deviceAddress = panelConfig.deviceAddress;
     config.vendorFunctions = panelConfig.vendorFunctions;
     config.allowBroadcast = panelConfig.allowBroadcast;
+    config.anyFunction = panelConfig.anyFunction;
   }
 
   return config;
