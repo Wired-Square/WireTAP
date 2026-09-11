@@ -38,14 +38,22 @@ else
   )
 fi
 
+sign_adhoc() {
+  codesign --force --sign - \
+    --identifier com.wiredsquare.wiretap \
+    --entitlements "$entitlements" \
+    --generate-entitlement-der \
+    "$1"
+}
+
 signed_any=0
 for app in "${apps[@]}"; do
   if [[ -d "$app" ]]; then
-    codesign --force --sign - \
-      --identifier com.wiredsquare.wiretap \
-      --entitlements "$entitlements" \
-      --generate-entitlement-der \
-      "$app"
+    exe="$app/Contents/MacOS/WireTAP"
+    if [[ -x "$exe" ]]; then
+      sign_adhoc "$exe"
+    fi
+    sign_adhoc "$app"
     echo "Resigned $app with stable identifier com.wiredsquare.wiretap"
     signed_any=1
   fi

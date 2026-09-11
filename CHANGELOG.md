@@ -36,6 +36,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **macOS bundle signing now re-signs the executable inside `WireTAP.app`, not only the wrapper.** The linker left a randomised adhoc identity on the Mach-O (`WireTAP-<hash>`) with the Info.plist unbound, so Local Network stayed `EHOSTUNREACH` even after you allowed the prompt. The bundle script now stamps `com.wiredsquare.wiretap` on both the binary and the `.app`.
+
 - **macOS builds no longer crash in `apple-sys` bindgen.** `keepawake` 0.5 generated CoreFoundation/IOKit bindings from the local SDK at compile time, and bindgen overflowed its stack on the Xcode 27 headers. 0.6 uses pre-generated `objc2` bindings instead.
 
 - **Coil and discrete-input signals now read the coil they name.** A catalogue signal on a coil frame decoded the mirror-image bit within each byte — coil 0 read coil 7, coil 3 read coil 4 — and a wide coil field under little word order was word-swapped as though it were registers. Byte and word order no longer apply to coil frames, including a per-signal override, so a rule or dashboard keyed on such a signal will see it change. (wiretap-lib-rs v0.16.4.)
