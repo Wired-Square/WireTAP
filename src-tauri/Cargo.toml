@@ -111,7 +111,7 @@ wiretap-protocol = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"
-keepawake = "0.5"
+keepawake = "0.6"
 # Firmware flashers — drive the ESP32 serial bootloader (esptool-style) and
 # STM32 USB DFU 1.1 / DfuSe protocols. Used by the Serial app's flash tabs.
 espflash = { version = "4", default-features = false, features = ["serialport"] }
