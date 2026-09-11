@@ -12,11 +12,19 @@ All notable changes to WireTAP will be documented in this file.
 
 - **An agent can hand WireTAP a stream of bytes to work on.** The new `ingest_bytes` MCP tool puts raw bytes into a byte capture as though a serial port had produced them, so a recorded line, a hand-built message or a protocol you are still working out can be framed and analysed with no device attached. The capture behaves like any other and is pinned, so it survives a restart. Requires the session-control MCP permission.
 
+- **Test Pattern can check every CAN payload length, including the CAN FD ones.** The new Sweep mode sends one frame per data length code — 0 to 8 bytes on classic CAN, and 12, 16, 20, 24, 32, 48 and 64 as well when FD is on — and checks each echo against the length its code names. It is the only test that can prove a link is really carrying CAN FD: every other message is eight bytes, which is exactly the size a downgraded FD frame still carries intact. A failure names the byte count that broke. Sweep runs on its own and as part of the full Auto suite.
+
+- **Test Pattern finds the other end before it starts.** An initiator now broadcasts a greeting, reports which bus answered and whether that endpoint supports CAN FD and extended IDs, then tells it which run to take part in and when to stop. A responder no longer needs its duration set to match: leave it running and it serves every phase of an Auto suite, showing "listening" between runs.
+
 ### Changed
 
 - **Framing detection now runs against the real framer.** It used to be a separate implementation that guessed message boundaries by checksum alone, so it could disagree with what you actually got when you applied that framing. It now runs the same framer the port does, which also means frame counts and coverage figures reflect reality — expect them to differ from before, downward where the old scan was inventing messages.
 
 - **Two Modbus exception names now match the current spec** — "Server Device Failure" and "Gateway Target Device Failed To Respond", where the Decoder's Modbus tab previously said "Slave".
+
+- **WireTAP and the WireTAP capture server now speak the same code for every wire protocol between them.** GVRET, SLCAN, gs_usb, the SocketCAN frame layouts, the backend ingest format and the Test Pattern protocol have moved into the shared library both use, so the desktop and the server can no longer disagree about a byte. Nothing about how you connect to a device changes.
+
+- **The `scripts/transport_test.py` Test Pattern peer has been removed.** Two WireTAP instances, or WireTAP plus the capture server, cover every arrangement it was used for, and the new Loopback mode runs a full sweep against a Virtual Device with no hardware at all.
 
 ### Fixed
 
@@ -30,23 +38,9 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Transmitting a CAN FD frame over SLCAN or gs_usb now sends the frame you asked for.** On an SLCAN adapter the frame went out as a classic CAN frame claiming eight bytes while carrying more, which the adapter rejected; on a gs_usb adapter anything longer than eight bytes was sent with the wrong length, so the device padded it out to the next size up. Both now send CAN FD properly, including the bit rate switch. Classic CAN transmission was never affected, and neither was receiving.
 
-### Added
-
-- **Test Pattern can check every CAN payload length, including the CAN FD ones.** The new Sweep mode sends one frame per data length code — 0 to 8 bytes on classic CAN, and 12, 16, 20, 24, 32, 48 and 64 as well when FD is on — and checks each echo against the length its code names. It is the only test that can prove a link is really carrying CAN FD: every other message is eight bytes, which is exactly the size a downgraded FD frame still carries intact. A failure names the byte count that broke. Sweep runs on its own and as part of the full Auto suite.
-
-- **Test Pattern finds the other end before it starts.** An initiator now broadcasts a greeting, reports which bus answered and whether that endpoint supports CAN FD and extended IDs, then tells it which run to take part in and when to stop. A responder no longer needs its duration set to match: leave it running and it serves every phase of an Auto suite, showing "listening" between runs.
-
-### Fixed
-
 - **A Test Pattern run that lost every frame no longer reports success.** It reported "completed" whatever the drop count, so only the Auto suite's per-phase table showed the failure. The run's own result now says PASS or FAIL. Auto's live counters also reach the panel while a phase is running rather than only at the end, and an initiator and a responder sharing one session no longer cut off each other's frames when the first finishes.
 
 - **Test Pattern's extended-ID option now sends extended IDs.** Ticking *Ext* set the frame's extended flag but left the 11-bit ID in place, so the run never exercised 29-bit addressing.
-
-### Changed
-
-- **WireTAP and the WireTAP capture server now speak the same code for every wire protocol between them.** GVRET, SLCAN, gs_usb, the SocketCAN frame layouts, the backend ingest format and the Test Pattern protocol have moved into the shared library both use, so the desktop and the server can no longer disagree about a byte. Nothing about how you connect to a device changes.
-
-- **The `scripts/transport_test.py` Test Pattern peer has been removed.** Two WireTAP instances, or WireTAP plus the capture server, cover every arrangement it was used for, and the new Loopback mode runs a full sweep against a Virtual Device with no hardware at all.
 
 ## [0.11.2] - 2026-09-04
 
