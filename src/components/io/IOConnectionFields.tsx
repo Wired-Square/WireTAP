@@ -80,6 +80,12 @@ export interface IOConnectionFieldsProps {
   frameLinkSignalPanel?: React.ReactNode;
 }
 
+/** A database size the way the gateway's admin UI shows it. */
+function formatGigabytes(bytes: number): string {
+  const gb = bytes / 1e9;
+  return gb >= 10 ? `${gb.toFixed(0)} GB` : gb >= 0.1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
+}
+
 /** The 8N1 trio, identical for serial and for slcan's advanced options. */
 function SerialLineFields({
   connection,
@@ -456,13 +462,63 @@ export default function IOConnectionFields({
           hasLegacyPassword={false}
         />
 
+        {profile.connection.url && (
+          <IODeviceStatus
+            state={probe.wiretapState}
+            result={probe.wiretapResult}
+            primaryLabel={t("ioProfileDialog.wiretap.versionLabel")}
+            secondaryLabel={t("ioProfileDialog.wiretap.databasesLabel")}
+            onRefresh={probe.probeWiretap}
+            probingText={t("ioProfileDialog.wiretap.probingText")}
+            successText={t("ioProfileDialog.wiretap.successText")}
+            errorText={
+              probe.wiretapResult?.primaryInfo
+                ? t("ioProfileDialog.wiretap.keyRefused", { version: probe.wiretapResult.primaryInfo })
+                : t("ioProfileDialog.wiretap.errorText")
+            }
+            idleText={t("ioProfileDialog.wiretap.idleText")}
+          />
+        )}
+
         <FormField label={t("ioProfileDialog.wiretap.database")} variant="default">
+          {/* A datalist rather than a select: the gateway's list is a suggestion,
+              and a name it did not list still has to be typeable. */}
           <Input
             variant="default"
+            list="wiretap-databases"
             value={profile.connection.database || ""}
             onChange={(e) => onUpdateConnectionField("database", e.target.value)}
             placeholder={t("ioProfileDialog.wiretap.databasePlaceholder")}
           />
+          <datalist id="wiretap-databases">
+            {probe.wiretapDatabases.map((db) => (
+              <option key={db.name} value={db.name}>
+                {formatGigabytes(db.size_bytes)}
+              </option>
+            ))}
+          </datalist>
+        </FormField>
+
+        <FormField label={t("ioProfileDialog.wiretap.protocol")} variant="default">
+          <Select
+            variant="default"
+            value={profile.connection.protocol || "can"}
+            onChange={(e) => onUpdateConnectionField("protocol", e.target.value)}
+          >
+            <option value="can">{t("ioProfileDialog.wiretap.protocols.can")}</option>
+            <option value="modbus">{t("ioProfileDialog.wiretap.protocols.modbus")}</option>
+          </Select>
+          <p className={`${caption} mt-1`}>
+            {probe.wiretapProtocols === null
+              ? t("ioProfileDialog.wiretap.protocolHint")
+              : probe.wiretapProtocols.length === 0
+                ? t("ioProfileDialog.wiretap.databaseEmpty")
+                : t("ioProfileDialog.wiretap.databaseHolds", {
+                    protocols: probe.wiretapProtocols
+                      .map((p) => t(`ioProfileDialog.wiretap.protocols.${p}`))
+                      .join(", "),
+                  })}
+          </p>
         </FormField>
 
         <FormField label={t("ioProfileDialog.wiretap.defaultSpeed")} variant="default">

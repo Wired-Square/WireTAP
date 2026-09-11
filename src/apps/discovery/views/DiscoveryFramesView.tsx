@@ -30,6 +30,7 @@ import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import { useCaptureFrameView } from "../hooks/useCaptureFrameView";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { formatFrameId } from "../../../utils/frameIds";
+import { protocolLabel } from "../../../utils/profileTraits";
 import { openPanel } from "../../../utils/windowCommunication";
 import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
 import { useTransmitStore } from "../../../stores/transmitStore";
@@ -926,7 +927,7 @@ function DiscoveryFramesView({
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id)}
       onTabClose={handleTabClose}
-      protocolLabel={(protocol ?? protocolForToolTab(activeTab))?.toUpperCase() ?? "—"}
+      protocolLabel={protocolLabel(protocol ?? protocolForToolTab(activeTab) ?? "—").toUpperCase()}
       isStreaming={isStreaming}
       timestamp={timestamp}
       displayTime={displayTime}

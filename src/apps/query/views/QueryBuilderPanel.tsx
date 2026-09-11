@@ -348,6 +348,7 @@ export default function QueryBuilderPanel({
   const showGapAnalysis = queryType === "gap_analysis";
   const showFrequency = queryType === "frequency";
   const showPatternSearch = queryType === "pattern_search";
+  const showInventory = queryType === "frame_inventory";
 
   // Frame-id label/placeholder follow the active display format.
   const isHex = displayIdFormat === "hex";
@@ -497,6 +498,16 @@ LIMIT ${limitOverride.toLocaleString()}
 -- Pattern: ${patternStr}`;
       }
 
+      if (queryType === "frame_inventory") {
+        return `-- SQLite capture query
+SELECT protocol, frame_id, is_extended, COUNT(*) AS count,
+  MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc
+FROM frames
+WHERE capture_id = ?${timeConditions}
+GROUP BY protocol, frame_id, is_extended
+ORDER BY frame_id`;
+      }
+
       return `-- Query type "${queryType}" not yet implemented for captures`;
     }
 
@@ -644,6 +655,16 @@ WHERE 1=1${timeConditions}
 ORDER BY ts
 LIMIT ${limitOverride.toLocaleString()}
 -- Pattern: ${patternStr}`;
+    }
+
+    if (queryType === "frame_inventory") {
+      return `-- Served from the hourly rollup when no time range is set
+SELECT id, extended, sum(frame_count) AS count,
+  min(first_ts) AS first_us, max(last_ts) AS last_us, max(max_dlc) AS max_dlc
+FROM capture_frame_hourly
+WHERE protocol = <profile protocol>${timeConditions}
+GROUP BY id, extended
+ORDER BY id, extended`;
     }
 
     return `-- Query type "${queryType}" not yet implemented`;
@@ -952,6 +973,9 @@ LIMIT ${limitOverride.toLocaleString()}
               </div>
             </div>
           </div>
+        ) : showInventory ? (
+          /* Inventory — no parameters beyond the time range */
+          <p className={`text-xs ${textMuted}`}>{t("builder.inventoryHint")}</p>
         ) : showPatternSearch ? (
           /* Pattern Search — no frame ID, just a hex pattern input */
           <div>

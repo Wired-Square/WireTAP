@@ -54,6 +54,8 @@ export const FrameType = {
   CanFd: 0x0002,
   Modbus: 0x0003,
   Serial: 0x0004,
+  /** A whole Modbus RTU message; the prefix is `unit << 8 | function`. */
+  ModbusRtu: 0x0005,
 } as const;
 
 // ============================================================================
@@ -184,13 +186,14 @@ export function decodeFrameBatch(
         is_fd: frameType === FrameType.CanFd,
         direction: directionTx ? "tx" : undefined,
       };
-    } else if (frameType === FrameType.Modbus) {
-      // Modbus: first 4 bytes are frame_id (register number) in LE, rest is payload
+    } else if (frameType === FrameType.Modbus || frameType === FrameType.ModbusRtu) {
+      // Modbus: first 4 bytes are frame_id in LE — a register number for a
+      // poll, `unit << 8 | function` for a whole RTU message — rest is payload
       if (len < 4) continue;
       const modbusId = view.getUint32(dataStart, true);
       const payloadLen = len - 4;
       frame = {
-        protocol: "modbus",
+        protocol: frameType === FrameType.ModbusRtu ? "modbus_rtu" : "modbus",
         timestamp_us,
         frame_id: modbusId,
         bus,

@@ -6,7 +6,8 @@ import { ChevronDown, ChevronRight, AlertTriangle, Save, Star, CheckCheck, Squar
 import { iconSm } from "../styles/spacing";
 import { labelSmall, captionMuted, emptyStateText } from "../styles/typography";
 import { hoverLight } from "../styles";
-import { formatFrameId } from "../utils/frameIds";
+import { formatProtocolFrameId } from "../utils/frameIds";
+import { protocolLabel } from "../utils/profileTraits";
 import { useFrameIdFormat } from "../hooks/useFrameIdFormat";
 import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
@@ -73,7 +74,8 @@ function FramePicker({
     [frames]
   );
 
-  const formatId = (f: FrameInfo) => formatFrameId(parseFrameKey(f.id).frameId, displayFrameIdFormat, f.isExtended);
+  const formatId = (f: FrameInfo) =>
+    formatProtocolFrameId(f.protocol, parseFrameKey(f.id).frameId, displayFrameIdFormat, f.isExtended);
 
   const anyFrames = sortedFrames.length > 0;
   const buses = useMemo(() => {
@@ -346,11 +348,11 @@ function FramePicker({
                     )}
                     {isMultiProtocol && f.protocol && (
                       <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${
-                        f.protocol === 'modbus' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
+                        f.protocol === 'modbus' || f.protocol === 'modbus_rtu' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
                         f.protocol === 'serial' ? 'bg-purple-500/15 text-[color:var(--text-purple)]' :
                         'bg-blue-500/15 text-[color:var(--text-blue)]'
                       }`}>
-                        {f.protocol.toUpperCase()}
+                        {protocolLabel(f.protocol)}
                       </span>
                     )}
                   </span>

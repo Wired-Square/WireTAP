@@ -20,7 +20,9 @@ import type {
   DistributionResult,
   GapResult,
   PatternSearchResult,
+  InventoryRow,
 } from "../../../api/dbquery";
+import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import MuxStatisticsView from "./MuxStatisticsView";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { formatHumanUs } from "../../../utils/timeFormat";
@@ -86,7 +88,7 @@ export default function ResultsPanel({
       return { paginatedResults: [], totalPages: 0, pageStart: 0 };
     }
 
-    const allResults = results as (ByteChangeResult | FrameChangeResult | MirrorValidationResult | FrequencyBucket | DistributionResult | GapResult | PatternSearchResult)[];
+    const allResults = results as AnyRowResult[];
 
     // Not measured yet, or "All" resolved past the result count — show everything.
     if (pageSize === null || pageSize >= resultCount) {
@@ -401,7 +403,7 @@ export default function ResultsPanel({
 }
 
 // Individual result row component
-type AnyRowResult = ByteChangeResult | FrameChangeResult | MirrorValidationResult | FrequencyBucket | DistributionResult | GapResult | PatternSearchResult;
+type AnyRowResult = ByteChangeResult | FrameChangeResult | MirrorValidationResult | FrequencyBucket | DistributionResult | GapResult | PatternSearchResult | InventoryRow;
 
 interface ResultRowProps {
   result: AnyRowResult;
@@ -421,6 +423,7 @@ function ResultRow({
   onIngest,
 }: ResultRowProps) {
   const { t } = useTranslation("query");
+  const { formatFor: formatId } = useFrameIdFormat();
   // Get the primary timestamp for ingest (use mirror_timestamp_us for mirror validation)
   const primaryTimestamp = queryType === "mirror_validation"
     ? (result as MirrorValidationResult).mirror_timestamp_us
@@ -595,6 +598,38 @@ function ResultRow({
           onClick={() => onIngest(gap.gap_start_us)}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
           title={t("results.ingestAroundGap")}
+        >
+          <PlayCircle className={iconSm} />
+          <span className="text-xs">{t("results.ingest")}</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Render an inventory row: one id, how often and over what span. Ingest
+  // opens its first sighting.
+  if (queryType === "frame_inventory") {
+    const inv = result as InventoryRow;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2 ${hoverBg} group`}>
+        <span className={`${monoBody} text-xs ${textDataPurple} w-24 flex-shrink-0`}>
+          {formatId(inv.protocol, inv.frame_id, inv.is_extended)}
+        </span>
+        <span className={`${monoBody} text-xs ${textDataGreen} w-24 flex-shrink-0 text-right`}>
+          {inv.count.toLocaleString()}
+        </span>
+        <span className={`${monoBody} text-xs ${textMuted} w-14 flex-shrink-0 text-right`}>
+          {t("results.inventoryLen", { len: inv.max_dlc })}
+        </span>
+        <span className={`${monoBody} text-xs ${textSecondary} flex-1 min-w-0 truncate`}>
+          <span title={formatTimestampFull(inv.first_us)}>{formatTimestamp(inv.first_us)}</span>
+          <span className={textMuted}>{t("results.inventoryTo")}</span>
+          <span title={formatTimestampFull(inv.last_us)}>{formatTimestamp(inv.last_us)}</span>
+        </span>
+        <button
+          onClick={() => onIngest(inv.first_us)}
+          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
+          title={t("results.ingestAroundFirst")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>

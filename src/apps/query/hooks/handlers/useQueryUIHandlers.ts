@@ -11,6 +11,7 @@ import type {
   DistributionResult,
   GapResult,
   PatternSearchResult,
+  InventoryRow,
 } from "../../../../api/dbquery";
 import { addFavorite, getFavoritesForProfile, type TimeRangeFavorite } from "../../../../utils/favorites";
 import type { TimeBounds } from "../../../../components/TimeBoundsInput";
@@ -279,6 +280,23 @@ function buildQueryCsv(query: QueuedQuery): string | null {
       ]);
       return buildCsv(
         ["timestamp_us", "frame_id", "is_extended", "payload", "match_positions"],
+        rows,
+      );
+    }
+
+    case "frame_inventory": {
+      const rows = (results as InventoryRow[]).map((r) => [
+        r.protocol,
+        r.frame_id,
+        r.frame_id_hex,
+        r.is_extended ? "true" : "false",
+        r.count,
+        r.first_us,
+        r.last_us,
+        r.max_dlc,
+      ]);
+      return buildCsv(
+        ["protocol", "frame_id", "frame_id_hex", "is_extended", "count", "first_us", "last_us", "max_dlc"],
         rows,
       );
     }

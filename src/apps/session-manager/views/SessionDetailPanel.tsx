@@ -124,6 +124,7 @@ function protocolLabel(protocol: string): string {
     case "can": return "CAN";
     case "canfd": return "CAN FD";
     case "modbus": return "Modbus";
+    case "modbus_rtu": return "Modbus RTU";
     case "serial": return "Serial";
     default: return protocol.toUpperCase();
   }
@@ -136,6 +137,7 @@ function protocolBadgeStyle(protocol: string): string {
     case "canfd":
       return "bg-cyan-500/20 text-cyan-400";
     case "modbus":
+    case "modbus_rtu":
       return "bg-teal-500/20 text-teal-400";
     case "serial":
       return "bg-orange-500/20 text-orange-400";

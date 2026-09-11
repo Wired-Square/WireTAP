@@ -4,6 +4,10 @@
 // backend gateway over HTTP instead of connecting to PostgreSQL directly.
 // Each function mirrors a dbquery command and returns the SAME result struct,
 // so callers (the Query app, MCP tools, analysis) are agnostic to the backend.
+//
+// The archive is one table with a `protocol` column and every read on the
+// gateway defaults to CAN, so a profile names the protocol it reads
+// (`ArchiveProtocol`) and this module says so on every request that is not CAN.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::LazyLock;
@@ -78,12 +82,60 @@ pub struct RunningQueryInfo {
     pub started_at: std::time::Instant,
 }
 
+/// Which of the archive's protocols a profile reads. The gateway's own tags:
+/// `can` is its default and goes unsaid on the wire, so a CAN profile's requests
+/// are byte-for-byte what they were before the column existed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArchiveProtocol {
+    Can,
+    Modbus,
+}
+
+impl ArchiveProtocol {
+    /// The gateway's tag, or `None` for the default it assumes.
+    fn query_value(self) -> Option<&'static str> {
+        match self {
+            Self::Can => None,
+            Self::Modbus => Some("modbus"),
+        }
+    }
+
+    /// The `FrameMessage.protocol` a row of this protocol becomes. A Modbus
+    /// archive row is one whole RTU message, which this app calls `modbus_rtu`;
+    /// `modbus` here means a register poll and would decode it as one.
+    pub fn frame_tag(self) -> &'static str {
+        match self {
+            Self::Can => "can",
+            Self::Modbus => "modbus_rtu",
+        }
+    }
+
+    /// `?protocol=…` for a GET, empty for CAN. `first` says whether this is the
+    /// first parameter on the URL.
+    pub fn query_suffix(self, first: bool) -> String {
+        self.query_value()
+            .map(|p| format!("{}protocol={p}", if first { "?" } else { "&" }))
+            .unwrap_or_default()
+    }
+
+    /// The profile's setting, absent meaning CAN.
+    pub fn from_connection(conn: &HashMap<String, Value>) -> Result<Self, String> {
+        match conn.get("protocol").and_then(|v| v.as_str()) {
+            None | Some("") | Some("can") => Ok(Self::Can),
+            Some("modbus") => Ok(Self::Modbus),
+            Some(other) => Err(format!("unknown archive protocol '{other}'")),
+        }
+    }
+}
+
 /// Resolved connection details for a wiretap profile.
 pub struct ApiProfile {
     profile_id: String,
     base_url: String,
     api_key: String,
     database: String,
+    pub protocol: ArchiveProtocol,
 }
 
 impl ApiProfile {
@@ -94,9 +146,18 @@ impl ApiProfile {
     fn db_url(&self, path: &str) -> String {
         format!("{}/v1/db/{}{}", self.base_url, self.database, path)
     }
+
+    /// A query body with the profile's protocol named when it is not the
+    /// gateway's default.
+    fn with_protocol(&self, body: Value) -> Value {
+        match self.protocol.query_value() {
+            Some(p) => merge(body, &[("protocol", json!(p))]),
+            None => body,
+        }
+    }
 }
 
-/// Pull url + api key + database out of a wiretap profile.
+/// Pull url + api key + database + protocol out of a wiretap profile.
 pub fn resolve(profile: &IOProfile) -> Result<ApiProfile, String> {
     let conn = &profile.connection;
     let base_url = conn
@@ -111,7 +172,8 @@ pub fn resolve(profile: &IOProfile) -> Result<ApiProfile, String> {
         .unwrap_or("wiretap")
         .to_string();
     let api_key = resolve_api_key(profile)?;
-    Ok(ApiProfile { profile_id: profile.id.clone(), base_url, api_key, database })
+    let protocol = ArchiveProtocol::from_connection(conn)?;
+    Ok(ApiProfile { profile_id: profile.id.clone(), base_url, api_key, database, protocol })
 }
 
 fn resolve_api_key(profile: &IOProfile) -> Result<String, String> {
@@ -135,7 +197,9 @@ fn resolve_api_key(profile: &IOProfile) -> Result<String, String> {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-async fn parse<T: DeserializeOwned>(resp: reqwest::Response) -> Result<T, String> {
+/// A gateway response as its type, or its `error` text — "invalid database
+/// name 'X'" rather than "HTTP 404". Shared with the frame stream.
+pub(crate) async fn parse<T: DeserializeOwned>(resp: reqwest::Response) -> Result<T, String> {
     if !resp.status().is_success() {
         let status = resp.status();
         let msg = resp
@@ -149,14 +213,20 @@ async fn parse<T: DeserializeOwned>(resp: reqwest::Response) -> Result<T, String
     resp.json::<T>().await.map_err(|e| format!("API response decode failed: {e}"))
 }
 
-async fn get<T: DeserializeOwned>(api: &ApiProfile, path: &str) -> Result<T, String> {
-    let resp = HTTP
-        .get(api.db_url(path))
-        .bearer_auth(&api.api_key)
+/// GET a full URL with a bearer key. An empty key sends no header — right for
+/// `/v1/health`, and elsewhere the gateway's 401 comes back as the error text.
+async fn get_url<T: DeserializeOwned>(url: String, api_key: &str) -> Result<T, String> {
+    let req = HTTP.get(url);
+    let req = if api_key.is_empty() { req } else { req.bearer_auth(api_key) };
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("API request failed: {}", describe(&e)))?;
     parse(resp).await
+}
+
+async fn get<T: DeserializeOwned>(api: &ApiProfile, path: &str) -> Result<T, String> {
+    get_url(api.db_url(path), &api.api_key).await
 }
 
 /// POST a query body, registering it for cancellation under `query_id`.
@@ -177,6 +247,7 @@ async fn post_query<T: DeserializeOwned>(
             },
         },
     );
+    let body = api.with_protocol(body);
     let result = async {
         let resp = HTTP
             .post(api.db_url(path))
@@ -491,11 +562,12 @@ struct InventoryEntry {
     count: i64,
     first_us: i64,
     last_us: i64,
-    max_dlc: u8,
+    /// A message length for Modbus, whose ceiling of 256 is one past `u8`.
+    max_dlc: u16,
 }
 
-/// The gateway serves the same CAN-only archive as a direct PostgreSQL profile,
-/// so every entry is CAN.
+/// Every entry is the profile's protocol — the gateway groups one protocol at
+/// a time, and a Modbus row's `frame_id` is its unit/function word.
 pub async fn frame_inventory(
     profile: &IOProfile,
     start_time: Option<String>,
@@ -509,6 +581,9 @@ pub async fn frame_inventory(
     }
     if let Some(e) = &end_time {
         params.push(format!("end={}", urlencoding(e)));
+    }
+    if let Some(p) = api.protocol.query_value() {
+        params.push(format!("protocol={p}"));
     }
     if !params.is_empty() {
         path.push('?');
@@ -524,13 +599,13 @@ pub async fn frame_inventory(
         .into_iter()
         .map(|e| {
             crate::capture_db::InventoryRow::new(
-                "can",
+                api.protocol.frame_tag(),
                 e.frame_id,
                 e.is_extended,
                 e.count,
                 e.first_us,
                 e.last_us,
-                e.max_dlc,
+                e.max_dlc.min(u8::MAX as u16) as u8,
             )
         })
         .collect())
@@ -543,7 +618,11 @@ pub async fn fetch_frame_payloads(
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
     let api = resolve(profile)?;
-    let body = json!({ "frame_id": frame_id, "is_extended": is_extended, "limit": limit });
+    let body = api.with_protocol(json!({
+        "frame_id": frame_id,
+        "is_extended": is_extended,
+        "limit": limit,
+    }));
     #[derive(Deserialize)]
     struct Resp {
         payloads: Vec<Vec<u8>>,
@@ -715,17 +794,15 @@ pub async fn api_list_databases(
     profile_id: String,
 ) -> Result<Vec<ApiDatabase>, String> {
     let api = resolve_by_id(&app, &profile_id).await?;
+    list_databases(&api.base_url, &api.api_key).await
+}
+
+async fn list_databases(base_url: &str, api_key: &str) -> Result<Vec<ApiDatabase>, String> {
     #[derive(Deserialize)]
     struct Resp {
         databases: Vec<ApiDatabase>,
     }
-    let resp = HTTP
-        .get(format!("{}/v1/databases", api.base_url))
-        .bearer_auth(&api.api_key)
-        .send()
-        .await
-        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
-    Ok(parse::<Resp>(resp).await?.databases)
+    Ok(get_url::<Resp>(format!("{base_url}/v1/databases"), api_key).await?.databases)
 }
 
 /// Create a new capture database on the backend (admin key required).
@@ -758,6 +835,111 @@ pub async fn api_test_connection(app: tauri::AppHandle, profile_id: String) -> R
     Ok(resp.status().is_success())
 }
 
+// ---------------------------------------------------------------------------
+// Profile-editor probes — from loose parameters, so an unsaved profile works
+// ---------------------------------------------------------------------------
+
+/// The key for a form that is still being edited: what was typed, else what the
+/// saved profile keeps in the keychain. Empty when there is neither, which the
+/// gateway answers with a 401 the probe reports as such.
+async fn editor_api_key(
+    app: &tauri::AppHandle,
+    api_key: Option<String>,
+    profile_id: Option<String>,
+) -> Result<String, String> {
+    if let Some(key) = api_key.filter(|k| !k.is_empty()) {
+        return Ok(key);
+    }
+    match profile_id {
+        Some(id) => resolve_by_id(app, &id).await.map(|api| api.api_key),
+        None => Ok(String::new()),
+    }
+}
+
+/// What `/v1/health` and `/v1/databases` say about a gateway. Health needs no
+/// key, so a wrong key still gets the version and a `databases_error` naming
+/// the refusal rather than an opaque failure.
+#[derive(serde::Serialize)]
+pub struct BackendProbe {
+    pub version: String,
+    pub status: String,
+    pub db_ok: bool,
+    pub databases: Vec<ApiDatabase>,
+    pub databases_error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn api_probe_backend(
+    app: tauri::AppHandle,
+    url: String,
+    api_key: Option<String>,
+    profile_id: Option<String>,
+) -> Result<BackendProbe, String> {
+    let base_url = url.trim_end_matches('/').to_string();
+    #[derive(Deserialize)]
+    struct Health {
+        #[serde(default)]
+        version: String,
+        #[serde(default)]
+        status: String,
+        #[serde(default)]
+        db_ok: bool,
+    }
+    let health: Health = get_url(format!("{base_url}/v1/health"), "").await?;
+    let key = editor_api_key(&app, api_key, profile_id).await?;
+    let (databases, databases_error) = match list_databases(&base_url, &key).await {
+        Ok(d) => (d, None),
+        Err(e) => (Vec::new(), Some(e)),
+    };
+    Ok(BackendProbe {
+        version: health.version,
+        status: health.status,
+        db_ok: health.db_ok,
+        databases,
+        databases_error,
+    })
+}
+
+/// The protocols a capture database holds, for defaulting a profile's.
+///
+/// `time-bounds` is one rollup row per call, so this costs two of them. A
+/// gateway that predates the column ignores `?protocol=` and answers the CAN
+/// bounds to both, which is why Modbus is reported only when its bounds differ
+/// from CAN's — a database holding both will have different edges, and one
+/// answered by an old gateway cannot.
+#[tauri::command]
+pub async fn api_database_protocols(
+    app: tauri::AppHandle,
+    url: String,
+    api_key: Option<String>,
+    profile_id: Option<String>,
+    database: String,
+) -> Result<Vec<ArchiveProtocol>, String> {
+    let base_url = url.trim_end_matches('/').to_string();
+    let key = editor_api_key(&app, api_key, profile_id).await?;
+    #[derive(Deserialize, PartialEq)]
+    struct Bounds {
+        min_ts_us: Option<i64>,
+        max_ts_us: Option<i64>,
+    }
+    let bounds = |protocol: ArchiveProtocol| {
+        get_url::<Bounds>(
+            format!("{base_url}/v1/db/{database}/time-bounds{}", protocol.query_suffix(true)),
+            &key,
+        )
+    };
+    let can = bounds(ArchiveProtocol::Can).await?;
+    let modbus = bounds(ArchiveProtocol::Modbus).await?;
+    let mut out = Vec::new();
+    if can.min_ts_us.is_some() {
+        out.push(ArchiveProtocol::Can);
+    }
+    if modbus.min_ts_us.is_some() && modbus != can {
+        out.push(ArchiveProtocol::Modbus);
+    }
+    Ok(out)
+}
+
 /// Minimal percent-encoding for query-string values (RFC3339 timestamps).
 pub(crate) fn urlencoding(s: &str) -> String {
     s.bytes()
@@ -768,4 +950,52 @@ pub(crate) fn urlencoding(s: &str) -> String {
             _ => format!("%{b:02X}"),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn conn(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    }
+
+    /// Absent and `can` are the gateway's default and go unsaid, so a CAN
+    /// profile's requests are what they were before the column existed.
+    #[test]
+    fn can_is_the_unsaid_default_and_modbus_is_named() {
+        assert_eq!(ArchiveProtocol::from_connection(&conn(&[])).unwrap(), ArchiveProtocol::Can);
+        assert_eq!(
+            ArchiveProtocol::from_connection(&conn(&[("protocol", json!("can"))])).unwrap(),
+            ArchiveProtocol::Can
+        );
+        assert_eq!(
+            ArchiveProtocol::from_connection(&conn(&[("protocol", json!("modbus"))])).unwrap(),
+            ArchiveProtocol::Modbus
+        );
+        assert!(ArchiveProtocol::from_connection(&conn(&[("protocol", json!("modbsu"))])).is_err());
+
+        assert_eq!(ArchiveProtocol::Can.query_suffix(true), "");
+        assert_eq!(ArchiveProtocol::Modbus.query_suffix(true), "?protocol=modbus");
+        assert_eq!(ArchiveProtocol::Modbus.query_suffix(false), "&protocol=modbus");
+        assert_eq!(ArchiveProtocol::Can.frame_tag(), "can");
+        assert_eq!(ArchiveProtocol::Modbus.frame_tag(), "modbus_rtu");
+    }
+
+    #[test]
+    fn a_query_body_names_the_protocol_only_when_it_is_not_can() {
+        let api = |protocol| ApiProfile {
+            profile_id: "p".into(),
+            base_url: "http://g:8423".into(),
+            api_key: String::new(),
+            database: "db".into(),
+            protocol,
+        };
+        let body = json!({ "frame_id": 613 });
+        assert_eq!(api(ArchiveProtocol::Can).with_protocol(body.clone()), body);
+        assert_eq!(
+            api(ArchiveProtocol::Modbus).with_protocol(body),
+            json!({ "frame_id": 613, "protocol": "modbus" })
+        );
+    }
 }

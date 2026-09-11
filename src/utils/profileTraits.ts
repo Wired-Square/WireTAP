@@ -18,7 +18,7 @@ export type Platform = "windows" | "macos" | "linux" | "ios";
 export type TemporalMode = "realtime" | "recorded";
 
 /** Protocol type - determines frame format and compatibility */
-export type Protocol = "can" | "canfd" | "modbus" | "serial";
+export type Protocol = "can" | "canfd" | "modbus" | "modbus_rtu" | "serial";
 
 /**
  * How each protocol is spelled on screen. One map so the source picker's per-bus
@@ -29,6 +29,7 @@ export const PROTOCOL_LABELS: Record<Protocol, string> = {
   can: "CAN",
   canfd: "CAN-FD",
   modbus: "Modbus",
+  modbus_rtu: "Modbus RTU",
   serial: "Serial",
 };
 
@@ -430,6 +431,7 @@ function getProtocolGroup(protocol: Protocol): number {
     case "canfd":
       return 0; // CAN group
     case "modbus":
+    case "modbus_rtu":
       return 1;
     case "serial":
       return 2;

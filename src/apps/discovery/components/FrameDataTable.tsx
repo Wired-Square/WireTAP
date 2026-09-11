@@ -151,6 +151,16 @@ function rowIndexFromEvent(e: MouseEvent): number | null {
 /** Default byte renderer — hex string with colour based on completeness */
 function DefaultBytes({ frame }: { frame: FrameRow }) {
   const hexBytes = frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase());
+  // A whole Modbus RTU message ends in its CRC; set the two bytes apart so the
+  // body reads as the message and the check reads as the check.
+  if (frame.protocol === 'modbus_rtu' && hexBytes.length >= 4) {
+    return (
+      <span className={`break-all ${textDataGreen}`}>
+        {hexBytes.slice(0, -2).join(' ')}
+        <span className={`ml-2 ${textDataTertiary}`}>{hexBytes.slice(-2).join(' ')}</span>
+      </span>
+    );
+  }
   return (
     <span className={`break-all ${frame.incomplete ? textDataOrange : textDataGreen}`}>
       {hexBytes.join(' ')}
@@ -187,7 +197,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   autoFit = false,
   onFitChange,
 }, ref) => {
-  const { format: formatId } = useFrameIdFormat();
+  const { formatFor: formatId } = useFrameIdFormat();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || internalRef;
 
@@ -335,7 +345,9 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             )}
             <th className={`text-left ${dataHeaderCell}`}>Time</th>
             {showId && (
-              <th className={`text-right ${dataHeaderCell}`}>ID</th>
+              <th className={`text-right ${dataHeaderCell}`}>
+                {frames[0]?.protocol === 'modbus_rtu' ? 'Unit/Fn' : 'ID'}
+              </th>
             )}
             {showBus && (
               <th className={`text-center ${dataHeaderCell} ${textDataCyan}`}>Bus</th>
@@ -389,7 +401,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 </td>
                 {showId && (
                   <td className={`${dataCell} text-right ${frame.incomplete ? textDataOrange : textDataYellow} ${cellHighlight}`}>
-                    {formatId(frame.frame_id, frame.is_extended)}
+                    {formatId(frame.protocol, frame.frame_id, frame.is_extended)}
                     {frame.incomplete && <span className={`ml-1 ${textDataOrange}`}>?</span>}
                   </td>
                 )}

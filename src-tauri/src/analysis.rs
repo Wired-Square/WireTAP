@@ -135,6 +135,19 @@ pub async fn frame_inventory(
     }
 }
 
+/// The Query app's per-id rollup, over either source. Time bounds are RFC3339.
+#[tauri::command]
+pub async fn query_frame_inventory(
+    app: AppHandle,
+    capture_id: Option<String>,
+    profile_id: Option<String>,
+    start_time: Option<String>,
+    end_time: Option<String>,
+) -> Result<Vec<InventoryRow>, String> {
+    let src = resolve(capture_id, profile_id)?;
+    frame_inventory(&app, &src, start_time, end_time).await
+}
+
 /// `protocol` is the identity's other half; `None` matches any.
 async fn fetch_payloads(
     app: &AppHandle,
@@ -145,7 +158,7 @@ async fn fetch_payloads(
     sample_limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
     match src {
-        // No protocol and no stride: the backend serves a CAN-only archive, and a
+        // No protocol and no stride: a backend profile reads one protocol, and a
         // modulo window over a multi-month archive is a full scan where the
         // tail query is an index seek. A capture is bounded and local, which is
         // what makes striding it affordable.

@@ -6,6 +6,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
+- **A WireTAP Backend profile can read a Modbus archive.** A gateway's capture database can hold Modbus RTU traffic beside CAN, and every read on it is CAN unless asked, so the profile now has a Protocol setting. The profile editor contacts the gateway as you type, shows its version and lists its databases, and once you pick a database it asks what that database holds and sets the protocol to match. A Modbus archive row is one whole message: Discovery shows it as `unit/function` with the CRC set apart from the body, and the Query app's queries and inventory work on those ids. Existing CAN profiles are unchanged.
+
+- **The Query app has a Frame Inventory query.** Every frame id the source holds, with its count, first and last sighting and longest payload — the cheapest possible look at what an archive or a capture contains before you ask it anything specific. Works on a backend profile and on a capture, and exports as CSV like the others.
+
 - **The Modbus RTU framer can frame every function code.** A line you don't yet know carries codes nobody has declared, and an undeclared code frames as nothing — on one Sungrow RS-485 line the difference between 9% and 99.97% of bytes framed. The new "Frame every function code" tick beside the vendor-code list turns that on; it costs about one invented message per 260 resyncs, so declare the codes instead for a session you will export.
 
 - **A Modbus RTU line that isn't stock Modbus can now be read.** Real RS-485 buses carry vendor function codes the Modbus spec never defined, and masters that broadcast to address 0 — on one Sungrow logger that is 90% of the traffic, and WireTAP framed none of it. The serial framing options now take a list of vendor function codes and a broadcast tick, and a catalogue can declare the same two for a tunnelled line; set in both places, they combine. Both are off by default, so a stock Modbus line is unchanged.
@@ -20,7 +24,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **A backend connection failure now says why.** "error sending request" was all the message carried; it now ends with the cause — refused, reset, timed out, no route.
+- **A backend connection failure now says why.** "error sending request" was all the message carried; it now ends with the cause — refused, reset, timed out, no route. A gateway that refuses a replay says so in its own words too — "invalid database name" rather than "HTTP 404".
 
 - **Framing detection now runs against the real framer.** It used to be a separate implementation that guessed message boundaries by checksum alone, so it could disagree with what you actually got when you applied that framing. It now runs the same framer the port does, which also means frame counts and coverage figures reflect reality — expect them to differ from before, downward where the old scan was inventing messages.
 

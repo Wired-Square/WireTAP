@@ -13,6 +13,31 @@ export function formatFrameId(
   return `0x${id.toString(16).toUpperCase().padStart(pad, "0")}`;
 }
 
+/** Split a Modbus RTU frame id (`unit << 8 | function`) into its two bytes. */
+export function splitModbusRtuId(id: number): { unit: number; func: number } {
+  return { unit: (id >> 8) & 0xff, func: id & 0xff };
+}
+
+/**
+ * Format a Modbus RTU frame id as `unit/function`. The unit is an address and
+ * reads as decimal in either mode; the function code follows the id format.
+ */
+export function formatModbusRtuId(id: number, mode: "hex" | "decimal" = "hex"): string {
+  const { unit, func } = splitModbusRtuId(id);
+  const fn = mode === "decimal" ? String(func) : `0x${func.toString(16).toUpperCase().padStart(2, "0")}`;
+  return `${unit}/${fn}`;
+}
+
+/** Format a frame id the way its protocol reads it. */
+export function formatProtocolFrameId(
+  protocol: string | undefined,
+  id: number,
+  mode: "hex" | "decimal" = "hex",
+  isExtended?: boolean
+): string {
+  return protocol === "modbus_rtu" ? formatModbusRtuId(id, mode) : formatFrameId(id, mode, isExtended);
+}
+
 /**
  * Format a frame id for an editable text field: bare value with no "0x" prefix
  * or padding (the field's label already states the radix). Hex is upper-cased.

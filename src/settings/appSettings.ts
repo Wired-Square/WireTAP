@@ -45,6 +45,9 @@ export interface MqttConnection {
   };
 }
 
+/** The archive protocols a WireTAP backend profile can read. */
+export type ArchiveProtocol = "can" | "modbus";
+
 /** Connection to a WireTAP backend gateway — the only database-backed source. */
 export interface WiretapConnection {
   url?: string;
@@ -52,6 +55,8 @@ export interface WiretapConnection {
   api_key?: string;
   _api_key_stored?: boolean;
   default_speed?: string;
+  /** Which of the archive's protocols this profile reads; absent means CAN. */
+  protocol?: ArchiveProtocol;
 }
 
 /** Interface configuration for GVRET devices */

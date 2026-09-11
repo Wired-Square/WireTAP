@@ -287,11 +287,13 @@ function QueryInner() {
     // Mux statistics results are an object, not a timestamped array
     if (!Array.isArray(selectedQuery.results)) return null;
     if (selectedQuery.results.length === 0) return null;
-    const results = selectedQuery.results as { timestamp_us: number }[];
-    const timestamps = results.map((r) => r.timestamp_us);
+    // An inventory row spans first→last; everything else is one instant.
+    const results = selectedQuery.results as ({ timestamp_us: number } | { first_us: number; last_us: number })[];
+    const starts = results.map((r) => ("first_us" in r ? r.first_us : r.timestamp_us));
+    const ends = results.map((r) => ("last_us" in r ? r.last_us : r.timestamp_us));
     return {
-      minTimestampUs: Math.min(...timestamps),
-      maxTimestampUs: Math.max(...timestamps),
+      minTimestampUs: Math.min(...starts),
+      maxTimestampUs: Math.max(...ends),
     };
   }, [selectedQuery]);
 

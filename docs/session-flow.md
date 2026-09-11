@@ -80,13 +80,18 @@ with `multi_source: false` cannot be combined with others.
 | Modbus scan²      | [io/modbus_tcp/scan_source.rs](../src-tauri/src/io/modbus_tcp/scan_source.rs) | realtime | modbus | ✗ | ✗ | ✗ |
 | FrameLink         | [io/framelink/](../src-tauri/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
 | Virtual device    | [io/virtual_device/](../src-tauri/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
-| WireTAP backend   | [io/recorded/backend_api.rs](../src-tauri/src/io/recorded/backend_api.rs) | recorded | can | ✗ | ✗ | ✗ |
+| WireTAP backend   | [io/recorded/backend_api.rs](../src-tauri/src/io/recorded/backend_api.rs) | recorded | can \| modbus_rtu³ | ✗ | ✗ | ✗ |
 | Capture replay    | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | capture | (inherited) | ✗ | ✗ | ✗ |
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 ² A discovery sweep, not a device you configure — see *Modbus discovery* below.
   It cannot be paused (there is no coherent half-way state to pause into) and it
   ends itself when the sweep finishes.
+³ One per profile: the gateway's archive has a `protocol` column and every read
+  on it is CAN unless asked, so the profile names which it reads
+  (`apiclient::ArchiveProtocol`). A Modbus archive row is a whole RTU message,
+  `id` = unit << 8 | function, delivered as `modbus_rtu` — not `modbus`, which
+  is a register poll and would read that word as a register number.
 
 **Bus mappings are built from the profile, and that is a known gap.**
 `sessions::profile_bus_mappings` runs before a connection exists, so the only

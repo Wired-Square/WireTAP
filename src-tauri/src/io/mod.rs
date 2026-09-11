@@ -240,8 +240,12 @@ pub enum Protocol {
     /// CAN FD (flexible data rate) - compatible with Can
     #[serde(rename = "canfd")]
     CanFd,
-    /// Modbus RTU/TCP
+    /// Modbus register polls: one frame per register, `frame_id` the register
     Modbus,
+    /// Whole Modbus RTU messages off a line, `frame_id` = unit << 8 | function
+    /// and the CRC still on the end — what a passive tap archives
+    #[serde(rename = "modbus_rtu")]
+    ModbusRtu,
     /// Raw serial bytes
     Serial,
 }

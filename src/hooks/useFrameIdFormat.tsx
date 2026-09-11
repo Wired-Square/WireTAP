@@ -20,7 +20,7 @@ import {
   type ReactNode,
 } from "react";
 import { useSettings, getDisplayFrameIdFormat, type FrameIdFormat } from "./useSettings";
-import { formatFrameId } from "../utils/frameIds";
+import { formatFrameId, formatProtocolFrameId } from "../utils/frameIds";
 
 /** Local per-panel override; "default" means "follow the global setting". */
 export type FrameIdOverride = "default" | "hex" | "decimal";
@@ -36,6 +36,8 @@ export interface FrameIdFormatValue {
   effective: FrameIdFormat;
   /** Format an id with the effective format. */
   format: (id: number, isExtended?: boolean) => string;
+  /** Format an id the way its protocol reads it, with the effective format. */
+  formatFor: (protocol: string | undefined, id: number, isExtended?: boolean) => string;
 }
 
 const FALLBACK: FrameIdFormatValue = {
@@ -44,6 +46,7 @@ const FALLBACK: FrameIdFormatValue = {
   defaultFormat: "hex",
   effective: "hex",
   format: (id, isExtended) => formatFrameId(id, "hex", isExtended),
+  formatFor: (protocol, id, isExtended) => formatProtocolFrameId(protocol, id, "hex", isExtended),
 };
 
 const FrameIdFormatContext = createContext<FrameIdFormatValue | null>(null);
@@ -66,6 +69,7 @@ export function FrameIdFormatProvider({ children }: { children: ReactNode }) {
       defaultFormat,
       effective,
       format: (id, isExtended) => formatFrameId(id, effective, isExtended),
+      formatFor: (protocol, id, isExtended) => formatProtocolFrameId(protocol, id, effective, isExtended),
     }),
     // effective is derived from override + defaultFormat, so those two cover it.
     [override, defaultFormat, effective],

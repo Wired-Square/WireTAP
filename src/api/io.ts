@@ -27,7 +27,7 @@ export type TemporalMode = "realtime" | "recorded" | "capture";
  * CAN and CAN-FD are compatible (can coexist in a session).
  * Other protocols are incompatible with each other.
  */
-export type Protocol = "can" | "canfd" | "modbus" | "serial";
+export type Protocol = "can" | "canfd" | "modbus" | "modbus_rtu" | "serial";
 
 /**
  * Combined interface traits for formal session/interface characterization.

@@ -8,17 +8,28 @@
 // unsaved device. GVRET's probe goes through `probe_device`, which resolves a
 // profile by id — an ad-hoc device must be registered before it can be probed.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PROBE_DEBOUNCE_MS } from "../../constants";
 import { probeSlcanDevice } from "../../api/serial";
 import { probeGsUsbDevice } from "../../api/gs_usb";
 import { probeDevice, type GvretDeviceInfo } from "../../api/io";
 import { framelinkProbeDevice } from "../../api/framelink";
+import {
+  apiDatabaseProtocols,
+  apiProbeBackend,
+  type ApiDatabase,
+  type EditorCredentials,
+} from "../../api/backendApi";
 import type {
   DeviceProbeState,
   DeviceProbeResult,
 } from "./IODeviceStatus";
-import { isProfileKind, type IOProfile, type GvretInterfaceConfig } from "../../settings/appSettings";
+import {
+  isProfileKind,
+  type ArchiveProtocol,
+  type IOProfile,
+  type GvretInterfaceConfig,
+} from "../../settings/appSettings";
 import { getPlatform } from "../../utils/platform";
 import { getAvailableProfileKinds, type Platform, type ProfileKind } from "../../utils/profileTraits";
 
@@ -77,6 +88,14 @@ export interface ConnectionProbe {
   framelinkState: DeviceProbeState;
   framelinkError: string | null;
   probeFramelink: () => Promise<void>;
+
+  wiretapState: DeviceProbeState;
+  wiretapResult: DeviceProbeResult | null;
+  /** Capture databases the gateway listed; empty until the key is accepted. */
+  wiretapDatabases: ApiDatabase[];
+  /** Protocols the chosen database holds; null until it has been asked. */
+  wiretapProtocols: ArchiveProtocol[] | null;
+  probeWiretap: () => Promise<void>;
 }
 
 export interface UseConnectionProbeOptions {
@@ -114,6 +133,10 @@ export function useConnectionProbe({
   const [gvretError, setGvretError] = useState<string | null>(null);
   const [framelinkState, setFramelinkState] = useState<DeviceProbeState>("idle");
   const [framelinkError, setFramelinkError] = useState<string | null>(null);
+  const [wiretapState, setWiretapState] = useState<DeviceProbeState>("idle");
+  const [wiretapResult, setWiretapResult] = useState<DeviceProbeResult | null>(null);
+  const [wiretapDatabases, setWiretapDatabases] = useState<ApiDatabase[]>([]);
+  const [wiretapProtocols, setWiretapProtocols] = useState<ArchiveProtocol[] | null>(null);
 
   // ── slcan ──────────────────────────────────────────────────────────────────
 
@@ -302,6 +325,87 @@ export function useConnectionProbe({
     }
   }, [profile, onUpdateConnectionField]);
 
+  // ── WireTAP backend (probes from loose url + key, so it works unsaved) ─────
+
+  const wiretap = isProfileKind(profile, "wiretap") ? profile.connection : undefined;
+  const isWiretap = wiretap !== undefined;
+  const wiretapUrl = wiretap?.url ?? "";
+  const wiretapKey = wiretap?.api_key ?? "";
+  const wiretapDatabase = wiretap?.database ?? "";
+  // Only what the probes read, so a keystroke elsewhere in the form does not
+  // re-probe the gateway.
+  const wiretapCreds = useMemo<EditorCredentials>(
+    () => ({ url: wiretapUrl, apiKey: wiretapKey, profileId: probeProfileId }),
+    [wiretapUrl, wiretapKey, probeProfileId],
+  );
+  // Read at resolve time, so the answer compares against what the form says
+  // then rather than when the question was asked.
+  const wiretapProtocolRef = useRef(wiretap?.protocol);
+  wiretapProtocolRef.current = wiretap?.protocol;
+
+  const probeWiretap = useCallback(async () => {
+    setWiretapState("probing");
+    try {
+      const result = await apiProbeBackend(wiretapCreds);
+      setWiretapDatabases(result.databases);
+      // Health needs no key, so `primaryInfo` carries the version even when
+      // the key was refused — the caller words the error state from it.
+      setWiretapResult({
+        success: !result.databases_error,
+        primaryInfo: result.version,
+        secondaryInfo: String(result.databases.length),
+        error: result.databases_error,
+      });
+      setWiretapState(result.databases_error ? "error" : "success");
+    } catch (e) {
+      setWiretapDatabases([]);
+      setWiretapResult({ success: false, error: e instanceof Error ? e.message : String(e) });
+      setWiretapState("error");
+    }
+  }, [wiretapCreds]);
+
+  useEffect(() => {
+    if (!active || !isWiretap || !wiretapUrl) {
+      setWiretapState("idle");
+      setWiretapResult(null);
+      setWiretapDatabases([]);
+      return;
+    }
+    const timer = setTimeout(() => void probeWiretap(), PROBE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [active, isWiretap, wiretapUrl, probeWiretap]);
+
+  // Ask the chosen database what it holds, and default the protocol from the
+  // answer: a database holding exactly one protocol is read as that one.
+  // Whatever the user picked on a database that holds both stays picked.
+  useEffect(() => {
+    if (!active || !isWiretap || !wiretapCreds.url || !wiretapDatabase) {
+      setWiretapProtocols(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void apiDatabaseProtocols(wiretapCreds, wiretapDatabase)
+        .then((held) => {
+          if (cancelled) return;
+          setWiretapProtocols(held);
+          if (held.length === 1 && held[0] !== (wiretapProtocolRef.current ?? "can")) {
+            onUpdateConnectionField("protocol", held[0]);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setWiretapProtocols(null);
+        });
+    }, PROBE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // Re-asks when the database or credentials change; the setter is read from
+    // the closure so a re-rendered parent does not re-ask.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isWiretap, wiretapCreds, wiretapDatabase]);
+
   return {
     slcanState,
     slcanResult,
@@ -316,5 +420,10 @@ export function useConnectionProbe({
     framelinkState,
     framelinkError,
     probeFramelink,
+    wiretapState,
+    wiretapResult,
+    wiretapDatabases,
+    wiretapProtocols,
+    probeWiretap,
   };
 }

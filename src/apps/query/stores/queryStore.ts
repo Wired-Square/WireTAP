@@ -15,6 +15,7 @@ import {
   queryDistribution,
   queryGapAnalysis,
   queryPatternSearch,
+  queryFrameInventory,
   cancelQuery,
   queryActivity,
   cancelBackend,
@@ -27,6 +28,7 @@ import {
   type DistributionResult,
   type GapResult,
   type PatternSearchResult,
+  type InventoryRow,
 } from "../../../api/dbquery";
 import {
   queryByteChangesCapture,
@@ -44,7 +46,7 @@ import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
 import { inheritedByteIndices } from "../../../utils/mirrorBytes";
 
-export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult };
+export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult, InventoryRow };
 
 /** Available query types */
 export type QueryType =
@@ -56,7 +58,8 @@ export type QueryType =
   | "frequency"
   | "distribution"
   | "gap_analysis"
-  | "pattern_search";
+  | "pattern_search"
+  | "frame_inventory";
 
 /** Query type metadata for UI display */
 export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: string }> = {
@@ -95,6 +98,10 @@ export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: st
   pattern_search: {
     label: "Pattern Search",
     description: "Search for a byte pattern across all frame IDs",
+  },
+  frame_inventory: {
+    label: "Frame Inventory",
+    description: "Every frame id in the source with its count, first and last sighting",
   },
 };
 
@@ -142,7 +149,8 @@ export type QueryResult =
   | FrequencyBucket[]
   | DistributionResult[]
   | GapResult[]
-  | PatternSearchResult[];
+  | PatternSearchResult[]
+  | InventoryRow[];
 
 /** Query parameters */
 export interface QueryParams {
@@ -261,6 +269,8 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
     const mirrorHex = formatFrameId(queryParams.mirrorFrameId, queryParams.isExtended);
     const sourceHex = formatFrameId(queryParams.sourceFrameId, queryParams.isExtended);
     name = `${typeLabel} - ${mirrorHex} ↔ ${sourceHex}`;
+  } else if (queryType === "frame_inventory") {
+    name = typeLabel;
   } else if (queryType === "pattern_search") {
     const patternHex = queryParams.pattern.length > 0
       ? queryParams.pattern
@@ -733,6 +743,16 @@ export const useQueryStore = create<QueryState>((set, get) => ({
             stats = response.stats;
             break;
           }
+
+          case "frame_inventory": {
+            // The command reads a bare integer as microseconds.
+            results = await queryFrameInventory(
+              { captureId },
+              startTimeUs?.toString(),
+              endTimeUs?.toString(),
+            );
+            break;
+          }
         }
       } else {
         // ── Backend query path ──
@@ -895,6 +915,11 @@ export const useQueryStore = create<QueryState>((set, get) => ({
             );
             results = response.results;
             stats = response.stats;
+            break;
+          }
+
+          case "frame_inventory": {
+            results = await queryFrameInventory({ profileId }, startTime, endTime);
             break;
           }
         }

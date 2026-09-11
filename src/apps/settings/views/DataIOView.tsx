@@ -107,6 +107,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
       <div className="flex flex-wrap gap-2">
         <SummaryBadge label={s("url")} value={url} />
         <SummaryBadge label={s("db")} value={db} />
+        {c.protocol === "modbus" && <SummaryBadge label={s("protocol")} value="Modbus" />}
       </div>
     );
   }

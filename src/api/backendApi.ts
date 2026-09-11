@@ -6,10 +6,54 @@
 // upload flow.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { ArchiveProtocol } from "../settings/appSettings";
 
 export interface ApiDatabase {
   name: string;
   size_bytes: number;
+}
+
+/** What `/v1/health` and `/v1/databases` say about a gateway. */
+export interface BackendProbe {
+  /** e.g. "0.1.0 (gc21b57813120)" — names the build you are talking to. */
+  version: string;
+  status: string;
+  db_ok: boolean;
+  databases: ApiDatabase[];
+  /** Why the database list is empty when it is — usually the key was refused. */
+  databases_error: string | null;
+}
+
+/** The key is what was typed, else the saved profile's; both may be absent. */
+export interface EditorCredentials {
+  url: string;
+  apiKey?: string;
+  profileId?: string | null;
+}
+
+/**
+ * Probe a gateway from loose parameters, so an unsaved profile works. Health
+ * needs no key, so a wrong key still reports the version.
+ */
+export async function apiProbeBackend(creds: EditorCredentials): Promise<BackendProbe> {
+  return invoke<BackendProbe>("api_probe_backend", {
+    url: creds.url,
+    apiKey: creds.apiKey || null,
+    profileId: creds.profileId || null,
+  });
+}
+
+/** The protocols a capture database holds, for defaulting a profile's. */
+export async function apiDatabaseProtocols(
+  creds: EditorCredentials,
+  database: string,
+): Promise<ArchiveProtocol[]> {
+  return invoke<ArchiveProtocol[]>("api_database_protocols", {
+    url: creds.url,
+    apiKey: creds.apiKey || null,
+    profileId: creds.profileId || null,
+    database,
+  });
 }
 
 /** List capture databases available on a backend (for the profile picker). */

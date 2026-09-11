@@ -69,7 +69,11 @@ Optional time bounds. **On a large archive this is a full-table GROUP BY — pas
 
 Frame identity is **(protocol, frame_id)**: a mixed capture holds CAN `0x100` and
 Modbus register 256 under the same number, and they are separate rows. A
-WireTAP backend serves a CAN-only archive, so every row reports `"can"`.
+WireTAP backend profile reads one protocol — the one it is configured for — so
+every row reports that: `"can"`, or `"modbus_rtu"` for a Modbus archive, where
+`frame_id` is `unit << 8 | function` of a whole RTU message and `frame_id_hex`
+is still its plain hex (`0x120` is unit 1, function `0x20`). Without time bounds
+a backend answers from its hourly rollup, which is why it is cheap there.
 
 ### `frame_byte_profile`
 For one `frame_id`, classifies each payload byte over sampled frames:

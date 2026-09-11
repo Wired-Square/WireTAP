@@ -126,6 +126,7 @@ pub fn traits_for_protocol(protocol: Protocol) -> InterfaceTraits {
         Protocol::Can => (vec![Protocol::Can], true, false),
         Protocol::CanFd => (vec![Protocol::Can, Protocol::CanFd], true, false),
         Protocol::Modbus => (vec![Protocol::Modbus], false, false),
+        Protocol::ModbusRtu => (vec![Protocol::ModbusRtu], false, false),
         Protocol::Serial => (vec![Protocol::Serial], false, true),
     };
     InterfaceTraits {

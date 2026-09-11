@@ -468,6 +468,40 @@ export async function queryActivity(
   return invoke("db_query_activity", { profileId });
 }
 
+// ── Frame Inventory ──
+
+/**
+ * One frame id's rollup. Identity is (protocol, frame_id, is_extended): a
+ * Modbus row's `frame_id` is `unit << 8 | function`, under `modbus_rtu`.
+ */
+export interface InventoryRow {
+  protocol: string;
+  frame_id: number;
+  frame_id_hex: string;
+  is_extended: boolean;
+  count: number;
+  first_us: number;
+  last_us: number;
+  max_dlc: number;
+}
+
+/**
+ * Per-id rollup over a backend profile or a capture — exactly one of the two.
+ * Time bounds are RFC3339 strings.
+ */
+export async function queryFrameInventory(
+  source: { profileId?: string; captureId?: string },
+  startTime?: string,
+  endTime?: string,
+): Promise<InventoryRow[]> {
+  return invoke("query_frame_inventory", {
+    profileId: source.profileId,
+    captureId: source.captureId,
+    startTime,
+    endTime,
+  });
+}
+
 /**
  * Cancel a running query by backend PID using pg_cancel_backend.
  *

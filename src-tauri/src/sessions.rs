@@ -489,7 +489,7 @@ fn parse_virtual_interfaces(
     let traffic_type = conn_str(profile, "traffic_type");
     let protocol = protocol_from_str(traffic_type.as_deref());
     let prefix = match protocol {
-        Protocol::Modbus => "modbus",
+        Protocol::Modbus | Protocol::ModbusRtu => "modbus",
         Protocol::Serial => "serial",
         Protocol::Can | Protocol::CanFd => "can",
     };
@@ -786,6 +786,7 @@ pub async fn create_reader_session(
                     .and_then(|v| v.as_str())
                     .unwrap_or("wiretap")
                     .to_string(),
+                protocol: crate::apiclient::ArchiveProtocol::from_connection(&profile.connection)?,
             };
 
             let start_from_profile =

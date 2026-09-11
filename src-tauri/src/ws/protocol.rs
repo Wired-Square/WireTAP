@@ -171,6 +171,8 @@ pub enum FrameType {
     CanFd  = 0x0002,
     Modbus = 0x0003,
     Serial = 0x0004,
+    /// A whole Modbus RTU message; the 4-byte prefix is `unit << 8 | function`
+    ModbusRtu = 0x0005,
 }
 
 impl TryFrom<u16> for FrameType {
@@ -182,6 +184,7 @@ impl TryFrom<u16> for FrameType {
             0x0002 => Ok(FrameType::CanFd),
             0x0003 => Ok(FrameType::Modbus),
             0x0004 => Ok(FrameType::Serial),
+            0x0005 => Ok(FrameType::ModbusRtu),
             other  => Err(ProtocolError::InvalidFrameType(other)),
         }
     }
@@ -652,13 +655,16 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
             | if direction_tx       { 1 << 31 } else { 0 };
 
         // 4-byte LE prefix preceding the payload inside the envelope data:
-        // CAN id_flags, Modbus register number, none for serial/raw.
+        // CAN id_flags, Modbus register number or RTU unit/function word, none
+        // for serial/raw.
         let (frame_type, prefix) = if frame.is_fd || frame.protocol == "canfd" {
             (FrameType::CanFd, Some(id_flags))
         } else if frame.protocol == "can" {
             (FrameType::Can, Some(id_flags))
         } else if frame.protocol == "modbus" {
             (FrameType::Modbus, Some(frame.frame_id))
+        } else if frame.protocol == "modbus_rtu" {
+            (FrameType::ModbusRtu, Some(frame.frame_id))
         } else {
             (FrameType::Serial, None)
         };
@@ -855,7 +861,7 @@ mod tests {
 
     #[test]
     fn frame_type_round_trip() {
-        for (raw, expected) in [(0x0001u16, FrameType::Can), (0x0002, FrameType::CanFd), (0x0003, FrameType::Modbus), (0x0004, FrameType::Serial)] {
+        for (raw, expected) in [(0x0001u16, FrameType::Can), (0x0002, FrameType::CanFd), (0x0003, FrameType::Modbus), (0x0004, FrameType::Serial), (0x0005, FrameType::ModbusRtu)] {
             assert_eq!(FrameType::try_from(raw).unwrap(), expected);
             assert_eq!(expected as u16, raw);
         }
@@ -1095,6 +1101,18 @@ mod tests {
         let (env, _) = FrameEnvelope::decode(&batch).unwrap();
         assert_eq!(env.frame_type, FrameType::Serial);
         assert_eq!(env.data, b"raw bytes");
+    }
+
+    #[test]
+    fn batch_modbus_rtu_message_keeps_its_unit_function_word() {
+        let raw = vec![0x02, 0x65, 0x03, 0x00, 0x2E, 0x3A, 0xCA];
+        let msg = make_frame_message("modbus_rtu", false, 0x0265, 2, raw.clone(), Some("rx"));
+        let batch = encode_frame_batch(&[msg]);
+        let (env, _) = FrameEnvelope::decode(&batch).unwrap();
+        assert_eq!(env.frame_type, FrameType::ModbusRtu);
+        assert_eq!(env.bus, 2);
+        assert_eq!(u32::from_le_bytes(env.data[..4].try_into().unwrap()), 0x0265);
+        assert_eq!(&env.data[4..], &raw[..]);
     }
 
     #[test]

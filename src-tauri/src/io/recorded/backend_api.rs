@@ -1,9 +1,13 @@
 // ui/src-tauri/src/io/recorded/backend_api.rs
 //
-// Backend API Source — streams historical CAN data from the WireTAP backend
+// Backend API Source — streams one protocol's archive from the WireTAP backend
 // gateway over HTTP (the GET /v1/db/{db}/frames keyset cursor). This is the only
 // database-backed source; the pacing / batching / emit loop is its own, tuned for
 // frames arriving a page at a time over HTTP rather than from local storage.
+//
+// A CAN row is a CAN frame. A Modbus row is one whole RTU message, CRC and all,
+// with `id` = unit << 8 | function — delivered as `modbus_rtu`, never `modbus`,
+// which this app reserves for register polls.
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -11,11 +15,12 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use super::base::{PlaybackControl, RecordedSourceState};
+use crate::apiclient::ArchiveProtocol;
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
     signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
-    SignalThrottle,
+    Protocol, SignalThrottle,
 };
 
 /// Connection details for a backend-API source.
@@ -24,6 +29,7 @@ pub struct BackendApiConfig {
     pub base_url: String, // e.g. http://gateway:8423 (no trailing slash)
     pub api_key: String,
     pub database: String,
+    pub protocol: ArchiveProtocol,
 }
 
 /// Filtering / pacing options (pacing and time bounds for a recorded source).
@@ -62,7 +68,11 @@ impl BackendApiSource {
 #[async_trait]
 impl IOSource for BackendApiSource {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::recorded_can().with_time_range(true)
+        let caps = IOCapabilities::recorded_can().with_time_range(true);
+        match self.config.protocol {
+            ArchiveProtocol::Can => caps,
+            ArchiveProtocol::Modbus => caps.with_protocols(vec![Protocol::ModbusRtu]),
+        }
     }
 
     async fn start(&mut self) -> Result<(), String> {
@@ -154,7 +164,8 @@ struct ApiFrameRow {
     ts_us: i64,
     id: u32,
     extended: bool,
-    dlc: u8,
+    /// A message length for Modbus, whose ceiling of 256 is one past `u8`.
+    dlc: u16,
     is_fd: bool,
     bus: u8,
     #[allow(dead_code)]
@@ -175,6 +186,7 @@ struct CursorFetcher {
     base_url: String,
     api_key: String,
     database: String,
+    protocol: ArchiveProtocol,
     start: Option<String>,
     end: Option<String>,
     page_size: u32,
@@ -186,8 +198,11 @@ struct CursorFetcher {
 impl CursorFetcher {
     fn frames_url(&self) -> String {
         let mut url = format!(
-            "{}/v1/db/{}/frames?limit={}",
-            self.base_url, self.database, self.page_size
+            "{}/v1/db/{}/frames?limit={}{}",
+            self.base_url,
+            self.database,
+            self.page_size,
+            self.protocol.query_suffix(false)
         );
         if let Some(s) = &self.start {
             url.push_str(&format!("&start={}", crate::apiclient::urlencoding(s)));
@@ -213,11 +228,9 @@ impl CursorFetcher {
             .send()
             .await
             .map_err(|e| format!("frame fetch failed: {}", crate::apiclient::describe(&e)))?;
-        if !resp.status().is_success() {
-            return Err(format!("frame fetch HTTP {}", resp.status()));
-        }
-        let batch: ApiFrameBatch =
-            resp.json().await.map_err(|e| format!("frame decode failed: {e}"))?;
+        let batch: ApiFrameBatch = crate::apiclient::parse(resp)
+            .await
+            .map_err(|e| format!("frame fetch failed: {e}"))?;
 
         self.cursor = batch.next_cursor;
         if self.cursor.is_none() {
@@ -229,11 +242,11 @@ impl CursorFetcher {
             let bytes = hex::decode(&row.data_hex)
                 .map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
             frames.push(FrameMessage {
-                protocol: "can".to_string(),
+                protocol: self.protocol.frame_tag().to_string(),
                 timestamp_us: row.ts_us as u64,
                 frame_id: row.id,
                 bus: row.bus,
-                dlc: row.dlc,
+                dlc: row.dlc.min(u8::MAX as u16) as u8,
                 bytes,
                 is_extended: row.extended,
                 is_fd: row.is_fd,
@@ -301,6 +314,7 @@ async fn run_api_stream(
         base_url: config.base_url.clone(),
         api_key: config.api_key.clone(),
         database: config.database.clone(),
+        protocol: config.protocol,
         start: options.start.clone(),
         end: options.end.clone(),
         page_size: options.batch_size.clamp(1, 5000) as u32,
