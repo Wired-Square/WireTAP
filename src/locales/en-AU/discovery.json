@@ -68,6 +68,12 @@
       "playbackSpeed": "Playback speed"
     }
   },
+  "modbusView": {
+    "tab": "Modbus",
+    "loading": "Loading messages…",
+    "waiting": "Waiting for messages…",
+    "none": "No Modbus messages"
+  },
   "messageOrder": {
     "title": "Frame Order Analysis",
     "subtitle": "Detected transmission patterns and timing",

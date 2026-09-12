@@ -30,6 +30,12 @@ export interface UseBufferFrameViewOptions {
   isStreaming: boolean;
   /** Selected composite frame keys filter (empty = all) */
   selectedFrames: Set<string>;
+  /**
+   * The filter to send instead of `selectedFrames` — a protocol tab reads its
+   * protocol whole (`wholeProtocol`) whatever the picker says. Pass a stable
+   * reference; it is a dependency of the fetch.
+   */
+  selection?: ProtocolFrames[];
   /** Page size for pagination (when stopped) */
   pageSize: ResolvedPageSize;
   /** Tail size for streaming mode (default: 50); null until an Auto fit lands. */
@@ -115,6 +121,7 @@ export function useCaptureFrameView(
     sessionId,
     isStreaming,
     selectedFrames,
+    selection,
     pageSize,
     tailSize = 50,
     pollIntervalMs = BUFFER_POLL_INTERVAL_MS,
@@ -141,13 +148,13 @@ export function useCaptureFrameView(
   const refreshOnce = useCallback(() => fetchTailRef.current(), []);
 
   // Refs to avoid stale closures in intervals
-  const selectionRef = useRef<ProtocolFrames[]>(groupKeysByProtocol(selectedFrames));
+  const selectionRef = useRef<ProtocolFrames[]>(selection ?? groupKeysByProtocol(selectedFrames));
   const pageSizeRef = useRef(pageSize);
 
   // Update refs when values change
   useEffect(() => {
-    selectionRef.current = groupKeysByProtocol(selectedFrames);
-  }, [selectedFrames]);
+    selectionRef.current = selection ?? groupKeysByProtocol(selectedFrames);
+  }, [selection, selectedFrames]);
 
   useEffect(() => {
     pageSizeRef.current = pageSize;
@@ -294,7 +301,7 @@ export function useCaptureFrameView(
     return () => {
       isMounted = false;
     };
-  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selectedFrames, totalCount]);
+  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selection, selectedFrames, totalCount]);
 
   // Navigate to timestamp (for timeline scrub and step following)
   const navigateToTimestamp = useCallback(

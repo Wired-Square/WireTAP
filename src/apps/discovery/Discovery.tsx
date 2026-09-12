@@ -759,6 +759,16 @@ function DiscoveryInner() {
     || protocolOf(frameInfoMap)
     || capabilities?.traits?.protocols?.[0];
 
+  // Every protocol the stream carries — the frames seen plus what the session
+  // declares, so a tab exists before its first frame. A mixed stream lists both.
+  const protocols = useMemo(() => {
+    const set = new Set<string>(capabilities?.traits?.protocols ?? []);
+    for (const info of frameInfoMap.values()) {
+      if (info.protocol) set.add(info.protocol);
+    }
+    return [...set];
+  }, [capabilities?.traits?.protocols, frameInfoMap]);
+
   // Non-realtime sources: recorded (WireTAP backend, csv) and capture replay
   const isRecorded = capabilities?.traits.temporal_mode === "recorded"
     || capabilities?.traits.temporal_mode === "capture";
@@ -1161,6 +1171,7 @@ function DiscoveryInner() {
             captureId={activeCaptureId}
             sessionId={sessionId}
             protocol={protocolLabel}
+            protocols={protocols}
             onCancelScan={handleCancelModbusScan}
             displayFrameIdFormat={displayFrameIdFormat}
             displayTimeFormat={displayTimeFormat}
