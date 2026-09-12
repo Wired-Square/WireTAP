@@ -12,9 +12,12 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
-- **A backend session opened from the source picker shows its frames.** Discovery's table sat at "Waiting for frames…" for every WireTAP Backend session started from the picker — the app was never told which capture the session was writing to, because a recorded source creates it a moment after the picker asks. Sessions started over MCP, and live devices, were unaffected.
+- **A backend session opened from the source picker shows its frames.** Discovery's table sat at "Waiting for frames…" for every WireTAP Backend session started from the picker — the app was never told which capture the session was writing to, because a recorded source creates it a moment after the picker asks. Sessions started over MCP, and live devices, were unaffected. A recorded session that is streaming also no longer refetches its page continuously — on a 250 frames/s archive that was over a hundred queries a second — and only pulls a fresh page when new rows belong on the one you are looking at.
 
 - **A joined session names itself in the Decoder's top bar** rather than reading "No source".
+
+- **macOS bundle signing now re-signs the executable inside `WireTAP.app`, not only the wrapper.** The linker left a randomised adhoc identity on the Mach-O (`WireTAP-<hash>`) with the Info.plist unbound, so Local Network stayed `EHOSTUNREACH` even after you allowed the prompt. The bundle script now stamps `com.wiredsquare.wiretap` on both the binary and the `.app`.
+
 
 ## [0.11.3] - 2026-09-11
 
@@ -49,8 +52,6 @@ All notable changes to WireTAP will be documented in this file.
 - **The `scripts/transport_test.py` Test Pattern peer has been removed.** Two WireTAP instances, or WireTAP plus the capture server, cover every arrangement it was used for, and the new Loopback mode runs a full sweep against a Virtual Device with no hardware at all.
 
 ### Fixed
-
-- **macOS bundle signing now re-signs the executable inside `WireTAP.app`, not only the wrapper.** The linker left a randomised adhoc identity on the Mach-O (`WireTAP-<hash>`) with the Info.plist unbound, so Local Network stayed `EHOSTUNREACH` even after you allowed the prompt. The bundle script now stamps `com.wiredsquare.wiretap` on both the binary and the `.app`.
 
 - **macOS builds no longer crash in `apple-sys` bindgen.** `keepawake` 0.5 generated CoreFoundation/IOKit bindings from the local SDK at compile time, and bindgen overflowed its stack on the Xcode 27 headers. 0.6 uses pre-generated `objc2` bindings instead.
 
