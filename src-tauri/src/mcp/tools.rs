@@ -410,12 +410,16 @@ impl WireTapTools {
         let groups = match (p.frame_id, p.protocol) {
             (None, _) => Vec::new(),
             (Some(frame_id), Some(protocol)) => {
-                vec![ProtocolFrames { protocol, frame_ids: vec![frame_id] }]
+                vec![ProtocolFrames { protocol, frame_ids: vec![frame_id], all_ids: false }]
             }
             (Some(frame_id), None) => crate::capture_store::get_capture_frame_info(&p.capture_id)
                 .into_iter()
                 .filter(|info| info.frame_id == frame_id)
-                .map(|info| ProtocolFrames { protocol: info.protocol, frame_ids: vec![frame_id] })
+                .map(|info| ProtocolFrames {
+                    protocol: info.protocol,
+                    frame_ids: vec![frame_id],
+                    all_ids: false,
+                })
                 .collect(),
         };
         let (frames, _idx, total) = crate::capture_store::get_capture_frames_paginated_filtered(

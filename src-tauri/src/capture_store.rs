@@ -150,33 +150,43 @@ fn note_unique_frame(unique: &mut HashMap<String, HashSet<u32>>, frame: &FrameMe
 pub struct ProtocolFrames {
     pub protocol: String,
     pub frame_ids: Vec<u32>,
+    /// Every id of this protocol, `frame_ids` notwithstanding — a protocol tab
+    /// wants its whole protocol, ids seen or not.
+    #[serde(default)]
+    pub all_ids: bool,
 }
 
-/// A normalised frame selection: empty groups dropped, ids deduplicated.
+/// A normalised frame selection: empty groups dropped, ids deduplicated, and the
+/// protocols selected whole.
 ///
 /// Every consumer reads empty as "select everything", so a group carrying no ids must
 /// not leave the selection looking non-empty — that would turn "select nothing" into
 /// "select everything".
 #[derive(Debug, Clone, Default)]
-pub struct FrameSelection(HashMap<String, HashSet<u32>>);
+pub struct FrameSelection {
+    ids: HashMap<String, HashSet<u32>>,
+    whole: HashSet<String>,
+}
 
 impl FrameSelection {
     pub fn from_groups(groups: Vec<ProtocolFrames>) -> Self {
-        let mut by_protocol: HashMap<String, HashSet<u32>> = HashMap::new();
+        let mut selection = Self::default();
         for group in groups {
-            if group.frame_ids.is_empty() {
-                continue;
+            if group.all_ids {
+                selection.whole.insert(group.protocol);
+            } else if !group.frame_ids.is_empty() {
+                selection
+                    .ids
+                    .entry(group.protocol)
+                    .or_default()
+                    .extend(group.frame_ids);
             }
-            by_protocol
-                .entry(group.protocol)
-                .or_default()
-                .extend(group.frame_ids);
         }
-        Self(by_protocol)
+        selection
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.ids.is_empty() && self.whole.is_empty()
     }
 
     /// True when every frame the capture has seen is selected, so the filter can be
@@ -184,24 +194,35 @@ impl FrameSelection {
     /// common case.
     pub fn covers(&self, unique: &HashMap<String, HashSet<u32>>) -> bool {
         unique.iter().all(|(protocol, ids)| {
-            self.0.get(protocol).is_some_and(|selected| ids.is_subset(selected))
+            self.whole.contains(protocol)
+                || self.ids.get(protocol).is_some_and(|selected| ids.is_subset(selected))
         })
     }
 
     /// Whether one frame is selected, matched on the identity pair.
     pub fn contains(&self, protocol: &str, frame_id: u32) -> bool {
-        self.0.get(protocol).is_some_and(|ids| ids.contains(&frame_id))
+        self.whole.contains(protocol)
+            || self.ids.get(protocol).is_some_and(|ids| ids.contains(&frame_id))
     }
 
     /// (frame_id, protocol) pairs, sorted so the JSON payload is stable across calls.
+    /// A protocol selected whole contributes none: it is matched by `protocols`.
     pub fn pairs(&self) -> Vec<(u32, &str)> {
         let mut pairs: Vec<(u32, &str)> = self
-            .0
+            .ids
             .iter()
+            .filter(|(protocol, _)| !self.whole.contains(*protocol))
             .flat_map(|(protocol, ids)| ids.iter().map(move |id| (*id, protocol.as_str())))
             .collect();
         pairs.sort_unstable();
         pairs
+    }
+
+    /// The protocols selected whole, sorted.
+    pub fn protocols(&self) -> Vec<&str> {
+        let mut out: Vec<&str> = self.whole.iter().map(String::as_str).collect();
+        out.sort_unstable();
+        out
     }
 }
 
@@ -1389,8 +1410,13 @@ mod tests {
             .map(|(protocol, ids)| ProtocolFrames {
                 protocol: protocol.to_string(),
                 frame_ids: ids.to_vec(),
+                all_ids: false,
             })
             .collect()
+    }
+
+    fn whole(protocol: &str) -> ProtocolFrames {
+        ProtocolFrames { protocol: protocol.to_string(), frame_ids: Vec::new(), all_ids: true }
     }
 
     fn unique(entries: &[(&str, &[u32])]) -> HashMap<String, HashSet<u32>> {
@@ -1440,6 +1466,28 @@ mod tests {
             FrameSelection::from_groups(groups(&[("can", &[256]), ("modbus", &[256])]))
                 .covers(&capture)
         );
+    }
+
+    /// A protocol tab selects its protocol whole: not empty (which would select
+    /// everything), covering every id of that protocol including ones not yet seen,
+    /// and contributing no pairs — the predicate matches it by name.
+    #[test]
+    fn a_protocol_selected_whole_covers_ids_it_has_not_seen() {
+        let selection = FrameSelection::from_groups(vec![whole("modbus_rtu")]);
+        assert!(!selection.is_empty());
+        assert!(selection.contains("modbus_rtu", 0x0265));
+        assert!(!selection.contains("can", 0x0265));
+        assert!(selection.covers(&unique(&[("modbus_rtu", &[288, 613])])));
+        assert!(!selection.covers(&unique(&[("modbus_rtu", &[288]), ("can", &[256])])));
+        assert!(selection.pairs().is_empty());
+        assert_eq!(selection.protocols(), vec!["modbus_rtu"]);
+
+        // Whole and by-id combine, and a whole protocol absorbs its own ids.
+        let mut mixed = groups(&[("can", &[256]), ("modbus_rtu", &[288])]);
+        mixed.push(whole("modbus_rtu"));
+        let mixed = FrameSelection::from_groups(mixed);
+        assert_eq!(mixed.pairs(), vec![(256, "can")]);
+        assert_eq!(mixed.protocols(), vec!["modbus_rtu"]);
     }
 
     #[test]

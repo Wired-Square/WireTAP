@@ -28,6 +28,13 @@ export function keyOf(frame: { protocol: string; frame_id: number }): string {
 export interface ProtocolFrames {
   protocol: string;
   frame_ids: number[];
+  /** Every id of this protocol, seen or not — what a protocol tab asks for. */
+  all_ids?: boolean;
+}
+
+/** The selection a protocol tab sends: its whole protocol. */
+export function wholeProtocol(protocol: string): ProtocolFrames[] {
+  return [{ protocol, frame_ids: [], all_ids: true }];
 }
 
 /**

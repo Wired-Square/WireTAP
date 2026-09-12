@@ -554,33 +554,29 @@ fn get_frames_paginated_filtered_with_conn(
 const FRAME_COLUMNS: &str =
     "rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction";
 
-/// Restrict a frame query to a selection, matching on the identity pair rather than the
-/// bare id — CAN 0x100 and Modbus register 256 are different frames.
+/// Restrict a frame query to a selection: a protocol selected whole, or the identity
+/// pair rather than the bare id — CAN 0x100 and Modbus register 256 are different
+/// frames.
 ///
-/// The pairs ride in as one bound JSON parameter rather than an interpolated list, which
-/// buys three things: the SQL text is constant, so `prepare_cached` hits whatever the
-/// selection is; there is no parameter-count ceiling; and protocol, being TEXT, is bound
-/// rather than quoted into the statement. `EXPLAIN QUERY PLAN` shows the filtered
+/// The selection rides in as one bound JSON parameter rather than an interpolated list,
+/// which buys three things: the SQL text is constant, so `prepare_cached` hits whatever
+/// the selection is; there is no parameter-count ceiling; and protocol, being TEXT, is
+/// bound rather than quoted into the statement. `EXPLAIN QUERY PLAN` shows the filtered
 /// `COUNT(*)` seeking `idx_frames_capture_fid` as a covering index.
 fn selection_predicate(param: usize) -> String {
-    format!("AND (frame_id, protocol) IN (SELECT j.value ->> 0, j.value ->> 1 FROM json_each(?{param}) j)")
+    format!(
+        "AND (protocol IN (SELECT value FROM json_each(?{param}, '$.protocols')) \
+         OR (frame_id, protocol) IN (SELECT j.value ->> 0, j.value ->> 1 FROM json_each(?{param}, '$.pairs') j))"
+    )
 }
 
-/// `[[frame_id, protocol], …]` for [`selection_predicate`]'s bound parameter.
+/// `{"protocols": [...], "pairs": [[frame_id, protocol], …]}` for
+/// [`selection_predicate`]'s bound parameter.
 fn selection_json(selection: &FrameSelection) -> String {
-    let pairs = selection.pairs();
-    let mut json = String::with_capacity(pairs.len() * 16 + 2);
-    json.push('[');
-    for (i, (frame_id, protocol)) in pairs.iter().enumerate() {
-        if i > 0 {
-            json.push(',');
-        }
-        // Protocol is a bare identifier from a closed vocabulary, but serialise it
-        // properly anyway — this string is a SQL parameter, not SQL.
-        json.push_str(&format!("[{frame_id},{}]", serde_json::to_string(protocol).unwrap()));
-    }
-    json.push(']');
-    json
+    let pairs: Vec<(u32, &str)> = selection.pairs();
+    // Protocol is a bare identifier from a closed vocabulary, but serialise it
+    // properly anyway — this string is a SQL parameter, not SQL.
+    serde_json::json!({ "protocols": selection.protocols(), "pairs": pairs }).to_string()
 }
 
 /// Run a `... ORDER BY rowid DESC LIMIT n` tail query and return it chronologically.
@@ -1907,9 +1903,60 @@ mod tests {
                 .map(|(protocol, ids)| crate::capture_store::ProtocolFrames {
                     protocol: protocol.to_string(),
                     frame_ids: ids.to_vec(),
+                    all_ids: false,
                 })
                 .collect(),
         )
+    }
+
+    fn whole(protocol: &str) -> FrameSelection {
+        FrameSelection::from_groups(vec![crate::capture_store::ProtocolFrames {
+            protocol: protocol.to_string(),
+            frame_ids: Vec::new(),
+            all_ids: true,
+        }])
+    }
+
+    /// A protocol tab asks for its protocol whole, ids it has seen or not: every
+    /// row of that protocol and nothing of the others, in both the page and the tail.
+    #[test]
+    fn a_whole_protocol_selects_all_its_rows_and_no_others() {
+        let conn = multi_protocol_capture();
+
+        let (frames, _rowids, total) =
+            get_frames_paginated_filtered_with_conn(&conn, "c1", 0, 50, &whole("can")).unwrap();
+        assert_eq!(total, 2);
+        assert_eq!(frames.iter().map(|f| f.frame_id).collect::<Vec<_>>(), vec![256, 257]);
+        assert!(frames.iter().all(|f| f.protocol == "can"));
+
+        let (tail, _rowids, total) =
+            get_frames_tail_filtered_with_conn(&conn, "c1", 50, &whole("modbus")).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(tail[0].protocol, "modbus");
+
+        // Whole and by-id combine in one predicate.
+        let mut combined = vec![crate::capture_store::ProtocolFrames {
+            protocol: "serial".to_string(),
+            frame_ids: Vec::new(),
+            all_ids: true,
+        }];
+        combined.push(crate::capture_store::ProtocolFrames {
+            protocol: "can".to_string(),
+            frame_ids: vec![257],
+            all_ids: false,
+        });
+        let (frames, _rowids, total) = get_frames_paginated_filtered_with_conn(
+            &conn,
+            "c1",
+            0,
+            50,
+            &FrameSelection::from_groups(combined),
+        )
+        .unwrap();
+        assert_eq!(total, 2);
+        let mut got: Vec<(&str, u32)> = frames.iter().map(|f| (f.protocol.as_str(), f.frame_id)).collect();
+        got.sort_unstable();
+        assert_eq!(got, vec![("can", 257), ("serial", 256)]);
     }
 
     /// The bug: a bare `frame_id IN (…)` filter matched CAN 0x100 and Modbus register 256
