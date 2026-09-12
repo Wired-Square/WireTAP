@@ -2,6 +2,20 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Discovery has a tab per protocol.** The frames table is the CAN tab when that is all a session carries, and a stream of whole Modbus RTU messages — a backend Modbus archive — gets a Modbus tab beside it: every message in arrival order across all units, as `unit/function`, with the CRC set apart. A mixed stream shows both tabs. The tab follows the stream live and pages it when stopped; there is no picker, because a tap reads best with the request beside its reply.
+
+- **The Decoder decodes an archive's Modbus messages.** With a Modbus catalogue attached, each whole message goes through the same decode a framed serial port gets — the response paired with the request that named its register — and the Decoder's Modbus tab appears to list them. Messages with a function code no catalogue models, including a vendor's, show their body raw. The Unmatched and Filtered lists read a Modbus message's id as `unit/function` rather than as a CAN id.
+
+### Fixed
+
+- **A backend session opened from the source picker shows its frames.** Discovery's table sat at "Waiting for frames…" for every WireTAP Backend session started from the picker — the app was never told which capture the session was writing to, because a recorded source creates it a moment after the picker asks. Sessions started over MCP, and live devices, were unaffected.
+
+- **A joined session names itself in the Decoder's top bar** rather than reading "No source".
+
 ## [0.11.3] - 2026-09-11
 
 ### Added

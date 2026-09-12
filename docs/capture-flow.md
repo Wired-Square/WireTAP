@@ -166,7 +166,7 @@ through the streaming loop.
 | `list_captures()` | All captures with live `is_streaming` flag. |
 | `list_orphaned_captures()` | Captures with no owning session — pickable as standalone sources. |
 | `get_capture_metadata(id)` | Single capture metadata. |
-| `get_capture_frames(id)` / `_paginated` / `_paginated_filtered` / `_tail` | Read frame data. |
+| `get_capture_frames(id)` / `_paginated` / `_paginated_filtered` / `_tail` | Read frame data. The filter is a `FrameSelection`: `(protocol, frame_id)` pairs, plus protocols selected whole (`all_ids`) — what Discovery's Modbus tab sends, so a protocol's every id matches, seen or not. Empty means everything. |
 | `get_capture_latest_frames(id)` | The newest frame per `(protocol, frame_id)` — "the current value of each thing" rather than the history. |
 | `get_capture_bytes(id)` / `_paginated` | Read byte data. |
 | `find_capture_offset_for_timestamp(...)` / `find_capture_bytes_offset_for_timestamp_by_id(...)` | Seek helpers. |
