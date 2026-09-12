@@ -156,8 +156,18 @@ pub struct ProtocolFrames {
     pub all_ids: bool,
 }
 
+impl ProtocolFrames {
+    pub fn ids(protocol: impl Into<String>, frame_ids: Vec<u32>) -> Self {
+        Self { protocol: protocol.into(), frame_ids, all_ids: false }
+    }
+
+    pub fn whole(protocol: impl Into<String>) -> Self {
+        Self { protocol: protocol.into(), frame_ids: Vec::new(), all_ids: true }
+    }
+}
+
 /// A normalised frame selection: empty groups dropped, ids deduplicated, and the
-/// protocols selected whole.
+/// protocols selected whole — which absorb any ids listed under them.
 ///
 /// Every consumer reads empty as "select everything", so a group carrying no ids must
 /// not leave the selection looking non-empty — that would turn "select nothing" into
@@ -182,6 +192,8 @@ impl FrameSelection {
                     .extend(group.frame_ids);
             }
         }
+        let whole = &selection.whole;
+        selection.ids.retain(|protocol, _| !whole.contains(protocol));
         selection
     }
 
@@ -211,7 +223,6 @@ impl FrameSelection {
         let mut pairs: Vec<(u32, &str)> = self
             .ids
             .iter()
-            .filter(|(protocol, _)| !self.whole.contains(*protocol))
             .flat_map(|(protocol, ids)| ids.iter().map(move |id| (*id, protocol.as_str())))
             .collect();
         pairs.sort_unstable();
@@ -1405,18 +1416,7 @@ mod tests {
     use super::*;
 
     fn groups(entries: &[(&str, &[u32])]) -> Vec<ProtocolFrames> {
-        entries
-            .iter()
-            .map(|(protocol, ids)| ProtocolFrames {
-                protocol: protocol.to_string(),
-                frame_ids: ids.to_vec(),
-                all_ids: false,
-            })
-            .collect()
-    }
-
-    fn whole(protocol: &str) -> ProtocolFrames {
-        ProtocolFrames { protocol: protocol.to_string(), frame_ids: Vec::new(), all_ids: true }
+        entries.iter().map(|(protocol, ids)| ProtocolFrames::ids(*protocol, ids.to_vec())).collect()
     }
 
     fn unique(entries: &[(&str, &[u32])]) -> HashMap<String, HashSet<u32>> {
@@ -1473,7 +1473,7 @@ mod tests {
     /// and contributing no pairs — the predicate matches it by name.
     #[test]
     fn a_protocol_selected_whole_covers_ids_it_has_not_seen() {
-        let selection = FrameSelection::from_groups(vec![whole("modbus_rtu")]);
+        let selection = FrameSelection::from_groups(vec![ProtocolFrames::whole("modbus_rtu")]);
         assert!(!selection.is_empty());
         assert!(selection.contains("modbus_rtu", 0x0265));
         assert!(!selection.contains("can", 0x0265));
@@ -1484,7 +1484,7 @@ mod tests {
 
         // Whole and by-id combine, and a whole protocol absorbs its own ids.
         let mut mixed = groups(&[("can", &[256]), ("modbus_rtu", &[288])]);
-        mixed.push(whole("modbus_rtu"));
+        mixed.push(ProtocolFrames::whole("modbus_rtu"));
         let mixed = FrameSelection::from_groups(mixed);
         assert_eq!(mixed.pairs(), vec![(256, "can")]);
         assert_eq!(mixed.protocols(), vec!["modbus_rtu"]);

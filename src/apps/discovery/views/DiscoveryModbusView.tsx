@@ -19,15 +19,12 @@ type Props = {
   formatTime: (timestampUs: number, prevTimestampUs: number | null) => ReactNode;
   displayFrameIdFormat: "hex" | "decimal";
   displayTimeFormat: TimeDisplayFormat;
-  isStreaming: boolean;
-  isStreamPaused: boolean;
   showRef: boolean;
   showBus: boolean;
   showAscii: boolean;
   autoFit: boolean;
   onFitChange: (rows: number) => void;
   useLocalTimezone: boolean;
-  scrollRef?: React.Ref<HTMLDivElement>;
 };
 
 export default function DiscoveryModbusView({
@@ -35,15 +32,12 @@ export default function DiscoveryModbusView({
   formatTime,
   displayFrameIdFormat,
   displayTimeFormat,
-  isStreaming,
-  isStreamPaused,
   showRef,
   showBus,
   showAscii,
   autoFit,
   onFitChange,
   useLocalTimezone,
-  scrollRef,
 }: Props) {
   const { t } = useTranslation("discovery");
   const [contextMenu, setContextMenu] = useState<{ frame: FrameRow; position: { x: number; y: number } } | null>(null);
@@ -74,24 +68,18 @@ export default function DiscoveryModbusView({
     <>
       <FrameDataTable
         displayTimeFormat={displayTimeFormat}
-        ref={scrollRef}
         frames={view.frames}
         formatTime={formatTime}
         emptyMessage={
-          view.isLoading
-            ? t("modbusView.loading")
-            : isStreamPaused
-              ? t("modbusView.none")
-              : isStreaming
-                ? t("modbusView.waiting")
-                : t("modbusView.none")
+          view.isLoading ? t("modbusView.loading") : view.tailing ? t("modbusView.waiting") : t("modbusView.none")
         }
         showRef={showRef}
         showBus={showBus}
         showAscii={showAscii}
+        // No capture indices: `#` is the message's ordinal within its protocol,
+        // which is what a list of one protocol's messages means by it.
         pageStartIndex={view.pageStartIndex}
-        captureIndices={view.captureIndices}
-        autoScroll={isStreaming && !isStreamPaused}
+        autoScroll={view.tailing}
         autoFit={autoFit}
         onFitChange={onFitChange}
         onContextMenu={handleContextMenu}

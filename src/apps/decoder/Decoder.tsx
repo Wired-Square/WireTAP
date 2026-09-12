@@ -46,6 +46,7 @@ import { anyModbusProfile } from "../../utils/modbusProfiles";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
+import { isMessageProtocol } from "../../utils/profileTraits";
 
 /** The loaded catalogue's poll groups, but only for sources they actually apply to.
  *  A Modbus catalogue left loaded from an earlier session would otherwise carry its
@@ -1161,7 +1162,7 @@ function DecoderInner() {
           unmatchedFrames={unmatchedFrames}
           filteredFrames={filteredFrames}
           tunnelTransactions={tunnelTransactions}
-          hasTunnel={hasTunnel}
+          hasTunnel={hasTunnel || (capabilities?.traits?.protocols ?? []).some(isMessageProtocol)}
           isReady={isReady}
           playbackState={getPlaybackState()}
           playbackDirection={playbackDirection}

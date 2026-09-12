@@ -144,6 +144,13 @@ impl Default for ModbusRtuOptions {
 }
 
 impl ModbusRtuOptions {
+    /// A line somebody else already framed — an archive's whole messages. Every
+    /// code and address interprets, since refusing one here would only drop a
+    /// message the tap had already judged.
+    pub fn tapped() -> Self {
+        Self { any_function: true, allow_broadcast: true, ..Default::default() }
+    }
+
     /// A stream configured for this line. Both opt-ins union with whatever a
     /// catalogue declares, which is the crate's contract for them.
     pub fn stream(&self) -> wiretap_catalog::ModbusRtuStream {

@@ -25,6 +25,7 @@ import FilteredTabContent from "./FilteredTabContent";
 import { bgDataView, bgSurface, tabBarIconToggle, textDataSecondary, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, groupKeysByProtocol, wholeProtocol } from "../../../utils/frameKey";
+import { isMessageProtocol, protocolFamily } from "../../../utils/profileTraits";
 import DiscoveryModbusView from "./DiscoveryModbusView";
 import type { IOCapabilities } from "../../../api/io";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
@@ -44,9 +45,8 @@ import type { TimeDisplayFormat } from "../../../types/common";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 
-// Stable references: both are fetch dependencies of the Modbus tab's view.
+// A stable reference: it is a fetch dependency of the Modbus tab's view.
 const MODBUS_SELECTION = wholeProtocol("modbus_rtu");
-const NO_FRAMES = new Set<string>();
 
 type Props = {
   /** Capture the rows come from. Rust owns a capture for every session. */
@@ -248,58 +248,47 @@ function DiscoveryFramesView({
   const [autoRows, setAutoRows] = useState<number | null>(null);
   const pageSize = resolvePageSize(renderBuffer, autoRows);
 
-  const captureFrameView = useCaptureFrameView({
-    captureId: effectiveBufferId,
-    sessionId,
-    isStreaming,
-    selectedFrames,
-    pageSize,
-    tailSize: pageSize === null ? null : Math.min(pageSize, 200),
-    pollIntervalMs: BUFFER_POLL_INTERVAL_MS,
-    isCapturePlayback,
-    frozen: renderFrozen,
-    // During capture playback, the hook follows the playback position and auto-navigates pages
-    followTimeUs: isCapturePlayback ? currentTimeUs : null,
-  });
+  // Tab state for CAN frames view - stored in UI store so analysis can switch to it
+  const activeTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
+  const setActiveTab = useDiscoveryUIStore((s) => s.setFramesViewActiveTab);
 
-  // One tab per protocol the session carries. Whole Modbus RTU messages get their
+  // One tab per protocol the session carries. A whole-message protocol gets its
   // own list; everything else shares the frames table, which is the CAN tab when
   // that is all it holds.
-  const hasModbusTab = protocols.includes("modbus_rtu");
+  const hasModbusTab = protocols.some(isMessageProtocol);
   const tableProtocols = useMemo(
-    () => [...new Set(protocols.filter((p) => p !== "modbus_rtu").map((p) => (p === "canfd" ? "can" : p)))],
+    () => [...new Set(protocols.filter((p) => !isMessageProtocol(p)).map(protocolFamily))],
     [protocols],
   );
   const hasFramesTab = tableProtocols.length > 0 || !hasModbusTab;
   const homeTab = hasFramesTab ? "frames" : "modbus";
 
-  // The Modbus tab is a raw view: its protocol whole, whatever the picker says, and
-  // the live tail while streaming rather than the playback-following page.
-  const modbusView = useCaptureFrameView({
-    captureId: hasModbusTab ? effectiveBufferId : null,
+  // What both views share. A view whose tab is not on offer, or (for Modbus) not
+  // on screen, reads no capture and so fetches nothing.
+  const viewBase = {
     sessionId,
     isStreaming,
-    selectedFrames: NO_FRAMES,
-    selection: MODBUS_SELECTION,
     pageSize,
     tailSize: pageSize === null ? null : Math.min(pageSize, 200),
     pollIntervalMs: BUFFER_POLL_INTERVAL_MS,
-    isCapturePlayback: isStreamPaused || captureMode.enabled,
     frozen: renderFrozen,
-    followTimeUs: null,
+  };
+  const captureFrameView = useCaptureFrameView({
+    ...viewBase,
+    captureId: hasFramesTab ? effectiveBufferId : null,
+    selectedFrames,
+    isCapturePlayback,
+    // During capture playback, the hook follows the playback position and auto-navigates pages
+    followTimeUs: isCapturePlayback ? currentTimeUs : null,
   });
-
-  // Tab state for CAN frames view - stored in UI store so analysis can switch to it
-  const activeTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
-  const setActiveTab = useDiscoveryUIStore((s) => s.setFramesViewActiveTab);
-
-  // A tab that is not on offer cannot stay active: a Modbus-only session opens on
-  // Modbus, and losing the protocol sends the view home.
-  useEffect(() => {
-    if ((activeTab === "frames" && !hasFramesTab) || (activeTab === "modbus" && !hasModbusTab)) {
-      setActiveTab(homeTab);
-    }
-  }, [activeTab, hasFramesTab, hasModbusTab, homeTab, setActiveTab]);
+  // The Modbus tab is a raw view: its protocol whole, whatever the picker says, and
+  // the live tail while streaming rather than the playback-following page.
+  const modbusView = useCaptureFrameView({
+    ...viewBase,
+    captureId: hasModbusTab && (activeTab === "modbus" || !hasFramesTab) ? effectiveBufferId : null,
+    selectedFrames: MODBUS_SELECTION,
+    isCapturePlayback: isStreamPaused || captureMode.enabled,
+  });
 
   // Ref column toggle
   const showRefColumn = useDiscoveryUIStore((s) => s.showRefColumn);
@@ -520,6 +509,7 @@ function DiscoveryFramesView({
       result.push({ id: 'frames', label, count: frameCount, countColor: 'green' as const });
     }
     if (hasModbusTab) {
+      // Counted while shown; a hidden tab keeps the count it last had.
       result.push({ id: 'modbus', label: t("modbusView.tab"), count: modbusCount, countColor: 'green' as const });
     }
     result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countColor: 'orange' as const });
@@ -569,19 +559,22 @@ function DiscoveryFramesView({
     }
   }, [clearToolResult, activeTab, setActiveTab, homeTab]);
 
-  // Safety: fall back to the home tab if active tab is a tool tab that no longer exists
+  // A tab that is not on offer cannot stay active — a closed tool tab, or a protocol
+  // the session does not carry. A Modbus-only session opens on Modbus this way.
   useEffect(() => {
-    if (activeTab.startsWith('tool:') && !tabs.some(t => t.id === activeTab)) {
+    if (!tabs.some(t => t.id === activeTab)) {
       setActiveTab(homeTab);
     }
   }, [activeTab, tabs, setActiveTab, homeTab]);
 
   // Handle page size change - reset to page 0
+  const modbusSetCurrentPage = modbusView.setCurrentPage;
   const handlePageSizeChange = useCallback((size: PageSize) => {
     setRenderBuffer(size);
-    // Reset page using the stable callback
+    // Both views page by the one size; both go back to the top.
     setCurrentPageStable(0);
-  }, [setRenderBuffer, setCurrentPageStable]);
+    modbusSetCurrentPage(0);
+  }, [setRenderBuffer, setCurrentPageStable, modbusSetCurrentPage]);
 
   // Keep stable reference to hook's navigateToTimestamp
   const hookNavigateToTimestampRef = useRef(captureFrameView.navigateToTimestamp);
@@ -782,7 +775,6 @@ function DiscoveryFramesView({
 
   // Toolbar on the protocol tabs, paging whichever view is on screen; timeline on frames only
   const isProtocolTab = activeTab === 'frames' || activeTab === 'modbus';
-  const showToolbar = isProtocolTab;
   const showTimeline = activeTab === 'frames' && timelineProps.show;
   const activeView = activeTab === 'modbus' ? modbusView : captureFrameView;
 
@@ -876,7 +868,7 @@ function DiscoveryFramesView({
   // Playback controls for toolbar center
   // Show playback controls for recorded sources (including captures), live streaming, or after ingest
   const showPlaybackControls = isRecorded || isLiveStreaming || (!isStreaming && captureMode.enabled);
-  const effectiveTotalFrames = captureFrameView.totalCount || captureMetadata?.count || captureMode.totalFrames || undefined;
+  const effectiveTotalFrames = activeView.totalCount || captureMetadata?.count || captureMode.totalFrames || undefined;
   effectiveTotalFramesRef.current = effectiveTotalFrames;
 
   // Wrapped play handlers: auto-seek to start/end when at boundary so playback has
@@ -991,7 +983,7 @@ function DiscoveryFramesView({
       tabBarControls={tabBarControls}
       // Toolbar - on the protocol tabs, paging the view on screen
       toolbar={
-        showToolbar
+        isProtocolTab
           ? {
               currentPage: activeView.currentPage,
               totalPages: activeView.totalPages,
@@ -1001,8 +993,7 @@ function DiscoveryFramesView({
               onPageChange: activeView.setCurrentPage,
               onPageSizeChange: handlePageSizeChange,
               loading: activeView.isLoading,
-              // The Modbus tab tails a live stream; the frames table pages a recorded one.
-              disabled: isStreaming && !isStreamPaused && (activeTab === 'modbus' || !isRecorded),
+              disabled: activeView.tailing,
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
               infoContent: activeTab === 'frames' ? frameCounterInfo : undefined,
@@ -1087,8 +1078,6 @@ function DiscoveryFramesView({
           formatTime={formatTime}
           displayFrameIdFormat={displayFrameIdFormat}
           displayTimeFormat={displayTimeFormat}
-          isStreaming={isStreaming}
-          isStreamPaused={isStreamPaused}
           showRef={showRefColumn}
           showBus={showBusColumn}
           showAscii={showAsciiColumn}

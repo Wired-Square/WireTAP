@@ -517,7 +517,7 @@ fn get_frames_paginated_filtered_with_conn(
     // Get total filtered count
     let total: usize = conn
         .query_row(
-            &format!("SELECT COUNT(*) FROM frames WHERE capture_id = ?1 {}", selection_predicate(2)),
+            &format!("SELECT COUNT(*) FROM frames WHERE capture_id = ?1 {}", selection_predicate(2, selection)),
             params![capture_id, pairs],
             |row| row.get::<_, i64>(0),
         )
@@ -528,7 +528,7 @@ fn get_frames_paginated_filtered_with_conn(
         .prepare_cached(&format!(
             "SELECT {FRAME_COLUMNS} FROM frames WHERE capture_id = ?1 {} \
              ORDER BY rowid LIMIT ?2 OFFSET ?3",
-            selection_predicate(4)
+            selection_predicate(4, selection)
         ))
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -554,29 +554,33 @@ fn get_frames_paginated_filtered_with_conn(
 const FRAME_COLUMNS: &str =
     "rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction";
 
-/// Restrict a frame query to a selection: a protocol selected whole, or the identity
-/// pair rather than the bare id — CAN 0x100 and Modbus register 256 are different
-/// frames.
+/// Restrict a frame query to a selection: the identity pair rather than the bare
+/// id — CAN 0x100 and Modbus register 256 are different frames — and, for a
+/// protocol selected whole, the protocol alone.
 ///
 /// The selection rides in as one bound JSON parameter rather than an interpolated list,
-/// which buys three things: the SQL text is constant, so `prepare_cached` hits whatever
-/// the selection is; there is no parameter-count ceiling; and protocol, being TEXT, is
-/// bound rather than quoted into the statement. `EXPLAIN QUERY PLAN` shows the filtered
-/// `COUNT(*)` seeking `idx_frames_capture_fid` as a covering index.
-fn selection_predicate(param: usize) -> String {
-    format!(
-        "AND (protocol IN (SELECT value FROM json_each(?{param}, '$.protocols')) \
-         OR (frame_id, protocol) IN (SELECT j.value ->> 0, j.value ->> 1 FROM json_each(?{param}, '$.pairs') j))"
-    )
+/// which buys three things: the SQL text is constant per shape, so `prepare_cached`
+/// hits whatever the selection is; there is no parameter-count ceiling; and protocol,
+/// being TEXT, is bound rather than quoted into the statement. The text follows the
+/// shape because the planner does not: a pair-only selection seeks
+/// `idx_frames_capture_fid` as a covering index, and an `OR` on the protocol arm
+/// turns that seek into a scan of the capture for every caller.
+fn selection_predicate(param: usize, selection: &FrameSelection) -> String {
+    let by_pair = format!(
+        "(frame_id, protocol) IN (SELECT j.value ->> 0, j.value ->> 1 FROM json_each(?{param}, '$.pairs') j)"
+    );
+    let by_protocol = format!("protocol IN (SELECT value FROM json_each(?{param}, '$.protocols'))");
+    match (selection.protocols().is_empty(), selection.pairs().is_empty()) {
+        (true, _) => format!("AND {by_pair}"),
+        (false, true) => format!("AND {by_protocol}"),
+        (false, false) => format!("AND ({by_protocol} OR {by_pair})"),
+    }
 }
 
 /// `{"protocols": [...], "pairs": [[frame_id, protocol], …]}` for
 /// [`selection_predicate`]'s bound parameter.
 fn selection_json(selection: &FrameSelection) -> String {
-    let pairs: Vec<(u32, &str)> = selection.pairs();
-    // Protocol is a bare identifier from a closed vocabulary, but serialise it
-    // properly anyway — this string is a SQL parameter, not SQL.
-    serde_json::json!({ "protocols": selection.protocols(), "pairs": pairs }).to_string()
+    serde_json::json!({ "protocols": selection.protocols(), "pairs": selection.pairs() }).to_string()
 }
 
 /// Run a `... ORDER BY rowid DESC LIMIT n` tail query and return it chronologically.
@@ -649,7 +653,7 @@ fn get_frames_tail_filtered_with_conn(
 
     let total: usize = conn
         .query_row(
-            &format!("SELECT COUNT(*) FROM frames WHERE capture_id = ?1 {}", selection_predicate(2)),
+            &format!("SELECT COUNT(*) FROM frames WHERE capture_id = ?1 {}", selection_predicate(2, selection)),
             params![capture_id, pairs],
             |row| row.get::<_, i64>(0),
         )
@@ -659,7 +663,7 @@ fn get_frames_tail_filtered_with_conn(
         .prepare_cached(&format!(
             "SELECT {FRAME_COLUMNS} FROM frames WHERE capture_id = ?1 {} \
              ORDER BY rowid DESC LIMIT ?2",
-            selection_predicate(3)
+            selection_predicate(3, selection)
         ))
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -925,7 +929,7 @@ pub fn find_offset_for_timestamp(
 
     let sql = format!(
         "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2 {}",
-        if selection.is_empty() { String::new() } else { selection_predicate(3) }
+        if selection.is_empty() { String::new() } else { selection_predicate(3, selection) }
     );
     let count: i64 = if selection.is_empty() {
         conn.query_row(&sql, params![capture_id, target_us as i64], |row| row.get(0))
@@ -972,7 +976,7 @@ pub fn search_frames(
     let id_filter = if selection.is_empty() {
         String::new()
     } else {
-        format!(" {}", selection_predicate(2))
+        format!(" {}", selection_predicate(2, selection))
     };
 
     // ROW_NUMBER gives us the 0-based offset in the filtered result set.
@@ -1322,7 +1326,7 @@ pub fn get_next_filtered_frame(
     let sql = format!(
         "SELECT {FRAME_COLUMNS} FROM frames WHERE capture_id = ?1 AND rowid {op} ?2 {} \
          ORDER BY rowid {order} LIMIT 1",
-        if selection.is_empty() { String::new() } else { selection_predicate(3) }
+        if selection.is_empty() { String::new() } else { selection_predicate(3, selection) }
     );
 
     let row_result = if selection.is_empty() {
@@ -1766,6 +1770,7 @@ pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capture_store::ProtocolFrames;
 
     /// The pre-rename schema as shipped before April 2026 — used to build
     /// legacy databases the baseline must normalise.
@@ -1898,23 +1903,12 @@ mod tests {
 
     fn selection(groups: &[(&str, &[u32])]) -> FrameSelection {
         FrameSelection::from_groups(
-            groups
-                .iter()
-                .map(|(protocol, ids)| crate::capture_store::ProtocolFrames {
-                    protocol: protocol.to_string(),
-                    frame_ids: ids.to_vec(),
-                    all_ids: false,
-                })
-                .collect(),
+            groups.iter().map(|(protocol, ids)| ProtocolFrames::ids(*protocol, ids.to_vec())).collect(),
         )
     }
 
     fn whole(protocol: &str) -> FrameSelection {
-        FrameSelection::from_groups(vec![crate::capture_store::ProtocolFrames {
-            protocol: protocol.to_string(),
-            frame_ids: Vec::new(),
-            all_ids: true,
-        }])
+        FrameSelection::from_groups(vec![ProtocolFrames::whole(protocol)])
     }
 
     /// A protocol tab asks for its protocol whole, ids it has seen or not: every
@@ -1935,24 +1929,12 @@ mod tests {
         assert_eq!(tail[0].protocol, "modbus");
 
         // Whole and by-id combine in one predicate.
-        let mut combined = vec![crate::capture_store::ProtocolFrames {
-            protocol: "serial".to_string(),
-            frame_ids: Vec::new(),
-            all_ids: true,
-        }];
-        combined.push(crate::capture_store::ProtocolFrames {
-            protocol: "can".to_string(),
-            frame_ids: vec![257],
-            all_ids: false,
-        });
-        let (frames, _rowids, total) = get_frames_paginated_filtered_with_conn(
-            &conn,
-            "c1",
-            0,
-            50,
-            &FrameSelection::from_groups(combined),
-        )
-        .unwrap();
+        let combined = FrameSelection::from_groups(vec![
+            ProtocolFrames::whole("serial"),
+            ProtocolFrames::ids("can", vec![257]),
+        ]);
+        let (frames, _rowids, total) =
+            get_frames_paginated_filtered_with_conn(&conn, "c1", 0, 50, &combined).unwrap();
         assert_eq!(total, 2);
         let mut got: Vec<(&str, u32)> = frames.iter().map(|f| (f.protocol.as_str(), f.frame_id)).collect();
         got.sort_unstable();
@@ -2137,25 +2119,28 @@ mod tests {
     }
 
     /// The filtered COUNT is the only query the frame-id index covers, and one of the two
-    /// runs on the live tail path twice a second. Reshaping the predicate must not cost it.
+    /// runs on the live tail path twice a second. Reshaping the predicate must not cost
+    /// it: a seek on the id, not a walk of the capture — which is what an `OR` on the
+    /// protocol arm produced, at 200× the cost, while still reading as "covering".
     #[test]
     fn filtered_count_uses_the_covering_index() {
         let conn = multi_protocol_capture();
+        let by_id = selection(&[("can", &[256])]);
 
         let plan: String = conn
             .query_row(
                 &format!(
                     "EXPLAIN QUERY PLAN SELECT COUNT(*) FROM frames WHERE capture_id = 'c1' {}",
-                    selection_predicate(1)
+                    selection_predicate(1, &by_id)
                 ),
-                params![selection_json(&selection(&[("can", &[256])]))],
+                params![selection_json(&by_id)],
                 |row| row.get(3),
             )
             .unwrap();
 
         assert!(
-            plan.contains("COVERING INDEX idx_frames_capture_fid"),
-            "filtered count should stay covering, got: {plan}"
+            plan.contains("COVERING INDEX idx_frames_capture_fid") && plan.contains("frame_id=?"),
+            "filtered count should seek the id on the covering index, got: {plan}"
         );
     }
 

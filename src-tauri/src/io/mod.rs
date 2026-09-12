@@ -1534,8 +1534,9 @@ pub fn emit_stream_ended(
     );
 }
 
-/// Emit capture-changed signal when session captures are created or orphaned.
-/// Frontend fetches current capture state via commands.
+/// Emit capture-changed when session captures are created or orphaned. The
+/// message carries the session's frames capture id, so the frontend needs no
+/// round trip.
 pub fn emit_capture_changed(session_id: &str) {
     crate::ws::dispatch::send_capture_changed(session_id);
 }

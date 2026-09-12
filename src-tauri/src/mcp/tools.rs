@@ -409,17 +409,11 @@ impl WireTapTools {
         // every protocol the capture holds, which is what a bare id used to do.
         let groups = match (p.frame_id, p.protocol) {
             (None, _) => Vec::new(),
-            (Some(frame_id), Some(protocol)) => {
-                vec![ProtocolFrames { protocol, frame_ids: vec![frame_id], all_ids: false }]
-            }
+            (Some(frame_id), Some(protocol)) => vec![ProtocolFrames::ids(protocol, vec![frame_id])],
             (Some(frame_id), None) => crate::capture_store::get_capture_frame_info(&p.capture_id)
                 .into_iter()
                 .filter(|info| info.frame_id == frame_id)
-                .map(|info| ProtocolFrames {
-                    protocol: info.protocol,
-                    frame_ids: vec![frame_id],
-                    all_ids: false,
-                })
+                .map(|info| ProtocolFrames::ids(info.protocol, vec![frame_id]))
                 .collect(),
         };
         let (frames, _idx, total) = crate::capture_store::get_capture_frames_paginated_filtered(

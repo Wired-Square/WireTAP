@@ -74,6 +74,7 @@ import {
   decodeSessionInfo,
   decodeFrameCounts,
   decodeByteCounts,
+  decodeCaptureChanged,
   decodeScopedSessionLifecycle,
 } from "../services/wsProtocol";
 
@@ -506,6 +507,22 @@ export interface SessionStore {
 // ============================================================================
 
 /** Invoke all callbacks for an event type */
+/** A session's capture slot before anything is known about the capture — or with
+ *  only its id, as the CaptureChanged message reports it. */
+function emptyCapture(id: string | null = null, owningSessionId: string | null = null): Session["capture"] {
+  return {
+    available: id !== null,
+    id,
+    kind: id ? "frames" : null,
+    count: 0,
+    owningSessionId,
+    startTimeUs: null,
+    endTimeUs: null,
+    name: null,
+    persistent: false,
+  };
+}
+
 function invokeCallbacks<T>(
   eventListeners: SessionEventSubscribers,
   eventType: keyof SessionCallbacks,
@@ -695,6 +712,18 @@ async function setupSessionEventSubscribers(
       wsTransport.onSessionMessage(sessionId, MsgType.ByteCounts, (payload) => {
         const { total, captureId } = decodeByteCounts(payload);
         updateSession(sessionId, { byteCount: total, bytesCaptureId: captureId });
+      })
+    );
+
+    // CaptureChanged (0x07) — the session's frames capture id, empty when it has none.
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.CaptureChanged, (payload) => {
+        const captureId =
+          decodeCaptureChanged(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)) || null;
+        const current = useSessionStore.getState().sessions[sessionId];
+        if (!current || current.capture.id === captureId) return;
+        updateSession(sessionId, { capture: emptyCapture(captureId, captureId ? sessionId : null) });
+        if (captureId) useSessionStore.getState().addKnownCaptureId(captureId);
       })
     );
 
@@ -1042,7 +1071,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             capabilities: null,
             errorMessage: msg,
             subscriberCount: 0,
-            capture: { available: false, id: null, kind: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
+            capture: emptyCapture(),
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
@@ -2036,7 +2065,7 @@ let _unlistenCaptureChanged: (() => void) | null = null;
         if (session.capture.id && deletedSet.has(session.capture.id)) {
           updated[sid] = {
             ...session,
-            capture: { available: false, id: null, kind: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
+            capture: emptyCapture(),
           };
         }
       }

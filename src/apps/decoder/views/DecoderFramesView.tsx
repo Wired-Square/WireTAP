@@ -63,8 +63,10 @@ type Props = {
   filteredFrames?: FilteredFrame[];
   /** Modbus messages reassembled from tunnel frames; shown in the Modbus tab. */
   tunnelTransactions?: TunnelTransaction[];
-  /** The attached catalogue declares a tunnel frame — the Modbus tab's reason
-   *  to exist, so it is there before the first message and stays after a clear. */
+  /** The Modbus tab's reason to exist: the attached catalogue declares a tunnel
+   *  frame, or the session carries whole Modbus messages. Decided from what is
+   *  declared, not what has arrived, so the tab is there before the first message
+   *  and stays after a clear. */
   hasTunnel?: boolean;
 
   // Playback controls (for buffer replay)
@@ -305,6 +307,49 @@ const MODBUS_TYPE_BADGE: Record<'holding' | 'input' | 'coil' | 'discrete', strin
 };
 
 /** A Modbus signal's register, as "13019" or a span "13021–13022". */
+/** One raw frame as the Unmatched and Filtered lists show it; extras (a reason, a button) ride as children. */
+function RawFrameRow({
+  frame,
+  displayFrameIdFormat,
+  showAscii,
+  onContextMenu,
+  children,
+}: {
+  frame: UnmatchedFrame;
+  displayFrameIdFormat: 'hex' | 'decimal';
+  showAscii: boolean;
+  onContextMenu: (e: React.MouseEvent, frame: UnmatchedFrame) => void;
+  children?: React.ReactNode;
+}) {
+  const date = new Date(frame.timestamp * 1000);
+  const timeStr = date.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
+  return (
+    <div
+      className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
+      onContextMenu={(e) => onContextMenu(e, frame)}
+    >
+      <span className={`${textMuted} text-xs`}>{timeStr}</span>
+      <span className={`${textDataPurple} font-semibold`}>
+        {formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF)}
+      </span>
+      {frame.sourceAddress !== undefined && (
+        <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
+      )}
+      <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
+      <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
+      {showAscii && (
+        <span className={`${textDataYellow} text-xs font-mono`}>{frame.bytes.map(byteToAscii).join('')}</span>
+      )}
+      {children}
+    </div>
+  );
+}
+
 function modbusRegisterLabel(reg: number, count: number | undefined, fmt: "hex" | "decimal"): string {
   const end = count && count > 1 ? `–${formatFrameId(reg + count - 1, fmt)}` : "";
   return `${formatFrameId(reg, fmt)}${end}`;
@@ -1059,9 +1104,7 @@ export default function DecoderFramesView({
       { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countColor: 'orange' as const, countPrefix: unmatchedAtMax ? '>' : undefined },
       { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countColor: 'purple' as const, countPrefix: filteredAtMax ? '>' : undefined },
     ];
-    // Declared by the catalogue, or arriving anyway — an archive's whole messages
-    // decode through a plain Modbus catalogue and need somewhere to show.
-    if (hasTunnel || tunnelTransactions.length > 0) {
+    if (hasTunnel) {
       tabDefs.push({
         id: 'tunnel',
         label: t("tunnelView.tab"),
@@ -1661,35 +1704,15 @@ export default function DecoderFramesView({
                 <p className={emptyStateText}>No unmatched frames.</p>
               </div>
             ) : (
-              unmatchedFrames.slice(-100).reverse().map((frame) => {
-                const date = new Date(frame.timestamp * 1000);
-                const timeStr = date.toLocaleTimeString('en-US', {
-                  hour12: false,
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-                const idStr = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF);
-                const asciiStr = frame.bytes.map(byteToAscii).join('');
-                return (
-                  <div
-                    key={`${frame.timestamp}-${frame.frameId}`}
-                    className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
-                    onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
-                  >
-                    <span className={`${textMuted} text-xs`}>{timeStr}</span>
-                    <span className={`${textDataPurple} font-semibold`}>{idStr}</span>
-                    {frame.sourceAddress !== undefined && (
-                      <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
-                    )}
-                    <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-                    <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
-                    {showAsciiGutter && (
-                      <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
-                    )}
-                  </div>
-                );
-              })
+              unmatchedFrames.slice(-100).reverse().map((frame) => (
+                <RawFrameRow
+                  key={`${frame.timestamp}-${frame.frameId}`}
+                  frame={frame}
+                  displayFrameIdFormat={displayFrameIdFormat}
+                  showAscii={showAsciiGutter}
+                  onContextMenu={handleUnmatchedContextMenu}
+                />
+              ))
             )}
           </div>
         ) : activeTab === 'filtered' ? (
@@ -1720,45 +1743,26 @@ export default function DecoderFramesView({
             ))}
             {filteredFrames.length > 0 && (
               <div className="space-y-1">
-                {filteredFrames.slice(-100).reverse().map((frame) => {
-                  const date = new Date(frame.timestamp * 1000);
-                  const timeStr = date.toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-                  const idStr = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF);
-                  const asciiStr = frame.bytes.map(byteToAscii).join('');
-                  return (
-                    <div
-                      key={`${frame.timestamp}-${frame.frameId}`}
-                      className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
-                      onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
+                {filteredFrames.slice(-100).reverse().map((frame) => (
+                  <RawFrameRow
+                    key={`${frame.timestamp}-${frame.frameId}`}
+                    frame={frame}
+                    displayFrameIdFormat={displayFrameIdFormat}
+                    showAscii={showAsciiGutter}
+                    onContextMenu={handleUnmatchedContextMenu}
+                  >
+                    <span className={`${textDataAmber} text-xs`}>
+                      {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
+                    </span>
+                    <button
+                      onClick={() => sendHexDataToCalculator(bytesToHex(frame.bytes))}
+                      className={`p-1 rounded ${hoverBg} transition-colors`}
+                      title={t("framesView.sendToCalculator")}
                     >
-                      <span className={`${textMuted} text-xs`}>{timeStr}</span>
-                      <span className={`${textDataPurple} font-semibold`}>{idStr}</span>
-                      {frame.sourceAddress !== undefined && (
-                        <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
-                      )}
-                      <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-                      <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
-                      {showAsciiGutter && (
-                        <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
-                      )}
-                      <span className={`${textDataAmber} text-xs`}>
-                        {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
-                      </span>
-                      <button
-                        onClick={() => sendHexDataToCalculator(bytesToHex(frame.bytes))}
-                        className={`p-1 rounded ${hoverBg} transition-colors`}
-                        title={t("framesView.sendToCalculator")}
-                      >
-                        <Calculator className={`${iconSm} ${textDataOrange}`} />
-                      </button>
-                    </div>
-                  );
-                })}
+                      <Calculator className={`${iconSm} ${textDataOrange}`} />
+                    </button>
+                  </RawFrameRow>
+                ))}
               </div>
             )}
           </>

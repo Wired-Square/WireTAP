@@ -19,6 +19,7 @@ import {
   hoverDataRow,
   textDataYellow,
   textDataOrange,
+  textDataGreen,
   textDataPurple,
   textDataAmber,
   textDataCyan,
@@ -148,14 +149,14 @@ function rowIndexFromEvent(e: MouseEvent): number | null {
   return Number.isFinite(idx) ? idx : null;
 }
 
-/** Default byte renderer — the shared hex run, CRC set apart for a Modbus RTU message. */
+/** Default byte renderer — the shared hex run, in the warning colour for an incomplete frame. */
 function DefaultBytes({ frame }: { frame: FrameRow }) {
   return (
     <MessageBytes
       bytes={frame.bytes}
       hexBytes={frame.hexBytes}
       protocol={frame.protocol}
-      incomplete={frame.incomplete}
+      className={frame.incomplete ? textDataOrange : textDataGreen}
     />
   );
 }
@@ -316,7 +317,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
         <colgroup>
           {renderRowStatus && <col className="w-8" />}
           {onBookmark && <col className="w-7" />}
-          {showRef && <col className="w-16" />}
+          {showRef && <col className="w-20" />}
           <col style={{ width: `calc(${TIME_COLUMN_CHARS[displayTimeFormat]}ch + 1rem)` }} />
           {showId && <col className="w-24" />}
           {showBus && <col className="w-12" />}

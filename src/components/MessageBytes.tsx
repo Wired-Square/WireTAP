@@ -1,32 +1,32 @@
 // ui/src/components/MessageBytes.tsx
 //
 // The bytes of one frame as hex, the one way both Discovery's tables and the
-// Decoder's lists show them. A whole Modbus RTU message ends in its CRC; the two
-// bytes are set apart so the body reads as the message and the check as the
-// check. An incomplete serial frame reads in the warning colour.
+// Decoder's lists show them. A whole message ends in its check; those bytes are
+// set apart so the body reads as the message and the check as the check.
 
-import { textDataGreen, textDataOrange, textDataTertiary } from '../styles';
+import { textDataGreen, textDataTertiary } from '../styles';
+import { byteToHex } from '../utils/byteUtils';
+import { trailingCheckBytes } from '../utils/profileTraits';
 
 type Props = {
   bytes: number[];
   /** Pre-computed hex, when the caller already has it. */
   hexBytes?: string[];
   protocol?: string;
-  incomplete?: boolean;
   /** Colour for the body; defaults to the data green. */
   className?: string;
 };
 
-export default function MessageBytes({ bytes, hexBytes, protocol, incomplete, className }: Props) {
-  const hex = hexBytes ?? bytes.map((b) => b.toString(16).padStart(2, '0').toUpperCase());
-  const body = className ?? (incomplete ? textDataOrange : textDataGreen);
-  if (protocol === 'modbus_rtu' && hex.length >= 4) {
+export default function MessageBytes({ bytes, hexBytes, protocol, className = textDataGreen }: Props) {
+  const hex = hexBytes ?? bytes.map(byteToHex);
+  const check = trailingCheckBytes(protocol);
+  if (check > 0 && hex.length > check + 1) {
     return (
-      <span className={`break-all ${body}`}>
-        {hex.slice(0, -2).join(' ')}
-        <span className={`ml-2 ${textDataTertiary}`}>{hex.slice(-2).join(' ')}</span>
+      <span className={`break-all ${className}`}>
+        {hex.slice(0, -check).join(' ')}
+        <span className={`ml-2 ${textDataTertiary}`}>{hex.slice(-check).join(' ')}</span>
       </span>
     );
   }
-  return <span className={`break-all ${body}`}>{hex.join(' ')}</span>;
+  return <span className={`break-all ${className}`}>{hex.join(' ')}</span>;
 }

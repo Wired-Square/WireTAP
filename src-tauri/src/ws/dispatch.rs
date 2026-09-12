@@ -273,7 +273,8 @@ fn feed_tunnels(
     let Some(tunnels) = tunnels else {
         return Vec::new();
     };
-    if frame.protocol == "serial" || frame.protocol == "modbus_rtu" {
+    let archive = frame.protocol == "modbus_rtu";
+    if archive || frame.protocol == "serial" {
         let Some(serial) = tunnels.serial.as_ref() else {
             return Vec::new();
         };
@@ -282,9 +283,12 @@ fn feed_tunnels(
         };
         // The device address is left open: whatever filtering the profile asked
         // for was already applied by the framer that produced this frame. The
-        // vendor codes are not — see `SERIAL_RTU_OPTIONS`. An archive message
-        // was judged by whatever tapped the line, so it interprets under every
-        // code and address: refusing one here would only drop it.
+        // vendor codes are not — see `SERIAL_RTU_OPTIONS`.
+        let fallback = if archive {
+            crate::io::ModbusRtuOptions::tapped()
+        } else {
+            Default::default()
+        };
         return streams
             .entry(frame.bus)
             .or_insert_with(|| {
@@ -292,17 +296,7 @@ fn feed_tunnels(
                     .read()
                     .ok()
                     .and_then(|m| m.get(session_id).cloned())
-                    .unwrap_or_else(|| {
-                        if frame.protocol == "modbus_rtu" {
-                            crate::io::ModbusRtuOptions {
-                                any_function: true,
-                                allow_broadcast: true,
-                                ..Default::default()
-                            }
-                        } else {
-                            Default::default()
-                        }
-                    })
+                    .unwrap_or(fallback)
                     .stream()
             })
             .interpret(&frame.bytes)
@@ -754,7 +748,7 @@ pub fn send_device_connected(
     server.send_to_channel(channel, msg);
 }
 
-/// Send capture-changed signal.
+/// Send capture-changed, carrying the session's frames capture id (empty: none).
 pub fn send_capture_changed(session_id: &str) {
     let server = match ws_server() {
         Some(s) => s,
@@ -764,8 +758,9 @@ pub fn send_capture_changed(session_id: &str) {
         Some(c) => c,
         None => return,
     };
-    // Empty payload — the frontend fetches capture state via command
-    let msg = protocol::encode_message(MsgType::CaptureChanged, channel, &[]);
+    let capture_id = crate::capture_store::get_session_frame_capture_id(session_id).unwrap_or_default();
+    let payload = protocol::encode_capture_changed(&capture_id);
+    let msg = protocol::encode_message(MsgType::CaptureChanged, channel, &payload);
     server.send_to_channel(channel, msg);
 }
 

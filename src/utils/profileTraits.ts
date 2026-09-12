@@ -38,6 +38,29 @@ export function protocolLabel(protocol: string): string {
   return PROTOCOL_LABELS[protocol as Protocol] ?? protocol;
 }
 
+/**
+ * Whether a frame of this protocol is one whole message off a line — a Modbus RTU
+ * message with its CRC still on the end — rather than a frame with a payload. Such
+ * a protocol gets its own Discovery tab, and its bytes show the check set apart.
+ */
+export function isMessageProtocol(protocol: string): boolean {
+  return protocol === "modbus_rtu";
+}
+
+/** Trailing check bytes a message protocol carries; 0 where the frame has none. */
+export function trailingCheckBytes(protocol: string | undefined): number {
+  return protocol === "modbus_rtu" ? 2 : 0;
+}
+
+/**
+ * The family a frame protocol belongs to for grouping: CAN FD frames share the
+ * CAN tab and table. The inverse fold to `busProtocol`, which picks the single
+ * protocol a *bus* runs as (FD wins); here a mixed classic/FD stream is one family.
+ */
+export function protocolFamily(protocol: string): string {
+  return protocol === "canfd" ? "can" : protocol;
+}
+
 /** Profile kind type - all supported IO profile types */
 export type ProfileKind = NonNullable<IOProfile["kind"]>;
 

@@ -28,14 +28,12 @@ export interface UseBufferFrameViewOptions {
   sessionId?: string | null;
   /** Whether currently streaming (determines tail vs pagination mode) */
   isStreaming: boolean;
-  /** Selected composite frame keys filter (empty = all) */
-  selectedFrames: Set<string>;
   /**
-   * The filter to send instead of `selectedFrames` — a protocol tab reads its
-   * protocol whole (`wholeProtocol`) whatever the picker says. Pass a stable
-   * reference; it is a dependency of the fetch.
+   * The filter: the picker's composite frame keys (empty = all), or a ready
+   * selection — a protocol tab reads its protocol whole (`wholeProtocol`) whatever
+   * the picker says. A dependency of the fetch, so pass a stable reference.
    */
-  selection?: ProtocolFrames[];
+  selectedFrames: Set<string> | ProtocolFrames[];
   /** Page size for pagination (when stopped) */
   pageSize: ResolvedPageSize;
   /** Tail size for streaming mode (default: 50); null until an Auto fit lands. */
@@ -76,6 +74,8 @@ export interface UseBufferFrameViewResult {
   navigateToTimestamp: (timeUs: number) => Promise<void>;
   /** Pull the tail once while frozen, without unfreezing. */
   refreshOnce: () => void;
+  /** Following the live tail, as opposed to paging. */
+  tailing: boolean;
 }
 
 /** Hold the window inside the data: growing the page past the end would leave it part-empty. */
@@ -88,6 +88,11 @@ function clampAnchor(anchorRow: number, totalCount: number, pageSize: ResolvedPa
 function pageAlignedAnchor(offset: number, pageSize: ResolvedPageSize): number {
   const size = pageSize ?? 1;
   return Math.max(0, Math.floor(offset / size) * size);
+}
+
+/** The filter as the capture API takes it. */
+function toSelection(selected: Set<string> | ProtocolFrames[]): ProtocolFrames[] {
+  return selected instanceof Set ? groupKeysByProtocol(selected) : selected;
 }
 
 /** Convert CaptureFrame to FrameMessage with hex bytes */
@@ -121,7 +126,6 @@ export function useCaptureFrameView(
     sessionId,
     isStreaming,
     selectedFrames,
-    selection,
     pageSize,
     tailSize = 50,
     pollIntervalMs = BUFFER_POLL_INTERVAL_MS,
@@ -147,14 +151,16 @@ export function useCaptureFrameView(
   const fetchTailRef = useRef<() => void>(() => {});
   const refreshOnce = useCallback(() => fetchTailRef.current(), []);
 
+  const tailing = isStreaming && !isCapturePlayback;
+
   // Refs to avoid stale closures in intervals
-  const selectionRef = useRef<ProtocolFrames[]>(selection ?? groupKeysByProtocol(selectedFrames));
+  const selectionRef = useRef<ProtocolFrames[]>(toSelection(selectedFrames));
   const pageSizeRef = useRef(pageSize);
 
   // Update refs when values change
   useEffect(() => {
-    selectionRef.current = selection ?? groupKeysByProtocol(selectedFrames);
-  }, [selection, selectedFrames]);
+    selectionRef.current = toSelection(selectedFrames);
+  }, [selectedFrames]);
 
   useEffect(() => {
     pageSizeRef.current = pageSize;
@@ -205,6 +211,22 @@ export function useCaptureFrameView(
   const frozenRef = useRef(frozen);
   frozenRef.current = frozen;
 
+  // Rust writes frames into the capture before it signals, and it owns the frame count
+  // it pushes over WS — so refetching whenever that count moves keeps a view in step
+  // with the backend at the backend's own throttle, with no timer on this side.
+  const onFrameCount = useCallback(
+    (refetch: () => void) => {
+      if (!sessionId) return undefined;
+      return useSessionStore.subscribe((state, prevState) => {
+        if (frozenRef.current) return;
+        if (state.sessions[sessionId]?.frameCount !== prevState.sessions[sessionId]?.frameCount) {
+          refetch();
+        }
+      });
+    },
+    [sessionId],
+  );
+
   useEffect(() => {
     // tailSize is null until an auto fit has been measured; re-running when it lands is
     // what arms the subscription.
@@ -239,16 +261,8 @@ export function useCaptureFrameView(
     fetchTailRef.current = fetchTail;
     void fetchTail();
 
-    // Rust writes frames into the capture before it signals, and it owns the frame count
-    // it pushes over WS — so refetching whenever that count moves keeps the view in step
-    // with the backend at the backend's own throttle, with no timer on this side.
-    if (sessionId) {
-      const unsubscribe = useSessionStore.subscribe((state, prevState) => {
-        if (frozenRef.current) return;
-        if (state.sessions[sessionId]?.frameCount !== prevState.sessions[sessionId]?.frameCount) {
-          void fetchTail();
-        }
-      });
+    const unsubscribe = onFrameCount(() => void fetchTail());
+    if (unsubscribe) {
       return () => {
         isMounted = false;
         unsubscribe();
@@ -261,20 +275,29 @@ export function useCaptureFrameView(
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [captureId, isStreaming, isCapturePlayback, tailSize, pollIntervalMs, sessionId]);
+  }, [captureId, isStreaming, isCapturePlayback, tailSize, pollIntervalMs, onFrameCount]);
 
   // PAGINATION MODE: Fetch page when stopped or during buffer playback
+  // The total the clamp reads, kept out of the effect's dependencies: refetching on
+  // the fetch's own result made a streaming recorded session spin at the DB's pace.
+  const totalCountRef = useRef(totalCount);
+  totalCountRef.current = totalCount;
+
   useEffect(() => {
     // Run pagination when stopped, OR when in buffer playback mode
     if (!captureId || (isStreaming && !isCapturePlayback)) return;
     if (pageSize === null) return; // auto size not measured yet
 
     let isMounted = true;
+    // Whether the window on screen ends at the data's end, so appended rows belong on it.
+    let atEnd = false;
 
-    const fetchPage = async () => {
-      setIsLoading(true);
+    // `loading` only for the page the user asked for: a growth refetch swaps rows in
+    // silently rather than remounting the toolbar's page controls each time.
+    const fetchPage = async (retried = false, silent = false) => {
+      if (!silent) setIsLoading(true);
       try {
-        const offset = clampAnchor(anchorRow, totalCount, pageSize);
+        const offset = clampAnchor(anchorRow, totalCountRef.current, pageSize);
         const response = await getCaptureFramesPaginatedFiltered(
           captureId,
           offset,
@@ -283,25 +306,36 @@ export function useCaptureFrameView(
         );
         if (!isMounted) return;
 
-        const withHex = addHexBytes(response.frames);
-        setFrames(withHex);
+        setFrames(addHexBytes(response.frames));
         setBufferIndices(response.capture_indices);
         setTotalCount(response.total_count);
+        atEnd = offset + response.frames.length >= response.total_count;
+        // The clamp used a stale total and overshot the data — once more, clamped to
+        // the total just learned.
+        if (!retried && response.frames.length === 0 && response.total_count > 0) {
+          totalCountRef.current = response.total_count;
+          await fetchPage(true, silent);
+        }
       } catch (e) {
         console.error("[useCaptureFrameView] page fetch error:", e);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted && !silent) setIsLoading(false);
       }
     };
 
-    fetchPage();
+    void fetchPage();
+
+    // A recorded session streaming into this capture: a window at the data's end
+    // grows as rows land.
+    const unsubscribe = isStreaming
+      ? onFrameCount(() => { if (atEnd) void fetchPage(false, true); })
+      : undefined;
 
     return () => {
       isMounted = false;
+      unsubscribe?.();
     };
-  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selection, selectedFrames, totalCount]);
+  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selectedFrames, onFrameCount]);
 
   // Navigate to timestamp (for timeline scrub and step following)
   const navigateToTimestamp = useCallback(
@@ -384,14 +418,16 @@ export function useCaptureFrameView(
   }, [followTimeUs, captureId, isCapturePlayback, doFollowNavigate]);
 
   // Track previous selection to detect actual changes
-  const prevSelectedFramesRef = useRef<Set<string>>(selectedFrames);
+  const prevSelectedFramesRef = useRef(selectedFrames);
 
-  // Reset to page 0 when selection actually changes (not when streaming state changes)
+  // Reset to page 0 when the picker's selection actually changes (not when streaming
+  // state changes). A ready selection is a constant, so it never resets.
   useEffect(() => {
-    const prevSet = prevSelectedFramesRef.current;
+    const prev = prevSelectedFramesRef.current;
     const changed =
-      prevSet.size !== selectedFrames.size ||
-      [...selectedFrames].some((fk) => !prevSet.has(fk));
+      selectedFrames instanceof Set && prev instanceof Set
+        ? prev.size !== selectedFrames.size || [...selectedFrames].some((fk) => !prev.has(fk))
+        : prev !== selectedFrames;
 
     if (changed && captureId) {
       setAnchorRow(0);
@@ -403,8 +439,11 @@ export function useCaptureFrameView(
 
   // The row this window starts at. Callers must use this rather than page * pageSize:
   // the clamp above lands on totalCount - pageSize, which is not page-aligned, so the
-  // two disagree exactly when a resize has done its job.
-  const pageStartIndex = clampAnchor(anchorRow, totalCount, pageSize);
+  // two disagree exactly when a resize has done its job. A live tail is the last
+  // `frames.length` rows of the filtered set, whatever the anchor says.
+  const pageStartIndex = tailing
+    ? Math.max(0, totalCount - frames.length)
+    : clampAnchor(anchorRow, totalCount, pageSize);
   // Page buttons still move in whole pages; the anchor is what a resize preserves.
   const currentPage = pageForOffset(pageStartIndex, pageSize);
   const setCurrentPage = useCallback((page: number) => {
@@ -426,5 +465,6 @@ export function useCaptureFrameView(
     timeRange,
     navigateToTimestamp,
     refreshOnce,
+    tailing,
   };
 }
