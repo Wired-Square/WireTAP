@@ -262,7 +262,8 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
 ///
 /// A serial frame under a Modbus catalogue takes the other path: the port was
 /// framed by the reader, so the frame is a whole message and the boundary is
-/// taken as given rather than searched for.
+/// taken as given rather than searched for. So does a `modbus_rtu` frame — an
+/// archive row that is one whole message already.
 fn feed_tunnels(
     tunnels: Option<&SharedTunnels>,
     session_id: &str,
@@ -272,7 +273,7 @@ fn feed_tunnels(
     let Some(tunnels) = tunnels else {
         return Vec::new();
     };
-    if frame.protocol == "serial" {
+    if frame.protocol == "serial" || frame.protocol == "modbus_rtu" {
         let Some(serial) = tunnels.serial.as_ref() else {
             return Vec::new();
         };
@@ -281,7 +282,9 @@ fn feed_tunnels(
         };
         // The device address is left open: whatever filtering the profile asked
         // for was already applied by the framer that produced this frame. The
-        // vendor codes are not — see `SERIAL_RTU_OPTIONS`.
+        // vendor codes are not — see `SERIAL_RTU_OPTIONS`. An archive message
+        // was judged by whatever tapped the line, so it interprets under every
+        // code and address: refusing one here would only drop it.
         return streams
             .entry(frame.bus)
             .or_insert_with(|| {
@@ -289,7 +292,17 @@ fn feed_tunnels(
                     .read()
                     .ok()
                     .and_then(|m| m.get(session_id).cloned())
-                    .unwrap_or_default()
+                    .unwrap_or_else(|| {
+                        if frame.protocol == "modbus_rtu" {
+                            crate::io::ModbusRtuOptions {
+                                any_function: true,
+                                allow_broadcast: true,
+                                ..Default::default()
+                            }
+                        } else {
+                            Default::default()
+                        }
+                    })
                     .stream()
             })
             .interpret(&frame.bytes)
@@ -1053,11 +1066,21 @@ mod tests {
     }
 
     fn serial_frame(bytes: Vec<u8>) -> FrameMessage {
+        framed("serial", 0, bytes)
+    }
+
+    /// An archive row: one whole message, `frame_id` = unit << 8 | function.
+    fn archive_frame(bytes: Vec<u8>) -> FrameMessage {
+        let id = (u32::from(bytes[0]) << 8) | u32::from(bytes[1]);
+        framed("modbus_rtu", id, bytes)
+    }
+
+    fn framed(protocol: &str, frame_id: u32, bytes: Vec<u8>) -> FrameMessage {
         FrameMessage {
-            protocol: "serial".to_string(),
+            protocol: protocol.to_string(),
             timestamp_us: 0,
-            frame_id: 0,
-            bus: 0,
+            frame_id,
+            bus: 2,
             dlc: bytes.len() as u8,
             bytes,
             is_extended: false,
@@ -1100,6 +1123,53 @@ mod tests {
         // Carried over from the request: a read response has no address of its own.
         assert_eq!(out[0].start_register, Some(0x6B));
         assert_eq!(out[0].registers, vec![0x022B, 0x0000, 0x0064]);
+    }
+
+    /// An archive row takes the same path, and interprets under codes and
+    /// addresses a stock stream would refuse: the Sungrow line is 90% vendor
+    /// codes and unit-0 broadcasts, and a tap already decided they were messages.
+    /// The FC04 pair still decodes through a catalogue frame at its register.
+    #[test]
+    fn an_archive_message_interprets_whole_and_decodes_by_register() {
+        let tunnels = Arc::new(modbus_session());
+        let catalog = wiretap_catalog::Catalog::parse(
+            r#"
+[meta]
+name = "line"
+
+[frame.modbus.block]
+register_number = 7815
+register_type = "input"
+length = 2
+
+[[frame.modbus.block.signals]]
+name = "First"
+start_bit = 0
+bit_length = 16
+"#,
+        )
+        .expect("catalogue parses");
+
+        let request = archive_frame(rtu(&[0x01, 0x04, 0x1E, 0x87, 0x00, 0x02]));
+        let response = archive_frame(rtu(&[0x01, 0x04, 0x04, 0x12, 0x34, 0x00, 0x01]));
+        let vendor = archive_frame(rtu(&[0x02, 0x65, 0x03, 0x00, 0x2E, 0x00, 0x0E]));
+        let broadcast = archive_frame(rtu(&[0x00, 0x60, 0x00, 0x00, 0x00, 0x05]));
+
+        assert_eq!(feed_tunnels(Some(&tunnels), "test", &request, 0).len(), 1);
+        let out = feed_tunnels(Some(&tunnels), "test", &response, 0);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].start_register, Some(7815));
+        let decoded = tunnel_signals::decode_message(&out[0], &catalog);
+        assert!(decoded.signals.iter().any(|s| s.name == "First" && s.value == 0x1234 as f64));
+        assert_eq!(decoded.transaction["frame"], "block");
+
+        let out = feed_tunnels(Some(&tunnels), "test", &vendor, 0);
+        assert_eq!(out.len(), 1, "a vendor code frames without being declared");
+        let decoded = tunnel_signals::decode_message(&out[0], &catalog);
+        assert_eq!(decoded.transaction["register"], serde_json::Value::Null);
+        assert!(!decoded.transaction["data"].as_array().unwrap().is_empty());
+
+        assert_eq!(feed_tunnels(Some(&tunnels), "test", &broadcast, 0).len(), 1, "a broadcast is a message");
     }
 
     /// A message whose CRC disagrees is still reported, flagged — that flag is

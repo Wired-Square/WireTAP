@@ -161,6 +161,10 @@ export function SessionButton({
     // No matching profile - ioProfile is the session ID (e.g., "t_8852db")
     displayName = ioProfile;
     sessionIdInDisplayName = true; // Don't show sessionId separately
+  } else if (sessionId) {
+    // A joined session the store has let go of names itself while it streams.
+    displayName = sessionId;
+    sessionIdInDisplayName = true;
   } else {
     displayName = "No source";
   }

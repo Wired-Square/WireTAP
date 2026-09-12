@@ -197,6 +197,8 @@ export type UnmatchedFrame = {
   bytes: number[];
   timestamp: number;
   sourceAddress?: number;
+  /** What produced the frame — a `modbus_rtu` id reads as unit/function, not as a CAN id. */
+  protocol?: string;
 };
 
 /** Filtered frame (too short or matched by ID filter) */
@@ -205,6 +207,7 @@ export type FilteredFrame = {
   bytes: number[];
   timestamp: number;
   sourceAddress?: number;
+  protocol?: string;
   reason: 'too_short' | 'id_filter';
 };
 

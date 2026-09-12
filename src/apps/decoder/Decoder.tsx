@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
-import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames, getTunnelTransactions } from "../../stores/decoderStore";
+import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames, getTunnelTransactions, type UnmatchedFrame, type FilteredFrame } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
@@ -220,8 +220,8 @@ function DecoderInner() {
   // Note: sessionStore also throttles frame delivery at 10Hz, this provides additional
   // batching for expensive decode/store operations within each callback
   const pendingFramesRef = useRef<Array<{ frameId: number; bytes: number[] }>>([]);
-  const pendingUnmatchedRef = useRef<Array<{ frameId: number; bytes: number[]; timestamp: number; sourceAddress?: number }>>([]);
-  const pendingFilteredRef = useRef<Array<{ frameId: number; bytes: number[]; timestamp: number; sourceAddress?: number; reason: 'too_short' | 'id_filter' }>>([]);
+  const pendingUnmatchedRef = useRef<UnmatchedFrame[]>([]);
+  const pendingFilteredRef = useRef<FilteredFrame[]>([]);
   const pendingTimeRef = useRef<number | null>(null);
   const flushScheduledRef = useRef<boolean>(false);
   // UI_UPDATE_INTERVAL_MS imported from constants
@@ -310,7 +310,7 @@ function DecoderInner() {
 
       // Check if frame is too short (filtered by length)
       if (minFrameLength > 0 && f.bytes.length < minFrameLength) {
-        pendingFilteredRef.current.push({ frameId: f.frame_id, bytes: f.bytes, timestamp, sourceAddress: f.source_address, reason: 'too_short' });
+        pendingFilteredRef.current.push({ frameId: f.frame_id, bytes: f.bytes, timestamp, sourceAddress: f.source_address, protocol: f.protocol, reason: 'too_short' });
         continue;
       }
 
@@ -340,7 +340,7 @@ function DecoderInner() {
 
       // Check if frame ID matches the filter (if filter is set, matching IDs go to Filtered tab)
       if (idFilterSet !== null && idFilterSet.has(frameId)) {
-        pendingFilteredRef.current.push({ frameId, bytes: f.bytes, timestamp, sourceAddress: f.source_address, reason: 'id_filter' });
+        pendingFilteredRef.current.push({ frameId, bytes: f.bytes, timestamp, sourceAddress: f.source_address, protocol: f.protocol, reason: 'id_filter' });
         continue;
       }
 
@@ -365,6 +365,7 @@ function DecoderInner() {
           bytes: f.bytes,
           timestamp,
           sourceAddress: f.source_address,
+          protocol: f.protocol,
         });
       }
     }

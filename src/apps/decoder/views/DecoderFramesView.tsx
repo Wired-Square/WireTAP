@@ -12,7 +12,9 @@ import { frameKey } from "../../../utils/frameKey";
 import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
-import { formatFrameId } from "../../../utils/frameIds";
+import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
+import { protocolLabel } from "../../../utils/profileTraits";
+import MessageBytes from "../../../components/MessageBytes";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
 import HeaderFieldFilter from "../../../components/HeaderFieldFilter";
@@ -1057,7 +1059,9 @@ export default function DecoderFramesView({
       { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countColor: 'orange' as const, countPrefix: unmatchedAtMax ? '>' : undefined },
       { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countColor: 'purple' as const, countPrefix: filteredAtMax ? '>' : undefined },
     ];
-    if (hasTunnel) {
+    // Declared by the catalogue, or arriving anyway — an archive's whole messages
+    // decode through a plain Modbus catalogue and need somewhere to show.
+    if (hasTunnel || tunnelTransactions.length > 0) {
       tabDefs.push({
         id: 'tunnel',
         label: t("tunnelView.tab"),
@@ -1307,7 +1311,7 @@ export default function DecoderFramesView({
     if (!unmatchedContextMenu) return [];
     const { frame } = unmatchedContextMenu;
     const isExtended = frame.frameId > 0x7FF;
-    const formattedId = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
+    const formattedId = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, isExtended);
     const hexData = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
     return [
@@ -1489,7 +1493,7 @@ export default function DecoderFramesView({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
-      protocolLabel={protocol.toUpperCase()}
+      protocolLabel={protocolLabel(protocol).toUpperCase()}
       protocolBadges={protocolBadges}
       isStreaming={isDecoding && !isPaused}
       timestamp={timestamp}
@@ -1665,9 +1669,7 @@ export default function DecoderFramesView({
                   minute: '2-digit',
                   second: '2-digit',
                 }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-                const isExtended = frame.frameId > 0x7FF;
-                const idStr = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
-                const bytesHex = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+                const idStr = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF);
                 const asciiStr = frame.bytes.map(byteToAscii).join('');
                 return (
                   <div
@@ -1681,7 +1683,7 @@ export default function DecoderFramesView({
                       <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
                     )}
                     <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-                    <span className={`${textDataPrimary} flex-1`}>{bytesHex}</span>
+                    <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
                     {showAsciiGutter && (
                       <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
                     )}
@@ -1726,9 +1728,7 @@ export default function DecoderFramesView({
                     minute: '2-digit',
                     second: '2-digit',
                   }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-                  const isExtended = frame.frameId > 0x7FF;
-                  const idStr = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
-                  const bytesHex = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+                  const idStr = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF);
                   const asciiStr = frame.bytes.map(byteToAscii).join('');
                   return (
                     <div
@@ -1742,7 +1742,7 @@ export default function DecoderFramesView({
                         <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
                       )}
                       <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-                      <span className={`${textDataPrimary} flex-1`}>{bytesHex}</span>
+                      <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
                       {showAsciiGutter && (
                         <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
                       )}
@@ -1750,7 +1750,7 @@ export default function DecoderFramesView({
                         {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
                       </span>
                       <button
-                        onClick={() => sendHexDataToCalculator(bytesHex.replace(/\s+/g, ''))}
+                        onClick={() => sendHexDataToCalculator(bytesToHex(frame.bytes))}
                         className={`p-1 rounded ${hoverBg} transition-colors`}
                         title={t("framesView.sendToCalculator")}
                       >

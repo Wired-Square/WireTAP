@@ -8,6 +8,7 @@ import { useAutoRowCount } from '../../../hooks/useAutoRowCount';
 import { useFrameIdFormat } from '../../../hooks/useFrameIdFormat';
 import { bytesToAscii, hexRunChars } from '../../../utils/byteUtils';
 import { frameRowKey } from '../../../utils/frameKey';
+import MessageBytes from '../../../components/MessageBytes';
 import { formatHumanUs, TIME_COLUMN_CHARS } from '../../../utils/timeFormat';
 import type { TimeDisplayFormat } from '../../../types/common';
 import {
@@ -16,7 +17,6 @@ import {
   textDataSecondary,
   textDataTertiary,
   hoverDataRow,
-  textDataGreen,
   textDataYellow,
   textDataOrange,
   textDataPurple,
@@ -148,23 +148,15 @@ function rowIndexFromEvent(e: MouseEvent): number | null {
   return Number.isFinite(idx) ? idx : null;
 }
 
-/** Default byte renderer — hex string with colour based on completeness */
+/** Default byte renderer — the shared hex run, CRC set apart for a Modbus RTU message. */
 function DefaultBytes({ frame }: { frame: FrameRow }) {
-  const hexBytes = frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase());
-  // A whole Modbus RTU message ends in its CRC; set the two bytes apart so the
-  // body reads as the message and the check reads as the check.
-  if (frame.protocol === 'modbus_rtu' && hexBytes.length >= 4) {
-    return (
-      <span className={`break-all ${textDataGreen}`}>
-        {hexBytes.slice(0, -2).join(' ')}
-        <span className={`ml-2 ${textDataTertiary}`}>{hexBytes.slice(-2).join(' ')}</span>
-      </span>
-    );
-  }
   return (
-    <span className={`break-all ${frame.incomplete ? textDataOrange : textDataGreen}`}>
-      {hexBytes.join(' ')}
-    </span>
+    <MessageBytes
+      bytes={frame.bytes}
+      hexBytes={frame.hexBytes}
+      protocol={frame.protocol}
+      incomplete={frame.incomplete}
+    />
   );
 }
 
