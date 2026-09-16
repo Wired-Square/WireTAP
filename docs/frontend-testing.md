@@ -44,13 +44,13 @@ Two patterns worth copying rather than inventing:
   shared shape is pinned by a test that parses the *other* language's source. It
   already runs in both directions: a Rust test parses
   `src/api/framelinkAxes.ts`, and the connection-defaults table
-  (`src-tauri/src/io/device_kinds.rs`) is the reverse case. Prefer this to
+  (`crates/wiretap-app/src/io/device_kinds.rs`) is the reverse case. Prefer this to
   hand-copying a table and hoping.
 
 ### MCP bridge — the only real end-to-end
 
 There is a **reverse RPC channel, Rust → frontend**
-([src/services/mcpBridge.ts](../src/services/mcpBridge.ts)), so an agent or
+([src/services/mcpBridge.ts](../frontend/wiretap-ui/src/services/mcpBridge.ts)), so an agent or
 script driving the MCP server can ask the running frontend what it computed.
 It exposes exactly four methods:
 
@@ -92,7 +92,7 @@ it is not worth a browser download and a new dependency for one form.
   Driver (Windows). Apple ships no WKWebView WebDriver, so there is **no macOS
   path**. A Linux or Windows runner is the only way to get it.
 - **`window.__TAURI__` in a console.** `withGlobalTauri` is absent from
-  `src-tauri/tauri.conf.json`, so it defaults to false and the global is not
+  `crates/wiretap-app/tauri.conf.json`, so it defaults to false and the global is not
   injected. Calling `invoke` by hand from the WebView inspector needs that
   turned on first.
 - **An HTTP surface for Tauri commands.** They are IPC. See below.
@@ -104,8 +104,8 @@ Two things do listen on loopback, and neither helps.
 
 | | Port | Auth | From a browser |
 |---|---|---|---|
-| WS binary transport ([ws/server.rs](../src-tauri/src/ws/server.rs)) | `127.0.0.1:0` — ephemeral, new each run | 32-hex token, new each run | Socket opens; cannot authenticate |
-| MCP server ([mcp/mod.rs](../src-tauri/src/mcp/mod.rs)) | `127.0.0.1:8787` default, opt-in | Bearer token in Settings | Rejected — see below |
+| WS binary transport ([ws/server.rs](../crates/wiretap-app/src/ws/server.rs)) | `127.0.0.1:0` — ephemeral, new each run | 32-hex token, new each run | Socket opens; cannot authenticate |
+| MCP server ([mcp/mod.rs](../crates/wiretap-app/src/mcp/mod.rs)) | `127.0.0.1:8787` default, opt-in | Bearer token in Settings | Rejected — see below |
 
 The WS port is logged; the token deliberately is not (`lib.rs` discards it as
 `_token`). The frontend gets both from `invoke("get_ws_config")`, so the only

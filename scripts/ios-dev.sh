@@ -14,7 +14,7 @@ npm run build
 
 # --- 2. Build iOS debug via Tauri ---
 echo "▸ Building iOS (debug)…"
-npx tauri ios build --debug
+bash "$(dirname "$0")/tauri.sh" ios build --debug
 
 # --- 3. Find the .app in DerivedData ---
 APP_PATH=$(find "$DERIVED_DATA"/wiretap-*/Build/Products/debug-iphoneos -maxdepth 1 -name "WireTAP.app" -type d 2>/dev/null | head -1)

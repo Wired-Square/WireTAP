@@ -7,7 +7,7 @@ once from a known starting shape; ad-hoc DDL and shape-inference cannot make
 that guarantee once databases from different builds mix.
 
 The runner is `run_migrations` + `MIGRATIONS` in
-[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs); schema
+[crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs); schema
 reference in [capture-database-schema.md](capture-database-schema.md).
 
 ## How it works
@@ -22,7 +22,7 @@ reference in [capture-database-schema.md](capture-database-schema.md).
 
 ## Adding a migration
 
-1. Create `src-tauri/migrations/NNNN_short_name.sql`, where `NNNN` is the
+1. Create `crates/wiretap-app/migrations/NNNN_short_name.sql`, where `NNNN` is the
    next version, zero-padded (`0002_add_capture_notes.sql`). Plain SQL only;
    it is applied verbatim in one transaction.
 2. Append an entry to `MIGRATIONS` in `capture_db.rs`:

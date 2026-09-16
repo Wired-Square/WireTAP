@@ -1,8 +1,0 @@
-# WireTAP Server Dependencies
-# Install with: pip install -r requirements.txt
-
-# PostgreSQL adapter (only needed if [postgres].enable = true)
-psycopg2-binary>=2.9
-
-# Linux netlink interface for detecting CAN bitrates
-pyroute2>=0.7

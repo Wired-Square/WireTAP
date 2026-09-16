@@ -58,67 +58,24 @@ To use gs_usb, flash your CANable with [candleLight firmware](https://github.com
 > **Moving from a direct PostgreSQL source?** WireTAP no longer connects to a
 > database itself — the backend owns it, and the app authenticates with an API
 > key instead of database credentials. Existing PostgreSQL profiles are removed
-> on first launch after upgrading and named in a notice. See
-> [Migrating from direct PostgreSQL](#migrating-from-direct-postgresql).
+> on first launch after upgrading and named in a notice. The archive-migration
+> runbook lives with the backend in the WireTAP-Server repository.
 
 ## Tools
 
-### [gs_usb_cli](tools/gs_usb_cli/)
+### [gs_usb_cli](crates/wiretap-gs-usb-cli/)
 
 A diagnostic CLI for gs_usb/candleLight CAN adapters. Bypasses the WireTAP UI to give direct USB-level control for diagnosing frame loss and protocol issues. Supports device discovery, capability probing, USB topology inspection, frame receive with per-transfer diagnostics, and frame transmission.
 
 Available on macOS and Windows. On Linux, use SocketCAN tools (`candump`, `cansend`) instead.
 
-See [tools/gs_usb_cli/README.md](tools/gs_usb_cli/README.md) for build and usage instructions.
+See [crates/wiretap-gs-usb-cli/README.md](crates/wiretap-gs-usb-cli/README.md) for build and usage instructions.
 
-### [WireTAP Server](tools/wiretap-server/)
+### WireTAP Server
 
-A GVRET-compatible TCP server for Linux that bridges SocketCAN interfaces to TCP clients. Deploy on a Raspberry Pi or any Linux system with CAN hardware to:
-
-- Stream live CAN data to the WireTAP desktop app over the network
-- Optionally forward all frames to a WireTAP backend over the binary ingest protocol for historical analysis
-- Support multiple CAN interfaces and CAN FD
-
-See [tools/wiretap-server/README.md](tools/wiretap-server/README.md) for setup instructions.
-
-### [WireTAP Backend](tools/wiretap-backend/)
-
-A Dockerised TimescaleDB + API gateway that owns the long-term capture database, so nothing connects to PostgreSQL directly. Microcontroller capture devices, the WireTAP Server, and the desktop app all authenticate with API keys instead of database credentials:
-
-- Binary TCP ingest (devices and forward mode) and an HTTP query API (desktop), one database per capture with auto-create
-- A built-in admin UI for API keys, databases, live ingest sessions and activity
-- Optional pgBackRest backups; an [ingest protocol](https://github.com/Wired-Square/wiretap-lib-rs/blob/main/crates/wiretap-protocol/docs/ingest.md) for writing MCU firmware
-
-See [tools/wiretap-backend/README.md](tools/wiretap-backend/README.md) for setup and the archive-migration runbook.
-
-## Migrating from direct PostgreSQL
-
-Earlier versions could connect straight to a PostgreSQL server. That path is
-gone: the backend owns the database, and devices, the WireTAP Server and the
-desktop app all authenticate with API keys rather than database credentials.
-Moving across is two independent halves — the archive, and the app.
-
-**1. Move the archive.** [`migrate_to_timescale.py`](tools/wiretap-server/migrate_to_timescale.py)
-copies `public.can_frame` day-by-day from your existing database into the
-container's TimescaleDB hypertable, validating each day by row count and
-checksum, compressing as it goes. It is resumable — re-run it and finished days
-are skipped — and `--status` reports progress. A plain `pg_dump` will not do:
-the hypertable drops the legacy `row_id`/`id_hex`/`data_hex` columns, so the
-column sets do not match. Stop writes to the source first (switch the Pi to
-`[forward]` mode) so the archive is static while it copies.
-
-**2. Point the app at the gateway.** Create an API key in the admin UI — `read`
-is enough for querying, replay and analysis — then add a **WireTAP Backend**
-profile under Settings → Data I/O with the gateway URL, that key, and the
-capture database name. (The Database Activity view needs an `admin` key, and
-importing a capture needs `ingest`; the runbook has the full table.) Any direct PostgreSQL
-profile is removed on first launch after upgrading, named in a notice, and its
-keychain password deleted; captures, catalogues and other profiles are
-untouched. Queries, bookmarks, replay and the MCP analysis tools all behave as
-they did before against the new profile.
-
-The full runbook, with commands for both halves, is in
-[tools/wiretap-backend/README.md § Migrating an existing archive](tools/wiretap-backend/README.md#migrating-an-existing-archive-into-the-container).
+The GVRET-compatible Raspberry Pi bridge and the TimescaleDB + API backend
+gateway (binary ingest, HTTP query API, admin UI) live in the separate
+WireTAP-Server repository.
 
 ## Tech Stack
 
@@ -145,7 +102,7 @@ npm run tauri build
 npm run tauri:build:debug
 
 # Clean build artifacts
-rm -rf node_modules/.vite dist src-tauri/target
+rm -rf node_modules/.vite frontend/wiretap-ui/dist target
 ```
 
 ## License

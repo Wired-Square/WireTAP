@@ -28,7 +28,7 @@ pub enum CaptureKind {
 }
 ```
 
-See [src-tauri/src/capture_store.rs:22-29](../src-tauri/src/capture_store.rs#L22-L29).
+See [crates/wiretap-app/src/capture_store.rs:22-29](../crates/wiretap-app/src/capture_store.rs#L22-L29).
 
 A single session may own **at most one capture of each kind**. A framed
 serial session owns one `Frames` capture. A raw serial session owns one
@@ -55,7 +55,7 @@ own `b_`-prefixed session ID (see
 
 ## 4. Registry state
 
-`CaptureRegistry` in [src-tauri/src/capture_store.rs:89-100](../src-tauri/src/capture_store.rs#L89-L100):
+`CaptureRegistry` in [crates/wiretap-app/src/capture_store.rs:89-100](../crates/wiretap-app/src/capture_store.rs#L89-L100):
 
 ```rust
 struct CaptureRegistry {
@@ -111,7 +111,7 @@ contamination when two sessions ran concurrently (see git commit `a320fb8`).
 
 ## 5. Public API
 
-All of these are in [src-tauri/src/capture_store.rs](../src-tauri/src/capture_store.rs).
+All of these are in [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs).
 Session sources and lifecycle code should use the session-scoped API; direct
 capture-ID calls exist for queries and pagination.
 
@@ -203,7 +203,7 @@ On stop (device.stop() or stream end):
 `finalize_session_captures` is idempotent — calling it on a session whose
 captures are already finalised returns an empty vec.
 
-Call sites: [io/mod.rs:1160](../src-tauri/src/io/mod.rs#L1160) (`emit_stream_ended`).
+Call sites: [io/mod.rs:1160](../crates/wiretap-app/src/io/mod.rs#L1160) (`emit_stream_ended`).
 
 ### Stop-and-switch to capture replay
 
@@ -306,11 +306,11 @@ Imports are session-scoped end-to-end. The Tauri command accepts a
 
 | Command | File |
 |---------|------|
-| `import_csv_to_capture` | [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) |
-| `import_csv_with_mapping` | [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) |
-| `import_csv_batch_with_mapping` | [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) |
-| `create_frame_capture_from_frames` | [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) |
-| `apply_framing_to_capture` | [src-tauri/src/framing.rs](../src-tauri/src/framing.rs) |
+| `import_csv_to_capture` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
+| `import_csv_with_mapping` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
+| `import_csv_batch_with_mapping` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
+| `create_frame_capture_from_frames` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
+| `apply_framing_to_capture` | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) |
 
 Each import follows the same pattern:
 
@@ -379,7 +379,7 @@ Schema details — columns, indexes, cleanup policies — are in
 
 ## 8. CaptureSource — replaying a capture as a session
 
-[src-tauri/src/io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs)
+[crates/wiretap-app/src/io/recorded/capture.rs](../crates/wiretap-app/src/io/recorded/capture.rs)
 implements `CaptureSource`, the `IOSource` that exposes a stored capture as
 a timeline session. It is constructed with an **explicit** `capture_id` —
 there is no fallback / guess path; frontends must pass the ID they want to
@@ -412,7 +412,7 @@ TypeScript wrappers mirror the session-scoped API:
 | `createFrameCaptureFromFrames(sessionId, …)` | `create_frame_capture_from_frames` |
 | `applyFramingToCapture(sessionId, …)` | `apply_framing_to_capture` |
 
-See [src/api/capture.ts](../src/api/capture.ts) for the full list.
+See [src/api/capture.ts](../frontend/wiretap-ui/src/api/capture.ts) for the full list.
 
 The WS `CaptureChanged` message (`MsgType 0x07`) signals "something changed
 about this session's captures"; the frontend reacts by re-querying
@@ -424,7 +424,7 @@ payload.
 Because every session owns a capture from its first frame, apps read their rows
 from the capture rather than keeping their own copy — live tail, a stopped page
 and capture playback are the same query at different offsets.
-[useCaptureFrameView](../src/apps/discovery/hooks/useCaptureFrameView.ts) is the
+[useCaptureFrameView](../frontend/wiretap-ui/src/apps/discovery/hooks/useCaptureFrameView.ts) is the
 reference implementation: it refetches the tail when the session's
 Rust-reported `frameCount` moves (`MsgType 0x16`, the same 2 Hz signal above),
 and pages via `get_capture_frames_paginated_filtered` when stopped.
@@ -441,7 +441,7 @@ Two consequences worth knowing before changing it:
 - **Rows carry their capture position.** `capture_indices` are SQLite rowids,
   parallel to `frames`. They are the row's identity — the `#` column and the
   React key both come from them, via `frameRowKey` in
-  [src/utils/frameKey.ts](../src/utils/frameKey.ts). Frames have no identity of
+  [src/utils/frameKey.ts](../frontend/wiretap-ui/src/utils/frameKey.ts). Frames have no identity of
   their own: `(timestamp_us, frame_id, bus)` collides whenever a source emits
   the same ID twice in one microsecond, and duplicate keys make React orphan
   rows it can never remove, so they accumulate on every render.
@@ -462,7 +462,7 @@ bulk-add and the MCP live frame map — not for rendering the frames table.
 ### Auto rows-per-page
 
 Tables default to fitting their page to the height available.
-[useAutoRowCount](../src/hooks/useAutoRowCount.ts) observes one element — the
+[useAutoRowCount](../frontend/wiretap-ui/src/hooks/useAutoRowCount.ts) observes one element — the
 scroll container — which already reflects Dockview resizes, window resizes and
 every chrome row appearing or disappearing, so nothing enumerates the chrome.
 `FrameDataTable` calls it on its callers' behalf (`autoFit` / `onFitChange`),
@@ -470,7 +470,7 @@ because it is the only thing that knows its own container, sticky header and
 trailing spacer; `ResultsPanel` is div-based and calls the hook directly.
 
 Two types carry this, both in
-[src/utils/pageSize.ts](../src/utils/pageSize.ts). A `PageSize` is what the
+[src/utils/pageSize.ts](../frontend/wiretap-ui/src/utils/pageSize.ts). A `PageSize` is what the
 control holds — `number | "auto" | "all"` — and a `ResolvedPageSize` is a
 concrete count, `null` until the fit has been measured. Views hold the setting
 so the select can match an option, and pass `resolvePageSize(...)` to their
@@ -497,10 +497,10 @@ cannot go infinite even where a size is legitimately unresolved.
 
 | File | Role |
 |------|------|
-| [src-tauri/src/capture_store.rs](../src-tauri/src/capture_store.rs) | Registry, session-scoped API, streaming/active sets |
-| [src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs) | SQLite persistence |
-| [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) | Tauri commands (list/read/import/delete) |
-| [src-tauri/src/framing.rs](../src-tauri/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |
-| [src-tauri/src/io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | `CaptureSource` timeline device |
-| [src/api/capture.ts](../src/api/capture.ts) | TypeScript wrappers |
+| [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs) | Registry, session-scoped API, streaming/active sets |
+| [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | SQLite persistence |
+| [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) | Tauri commands (list/read/import/delete) |
+| [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |
+| [crates/wiretap-app/src/io/recorded/capture.rs](../crates/wiretap-app/src/io/recorded/capture.rs) | `CaptureSource` timeline device |
+| [src/api/capture.ts](../frontend/wiretap-ui/src/api/capture.ts) | TypeScript wrappers |
 | [docs/capture-database-schema.md](capture-database-schema.md) | On-disk schema reference |

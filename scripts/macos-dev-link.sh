@@ -28,7 +28,7 @@ cc "$@"
 output_base="$(basename "${output:-}")"
 if [[ -n "$output" && ( "$output_base" == "WireTAP" || "$output_base" =~ ^WireTAP-[0-9a-f]+$ ) ]]; then
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  entitlements="$script_dir/../src-tauri/WireTAP-debug.entitlements"
+  entitlements="$script_dir/../crates/wiretap-app/WireTAP-debug.entitlements"
   codesign --force --sign - \
     --identifier com.wiredsquare.wiretap \
     --entitlements "$entitlements" \

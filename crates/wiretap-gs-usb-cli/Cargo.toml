@@ -1,0 +1,20 @@
+[package]
+name = "wiretap-gs-usb-cli"
+version = "0.1.0"
+description = "Diagnostic CLI for gs_usb CAN adapters."
+authors = ["Alex Ferrara"]
+edition = "2021"
+
+[[bin]]
+name = "gs_usb_cli"
+path = "src/main.rs"
+
+[dependencies]
+wiretap = { path = "../wiretap-app" }
+clap = { version = "4", features = ["derive"] }
+hex = "0.4"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+
+# Linux gs_usb goes through SocketCAN; the CLI is a stub there.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+nusb = { version = "0.2", features = ["tokio"] }

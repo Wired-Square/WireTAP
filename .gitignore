@@ -36,20 +36,19 @@ CLAUDE.md
 __pycache__/
 
 # Rust/Cargo
-src-tauri/target/
-tools/bt_scan_cli/target/
+target/
 # Local-only cargo config (paths overrides for sibling-checkout iteration).
 .cargo/
 
 # Tauri generated schemas
-src-tauri/gen/schemas
+crates/wiretap-app/gen/schemas
 
 # Test files and dumps
 *.dump
 
 # Local research notes
 docs/local/
-/src-tauri/.cargo/
+/crates/wiretap-app/.cargo/
 
 # Obsidian vault app config (docs live in the Google Drive vault, not here)
 .obsidian/

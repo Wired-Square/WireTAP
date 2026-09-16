@@ -1,0 +1,385 @@
+// ui/crates/wiretap-app/src/io/mqtt/reader.rs
+//
+// MQTT Source - streams CAN frames from an MQTT broker.
+// Supports SavvyCAN JSON format with optional CAN FD.
+//
+// JSON message format:
+// {
+//   "bus": 0,           // CAN bus number (optional, default 0)
+//   "id": 291,          // CAN ID (decimal)
+//   "dlc": 8,           // Data length code
+//   "data": [0,1,2...], // Byte array (up to 8 for classic, 64 for FD)
+//   "extended": false,  // Extended ID (optional, default false)
+//   "fd": false         // CAN FD frame (optional, default false)
+// }
+
+use async_trait::async_trait;
+use rumqttc::{AsyncClient, Event, MqttOptions, NetworkOptions, Packet, QoS};
+use serde::Deserialize;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use tauri::AppHandle;
+use tokio::time::Duration;
+
+use crate::io::lifecycle::{SourceLifecycle, SourceLifecycleGuard};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle};
+use crate::capture_store::{self, CaptureKind};
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+/// MQTT source configuration
+#[derive(Clone, Debug)]
+pub struct MqttConfig {
+    /// MQTT broker hostname
+    pub host: String,
+    /// MQTT broker port
+    pub port: u16,
+    /// Username for authentication (optional)
+    pub username: Option<String>,
+    /// Password for authentication (optional)
+    pub password: Option<String>,
+    /// Topic pattern to subscribe to (supports MQTT wildcards: +, #)
+    pub topic: String,
+    /// Client ID (auto-generated if None)
+    pub client_id: Option<String>,
+}
+
+impl Default for MqttConfig {
+    fn default() -> Self {
+        Self {
+            host: "localhost".to_string(),
+            port: 1883,
+            username: None,
+            password: None,
+            topic: "wiretap/#".to_string(),
+            client_id: None,
+        }
+    }
+}
+
+// ============================================================================
+// JSON Message Format
+// ============================================================================
+
+/// SavvyCAN-compatible JSON message format
+#[derive(Debug, Deserialize)]
+struct MqttCanFrame {
+    /// CAN bus number (default 0)
+    #[serde(default)]
+    bus: u8,
+    /// CAN ID (decimal or hex string)
+    #[serde(deserialize_with = "deserialize_can_id")]
+    id: u32,
+    /// Data length code
+    #[serde(default)]
+    dlc: u8,
+    /// Frame data as byte array
+    #[serde(default)]
+    data: Vec<u8>,
+    /// Extended (29-bit) ID frame
+    #[serde(default)]
+    extended: bool,
+    /// CAN FD frame (allows up to 64 bytes)
+    #[serde(default)]
+    fd: bool,
+}
+
+/// Deserialize CAN ID from either integer or hex string
+fn deserialize_can_id<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+
+    struct CanIdVisitor;
+
+    impl<'de> Visitor<'de> for CanIdVisitor {
+        type Value = u32;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an integer or hex string")
+        }
+
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+            Ok(v as u32)
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+            Ok(v as u32)
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            // Try parsing as hex (with or without 0x prefix)
+            let s = v.trim_start_matches("0x").trim_start_matches("0X");
+            u32::from_str_radix(s, 16).or_else(|_| {
+                // Fall back to decimal
+                v.parse::<u32>().map_err(de::Error::custom)
+            })
+        }
+    }
+
+    deserializer.deserialize_any(CanIdVisitor)
+}
+
+// ============================================================================
+// MQTT Source
+// ============================================================================
+
+/// MQTT Source - receives CAN frames from an MQTT broker
+pub struct MqttSource {
+    app: AppHandle,
+    session_id: String,
+    config: MqttConfig,
+    state: IOState,
+    /// The event loop runs on a detached task; a broker that drops the connection
+    /// ends it without anything calling `stop`.
+    lifecycle: SourceLifecycle,
+    cancel_flag: Arc<AtomicBool>,
+    task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
+}
+
+impl MqttSource {
+    pub fn new(app: AppHandle, session_id: String, config: MqttConfig) -> Self {
+        Self {
+            app,
+            session_id,
+            config,
+            state: IOState::Stopped,
+            lifecycle: SourceLifecycle::new(),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            task_handle: None,
+        }
+    }
+}
+
+#[async_trait]
+impl IOSource for MqttSource {
+    fn capabilities(&self) -> IOCapabilities {
+        IOCapabilities::realtime_can()
+            .with_protocols(vec![Protocol::Can, Protocol::CanFd])
+            .with_buses(vec![])
+    }
+
+    async fn start(&mut self) -> Result<(), String> {
+        if self.state == IOState::Running {
+            return Err("Source is already running".to_string());
+        }
+
+        self.state = IOState::Starting;
+        self.cancel_flag.store(false, Ordering::Relaxed);
+
+        let app = self.app.clone();
+        let session_id = self.session_id.clone();
+        let config = self.config.clone();
+        let cancel_flag = self.cancel_flag.clone();
+
+        let handle = spawn_mqtt_stream(
+            app,
+            session_id,
+            config,
+            cancel_flag,
+            self.lifecycle.guard(IOState::Stopped),
+        );
+        self.task_handle = Some(handle);
+        self.state = IOState::Running;
+
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), String> {
+        self.cancel_flag.store(true, Ordering::Relaxed);
+
+        if let Some(handle) = self.task_handle.take() {
+            let _ = handle.await;
+        }
+
+        self.state = IOState::Stopped;
+        Ok(())
+    }
+
+    async fn pause(&mut self) -> Result<(), String> {
+        Err("MQTT is a live stream and cannot be paused. Data would be lost.".to_string())
+    }
+
+    async fn resume(&mut self) -> Result<(), String> {
+        Err("MQTT is a live stream and does not support pause/resume.".to_string())
+    }
+
+    fn set_speed(&mut self, _speed: f64) -> Result<(), String> {
+        Err("MQTT is a live stream and does not support speed control.".to_string())
+    }
+
+    fn set_time_range(
+        &mut self,
+        _start: Option<String>,
+        _end: Option<String>,
+    ) -> Result<(), String> {
+        Err("MQTT is a live stream and does not support time range filtering.".to_string())
+    }
+
+    fn state(&self) -> IOState {
+        self.lifecycle.state_or(&self.state)
+    }
+
+    fn session_id(&self) -> &str {
+        &self.session_id
+    }
+}
+
+// ============================================================================
+// MQTT Stream Task
+// ============================================================================
+
+fn spawn_mqtt_stream(
+    _app_handle: AppHandle,
+    session_id: String,
+    config: MqttConfig,
+    cancel_flag: Arc<AtomicBool>,
+    ended: SourceLifecycleGuard,
+) -> tauri::async_runtime::JoinHandle<()> {
+    tauri::async_runtime::spawn(async move {
+        // Held for the task's life: however this returns — subscribe failure,
+        // broker drop, cancel — the source stops claiming it is running.
+        let _ended = ended;
+        // Create a frame capture for this MQTT session (named after session ID)
+        capture_store::create_session_capture(&session_id, CaptureKind::Frames, session_id.clone());
+
+        let mut throttle = SignalThrottle::new();
+
+        #[allow(unused_assignments)]
+        let mut stream_reason = "disconnected";
+
+        // Generate client ID if not provided
+        let client_id = config.client_id.clone().unwrap_or_else(|| {
+            format!("wiretap-{}", uuid_simple())
+        });
+
+        // Configure MQTT options
+        let mut mqttoptions = MqttOptions::new(&client_id, &config.host, config.port);
+        mqttoptions.set_keep_alive(Duration::from_secs(30));
+
+        // Set credentials if provided
+        if let (Some(username), Some(password)) = (&config.username, &config.password) {
+            mqttoptions.set_credentials(username, password);
+        }
+
+        // Create async client
+        let (client, mut eventloop) = AsyncClient::new(mqttoptions, 100);
+
+        // rumqttc resolves and connects inside its own event loop, so
+        // `io::net::resolve_host_port` cannot wrap it. Without this bound an
+        // unroutable broker leaves the session sitting in "connecting" for as
+        // long as the OS keeps retrying.
+        let mut network_options = NetworkOptions::new();
+        network_options.set_connection_timeout(crate::io::net::CONNECT_TIMEOUT.as_secs());
+        eventloop.set_network_options(network_options);
+
+        // Subscribe to topic
+        if let Err(e) = client.subscribe(&config.topic, QoS::AtMostOnce).await {
+            emit_session_error(
+                &session_id,
+                format!("Failed to subscribe to {}: {}", config.topic, e),
+            );
+            stream_reason = "error";
+            emit_stream_ended(&session_id, stream_reason, "MQTT");
+            return;
+        }
+
+        tlog!(
+            "[MQTT:{}] Connected to {}:{}, subscribed to '{}'",
+            session_id, config.host, config.port, config.topic
+        );
+
+        // Emit device-connected event
+        let address = format!("{}:{}", config.host, config.port);
+        emit_device_connected(&session_id, "mqtt", &address, None);
+
+        // Process incoming messages
+        loop {
+            if cancel_flag.load(Ordering::Relaxed) {
+                stream_reason = "stopped";
+                break;
+            }
+
+            // Poll with timeout to check cancel flag periodically
+            match tokio::time::timeout(Duration::from_millis(100), eventloop.poll()).await {
+                Ok(Ok(event)) => {
+                    if let Event::Incoming(Packet::Publish(publish)) = event {
+                        // Try to parse the message as JSON
+                        match serde_json::from_slice::<MqttCanFrame>(&publish.payload) {
+                            Ok(mqtt_frame) => {
+                                let frame = FrameMessage {
+                                    protocol: "can".to_string(),
+                                    timestamp_us: now_us(),
+                                    frame_id: mqtt_frame.id,
+                                    bus: mqtt_frame.bus,
+                                    dlc: if mqtt_frame.dlc > 0 {
+                                        mqtt_frame.dlc
+                                    } else {
+                                        mqtt_frame.data.len() as u8
+                                    },
+                                    bytes: mqtt_frame.data,
+                                    is_extended: mqtt_frame.extended,
+                                    is_fd: mqtt_frame.fd,
+                                    source_address: None,
+                                    incomplete: None,
+                                    direction: Some("rx".to_string()),
+                                };
+
+                                // Buffer frame for replay
+                                capture_store::append_frames_to_session(&session_id, vec![frame]);
+
+                                if throttle.should_signal("frames-ready") {
+                                    signal_frames_ready(&session_id);
+                                }
+                            }
+                            Err(e) => {
+                                // Log parse error but continue (might be non-CAN message)
+                                tlog!(
+                                    "[MQTT:{}] Failed to parse message on '{}': {}",
+                                    session_id, publish.topic, e
+                                );
+                            }
+                        }
+                    }
+                }
+                Ok(Err(e)) => {
+                    // Connection error
+                    emit_session_error(
+                        &session_id,
+                        format!("MQTT error: {}", e),
+                    );
+                    stream_reason = "error";
+                    break;
+                }
+                Err(_) => {
+                    // Timeout - continue loop to check cancel flag
+                }
+            }
+        }
+
+        // Final signal so frontend sees all buffered frames
+        throttle.flush();
+        signal_frames_ready(&session_id);
+
+        // Disconnect cleanly
+        let _ = client.disconnect().await;
+
+        tlog!("[MQTT:{}] Stream ended: {}", session_id, stream_reason);
+        emit_stream_ended(&session_id, stream_reason, "MQTT");
+    })
+}
+
+/// Generate a simple UUID-like string for client IDs
+fn uuid_simple() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{:x}", timestamp)
+}

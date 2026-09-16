@@ -4,23 +4,23 @@ This guide describes how to build UI in WireTAP — what styling tokens to use,
 how to localise strings, how to register a new app, and which inline patterns
 should be migrated to centralised tokens. It is the canonical reference for
 the frontend; if a question is not answered here, prefer reading the source in
-[../src/styles/](../src/styles/) over inventing a new pattern.
+[../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/) over inventing a new pattern.
 
 ## Overview
 
-All visual styling is centralised in [../src/styles/](../src/styles/). The
-public surface is the barrel file [../src/styles/index.ts](../src/styles/index.ts) —
+All visual styling is centralised in [../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/). The
+public surface is the barrel file [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) —
 import tokens from there:
 
 ```tsx
 import { buttonBase, textPrimary, paddingDialog, h2 } from "../../../styles";
 ```
 
-Localisation lives in [../src/locales/](../src/locales/). The active language
+Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
-[../src/apps/settings/stores/settingsStore.ts](../src/apps/settings/stores/settingsStore.ts)).
-The bootstrap is [../src/i18n.ts](../src/i18n.ts), imported once for side
-effects from [../src/main.tsx](../src/main.tsx).
+[../frontend/wiretap-ui/src/apps/settings/stores/settingsStore.ts](../frontend/wiretap-ui/src/apps/settings/stores/settingsStore.ts)).
+The bootstrap is [../frontend/wiretap-ui/src/i18n.ts](../frontend/wiretap-ui/src/i18n.ts), imported once for side
+effects from [../frontend/wiretap-ui/src/main.tsx](../frontend/wiretap-ui/src/main.tsx).
 
 ## Core principles
 
@@ -44,13 +44,13 @@ These are non-negotiable in this codebase:
 
 ## Theming model
 
-`useTheme` ([../src/hooks/useTheme.ts](../src/hooks/useTheme.ts)) sets CSS
+`useTheme` ([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts)) sets CSS
 variables on `:root` based on the user's theme settings:
 
 - `--bg-primary`, `--bg-surface`, `--text-primary`, `--text-secondary`,
   `--border-default`, `--data-bg`, `--accent-primary`, status colours, etc.
 
-Tokens in [colourTokens.ts](../src/styles/colourTokens.ts) are Tailwind
+Tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) are Tailwind
 arbitrary-value classes that read those variables:
 
 ```ts
@@ -63,7 +63,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 
 ## Token reference
 
-### Colours — [colourTokens.ts](../src/styles/colourTokens.ts)
+### Colours — [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts)
 
 | Token | Class | Use |
 |---|---|---|
@@ -92,7 +92,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `hoverBg` / `hoverLight` / `hoverSubtle` / `hoverDataItem` / `hoverDataRow` | brightness or `var(--hover-bg)` | Hover states |
 | `dataViewContainer` | `rounded-lg border border-… overflow-hidden` | Standard data "bubble" |
 
-### Typography — [typography.ts](../src/styles/typography.ts)
+### Typography — [typography.ts](../frontend/wiretap-ui/src/styles/typography.ts)
 
 | Token | Use |
 |---|---|
@@ -105,7 +105,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `truncate` / `lineClamp2` / `lineClamp3` | Truncation |
 | `emptyStateContainer` / `emptyStateText` / `emptyStateHeading` / `emptyStateDescription` / `emptyStateHint` | "No data" / "Not connected" displays |
 
-### Spacing — [spacing.ts](../src/styles/spacing.ts)
+### Spacing — [spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts)
 
 | Token | Class | Use |
 |---|---|---|
@@ -123,7 +123,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `iconXs` … `icon2xl` | `w-3 h-3` … `w-8 h-8` | Icon sizes |
 | `flexRow` / `flexRowGap1`/`-2`/`-3` | flex helpers | Row layouts |
 
-### Buttons — [buttonStyles.ts](../src/styles/buttonStyles.ts)
+### Buttons — [buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts)
 
 | Token | Use |
 |---|---|
@@ -149,7 +149,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `disabledState` | `disabled:opacity-50 disabled:cursor-not-allowed` |
 | `badgeColorClass(colour)` / `tabCountColorClass(colour)` | Helpers (see backlog — colours hardcoded) |
 
-### Inputs — [inputStyles.ts](../src/styles/inputStyles.ts)
+### Inputs — [inputStyles.ts](../frontend/wiretap-ui/src/styles/inputStyles.ts)
 
 | Token | Use |
 |---|---|
@@ -162,7 +162,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `formElementHeight` / `toolbarElementHeight` | `h-[42px]` / `h-[26px]` |
 | `checkboxDefault` / `radioDefault` | Themed checkbox / radio styling |
 
-### Badges — [badgeStyles.ts](../src/styles/badgeStyles.ts)
+### Badges — [badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts)
 
 | Token | Use |
 |---|---|
@@ -171,7 +171,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `badgeDarkPanelInfo` / `-Success` / `-Danger` / `-Purple` / `-Cyan` | Mono data-panel badges |
 | `badgeMetadata` | Filename / type pills |
 
-### Cards & alerts — [cardStyles.ts](../src/styles/cardStyles.ts)
+### Cards & alerts — [cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts)
 
 | Token | Use |
 |---|---|
@@ -184,7 +184,7 @@ the token. Hardcoded `text-zinc-100` will not update.
 | `errorBoxCompact` | Inline form error (red, small) |
 | `cardPadding.{none,sm,md,lg}` | Card padding helper |
 
-### Data tables — [tableStyles.ts](../src/styles/tableStyles.ts)
+### Data tables — [tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts)
 
 The monospace data tables — Discovery's frame table and its Filtered tab, serial
 framed data, the serial byte dump, Transmit history — are read side by side, so
@@ -209,10 +209,10 @@ Two things worth knowing before changing the frame table's columns:
   non-breaking spans, because a column cannot move: payload length spans two
   orders of magnitude across protocols, and the pair has to sit side by side when
   there is room and stack when there is not. Every row's hex is padded to the
-  page's widest run (`hexRunChars` in [byteUtils.ts](../src/utils/byteUtils.ts))
+  page's widest run (`hexRunChars` in [byteUtils.ts](../frontend/wiretap-ui/src/utils/byteUtils.ts))
   so the ASCII behind it stays in a straight gutter.
 - **Time is sized to the format in use**, via `TIME_COLUMN_CHARS` in
-  [timeFormat.ts](../src/utils/timeFormat.ts). A column wide enough for an ISO
+  [timeFormat.ts](../frontend/wiretap-ui/src/utils/timeFormat.ts). A column wide enough for an ISO
   timestamp is nearly twice what a delta needs, and the slack shows up as a gap
   before whatever column follows.
 
@@ -308,7 +308,7 @@ import { dataViewContainer, bgDataView } from "../../styles";
 ## App top bar
 
 Every panel renders its top bar through
-[AppTopBar.tsx](../src/components/AppTopBar.tsx). It enforces a single,
+[AppTopBar.tsx](../frontend/wiretap-ui/src/components/AppTopBar.tsx). It enforces a single,
 flexible row containing five logical slots, in order:
 
 ```
@@ -346,9 +346,9 @@ trim controls.
 
 When a panel's top bar takes more than ~10 props, extract a wrapper
 component following the
-[DiscoveryTopBar](../src/apps/discovery/views/DiscoveryTopBar.tsx) /
-[DecoderTopBar](../src/apps/decoder/views/DecoderTopBar.tsx) /
-[RulesTopBar](../src/apps/rules/views/RulesTopBar.tsx) pattern. The
+[DiscoveryTopBar](../frontend/wiretap-ui/src/apps/discovery/views/DiscoveryTopBar.tsx) /
+[DecoderTopBar](../frontend/wiretap-ui/src/apps/decoder/views/DecoderTopBar.tsx) /
+[RulesTopBar](../frontend/wiretap-ui/src/apps/rules/views/RulesTopBar.tsx) pattern. The
 wrapper:
 - accepts a flat props object,
 - composes `AppTopBar` once,
@@ -359,7 +359,7 @@ wrapper:
 Never read `display_frame_id_format` from settings to render a frame id,
 and never thread a `displayFrameIdFormat` prop down a tree. Frame-id
 rendering is centralised in
-[useFrameIdFormat.tsx](../src/hooks/useFrameIdFormat.tsx): the global
+[useFrameIdFormat.tsx](../frontend/wiretap-ui/src/hooks/useFrameIdFormat.tsx): the global
 setting is the *default*, and each panel may override it locally
 (Auto → Dec → Hex) via the top-bar toggle. The override is ephemeral per
 panel instance.
@@ -398,7 +398,7 @@ flavours, depending on whether the panel deals with streaming data:
 ### Streaming / data apps — use `AppTabView`
 
 Apps that show frames, signals, or other live/recorded data (Discovery,
-Decoder) use [AppTabView.tsx](../src/components/AppTabView.tsx). It
+Decoder) use [AppTabView.tsx](../frontend/wiretap-ui/src/components/AppTabView.tsx). It
 bundles `DataViewController` (tab bar + protocol badge + streaming
 status + optional pagination toolbar + optional timeline scrubber)
 inside `dataViewContainer` with a `bgDataView` content area.
@@ -461,9 +461,9 @@ newest-first with a colour-coded dot per entry. Include the entity ID
 in every message ("Bridge 0x0001 added"), not just the verb — log
 entries should read clearly without needing to cross-reference the
 configuration tabs. See
-[apps/rules/stores/rulesStore.ts](../src/apps/rules/stores/rulesStore.ts)
+[apps/rules/stores/rulesStore.ts](../frontend/wiretap-ui/src/apps/rules/stores/rulesStore.ts)
 for the canonical implementation and
-[apps/rules/views/LogView.tsx](../src/apps/rules/views/LogView.tsx) for
+[apps/rules/views/LogView.tsx](../frontend/wiretap-ui/src/apps/rules/views/LogView.tsx) for
 the rendering.
 
 ## Identity pickers
@@ -472,8 +472,8 @@ Two pickers, one visual language:
 
 | Picker | When | File |
 |---|---|---|
-| `SessionButton` (inside `IOSessionControls`) | Session-bound apps (Discovery, Decoder, Transmit) | [SessionControls.tsx](../src/components/SessionControls.tsx) |
-| `FrameLinkDevicePicker` | Apps bound to a single FrameLink device (Rules) | [FrameLinkDevicePicker.tsx](../src/components/FrameLinkDevicePicker.tsx) |
+| `SessionButton` (inside `IOSessionControls`) | Session-bound apps (Discovery, Decoder, Transmit) | [SessionControls.tsx](../frontend/wiretap-ui/src/components/SessionControls.tsx) |
+| `FrameLinkDevicePicker` | Apps bound to a single FrameLink device (Rules) | [FrameLinkDevicePicker.tsx](../frontend/wiretap-ui/src/components/FrameLinkDevicePicker.tsx) |
 
 Both render as a compact `buttonBase`-styled control: `[type icon] [status dot] [label]`.
 Click opens a popover (never a native `<select>` — popovers can show
@@ -500,7 +500,7 @@ theme via the status CSS variables.
 
 Device pickers need a "is this device reachable right now?" signal.
 The reusable hook
-[useFrameLinkDeviceLiveness](../src/hooks/useFrameLinkDeviceLiveness.ts)
+[useFrameLinkDeviceLiveness](../frontend/wiretap-ui/src/hooks/useFrameLinkDeviceLiveness.ts)
 provides one: a hybrid of background mDNS scan (cheap, passive) plus
 on-demand probe (called by the picker on popover-open for any device
 the scan hasn't seen). Reuse this pattern when adding pickers for new
@@ -514,9 +514,9 @@ Choose the lightest weight one that fits the situation.
 
 | Surface | Token / Component | Use when |
 |---|---|---|
-| **Inline banner** (recoverable, dismissable) | `bgDanger` + `borderDanger` + `textDanger`, or `errorBoxCompact` from [cardStyles.ts](../src/styles/cardStyles.ts) | An operation failed but the panel is still usable; the user can retry |
-| **Modal `ErrorDialog`** (blocking) | `useSessionStore.getState().showAppError(title, message, details?)` from [appError.ts](../src/utils/appError.ts) | Unexpected failure with technical detail the user should see (stack, server response) |
-| **Toast `FlashNotification`** | [FlashNotification.tsx](../src/components/FlashNotification.tsx) | Transient confirmations and soft warnings that don't need acknowledgement |
+| **Inline banner** (recoverable, dismissable) | `bgDanger` + `borderDanger` + `textDanger`, or `errorBoxCompact` from [cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | An operation failed but the panel is still usable; the user can retry |
+| **Modal `ErrorDialog`** (blocking) | `useSessionStore.getState().showAppError(title, message, details?)` from [appError.ts](../frontend/wiretap-ui/src/utils/appError.ts) | Unexpected failure with technical detail the user should see (stack, server response) |
+| **Toast `FlashNotification`** | [FlashNotification.tsx](../frontend/wiretap-ui/src/components/FlashNotification.tsx) | Transient confirmations and soft warnings that don't need acknowledgement |
 | **Operational status footer** (Rules-style) | App-specific footer using semantic status colours | Long-running stateful apps that benefit from a persistent "last operation" line; pair with a coloured status dot |
 
 ### Inline banner recipe
@@ -573,7 +573,7 @@ try {
 
 Strings are loaded via [react-i18next](https://react.i18next.com/). The
 language preference is stored as `language` in `settingsStore.general` and
-applied by [WireTAP.tsx](../src/WireTAP.tsx) calling `i18n.changeLanguage()`.
+applied by [WireTAP.tsx](../frontend/wiretap-ui/src/WireTAP.tsx) calling `i18n.changeLanguage()`.
 
 ### File layout
 
@@ -587,9 +587,9 @@ src/locales/
 ```
 
 To add a new locale: drop `src/locales/<code>/` with the same namespace files,
-import them in [../src/locales/index.ts](../src/locales/index.ts), and add the
+import them in [../frontend/wiretap-ui/src/locales/index.ts](../frontend/wiretap-ui/src/locales/index.ts), and add the
 code to `SUPPORTED_LANGUAGES`. The Language picker in
-[GeneralView](../src/apps/settings/views/GeneralView.tsx) will show it
+[GeneralView](../frontend/wiretap-ui/src/apps/settings/views/GeneralView.tsx) will show it
 automatically.
 
 ### Key naming
@@ -604,7 +604,7 @@ automatically.
   dropdown. A shared control whose labels live in each caller's namespace is how
   the same dropdown ends up reading "FC 3" in one panel and "FC03" in another;
   that drift had already shipped before the options were lifted into
-  [ModbusFields.tsx](../src/components/modbus/ModbusFields.tsx).
+  [ModbusFields.tsx](../frontend/wiretap-ui/src/components/modbus/ModbusFields.tsx).
 - Form fields follow the pattern `section.field.label` and `section.field.help`.
 - Select option labels go under `section.field.options.<value>`.
 
@@ -689,17 +689,17 @@ those individually.
 
 ### Source-of-truth files
 
-- **[../src/apps/apps.json](../src/apps/apps.json)** — structural data
+- **[../frontend/wiretap-ui/src/apps/apps.json](../frontend/wiretap-ui/src/apps/apps.json)** — structural data
   (`id`, `label`, `group`, `accelerator`, `singleton`) shared by TypeScript
   and Rust. The `groupOrder` array controls divider placement in both menus.
-- **[../src/apps/registry.ts](../src/apps/registry.ts)** — TypeScript-only
+- **[../frontend/wiretap-ui/src/apps/registry.ts](../frontend/wiretap-ui/src/apps/registry.ts)** — TypeScript-only
   visual data (icon, colour classes, lazy import) keyed by panel id, plus
   hidden-only panels (analysis tools opened programmatically, never from the
   launcher).
 
 ### 1. Add the structural entry
 
-Append to `apps` in [../src/apps/apps.json](../src/apps/apps.json):
+Append to `apps` in [../frontend/wiretap-ui/src/apps/apps.json](../frontend/wiretap-ui/src/apps/apps.json):
 
 ```json
 { "id": "my-app", "label": "My App", "group": "utilities", "accelerator": "T" }
@@ -716,7 +716,7 @@ Append to `apps` in [../src/apps/apps.json](../src/apps/apps.json):
 
 ### 2. Add the visual config
 
-Append to `visualConfig` in [../src/apps/registry.ts](../src/apps/registry.ts),
+Append to `visualConfig` in [../frontend/wiretap-ui/src/apps/registry.ts](../frontend/wiretap-ui/src/apps/registry.ts),
 keyed by the same `id`:
 
 ```ts
@@ -735,7 +735,7 @@ The registry asserts at module load that every `apps.json` id has a
 ### 3. Localise
 
 Add the panel title to
-[../src/locales/en-AU/menus.json](../src/locales/en-AU/menus.json) under
+[../frontend/wiretap-ui/src/locales/en-AU/menus.json](../frontend/wiretap-ui/src/locales/en-AU/menus.json) under
 `panels.<i18nKey>`. The i18n key is the kebab-case id converted to camelCase
 (`my-app` → `myApp`, `frame-calculator` → `frameCalculator`).
 
@@ -747,14 +747,14 @@ If the app has its own substantial UI, create a new namespace
 Panels that should be Dockview-registered but never appear in the launcher
 (e.g. Payload Analysis, Frame Order Analysis — opened programmatically from
 inside another app) are added directly to `visualConfig` and listed in
-`hiddenApps` inside [../src/apps/registry.ts](../src/apps/registry.ts). They
+`hiddenApps` inside [../frontend/wiretap-ui/src/apps/registry.ts](../frontend/wiretap-ui/src/apps/registry.ts). They
 do **not** go in `apps.json`.
 
 ### 5. Panel style
 
-- The app's top bar uses [AppTopBar.tsx](../src/components/AppTopBar.tsx).
+- The app's top bar uses [AppTopBar.tsx](../frontend/wiretap-ui/src/components/AppTopBar.tsx).
 - The panel root wraps in `h-full overflow-hidden` (Dockview requirement).
-- Use tokens from [../src/styles/](../src/styles/) — no inline colour values.
+- Use tokens from [../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/) — no inline colour values.
 
 ### What the harness does for you
 
@@ -762,12 +762,12 @@ A single `apps.json` + `registry.ts` entry feeds:
 
 | Surface | Code path |
 |---|---|
-| Dockview component registry | [MainLayout.tsx](../src/components/MainLayout.tsx) iterates `apps` |
+| Dockview component registry | [MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) iterates `apps` |
 | Panel tab title (i18n) | `apps[i].i18nKey` resolved via `t(\`panels.${key}\`)` |
-| Watermark dashboard | [MainLayout.tsx](../src/components/MainLayout.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
-| Logo menu (with dividers) | [LogoMenu.tsx](../src/components/LogoMenu.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
-| Tab icon + colour | [AppTab.tsx](../src/components/AppTab.tsx) reads `appById[panelId]` |
-| Native Tauri **Apps** menu | [lib.rs](../src-tauri/src/lib.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
+| Watermark dashboard | [MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
+| Logo menu (with dividers) | [LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
+| Tab icon + colour | [AppTab.tsx](../frontend/wiretap-ui/src/components/AppTab.tsx) reads `appById[panelId]` |
+| Native Tauri **Apps** menu | [lib.rs](../crates/wiretap-app/src/lib.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
 | `cmdOrCtrl+<accel>` shortcut | Built from the JSON `accelerator` field |
 
 If a surface is missing your app, the cause is one of: missing `visualConfig`
@@ -783,30 +783,30 @@ guarantees they can't drift; the Rust menu reads the same file the TypeScript
 registry does, so a JSON edit re-flows all three surfaces consistently.
 
 Session-aware apps belong in the `sessions` group — they share state through
-[useIOSessionManager](../src/hooks/useIOSessionManager.ts) and benefit from
+[useIOSessionManager](../frontend/wiretap-ui/src/hooks/useIOSessionManager.ts) and benefit from
 adjacency so related tooling is visible at a glance.
 
 ## Where things live
 
 | Directory | What's there |
 |---|---|
-| [../src/styles/colourTokens.ts](../src/styles/colourTokens.ts) | Surfaces, text, borders, status, data accents, hover, interactive |
-| [../src/styles/typography.ts](../src/styles/typography.ts) | Headings, body, mono, labels, empty-state, truncation |
-| [../src/styles/spacing.ts](../src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
-| [../src/styles/buttonStyles.ts](../src/styles/buttonStyles.ts) | Button variants, toggle helpers, launcher, dialog options |
-| [../src/styles/inputStyles.ts](../src/styles/inputStyles.ts) | Input/select variants, label / help / heights |
-| [../src/styles/badgeStyles.ts](../src/styles/badgeStyles.ts) | Standard, small, dark-panel, metadata badges |
-| [../src/styles/cardStyles.ts](../src/styles/cardStyles.ts) | Card/alert variants, detail box, panel footer, expandable row, selectable option |
-| [../src/styles/tableStyles.ts](../src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
-| [../src/styles/index.ts](../src/styles/index.ts) | Single barrel — import from here |
-| [../src/locales/en-AU/common.json](../src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
-| [../src/locales/en-AU/settings.json](../src/locales/en-AU/settings.json) | Settings panel strings |
-| [../src/locales/en-AU/menus.json](../src/locales/en-AU/menus.json) | Logo menu, panel titles |
-| [../src/locales/index.ts](../src/locales/index.ts) | Locale registry, supported languages |
-| [../src/i18n.ts](../src/i18n.ts) | i18next bootstrap |
-| [../src/components/MainLayout.tsx](../src/components/MainLayout.tsx) | Panel registry, dashboard watermark |
-| [../src/components/LogoMenu.tsx](../src/components/LogoMenu.tsx) | App launcher menu |
-| [../src-tauri/src/lib.rs](../src-tauri/src/lib.rs) | Native Tauri menu, panel-open events |
+| [../frontend/wiretap-ui/src/styles/colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) | Surfaces, text, borders, status, data accents, hover, interactive |
+| [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, labels, empty-state, truncation |
+| [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
+| [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Button variants, toggle helpers, launcher, dialog options |
+| [../frontend/wiretap-ui/src/styles/inputStyles.ts](../frontend/wiretap-ui/src/styles/inputStyles.ts) | Input/select variants, label / help / heights |
+| [../frontend/wiretap-ui/src/styles/badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts) | Standard, small, dark-panel, metadata badges |
+| [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Card/alert variants, detail box, panel footer, expandable row, selectable option |
+| [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
+| [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
+| [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
+| [../frontend/wiretap-ui/src/locales/en-AU/settings.json](../frontend/wiretap-ui/src/locales/en-AU/settings.json) | Settings panel strings |
+| [../frontend/wiretap-ui/src/locales/en-AU/menus.json](../frontend/wiretap-ui/src/locales/en-AU/menus.json) | Logo menu, panel titles |
+| [../frontend/wiretap-ui/src/locales/index.ts](../frontend/wiretap-ui/src/locales/index.ts) | Locale registry, supported languages |
+| [../frontend/wiretap-ui/src/i18n.ts](../frontend/wiretap-ui/src/i18n.ts) | i18next bootstrap |
+| [../frontend/wiretap-ui/src/components/MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) | Panel registry, dashboard watermark |
+| [../frontend/wiretap-ui/src/components/LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) | App launcher menu |
+| [../crates/wiretap-app/src/lib.rs](../crates/wiretap-app/src/lib.rs) | Native Tauri menu, panel-open events |
 
 ## Future improvements (non-blocking)
 

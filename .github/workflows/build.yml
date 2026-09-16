@@ -116,6 +116,8 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_APP_PATH: ${{ github.workspace }}/crates/wiretap-app
+          TAURI_FRONTEND_PATH: ${{ github.workspace }}/frontend/wiretap-ui
         with:
           args: --target ${{ matrix.target }}
           # Release is pre-created by create-release job; tauri-action finds it and uploads assets
@@ -133,21 +135,22 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_APP_PATH: ${{ github.workspace }}/crates/wiretap-app
+          TAURI_FRONTEND_PATH: ${{ github.workspace }}/frontend/wiretap-ui
         with:
           args: --target ${{ matrix.target }}
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build gs_usb_cli
         if: runner.os == 'macOS' || runner.os == 'Windows'
-        run: cargo build --release --features cli --bin gs_usb_cli --target ${{ matrix.target }}
-        working-directory: src-tauri
+        run: cargo build --release -p wiretap-gs-usb-cli --target ${{ matrix.target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           name: wiretap-${{ matrix.target }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/
+            target/${{ matrix.target }}/release/bundle/
           if-no-files-found: error
 
       - name: Upload gs_usb_cli artifact
@@ -156,7 +159,7 @@ jobs:
         with:
           name: gs_usb_cli-${{ matrix.target }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}
+            target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}
           if-no-files-found: error
 
       - name: Upload gs_usb_cli to release
@@ -164,7 +167,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BINARY="src-tauri/target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}"
+          BINARY="target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}"
           EXT="${{ runner.os == 'Windows' && '.exe' || '' }}"
           ASSET_NAME="gs_usb_cli-${{ matrix.target }}${EXT}"
           mv "$BINARY" "$ASSET_NAME"

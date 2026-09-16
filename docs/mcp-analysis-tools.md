@@ -1,23 +1,23 @@
 # MCP analysis tools (headless capture / database analysis)
 
-WireTAP's embedded MCP server (`src-tauri/src/mcp/`) exposes read tools that let an
+WireTAP's embedded MCP server (`crates/wiretap-app/src/mcp/`) exposes read tools that let an
 agent inspect recorded CAN data **without any view open**. Alongside the existing
 session/capture/catalog tools, these *analysis levers* run the same query engines
 that back the Query app, against **either** a SQLite capture **or** a WireTAP
 backend profile, and a catalog-coverage diff on top.
 
-Implementation: [src-tauri/src/analysis.rs](../src-tauri/src/analysis.rs)
+Implementation: [crates/wiretap-app/src/analysis.rs](../crates/wiretap-app/src/analysis.rs)
 (orchestration + the pure byte-role classifier), the backend/sqlite query paths in
-[src-tauri/src/dbquery.rs](../src-tauri/src/dbquery.rs) and
-[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs), wired as MCP tools in
-[src-tauri/src/mcp/tools.rs](../src-tauri/src/mcp/tools.rs).
+[crates/wiretap-app/src/dbquery.rs](../crates/wiretap-app/src/dbquery.rs) and
+[crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs), wired as MCP tools in
+[crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs).
 
 ## Protocol
 
 The server speaks **MCP `2026-07-28`** (via `rmcp` 3.x) over Streamable HTTP at
 `http://127.0.0.1:<mcp_server_port>/mcp`, default port 8787. It is **dual-era**:
 `supported_protocol_versions()` in
-[src-tauri/src/mcp/tools.rs](../src-tauri/src/mcp/tools.rs) advertises
+[crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs) advertises
 `2026-07-28`, `2025-11-25` and `2025-06-18`, so a client that still opens with the
 legacy `initialize` handshake keeps working alongside one that sends stateless
 per-request `_meta`. `server/discover` is answered from `get_info()`.
@@ -33,7 +33,7 @@ Consequences worth knowing when reading results:
   changes when a permission gate does, which forces a server restart.
 - **There are no protocol sessions** under `2026-07-28`, so the Session Manager's
   MCP connect/disconnect entries come from a 90-second activity window
-  ([src-tauri/src/mcp/mod.rs](../src-tauri/src/mcp/mod.rs)), not a handshake. A
+  ([crates/wiretap-app/src/mcp/mod.rs](../crates/wiretap-app/src/mcp/mod.rs)), not a handshake. A
   legacy client's explicit `DELETE` still disconnects it immediately; everything
   else — every stateless client, and any legacy client that just exits — is
   expired by the window. Expect a disconnect entry to lag the client leaving.

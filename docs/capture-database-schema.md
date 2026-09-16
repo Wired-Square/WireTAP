@@ -17,7 +17,7 @@ always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-p
 gated by `PRAGMA user_version` and audited in the `schema_migrations` table —
 see [capture-db-migrations.md](capture-db-migrations.md) for the rules and
 how to add one. The v1 baseline (`baseline_capture_schema` in
-[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs)) normalises
+[crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs)) normalises
 unstamped pre-versioning databases, including the legacy `buffer_*` rename.
 
 **PRAGMAs:**
@@ -133,9 +133,9 @@ One row per capture. Survives `ALTER TABLE RENAME` from the legacy
 
 | Module | File | Role |
 |--------|------|------|
-| `capture_db` | `src-tauri/src/capture_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
-| `capture_store` | `src-tauri/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
-| `CaptureSource` | `src-tauri/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
+| `capture_db` | `crates/wiretap-app/src/capture_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+| `capture_store` | `crates/wiretap-app/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
+| `CaptureSource` | `crates/wiretap-app/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
 
 ### Data flow
 
@@ -271,7 +271,7 @@ One row per transmitted frame or serial payload.
 
 | Module | File | Role |
 |--------|------|------|
-| `transmit_history` | `src-tauri/src/transmit_history.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+| `transmit_history` | `crates/wiretap-app/src/transmit_history.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
 
 ### Data flow
 

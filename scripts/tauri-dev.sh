@@ -12,4 +12,4 @@ if [[ "$(uname)" == "Darwin" ]]; then
   export CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER="$linker"
 fi
 
-exec npx tauri dev "$@"
+exec bash "$script_dir/tauri.sh" dev "$@"

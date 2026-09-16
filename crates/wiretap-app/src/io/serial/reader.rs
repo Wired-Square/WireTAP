@@ -1,0 +1,372 @@
+// ui/crates/wiretap-app/src/io/serial/reader.rs
+//
+// Serial port reader for multi-source sessions.
+// Can emit raw bytes and/or framed messages (SLIP, Modbus RTU, delimiter-based).
+// Provides cross-platform serial communication for WireTAP.
+
+use serde::Serialize;
+use std::io::{Read, Write};
+use std::sync::mpsc as std_mpsc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
+use std::time::Duration;
+use tokio::sync::mpsc;
+
+use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
+use crate::io::types::{ByteEntry, EndReason, SetFramingRequest, SourceMessage, TransmitRequest};
+use crate::io::{now_us, FrameMessage};
+
+// Re-export Parity for external use
+pub use super::utils::Parity;
+use super::framer::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer};
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/// Information about an available serial port
+#[derive(Clone, Serialize)]
+pub struct SerialPortInfo {
+    pub port_name: String,
+    pub port_type: String,
+    pub manufacturer: Option<String>,
+    pub product: Option<String>,
+    pub serial_number: Option<String>,
+    pub vid: Option<u16>,
+    pub pid: Option<u16>,
+}
+
+// ============================================================================
+// Multi-Source Streaming
+// ============================================================================
+
+/// Frames from one batch of framed serial messages: too-short ones, and any the
+/// bus mapping drops, are left out.
+///
+/// One function for both the read loop and the end-of-stream flush, which had
+/// diverged — both hardcoded `incomplete: None`, so a trailing partial message
+/// was delivered looking like a complete one.
+fn frames_from_serial(
+    frames: Vec<SerialFrame>,
+    timestamp_us: u64,
+    min_frame_length: usize,
+    frame_id_config: Option<&FrameIdConfig>,
+    source_address_config: Option<&FrameIdConfig>,
+    bus_mappings: &[BusMapping],
+) -> Vec<FrameMessage> {
+    frames
+        .into_iter()
+        .filter(|f| f.bytes.len() >= min_frame_length)
+        .filter_map(|frame| {
+            let extract =
+                |cfg: Option<&FrameIdConfig>| cfg.and_then(|c| extract_frame_id(&frame.bytes, c));
+            let frame_id = extract(frame_id_config).unwrap_or(0);
+            let source_address = extract(source_address_config).map(|v| v as u16);
+
+            // `frame.crc_valid` is deliberately not carried: the decode path
+            // recomputes it from these same bytes. See `framing.rs`.
+            let mut msg = FrameMessage {
+                protocol: "serial".to_string(),
+                timestamp_us,
+                frame_id,
+                bus: 0,
+                dlc: frame.bytes.len() as u8,
+                bytes: frame.bytes,
+                is_extended: false,
+                is_fd: false,
+                source_address,
+                incomplete: frame.incomplete.then_some(true),
+                direction: None,
+            };
+            apply_bus_mapping(&mut msg, bus_mappings).then_some(msg)
+        })
+        .collect()
+}
+
+/// Run serial source and send frames/bytes to merge task.
+/// Can emit raw bytes and/or framed data depending on configuration.
+pub async fn run_source(
+    source_idx: usize,
+    port_path: String,
+    baud_rate: u32,
+    data_bits: u8,
+    stop_bits: u8,
+    parity: Parity,
+    framing_encoding: FramingEncoding,
+    frame_id_config: Option<FrameIdConfig>,
+    source_address_config: Option<FrameIdConfig>,
+    min_frame_length: usize,
+    emit_raw_bytes: bool,
+    bus_mappings: Vec<BusMapping>,
+    stop_flag: Arc<AtomicBool>,
+    tx: mpsc::Sender<SourceMessage>,
+) {
+    // Convert config to serialport types
+    let sp_data_bits = super::utils::to_serialport_data_bits(data_bits);
+    let sp_stop_bits = super::utils::to_serialport_stop_bits(stop_bits);
+    let sp_parity = super::utils::to_serialport_parity(&parity);
+
+    // Open serial port
+    let serial_port = match serialport::new(&port_path, baud_rate)
+        .data_bits(sp_data_bits)
+        .stop_bits(sp_stop_bits)
+        .parity(sp_parity)
+        .timeout(Duration::from_millis(50))
+        .open()
+    {
+        Ok(p) => p,
+        Err(e) => {
+            let _ = tx
+                .send(SourceMessage::Error(
+                    source_idx,
+                    format!("Failed to open {}: {}", port_path, e),
+                ))
+                .await;
+            return;
+        }
+    };
+
+    // Wrap in Arc<Mutex> for shared access between read and transmit
+    let serial_port = Arc::new(Mutex::new(serial_port));
+
+    // Create transmit channel
+    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
+    let _ = tx
+        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
+        .await;
+
+    // Create control channel (live framing changes)
+    let (control_tx, control_rx) = std_mpsc::sync_channel::<SetFramingRequest>(8);
+    let _ = tx
+        .send(SourceMessage::ControlReady(source_idx, control_tx))
+        .await;
+
+    // Get the output bus from the first enabled mapping (for raw bytes)
+    let output_bus = bus_mappings
+        .iter()
+        .find(|m| m.enabled)
+        .map(|m| m.output_bus)
+        .unwrap_or(0);
+
+    tlog!(
+        "[serial] Source {} connected to {} (baud: {}, framing: {:?}, emit_raw: {}, bus: {})",
+        source_idx, port_path, baud_rate, framing_encoding, emit_raw_bytes, output_bus
+    );
+
+    // Emit device-connected event
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "serial".to_string(), port_path.clone(), Some(output_bus)))
+        .await;
+
+    // Read loop (blocking)
+    let tx_clone = tx.clone();
+    let stop_flag_clone = stop_flag.clone();
+    let serial_port_clone = serial_port.clone();
+    let port_name = port_path.clone();
+
+    // Check if we have actual framing (not Raw mode)
+    let has_framing = !matches!(framing_encoding, FramingEncoding::Raw);
+
+    let blocking_handle = tokio::task::spawn_blocking(move || {
+        let mut framer = SerialFramer::new(framing_encoding);
+        // Framing config is mutable so a live `SetFraming` control message can
+        // swap it without reconnecting the port (see the control poll below).
+        let mut frame_id_config = frame_id_config;
+        let mut source_address_config = source_address_config;
+        let mut min_frame_length = min_frame_length;
+        let mut emit_raw_bytes = emit_raw_bytes;
+        let mut has_framing = has_framing;
+        let mut buf = [0u8; 256];
+
+        while !stop_flag_clone.load(Ordering::SeqCst) {
+            // Check for transmit requests (non-blocking)
+            while let Ok(req) = transmit_rx.try_recv() {
+                let result = match serial_port_clone.lock() {
+                    Ok(mut port) => port
+                        .write_all(&req.data)
+                        .and_then(|_| port.flush())
+                        .map_err(|e| format!("Write error: {}", e)),
+                    Err(e) => {
+                        tlog!("[serial] Mutex poisoned in transmit: {}", e);
+                        Err(format!("Port mutex poisoned: {}", e))
+                    }
+                };
+                let _ = req.result_tx.send(result);
+            }
+
+            // Check for live framing changes (non-blocking). Swaps the framer in
+            // place — the old framer's partial buffer is dropped; the device
+            // re-syncs on the next boundary in the new encoding.
+            while let Ok(req) = control_rx.try_recv() {
+                let new_framing =
+                    super::utils::framing_from_str(&req.encoding, req.modbus.as_ref());
+                has_framing = !matches!(new_framing, FramingEncoding::Raw);
+                framer = SerialFramer::new(new_framing);
+                let mk_cfg = |start: Option<i32>, bytes: Option<u8>, big_endian: bool| {
+                    start.map(|start_byte| FrameIdConfig {
+                        start_byte,
+                        num_bytes: bytes.unwrap_or(1),
+                        big_endian,
+                    })
+                };
+                frame_id_config = mk_cfg(req.frame_id_start_byte, req.frame_id_bytes, req.frame_id_big_endian);
+                source_address_config = mk_cfg(
+                    req.source_address_start_byte,
+                    req.source_address_bytes,
+                    req.source_address_big_endian,
+                );
+                min_frame_length = req.min_frame_length;
+                emit_raw_bytes = req.emit_raw_bytes;
+                tlog!(
+                    "[serial] Source {} framing updated → {} (has_framing: {})",
+                    source_idx, req.encoding, has_framing
+                );
+            }
+
+            // Read data
+            let read_result = match serial_port_clone.lock() {
+                Ok(mut port) => port.read(&mut buf),
+                Err(e) => {
+                    tlog!("[serial] Mutex poisoned in read loop: {}", e);
+                    let _ = tx_clone.blocking_send(SourceMessage::Error(
+                        source_idx,
+                        format!("Port mutex poisoned: {}", e),
+                    ));
+                    return;
+                }
+            };
+
+            match read_result {
+                Ok(n) if n > 0 => {
+                    let base_ts = now_us();
+                    let read_bytes = &buf[..n];
+
+                    // Emit raw bytes if requested
+                    if emit_raw_bytes {
+                        let raw_entries: Vec<ByteEntry> = read_bytes
+                            .iter()
+                            .map(|&byte| ByteEntry {
+                                byte,
+                                timestamp_us: base_ts,
+                                bus: output_bus,
+                            })
+                            .collect();
+                        let _ = tx_clone.blocking_send(SourceMessage::Bytes(source_idx, raw_entries));
+                    }
+
+                    // Only process through framer if we have actual framing
+                    if has_framing {
+                        let pending_frames = frames_from_serial(
+                            framer.feed(read_bytes),
+                            base_ts,
+                            min_frame_length,
+                            frame_id_config.as_ref(),
+                            source_address_config.as_ref(),
+                            &bus_mappings,
+                        );
+
+                        if !pending_frames.is_empty() {
+                            let _ = tx_clone
+                                .blocking_send(SourceMessage::Frames(source_idx, pending_frames));
+                        }
+                    }
+                }
+                Ok(0) => {
+                    // EOF - port disconnected
+                    let _ = tx_clone
+                        .blocking_send(SourceMessage::Ended(source_idx, EndReason::Disconnected));
+                    return;
+                }
+                Ok(_) => {}
+                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                    // Timeout - continue
+                }
+                Err(e) => {
+                    super::utils::send_serial_read_error(&tx_clone, source_idx, &port_name, &e);
+                    return;
+                }
+            }
+        }
+
+        // Flush the framer at end of stream. Modbus RTU can still recover whole
+        // messages from what it holds, so this is a list, not one residue.
+        if has_framing {
+            let flushed = frames_from_serial(
+                framer.flush(),
+                now_us(),
+                min_frame_length,
+                frame_id_config.as_ref(),
+                source_address_config.as_ref(),
+                &bus_mappings,
+            );
+            if !flushed.is_empty() {
+                let _ = tx_clone.blocking_send(SourceMessage::Frames(source_idx, flushed));
+            }
+        }
+
+        let _ = tx_clone.blocking_send(SourceMessage::Ended(source_idx, EndReason::Stopped));
+    });
+
+    let _ = blocking_handle.await;
+}
+
+// ============================================================================
+// Tauri Commands
+// ============================================================================
+
+/// List available serial ports
+///
+/// On macOS, filters out /dev/tty.* devices and only shows /dev/cu.* devices.
+/// The cu (calling unit) devices are non-blocking and preferred for outgoing connections.
+/// The tty (terminal) devices block on open waiting for carrier detect.
+#[tauri::command]
+pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
+    let ports = serialport::available_ports().map_err(|e| format!("Failed to enumerate ports: {}", e))?;
+
+    Ok(ports
+        .into_iter()
+        // On macOS, filter out /dev/tty.* devices - only show /dev/cu.* (calling unit)
+        .filter(|_p| {
+            #[cfg(target_os = "macos")]
+            {
+                !_p.port_name.starts_with("/dev/tty.")
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                true
+            }
+        })
+        .map(|p| {
+            let (port_type, manufacturer, product, serial_number, vid, pid) = match p.port_type {
+                serialport::SerialPortType::UsbPort(info) => (
+                    "USB".to_string(),
+                    info.manufacturer,
+                    info.product,
+                    info.serial_number,
+                    Some(info.vid),
+                    Some(info.pid),
+                ),
+                serialport::SerialPortType::BluetoothPort => {
+                    ("Bluetooth".to_string(), None, None, None, None, None)
+                }
+                serialport::SerialPortType::PciPort => {
+                    ("PCI".to_string(), None, None, None, None, None)
+                }
+                serialport::SerialPortType::Unknown => {
+                    ("Unknown".to_string(), None, None, None, None, None)
+                }
+            };
+            SerialPortInfo {
+                port_name: p.port_name,
+                port_type,
+                manufacturer,
+                product,
+                serial_number,
+                vid,
+                pid,
+            }
+        })
+        .collect())
+}

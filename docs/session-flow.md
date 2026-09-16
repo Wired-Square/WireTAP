@@ -31,7 +31,7 @@ rather than Tauri events — see [§ WebSocket transport](#websocket-transport).
 ## 1. Source traits
 
 Every IO source declares its capabilities via two embedded structs on
-`IOCapabilities` ([src-tauri/src/io/traits.rs](../src-tauri/src/io/traits.rs)):
+`IOCapabilities` ([crates/wiretap-app/src/io/traits.rs](../crates/wiretap-app/src/io/traits.rs)):
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -68,20 +68,20 @@ with `multi_source: false` cannot be combined with others.
 
 | Source            | Module                                   | Temporal  | Protocols     | tx_frames | tx_bytes | multi |
 |-------------------|------------------------------------------|-----------|---------------|-----------|----------|-------|
-| GVRET (TCP/USB)   | [io/gvret/](../src-tauri/src/io/gvret/)  | realtime  | can, canfd    | ✓         | ✗        | ✓     |
-| slcan             | [io/slcan/](../src-tauri/src/io/slcan/)  | realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
-| gs_usb            | [io/gs_usb/](../src-tauri/src/io/gs_usb/)| realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
-| SocketCAN         | [io/socketcan/](../src-tauri/src/io/socketcan/) | realtime | can      | ✓         | ✗        | ✓     |
-| Serial (framed)   | [io/serial/](../src-tauri/src/io/serial/)| realtime  | serial¹       | ✗         | ✗        | ✓     |
-| Serial (raw)      | [io/serial/](../src-tauri/src/io/serial/)| realtime  | serial        | ✗         | ✓        | ✓     |
-| MQTT              | [io/mqtt/](../src-tauri/src/io/mqtt/)    | realtime  | can           | ✗         | ✗        | ✓     |
-| Modbus TCP        | [io/modbus_tcp/](../src-tauri/src/io/modbus_tcp/) | realtime | modbus | ✗         | ✗        | ✓     |
-| Modbus RTU        | [io/modbus_rtu/](../src-tauri/src/io/modbus_rtu/) | realtime | modbus | ✓         | ✗        | ✓     |
-| Modbus scan²      | [io/modbus_tcp/scan_source.rs](../src-tauri/src/io/modbus_tcp/scan_source.rs) | realtime | modbus | ✗ | ✗ | ✗ |
-| FrameLink         | [io/framelink/](../src-tauri/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
-| Virtual device    | [io/virtual_device/](../src-tauri/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
-| WireTAP backend   | [io/recorded/backend_api.rs](../src-tauri/src/io/recorded/backend_api.rs) | recorded | can \| modbus_rtu³ | ✗ | ✗ | ✗ |
-| Capture replay    | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | capture | (inherited) | ✗ | ✗ | ✗ |
+| GVRET (TCP/USB)   | [io/gvret/](../crates/wiretap-app/src/io/gvret/)  | realtime  | can, canfd    | ✓         | ✗        | ✓     |
+| slcan             | [io/slcan/](../crates/wiretap-app/src/io/slcan/)  | realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
+| gs_usb            | [io/gs_usb/](../crates/wiretap-app/src/io/gs_usb/)| realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
+| SocketCAN         | [io/socketcan/](../crates/wiretap-app/src/io/socketcan/) | realtime | can      | ✓         | ✗        | ✓     |
+| Serial (framed)   | [io/serial/](../crates/wiretap-app/src/io/serial/)| realtime  | serial¹       | ✗         | ✗        | ✓     |
+| Serial (raw)      | [io/serial/](../crates/wiretap-app/src/io/serial/)| realtime  | serial        | ✗         | ✓        | ✓     |
+| MQTT              | [io/mqtt/](../crates/wiretap-app/src/io/mqtt/)    | realtime  | can           | ✗         | ✗        | ✓     |
+| Modbus TCP        | [io/modbus_tcp/](../crates/wiretap-app/src/io/modbus_tcp/) | realtime | modbus | ✗         | ✗        | ✓     |
+| Modbus RTU        | [io/modbus_rtu/](../crates/wiretap-app/src/io/modbus_rtu/) | realtime | modbus | ✓         | ✗        | ✓     |
+| Modbus scan²      | [io/modbus_tcp/scan_source.rs](../crates/wiretap-app/src/io/modbus_tcp/scan_source.rs) | realtime | modbus | ✗ | ✗ | ✗ |
+| FrameLink         | [io/framelink/](../crates/wiretap-app/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
+| Virtual device    | [io/virtual_device/](../crates/wiretap-app/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
+| WireTAP backend   | [io/recorded/backend_api.rs](../crates/wiretap-app/src/io/recorded/backend_api.rs) | recorded | can \| modbus_rtu³ | ✗ | ✗ | ✗ |
+| Capture replay    | [io/recorded/capture.rs](../crates/wiretap-app/src/io/recorded/capture.rs) | capture | (inherited) | ✗ | ✗ | ✗ |
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 ² A discovery sweep, not a device you configure — see *Modbus discovery* below.
@@ -262,7 +262,7 @@ only client slot for the life of the process.
 
 **Host resolution.** TCP-based sources accept either a hostname or a literal IP
 for their host. GVRET TCP, Modbus TCP and FrameLink resolve through
-[`io/net.rs::resolve_host_port`](../src-tauri/src/io/net.rs), a wrapper over
+[`io/net.rs::resolve_host_port`](../crates/wiretap-app/src/io/net.rs), a wrapper over
 `tokio::net::lookup_host` that bounds the lookup with `DNS_TIMEOUT` and classifies
 failures as `IoError::DnsResolution`. New TCP transports must resolve through that
 helper — parsing `"host:port"` straight into a `SocketAddr` accepts only numeric
@@ -304,7 +304,7 @@ reason `error` to `ioState: "error"` — collapsing every non-paused reason to
 
 **Device errors.** The serial-family read loops (serial, slcan, gvret_usb) route
 read failures through `IoError` via one
-[`serial::utils::send_serial_read_error`](../src-tauri/src/io/serial/utils.rs)
+[`serial::utils::send_serial_read_error`](../crates/wiretap-app/src/io/serial/utils.rs)
 helper, which probes port presence (`serialport::available_ports`) to classify
 access-denied as *in use* vs *disconnected* and emits a device-identified,
 actionable message rather than a raw `os error`. Stream errors are shown once,
@@ -345,7 +345,7 @@ choose a variant, which is the point: the contract is checked rather than spelle
 handshake — `connect` writes nothing, so a successful TCP connect proves only
 that a socket opened, and a peer on a different protocol version drops our
 frames *before dispatch* without replying. A timeout is therefore ambiguous, so
-[`framelink/version_probe.rs`](../src-tauri/src/io/framelink/version_probe.rs)
+[`framelink/version_probe.rs`](../crates/wiretap-app/src/io/framelink/version_probe.rs)
 asks the device directly: one `PING` per protocol version `0..=15` in a single
 write, then one read. The device answers the single dialect it understands and
 ignores the rest, and `parse_frame` reports a foreign peer's version in
@@ -377,7 +377,7 @@ Three constraints on that path, each of which was got wrong first:
 
 What a device kind's `connection` map holds — its defaults and its required
 fields — is declared once, in
-[io/device_kinds.rs](../src-tauri/src/io/device_kinds.rs). Read it before adding
+[io/device_kinds.rs](../crates/wiretap-app/src/io/device_kinds.rs). Read it before adding
 a device kind or a connection field.
 
 **Defaults are resolved at read time, never written to disk.** The `req_*` and
@@ -412,7 +412,7 @@ reader was the one that disagreed, which is why the symptom was an adapter
 ACKing on a bus the user believed it was only listening to.
 
 Still to come: `applyConnectionDefaults` and `validateProfileForm`
-([src/settings/ioProfileForm.ts](../src/settings/ioProfileForm.ts)) are to seed
+([src/settings/ioProfileForm.ts](../frontend/wiretap-ui/src/settings/ioProfileForm.ts)) are to seed
 from the `default_connection_for_kind` and `validate_io_profile` commands rather
 than carry their own copies.
 
@@ -421,7 +421,7 @@ than carry their own copies.
 ## 2. Source selection
 
 All sources — hardware devices, databases, recorded sources, and captures — are
-selected through a single dialog, [IoSourcePickerDialog](../src/dialogs/IoSourcePickerDialog.tsx).
+selected through a single dialog, [IoSourcePickerDialog](../frontend/wiretap-ui/src/dialogs/IoSourcePickerDialog.tsx).
 Clicking the session chip opens the **session menu**; its **Change source** item
 opens the picker (with no current source, clicking the chip opens it directly).
 
@@ -461,7 +461,7 @@ A device is an `IOProfile`, and it lives in one of two places:
 
 **Every profile consumer sees both, with no code of its own.**
 `settings::load_settings` (and `load_settings_sync`) call
-[`ephemeral::overlay`](../src-tauri/src/io/ephemeral.rs), which appends the
+[`ephemeral::overlay`](../crates/wiretap-app/src/io/ephemeral.rs), which appends the
 ad-hoc devices to `io_profiles` on the way out; `save_settings` drops them again
 on the way in. So `choose_profile_by_id`, `resolve_source_config`, the broker
 spawner, `probe_device`, transmit, Modbus and MCP all resolve an ad-hoc device by
@@ -479,7 +479,7 @@ Two rules hold the design up, both enforced in Rust:
   the affordance; `unregister_ephemeral_profile` enforces it against races.
 
 The frontend keeps the two apart: `normalizeSettings` filters `ephemeral` out of
-`io_profiles`, and [`useAllIOProfiles`](../src/hooks/useAllIOProfiles.ts) merges
+`io_profiles`, and [`useAllIOProfiles`](../frontend/wiretap-ui/src/hooks/useAllIOProfiles.ts) merges
 the settings store with `adHocProfileStore` for anything that feeds session
 start. `useIOSessionManager` resolves ids through a `findProfile` that also
 reads the ad-hoc store imperatively — a device registered and connected in the
@@ -489,7 +489,7 @@ same handler is not in the prop array's closure yet.
 
 Changing a device's connection parameters — bitrate, baud rate, 8N1, host, port
 — is **one backend command**,
-[`io::profiles::reconfigure_device`](../src-tauri/src/io/profiles.rs):
+[`io::profiles::reconfigure_device`](../crates/wiretap-app/src/io/profiles.rs):
 
 ```
 reconfigure_device(profile_id, connection, session_id?)
@@ -516,16 +516,16 @@ its device directly) reports the limit rather than failing obscurely.
 
 Two surfaces open this, both landing on the same command:
 
-- **The session menu's interface rows** ([SessionControls](../src/components/SessionControls.tsx)),
+- **The session menu's interface rows** ([SessionControls](../frontend/wiretap-ui/src/components/SessionControls.tsx)),
   one row per interface, so a multi-bus session needs no "which device?" step.
 - **The pencil on a device row** in the source picker.
 
-Both open [DeviceSettingsDialog](../src/dialogs/DeviceSettingsDialog.tsx), hosted
+Both open [DeviceSettingsDialog](../frontend/wiretap-ui/src/dialogs/DeviceSettingsDialog.tsx), hosted
 once at the app root and driven by `deviceEditorStore`. It dispatches globally
 rather than taking a prop because the action is app-agnostic — the backend does
 the whole thing from `(profileId, sessionId)` — and the alternative is a prop
 threaded through six app top bars.
-[DeviceEditor](../src/dialogs/io-source-picker/DeviceEditor.tsx) inside the
+[DeviceEditor](../frontend/wiretap-ui/src/dialogs/io-source-picker/DeviceEditor.tsx) inside the
 picker is **creation only**; it needs the kind selector, the name and the connect
 that follows, none of which apply to a device that already exists.
 
@@ -614,11 +614,11 @@ picker still wins.
 
 | Prefix | Meaning                                                    | Generated in |
 |--------|------------------------------------------------------------|--------------|
-| `f_`   | realtime + rx_frames (CAN, framed serial, GVRET, gs_usb…)  | Rust `generate_session_id` ([sessions.rs](../src-tauri/src/sessions.rs)) |
+| `f_`   | realtime + rx_frames (CAN, framed serial, GVRET, gs_usb…)  | Rust `generate_session_id` ([sessions.rs](../crates/wiretap-app/src/sessions.rs)) |
 | `b_`   | realtime + rx_bytes (raw serial), or capture replay session | Rust (realtime) / `generateCaptureSessionId` (capture) |
 | `m_`   | realtime + modbus protocol                                 | Rust `generate_session_id` |
 | `s_`   | realtime fallback                                          | Rust `generate_session_id` |
-| `t_`   | recorded (WireTAP backend, CSV import)                           | `generateRecordedSessionId` ([useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts)) |
+| `t_`   | recorded (WireTAP backend, CSV import)                           | `generateRecordedSessionId` ([useIOSessionManager.ts](../frontend/wiretap-ui/src/hooks/useIOSessionManager.ts)) |
 
 **Realtime** session IDs are generated by Rust: the multi-source watch path calls
 the `generate_session_id` command, which infers the prefix from the profiles'
@@ -633,7 +633,7 @@ a capture gets a fresh `b_` session ID that owns the capture. See
 
 ### `sessionStore.openSession` steps
 
-Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
+Defined in [src/stores/sessionStore.ts:711](../frontend/wiretap-ui/src/stores/sessionStore.ts#L711).
 
 1. Check if the session already exists locally (connected) — if so, register
    another subscriber and return.
@@ -648,12 +648,12 @@ Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
    interval.
 6. **Step 5.5** — auto-start playback for recorded sources (WireTAP backend, CSV).
    Capture replay sessions explicitly do **not** auto-start — the user drives
-   playback manually. See [sessionStore.ts:992-999](../src/stores/sessionStore.ts#L992-L999).
+   playback manually. See [sessionStore.ts:992-999](../frontend/wiretap-ui/src/stores/sessionStore.ts#L992-L999).
 7. Create/update the `Session` entry in the Zustand store and return.
 
 ### Headless open — the MCP path
 
-[src-tauri/src/mcp/session.rs](../src-tauri/src/mcp/session.rs) is the Rust-native
+[crates/wiretap-app/src/mcp/session.rs](../crates/wiretap-app/src/mcp/session.rs) is the Rust-native
 equivalent of the flow above, for `open_session` with no window open. It calls the
 same `create_reader_session`, then does the three things the frontend would have
 done:
@@ -674,7 +674,7 @@ done:
 - **Passes a time window through.** `start_time` / `end_time` / `speed` / `limit`
   reach `create_reader_session`'s existing parameters, each overriding the profile's
   own `connection` value without modifying the profile
-  ([sessions.rs](../src-tauri/src/sessions.rs) — `start_time.or(start_from_profile)`).
+  ([sessions.rs](../crates/wiretap-app/src/sessions.rs) — `start_time.or(start_from_profile)`).
   Without them a recorded source replays its entire archive from the head, which on
   a long-term store is rarely what an agent wants; `speed` defaults to `0` (as fast
   as the source allows).
@@ -683,7 +683,7 @@ done:
   what to poll, and that normally comes from the profile's catalogue. When the
   device has no catalogue yet — the whole point of discovery — `register_ranges`
   supplies an address range instead, via
-  [`build_polls_from_ranges`](../src-tauri/src/io/modbus_tcp/ranges.rs). An
+  [`build_polls_from_ranges`](../crates/wiretap-app/src/io/modbus_tcp/ranges.rs). An
   explicit range **wins over** a present `preferred_catalog`, which is how you
   re-sweep a device whose catalogue you already know is incomplete. With neither,
   the open fails naming both remedies: silently sweeping an unknown industrial bus
@@ -892,7 +892,7 @@ reliably *before* the frontend subscribes to that channel — so the push was
 missed and the state went on saying "running" forever.
 
 Two pieces close it, and neither is a new event. `SourceLifecycle`
-([`io/lifecycle.rs`](../src-tauri/src/io/lifecycle.rs)) is a terminal-state slot
+([`io/lifecycle.rs`](../crates/wiretap-app/src/io/lifecycle.rs)) is a terminal-state slot
 stamped by a `Drop` guard the merge task holds for its life — a guard rather than
 an explicit store, because `run_merge_task` also returns early when settings fail
 to load, and a flag written at one of two exit points is exactly the hole this
@@ -942,7 +942,7 @@ against `scan_holding`.
 ## 4. Rust session lifecycle
 
 A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
-[src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs). Each session owns a
+[crates/wiretap-app/src/io/mod.rs](../crates/wiretap-app/src/io/mod.rs). Each session owns a
 `Box<dyn IOSource>` plus source config, profile bookkeeping, and capabilities. Its
 subscribers are **not** stored on it — they live in the global `APP_REGISTRY` (see
 [The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)).
@@ -986,7 +986,7 @@ exist but the picker already reads 0/0.
 
 **A reset only ever applies to one session.** Registering on a new session makes
 Rust tear the old one down (`teardown_session_if_empty(prev, true)`,
-[io/mod.rs](../src-tauri/src/io/mod.rs)) and broadcast `destroyed` with
+[io/mod.rs](../crates/wiretap-app/src/io/mod.rs)) and broadcast `destroyed` with
 `reset: true`. That event lands a few milliseconds *after* the switch returned
 and set the new session id, and `useIOSession`'s lifecycle listener is
 registered per session id behind an `await listen(...)` — so the departing
@@ -1011,15 +1011,15 @@ genuinely gone.
 
 ### Leave session — per-app detach to a snapshot
 
-`handleLeave` ([useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts)) calls the
+`handleLeave` ([useIOSessionManager.ts](../frontend/wiretap-ui/src/hooks/useIOSessionManager.ts)) calls the
 Rust `session_leave_to_capture` command; the heavy lifting is in
-`detach_subscriber_to_capture_copy` ([io/mod.rs](../src-tauri/src/io/mod.rs)):
+`detach_subscriber_to_capture_copy` ([io/mod.rs](../crates/wiretap-app/src/io/mod.rs)):
 
 ```
 App clicks Leave (realtime/recorded; other apps may share the session)
      │
      ▼
-session_leave_to_capture(session_id, subscriber_id)      src-tauri/src/io/mod.rs
+session_leave_to_capture(session_id, subscriber_id)      crates/wiretap-app/src/io/mod.rs
      ├─ copy_capture(frame capture) → orphaned snapshot "{capture}_{n}"
      ├─ unregister_subscriber(this subscriber only)
      │     └─ session stays alive if other subscribers remain;
@@ -1067,7 +1067,7 @@ no frontend shim.
 ### The open-app registry — subscribers & the cross-window roster
 
 Subscribers are **not** stored on the `IOSession`. A single global `APP_REGISTRY`
-([io/mod.rs](../src-tauri/src/io/mod.rs)) is the source of truth for every open
+([io/mod.rs](../crates/wiretap-app/src/io/mod.rs)) is the source of truth for every open
 session-aware app instance across **all** windows. Each `AppInstance` carries its
 `instance_id`, a cosmetic `display_id` (`appName_<rand>`, for the UI), its owning
 `window_label`, and a single `session_id: Option<String>` — `None` = the panel is
@@ -1138,7 +1138,7 @@ it is `null`). When a window closes, `on_window_event`'s `Destroyed` handler cal
 last-subscriber teardown.
 
 Windows are surfaced to the user by `formatWindowName`
-([src/utils/windowName.ts](../src/utils/windowName.ts)): the primary window
+([src/utils/windowName.ts](../frontend/wiretap-ui/src/utils/windowName.ts)): the primary window
 (internally labelled `dashboard`) shows as `main`, and dynamic `main-N` windows
 show as `N` (in App Details and the OS title bar).
 
@@ -1167,7 +1167,7 @@ it (marks it persistent). The Speed item is always present but disabled
 ### `replace_session_source` — the shared primitive
 
 All three transitions (stop→capture, capture→live, recorded→capture replay) go
-through [`replace_session_source`](../src-tauri/src/io/mod.rs):
+through [`replace_session_source`](../crates/wiretap-app/src/io/mod.rs):
 
 1. Stop old device (idempotent — no-op if already stopped).
 2. Record old device type.
@@ -1187,14 +1187,14 @@ double-locking.
 ## 5. WebSocket transport
 
 Frame delivery and most session events flow over a local WebSocket, not
-Tauri events. The server is started during Tauri `setup()` in [lib.rs:945](../src-tauri/src/lib.rs#L945)
+Tauri events. The server is started during Tauri `setup()` in [lib.rs:945](../crates/wiretap-app/src/lib.rs#L945)
 and binds to `127.0.0.1:0` (ephemeral port). The frontend fetches the port
 and auth token via the Tauri command `get_ws_config` and connects once at
-startup through [src/services/wsTransport.ts](../src/services/wsTransport.ts).
+startup through [src/services/wsTransport.ts](../frontend/wiretap-ui/src/services/wsTransport.ts).
 
 ### Binary protocol
 
-Each message is a 4-byte header + payload ([ws/protocol.rs](../src-tauri/src/ws/protocol.rs)):
+Each message is a 4-byte header + payload ([ws/protocol.rs](../crates/wiretap-app/src/ws/protocol.rs)):
 
 ```
 ┌──────────┬──────────┬──────────┬──────────┬─────────────────┐
@@ -1229,7 +1229,7 @@ Per-session (channel 1..254):
 | `ModbusScanState`   | 0x1A | Discovery sweep progress + device identification, throttled to 2 Hz (see [§ Modbus discovery](#modbus-discovery)) |
 
 JSON-payload session messages go out through
-[`send_session_json`](../src-tauri/src/ws/dispatch.rs), which resolves the
+[`send_session_json`](../crates/wiretap-app/src/ws/dispatch.rs), which resolves the
 channel, serialises only once a subscriber is known to exist, and drops silently
 otherwise — the same contract as every other session sender.
 
@@ -1256,7 +1256,7 @@ Catalogue decoding is done **once, in Rust**, by the shared
 re-decodes every frame. Two surfaces, both over this WebSocket:
 
 - **`catalog.*` commands** (request/response via `Command`/`CommandResponse`,
-  dispatched in [catalog.rs](../src-tauri/src/catalog.rs) `dispatch_catalog_command`):
+  dispatched in [catalog.rs](../crates/wiretap-app/src/catalog.rs) `dispatch_catalog_command`):
   - `catalog.parse` — TOML → resolved `Catalog` model (CAN/Serial/Modbus;
     shorthands + mirror/copy resolved)
   - `catalog.validate` — TOML → `{ valid, errors[] }` (field-path + message)
@@ -1487,10 +1487,10 @@ Decoding lives entirely in the crate, and so does parsing: the frontend's
 serial header byte-positions (`frame_id_*`, `source_address_*`, `header_fields`)
 are derived in the crate at parse time (v0.6.0+), so the adapter just renames
 them rather than re-deriving from masks. The Catalog Editor keeps its own TOML
-parser ([apps/catalog/toml.ts](../src/apps/catalog/toml.ts)) for round-tripping edits.
+parser ([apps/catalog/toml.ts](../frontend/wiretap-ui/src/apps/catalog/toml.ts)) for round-tripping edits.
 
 For a session-bound app, loading a catalogue parses it **once**: the
-[`useSessionCatalog`](../src/hooks/useSessionCatalog.ts) hook (used by Decoder and
+[`useSessionCatalog`](../frontend/wiretap-ui/src/hooks/useSessionCatalog.ts) hook (used by Decoder and
 Graph) mirrors the session's `catalogPath` into local state, then `attachAndResolve`
 (`catalogParser.ts`) calls `catalog.attach` and adapts the returned `Catalog` — so
 the same parse binds Rust decode *and* builds the UI model (it falls back to a
@@ -1529,7 +1529,7 @@ single-connection devices). A catalogue change mid-stream reinitialises the same
 session id with the new polls.
 
 **One-step decoder from the Data Source picker.** The picker
-([IoSourcePickerDialog.tsx](../src/dialogs/IoSourcePickerDialog.tsx)) has a Decoder
+([IoSourcePickerDialog.tsx](../frontend/wiretap-ui/src/dialogs/IoSourcePickerDialog.tsx)) has a Decoder
 footer that attaches a catalogue *as the session is created*: the chosen path rides
 through `LoadOptions.catalogPath` and `useIOSessionManager` sets it on the new
 session via `setSessionCatalogPath` (the cross-app channel), so a decode-aware app's
@@ -1554,17 +1554,17 @@ from the catalog *list* read (which `list_catalogs` resolves dir-side and so doe
 gate on `decoderDir`).
 
 **Live serial reframing.** Serial framing (SLIP/Modbus-RTU/delimiter) is applied
-by the backend read loop ([io/serial/reader.rs](../src-tauri/src/io/serial/reader.rs)),
+by the backend read loop ([io/serial/reader.rs](../crates/wiretap-app/src/io/serial/reader.rs)),
 so a source connected *before* its catalogue starts in `Raw` mode — raw bytes, no
 frames, nothing to decode. Selecting a serial catalogue mid-stream calls the
-**`io_set_framing`** command ([transmit.rs](../src-tauri/src/transmit.rs)), which
+**`io_set_framing`** command ([transmit.rs](../crates/wiretap-app/src/transmit.rs)), which
 swaps the running source's framer **in place** via a per-source control channel
 (`SourceMessage::ControlReady`, mirroring the transmit path) — same session, no
 device reopen, and the attached catalogue keeps decoding (no re-attach). The broker
 records a framing override so `combined_capabilities` flips `rx_frames` true (pushed
 as a `SessionLifecycle` update), and creates a frame capture on demand (a bytes-only
 session has none) so the now-framed messages land, stream and decode. The Decoder
-calls it from [`useSessionCatalog`](../src/hooks/useSessionCatalog.ts)'s sibling
+calls it from [`useSessionCatalog`](../frontend/wiretap-ui/src/hooks/useSessionCatalog.ts)'s sibling
 serial-config effect when the encoding first appears, falling back to a full
 re-watch if the live swap fails.
 
@@ -1587,7 +1587,7 @@ a noisy line with no declared `device_address`, lenient *will* invent messages.
 The decoder-picker list (what `list_catalogs` returns — the `.toml` files in
 `decoder_dir`, distinct from the *attached* catalogue above) is **owned by the
 backend**, not re-scanned per call. A `CatalogCache` in managed state
-([catalog.rs](../src-tauri/src/catalog.rs)) is **warmed once during `setup`**
+([catalog.rs](../crates/wiretap-app/src/catalog.rs)) is **warmed once during `setup`**
 (`start_catalog_cache`, right after settings resolve), so the frontend's first
 `list_catalogs` is served from memory — no startup race where the picker shows
 empty until settings resolve, and no re-walking the directory (or re-logging
@@ -1601,9 +1601,9 @@ files added or edited outside the app. iOS has no watcher: it warms once and
 refreshes only via the explicit mutation/settings paths.
 
 Each rebuild signals every WS client with a global `CatalogListChanged` (0x18)
-on channel 0 ([ws/dispatch.rs](../src-tauri/src/ws/dispatch.rs)
+on channel 0 ([ws/dispatch.rs](../crates/wiretap-app/src/ws/dispatch.rs)
 `send_catalog_list_changed`). The frontend's
-[`useCatalogList`](../src/hooks/useCatalogList.ts) hook (Decoder, Dashboard,
+[`useCatalogList`](../frontend/wiretap-ui/src/hooks/useCatalogList.ts) hook (Decoder, Dashboard,
 Query, Catalog Editor) treats the push as a re-sync trigger and reconciles via
 `list_catalogs` — fetching on mount, on each push, and on WS reconnect — exactly
 the `useOpenAppsSync` pattern, keeping Rust the single source of truth. (The
@@ -1640,7 +1640,7 @@ ws::dispatch::send_new_frames(session_id)
    onFrames     raw bytes      raw          DecodedSignals (decoded in Rust)
 ```
 
-The 2 Hz throttle lives in [io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs).
+The 2 Hz throttle lives in [io/signal_throttle.rs](../crates/wiretap-app/src/io/signal_throttle.rs).
 Readers write frames into the capture as fast as they arrive; `send_new_frames`
 pulls from the capture and pushes to the WS channel at most twice per second.
 `SignalThrottle::flush()` is called on stream stop so the final batch is
@@ -1689,7 +1689,7 @@ Two consequences worth knowing:
   Reinstating an `OFFSET total - n` there makes it quadratic over a session.
 - **Readers coalesce their own fetches.** A fetch can outlast the 500 ms signal,
   so the byte view skips while one is in flight and runs once more on completion
-  rather than queuing on the DB mutex ([ByteView.tsx](../src/apps/discovery/views/serial/ByteView.tsx),
+  rather than queuing on the DB mutex ([ByteView.tsx](../frontend/wiretap-ui/src/apps/discovery/views/serial/ByteView.tsx),
   mirroring `useCaptureFrameView`).
 - **The session is the only copy.** Discovery reads `byteCount` and
   `bytesCaptureId` off the session through `useIOSessionManager` and passes them
@@ -1702,7 +1702,7 @@ Two consequences worth knowing:
 
 Frame counts are **Rust-authoritative** — the frontend does not count. Each
 capture maintains a running total (`metadata.count`) and an in-memory set of
-distinct `(bus, frame_id)` keys ([capture_store.rs](../src-tauri/src/capture_store.rs)),
+distinct `(bus, frame_id)` keys ([capture_store.rs](../crates/wiretap-app/src/capture_store.rs)),
 so total and unique counts are both O(1). `send_new_frames` pushes them on the
 2 Hz frame cadence as `FrameCounts` (0x16); they are also surfaced on
 `list_active_sessions` (`capture_frame_count` / `capture_unique_frame_count`).
@@ -1726,7 +1726,7 @@ old numeric "N frames" readout was dropped in favour of it.
    rather than closing over the map it was first put in; capturing that map
    makes the unlisten a silent no-op for any subscriber that registers before
    its session is joined, which is the normal case.
-4. [`reset_frame_offset`](../src-tauri/src/ws/dispatch.rs#L74) is called so
+4. [`reset_frame_offset`](../crates/wiretap-app/src/ws/dispatch.rs#L74) is called so
    the client only receives frames that arrive after subscription.
 5. On `Unsubscribe` (or disconnect), the channel refcount drops; if it hits
    zero the channel is released, the frame offset cleared, and any attached
@@ -1742,20 +1742,20 @@ the work ends, rather than on a value only written at the start.
 ### Reconnect resync
 
 If the WebSocket drops, the transport reconnects with exponential backoff
-([wsTransport.ts](../src/services/wsTransport.ts) `scheduleReconnect`). Channel
+([wsTransport.ts](../frontend/wiretap-ui/src/services/wsTransport.ts) `scheduleReconnect`). Channel
 numbers are invalid after a reconnect, so the server reassigns them via fresh
 `SubscribeAck`s. The transport **re-stages the existing per-session handlers**
 (keyed by sessionId) before re-subscribing, so they are re-wired to the new
 channels — without this the frontend would go deaf to a session the backend still
 has alive and the UI would appear frozen. After re-subscribing, the transport
-fires `onReconnect` listeners; [`useSessionRosterSync`](../src/hooks/useSessionRosterSync.ts)
+fires `onReconnect` listeners; [`useSessionRosterSync`](../frontend/wiretap-ui/src/hooks/useSessionRosterSync.ts)
 uses this (and the global `SessionLifecycle` broadcast) to reconcile against the
 backend roster (`list_active_sessions`). Reconciliation refreshes the
 authoritative state (`ioState`, capabilities, subscriber count, capture, attached
 catalogue path) of sessions the UI already owns — Rust is the source of truth — as
 well as adopting
 new backend sessions and dropping vanished adopted ones
-([sessionRoster.ts](../src/stores/sessionRoster.ts)).
+([sessionRoster.ts](../frontend/wiretap-ui/src/stores/sessionRoster.ts)).
 
 ### What still uses Tauri events
 
@@ -1771,7 +1771,7 @@ Not everything is on WS. These remain Tauri-emitted:
 ### post_session cache
 
 When a session ends, its `StreamEndedInfo`, errors, source info, and
-orphaned-capture IDs are written to [io/post_session.rs](../src-tauri/src/io/post_session.rs)
+orphaned-capture IDs are written to [io/post_session.rs](../crates/wiretap-app/src/io/post_session.rs)
 with a 10-second TTL. This exists so a client that unsubscribes in the same
 tick a stream ends can still fetch the outcome via command.
 
@@ -1836,7 +1836,7 @@ Each app registers a unique `subscriberId`. The Rust side tracks them in
 
 ## 8. Heartbeats, suspension, eviction
 
-Defined in [io/mod.rs:627-633](../src-tauri/src/io/mod.rs#L627-L633):
+Defined in [io/mod.rs:627-633](../crates/wiretap-app/src/io/mod.rs#L627-L633):
 
 ```
 HEARTBEAT_TIMEOUT_SECS          = 30   // subscriber is stale after 30s silence
@@ -1863,7 +1863,7 @@ throttling during display sleep. Frontend heartbeats ride the WebSocket as
 falls back to polling via an `invoke` command.
 
 The WebSocket *connection* itself times out separately, at
-`2 × HEARTBEAT_TIMEOUT_SECS` ([ws/server.rs](../src-tauri/src/ws/server.rs)) —
+`2 × HEARTBEAT_TIMEOUT_SECS` ([ws/server.rs](../crates/wiretap-app/src/ws/server.rs)) —
 deliberately longer than the subscriber timeout, so the socket outlives a
 suspended session and a display-sleep wake resumes on the same connection
 without re-subscribing.
@@ -1904,14 +1904,14 @@ protocols → `SerialTransmitView`) and gates the send itself on
 `tx_frames` / `tx_bytes`.
 
 **Interval-driven loops share one cadence.** Repeating transmits (`io_start_repeat_transmit`,
-the serial and group variants in [transmit.rs](../src-tauri/src/transmit.rs)) and
+the serial and group variants in [transmit.rs](../crates/wiretap-app/src/transmit.rs)) and
 Modbus register polling (the poll task in
-[io/broker/spawner.rs](../src-tauri/src/io/broker/spawner.rs), and the standalone
-[io/modbus_tcp/reader.rs](../src-tauri/src/io/modbus_tcp/reader.rs)) are the same
+[io/broker/spawner.rs](../crates/wiretap-app/src/io/broker/spawner.rs), and the standalone
+[io/modbus_tcp/reader.rs](../crates/wiretap-app/src/io/modbus_tcp/reader.rs)) are the same
 skeleton — fire immediately, then once per interval, stopping on a cancel flag and
 skipping ticks while paused — differing only in the per-tick body (a transmit logs a
 `TransmitResult`; a poll emits a `FrameMessage` into the rx stream). That timing
-triad lives in one place, `Cadence` ([io/periodic.rs](../src-tauri/src/io/periodic.rs)):
+triad lives in one place, `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
 callers write `while cadence.next().await.is_some() { … }`. Modbus RTU keeps its own
 sequential scheduler — half-duplex means requests must be strictly ordered, which a
 per-task interval can't express.
@@ -1924,41 +1924,41 @@ per-task interval can't express.
 
 | File | Role |
 |------|------|
-| [src/components/SessionControls.tsx](../src/components/SessionControls.tsx) | Session chip + click-to-open session menu (details, change source, playback, capture actions, disconnect, destroy) |
-| [src/dialogs/IoSourcePickerDialog.tsx](../src/dialogs/IoSourcePickerDialog.tsx) | Unified source selection dialog |
-| [src/dialogs/DeviceSettingsDialog.tsx](../src/dialogs/DeviceSettingsDialog.tsx) | Change a device's connection parameters, live or not (see [Reconfiguring a device](#reconfiguring-a-device)) |
-| [src/dialogs/io-source-picker/DeviceEditor.tsx](../src/dialogs/io-source-picker/DeviceEditor.tsx) | Create a device from the picker (creation only) |
-| [src/components/io/IOConnectionFields.tsx](../src/components/io/IOConnectionFields.tsx) | Per-kind connection fields, shared by every device form |
-| [src/components/io/useConnectionProbe.ts](../src/components/io/useConnectionProbe.ts) | Debounced device probing while a form is edited |
-| [src/hooks/useAllIOProfiles.ts](../src/hooks/useAllIOProfiles.ts) | Saved profiles + ad-hoc devices — the list that feeds session start |
-| [src/stores/adHocProfileStore.ts](../src/stores/adHocProfileStore.ts) | Mirror of the Rust ephemeral registry |
-| [src/stores/deviceEditorStore.ts](../src/stores/deviceEditorStore.ts) | Which device the device-settings dialog is open on |
-| [src/dialogs/io-source-picker/ActionButtons.tsx](../src/dialogs/io-source-picker/ActionButtons.tsx) | Trait-driven action buttons |
-| [src/dialogs/io-source-picker/LoadOptions.tsx](../src/dialogs/io-source-picker/LoadOptions.tsx) | Recorded source options (time bounds, speed) |
-| [src/dialogs/io-source-picker/FramingOptions.tsx](../src/dialogs/io-source-picker/FramingOptions.tsx) | Serial framing options |
-| [src/hooks/useIOSourcePickerHandlers.ts](../src/hooks/useIOSourcePickerHandlers.ts) | Dialog → session manager bridge |
-| [src/hooks/useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts) | `watchSource` / `loadSource` / `joinSession` orchestration |
-| [src/hooks/useIOSession.ts](../src/hooks/useIOSession.ts) | Per-subscriber session hook |
-| [src/hooks/useCaptureSession.ts](../src/hooks/useCaptureSession.ts) | Capture switching helper |
-| [src/stores/sessionStore.ts](../src/stores/sessionStore.ts) | Zustand store, `openSession`, WS routing to callbacks |
-| [src/services/wsTransport.ts](../src/services/wsTransport.ts) | WebSocket client, subscribe/unsubscribe, message decode |
-| [src/api/io.ts](../src/api/io.ts) | `IOCapabilities`, `InterfaceTraits`, `SessionDataStreams` types, Tauri command wrappers |
+| [src/components/SessionControls.tsx](../frontend/wiretap-ui/src/components/SessionControls.tsx) | Session chip + click-to-open session menu (details, change source, playback, capture actions, disconnect, destroy) |
+| [src/dialogs/IoSourcePickerDialog.tsx](../frontend/wiretap-ui/src/dialogs/IoSourcePickerDialog.tsx) | Unified source selection dialog |
+| [src/dialogs/DeviceSettingsDialog.tsx](../frontend/wiretap-ui/src/dialogs/DeviceSettingsDialog.tsx) | Change a device's connection parameters, live or not (see [Reconfiguring a device](#reconfiguring-a-device)) |
+| [src/dialogs/io-source-picker/DeviceEditor.tsx](../frontend/wiretap-ui/src/dialogs/io-source-picker/DeviceEditor.tsx) | Create a device from the picker (creation only) |
+| [src/components/io/IOConnectionFields.tsx](../frontend/wiretap-ui/src/components/io/IOConnectionFields.tsx) | Per-kind connection fields, shared by every device form |
+| [src/components/io/useConnectionProbe.ts](../frontend/wiretap-ui/src/components/io/useConnectionProbe.ts) | Debounced device probing while a form is edited |
+| [src/hooks/useAllIOProfiles.ts](../frontend/wiretap-ui/src/hooks/useAllIOProfiles.ts) | Saved profiles + ad-hoc devices — the list that feeds session start |
+| [src/stores/adHocProfileStore.ts](../frontend/wiretap-ui/src/stores/adHocProfileStore.ts) | Mirror of the Rust ephemeral registry |
+| [src/stores/deviceEditorStore.ts](../frontend/wiretap-ui/src/stores/deviceEditorStore.ts) | Which device the device-settings dialog is open on |
+| [src/dialogs/io-source-picker/ActionButtons.tsx](../frontend/wiretap-ui/src/dialogs/io-source-picker/ActionButtons.tsx) | Trait-driven action buttons |
+| [src/dialogs/io-source-picker/LoadOptions.tsx](../frontend/wiretap-ui/src/dialogs/io-source-picker/LoadOptions.tsx) | Recorded source options (time bounds, speed) |
+| [src/dialogs/io-source-picker/FramingOptions.tsx](../frontend/wiretap-ui/src/dialogs/io-source-picker/FramingOptions.tsx) | Serial framing options |
+| [src/hooks/useIOSourcePickerHandlers.ts](../frontend/wiretap-ui/src/hooks/useIOSourcePickerHandlers.ts) | Dialog → session manager bridge |
+| [src/hooks/useIOSessionManager.ts](../frontend/wiretap-ui/src/hooks/useIOSessionManager.ts) | `watchSource` / `loadSource` / `joinSession` orchestration |
+| [src/hooks/useIOSession.ts](../frontend/wiretap-ui/src/hooks/useIOSession.ts) | Per-subscriber session hook |
+| [src/hooks/useCaptureSession.ts](../frontend/wiretap-ui/src/hooks/useCaptureSession.ts) | Capture switching helper |
+| [src/stores/sessionStore.ts](../frontend/wiretap-ui/src/stores/sessionStore.ts) | Zustand store, `openSession`, WS routing to callbacks |
+| [src/services/wsTransport.ts](../frontend/wiretap-ui/src/services/wsTransport.ts) | WebSocket client, subscribe/unsubscribe, message decode |
+| [src/api/io.ts](../frontend/wiretap-ui/src/api/io.ts) | `IOCapabilities`, `InterfaceTraits`, `SessionDataStreams` types, Tauri command wrappers |
 
 ### Backend
 
 | File | Role |
 |------|------|
-| [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs) | `IOSource` trait, `IOSession`, lifecycle, `replace_session_source`, heartbeat watchdog |
-| [src-tauri/src/io/traits.rs](../src-tauri/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
-| [src-tauri/src/io/ephemeral.rs](../src-tauri/src/io/ephemeral.rs) | Ad-hoc device registry, overlaid onto `io_profiles` (see [Where a device lives](#where-a-device-lives--saved-and-ad-hoc-profiles)) |
-| [src-tauri/src/io/profiles.rs](../src-tauri/src/io/profiles.rs) | `reconfigure_device` — write a device's settings and reconnect it |
-| [src-tauri/src/io/device_kinds.rs](../src-tauri/src/io/device_kinds.rs) | Per-kind connection defaults and required fields (see [Connection defaults](#connection-defaults--one-table)) |
-| [src-tauri/src/io/broker/](../src-tauri/src/io/broker/) | `IOBroker` — source aggregator / merge task |
-| [src-tauri/src/io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
-| [src-tauri/src/io/periodic.rs](../src-tauri/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit and Modbus polling |
-| [src-tauri/src/io/post_session.rs](../src-tauri/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |
-| [src-tauri/src/ws/server.rs](../src-tauri/src/ws/server.rs) | WS server, channel allocation, auth |
-| [src-tauri/src/ws/protocol.rs](../src-tauri/src/ws/protocol.rs) | Binary message format, `MsgType`, `encode_frame_batch` |
-| [src-tauri/src/ws/dispatch.rs](../src-tauri/src/ws/dispatch.rs) | `send_new_frames`, `send_session_state`, `send_stream_ended`, etc. |
-| [src-tauri/src/capture_store.rs](../src-tauri/src/capture_store.rs) | Session-scoped capture registry (see [capture-flow.md](capture-flow.md)) |
-| [src-tauri/src/credentials.rs](../src-tauri/src/credentials.rs) | Keyring namespaces, `resolve_secret`, `split_secrets`, legacy-namespace drain (see [IO-profile secrets](#io-profile-secrets)) |
+| [crates/wiretap-app/src/io/mod.rs](../crates/wiretap-app/src/io/mod.rs) | `IOSource` trait, `IOSession`, lifecycle, `replace_session_source`, heartbeat watchdog |
+| [crates/wiretap-app/src/io/traits.rs](../crates/wiretap-app/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
+| [crates/wiretap-app/src/io/ephemeral.rs](../crates/wiretap-app/src/io/ephemeral.rs) | Ad-hoc device registry, overlaid onto `io_profiles` (see [Where a device lives](#where-a-device-lives--saved-and-ad-hoc-profiles)) |
+| [crates/wiretap-app/src/io/profiles.rs](../crates/wiretap-app/src/io/profiles.rs) | `reconfigure_device` — write a device's settings and reconnect it |
+| [crates/wiretap-app/src/io/device_kinds.rs](../crates/wiretap-app/src/io/device_kinds.rs) | Per-kind connection defaults and required fields (see [Connection defaults](#connection-defaults--one-table)) |
+| [crates/wiretap-app/src/io/broker/](../crates/wiretap-app/src/io/broker/) | `IOBroker` — source aggregator / merge task |
+| [crates/wiretap-app/src/io/signal_throttle.rs](../crates/wiretap-app/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
+| [crates/wiretap-app/src/io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit and Modbus polling |
+| [crates/wiretap-app/src/io/post_session.rs](../crates/wiretap-app/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |
+| [crates/wiretap-app/src/ws/server.rs](../crates/wiretap-app/src/ws/server.rs) | WS server, channel allocation, auth |
+| [crates/wiretap-app/src/ws/protocol.rs](../crates/wiretap-app/src/ws/protocol.rs) | Binary message format, `MsgType`, `encode_frame_batch` |
+| [crates/wiretap-app/src/ws/dispatch.rs](../crates/wiretap-app/src/ws/dispatch.rs) | `send_new_frames`, `send_session_state`, `send_stream_ended`, etc. |
+| [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs) | Session-scoped capture registry (see [capture-flow.md](capture-flow.md)) |
+| [crates/wiretap-app/src/credentials.rs](../crates/wiretap-app/src/credentials.rs) | Keyring namespaces, `resolve_secret`, `split_secrets`, legacy-namespace drain (see [IO-profile secrets](#io-profile-secrets)) |

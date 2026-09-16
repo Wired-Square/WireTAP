@@ -182,7 +182,7 @@ async function main() {
   }
 
   // Calculate what the new version will be
-  const packageJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
+  const packageJson = JSON.parse(readFileSync(join(rootDir, 'frontend', 'wiretap-ui', 'package.json'), 'utf8'));
   const currentVersion = packageJson.version;
   const newVersion = isRebuild ? currentVersion : calculateNewVersion(currentVersion, bumpType);
   const tag = `v${newVersion}`;
@@ -265,10 +265,10 @@ async function main() {
 
     // Update Cargo.lock by running cargo check
     console.log('\nUpdating Cargo.lock...');
-    run('cargo check --manifest-path src-tauri/Cargo.toml');
+    run('cargo check --manifest-path crates/wiretap-app/Cargo.toml');
 
     console.log('\nCommitting version bump...');
-    run('git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json CHANGELOG.md src-tauri/gen/apple/project.yml src-tauri/gen/apple/wiretap_iOS/Info.plist');
+    run('git add frontend/wiretap-ui/package.json Cargo.lock crates/wiretap-app/Cargo.toml crates/wiretap-app/tauri.conf.json CHANGELOG.md crates/wiretap-app/gen/apple/project.yml crates/wiretap-app/gen/apple/wiretap_iOS/Info.plist');
     run(`git commit -m "Bump version to ${newVersion}"`);
 
     // Create tag

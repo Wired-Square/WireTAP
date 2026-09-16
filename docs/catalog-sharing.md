@@ -1,12 +1,12 @@
 # Catalogue Sharing over Git
 
 How WireTAP pulls decoder catalogues from a repository someone shared, and pushes
-yours back. This is the canonical reference for `src-tauri/src/catalog_share/`.
+yours back. This is the canonical reference for `crates/wiretap-app/src/catalog_share/`.
 
 For how catalogues are loaded, cached and watched locally, see
 [catalog-and-decoder-loading in the docs vault] — the local cache
 (`CatalogCache`, the `notify` watcher, the `CatalogListChanged` WS push) is
-described alongside `src-tauri/src/catalog.rs`.
+described alongside `crates/wiretap-app/src/catalog.rs`.
 
 ---
 
@@ -37,7 +37,7 @@ Windows, OpenSSL on Linux. `libgit2-sys` declares `openssl-sys` under a blanket
 vendor OpenSSL purely to satisfy the dependency graph; without it the iOS
 cross-compile fails outright hunting for a host OpenSSL. Linux vendors it because
 it genuinely uses it and CI installs no `libssl-dev`. See the comments in
-`src-tauri/Cargo.toml`; the real fix is upstream narrowing that cfg.
+`crates/wiretap-app/Cargo.toml`; the real fix is upstream narrowing that cfg.
 
 **SSH is deliberately not enabled.** The `ssh` feature pulls libssh2 onto four
 platforms, and the keychain token over HTTPS covers every supported host today.

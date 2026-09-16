@@ -27,14 +27,14 @@ if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-entitlements="$script_dir/../src-tauri/Entitlements.plist"
+entitlements="$script_dir/../crates/wiretap-app/Entitlements.plist"
 
 if [[ $# -ge 1 ]]; then
   apps=("$1")
 else
   apps=(
-    "$script_dir/../src-tauri/target/release/bundle/macos/WireTAP.app"
-    "$script_dir/../src-tauri/target/debug/bundle/macos/WireTAP.app"
+    "$script_dir/../target/release/bundle/macos/WireTAP.app"
+    "$script_dir/../target/debug/bundle/macos/WireTAP.app"
   )
 fi
 

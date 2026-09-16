@@ -12,8 +12,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const uiDir = join(__dirname, '..');
-const tauriDir = join(uiDir, 'src-tauri');
+const rootDir = join(__dirname, '..');
+const uiDir = join(rootDir, 'frontend', 'wiretap-ui');
+const tauriDir = join(rootDir, 'crates', 'wiretap-app');
 
 // Parse bump type from args (default: patch)
 const bumpType = process.argv[2] || 'patch';
@@ -47,7 +48,7 @@ console.log(`Bumping version: ${currentVersion} → ${newVersion}`);
 // Update package.json
 packageJson.version = newVersion;
 writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
-console.log(`  ✓ package.json`);
+console.log(`  ✓ frontend/wiretap-ui/package.json`);
 
 // Update Cargo.toml
 const cargoTomlPath = join(tauriDir, 'Cargo.toml');
@@ -57,14 +58,14 @@ cargoToml = cargoToml.replace(
   `version = "${newVersion}"`
 );
 writeFileSync(cargoTomlPath, cargoToml);
-console.log(`  ✓ src-tauri/Cargo.toml`);
+console.log(`  ✓ crates/wiretap-app/Cargo.toml`);
 
 // Update tauri.conf.json
 const tauriConfPath = join(tauriDir, 'tauri.conf.json');
 const tauriConf = JSON.parse(readFileSync(tauriConfPath, 'utf8'));
 tauriConf.version = newVersion;
 writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
-console.log(`  ✓ src-tauri/tauri.conf.json`);
+console.log(`  ✓ crates/wiretap-app/tauri.conf.json`);
 
 // Update iOS Info.plist (CFBundleShortVersionString + CFBundleVersion)
 const iosPlistPath = join(tauriDir, 'gen', 'apple', 'wiretap_iOS', 'Info.plist');
@@ -80,7 +81,7 @@ try {
   );
   if (!iosPlist.endsWith('\n')) iosPlist += '\n';
   writeFileSync(iosPlistPath, iosPlist);
-  console.log(`  ✓ src-tauri/gen/apple/wiretap_iOS/Info.plist`);
+  console.log(`  ✓ crates/wiretap-app/gen/apple/wiretap_iOS/Info.plist`);
 } catch { /* iOS not initialised yet */ }
 
 // Update iOS project.yml (CFBundleShortVersionString + CFBundleVersion)
@@ -96,7 +97,7 @@ try {
     `CFBundleVersion: "${newVersion}"`
   );
   writeFileSync(projectYmlPath, projectYml);
-  console.log(`  ✓ src-tauri/gen/apple/project.yml`);
+  console.log(`  ✓ crates/wiretap-app/gen/apple/project.yml`);
 } catch { /* iOS not initialised yet */ }
 
 console.log(`\nVersion bumped to ${newVersion}`);

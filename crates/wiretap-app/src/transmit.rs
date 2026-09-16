@@ -1,0 +1,759 @@
+// ui/crates/wiretap-app/src/transmit.rs
+//
+// Tauri commands for CAN frame and serial byte transmission.
+//
+// Transmission works through existing IO sessions (created by Discovery/Decoder or Transmit app).
+// This approach avoids creating duplicate connections and integrates with the session model.
+
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use tauri::AppHandle;
+
+use crate::io::device_kinds::conn_bool;
+use crate::io::periodic::Cadence;
+use crate::io::{self, CanTransmitFrame, IOCapabilities, SignalThrottle};
+use crate::settings::{load_settings, IOProfile};
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/// Writer capabilities - what a transmit-capable profile supports
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WriterCapabilities {
+    pub can_transmit_can: bool,
+    pub can_transmit_serial: bool,
+    pub supports_canfd: bool,
+    pub supports_extended_id: bool,
+    pub supports_rtr: bool,
+    pub available_buses: Vec<u8>,
+}
+
+/// Profile info with transmit capabilities
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TransmitProfile {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub capabilities: WriterCapabilities,
+}
+
+/// Transmit result returned by transmission functions
+#[allow(dead_code)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TransmitResult {
+    pub success: bool,
+    pub timestamp_us: u64,
+    pub error: Option<String>,
+}
+
+/// Event payload for repeat stopped (emitted when repeat stops due to permanent error)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RepeatStoppedEvent {
+    pub queue_id: String,
+    pub reason: String,
+}
+
+/// Announces a repeat transmit that started outside the Transmit UI (e.g. an
+/// MCP agent), carrying everything the frontend needs to render it as a queue
+/// row so the human and the agent share one visible queue.
+#[derive(Clone, Debug, Serialize)]
+pub struct RepeatStartedEvent {
+    pub queue_id: String,
+    pub session_id: String,
+    pub profile_id: String,
+    pub profile_name: String,
+    pub frame_id: u32,
+    pub data: Vec<u8>,
+    pub bus: u8,
+    pub is_extended: bool,
+    pub is_fd: bool,
+    pub interval_ms: u64,
+    /// Where the repeat came from, e.g. `"agent"`.
+    pub origin: String,
+}
+
+/// Kinds that support CAN transmit (platform-dependent)
+#[cfg(not(target_os = "ios"))]
+const CAN_TRANSMIT_KINDS: [&str; 6] = ["slcan", "gvret_tcp", "gvret_usb", "socketcan", "gs_usb", "virtual"];
+#[cfg(target_os = "ios")]
+const CAN_TRANSMIT_KINDS: [&str; 2] = ["gvret_tcp", "virtual"];
+
+/// Kinds that support serial transmit (not available on iOS)
+#[cfg(not(target_os = "ios"))]
+const SERIAL_TRANSMIT_KINDS: [&str; 1] = ["serial"];
+#[cfg(target_os = "ios")]
+const SERIAL_TRANSMIT_KINDS: [&str; 0] = [];
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Check if a profile kind supports CAN transmit
+fn supports_can_transmit(kind: &str) -> bool {
+    CAN_TRANSMIT_KINDS.contains(&kind)
+}
+
+/// Check if a profile kind supports serial transmit
+fn supports_serial_transmit(kind: &str) -> bool {
+    SERIAL_TRANSMIT_KINDS.contains(&kind)
+}
+
+/// Get capabilities for a profile kind
+fn get_capabilities_for_kind(kind: &str, profile: &IOProfile) -> WriterCapabilities {
+    match kind {
+        "slcan" => {
+            // Silent mode means no transmit. The default is declared once, in
+            // `io::device_kinds`, and is listen-only for safety.
+            let silent_mode = conn_bool(profile, "silent_mode").unwrap_or(true);
+            let enable_fd = conn_bool(profile, "enable_fd").unwrap_or(false);
+
+            if silent_mode {
+                WriterCapabilities {
+                    can_transmit_can: false, // Can't transmit in silent mode
+                    can_transmit_serial: false,
+                    supports_canfd: false,
+                    supports_extended_id: true,
+                    supports_rtr: true,
+                    available_buses: vec![],
+                }
+            } else {
+                WriterCapabilities {
+                    can_transmit_can: true,
+                    can_transmit_serial: false,
+                    supports_canfd: enable_fd,
+                    supports_extended_id: true,
+                    supports_rtr: true,
+                    available_buses: vec![], // Single bus
+                }
+            }
+        }
+        "gvret_tcp" | "gvret_usb" => WriterCapabilities {
+            can_transmit_can: true,
+            can_transmit_serial: false,
+            supports_canfd: true,
+            supports_extended_id: true,
+            supports_rtr: false,
+            available_buses: vec![0, 1, 2, 3, 4], // Bus 0-4 (device-dependent)
+        },
+        "socketcan" => WriterCapabilities {
+            can_transmit_can: cfg!(target_os = "linux"),
+            can_transmit_serial: false,
+            supports_canfd: true,
+            supports_extended_id: true,
+            supports_rtr: true,
+            available_buses: vec![], // Single interface
+        },
+        "serial" => WriterCapabilities {
+            can_transmit_can: false,
+            can_transmit_serial: true,
+            supports_canfd: false,
+            supports_extended_id: false,
+            supports_rtr: false,
+            available_buses: vec![],
+        },
+        "virtual" => WriterCapabilities {
+            can_transmit_can: true,
+            can_transmit_serial: false,
+            supports_canfd: false,
+            supports_extended_id: true,
+            supports_rtr: false,
+            available_buses: vec![0, 1, 2, 3, 4, 5, 6, 7],
+        },
+        _ => WriterCapabilities {
+            can_transmit_can: false,
+            can_transmit_serial: false,
+            supports_canfd: false,
+            supports_extended_id: false,
+            supports_rtr: false,
+            available_buses: vec![],
+        },
+    }
+}
+
+// ============================================================================
+// Tauri Commands - Profile Query
+// ============================================================================
+
+/// Get all IO profiles that support transmission
+#[tauri::command]
+pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<TransmitProfile>, String> {
+    let settings = load_settings(app).await?;
+
+    let mut profiles = Vec::new();
+
+    for profile in &settings.io_profiles {
+        let supports_can = supports_can_transmit(&profile.kind);
+        let supports_serial = supports_serial_transmit(&profile.kind);
+
+        if supports_can || supports_serial {
+            let capabilities = get_capabilities_for_kind(&profile.kind, profile);
+
+            // Only include if actually capable of transmitting
+            if capabilities.can_transmit_can || capabilities.can_transmit_serial {
+                profiles.push(TransmitProfile {
+                    id: profile.id.clone(),
+                    name: profile.name.clone(),
+                    kind: profile.kind.clone(),
+                    capabilities,
+                });
+            }
+        }
+    }
+
+    Ok(profiles)
+}
+
+/// Get the current usage of a profile (if any)
+#[tauri::command]
+pub async fn get_profile_usage(
+    profile_id: String,
+) -> Result<Option<crate::profile_tracker::ProfileUsage>, String> {
+    Ok(crate::profile_tracker::get_usage(&profile_id))
+}
+
+// ============================================================================
+// IO Session-Based Transmit Commands
+// ============================================================================
+//
+// These commands transmit through existing IO sessions, avoiding the need
+// for separate writer connections. The IO session must be started first.
+
+/// Transmit a CAN frame through an existing IO session
+#[tauri::command]
+pub async fn io_transmit_can_frame(
+    _app: AppHandle,
+    session_id: String,
+    frame: CanTransmitFrame,
+) -> Result<crate::io::TransmitResult, String> {
+    let result = io::transmit_frame(&session_id, &frame).await?;
+    crate::transmit_history::write_entry(
+        &session_id, "can",
+        Some(frame.frame_id as i64),
+        Some(frame.data.len() as i64),
+        &frame.data,
+        frame.bus as i64,
+        frame.is_extended,
+        frame.is_fd,
+        result.success,
+        result.error.as_deref(),
+    );
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+    Ok(result)
+}
+
+/// Transmit raw serial bytes through an IO session
+#[tauri::command]
+pub async fn io_transmit_serial(
+    _app: AppHandle,
+    session_id: String,
+    bytes: Vec<u8>,
+) -> Result<crate::io::TransmitResult, String> {
+    let result = io::transmit_serial(&session_id, &bytes).await?;
+    crate::transmit_history::write_entry(
+        &session_id, "serial",
+        None, None,
+        &bytes,
+        0, false, false,
+        result.success,
+        result.error.as_deref(),
+    );
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+    Ok(result)
+}
+
+/// Get IO session capabilities (includes transmit capabilities)
+#[tauri::command]
+pub async fn get_io_session_capabilities(session_id: String) -> Result<Option<IOCapabilities>, String> {
+    Ok(io::get_session_capabilities(&session_id).await)
+}
+
+/// Change serial framing on a running session in place (no device reconnect).
+/// Used by the Decoder when a serial catalogue is selected mid-stream so the
+/// source starts SLIP-framing without a re-watch. Returns the updated capabilities.
+#[tauri::command(rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
+pub async fn io_set_framing(
+    session_id: String,
+    encoding: String,
+    frame_id_start_byte: Option<i32>,
+    frame_id_bytes: Option<u8>,
+    frame_id_big_endian: Option<bool>,
+    source_address_start_byte: Option<i32>,
+    source_address_bytes: Option<u8>,
+    source_address_big_endian: Option<bool>,
+    min_frame_length: Option<usize>,
+    modbus: Option<crate::io::ModbusRtuOptions>,
+) -> Result<IOCapabilities, String> {
+    let req = crate::io::types::SetFramingRequest {
+        encoding,
+        modbus,
+        frame_id_start_byte,
+        frame_id_bytes,
+        frame_id_big_endian: frame_id_big_endian.unwrap_or(true),
+        source_address_start_byte,
+        source_address_bytes,
+        source_address_big_endian: source_address_big_endian.unwrap_or(true),
+        min_frame_length: min_frame_length.unwrap_or(0),
+        // Keep raw bytes flowing (matches mergeSerialConfigForWatch).
+        emit_raw_bytes: true,
+    };
+    io::set_framing(&session_id, req).await
+}
+
+// ============================================================================
+// IO Session Repeat Transmit
+// ============================================================================
+
+/// Counter for generating unique repeat task IDs
+static IO_REPEAT_TASK_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+// ============================================================================
+// Simple Transmit Helpers
+// ============================================================================
+
+/// Public re-export of is_permanent_error for use by other modules (e.g. replay).
+pub fn is_permanent_error_pub(error: &str) -> bool {
+    is_permanent_error(error)
+}
+
+/// Check if an error is permanent (should stop repeat) vs transient (can continue)
+fn is_permanent_error(error: &str) -> bool {
+    let error_lower = error.to_lowercase();
+    // Permanent errors - device is gone or session invalid
+    error_lower.contains("not found")
+        || error_lower.contains("disconnected")
+        || error_lower.contains("does not support")
+        || error_lower.contains("no device")
+        || error_lower.contains("permission denied")
+        || error_lower.contains("access denied")
+        // Windows renders ERROR_ACCESS_DENIED as "Access is denied." — the "is"
+        // means the "access denied" needle above never matches it.
+        || error_lower.contains("access is denied")
+}
+
+/// Simple transmit - no retry logic.
+/// Returns (result, should_stop) where should_stop is true if repeat should end.
+async fn do_transmit(
+    session_id: &str,
+    frame: &CanTransmitFrame,
+) -> (Result<crate::io::TransmitResult, String>, bool) {
+    let result = io::transmit_frame(session_id, frame).await;
+
+    match &result {
+        Ok(r) if r.success => (result, false),
+        Ok(r) => {
+            let error = r.error.as_deref().unwrap_or("Unknown error");
+            let should_stop = is_permanent_error(error);
+            (result, should_stop)
+        }
+        Err(e) => {
+            let should_stop = is_permanent_error(e);
+            (result, should_stop)
+        }
+    }
+}
+
+/// Simple serial transmit - no retry logic.
+async fn do_serial_transmit(
+    session_id: &str,
+    bytes: &[u8],
+) -> (Result<crate::io::TransmitResult, String>, bool) {
+    let result = io::transmit_serial(session_id, bytes).await;
+
+    match &result {
+        Ok(r) if r.success => (result, false),
+        Ok(r) => {
+            let error = r.error.as_deref().unwrap_or("Unknown error");
+            let should_stop = is_permanent_error(error);
+            (result, should_stop)
+        }
+        Err(e) => {
+            let should_stop = is_permanent_error(e);
+            (result, should_stop)
+        }
+    }
+}
+
+/// Active repeat transmit task for IO sessions
+struct IoRepeatTask {
+    /// Cancel flag for the repeat loop
+    cancel_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Task handle
+    #[allow(dead_code)]
+    handle: tauri::async_runtime::JoinHandle<()>,
+}
+
+/// Map of queue_id -> IoRepeatTask for active repeat transmissions via IO sessions
+static IO_REPEAT_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>> =
+    Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
+
+/// Start repeat transmission for a CAN frame through an IO session
+#[tauri::command]
+pub async fn io_start_repeat_transmit(
+    session_id: String,
+    queue_id: String,
+    frame: CanTransmitFrame,
+    interval_ms: u64,
+) -> Result<(), String> {
+    if interval_ms < 1 {
+        return Err("Interval must be at least 1ms".to_string());
+    }
+
+    // Stop any existing repeat for this queue_id
+    io_stop_repeat_transmit(queue_id.clone()).await?;
+
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let cancel_flag_clone = cancel_flag.clone();
+    let session_id_clone = session_id.clone();
+    let queue_id_for_task = queue_id.clone();
+
+    let handle = tauri::async_runtime::spawn(async move {
+        let mut throttle = SignalThrottle::new();
+
+        // Write this frame's transmit result to SQLite and throttle the UI notification.
+        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> (bool, Option<String>) {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
+            };
+            crate::transmit_history::write_entry(
+                &session_id_clone, "can",
+                Some(frame.frame_id as i64),
+                Some(frame.data.len() as i64),
+                &frame.data,
+                frame.bus as i64,
+                frame.is_extended,
+                frame.is_fd,
+                success,
+                error.as_deref(),
+            );
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+            }
+            (success, error)
+        };
+
+        // Fire immediately, then once per interval. Cadence handles the cancel
+        // check; subsequent ticks aren't skewed by the first transmit's latency.
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        while cadence.next().await.is_some() {
+            let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
+            let (_, error) = write_and_notify(&result, &mut throttle);
+
+            // Stop on permanent errors (device gone, session invalid)
+            if should_stop {
+                let reason = error.unwrap_or_else(|| "Permanent error".to_string());
+                tlog!(
+                    "[io_transmit] Stopping repeat for '{}' due to permanent error: {}",
+                    queue_id_for_task, reason
+                );
+                crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
+                    queue_id: queue_id_for_task.clone(),
+                    reason,
+                });
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                break;
+            }
+        }
+    });
+
+    // Store the task
+    let mut tasks = IO_REPEAT_TASKS.lock().await;
+    tasks.insert(
+        queue_id,
+        IoRepeatTask {
+            cancel_flag,
+            handle,
+        },
+    );
+
+    Ok(())
+}
+
+/// Stop repeat transmission for a queue item (IO session)
+#[tauri::command]
+pub async fn io_stop_repeat_transmit(queue_id: String) -> Result<(), String> {
+    let mut tasks = IO_REPEAT_TASKS.lock().await;
+    if let Some(task) = tasks.remove(&queue_id) {
+        tlog!("[io_transmit] Stopping repeat for queue_id '{}'", queue_id);
+        task.cancel_flag.store(true, Ordering::Relaxed);
+        // Don't await the handle - let it finish on its own after seeing cancel flag
+    }
+    Ok(())
+}
+
+/// Stop all repeat transmissions for an IO session
+#[tauri::command]
+pub async fn io_stop_all_repeats(_session_id: String) -> Result<(), String> {
+    let mut tasks = IO_REPEAT_TASKS.lock().await;
+    let queue_ids: Vec<String> = tasks.keys().cloned().collect();
+
+    for queue_id in queue_ids {
+        if let Some(task) = tasks.remove(&queue_id) {
+            tlog!(
+                "[io_transmit] Stopping repeat for queue_id '{}' (stop all)",
+                queue_id
+            );
+            task.cancel_flag.store(true, Ordering::Relaxed);
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// IO Session Serial Repeat Transmit
+// ============================================================================
+
+/// Start repeat transmission for serial bytes through an IO session
+#[tauri::command]
+pub async fn io_start_serial_repeat_transmit(
+    session_id: String,
+    queue_id: String,
+    bytes: Vec<u8>,
+    interval_ms: u64,
+) -> Result<(), String> {
+    if interval_ms < 1 {
+        return Err("Interval must be at least 1ms".to_string());
+    }
+
+    if bytes.is_empty() {
+        return Err("No bytes to transmit".to_string());
+    }
+
+    // Stop any existing repeat for this queue_id
+    io_stop_repeat_transmit(queue_id.clone()).await?;
+
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let cancel_flag_clone = cancel_flag.clone();
+    let session_id_clone = session_id.clone();
+    let queue_id_for_task = queue_id.clone();
+
+    let handle = tauri::async_runtime::spawn(async move {
+        let mut throttle = SignalThrottle::new();
+
+        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
+            };
+            crate::transmit_history::write_entry(
+                &session_id_clone, "serial",
+                None, None,
+                &bytes,
+                0, false, false,
+                success,
+                error.as_deref(),
+            );
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+            }
+            error
+        };
+
+        // Fire immediately, then once per interval (see io_start_repeat_transmit).
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        while cadence.next().await.is_some() {
+            let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
+            let error = write_and_notify(&result, &mut throttle);
+
+            // Stop on permanent errors (device gone, session invalid)
+            if should_stop {
+                let reason = error.unwrap_or_else(|| "Permanent error".to_string());
+                tlog!(
+                    "[io_transmit] Stopping serial repeat for '{}' due to permanent error: {}",
+                    queue_id_for_task, reason
+                );
+                crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
+                    queue_id: queue_id_for_task.clone(),
+                    reason,
+                });
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                break;
+            }
+        }
+    });
+
+    // Store the task (uses same map as CAN repeats - queue_id is unique)
+    let mut tasks = IO_REPEAT_TASKS.lock().await;
+    tasks.insert(
+        queue_id,
+        IoRepeatTask {
+            cancel_flag,
+            handle,
+        },
+    );
+
+    Ok(())
+}
+
+// ============================================================================
+// IO Session Group Repeat Transmit
+// ============================================================================
+//
+// Group repeat transmits multiple frames in sequence within a single loop.
+// All frames in the group are sent one after another (no delay between them),
+// then the system waits for the interval before repeating the sequence.
+
+/// Map of group_id -> IoRepeatTask for active group repeat transmissions
+static IO_REPEAT_GROUPS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>> =
+    Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
+
+/// Start repeat transmission for a group of CAN frames through an IO session.
+/// Frames are sent sequentially (A→B→C) with no delay between them, then the
+/// system waits for the interval before repeating the sequence.
+#[tauri::command]
+pub async fn io_start_repeat_group(
+    session_id: String,
+    group_id: String,
+    frames: Vec<CanTransmitFrame>,
+    interval_ms: u64,
+) -> Result<(), String> {
+    if interval_ms < 1 {
+        return Err("Interval must be at least 1ms".to_string());
+    }
+
+    if frames.is_empty() {
+        return Err("Group must contain at least one frame".to_string());
+    }
+
+    // Stop any existing repeat for this group
+    io_stop_repeat_group(group_id.clone()).await?;
+
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let cancel_flag_clone = cancel_flag.clone();
+    let session_id_clone = session_id.clone();
+    let group_id_for_task = group_id.clone();
+
+    let task_id = IO_REPEAT_TASK_COUNTER.fetch_add(1, Ordering::Relaxed);
+    tlog!(
+        "[io_transmit] Starting group repeat task {} for group '{}', session '{}', {} frames, interval {}ms",
+        task_id, group_id, session_id, frames.len(), interval_ms
+    );
+
+    let handle = tauri::async_runtime::spawn(async move {
+        let mut throttle = SignalThrottle::new();
+
+        // Write a CAN frame result to SQLite and throttle the UI notification.
+        let write_frame = |frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
+            };
+            crate::transmit_history::write_entry(
+                &session_id_clone, "can",
+                Some(frame.frame_id as i64),
+                Some(frame.data.len() as i64),
+                &frame.data,
+                frame.bus as i64,
+                frame.is_extended,
+                frame.is_fd,
+                success,
+                error.as_deref(),
+            );
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+            }
+            error
+        };
+
+        // Fire the first cycle immediately, then one cycle per interval
+        // (see io_start_repeat_transmit). All frames in a cycle are sent
+        // back-to-back; the interval spaces the cycles.
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        'outer: while cadence.next().await.is_some() {
+            // Send all frames in sequence (no delays between them)
+            for frame in &frames {
+                // Transmit with retry for transient errors
+                let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
+                let error = write_frame(frame, &result, &mut throttle);
+
+                // Stop on permanent errors (device gone, session invalid)
+                if should_stop {
+                    let reason = error.unwrap_or_else(|| "Permanent error".to_string());
+                    tlog!(
+                        "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
+                        group_id_for_task, reason
+                    );
+                    crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
+                        queue_id: group_id_for_task.clone(),
+                        reason,
+                    });
+                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                    break 'outer;
+                }
+            }
+        }
+    });
+
+    // Store the task
+    let mut groups = IO_REPEAT_GROUPS.lock().await;
+    groups.insert(
+        group_id,
+        IoRepeatTask {
+            cancel_flag,
+            handle,
+        },
+    );
+
+    Ok(())
+}
+
+/// Stop repeat transmission for a group
+#[tauri::command]
+pub async fn io_stop_repeat_group(group_id: String) -> Result<(), String> {
+    let mut groups = IO_REPEAT_GROUPS.lock().await;
+    if let Some(task) = groups.remove(&group_id) {
+        tlog!("[io_transmit] Stopping group repeat for '{}'", group_id);
+        task.cancel_flag.store(true, Ordering::Relaxed);
+        // Don't await the handle - let it finish on its own after seeing cancel flag
+    }
+    Ok(())
+}
+
+/// Stop all group repeat transmissions
+#[tauri::command]
+pub async fn io_stop_all_group_repeats() -> Result<(), String> {
+    let mut groups = IO_REPEAT_GROUPS.lock().await;
+    let group_ids: Vec<String> = groups.keys().cloned().collect();
+
+    for group_id in group_ids {
+        if let Some(task) = groups.remove(&group_id) {
+            tlog!(
+                "[io_transmit] Stopping group repeat for '{}' (stop all)",
+                group_id
+            );
+            task.cancel_flag.store(true, Ordering::Relaxed);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_permanent_error;
+
+    #[test]
+    fn windows_access_denied_is_permanent() {
+        // The exact string serialport surfaces on Windows ERROR_ACCESS_DENIED.
+        assert!(is_permanent_error("Read error: Access is denied. (os error 5)"));
+        assert!(is_permanent_error("Failed to open COM5: Access is denied."));
+    }
+
+    #[test]
+    fn existing_permanent_needles_still_match() {
+        assert!(is_permanent_error("device not found"));
+        assert!(is_permanent_error("Serial port disconnected"));
+        assert!(is_permanent_error("Permission denied"));
+    }
+
+    #[test]
+    fn transient_error_is_not_permanent() {
+        assert!(!is_permanent_error("timed out"));
+        assert!(!is_permanent_error("bus off"));
+    }
+}

@@ -12,8 +12,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SVG="$ROOT_DIR/public/logo.svg"
-TMP_PNG="$ROOT_DIR/src-tauri/icons/icon-1024.png"
+SVG="$ROOT_DIR/frontend/wiretap-ui/public/logo.svg"
+TMP_PNG="$ROOT_DIR/crates/wiretap-app/icons/icon-1024.png"
 
 if [ ! -f "$SVG" ]; then
   echo "Error: $SVG not found"

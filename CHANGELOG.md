@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **The repository is now a Cargo workspace under `crates/` and an npm workspace under `frontend/`.** The Tauri app lives at `crates/wiretap-app` (was `src-tauri`), `gs_usb_cli` is its own crate, and the React app is the `frontend/wiretap-ui` package. The Raspberry Pi server and the backend gateway have moved to the WireTAP-Server repository. After pulling, run `npm install` at the root once; `npm run tauri:dev` and the rest of the scripts work as before, and Cargo output now lands in `target/` at the root.
+
 ## [0.11.5] - 2026-09-12
 
 ### Added
