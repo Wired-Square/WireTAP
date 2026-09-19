@@ -11,7 +11,7 @@ import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
 import { Button, IconButton } from "../../../components/Button";
-
+import { Card } from "../../../components/Card";
 export type CANFrameViewProps = {
   selectedNode: TomlNode;
   catalogContent: string;
@@ -379,11 +379,11 @@ export default function CANFrameView({
           {selectedNode.metadata?.hasMux && muxData && (
             <div className="mt-4 space-y-3">
               {/* Mux selector bubble */}
-              <div className="p-3 border-2 border-purple-500/30 bg-purple-500/5 rounded-lg">
+              <Card tone="purple">
                 <div className="flex items-start justify-between min-w-0">
                   <div className="flex-1 min-w-0 flex gap-3">
                     <div
-                      className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${muxLegendColor || "bg-purple-500/30"}`}
+                      className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${muxLegendColor || "bg-[var(--status-purple-border)]"}`}
                     />
                     <div className="min-w-0">
                       <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
@@ -428,7 +428,7 @@ export default function CANFrameView({
                     )}
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* Mux cases */}
               {muxNode?.children && muxNode.children.length > 0 && (

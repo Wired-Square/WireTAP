@@ -10,7 +10,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import IndicatorSprite, { IndicatorSpriteDefs } from "../components/IndicatorSprite";
 import { brgbToCss } from "../utils/brgbColour";
@@ -18,7 +17,7 @@ import type { DiscoveredLed } from "../../../api/framelinkRules";
 import PaletteEditorDialog from "../dialogs/PaletteEditorDialog";
 import IndicatorConfigDialog, { type LedUpdateValues } from "../dialogs/IndicatorConfigDialog";
 import { Button, IconButton } from "../../../components/Button";
-
+import { cardClass } from "../../../components/Card";
 const STATE_KEYS = ["off", "on", "blink"] as const;
 
 export default function IndicatorsView() {
@@ -83,7 +82,7 @@ export default function IndicatorsView() {
           return (
             <button
               key={led.index}
-              className={`${cardDefault} ${cardPadding.md} flex items-center gap-3 w-full text-left cursor-pointer hover:brightness-110 transition-all`}
+              className={cardClass({ padding: "lg", interactive: true }, "flex items-center gap-3 w-full text-left")}
               onClick={() => setConfigLed(led)}
             >
               <IndicatorSprite

@@ -12,7 +12,7 @@ import DiffView from "../../views/DiffView";
 import { SecondaryButton } from "../../../../components/forms";
 import { formatDisplayTime } from "../../../../utils/timeFormat";
 import { iconMd, iconSm } from "../../../../styles/spacing";
-import { borderDefault, caption, textDanger, textSecondary } from "../../../../styles";
+import { borderDefault, caption, textSecondary } from "../../../../styles";
 import { PlanAlert, TabMessage, tabScroll } from "./parts";
 import type { T } from "./types";
 import type { PublishDiffResult } from "./usePublishDiff";
@@ -52,8 +52,8 @@ export default function DiffTab({
     return (
       <div className={tabScroll}>
         <PlanAlert tone="danger">
-          <p className={caption}>{t("publish.diffUnavailable")}</p>
-          <p className={`${caption} ${textDanger}`}>{error}</p>
+          <p className="text-xs">{t("publish.diffUnavailable")}</p>
+          <p className="text-xs">{error}</p>
         </PlanAlert>
         <SecondaryButton onClick={reload}>{t("publish.diffRetry")}</SecondaryButton>
       </div>
@@ -110,7 +110,7 @@ export default function DiffTab({
           thing this dialog can do, so it is said before the diff, not inside it. */}
       {diff.upstreamMoved && (
         <PlanAlert tone="warning">
-          <p className={caption}>
+          <p className="text-xs">
             {t("publish.diffUpstreamMoved", { path: diff.targetPath, ref: diff.comparedRef })}
           </p>
         </PlanAlert>

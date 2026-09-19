@@ -37,7 +37,6 @@ import { iconMd, iconSm } from "../../../../styles/spacing";
 import {
   borderDivider,
   caption,
-  cardCompact,
   h2,
   textMedium,
   textSecondary,
@@ -65,6 +64,7 @@ import { publishBlockers } from "./publishBlockers";
 import { usePublishDiff } from "./usePublishDiff";
 import { EMPTY_PUBLISH_FORM, type PublishForm, type PublishTab, type T } from "./types";
 import { Badge } from "../../../../components/Badge";
+import { Card } from "../../../../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -318,7 +318,7 @@ export default function PublishCatalogDialog({
                 </SecondaryButton>
               }
             >
-              <p className={caption}>{t("publish.needsAccount")}</p>
+              <p className="text-xs">{t("publish.needsAccount")}</p>
             </PlanAlert>
           )}
 
@@ -425,11 +425,11 @@ export default function PublishCatalogDialog({
         {publishState.error && (
           <div className="px-4 pb-2">
             <PlanAlert tone="danger">
-              <p className={caption}>{publishState.error.message}</p>
+              <p className="text-xs">{publishState.error.message}</p>
               {/* True of both actions here: publishing is idempotent, and linking
                   writes nothing until the fetch has succeeded. */}
               {publishState.error.kind === "network" && (
-                <p className={caption}>{t("publish.retryHint")}</p>
+                <p className="text-xs">{t("publish.retryHint")}</p>
               )}
             </PlanAlert>
           </div>
@@ -529,7 +529,7 @@ function PublishSuccess({
         <PublishHeader t={t} filename={filename} login={null} planning={false} />
       </div>
       <div className="p-4">
-        <div className={`${cardCompact} space-y-2`}>
+        <Card className="space-y-2">
           <div className="flex items-center gap-2">
             <ShareIcon.Success className={`${iconMd} ${textSuccess}`} />
             <span className={textMedium}>{t(`publish.action.${result.action}`)}</span>
@@ -561,7 +561,7 @@ function PublishSuccess({
               </SecondaryButton>
             )}
           </div>
-        </div>
+        </Card>
       </div>
       <div className={`${panelFooter} flex justify-end gap-2`}>
         <SecondaryButton onClick={onClose}>{t("publish.done")}</SecondaryButton>

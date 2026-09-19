@@ -9,8 +9,6 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { FolderOpen, HardDriveUpload, ListChecks, XCircle } from "lucide-react";
 import {
-  alertDanger,
-  cardDefault,
   labelSimple,
   textDanger,
   textPrimary,
@@ -28,6 +26,8 @@ import {
 import { pickFileToOpen } from "../../../api/dialogs";
 import { PrimaryButton, DangerButton, Select } from "../../../components/forms";
 import { Badge } from "../../../components/Badge";
+import { Alert } from "../../../components/Alert";
+import { Card } from "../../../components/Card";
 
 const TERMINATOR_TYPES = new Set(["Complete", "Cancelled", "Error"]);
 const EVENT_LOG_MAX = 200;
@@ -87,7 +87,7 @@ function UploadProgressBar({
           seconds: Math.round(etaSec % 60),
         });
   return (
-    <div className={`${cardDefault} p-3 flex flex-col gap-2`}>
+    <Card className="flex flex-col gap-2">
       <div className="flex items-center justify-between text-xs font-mono whitespace-pre">
         <span className={`font-medium ${textPrimary}`}>
           {pctStr}% — {sentKBStr} / {totalKBStr} KB
@@ -102,7 +102,7 @@ function UploadProgressBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -214,7 +214,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
     <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
 
       {/* Controls */}
-      <div className={`${cardDefault} p-4 flex flex-col gap-3`}>
+      <Card padding="lg" className="flex flex-col gap-3">
 
         {/* File picker */}
         <div className="flex items-center gap-3">
@@ -279,16 +279,16 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
             {t("firmware.listImages")}
           </PrimaryButton>
         </div>
-      </div>
+      </Card>
 
       {/* Slot cards */}
       {listError && (
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{listError}</div>
+        <Alert tone="danger">{listError}</Alert>
       )}
       {slots !== null && slots.length > 0 && (
         <div className="flex flex-col gap-2">
           {slots.map((img, idx) => (
-            <div key={idx} className={`${cardDefault} p-3`}>
+            <Card key={idx}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-sm font-medium ${textPrimary}`}>
                   {img.image !== null
@@ -313,7 +313,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
                   <span className={`${textPrimary} break-all`}>{img.hash || t("firmware.eta.unknown")}</span>
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -328,7 +328,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
       )}
 
       {/* Event log — always shown */}
-      <div className={`${cardDefault} p-3 flex flex-col gap-1`}>
+      <Card className="flex flex-col gap-1">
         <div className={`text-xs font-medium ${textSecondary} uppercase tracking-wide mb-1`}>
           {t("firmware.ota.logTitle")}
         </div>
@@ -359,7 +359,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
             })}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

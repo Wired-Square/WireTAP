@@ -10,7 +10,7 @@ import type { HeaderFieldFormat } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input } from "../../../../components/forms";
-
+import { Card } from "../../../../components/Card";
 /** Predefined CAN header field types */
 type CanFieldType = "source_address" | "custom";
 
@@ -195,7 +195,7 @@ export default function CanConfigSection({
   const showWarning = hasFrames && !isConfigured;
 
   return (
-    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -380,7 +380,7 @@ export default function CanConfigSection({
               </div>
             </div>
             {showFrameIdMaskPicker && (
-              <div className="mt-3 p-3 bg-[var(--bg-secondary)]/50 rounded-lg border border-[color:var(--border-default)]">
+              <Card className="mt-3">
                 <MaskBitPicker
                   mask={parseMaskString(frameIdMask)}
                   shift={0}
@@ -388,7 +388,7 @@ export default function CanConfigSection({
                   numBytes={4}
                   activeBits={useExtendedId ? 29 : 11}
                 />
-              </div>
+              </Card>
             )}
             <p className={`mt-1 ${caption}`}>
               Mask applied to frame ID before catalog matching. For J1939, use 0x1FFFFF00 to mask off the source address.
@@ -431,7 +431,7 @@ export default function CanConfigSection({
 
                   return (
                     <div key={index} className="space-y-2">
-                      <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)]/50 rounded-lg border border-[color:var(--border-default)]">
+                      <Card padding="sm" className="flex items-center gap-2">
                         {/* Expand/collapse toggle */}
                         <IconButton
                           onClick={() => toggleFieldPicker(index)}
@@ -505,11 +505,11 @@ export default function CanConfigSection({
                         >
                           <Trash2 className={iconMd} />
                         </IconButton>
-                      </div>
+                      </Card>
 
                       {/* Expanded bit picker */}
                       {isFieldExpanded && (
-                        <div className="ml-8 p-3 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)]">
+                        <Card className="ml-8">
                           <MaskBitPicker
                             mask={unshiftedMask}
                             shift={fieldShift}
@@ -517,7 +517,7 @@ export default function CanConfigSection({
                             numBytes={4}
                             activeBits={useExtendedId ? 29 : 11}
                           />
-                        </div>
+                        </Card>
                       )}
                     </div>
                   );
@@ -609,6 +609,6 @@ export default function CanConfigSection({
           {headerFields.length > 0 && ` • ${headerFields.length} header field(s)`}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

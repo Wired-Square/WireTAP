@@ -9,7 +9,7 @@ import { menuClasses, menuItem, menuDivider } from "../../../../styles/menuStyle
 import { useDashboardStore, type DashboardPanel } from "../../../../stores/dashboardStore";
 import { getWidget } from "../../widgets/registry";
 import { IconButton } from "../../../../components/Button";
-
+import { Card } from "../../../../components/Card";
 /** Menu-item toggle styling for active toggles in the dropdown. */
 function menuToggle(isActive: boolean, colour: "blue" | "purple"): string {
   if (isActive) {
@@ -140,7 +140,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg overflow-hidden">
+    <Card padding="none" className="flex flex-col h-full overflow-hidden">
       {/* Header — drag handle with title and overflow menu */}
       <div
         className="drag-handle cursor-grab active:cursor-grabbing select-none border-b border-[var(--border-default)] bg-[var(--bg-primary)]"
@@ -258,6 +258,6 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
         </div>,
         document.body,
       )}
-    </div>
+    </Card>
   );
 }

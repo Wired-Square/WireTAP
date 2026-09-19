@@ -16,8 +16,6 @@ import {
   h3,
   borderDefault,
   spaceYDefault,
-  alertInfo,
-  alertWarning,
   caption,
   textMedium,
   textMuted,
@@ -50,6 +48,7 @@ import type {
 } from "../../settings/appSettings";
 import { isProfileKind } from "../../settings/appSettings";
 import { Button } from "../Button";
+import { Alert } from "../Alert";
 
 export type MqttFormatKind = "json" | "savvycan" | "decode";
 export type MqttFormatField = "topic" | "enabled";
@@ -297,17 +296,11 @@ export default function IOConnectionFields({
       </div>
 
       {!canProbeByProfileId && (
-        <div className={alertInfo}>
-          <p className="text-sm text-[color:var(--text-info)]">
-            {t("ioProfileDialog.common.saveFirstHint")}
-          </p>
-        </div>
+        <Alert tone="info">{t("ioProfileDialog.common.saveFirstHint")}</Alert>
       )}
 
       {probe.gvretError && (
-        <div className={alertWarning}>
-          <p className="text-sm text-[color:var(--text-amber)]">{probe.gvretError}</p>
-        </div>
+        <Alert tone="warning">{probe.gvretError}</Alert>
       )}
 
       {deviceBusConfig.length > 0 && (
@@ -698,11 +691,7 @@ export default function IOConnectionFields({
           />
         </FormField>
 
-        <div className={alertInfo}>
-          <p className="text-sm text-[color:var(--text-info)]">
-            {t("ioProfileDialog.gvret.usbHint")}
-          </p>
-        </div>
+        <Alert tone="info">{t("ioProfileDialog.gvret.usbHint")}</Alert>
 
         {renderGvretInterfaces()}
       </div>
@@ -758,9 +747,7 @@ export default function IOConnectionFields({
             </SecondaryButton>
           </div>
           {probe.framelinkError && (
-            <div className={`${alertWarning} mt-3`}>
-              <p className={`text-sm ${textWarning}`}>{probe.framelinkError}</p>
-            </div>
+            <Alert tone="warning" className="mt-3">{probe.framelinkError}</Alert>
           )}
         </div>
 
@@ -917,11 +904,7 @@ export default function IOConnectionFields({
           )}
         </div>
 
-        <div className={alertInfo}>
-          <p className="text-sm text-[color:var(--text-info)]">
-            {t("ioProfileDialog.slcan.supportHint")}
-          </p>
-        </div>
+        <Alert tone="info">{t("ioProfileDialog.slcan.supportHint")}</Alert>
       </div>
     );
   }
@@ -978,17 +961,17 @@ export default function IOConnectionFields({
           </div>
         )}
 
-        <div className={alertInfo}>
-          <p className="text-sm text-[color:var(--text-info)]">
+        <Alert tone="info">
+          <p>
             <strong>{t("ioProfileDialog.socketcan.linuxHintBold")}</strong>
             {t("ioProfileDialog.socketcan.linuxHintRest")}
           </p>
-          <p className="text-sm text-[color:var(--text-info)] mt-2">
+          <p className="mt-2">
             {profile.connection.bitrate
               ? t("ioProfileDialog.socketcan.configureAuto")
               : t("ioProfileDialog.socketcan.configureManual")}
           </p>
-        </div>
+        </Alert>
       </div>
     );
   }
@@ -1114,14 +1097,12 @@ export default function IOConnectionFields({
           />
         )}
 
-        <div className={alertInfo}>
-          <p className="text-sm text-[color:var(--text-info)]">
-            {t("ioProfileDialog.gsUsb.supportHint")}
+        <Alert tone="info">
+          {t("ioProfileDialog.gsUsb.supportHint")}
             {platform.isWindows && t("ioProfileDialog.gsUsb.winNote")}
             {platform.isMacos && t("ioProfileDialog.gsUsb.macNote")}
             {platform.isLinux && t("ioProfileDialog.gsUsb.linuxNote")}
-          </p>
-        </div>
+        </Alert>
       </div>
     );
   }

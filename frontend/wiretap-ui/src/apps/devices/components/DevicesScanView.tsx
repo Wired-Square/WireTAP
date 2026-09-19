@@ -31,7 +31,7 @@ import {
 } from "../../../api/deviceRegistry";
 import RegisteredDeviceRow from "./RegisteredDeviceRow";
 import { Button } from "../../../components/Button";
-
+import { Alert } from "../../../components/Alert";
 const STALE_PRUNE_MS = 4000;
 const STALE_PRUNE_INTERVAL_MS = 1000;
 /** FrameLink-TCP port — the only transport that reports a device_id, so a
@@ -291,9 +291,7 @@ export default function DevicesScanView() {
       </div>
 
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
-          {error}
-        </div>
+        <Alert tone="danger">{error}</Alert>
       )}
 
       {isScanning && mergedDevices.length === 0 && (

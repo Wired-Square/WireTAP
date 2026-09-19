@@ -11,7 +11,7 @@ import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
 import { Button, IconButton } from "../../../components/Button";
-
+import { Card } from "../../../components/Card";
 export type MuxViewProps = {
   selectedNode: TomlNode;
   catalogContent: string;
@@ -136,12 +136,12 @@ export default function MuxView({
       )}
 
       {selectedNode.metadata?.muxDefaultCase && (
-        <div className="p-3 bg-[var(--status-info-bg)] border-2 border-[color:var(--status-info-border)] rounded-lg">
-          <div className="text-xs font-medium text-[color:var(--text-blue)] mb-1">{t("muxView.defaultCase")}</div>
-          <div className="font-mono text-sm text-[color:var(--text-blue)]">
+        <Card tone="info">
+          <div className="text-xs font-medium text-[color:var(--status-info-text)] mb-1">{t("muxView.defaultCase")}</div>
+          <div className="font-mono text-sm text-[color:var(--status-info-text)]">
             {selectedNode.metadata.muxDefaultCase}
           </div>
-        </div>
+        </Card>
       )}
 
       {selectedNode.children && selectedNode.children.length > 0 && (

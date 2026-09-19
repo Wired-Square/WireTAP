@@ -1,13 +1,13 @@
 // ui/src/apps/catalog/dialogs/ValidationErrorsDialog.tsx
 
 import { AlertTriangle, CheckCircle, X } from "lucide-react";
-import { iconMd, iconLg, iconXl } from "../../../styles/spacing";
+import { iconLg, iconXl } from "../../../styles/spacing";
 import Dialog from "../../../components/Dialog";
 import { SecondaryButton } from "../../../components/forms";
-import { h2, caption } from "../../../styles";
+import { h2 } from "../../../styles";
 import type { ValidationError } from "../types";
 import { IconButton } from "../../../components/Button";
-
+import { Alert } from "../../../components/Alert";
 type Props = {
   open: boolean;
   errors: ValidationError[];
@@ -66,22 +66,10 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
           <div className="mb-6 max-h-80 overflow-y-auto">
             <div className="space-y-2">
               {errors.map((error, idx) => (
-                <div
-                  key={idx}
-                  className="bg-[var(--status-warning-bg)] border border-[color:var(--status-warning-border)] rounded-lg p-3"
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className={`${iconMd} text-[color:var(--text-amber)] mt-0.5 flex-shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[color:var(--text-secondary)]">
-                        {error.message}
-                      </p>
-                      <p className={`${caption} mt-1 font-mono`}>
-                        {error.field}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <Alert key={idx} tone="warning">
+                  <p>{error.message}</p>
+                  <p className="text-xs mt-1 font-mono">{error.field}</p>
+                </Alert>
               ))}
             </div>
           </div>

@@ -11,7 +11,7 @@ import { getAlgorithmInfo, resolveByteIndexSync } from "../checksums";
 import type { TomlNode, ValidationError, ChecksumAlgorithm } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
-
+import { Card } from "../../../components/Card";
 export type ChecksumViewProps = {
   selectedNode: TomlNode;
   catalogContent: string;
@@ -121,7 +121,7 @@ export default function ChecksumView({
 
       {/* Algorithm Info Card */}
       {algorithmInfo && (
-        <div className="p-4 bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] rounded-lg">
+        <Card tone="info" padding="lg">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">🔐</span>
             <span className="font-semibold text-[color:var(--status-info-text)]">{algorithmInfo.name}</span>
@@ -130,7 +130,7 @@ export default function ChecksumView({
             </Badge>
           </div>
           <p className="text-sm text-[color:var(--status-info-text)]">{algorithmInfo.description}</p>
-        </div>
+        </Card>
       )}
 
       {/* Byte Range Visualization */}

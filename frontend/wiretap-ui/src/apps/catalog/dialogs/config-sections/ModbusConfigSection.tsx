@@ -7,7 +7,7 @@ import { caption, textMedium } from "../../../../styles/typography";
 import { expandableRowContainer } from "../../../../styles";
 import { Button } from "../../../../components/Button";
 import { Select, Input } from "../../../../components/forms";
-
+import { Card } from "../../../../components/Card";
 export type ModbusConfigSectionProps = {
   isConfigured: boolean;
   hasFrames: boolean;
@@ -47,7 +47,7 @@ export default function ModbusConfigSection({
   const showWarning = hasFrames && !isConfigured;
 
   return (
-    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -196,6 +196,6 @@ export default function ModbusConfigSection({
           {` • Word: ${defaultWordOrder === "big" ? "BE" : "LE"}`}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

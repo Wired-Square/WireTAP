@@ -2,18 +2,9 @@
 
 import { useTranslation } from "react-i18next";
 import { Loader2, Square } from "lucide-react";
-import { iconMd, iconXs } from "../../styles/spacing";
-import {
-  bgSuccess,
-  borderSuccess,
-  textSuccess,
-  bgDanger,
-  borderDanger,
-  textDanger,
-  gapSmall,
-} from "../../styles";
+import { iconXs } from "../../styles/spacing";
 import { Button } from "../../components/Button";
-
+import { Alert } from "../../components/Alert";
 type Props = {
   isLoading: boolean;
   loadFrameCount: number;
@@ -32,30 +23,26 @@ export default function LoadStatus({
     <>
       {/* Load Status (when active) */}
       {isLoading && (
-        <div className={`px-4 py-2 ${bgSuccess} border-b ${borderSuccess} flex items-center justify-between`}>
-          <div className={`flex items-center ${gapSmall}`}>
-            <Loader2 className={`${iconMd} animate-spin ${textSuccess}`} />
-            <span className={`text-sm ${textSuccess}`}>
-              {t("ioSourcePicker.loadingFrames", { count: loadFrameCount.toLocaleString() })}
-            </span>
-          </div>
-          <Button
-            onClick={onStopLoad}
-            variant="solid"
-            tone="danger"
-            size="sm"
-          >
-            <Square className={iconXs} />
-            <span>{t("ioSourcePicker.stop")}</span>
-          </Button>
-        </div>
+        <Alert
+          tone="success"
+          banner
+          icon={<Loader2 className="animate-spin" />}
+          action={
+            <Button onClick={onStopLoad} variant="solid" tone="danger" size="sm">
+              <Square className={iconXs} />
+              <span>{t("ioSourcePicker.stop")}</span>
+            </Button>
+          }
+        >
+          {t("ioSourcePicker.loadingFrames", { count: loadFrameCount.toLocaleString() })}
+        </Alert>
       )}
 
       {/* Load Error */}
       {loadError && (
-        <div className={`px-4 py-2 ${bgDanger} border-b ${borderDanger}`}>
-          <div className={`text-xs ${textDanger}`}>{loadError}</div>
-        </div>
+        <Alert tone="danger" size="sm" banner>
+          {loadError}
+        </Alert>
       )}
     </>
   );

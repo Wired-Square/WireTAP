@@ -11,7 +11,7 @@ import { diffCatalog, parseCatalog } from "../../api/catalog";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { Eye, X } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
-import { borderDataView, bgDataView, bgWarning, textWarning, borderWarning } from "../../styles/colourTokens";
+import { borderDataView, bgDataView } from "../../styles/colourTokens";
 import { iconSm } from "../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading } from "../../styles/typography";
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
@@ -41,7 +41,7 @@ import { sourcesFor } from "../../hooks/useCatalogSources";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
 import { IconButton } from "../../components/Button";
-
+import { Alert } from "../../components/Alert";
 function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
   // Zustand store selectors
@@ -571,40 +571,40 @@ function CatalogEditorInner() {
               than the file on disk — a schema upgrade, or an upstream update
               pulled in for review. Either way it is an unsaved, diffable change. */}
           {banner && (
-            <div className={`flex items-start gap-3 px-4 py-2.5 border-b ${borderWarning} ${bgWarning}`}>
-              <div className="flex-1 text-xs">
-                <p className={`font-medium ${textWarning}`}>
-                  {banner.kind === "remoteUpdate"
-                    ? t("editor.remoteUpdateBanner", { source: banner.source })
-                    : t("editor.migrationBanner")}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("text");
-                      setTextView("diff");
-                    }}
-                    className="underline font-semibold hover:no-underline"
-                  >
-                    {t("editor.textViewDiff", "Diff")}
-                  </button>
-                  .
-                </p>
-                {banner.kind === "migration" && banner.summary.length > 0 && (
-                  <ul className="mt-1 list-disc list-inside text-[color:var(--text-muted)]">
-                    {banner.summary.map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <IconButton
-                onClick={dismissBanner}
-                aria-label={t("common.dismiss", "Dismiss")}
-                size="sm"
-              >
-                <X className={iconSm} />
-              </IconButton>
-            </div>
+            <Alert
+              tone="warning"
+              size="sm"
+              banner
+              action={
+                <IconButton onClick={dismissBanner} aria-label={t("common.dismiss", "Dismiss")} size="sm">
+                  <X className={iconSm} />
+                </IconButton>
+              }
+            >
+              <p className="font-medium">
+                {banner.kind === "remoteUpdate"
+                  ? t("editor.remoteUpdateBanner", { source: banner.source })
+                  : t("editor.migrationBanner")}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("text");
+                    setTextView("diff");
+                  }}
+                  className="underline font-semibold hover:no-underline"
+                >
+                  {t("editor.textViewDiff", "Diff")}
+                </button>
+                .
+              </p>
+              {banner.kind === "migration" && banner.summary.length > 0 && (
+                <ul className="mt-1 list-disc list-inside">
+                  {banner.summary.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              )}
+            </Alert>
           )}
           {editMode === "text" ? (
             <>

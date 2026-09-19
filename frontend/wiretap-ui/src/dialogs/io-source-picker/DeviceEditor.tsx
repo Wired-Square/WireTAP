@@ -11,9 +11,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertCircle } from "lucide-react";
-import { iconMd } from "../../styles/spacing";
-import { borderDefault, caption, textMedium, alertWarning } from "../../styles";
+import { borderDefault, caption, textMedium } from "../../styles";
 import {
   Input,
   Select,
@@ -27,6 +25,7 @@ import { useConnectionProbe, usePlatformInfo } from "../../components/io/useConn
 import { applyConnectionDefaults, validateProfileForm } from "../../settings/ioProfileForm";
 import { getTraitsForKind } from "../../utils/profileTraits";
 import type { IOProfile, ConnectionFieldValue, ProfileKindId } from "../../hooks/useSettings";
+import { Alert } from "../../components/Alert";
 
 export interface DeviceEditorProps {
   /** Names already taken by existing devices, for the duplicate check. */
@@ -172,10 +171,7 @@ export default function DeviceEditor({
         />
 
         {error && (
-          <div className={`${alertWarning} flex items-center gap-2`}>
-            <AlertCircle className={`${iconMd} flex-shrink-0`} />
-            <span className="text-sm text-[color:var(--text-amber)]">{error}</span>
-          </div>
+          <Alert tone="warning">{error}</Alert>
         )}
       </div>
 

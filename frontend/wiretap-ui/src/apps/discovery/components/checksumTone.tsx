@@ -7,15 +7,8 @@
 
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
+import type { CardTone } from "../../../components/Card";
 import {
-  bgInfo,
-  bgSuccess,
-  bgSurface,
-  bgWarning,
-  borderDefault,
-  borderInfo,
-  borderSuccess,
-  borderWarning,
   textDataAmber,
   textDataGreen,
   textInfo,
@@ -43,12 +36,12 @@ function toned(matchRate: MatchRate): number {
   return matchRate ?? 100;
 }
 
-export function matchRateToneClasses(matchRate: MatchRate, isApplied = false): string {
-  if (isApplied) return `${bgInfo} ${borderInfo}`;
+export function matchRateTone(matchRate: MatchRate, isApplied = false): CardTone | undefined {
+  if (isApplied) return "info";
   const rate = toned(matchRate);
-  if (rate >= MATCH_RATE_STRONG) return `${bgSuccess} ${borderSuccess}`;
-  if (rate >= MATCH_RATE_WEAK) return `${bgWarning} ${borderWarning}`;
-  return `${bgSurface} ${borderDefault}`;
+  if (rate >= MATCH_RATE_STRONG) return "success";
+  if (rate >= MATCH_RATE_WEAK) return "warning";
+  return undefined;
 }
 
 export function matchRateTextClass(matchRate: MatchRate): string {

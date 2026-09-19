@@ -6,7 +6,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textSecondary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { TransformerDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
@@ -14,6 +13,7 @@ import TransformerDialog from "../dialogs/TransformerDialog";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 export default function TransformersView() {
   const { t } = useTranslation("rules");
@@ -92,9 +92,10 @@ export default function TransformersView() {
         const key = `xform:${xf.transformer_id}`;
         const isTemp = temporaryRules.has(key);
         return (
-          <div
+          <Card
             key={xf.transformer_id}
-            className={`${cardDefault} ${cardPadding.md} flex items-start justify-between`}
+            padding="lg"
+            className="flex items-start justify-between"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -151,7 +152,7 @@ export default function TransformersView() {
                 <Trash2 className={iconMd} />
               </IconButton>
             </div>
-          </div>
+          </Card>
         );
       })}
 

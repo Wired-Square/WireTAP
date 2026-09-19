@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { SignalDefDescriptor } from "../../../api/framelinkRules";
 import { textPrimary, textSecondary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import {
   type PlacedSignal,
@@ -33,6 +32,7 @@ import SignalProperties from "../components/SignalProperties";
 import { formatHexId } from "../utils/formatHex";
 import { IconButton } from "../../../components/Button";
 import { PrimaryButton } from "../../../components/forms";
+import { Card } from "../../../components/Card";
 
 // ============================================================================
 // Interface type name lookup
@@ -346,7 +346,7 @@ export default function FrameDefEditor({
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
-      <div className={`${cardDefault} ${cardPadding.md} flex items-center justify-between mb-2`}>
+      <Card padding="lg" className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <IconButton
             onClick={handleCancel}
@@ -370,13 +370,13 @@ export default function FrameDefEditor({
         >
           {t("frameDefEditor.save")}
         </PrimaryButton>
-      </div>
+      </Card>
 
       {/* Main layout: left (grid + signal list) | right (properties) */}
       <div className="flex flex-1 gap-2 min-h-0">
         {/* Left column */}
         <div className="flex-[2] flex flex-col gap-2 min-h-0">
-          <div className={`${cardDefault} ${cardPadding.sm} flex-1 min-h-0 overflow-auto`}>
+          <Card padding="sm" className="flex-1 min-h-0 overflow-auto">
             <BitGrid
               payloadBytes={payloadBytes}
               signals={state.signals}
@@ -386,25 +386,25 @@ export default function FrameDefEditor({
               onByteClick={onByteClick}
               scrollToByte={scrollToByte}
             />
-          </div>
-          <div className={`${cardDefault} ${cardPadding.sm} max-h-48 overflow-auto`}>
+          </Card>
+          <Card padding="sm" className="max-h-48 overflow-auto">
             <SignalList
               signals={state.signals}
               selectedIndex={state.selectedSignalIndex}
               onSelect={onSignalSelect}
             />
-          </div>
+          </Card>
         </div>
 
         {/* Right column — signal properties */}
-        <div className={`flex-1 ${cardDefault} min-h-0 overflow-auto`}>
+        <Card padding="none" className="flex-1 min-h-0 overflow-auto">
           <SignalProperties
             signal={selectedSignal}
             onChange={onSignalChange}
             onDelete={onSignalDelete}
             validationError={validationError}
           />
-        </div>
+        </Card>
       </div>
     </div>
   );

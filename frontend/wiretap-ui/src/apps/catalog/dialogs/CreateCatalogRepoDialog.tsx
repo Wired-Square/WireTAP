@@ -17,8 +17,9 @@ import { FormField, Input, PrimaryButton, SecondaryButton } from "../../../compo
 import SettingRadioGroup from "../../settings/components/rows/SettingRadioGroup";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, caption, h2, textDanger } from "../../../styles";
-import { alertDanger, panelFooter } from "../../../styles/cardStyles";
+import { panelFooter } from "../../../styles/cardStyles";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
+
 
 type Props = {
   isOpen: boolean;
@@ -113,16 +114,16 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
 
           {!isPrivate && (
             <Alert tone="warning">
-              <p className={caption}>{t("createRepo.publicWarning")}</p>
+              <p className="text-xs">{t("createRepo.publicWarning")}</p>
             </Alert>
           )}
 
           {!hasToken && <p className={`${caption} ${textDanger}`}>{t("createRepo.needsToken")}</p>}
 
           {account.error && (
-            <div className={`${alertDanger}`}>
-              <p className={caption}>{account.error.message}</p>
-            </div>
+            <Alert tone="danger">
+              <p className="text-xs">{account.error.message}</p>
+            </Alert>
           )}
         </div>
 

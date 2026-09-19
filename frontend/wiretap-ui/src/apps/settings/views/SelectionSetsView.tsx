@@ -3,9 +3,9 @@
 import { Star, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { cardDefault } from "../../../styles/cardStyles";
 import { selectionSetSize, type SelectionSet } from "../../../utils/selectionSets";
 import { IconButton } from "../../../components/Button";
+import { Card } from "../../../components/Card";
 
 type SelectionSetsViewProps = {
   selectionSets: SelectionSet[];
@@ -44,9 +44,10 @@ export default function SelectionSetsView({
           {selectionSets.map((set) => {
             const { total, selected } = selectionSetSize(set);
             return (
-              <div
+              <Card
                 key={set.id}
-                className={`flex items-center justify-between p-4 ${cardDefault}`}
+                padding="lg"
+                className="flex items-center justify-between"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
@@ -74,7 +75,7 @@ export default function SelectionSetsView({
                     <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                   </IconButton>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>

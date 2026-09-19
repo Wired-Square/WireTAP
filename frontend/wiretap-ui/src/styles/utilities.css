@@ -299,7 +299,6 @@
   .rounded-3xl { border-radius: 1.5rem }
   .rounded-full { border-radius: calc(infinity * 1px) }
   .rounded-lg { border-radius: 0.5rem }
-  .rounded-md { border-radius: 0.375rem }
   .rounded-sm { border-radius: 0.25rem }
   .rounded-xl { border-radius: 0.75rem }
   .rounded-l { border-top-left-radius: 0.25rem; border-bottom-left-radius: 0.25rem }
@@ -346,7 +345,6 @@
   .border-\[var\(--border-default\)\] { border-color: var(--border-default) }
   .border-amber-500 { border-color: oklch(76.9% 0.188 70.08) }
   .border-amber-500\/40 { border-color: color-mix(in oklab, oklch(76.9% 0.188 70.08) 40%, transparent) }
-  .border-amber-600\/30 { border-color: color-mix(in oklab, oklch(66.6% 0.179 58.318) 30%, transparent) }
   .border-blue-400 { border-color: oklch(70.7% 0.165 254.624) }
   .border-blue-500 { border-color: oklch(62.3% 0.214 259.815) }
   .border-blue-500\/40 { border-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 40%, transparent) }
@@ -355,19 +353,13 @@
   .border-current { border-color: currentcolor }
   .border-cyan-400 { border-color: oklch(78.9% 0.154 211.53) }
   .border-cyan-500\/40 { border-color: color-mix(in oklab, oklch(71.5% 0.143 215.221) 40%, transparent) }
-  .border-emerald-600\/30 { border-color: color-mix(in oklab, oklch(59.6% 0.145 163.225) 30%, transparent) }
-  .border-green-200 { border-color: oklch(92.5% 0.084 155.995) }
   .border-green-500 { border-color: oklch(72.3% 0.219 149.579) }
   .border-green-500\/40 { border-color: color-mix(in oklab, oklch(72.3% 0.219 149.579) 40%, transparent) }
   .border-indigo-400 { border-color: oklch(67.3% 0.182 276.935) }
   .border-neutral-500\/30 { border-color: color-mix(in oklab, oklch(55.6% 0 0) 30%, transparent) }
-  .border-pink-300 { border-color: oklch(82.3% 0.12 346.018) }
   .border-purple-500 { border-color: oklch(62.7% 0.265 303.9) }
-  .border-purple-500\/30 { border-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 30%, transparent) }
   .border-purple-500\/40 { border-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 40%, transparent) }
-  .border-red-200 { border-color: oklch(88.5% 0.062 18.334) }
   .border-red-500 { border-color: oklch(63.7% 0.237 25.331) }
-  .border-red-500\/30 { border-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 30%, transparent) }
   .border-sky-400 { border-color: oklch(74.6% 0.16 232.661) }
   .border-sky-500 { border-color: oklch(68.5% 0.169 237.323) }
   .border-slate-700 { border-color: oklch(37.2% 0.044 257.287) }
@@ -392,7 +384,6 @@
   .bg-\[var\(--accent-primary\)\] { background-color: var(--accent-primary) }
   .bg-\[var\(--accent-success\)\] { background-color: var(--accent-success) }
   .bg-\[var\(--accent-warning\)\] { background-color: var(--accent-warning) }
-  .bg-\[var\(--bg-accent\)\] { background-color: var(--bg-accent) }
   .bg-\[var\(--bg-amber\)\] { background-color: var(--bg-amber) }
   .bg-\[var\(--bg-blue\)\] { background-color: var(--bg-blue) }
   .bg-\[var\(--bg-green\)\] { background-color: var(--bg-green) }
@@ -404,8 +395,6 @@
   .bg-\[var\(--bg-purple\)\] { background-color: var(--bg-purple) }
   .bg-\[var\(--bg-purple-subtle\)\] { background-color: var(--bg-purple-subtle) }
   .bg-\[var\(--bg-red\)\] { background-color: var(--bg-red) }
-  .bg-\[var\(--bg-secondary\)\] { background-color: var(--bg-secondary) }
-  .bg-\[var\(--bg-secondary\)\]\/50 { background-color: color-mix(in oklab, var(--bg-secondary) 50%, transparent) }
   .bg-\[var\(--bg-subtle\)\] { background-color: var(--bg-subtle) }
   .bg-\[var\(--bg-surface\)\] { background-color: var(--bg-surface) }
   .bg-\[var\(--bg-surface-2\,\#222\)\] { background-color: var(--bg-surface-2,#222) }
@@ -437,6 +426,7 @@
   .bg-\[var\(--status-info-bg\)\] { background-color: var(--status-info-bg) }
   .bg-\[var\(--status-info-text\)\] { background-color: var(--status-info-text) }
   .bg-\[var\(--status-purple-bg\)\] { background-color: var(--status-purple-bg) }
+  .bg-\[var\(--status-purple-border\)\] { background-color: var(--status-purple-border) }
   .bg-\[var\(--status-success\)\] { background-color: var(--status-success) }
   .bg-\[var\(--status-success-bg\)\] { background-color: var(--status-success-bg) }
   .bg-\[var\(--status-success-bg\)\]\/50 { background-color: color-mix(in oklab, var(--status-success-bg) 50%, transparent) }
@@ -455,7 +445,6 @@
   .bg-\[var\(--text-purple\)\] { background-color: var(--text-purple) }
   .bg-\[var\(--text-yellow\)\] { background-color: var(--text-yellow) }
   .bg-amber-500\/10 { background-color: color-mix(in oklab, oklch(76.9% 0.188 70.08) 10%, transparent) }
-  .bg-amber-600\/20 { background-color: color-mix(in oklab, oklch(66.6% 0.179 58.318) 20%, transparent) }
   .bg-amber-900\/50 { background-color: color-mix(in oklab, oklch(41.4% 0.112 45.904) 50%, transparent) }
   .bg-black\/50 { background-color: color-mix(in oklab, #000 50%, transparent) }
   .bg-blue-500 { background-color: oklch(62.3% 0.214 259.815) }
@@ -465,14 +454,11 @@
   .bg-blue-600 { background-color: oklch(54.6% 0.245 262.881) }
   .bg-blue-600\/10 { background-color: color-mix(in oklab, oklch(54.6% 0.245 262.881) 10%, transparent) }
   .bg-blue-600\/15 { background-color: color-mix(in oklab, oklch(54.6% 0.245 262.881) 15%, transparent) }
-  .bg-blue-900\/30 { background-color: color-mix(in oklab, oklch(37.9% 0.146 265.522) 30%, transparent) }
   .bg-cyan-500\/10 { background-color: color-mix(in oklab, oklch(71.5% 0.143 215.221) 10%, transparent) }
   .bg-cyan-900\/50 { background-color: color-mix(in oklab, oklch(39.8% 0.07 227.392) 50%, transparent) }
   .bg-emerald-500\/10 { background-color: color-mix(in oklab, oklch(69.6% 0.17 162.48) 10%, transparent) }
-  .bg-emerald-600\/20 { background-color: color-mix(in oklab, oklch(59.6% 0.145 163.225) 20%, transparent) }
   .bg-gray-500 { background-color: oklch(55.1% 0.027 264.364) }
   .bg-gray-600 { background-color: oklch(44.6% 0.03 256.802) }
-  .bg-green-50 { background-color: oklch(98.2% 0.018 155.826) }
   .bg-green-400 { background-color: oklch(79.2% 0.209 151.711) }
   .bg-green-500 { background-color: oklch(72.3% 0.219 149.579) }
   .bg-green-500\/10 { background-color: color-mix(in oklab, oklch(72.3% 0.219 149.579) 10%, transparent) }
@@ -480,23 +466,17 @@
   .bg-green-900\/30 { background-color: color-mix(in oklab, oklch(39.3% 0.095 152.535) 30%, transparent) }
   .bg-indigo-500\/10 { background-color: color-mix(in oklab, oklch(58.5% 0.233 277.117) 10%, transparent) }
   .bg-orange-500\/10 { background-color: color-mix(in oklab, oklch(70.5% 0.213 47.604) 10%, transparent) }
-  .bg-pink-50\/50 { background-color: color-mix(in oklab, oklch(97.1% 0.014 343.198) 50%, transparent) }
   .bg-pink-500\/10 { background-color: color-mix(in oklab, oklch(65.6% 0.241 354.308) 10%, transparent) }
   .bg-purple-100 { background-color: oklch(94.6% 0.033 307.174) }
   .bg-purple-500 { background-color: oklch(62.7% 0.265 303.9) }
-  .bg-purple-500\/5 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 5%, transparent) }
   .bg-purple-500\/10 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 10%, transparent) }
-  .bg-purple-500\/30 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 30%, transparent) }
   .bg-purple-600\/10 { background-color: color-mix(in oklab, oklch(55.8% 0.288 302.321) 10%, transparent) }
   .bg-purple-600\/15 { background-color: color-mix(in oklab, oklch(55.8% 0.288 302.321) 15%, transparent) }
   .bg-purple-900\/50 { background-color: color-mix(in oklab, oklch(38.1% 0.176 304.987) 50%, transparent) }
-  .bg-red-50 { background-color: oklch(97.1% 0.013 17.38) }
   .bg-red-500 { background-color: oklch(63.7% 0.237 25.331) }
   .bg-red-500\/10 { background-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 10%, transparent) }
   .bg-red-500\/40 { background-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 40%, transparent) }
   .bg-red-900\/30 { background-color: color-mix(in oklab, oklch(39.6% 0.141 25.723) 30%, transparent) }
-  .bg-red-900\/50 { background-color: color-mix(in oklab, oklch(39.6% 0.141 25.723) 50%, transparent) }
-  .bg-red-950\/70 { background-color: color-mix(in oklab, oklch(25.8% 0.092 26.042) 70%, transparent) }
   .bg-sky-400 { background-color: oklch(74.6% 0.16 232.661) }
   .bg-sky-500\/10 { background-color: color-mix(in oklab, oklch(68.5% 0.169 237.323) 10%, transparent) }
   .bg-slate-900 { background-color: oklch(20.8% 0.042 265.755) }
@@ -618,9 +598,7 @@
   .text-\[color\:var\(--status-danger-text\)\] { color: var(--status-danger-text) }
   .text-\[color\:var\(--status-info\)\] { color: var(--status-info) }
   .text-\[color\:var\(--status-info-text\)\] { color: var(--status-info-text) }
-  .text-\[color\:var\(--status-info-text-bold\)\] { color: var(--status-info-text-bold) }
   .text-\[color\:var\(--status-purple-text\)\] { color: var(--status-purple-text) }
-  .text-\[color\:var\(--status-purple-text-bold\)\] { color: var(--status-purple-text-bold) }
   .text-\[color\:var\(--status-success\)\] { color: var(--status-success) }
   .text-\[color\:var\(--status-success-text\)\] { color: var(--status-success-text) }
   .text-\[color\:var\(--status-warning\)\] { color: var(--status-warning) }
@@ -646,10 +624,8 @@
   .text-\[color\:var\(--text-tertiary\)\] { color: var(--text-tertiary) }
   .text-\[color\:var\(--text-yellow\)\] { color: var(--text-yellow) }
   .text-amber-300 { color: oklch(87.9% 0.169 91.605) }
-  .text-amber-300\/80 { color: color-mix(in oklab, oklch(87.9% 0.169 91.605) 80%, transparent) }
   .text-amber-400 { color: oklch(82.8% 0.189 84.429) }
   .text-amber-500 { color: oklch(76.9% 0.188 70.08) }
-  .text-amber-600 { color: oklch(66.6% 0.179 58.318) }
   .text-blue-400 { color: oklch(70.7% 0.165 254.624) }
   .text-blue-500 { color: oklch(62.3% 0.214 259.815) }
   .text-cyan-400 { color: oklch(78.9% 0.154 211.53) }
@@ -660,17 +636,14 @@
   .text-gray-500 { color: oklch(55.1% 0.027 264.364) }
   .text-green-400 { color: oklch(79.2% 0.209 151.711) }
   .text-green-500 { color: oklch(72.3% 0.219 149.579) }
-  .text-green-700 { color: oklch(52.7% 0.154 150.069) }
   .text-indigo-400 { color: oklch(67.3% 0.182 276.935) }
   .text-orange-400 { color: oklch(75% 0.183 55.934) }
   .text-orange-500 { color: oklch(70.5% 0.213 47.604) }
   .text-pink-400 { color: oklch(71.8% 0.202 349.761) }
-  .text-pink-500 { color: oklch(65.6% 0.241 354.308) }
   .text-pink-600 { color: oklch(59.2% 0.249 0.584) }
   .text-purple-400 { color: oklch(71.4% 0.203 305.504) }
   .text-purple-500 { color: oklch(62.7% 0.265 303.9) }
   .text-purple-600 { color: oklch(55.8% 0.288 302.321) }
-  .text-red-300 { color: oklch(80.8% 0.114 19.571) }
   .text-red-400 { color: oklch(70.4% 0.191 22.216) }
   .text-red-500 { color: oklch(63.7% 0.237 25.331) }
   .text-red-600 { color: oklch(57.7% 0.245 27.325) }

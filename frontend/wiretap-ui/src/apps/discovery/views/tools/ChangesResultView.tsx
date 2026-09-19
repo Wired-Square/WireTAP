@@ -3,9 +3,8 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download, X } from "lucide-react";
-import { iconSm, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
-import { cardDefault } from "../../../../styles/cardStyles";
-import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, bgSurface, sectionHeaderText, textMuted } from "../../../../styles";
+import { iconSm, iconXs, iconLg, flexRowGap2 } from "../../../../styles/spacing";
+import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, sectionHeaderText, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { PayloadAnalysisResult, ByteStats, MuxCaseAnalysis, MultiBytePattern, MirrorGroup } from "../../../../utils/analysis/payloadAnalysis";
 import { formatMuxValue } from "../../../../utils/analysis/muxDetection";
@@ -17,6 +16,7 @@ import { useSettings } from "../../../../hooks/useSettings";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
 import { Button, IconButton } from "../../../../components/Button";
 import { Badge, type BadgeStyleProps, type BadgeTone } from "../../../../components/Badge";
+import { Card } from "../../../../components/Card";
 
 // Helper to build a set of byte indices that are part of multi-byte patterns
 function getBytesInMultiBytePatterns(patterns: MultiBytePattern[]): Set<number> {
@@ -116,10 +116,10 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
     }
 
     return (
-      <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
+      <Card padding="none" className="h-full flex flex-col">
         <Header onExport={() => {}} hasResults={false} onClose={onClose} />
         {content}
-      </div>
+      </Card>
     );
   }
 
@@ -206,10 +206,10 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
   }
 
   return (
-    <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
+    <Card padding="none" className="h-full flex flex-col">
       <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />
       {mainContent}
-    </div>
+    </Card>
   );
 }
 
@@ -273,44 +273,44 @@ type MirrorGroupCardProps = {
 function MirrorGroupCard({ group }: MirrorGroupCardProps) {
   const { t } = useTranslation("discovery");
   return (
-    <div className="p-3 bg-pink-50/50 rounded-lg border border-pink-300">
+    <Card tone="purple">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
             {group.frameIds.map((id, idx) => (
               <span key={id}>
-                <span className="font-mono font-semibold text-sm text-pink-600">
+                <span className="font-mono font-semibold text-sm text-[color:var(--status-purple-text)]">
                   {formatFrameId(id)}
                 </span>
                 {idx < group.frameIds.length - 1 && (
-                  <span className="text-pink-500 mx-1">↔</span>
+                  <span className="text-[color:var(--status-purple-text)] mx-1">↔</span>
                 )}
               </span>
             ))}
           </div>
-          <span className="text-xs text-pink-500">
+          <span className="text-xs text-[color:var(--status-purple-text)]">
             {t("changes.matchPercent", { percent: group.matchPercentage })}
           </span>
         </div>
-        <span className="text-[10px] text-pink-500">
+        <span className="text-[10px] text-[color:var(--status-purple-text)]">
           {t("changes.matchingPairs", { count: group.sampleCount })}
         </span>
       </div>
 
       {/* Sample payload */}
       {group.samplePayload && (
-        <div className="mt-2 text-[10px] text-pink-600">
-          <span className="text-pink-500">{t("changes.samplePrefix")} </span>
+        <div className="mt-2 text-[10px] text-[color:var(--status-purple-text)]">
+          <span className="text-[color:var(--status-purple-text)]">{t("changes.samplePrefix")} </span>
           <span className="font-mono">
             {group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
           </span>
         </div>
       )}
 
-      <div className="mt-1.5 text-[10px] text-pink-500">
+      <div className="mt-1.5 text-[10px] text-[color:var(--status-purple-text)]">
         {t("changes.mirrorDescription")}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -327,7 +327,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
   const counts = countByteRoles(result.byteStats, result.multiBytePatterns);
 
   return (
-    <div className={`${paddingCardSm} ${cardDefault}`}>
+    <Card>
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -449,7 +449,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -471,7 +471,7 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
   const counts = countByteRoles(caseAnalysis.byteStats, caseAnalysis.multiBytePatterns);
 
   return (
-    <div className={`${bgSurface} rounded border border-[color:var(--border-default)]`}>
+    <Card padding="none">
       {/* Collapsible header */}
       <button
         type="button"
@@ -538,7 +538,7 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

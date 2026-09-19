@@ -7,7 +7,6 @@ import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
 import {
-  cardElevated,
   h3,
   borderDefault,
   paddingCard,
@@ -31,6 +30,7 @@ import {
   type ToolDataCounts,
 } from "./toolboxGating";
 import { Button, IconButton } from "../components/Button";
+import { Card } from "../components/Card";
 
 type ToolConfig = {
   id: ToolboxView;
@@ -221,7 +221,7 @@ export default function ToolboxDialog({
 
   return (
     <Dialog isOpen onBackdropClick={onClose} maxWidth="max-w-lg">
-      <div className={`${cardElevated} shadow-xl overflow-hidden flex flex-col`}>
+      <Card padding="none" className="shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className={`${paddingCard} flex items-center justify-between border-b ${borderDefault}`}>
           <h2 className={h3}>
@@ -333,7 +333,7 @@ export default function ToolboxDialog({
             </div>
           )}
         </div>
-      </div>
+      </Card>
     </Dialog>
   );
 }

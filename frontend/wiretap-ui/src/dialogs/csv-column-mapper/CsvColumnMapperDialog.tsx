@@ -24,10 +24,7 @@ import {
 } from "../../api/capture";
 import {
   h3,
-  cardElevated,
-  paddingCard,
   caption,
-  errorBoxCompact,
   textMuted,
   bgSurface,
   borderDefault,
@@ -36,6 +33,8 @@ import {
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
 import { Select, Checkbox } from "../../components/forms";
+import { Alert } from "../../components/Alert";
+import { Card } from "../../components/Card";
 
 /** Format import summary as plain text for copying */
 function formatImportSummary(
@@ -346,7 +345,7 @@ export default function CsvColumnMapperDialog({
 
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onCancel} maxWidth="max-w-4xl">
-      <div className={`${cardElevated} ${paddingCard} space-y-4`}>
+      <Card padding="lg" className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -455,20 +454,16 @@ export default function CsvColumnMapperDialog({
 
             {/* Validation hints */}
             {!hasFrameId && (
-              <div className={`text-xs text-amber-600 ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
-                {t("csvColumnMapper.validation.needFrameId")}
-              </div>
+              <Alert tone="warning" size="sm">{t("csvColumnMapper.validation.needFrameId")}</Alert>
             )}
             {hasFrameId && !hasData && (
-              <div className={`text-xs ${textSecondary} ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
-                {t("csvColumnMapper.validation.noDataColumns")}
-              </div>
+              <Alert tone="info" size="sm">{t("csvColumnMapper.validation.noDataColumns")}</Alert>
             )}
           </>
         ) : null}
 
         {/* Error display */}
-        {error && <div className={errorBoxCompact}>{error}</div>}
+        {error && <Alert tone="danger" size="sm">{error}</Alert>}
 
         {/* Import progress */}
         {importProgress && (
@@ -568,7 +563,7 @@ export default function CsvColumnMapperDialog({
             />
           </div>
         )}
-      </div>
+      </Card>
     </Dialog>
   );
 }

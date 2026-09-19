@@ -5,9 +5,10 @@ import { Plus, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import Dialog from "../../../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, helpText, alertDanger, labelSmall } from "../../../styles";
+import { h2, helpText, labelSmall } from "../../../styles";
 import { parseIntValue, isValidIntValue } from "../../../utils/numberUtils";
 import { Button, IconButton } from "../../../components/Button";
+import { Alert } from "../../../components/Alert";
 
 export type EnumValue = {
   rawValue: string;
@@ -178,7 +179,7 @@ export default function EnumEditorDialog({
         </Button>
 
         {error && (
-          <div className={`mt-4 ${alertDanger}`}>{error}</div>
+          <Alert tone="danger" className="mt-4">{error}</Alert>
         )}
 
         <div className="flex justify-end gap-3 mt-6">

@@ -12,10 +12,10 @@ import type { ChecksumCandidate } from "../../../api/checksums";
 import { getAlgorithmInfo } from "../../../utils/analysis/checksums";
 import { flexRowGap2, iconXs } from "../../../styles/spacing";
 import { textMedium } from "../../../styles/typography";
-import { MatchRateIcon, matchRateTextClass, matchRateToneClasses } from "./checksumTone";
+import { MatchRateIcon, matchRateTextClass, matchRateTone } from "./checksumTone";
 import { Button } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
-
+import { Card } from "../../../components/Card";
 interface ChecksumCandidateListProps {
   candidates: ChecksumCandidate[];
   /** Index of the candidate currently in force, if any. */
@@ -49,7 +49,7 @@ export default function ChecksumCandidateList({
         const algorithmName = getAlgorithmInfo(candidate.algorithm)?.name ?? candidate.algorithm;
 
         return (
-          <div key={index} className={`p-3 rounded-lg border ${matchRateToneClasses(candidate.matchRate, isApplied)}`}>
+          <Card key={index} tone={matchRateTone(candidate.matchRate, isApplied)}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className={`${flexRowGap2} flex-wrap`}>
@@ -130,7 +130,7 @@ export default function ChecksumCandidateList({
                 <MatchRateIcon matchRate={candidate.matchRate} isApplied={isApplied} />
               </div>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>

@@ -5,15 +5,12 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
-  alertDanger,
   iconMd,
-  textDanger,
   textPrimary,
   textSecondary,
 } from "../../../styles";
-import { cardDefault } from "../../../styles/cardStyles";
 import { PrimaryButton } from "../../../components/forms";
 import { useDevicesStore } from "../stores/devicesStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
@@ -24,6 +21,8 @@ import {
   type ProbeInterface,
 } from "../../../api/framelink";
 import type { IOProfile } from "../../../hooks/useSettings";
+import { Alert } from "../../../components/Alert";
+import { Card } from "../../../components/Card";
 
 export default function DataIoTab() {
   const { t } = useTranslation("devices");
@@ -104,7 +103,7 @@ export default function DataIoTab() {
       )}
 
       {probeError && (
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{probeError}</div>
+        <Alert tone="danger">{probeError}</Alert>
       )}
 
       {probeResult && (
@@ -121,7 +120,7 @@ export default function DataIoTab() {
               {t("frameLink.interfacesHeading", { count: probeResult.interfaces.length })}
             </h3>
             {probeResult.interfaces.map((iface: ProbeInterface) => (
-              <div key={iface.index} className={`${cardDefault} p-3 flex items-center justify-between`}>
+              <Card key={iface.index} className="flex items-center justify-between">
                 <div>
                   <span className={`text-sm font-medium ${textPrimary}`}>{iface.name}</span>
                   <span className={`text-xs ${textSecondary} ml-2`}>{iface.type_name}</span>
@@ -129,7 +128,7 @@ export default function DataIoTab() {
                 <span className={`text-xs ${textSecondary}`}>
                   {t("frameLink.interfaceIndex", { index: iface.index })}
                 </span>
-              </div>
+              </Card>
             ))}
           </div>
 
@@ -141,10 +140,9 @@ export default function DataIoTab() {
               </span>
             </PrimaryButton>
           ) : (
-            <div className="flex items-center gap-2 p-3 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
-              <Check className={iconMd} />
+            <Alert tone="success">
               {t("frameLink.addedSuccess", { count: probeResult.interfaces.length })}
-            </div>
+            </Alert>
           )}
         </>
       )}

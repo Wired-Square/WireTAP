@@ -19,8 +19,6 @@ import { DialogFooter } from "../components/forms/DialogFooter";
 import { previewCsv } from "../api/capture";
 import {
   h3,
-  cardElevated,
-  paddingCard,
   caption,
   textMuted,
   textSecondary,
@@ -30,6 +28,7 @@ import {
 import { iconSm, iconMd } from "../styles/spacing";
 import { IconButton } from "../components/Button";
 import { Checkbox } from "../components/forms";
+import { Card } from "../components/Card";
 
 export type CsvFileOrderDialogProps = {
   isOpen: boolean;
@@ -286,7 +285,7 @@ export default function CsvFileOrderDialog({
   return (
     <>
     <Dialog isOpen={isOpen} onBackdropClick={onCancel} maxWidth="max-w-4xl">
-      <div className={`${cardElevated} ${paddingCard} space-y-4`}>
+      <Card padding="lg" className="space-y-4">
         <div>
           <h3 className={h3}>Confirm File Order</h3>
           <p className={caption}>
@@ -470,7 +469,7 @@ export default function CsvFileOrderDialog({
           confirmLabel="Next: Map Columns"
           confirmDisabled={detecting || entries.length === 0}
         />
-      </div>
+      </Card>
     </Dialog>
 
       {/* Context menu */}

@@ -6,13 +6,13 @@ import { useShallow } from "zustand/react/shallow";
 import { Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { formatHexId } from "../utils/formatHex";
 import UserSignalDialog from "../dialogs/UserSignalDialog";
 import type { UserSignalMetadata } from "../dialogs/UserSignalDialog";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 export default function UserSignalsView() {
   const { t } = useTranslation("rules");
@@ -82,9 +82,10 @@ export default function UserSignalsView() {
       {userSignals.map((signal) => {
         const isTemporary = temporaryRules.has(`usersig:${signal.signal_id}`);
         return (
-          <div
+          <Card
             key={signal.signal_id}
-            className={`${cardDefault} ${cardPadding.md} flex items-center justify-between`}
+            padding="lg"
+            className="flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
               <span className={`text-sm font-mono font-medium ${textPrimary}`}>
@@ -106,7 +107,7 @@ export default function UserSignalsView() {
             >
               <Trash2 className={iconMd} />
             </IconButton>
-          </div>
+          </Card>
         );
       })}
 

@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Info } from "lucide-react";
-import { iconSm } from "../../../../styles/spacing";
 import { textMuted } from "../../../../styles";
 import ModbusConnectionFields from "../../../../components/modbus/ModbusConnectionFields";
 import { useModbusTarget } from "../../../../components/modbus/useModbusTarget";
@@ -13,7 +11,7 @@ import {
   MODBUS_SCAN_DEFAULTS,
 } from "../../../../components/modbus/modbusScanDefaults";
 import type { UnitIdScanConfig, ModbusRegisterType } from "../../../../api/io";
-
+import { Alert } from "../../../../components/Alert";
 type Props = {
   onStartScan: (config: UnitIdScanConfig) => void;
 };
@@ -66,16 +64,11 @@ export default function ModbusUnitIdScanPanel({ onStartScan }: Props) {
       </FieldRow>
 
       {/* FC43 info */}
-      <div className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)]">
-        <Info className={`${iconSm} shrink-0 mt-0.5 text-purple-400`} />
-        <span className={textMuted}>
-          {t("modbusUnitId.fc43DescriptionPrefix")}
-          <strong className="text-[color:var(--text-secondary)]">
-            {t("modbusUnitId.fc43Title")}
-          </strong>
-          {t("modbusUnitId.fc43DescriptionSuffix")}
-        </span>
-      </div>
+      <Alert tone="info" size="sm">
+        {t("modbusUnitId.fc43DescriptionPrefix")}
+        <strong>{t("modbusUnitId.fc43Title")}</strong>
+        {t("modbusUnitId.fc43DescriptionSuffix")}
+      </Alert>
 
       {/* Fallback register config */}
       <div className="space-y-2 pt-1">

@@ -19,7 +19,7 @@ import type {
 } from "../../../api/framelinkRules";
 import { Button, IconButton } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Input, Select, Checkbox } from "../../../components/forms";
-
+import { Alert } from "../../../components/Alert";
 interface FilterRow {
   kind: BridgeFilterKind;
   ide: BridgeFilterIde;
@@ -169,7 +169,7 @@ export default function BridgeDialog({
         </h2>
 
         {validationError && (
-          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+          <Alert tone="danger" size="sm" className="mb-3">{validationError}</Alert>
         )}
 
         <div className="space-y-4">

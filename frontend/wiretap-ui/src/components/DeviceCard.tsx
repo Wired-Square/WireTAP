@@ -4,11 +4,11 @@
 // upgrade (BLE + mDNS/UDP). Renders differently based on transport type.
 
 import { Bluetooth, Globe, Wifi, HardDriveDownload, Plug, Cable } from "lucide-react";
-import { cardDefault } from "../styles/cardStyles";
 import { textPrimary } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import { PrimaryButton } from "./forms";
 import { Badge, SummaryBadge } from "./Badge";
+import { Card } from "./Card";
 
 /**
  * Polymorphic device type — works with both provisioning's BleDevice
@@ -65,7 +65,7 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
   const caps = device.capabilities ?? [];
 
   return (
-    <div className={`${cardDefault} flex items-center justify-between p-4`}>
+    <Card padding="lg" className="flex items-center justify-between">
       <div className="flex-1">
         {/* Row 1: name + badges */}
         <div className={`flex items-center ${gapSmall}`}>
@@ -120,6 +120,6 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
           </span>
         </PrimaryButton>
       </div>
-    </div>
+    </Card>
   );
 }

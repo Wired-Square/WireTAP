@@ -36,10 +36,10 @@ const UNDEFINED = undefinedVariables();
 // whose variable is defined, or no longer referenced, fails the guard until it is removed.
 const UNDEFINED_VARIABLES_IN_REGISTER = [
   "--accent", "--accent-green", "--accent-info", "--accent-yellow",
-  "--bg-accent", "--bg-card", "--bg-green", "--bg-green-subtle", "--bg-hover", "--bg-light",
+  "--bg-card", "--bg-green", "--bg-green-subtle", "--bg-hover", "--bg-light",
   "--bg-purple-subtle", "--bg-secondary", "--bg-subtle", "--bg-surface-2",
   "--border", "--border-green",
-  "--status-info-text-bold", "--status-purple-text-bold", "--status-warning",
+  "--status-warning",
   "--text-data-green", "--text-emerald", "--text-rose", "--text-tertiary",
 ];
 
@@ -48,7 +48,7 @@ const RUNTIME_DEFINED_VARIABLES = ["--safe-area-inset-bottom"];
 
 describe("utilities.css", () => {
   it("finds the sheet, the source and the variables (guards the extractors themselves)", () => {
-    expect(SHEET.split("\n").filter((l) => /^  [.:@]/.test(l)).length).toBeGreaterThan(800);
+    expect(SHEET.split("\n").filter((l) => /^  [.:@]/.test(l)).length).toBeGreaterThan(500);
     expect(Object.keys(sources).length).toBeGreaterThan(500);
     expect(classStrings.length).toBeGreaterThan(1000);
     expect(DECLARED.size).toBeGreaterThan(80);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, FileText, Database, FileCode, BookOpen } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, sectionHeaderText } from "../../../styles/typography";
-import { selectableOptionBox } from "../../../styles/cardStyles";
+import { cardClass } from "../../../components/Card";
 import Dialog from "../../../components/Dialog";
 import { pickFileToSave, CATALOG_FILTERS, DBC_FILTERS, HTML_FILTERS, MARKDOWN_FILTERS, TEXT_FILTERS, type DialogFilter } from "../../../api/dialogs";
 import { exportDbcWs, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
@@ -84,6 +84,8 @@ const FORMAT_INFO: Record<CatalogExportFormat, FormatInfo> = {
     group: "report",
   },
 };
+
+const optionCard = cardClass({ interactive: true }, "flex items-start gap-3");
 
 const FORMAT_OPTIONS: { value: CatalogExportFormat; label: string }[] = [
   { value: "toml", label: "TOML Catalog (.toml)" },
@@ -218,7 +220,7 @@ export default function ExportCatalogDialog({
                 Multiplexing Mode
               </label>
               <div className="space-y-2">
-                <label className={selectableOptionBox}>
+                <label className={optionCard}>
                   <Radio
                     name="dbcMuxMode"
                     value="extended"
@@ -235,7 +237,7 @@ export default function ExportCatalogDialog({
                     </div>
                   </div>
                 </label>
-                <label className={selectableOptionBox}>
+                <label className={optionCard}>
                   <Radio
                     name="dbcMuxMode"
                     value="flattened"

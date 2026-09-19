@@ -1,10 +1,11 @@
 // ui/src/apps/settings/components/SecurePasswordField.tsx
 import { useState } from "react";
 import { Shield, ShieldAlert, Eye, EyeOff } from "lucide-react";
-import { iconMd, iconXs, flexRowGap2 } from "../../styles/spacing";
+import { iconMd, iconXs } from "../../styles/spacing";
 import { Input } from "../../components/forms";
-import { labelDefault, helpText, alertWarning } from "../../styles";
+import { labelDefault, helpText } from "../../styles";
 import { Button, IconButton } from "../Button";
+import { Alert } from "../Alert";
 
 type Props = {
   value: string;
@@ -49,24 +50,21 @@ export default function SecurePasswordField({
       </label>
 
       {showMigrationWarning && (
-        <div className={`${alertWarning} mb-2 flex items-center justify-between gap-2`}>
-          <div className={flexRowGap2}>
-            <ShieldAlert className={`${iconMd} flex-shrink-0`} />
-            <span className="text-xs">
-              Password stored in plain text. Migrate to secure storage.
-            </span>
-          </div>
-          {onMigrate && (
-            <Button
-              onClick={onMigrate}
-              variant="solid"
-              tone="warning"
-              size="sm"
-            >
-              Migrate
-            </Button>
-          )}
-        </div>
+        <Alert
+          tone="warning"
+          size="sm"
+          icon={<ShieldAlert />}
+          className="mb-2"
+          action={
+            onMigrate && (
+              <Button onClick={onMigrate} variant="solid" tone="warning" size="sm">
+                Migrate
+              </Button>
+            )
+          }
+        >
+          Password stored in plain text. Migrate to secure storage.
+        </Alert>
       )}
 
       <div className="relative">

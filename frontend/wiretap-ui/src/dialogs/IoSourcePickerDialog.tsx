@@ -7,7 +7,6 @@ import { iconLg } from "../styles/spacing";
 import { emit, listen } from "@tauri-apps/api/event";
 import Dialog from "../components/Dialog";
 import {
-  cardElevated,
   h3,
   borderDefault,
   paddingCard,
@@ -86,7 +85,7 @@ import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { newSavedProfileId, storeProfileSecrets } from "../settings/ioProfileForm";
 import { withAppError } from "../utils/appError";
 import { IconButton } from "../components/Button";
-
+import { Card } from "../components/Card";
 
 /** Options passed when starting a load or connect operation */
 export interface LoadOptions {
@@ -2070,7 +2069,7 @@ export default function IoSourcePickerDialog({
   return (
     <>
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
-      <div className={`${cardElevated} shadow-xl overflow-hidden`}>
+      <Card padding="none" className="shadow-xl overflow-hidden">
         {/* Header */}
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
           <h2 className={h3}>{t("ioSourcePicker.title")}</h2>
@@ -2101,7 +2100,7 @@ export default function IoSourcePickerDialog({
           </div>
         ) : (
           pickerBody
-        )}      </div>
+        )}      </Card>
     </Dialog>
 
     {/* File order dialog (opens when multiple files selected) */}

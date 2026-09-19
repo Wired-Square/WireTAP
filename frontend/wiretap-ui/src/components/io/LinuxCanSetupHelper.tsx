@@ -4,12 +4,12 @@
 // Provides a copy button for easy use.
 
 import { useState, useEffect } from "react";
-import { Copy, Check, Terminal } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../styles/spacing";
 import { getCanSetupCommand } from "../../api/gs_usb";
-import { alertWarning, helpText } from "../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../constants";
 import { IconButton } from "../Button";
+import { Alert } from "../Alert";
 
 interface Props {
   /** CAN interface name (e.g., "can0") */
@@ -57,38 +57,31 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
   }
 
   return (
-    <div className={alertWarning}>
-      <div className="flex items-start gap-2">
-        <Terminal className={`${iconMd} mt-0.5 flex-shrink-0`} />
-        <div className="flex-1">
-          <p className="text-sm font-medium mb-2">
-            Linux setup required
-          </p>
-          <p className={`${helpText} mb-2`}>
-            Run this command in your terminal to configure the CAN interface:
-          </p>
-          <div className={flexRowGap2}>
-            <code className="flex-1 p-2 bg-[var(--bg-warning)] rounded text-xs font-mono break-all">
-              {setupCommand}
-            </code>
-            <IconButton
-              onClick={handleCopy}
-              tone="warning"
-              size="sm"
-              title={copied ? "Copied!" : "Copy to clipboard"}
-            >
-              {copied ? (
-                <Check className={`${iconMd} text-[color:var(--accent-success)]`} />
-              ) : (
-                <Copy className={iconMd} />
-              )}
-            </IconButton>
-          </div>
-          <p className={`${helpText} mt-2 text-xs`}>
-            Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.
-          </p>
-        </div>
+    <Alert tone="warning">
+      <p className="font-medium mb-2">Linux setup required</p>
+      <p className="text-xs mb-2">
+        Run this command in your terminal to configure the CAN interface:
+      </p>
+      <div className={flexRowGap2}>
+        <code className="flex-1 p-2 bg-[var(--bg-warning)] rounded text-xs font-mono break-all">
+          {setupCommand}
+        </code>
+        <IconButton
+          onClick={handleCopy}
+          tone="warning"
+          size="sm"
+          title={copied ? "Copied!" : "Copy to clipboard"}
+        >
+          {copied ? (
+            <Check className={`${iconMd} text-[color:var(--accent-success)]`} />
+          ) : (
+            <Copy className={iconMd} />
+          )}
+        </IconButton>
       </div>
-    </div>
+      <p className="text-xs mt-2">
+        Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.
+      </p>
+    </Alert>
   );
 }

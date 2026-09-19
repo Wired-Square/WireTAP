@@ -6,13 +6,13 @@ import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { BridgeDescriptor } from "../../../api/framelinkRules";
 import BridgeDialog from "../dialogs/BridgeDialog";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 export default function BridgesView() {
   const { t } = useTranslation("rules");
@@ -78,9 +78,10 @@ export default function BridgesView() {
         const key = `bridge:${b.bridge_id}`;
         const isTemp = temporaryRules.has(key);
         return (
-          <div
+          <Card
             key={b.bridge_id}
-            className={`${cardDefault} ${cardPadding.md} flex items-start justify-between`}
+            padding="lg"
+            className="flex items-start justify-between"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -122,7 +123,7 @@ export default function BridgesView() {
                 <Trash2 className={iconMd} />
               </IconButton>
             </div>
-          </div>
+          </Card>
         );
       })}
 

@@ -3,6 +3,8 @@
 // Options panel for Serial Payload Analysis tool in the Toolbox dialog.
 // Analyzes framed data to identify ID bytes and checksum positions.
 
+import { Alert } from "../../../../components/Alert";
+
 type Props = {
   framesCount: number;
 };
@@ -10,14 +12,10 @@ type Props = {
 export default function SerialPayloadToolPanel({ framesCount }: Props) {
   return (
     <div className="space-y-3 text-xs">
-      <div className="bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)] rounded p-2">
-        <p className="text-[color:var(--status-success-text)] font-medium">
-          Analyze Frame Structure
-        </p>
-        <p className="text-[color:var(--text-green)] mt-1">
-          Analyze {framesCount.toLocaleString()} frames to identify payload structure.
-        </p>
-      </div>
+      <Alert tone="success" size="sm">
+        <p className="font-medium">Analyze Frame Structure</p>
+        <p className="mt-1">Analyze {framesCount.toLocaleString()} frames to identify payload structure.</p>
+      </Alert>
       <p className="text-[color:var(--text-muted)]">
         Will identify:
       </p>

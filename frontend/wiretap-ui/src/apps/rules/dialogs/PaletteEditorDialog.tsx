@@ -22,7 +22,7 @@ import {
 } from "../../../api/framelinkRules";
 import { Button, IconButton } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Select } from "../../../components/forms";
-
+import { Alert } from "../../../components/Alert";
 interface PaletteEditorDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -129,9 +129,7 @@ export default function PaletteEditorDialog({
         )}
 
         {error && (
-          <div className="mb-3 px-3 py-2 text-xs bg-red-500/10 border border-red-500/30 text-red-400 rounded">
-            {error}
-          </div>
+          <Alert tone="danger" size="sm" className="mb-3">{error}</Alert>
         )}
 
         {!loading && palettes.length === 0 && (

@@ -29,7 +29,6 @@ import {
   bgSurface,
   borderDivider,
   caption,
-  cardCompact,
   emptyStateHint,
   emptyStateText,
   h2,
@@ -40,7 +39,7 @@ import {
   textSuccess,
   textWarning,
 } from "../../styles";
-import { alertWarning, panelFooter } from "../../styles/cardStyles";
+import { panelFooter } from "../../styles/cardStyles";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
 import { savedRepoName, revealRepoClone, GIT_PROGRESS_EVENT } from "../../api/catalogShare";
 import type {
@@ -55,6 +54,7 @@ import { writeClipboardText } from "../../api/clipboard";
 import { useIsIOS } from "../../hooks/useIsIOS";
 import { IconButton } from "../../components/Button";
 import { Badge } from "../../components/Badge";
+import { Card } from "../../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -197,7 +197,7 @@ function RepoRow({
   ];
 
   return (
-    <div className={`${cardCompact} flex items-center gap-2`}>
+    <Card className="flex items-center gap-2">
       {onToggleFavourite && (
         <IconButton
           onClick={onToggleFavourite}
@@ -231,7 +231,7 @@ function RepoRow({
         title={t("repository.saved.menu")}
         items={items}
       />
-    </div>
+    </Card>
   );
 }
 
@@ -528,12 +528,12 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               <p className={`${caption} ${textDanger}`}>{reposError.message}</p>
             )}
             {repos.length === 0 ? (
-              <div className={`${cardCompact} text-center py-4`}>
+              <Card className="text-center py-4">
                 <p className={emptyStateText}>
                   {t(mine ? "repository.saved.empty" : "repository.community.empty")}
                 </p>
                 <p className={emptyStateHint}>{t("repository.saved.emptyHint")}</p>
-              </div>
+              </Card>
             ) : (
               <div className="space-y-1">
                 {repos.map((repo) => (
@@ -619,13 +619,13 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
 
           {browse.error && (
             <Alert tone="danger">
-              <p className={textMedium}>{browse.error.message}</p>
-              {hintKey && <p className={caption}>{t(hintKey)}</p>}
+              <p className="font-medium">{browse.error.message}</p>
+              {hintKey && <p className="text-xs">{t(hintKey)}</p>}
             </Alert>
           )}
 
           {browse.result && (
-            <div className={`${cardCompact} space-y-2`}>
+            <Card className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <ShareIcon.Branch className={`${iconSm} ${textSecondary}`} />
                 <span className={textMedium}>{browse.result.repo.fullName}</span>
@@ -651,7 +651,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
                   {t("repository.dropped", { count: browse.result.dropped })}
                 </p>
               )}
-            </div>
+            </Card>
           )}
 
           {browse.result && (
@@ -695,12 +695,9 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
 
           {/* The one genuinely physical risk: an imported catalogue can define bus traffic. */}
           {totalTransmitFrames > 0 && (
-            <div className={`${alertWarning} flex items-start gap-2`}>
-              <ShareIcon.TransmitRisk className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
-              <p className={caption}>
-                {t("repository.transmitWarning", { count: totalTransmitFrames })}
-              </p>
-            </div>
+            <Alert tone="warning" icon={<ShareIcon.TransmitRisk />}>
+              <p className="text-xs">{t("repository.transmitWarning", { count: totalTransmitFrames })}</p>
+            </Alert>
           )}
 
           {anyCollisions && (
@@ -719,7 +716,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
           )}
 
           {importState.results && (
-            <div className={`${cardCompact} space-y-1`}>
+            <Card className="space-y-1">
               {importState.results.map((r) => {
                 const failed = r.outcome === "failed" || r.outcome === "skipped";
                 return (
@@ -743,7 +740,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
                   </div>
                 );
               })}
-            </div>
+            </Card>
           )}
 
           {importState.error && (

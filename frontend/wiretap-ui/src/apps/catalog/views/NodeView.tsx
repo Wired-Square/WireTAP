@@ -10,7 +10,7 @@ import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
-
+import { Card } from "../../../components/Card";
 export type NodeViewProps = {
   selectedNode: TomlNode;
   onSelectNode: (node: TomlNode) => void;
@@ -286,10 +286,7 @@ export default function NodeView({
           </div>
         ) : (
           framesForNode.map((frame) => (
-            <div
-              key={frame.id}
-              className={`p-4 ${bgSecondary} rounded-lg border border-[color:var(--border-default)]`}
-            >
+            <Card key={frame.id} padding="lg">
               {(() => {
                 const formatted = formatFrameId(frame.id, displayFrameIdFormat);
                 return (
@@ -388,7 +385,7 @@ export default function NodeView({
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           ))
         )}
       </div>

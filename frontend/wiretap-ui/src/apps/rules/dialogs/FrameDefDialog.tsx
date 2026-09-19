@@ -10,7 +10,7 @@ import type { FrameHeader } from "../utils/bitGrid";
 import { nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
 import { SecondaryButton, PrimaryButton, Input, Select, Checkbox } from "../../../components/forms";
-
+import { Alert } from "../../../components/Alert";
 interface FrameDefDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -90,7 +90,7 @@ export default function FrameDefDialog({
         </h2>
 
         {validationError && (
-          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+          <Alert tone="danger" size="sm" className="mb-3">{validationError}</Alert>
         )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">

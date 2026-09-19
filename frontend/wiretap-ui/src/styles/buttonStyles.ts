@@ -1,19 +1,7 @@
 // ui/src/styles/buttonStyles.ts
 // Buttons are <Button> and <IconButton> from src/components/Button.tsx, which
 // render the `.btn` classes in styles/components.css. What remains here belongs
-// to families that have not moved yet: the framing-option card, the data view
-// tab, and the launcher tiles.
-
-/**
- * Toggle card button for dark panels (e.g., framing options in dark dialogs)
- * @param isActive - Whether the toggle is currently active
- */
-export function toggleCardClass(isActive: boolean): string {
-  const base = "w-full text-left px-4 py-3 rounded border transition-colors";
-  return isActive
-    ? `${base} bg-blue-900/30 border-blue-600 text-white`
-    : `${base} bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95`;
-}
+// to families that have not moved yet: the data view tab and the launcher tiles.
 
 /**
  * Tab button for data views

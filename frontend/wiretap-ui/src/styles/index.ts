@@ -1,10 +1,10 @@
 // ui/src/styles/index.ts
 // Barrel export for all centralized styles
 
-// What is not yet a component: framing cards, data view tabs, the launcher
+// What is not yet a component: data view tabs, the launcher
 export * from './buttonStyles';
 
-// Card, panel, and container styles
+// What the dialogs family still owns: the panel footer, the config-section header
 export * from './cardStyles';
 
 // Colour tokens for consistent palette

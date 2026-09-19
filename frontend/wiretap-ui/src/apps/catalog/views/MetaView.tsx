@@ -6,7 +6,7 @@ import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, bgSecondary, captionMuted, sectionHeaderText } from "../../../styles";
 import type { MetaFields, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig } from "../types";
 import { IconButton } from "../../../components/Button";
-
+import { Card } from "../../../components/Card";
 export type MetaViewProps = {
   metaFields: MetaFields;
   canConfig?: CanProtocolConfig;
@@ -183,7 +183,7 @@ function ProtocolConfigCard({
   const showWarning = hasFrames && !isConfigured;
 
   return (
-    <div className={`flex items-start gap-3 p-3 ${bgSecondary} rounded-lg border border-[color:var(--border-default)]`}>
+    <Card className="flex items-start gap-3">
       <div className={`p-1.5 ${iconBg} rounded`}>
         {icon}
       </div>
@@ -209,6 +209,6 @@ function ProtocolConfigCard({
         </div>
         {children}
       </div>
-    </div>
+    </Card>
   );
 }

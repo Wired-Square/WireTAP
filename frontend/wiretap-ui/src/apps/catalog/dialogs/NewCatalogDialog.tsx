@@ -6,9 +6,10 @@ import { Network, Server, Cable } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
 import Dialog from "../../../components/Dialog";
 import { Input, Select, FormField, SecondaryButton, SuccessButton } from "../../../components/forms";
-import { h2, alertDanger, caption } from "../../../styles";
+import { h2, caption } from "../../../styles";
 import type { MetaFields, ValidationError, ProtocolType, SerialEncoding } from "../types";
 import { Button } from "../../../components/Button";
+import { Alert } from "../../../components/Alert";
 
 export type NewCatalogDialogProps = {
   open: boolean;
@@ -93,9 +94,9 @@ export default function NewCatalogDialog({
         <h2 className={`${h2} mb-6`}>{t("newCatalog.title")}</h2>
 
         {metaError && (
-          <div className={`${alertDanger} mb-4`}>
+          <Alert tone="danger" className="mb-4">
             {metaError.message}
-          </div>
+          </Alert>
         )}
 
         <div className="space-y-4">

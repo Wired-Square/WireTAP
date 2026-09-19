@@ -25,9 +25,10 @@ import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { buildCatalogPath, catalogBaseName } from "../../utils/catalogUtils";
 import { iconMd, iconLg, iconSm } from "../../styles/spacing";
 import { caption, textMedium, h3, borderDivider, emptyStateText } from "../../styles";
-import { errorBoxCompact, panelFooter } from "../../styles/cardStyles";
+import { panelFooter } from "../../styles/cardStyles";
 import { IconButton } from "../../components/Button";
 import { PrimaryButton, SecondaryButton } from "../../components/forms";
+import { Alert } from "../../components/Alert";
 
 // Its whole subtree — the share store and API — is dead weight in every panel
 // that never opens it.
@@ -175,7 +176,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
           )}
         </div>
 
-        {error && <div className={`mx-3 mb-2 ${errorBoxCompact}`}>{error}</div>}
+        {error && <Alert tone="danger" size="sm" className="mx-3 mb-2">{error}</Alert>}
 
         <div className={`${panelFooter} flex gap-2`}>
           {onNewCatalog && (

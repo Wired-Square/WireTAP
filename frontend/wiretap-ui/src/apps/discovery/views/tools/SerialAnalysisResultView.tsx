@@ -13,7 +13,8 @@ import { iconMd, iconXs, iconLg, icon2xl, flexRowGap2 } from "../../../../styles
 import { caption, captionMuted, textMedium, sectionHeaderText } from "../../../../styles";
 import { Button, IconButton } from "../../../../components/Button";
 import { Badge } from "../../../../components/Badge";
-
+import { Card } from "../../../../components/Card";
+import { Alert } from "../../../../components/Alert";
 type Props = {
   /** Which results to display. When omitted, shows whichever results exist. */
   mode?: 'framing' | 'payload';
@@ -181,8 +182,8 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
     return (
       <div className="h-full overflow-y-auto p-4 pb-8 space-y-6">
         {/* Summary Header */}
-        <div className="flex items-center gap-4 p-4 bg-[var(--status-info-bg)] rounded-lg border border-[color:var(--status-info-border)]">
-          <Layers className={`${icon2xl} text-blue-500`} />
+        <Card tone="info" padding="lg" className="flex items-center gap-4">
+          <Layers className={`${icon2xl} text-[color:var(--status-info-text)]`} />
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
               {t("serialAnalysis.framingTitle")}
@@ -201,7 +202,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
               <X className={iconXs} />
             </IconButton>
           )}
-        </div>
+        </Card>
 
         {/* General Notes */}
         {framingResult.notes.length > 0 && (
@@ -232,11 +233,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
           </div>
 
           {framingResult.candidates.length === 0 ? (
-            <div className="p-4 bg-[var(--status-warning-bg)] rounded-lg border border-[color:var(--status-warning-border)]">
-              <p className="text-sm text-[color:var(--status-warning-text)]">
-                {t("serialAnalysis.noFramingDetected")}
-              </p>
-            </div>
+            <Alert tone="warning">{t("serialAnalysis.noFramingDetected")}</Alert>
           ) : (
             <div className="space-y-2">
               {framingResult.candidates

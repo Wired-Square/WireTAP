@@ -9,8 +9,8 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useRulesStore, type RulesTab } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { formatHexId } from "../utils/formatHex";
+import { Card } from "../../../components/Card";
 
 export default function DeviceOverview() {
   const { t } = useTranslation("rules");
@@ -41,7 +41,7 @@ export default function DeviceOverview() {
   return (
     <div className="space-y-4">
       {/* Resource summary bar */}
-      <div className={`${cardDefault} ${cardPadding.sm} flex items-center gap-4 text-xs`}>
+      <Card padding="sm" className="flex items-center gap-4 text-xs">
         <ResourceCount label={t("overview.summary.interfaces")} count={interfaces.length} />
         <ResourceCount label={t("overview.summary.frameDefs")} count={frameDefs.length} />
         <ResourceCount label={t("overview.summary.bridges")} count={bridges.length} />
@@ -50,7 +50,7 @@ export default function DeviceOverview() {
         <span className={`ml-auto text-xs ${textTertiary}`}>
           {t("overview.summary.temporaryCount", { count: temporaryRules.size })}
         </span>
-      </div>
+      </Card>
 
       {/* Flow diagram */}
       <div className="relative min-h-[300px]">

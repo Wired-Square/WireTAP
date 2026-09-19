@@ -17,7 +17,7 @@ import { borderDataView, bgDataView } from "../../styles/colourTokens";
 import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacing";
 import { h2, sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
-
+import { Card } from "../../components/Card";
 export type Endianness = "little" | "big" | "mid-little" | "mid-big";
 export type GroupMode = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
 export type CustomUnit = "bits" | "bytes";
@@ -536,10 +536,7 @@ export default function FrameCalculator() {
                 ?.join(' ') || '';
 
               return (
-                <div
-                  key={g.index}
-                  className={`p-4 rounded-xl border border-[color:var(--border-default)] ${bgSurface} shadow-sm flex flex-col gap-3`}
-                >
+                <Card key={g.index} padding="lg" className="flex flex-col gap-3">
                   {/* Top section: Values */}
                   <div className="min-w-0">
                     {/* Header */}
@@ -667,7 +664,7 @@ export default function FrameCalculator() {
                       onBitToggle={(newHex) => handleBitToggle(groupIdx, newHex)}
                     />
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>
@@ -953,7 +950,7 @@ export default function FrameCalculator() {
               const scale = targetValue / Number(rawValue);
 
               return (
-                <div className="p-4 rounded-lg bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]">
+                <Card tone="info" padding="lg">
                   <div className="text-sm text-[color:var(--text-secondary)] mb-1">
                     Scale Factor (DBC)
                   </div>
@@ -975,7 +972,7 @@ export default function FrameCalculator() {
                   <div className={`${caption} mt-1`}>
                     raw × {scale.toPrecision(6)} = physical
                   </div>
-                </div>
+                </Card>
               );
             })()}
           </div>

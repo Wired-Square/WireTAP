@@ -8,13 +8,13 @@
 
 import { Globe, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cardDefault } from "../../../styles/cardStyles";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd, gapSmall } from "../../../styles/spacing";
 import type { DeviceRegistryEntry } from "../../../api/deviceRegistry";
 import { IconButton } from "../../../components/Button";
 import { SecondaryButton } from "../../../components/forms";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 interface RegisteredDeviceRowProps {
   entry: DeviceRegistryEntry;
@@ -32,7 +32,7 @@ export default function RegisteredDeviceRow({
   const { t } = useTranslation("devices");
 
   return (
-    <div className={`${cardDefault} flex items-center justify-between p-4`}>
+    <Card padding="lg" className="flex items-center justify-between">
       <div className="flex-1 min-w-0">
         <div className={`flex items-center flex-wrap ${gapSmall}`}>
           <h3 className={`font-medium ${textPrimary} truncate`}>{entry.device_id}</h3>
@@ -71,6 +71,6 @@ export default function RegisteredDeviceRow({
           <Trash2 className={iconMd} />
         </IconButton>
       </div>
-    </div>
+    </Card>
   );
 }

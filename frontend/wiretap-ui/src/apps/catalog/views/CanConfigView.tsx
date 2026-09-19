@@ -6,7 +6,7 @@ import { iconMd, iconLg } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import type { TomlNode, CanProtocolConfig } from "../types";
 import { IconButton } from "../../../components/Button";
-
+import { Alert } from "../../../components/Alert";
 export type CanConfigViewProps = {
   selectedNode: TomlNode;
   canConfig?: CanProtocolConfig;
@@ -112,11 +112,9 @@ export default function CanConfigView({
       </div>
 
       {/* Info box */}
-      <div className="p-4 bg-[var(--status-info-bg)] rounded-lg border border-[color:var(--status-info-border)]">
-        <p className="text-sm text-[color:var(--status-info)]">
-          <strong>{t("canConfig.noteTitle")}</strong> {t("canConfig.noteText")}
-        </p>
-      </div>
+      <Alert tone="info">
+        <strong>{t("canConfig.noteTitle")}</strong> {t("canConfig.noteText")}
+      </Alert>
     </div>
   );
 }

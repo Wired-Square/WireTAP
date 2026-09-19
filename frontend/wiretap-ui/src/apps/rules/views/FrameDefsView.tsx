@@ -6,7 +6,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textSecondary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { FrameDefDescriptor, SignalDefDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
@@ -16,6 +15,7 @@ import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 export default function FrameDefsView() {
   const { t } = useTranslation("rules");
@@ -151,9 +151,11 @@ export default function FrameDefsView() {
         const key = `framedef:${fd.frame_def_id}`;
         const isTemp = temporaryRules.has(key);
         return (
-          <div
+          <Card
             key={fd.frame_def_id}
-            className={`${cardDefault} ${cardPadding.md} flex items-start justify-between cursor-pointer`}
+            padding="lg"
+            interactive
+            className="flex items-start justify-between"
             onClick={() => handleEditFrameDef(fd)}
           >
             <div className="flex-1 min-w-0">
@@ -204,7 +206,7 @@ export default function FrameDefsView() {
             >
               <Trash2 className={iconMd} />
             </IconButton>
-          </div>
+          </Card>
         );
       })}
 

@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
-import { iconXs, iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
-import { cardDefault } from "../../../../styles/cardStyles";
+import { iconXs, iconMd, iconSm, iconLg, flexRowGap2 } from "../../../../styles/spacing";
 import { labelSmall, caption, captionMuted, sectionHeaderText, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
-import { borderDivider, bgSurface, textMuted } from "../../../../styles";
+import { borderDivider, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { DetectedPattern, IntervalGroup, StartIdCandidate, MultiplexedFrame, BurstFrame, MultiBusFrame } from "../../../../utils/analysis/messageOrderAnalysis";
 import { useSettings } from "../../../../hooks/useSettings";
@@ -19,6 +18,7 @@ import { generateFrameOrderReport } from "../../../../utils/frameOrderReport";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
 import { Button, IconButton } from "../../../../components/Button";
 import { Badge } from "../../../../components/Badge";
+import { Card, cardClass } from "../../../../components/Card";
 
 type Props = {
   embedded?: boolean;
@@ -55,9 +55,11 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
     setShowExportDialog(false);
   };
 
+  const shell = embedded ? "h-full flex flex-col" : cardClass({ padding: "none" }, "h-full flex flex-col");
+
   if (!results) {
     return (
-      <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
+      <div className={shell}>
         {!embedded && <Header onExport={() => {}} hasResults={false} onClose={onClose} />}
         <div className={emptyStateContainer}>
           <ListOrdered className={`w-12 h-12 ${textMuted} mb-4`} />
@@ -73,7 +75,7 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
   }
 
   return (
-    <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
+    <div className={shell}>
       {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />}
 
       {/* Stats Summary */}
@@ -235,7 +237,7 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
   const isHighConfidence = pattern.confidence >= 0.8;
 
   return (
-    <div className={`${paddingCardSm} ${cardDefault}`}>
+    <Card>
       <div className="flex items-start justify-between mb-2">
         <div className={flexRowGap2}>
           <span className={labelSmall}>
@@ -273,7 +275,7 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
       <div className={captionMuted}>
         {t("messageOrder.framesAvgCycle", { count: pattern.sequence.length, cycle: formatMs(pattern.avgCycleTimeMs) })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -303,7 +305,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
           {t("messageOrder.candidatesSorted")}
         </span>
       </div>
-      <div className={`${cardDefault} overflow-hidden`}>
+      <Card padding="none" className="overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
@@ -350,7 +352,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -380,7 +382,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
           {t("messageOrder.multiplexedHint")}
         </span>
       </div>
-      <div className={`${cardDefault} overflow-hidden`}>
+      <Card padding="none" className="overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
@@ -436,7 +438,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -466,7 +468,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
           {t("messageOrder.burstHint")}
         </span>
       </div>
-      <div className={`${cardDefault} overflow-hidden`}>
+      <Card padding="none" className="overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
@@ -518,7 +520,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -548,7 +550,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
           {t("messageOrder.multiBusHint")}
         </span>
       </div>
-      <div className={`${cardDefault} overflow-hidden`}>
+      <Card padding="none" className="overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
@@ -588,7 +590,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -622,10 +624,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
       </div>
       <div className="space-y-2">
         {groups.map((group, idx) => (
-          <div
-            key={idx}
-            className="p-2 bg-[var(--bg-surface)] rounded border border-[color:var(--border-default)]"
-          >
+          <Card key={idx} padding="sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium text-[color:var(--text-emerald)]">
                 ~{formatMs(group.intervalMs)}
@@ -652,7 +651,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                 );
               })}
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </section>

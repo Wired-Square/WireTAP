@@ -10,7 +10,6 @@ import * as ShareIcon from "../../../../components/catalogIcons";
 import { iconMd, iconSm } from "../../../../styles/spacing";
 import {
   caption,
-  cardCompact,
   emptyStateText,
   textDanger,
   textMedium,
@@ -18,11 +17,12 @@ import {
   textSuccess,
   textWarning,
 } from "../../../../styles";
-import { alertDanger, alertWarning } from "../../../../styles/cardStyles";
 import { CheckboxField } from "../../../../components/forms";
 import type { PublishPlan, PublishStep, SecretFinding } from "../../../../api/catalogShare";
 import type { Blocker, PublishTab, T } from "./types";
 import { Badge } from "../../../../components/Badge";
+import { Card } from "../../../../components/Card";
+import Alert from "../../../../components/Alert";
 
 /** A tab body that scrolls its own content. The panel around it is a fixed-height
  *  flex column, so each body owns its scrolling rather than nesting inside one. */
@@ -45,15 +45,13 @@ export function TabMessage({
   );
 }
 
-/** Box and glyph colours for an alert tone, so every alert shape agrees on them. */
-const alertToneBox = (tone: Tone) => (tone === "danger" ? alertDanger : alertWarning);
 const alertToneText = (tone: Tone) => (tone === "danger" ? textDanger : textWarning);
 
 type Tone = Blocker["tone"];
 
 export function PlanSummary({ plan, t }: { plan: PublishPlan; t: T }) {
   return (
-    <div className={`${cardCompact} space-y-2`}>
+    <Card className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className={textMedium}>{plan.upstream}</span>
         <Badge size="lg">{plan.baseBranch}</Badge>
@@ -82,7 +80,7 @@ export function PlanSummary({ plan, t }: { plan: PublishPlan; t: T }) {
           {t("publish.existingPr")}
         </button>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -98,27 +96,25 @@ export function SecretFindings({
   t: T;
 }) {
   return (
-    <div className={`${alertDanger} space-y-2`}>
-      <div className="flex items-start gap-2">
-        <ShareIcon.Secret className={`${iconMd} ${textDanger} flex-shrink-0 mt-0.5`} />
-        <div>
-          <p className={textMedium}>{t("publish.secretsFound", { count: findings.length })}</p>
-          <p className={caption}>{t("publish.secretsAdvice")}</p>
-        </div>
-      </div>
-      <ul className="space-y-0.5">
+    <Alert tone="danger" icon={<ShareIcon.Secret />}>
+      <p className="font-medium">{t("publish.secretsFound", { count: findings.length })}</p>
+      <p className="text-xs">{t("publish.secretsAdvice")}</p>
+      <ul className="mt-2 space-y-0.5 text-xs">
         {findings.map((f) => (
-          <li key={`${f.line}-${f.label}`} className={caption}>
+          <li key={`${f.line}-${f.label}`}>
             {t("publish.secretLine", { line: f.line, label: f.label })}: <code>{f.excerpt}</code>
           </li>
         ))}
       </ul>
-      <CheckboxField
-        checked={acknowledged}
-        onChange={onAcknowledge}
-        label={t("publish.secretsAcknowledge")}
-      />
-    </div>
+      <div className="mt-2">
+        <CheckboxField
+          checked={acknowledged}
+          onChange={onAcknowledge}
+          label={t("publish.secretsAcknowledge")}
+          labelClass="text-xs"
+        />
+      </div>
+    </Alert>
   );
 }
 
@@ -150,7 +146,7 @@ export function BlockerStrip({
 }) {
   const tone: Tone = blockers.some((b) => b.tone === "danger") ? "danger" : "warning";
   return (
-    <div className={`mx-4 mb-2 space-y-1.5 ${alertToneBox(tone)}`}>
+    <Card tone={tone} className="mx-4 mb-2 space-y-1.5">
       {blockers.map((blocker) => (
         <div key={blocker.id} className="flex items-start gap-2">
           <ShareIcon.Alert
@@ -167,7 +163,7 @@ export function BlockerStrip({
           )}
         </div>
       ))}
-    </div>
+    </Card>
   );
 }
 
@@ -189,7 +185,7 @@ export function StepChecklist({
   // is read from what actually arrived rather than inferred from position.
   const seen = new Set(steps);
   return (
-    <div className={`${cardCompact} space-y-1`}>
+    <Card className="space-y-1">
       {expected.map((step) => {
         const active = currentStep === step;
         const done = seen.has(step) && !active;
@@ -207,6 +203,6 @@ export function StepChecklist({
           </div>
         );
       })}
-    </div>
+    </Card>
   );
 }

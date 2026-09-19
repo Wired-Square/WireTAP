@@ -4,7 +4,7 @@
 // Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
 import { useEffect, useCallback, useMemo } from "react";
-import { Send, AlertCircle } from "lucide-react";
+import { Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -36,7 +36,7 @@ import TransmitHistoryView from "./views/TransmitHistoryView";
 import TransmitReplayView from "./views/TransmitReplayView";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { Button } from "../../components/Button";
-
+import { Alert } from "../../components/Alert";
 // ============================================================================
 // Helper: Check if a profile can transmit
 // ============================================================================
@@ -310,20 +310,17 @@ function TransmitInner() {
       <div className={`flex-1 flex flex-col min-h-0 ${dataViewContainer}`}>
         {/* Error Banner */}
         {transmitError && (
-          <div
-            className="flex items-center gap-2 px-4 py-2 bg-red-900/50 border-b border-slate-700"
-          >
-          <AlertCircle size={16} className="text-red-400 shrink-0" />
-          <span className="text-red-300 text-sm flex-1">{transmitError}</span>
-          <Button
-            onClick={clearError}
-            variant="link"
+          <Alert
             tone="danger"
-            className="text-xs"
+            banner
+            action={
+              <Button onClick={clearError} variant="link" tone="danger" size="sm">
+                Dismiss
+              </Button>
+            }
           >
-            Dismiss
-          </Button>
-        </div>
+            {transmitError}
+          </Alert>
       )}
 
       {/* Loading / No Profiles State */}

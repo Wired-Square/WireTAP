@@ -3,8 +3,7 @@
 import { X, FileText, Shuffle, Zap, GitBranch, Clock, Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { iconMd, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../styles/spacing";
-import { cardDefault } from "../styles/cardStyles";
+import { iconMd, iconXs, iconLg, flexRowGap2 } from "../styles/spacing";
 import { caption, captionMuted, sectionHeaderText, emptyStateText } from "../styles/typography";
 import { borderDivider, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
@@ -15,6 +14,7 @@ import { formatFrameId } from "../utils/frameIds";
 import { formatMs } from "../utils/reportExport";
 import { IconButton } from "../components/Button";
 import { Badge } from "../components/Badge";
+import { Card } from "../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -114,7 +114,7 @@ function MetaSection({ knowledge, t }: MetaSectionProps) {
           {t("decoderInfo.meta.title")}
         </h3>
       </div>
-      <div className={`${cardDefault} ${paddingCardSm} space-y-2`}>
+      <Card className="space-y-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-[color:var(--text-muted)]">default_frame</span>
           <span className="font-mono text-[color:var(--text-primary)]">"{meta.defaultFrame}"</span>
@@ -138,7 +138,7 @@ function MetaSection({ knowledge, t }: MetaSectionProps) {
             })}
           </div>
         )}
-      </div>
+      </Card>
     </section>
   );
 }
@@ -200,7 +200,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
   const allSignals = [...frame.signals, ...defaultSignals];
 
   return (
-    <div className={`${paddingCardSm} ${cardDefault}`}>
+    <Card>
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className={flexRowGap2}>
@@ -321,7 +321,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
           </ul>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

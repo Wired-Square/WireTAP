@@ -2,12 +2,12 @@
 import { Bookmark, Edit2, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm, flexRowGap2 } from "../../../styles/spacing";
-import { cardDefault } from "../../../styles/cardStyles";
 import { emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { PrimaryButton } from "../../../components/forms";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { IOProfile } from "../stores/settingsStore";
 import { IconButton } from "../../../components/Button";
+import { Card } from "../../../components/Card";
 
 type BookmarksViewProps = {
   bookmarks: TimeRangeFavorite[];
@@ -83,9 +83,10 @@ export default function BookmarksView({
               </h3>
               <div className="space-y-2">
                 {profileBookmarks.map((bookmark) => (
-                  <div
+                  <Card
                     key={bookmark.id}
-                    className={`flex items-center justify-between p-4 ${cardDefault}`}
+                    padding="lg"
+                    className="flex items-center justify-between"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
@@ -110,7 +111,7 @@ export default function BookmarksView({
                         <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                       </IconButton>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             </div>

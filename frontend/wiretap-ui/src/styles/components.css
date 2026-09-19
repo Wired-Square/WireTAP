@@ -486,6 +486,170 @@
     --badge-border: var(--status-cyan-border);
   }
 
+  /* ---- Cards -------------------------------------------------------------
+     .card [.card--sm|--lg|--flush] (md when none)
+           [.card--info|--success|--warning|--danger|--purple|--cyan]
+           [.card--interactive] [.card--selected]
+     A bordered surface. A tone tints the fill and edge but not the text — the
+     content keeps its own colours. A card that answers a click hovers like a
+     surface button and, selected, takes the accent tint like a lit toggle. */
+  .card {
+    --card-p: 12px;
+    --card-bg: var(--bg-surface);
+    --card-border: var(--border-default);
+
+    padding: var(--card-p);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-panel);
+    background-color: var(--card-bg);
+  }
+
+  .card--sm {
+    --card-p: 8px;
+  }
+
+  .card--lg {
+    --card-p: 16px;
+  }
+
+  .card--flush {
+    --card-p: 0;
+  }
+
+  .card--interactive {
+    cursor: pointer;
+    transition-property: background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .card--interactive:hover {
+    background-color: color-mix(in srgb, var(--card-bg), var(--text-primary) 8%);
+  }
+
+  .card--selected {
+    --card-bg: var(--status-info-bg);
+    --card-border: var(--status-info-border);
+  }
+
+  .card--info {
+    --card-bg: var(--status-info-bg);
+    --card-border: var(--status-info-border);
+  }
+
+  .card--success {
+    --card-bg: var(--status-success-bg);
+    --card-border: var(--status-success-border);
+  }
+
+  .card--warning {
+    --card-bg: var(--status-warning-bg);
+    --card-border: var(--status-warning-border);
+  }
+
+  .card--danger {
+    --card-bg: var(--status-danger-bg);
+    --card-border: var(--status-danger-border);
+  }
+
+  .card--purple {
+    --card-bg: var(--status-purple-bg);
+    --card-border: var(--status-purple-border);
+  }
+
+  .card--cyan {
+    --card-bg: var(--status-cyan-bg);
+    --card-border: var(--status-cyan-border);
+  }
+
+  /* ---- Alerts ------------------------------------------------------------
+     .alert .alert--info|--success|--warning|--danger [.alert--sm|--lg]
+            (md when none) [.alert--banner]
+     A tinted message: the tone colours the fill, the edge, the text and the
+     glyph, so a consumer sets none of them. The glyph sits on the first line,
+     a trailing action on the middle one. A banner is the strip form — full
+     width under a toolbar, square, only its bottom edge drawn. */
+  .alert {
+    --alert-p: 12px;
+    --alert-icon: 16px;
+    --alert-bg: var(--status-info-bg);
+    --alert-border: var(--status-info-border);
+    --alert-text: var(--status-info-text);
+
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: var(--alert-p);
+    border: 1px solid var(--alert-border);
+    border-radius: var(--radius-panel);
+    background-color: var(--alert-bg);
+    color: var(--alert-text);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .alert__icon {
+    display: flex;
+    flex-shrink: 0;
+    width: var(--alert-icon);
+    height: var(--alert-icon);
+    margin-top: calc((1.25rem - var(--alert-icon)) / 2);
+  }
+
+  .alert__icon > svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .alert__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .alert__action {
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .alert--sm {
+    --alert-p: 8px;
+    --alert-icon: 14px;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .alert--sm .alert__icon {
+    margin-top: calc((1rem - var(--alert-icon)) / 2);
+  }
+
+  .alert--lg {
+    --alert-p: 16px;
+  }
+
+  .alert--banner {
+    padding: 8px 16px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+
+  .alert--success {
+    --alert-bg: var(--status-success-bg);
+    --alert-border: var(--status-success-border);
+    --alert-text: var(--status-success-text);
+  }
+
+  .alert--warning {
+    --alert-bg: var(--status-warning-bg);
+    --alert-border: var(--status-warning-border);
+    --alert-text: var(--status-warning-text);
+  }
+
+  .alert--danger {
+    --alert-bg: var(--status-danger-bg);
+    --alert-border: var(--status-danger-border);
+    --alert-text: var(--status-danger-text);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;

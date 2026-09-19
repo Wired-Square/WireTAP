@@ -12,10 +12,9 @@ import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { ReactNode } from "react";
-import { AlertCircle } from "lucide-react";
 import { IconButton } from "../../components/Button";
 import { Badge } from "../../components/Badge";
-
+import { Alert } from "../../components/Alert";
 /**
  * Map buffer device type to a human-readable storage backend label.
  * Extensible for future buffer mechanisms (e.g., "parquet", "memory").
@@ -398,10 +397,7 @@ export default function SourceList({
         </div>
       </div>
       {validationError && (
-        <div className="mx-3 mb-2 px-3 py-2 text-xs text-[color:var(--status-danger-text)] bg-[var(--status-danger-bg)] border border-[color:var(--status-danger-border)] rounded-lg flex items-center gap-2">
-          <AlertCircle className={`${iconMd} flex-shrink-0`} />
-          <span>{validationError}</span>
-        </div>
+        <Alert tone="danger" size="sm" className="mx-3 mb-2">{validationError}</Alert>
       )}
       <div className="px-3 pb-2 space-y-1">
         {realtimeProfiles.map((profile) => {

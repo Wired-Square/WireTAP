@@ -3,9 +3,9 @@
 import { LayoutGrid, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { cardDefault } from "../../../styles/cardStyles";
 import type { DashboardLayout } from "../../../utils/dashboardLayouts";
 import { IconButton } from "../../../components/Button";
+import { Card } from "../../../components/Card";
 
 type DashboardLayoutsViewProps = {
   dashboardLayouts: DashboardLayout[];
@@ -42,9 +42,10 @@ export default function DashboardLayoutsView({
       ) : (
         <div className="space-y-2">
           {dashboardLayouts.map((layout) => (
-            <div
+            <Card
               key={layout.id}
-              className={`flex items-center justify-between p-4 ${cardDefault}`}
+              padding="lg"
+              className="flex items-center justify-between"
             >
               <div className="flex-1">
                 <div className="flex items-center gap-3">
@@ -73,7 +74,7 @@ export default function DashboardLayoutsView({
                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                 </IconButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

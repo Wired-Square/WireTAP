@@ -98,7 +98,7 @@ export default function GitHubTokenDialog({ isOpen, onClose }: Props) {
 
           {account.error && (
             <Alert tone="danger">
-              <p className={caption}>{account.error.message}</p>
+              <p className="text-xs">{account.error.message}</p>
             </Alert>
           )}
         </div>

@@ -10,7 +10,7 @@ import { iconMd, iconLg } from "../../styles/spacing";
 import { caption } from "../../styles";
 import { IconButton } from "../Button";
 import { Badge } from "../Badge";
-
+import { Card } from "../Card";
 export type DeviceProbeState = "idle" | "probing" | "success" | "error";
 
 export interface DeviceProbeResult {
@@ -66,7 +66,7 @@ export default function IODeviceStatus({
   const resolvedErrorText = errorText ?? t("ioDeviceStatus.notResponding");
   const resolvedIdleText = idleText ?? t("ioDeviceStatus.selectPort");
   return (
-    <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--bg-surface)] border border-[color:var(--border-default)]">
+    <Card className="flex items-center gap-2">
       {/* Status indicator */}
       <div className="flex-shrink-0">
         {state === "probing" && (
@@ -142,6 +142,6 @@ export default function IODeviceStatus({
           <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
         </IconButton>
       )}
-    </div>
+    </Card>
   );
 }

@@ -5,9 +5,10 @@ import { useTranslation } from "react-i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import type { PlaybackSpeed } from "../components/TimeController";
-import { h2, cardElevated, paddingCard, borderDefault, hoverLight, textSuccess, textMedium } from "../styles";
+import { h2, paddingCard, borderDefault, hoverLight, textSuccess, textMedium } from "../styles";
 import { SPEED_OPTIONS } from "./io-source-picker/utils";
 import { IconButton } from "../components/Button";
+import { Card } from "../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export default function SpeedPickerDialog({
 
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className={`${cardElevated} shadow-xl overflow-hidden`}>
+      <Card padding="none" className="shadow-xl overflow-hidden">
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
           <h2 className={h2}>{t("speedPicker.title")}</h2>
           <IconButton
@@ -64,7 +65,7 @@ export default function SpeedPickerDialog({
             })}
           </div>
         </div>
-      </div>
+      </Card>
     </Dialog>
   );
 }

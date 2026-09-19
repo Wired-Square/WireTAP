@@ -29,10 +29,10 @@ import {
 } from './serialTypes';
 import { getCaptureFramesTail } from '../../../../api/capture';
 import { byteToHex } from '../../../../utils/byteUtils';
-import { alertWarning } from '../../../../styles/cardStyles';
 import { bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
 import { Button, IconButton } from '../../../../components/Button';
 import { SecondaryButton, DangerButton, Select, Input } from '../../../../components/forms';
+import { Alert } from "../../../../components/Alert";
 
 /**
  * Only used when detection finds nothing and the caller supplied no config — a
@@ -264,17 +264,15 @@ export default function ChecksumExtractionDialog({
             </div>
           </div>
         ) : (
-          <div className={`${alertWarning} space-y-2`}>
-            <div className="text-sm font-medium text-[color:var(--status-warning-text)]">
-              {t("serial.checksumNoCandidates")}
-            </div>
-            <ul className={`text-xs ${textMuted} list-disc pl-4 space-y-0.5`}>
+          <Alert tone="warning">
+            <div className="font-medium mb-2">{t("serial.checksumNoCandidates")}</div>
+            <ul className="text-xs list-disc pl-4 space-y-0.5">
               {detection.notes.map((note, idx) => (
                 <li key={idx}>{t(`serial.checksumNote.${note.code}`, note.values)}</li>
               ))}
             </ul>
             {detection.tailColumns.length > 0 && (
-              <div className={`text-xs ${textMuted} font-mono`}>
+              <div className="text-xs font-mono mt-2">
                 {detection.tailColumns.map(column => (
                   <div key={column.position}>
                     {t("serial.checksumTailColumn", {
@@ -289,7 +287,7 @@ export default function ChecksumExtractionDialog({
                 ))}
               </div>
             )}
-          </div>
+          </Alert>
         )}
 
         {/* Sample frames preview */}

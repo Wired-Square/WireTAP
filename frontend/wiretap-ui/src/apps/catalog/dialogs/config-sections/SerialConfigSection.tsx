@@ -12,7 +12,7 @@ import { CHECKSUM_ALGORITHMS } from "../../../../utils/analysis/checksums";
 import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input, Checkbox } from "../../../../components/forms";
 import { Badge } from "../../../../components/Badge";
-
+import { Card } from "../../../../components/Card";
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
 
@@ -217,7 +217,7 @@ export default function SerialConfigSection({
   }));
 
   return (
-    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -398,7 +398,7 @@ export default function SerialConfigSection({
               <div className="space-y-2 mb-3">
                 {headerFields.map((field, index) => (
                   <div key={index} className="space-y-2">
-                    <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)]">
+                    <Card padding="sm" className="flex items-center gap-2">
                       {/* Expand/collapse toggle */}
                       <IconButton
                         onClick={() => toggleFieldPicker(index)}
@@ -460,18 +460,18 @@ export default function SerialConfigSection({
                       >
                         <Trash2 className={iconMd} />
                       </IconButton>
-                    </div>
+                    </Card>
 
                     {/* Expanded bit picker */}
                     {expandedFieldPickers[index] && (
-                      <div className="ml-8 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[color:var(--border-default)]">
+                      <Card className="ml-8">
                         <MaskBitPicker
                           mask={field.mask}
                           shift={0}
                           onMaskChange={(mask, shift) => handleFieldMaskChange(index, mask, shift)}
                           numBytes={effectiveHeaderLength}
                         />
-                      </div>
+                      </Card>
                     )}
                   </div>
                 ))}
@@ -593,7 +593,7 @@ export default function SerialConfigSection({
             </div>
 
             {checksum && (
-              <div className="p-3 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)] space-y-3">
+              <Card className="space-y-3">
                 {/* Algorithm */}
                 <div>
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
@@ -686,7 +686,7 @@ export default function SerialConfigSection({
                     </label>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             {!checksum && (
@@ -709,6 +709,6 @@ export default function SerialConfigSection({
           {checksum && ` • Checksum: ${checksum.algorithm.toUpperCase()}`}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -24,7 +24,7 @@ import SignalCombobox from "../components/SignalCombobox";
 import { useRulesStore } from "../stores/rulesStore";
 import { Button } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
-
+import { Alert } from "../../../components/Alert";
 const COLOUR_WRITE_DEBOUNCE_MS = 150;
 const DEFAULT_CAN_ID_HEX = "100";
 const DEFAULT_DATA_MASK_HEX = "FF00000000000000";
@@ -215,9 +215,7 @@ export default function IndicatorConfigDialog({
         </h2>
 
         {error && (
-          <div className="mb-3 px-3 py-2 text-xs bg-red-500/10 border border-red-500/30 text-red-400 rounded">
-            {error}
-          </div>
+          <Alert tone="danger" size="sm" className="mb-3">{error}</Alert>
         )}
 
         {/* State */}

@@ -8,10 +8,8 @@ import {
   iconMd,
   flexRowGap2,
   flexRowGap3,
-  paddingCard,
   spaceYTight,
 } from "../../../styles/spacing";
-import { cardDefault } from "../../../styles/cardStyles";
 import {
   emptyStateText,
   emptyStateHeading,
@@ -28,6 +26,7 @@ import { hasLocalChanges, hasRemoteChanges } from "../../../utils/catalogSync";
 import { CatalogSyncBadge } from "../../../components/catalogSyncPresentation";
 import type { TrackedCatalog } from "../../../api/catalogShare";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 type CatalogsViewProps = {
   decoderDir: string;
@@ -246,7 +245,7 @@ export default function CatalogsView({
       ) : (
         <div className="space-y-3">
           {catalogs.map((catalog) => (
-            <div key={catalog.path} className={`${paddingCard} ${cardDefault}`}>
+            <Card key={catalog.path} padding="lg">
               <div className={`${flexRowGap2} justify-between`}>
                 <div className={`${flexRowGap3} flex-wrap min-w-0`}>
                   <h3 className="font-medium text-[color:var(--text-primary)]">
@@ -295,7 +294,7 @@ export default function CatalogsView({
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}

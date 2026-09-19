@@ -11,7 +11,8 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex, byteToHex } from "../utils/byteUtils";
-import { toggleCardClass, textDataSecondary, caption, captionMuted } from "../styles";
+import { textDataSecondary, textPrimary, caption, captionMuted } from "../styles";
+import { cardClass } from "./Card";
 import { Button } from "./Button";
 import { Checkbox, Input } from "./forms";
 
@@ -259,31 +260,27 @@ export default function FramingOptionsPanel({
     <ModbusRtuFields config={config ?? {}} onChange={patchModbus} disabled={disabled} />
   );
 
+  const modeCard = (mode: FramingMode, title: string, description: string) => {
+    const selected = currentMode === mode;
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => handleModeChange(selected ? "raw" : mode)}
+        className={cardClass({ interactive: true, selected }, `w-full text-left ${textPrimary} disabled:opacity-50 disabled:cursor-not-allowed`)}
+      >
+        <div className="font-medium">{title}</div>
+        <div className={`text-xs ${textDataSecondary} mt-0.5`}>{description}</div>
+      </button>
+    );
+  };
+
   // Card variant - full button cards with descriptions (for dialogs)
   if (variant === "card") {
     return (
       <div className="space-y-2">
-        {/* SLIP Option */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handleModeChange(currentMode === "slip" ? "raw" : "slip")}
-          className={`${toggleCardClass(currentMode === "slip")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          <div className="font-medium">{t("framingOptions.slipTitle")}</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.slipDescription")}</div>
-        </button>
-
-        {/* Delimiter Option */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handleModeChange(currentMode === "delimiter" ? "raw" : "delimiter")}
-          className={`${toggleCardClass(currentMode === "delimiter")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          <div className="font-medium">{t("framingOptions.delimiterTitle")}</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.delimiterDescription")}</div>
-        </button>
+        {modeCard("slip", t("framingOptions.slipTitle"), t("framingOptions.slipDescription"))}
+        {modeCard("delimiter", t("framingOptions.delimiterTitle"), t("framingOptions.delimiterDescription"))}
         {currentMode === "delimiter" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
             <label className="block text-sm">
@@ -312,16 +309,7 @@ export default function FramingOptionsPanel({
           </div>
         )}
 
-        {/* Modbus RTU Option */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handleModeChange(currentMode === "modbus_rtu" ? "raw" : "modbus_rtu")}
-          className={`${toggleCardClass(currentMode === "modbus_rtu")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          <div className="font-medium">{t("framingOptions.modbusRtuTitle")}</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.modbusRtuDescription")}</div>
-        </button>
+        {modeCard("modbus_rtu", t("framingOptions.modbusRtuTitle"), t("framingOptions.modbusRtuDescription"))}
         {currentMode === "modbus_rtu" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 py-2">{modbusFields}</div>
         )}

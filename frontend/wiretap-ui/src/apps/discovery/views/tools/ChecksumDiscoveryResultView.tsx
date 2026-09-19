@@ -8,7 +8,6 @@ import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, flexRowGap2 } from "../../../../styles/spacing";
-import { cardBase, cardDefault } from "../../../../styles/cardStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -33,7 +32,7 @@ import {
   MatchRateIcon,
   formatMatchRate,
   matchRateTextClass,
-  matchRateToneClasses,
+  matchRateTone,
 } from "../../components/checksumTone";
 import type {
   ChecksumEvidence,
@@ -43,6 +42,7 @@ import type {
 } from "../../../../api/checksums";
 import { IconButton } from "../../../../components/Button";
 import { Badge } from "../../../../components/Badge";
+import { Card, cardClass } from "../../../../components/Card";
 
 type Props = {
   embedded?: boolean;
@@ -78,7 +78,7 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
   const { t } = useTranslation("discovery");
   const results = useDiscoveryStore((s) => s.toolbox.checksumDiscoveryResults);
 
-  const shell = `h-full flex flex-col ${embedded ? "" : cardDefault}`;
+  const shell = embedded ? "h-full flex flex-col" : cardClass({ padding: "none" }, "h-full flex flex-col");
 
   if (!results) {
     return (
@@ -153,7 +153,7 @@ function UnexplainedSection({ findings }: { findings: FrameChecksumFinding[] }) 
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={cardDefault}>
+    <Card padding="none">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -172,7 +172,7 @@ function UnexplainedSection({ findings }: { findings: FrameChecksumFinding[] }) 
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -229,9 +229,7 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
   };
 
   return (
-    <div
-      className={`${cardBase} ${matchRateToneClasses(best ? best.matchRate : 0)}`}
-    >
+    <Card padding="none" tone={matchRateTone(best ? best.matchRate : 0)}>
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
@@ -294,7 +292,7 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -304,7 +302,7 @@ function CandidateRow({ candidate }: { candidate: DiscoveredChecksum }) {
   const digits = spec.kind === "crc" ? spec.width / 4 : 2;
 
   return (
-    <div className={`${cardDefault} p-2 space-y-1`}>
+    <Card padding="sm" className="space-y-1">
       <div className="flex items-baseline gap-2 flex-wrap">
         <span className={`font-mono text-sm ${textPrimary}`}>{describeSpecification(spec)}</span>
         {spec.kind === "crc" && spec.wellKnown && (
@@ -396,7 +394,7 @@ function CandidateRow({ candidate }: { candidate: DiscoveredChecksum }) {
             .join(" • ")}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

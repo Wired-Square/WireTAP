@@ -28,7 +28,6 @@ import {
   borderDefault,
   borderDivider,
   caption,
-  cardCompact,
   h2,
   panelFooter,
   textDanger,
@@ -39,6 +38,7 @@ import {
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 import { sendUpdateToCatalogEditor } from "../../../utils/windowCommunication";
 import { Badge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -140,13 +140,13 @@ export default function CatalogUpdateDialog({
 
           {updates.reviewError && (
             <Alert tone="danger">
-              <p className={caption}>{updates.reviewError.message}</p>
+              <p className="text-xs">{updates.reviewError.message}</p>
             </Alert>
           )}
 
           {review && (
             <>
-              <div className={`${cardCompact} flex items-center gap-2 flex-wrap`}>
+              <Card className="flex items-center gap-2 flex-wrap">
                 <span className={textMedium}>{t("update.upstreamVersion")}</span>
                 <Badge size="lg">{review.remoteBlobSha.slice(0, 7)}</Badge>
                 {review.transmitFrameCount > 0 && (
@@ -155,12 +155,12 @@ export default function CatalogUpdateDialog({
                     {t("update.transmitFrames", { count: review.transmitFrameCount })}
                   </span>
                 )}
-              </div>
+              </Card>
 
               {blocked && (
                 <Alert tone="danger">
-                  <p className={textMedium}>{t("update.invalid")}</p>
-                  <p className={caption}>{review.validationErrors.join("; ")}</p>
+                  <p className="font-medium">{t("update.invalid")}</p>
+                  <p className="text-xs">{review.validationErrors.join("; ")}</p>
                 </Alert>
               )}
 
@@ -168,7 +168,7 @@ export default function CatalogUpdateDialog({
                   routing it through the editor instead. */}
               {diverged && (
                 <Alert tone="warning">
-                  <p className={caption}>{t("update.divergedWarning")}</p>
+                  <p className="text-xs">{t("update.divergedWarning")}</p>
                 </Alert>
               )}
 

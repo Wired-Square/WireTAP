@@ -10,13 +10,13 @@
 
 import { Bluetooth, Globe, Wifi, HardDriveDownload, Cable, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cardDefault } from "../styles/cardStyles";
 import { textPrimary } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import type { MergedDevice } from "../apps/devices/utils/mergedDevices";
 import { bleHasCap, preferredAddress } from "../apps/devices/utils/mergedDevices";
 import { Button } from "./Button";
 import { Badge, SummaryBadge, type BadgeTone } from "./Badge";
+import { Card } from "./Card";
 
 export type ConnectVia = "ble" | "ip";
 
@@ -157,7 +157,7 @@ export default function MergedDeviceCard({ device, onConnect, connecting }: Merg
   const addr = preferredAddress(device);
 
   return (
-    <div className={`${cardDefault} flex items-center justify-between p-4`}>
+    <Card padding="lg" className="flex items-center justify-between">
       <div className="flex-1 min-w-0">
         {/* Row 1: name + capability badges */}
         <div className={`flex items-center flex-wrap ${gapSmall}`}>
@@ -244,6 +244,6 @@ export default function MergedDeviceCard({ device, onConnect, connecting }: Merg
           />
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

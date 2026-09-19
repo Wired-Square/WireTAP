@@ -191,9 +191,8 @@ Where each goes:
 string for the rare element that must not be a `<button>`.
 
 [buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) keeps
-what other families own: `toggleCardClass(active)` (framing option cards),
-`dataViewTabClass(active, hasIndicator)` (data view tabs), the launcher
-tokens and `disabledState` for non-button controls.
+what other families own: `dataViewTabClass(active, hasIndicator)` (data view
+tabs) and the launcher tokens.
 
 ### Inputs — [components/forms](../frontend/wiretap-ui/src/components/forms/)
 
@@ -244,18 +243,44 @@ type from `MODBUS_REGISTER_TONES` beside it, so the same thing wears the same
 hue on every screen. `badgeClass({ tone, variant, size, mono })` is the class
 string for an element that cannot be a `<span>`.
 
-### Cards & alerts — [cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts)
+### Cards & alerts — [Card.tsx](../frontend/wiretap-ui/src/components/Card.tsx) · [Alert.tsx](../frontend/wiretap-ui/src/components/Alert.tsx)
 
-| Token | Use |
-|---|---|
-| `cardDefault` / `cardElevated` / `cardInteractive` | Containers |
-| `alertInfo` / `alertWarning` / `alertDanger` / `alertSuccess` | Alert boxes |
-| `detailBox` | Code / detail panel |
-| `panelFooter` | Dialog/panel action footer |
-| `expandableRowContainer` | Collapsible row header |
-| `selectableOptionBox` | Radio/checkbox option box |
-| `errorBoxCompact` | Inline form error (red, small) |
-| `cardPadding.{none,sm,md,lg}` | Card padding helper |
+`<Card>` renders the `.card` classes in
+[components.css](../frontend/wiretap-ui/src/styles/components.css): a
+bordered surface at `--radius-panel`, `--bg-surface` on `--border-default`.
+Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `padding` | `none` · `sm` 8 px · `md` 12 px (default) · `lg` 16 px | `lg` for the list-row cards in Settings and Devices, `md` for boxes inside a dialog, `sm` for dense result panels, `none` when the children draw their own sections |
+| `tone` | `info` · `success` · `warning` · `danger` · `purple` · `cyan` | Tints the fill and the edge only — the content keeps its own colours. For a tinted section, a result box, a colour-coded candidate |
+| `interactive` | `boolean` | A card that answers a click: pointer cursor and the surface hover lift |
+| `selected` | `boolean` | The chosen option among interactive cards; takes the accent tint like a lit toggle |
+
+`cardClass({ tone, padding, interactive, selected })` is the class string
+for a card that must be a `<button>` (an option card) or a `<label>` (a
+radio option box).
+
+`<Alert tone>` renders `.alert`: a tinted message with the tone's glyph —
+box, text and glyph all come from the one `tone`, so the consumer sets none
+of them. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `tone` | `info` · `success` · `warning` · `danger` | Required. Info and success draw ⓘ and ✓, warning and danger the triangle |
+| `size` | `sm` 8 px inset, 12 px text · `md` 12 px, 14 px (default) · `lg` 16 px | `sm` for the one-line validation error under a form and in-list errors |
+| `banner` | `boolean` | The strip form: full width, square, only its bottom edge drawn — under a toolbar or at the top of a dialog body |
+| `icon` | `ReactNode` | Replaces the glyph. Only when the picture carries a meaning the tone does not — a spinner for progress, the transmit-risk radio, the secret shield — never a second "something is wrong" glyph |
+| `action` | `ReactNode` | Trailing control, right-aligned and centred on the message — a Dismiss link, a Stop button |
+
+Inside an alert, a heading line is `font-medium` and a detail line
+`text-xs`; do not recolour the text. A message that needs its own layout as
+well — a summary header with a big icon, a row per finding with its own
+glyph — is a toned `<Card>`, not an alert.
+
+[cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) keeps
+what the dialogs family owns: `panelFooter` (the action footer) and
+`expandableRowContainer` (the config-section header).
 
 ### Data tables — [tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts)
 
@@ -586,7 +611,7 @@ Choose the lightest weight one that fits the situation.
 
 | Surface | Token / Component | Use when |
 |---|---|---|
-| **Inline banner** (recoverable, dismissable) | `bgDanger` + `borderDanger` + `textDanger`, or `errorBoxCompact` from [cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | An operation failed but the panel is still usable; the user can retry |
+| **Inline banner** (recoverable, dismissable) | `<Alert tone="danger">` from [Alert.tsx](../frontend/wiretap-ui/src/components/Alert.tsx) — `size="sm"` under a form, `banner` under a toolbar | An operation failed but the panel is still usable; the user can retry |
 | **Modal `ErrorDialog`** (blocking) | `useSessionStore.getState().showAppError(title, message, details?)` from [appError.ts](../frontend/wiretap-ui/src/utils/appError.ts) | Unexpected failure with technical detail the user should see (stack, server response) |
 | **Toast `FlashNotification`** | [FlashNotification.tsx](../frontend/wiretap-ui/src/components/FlashNotification.tsx) | Transient confirmations and soft warnings that don't need acknowledgement |
 | **Operational status footer** (Rules-style) | App-specific footer using semantic status colours | Long-running stateful apps that benefit from a persistent "last operation" line; pair with a coloured status dot |
@@ -594,17 +619,22 @@ Choose the lightest weight one that fits the situation.
 ### Inline banner recipe
 
 ```tsx
-import { bgDanger, borderDanger, textDanger } from "../../styles";
+import { Alert } from "../../components/Alert";
+import { Button } from "../../components/Button";
 
 {error && (
-  <div
-    className={`mx-2 mt-1 px-3 py-2 text-xs rounded-lg flex justify-between items-center border ${bgDanger} ${borderDanger} ${textDanger}`}
+  <Alert
+    tone="danger"
+    size="sm"
+    className="mx-2 mt-1"
+    action={
+      <Button variant="link" tone="danger" size="sm" onClick={clearError}>
+        {t("common:actions.dismiss", "Dismiss")}
+      </Button>
+    }
   >
-    <span>{error}</span>
-    <button onClick={clearError} className="ml-2 underline hover:brightness-125">
-      {t("common:actions.dismiss", "Dismiss")}
-    </button>
-  </div>
+    {error}
+  </Alert>
 )}
 ```
 
@@ -752,7 +782,9 @@ value.toLocaleString(i18n.language);
 | `<Button>Save</Button>` | `<Button>{t("common:actions.save")}</Button>` |
 | `<button className="px-3 py-1.5 rounded bg-blue-600 text-white …">` | `<Button variant="solid" tone="primary">` — the tone reads the theme's accent |
 | `<button className={`p-1 rounded ${hoverBg}`}>` | `<IconButton size="sm">` |
-| `hover:bg-zinc-700` | `hover:brightness-95` (or `hoverBg` for tokens) |
+| `hover:bg-zinc-700` / `hover:brightness-95` | `hoverBg`, or `<Card interactive>` for a clickable card |
+| `<div className="p-4 rounded-lg border …">` | `<Card padding="lg">` — `tone` for a tinted section |
+| `<div className="p-3 bg-[var(--status-danger-bg)] border …">{error}</div>` | `<Alert tone="danger">{error}</Alert>` — the tone draws the box, the text and the glyph |
 
 ## Adding a new app
 
@@ -867,8 +899,9 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) | Surfaces, text, borders, status, data accents, hover, interactive |
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
-| [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Button variants, toggle helpers, launcher, dialog options |
-| [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Card/alert variants, detail box, panel footer, expandable row, selectable option |
+| [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Data view tabs, launcher tiles |
+| [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Panel footer, config-section header (the dialogs family's) |
+| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert` and `forms/` — the primitives, over `styles/components.css` |
 | [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
 | [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |

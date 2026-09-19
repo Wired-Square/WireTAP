@@ -3,6 +3,8 @@
 // Options panel for Serial Framing Analysis tool in the Toolbox dialog.
 // Analyzes raw bytes to detect framing protocol (SLIP, Modbus RTU, delimiters).
 
+import { Alert } from "../../../../components/Alert";
+
 type Props = {
   bytesCount: number;
 };
@@ -10,14 +12,10 @@ type Props = {
 export default function SerialFramingToolPanel({ bytesCount }: Props) {
   return (
     <div className="space-y-3 text-xs">
-      <div className="bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] rounded p-2">
-        <p className="text-[color:var(--status-info-text)] font-medium">
-          Detect Framing Protocol
-        </p>
-        <p className="text-[color:var(--status-info-text)] mt-1">
-          Analyze {bytesCount.toLocaleString()} raw bytes to identify the framing protocol.
-        </p>
-      </div>
+      <Alert tone="info" size="sm">
+        <p className="font-medium">Detect Framing Protocol</p>
+        <p className="mt-1">Analyze {bytesCount.toLocaleString()} raw bytes to identify the framing protocol.</p>
+      </Alert>
       <p className="text-[color:var(--text-muted)]">
         Will test for:
       </p>

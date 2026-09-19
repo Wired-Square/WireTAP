@@ -26,16 +26,15 @@ import {
   h2,
   borderDefault,
   spaceYDefault,
-  alertWarning,
   caption,
   textMedium,
   textMuted,
-  textWarning,
 } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
+import { Alert } from "../../../components/Alert";
 
 type Props = {
   isOpen: boolean;
@@ -197,9 +196,7 @@ export default function IOProfileDialog({
   const frameLinkSignalPanel = (
     <>
       {flError && (
-        <div className={`${alertWarning} mt-3`}>
-          <p className={`text-sm ${textWarning}`}>{flError}</p>
-        </div>
+        <Alert tone="warning" className="mt-3">{flError}</Alert>
       )}
 
       {/* Interfaces — each row is collapsible and contains its own device configuration */}

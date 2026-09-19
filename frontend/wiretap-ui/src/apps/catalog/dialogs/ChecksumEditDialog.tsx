@@ -7,7 +7,7 @@ import type { TomlNode, ChecksumAlgorithm } from "../types";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
 import { CHECKSUM_ALGORITHMS, resolveByteIndexSync } from "../checksums";
-
+import { Card } from "../../../components/Card";
 export type ChecksumFields = {
   name: string;
   algorithm: ChecksumAlgorithm;
@@ -110,8 +110,8 @@ export default function ChecksumEditDialog({
           </div>
 
           {/* Checksum Position */}
-          <div className="p-4 bg-[var(--status-purple-bg)] rounded-lg">
-            <h3 className={`${h3} text-[color:var(--status-purple-text-bold)] mb-3`}>
+          <Card tone="purple" padding="lg">
+            <h3 className={`${h3} text-[color:var(--status-purple-text)] mb-3`}>
               Checksum Location
             </h3>
             <p className="text-xs text-[color:var(--status-purple-text)] mb-3">
@@ -166,11 +166,11 @@ export default function ChecksumEditDialog({
                 </Select>
               </FormField>
             </div>
-          </div>
+          </Card>
 
           {/* Calculation Range */}
-          <div className="p-4 bg-[var(--status-info-bg)] rounded-lg">
-            <h3 className={`${h3} text-[color:var(--status-info-text-bold)] mb-3`}>
+          <Card tone="info" padding="lg">
+            <h3 className={`${h3} text-[color:var(--status-info-text)] mb-3`}>
               Calculation Range
             </h3>
             <p className="text-xs text-[color:var(--status-info-text)] mb-3">
@@ -234,7 +234,7 @@ export default function ChecksumEditDialog({
                 </p>
               );
             })()}
-          </div>
+          </Card>
 
           {/* Byte Layout Visualization */}
           <div className="p-4 bg-[var(--bg-surface)] rounded-lg">

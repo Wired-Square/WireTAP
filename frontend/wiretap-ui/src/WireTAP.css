@@ -174,6 +174,7 @@ html, body {
   -webkit-text-size-adjust: 100%;
 
   --radius-control: 6px;
+  --radius-panel: 8px;
 
   /* Theme CSS variables - defaults for light mode */
   /* These are overridden by useTheme hook based on settings */

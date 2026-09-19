@@ -12,7 +12,6 @@ import { PrimaryButton } from "../../../components/forms/DialogButtons";
 import {
   h2,
   textTertiary,
-  cardDefault,
   textPrimary,
   textSecondary,
   spaceYLarge,
@@ -21,6 +20,7 @@ import {
 } from "../../../styles";
 import { IconButton } from "../../../components/Button";
 import { Badge, SummaryBadge } from "../../../components/Badge";
+import { Card } from "../../../components/Card";
 
 type DataIOViewProps = {
   ioProfiles: IOProfile[];
@@ -271,9 +271,10 @@ export default function DataIOView({
       ) : (
         <div className={spaceYSmall}>
           {ioProfiles.map((profile) => (
-            <div
+            <Card
               key={profile.id}
-              className={`flex items-center justify-between p-4 ${cardDefault}`}
+              padding="lg"
+              className="flex items-center justify-between"
             >
               <div className="flex-1">
                 <div className={`flex items-center ${gapSmall}`}>
@@ -341,7 +342,7 @@ export default function DataIOView({
                   <Trash2 className={`${iconMd} text-red-600`} />
                 </IconButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -356,9 +357,10 @@ export default function DataIOView({
             <p className={`text-sm ${textTertiary}`}>{t("dataIO.unsaved.description")}</p>
           </div>
           {adHocProfiles.map((profile) => (
-            <div
+            <Card
               key={profile.id}
-              className={`flex items-center justify-between p-4 ${cardDefault}`}
+              padding="lg"
+              className="flex items-center justify-between"
             >
               <div className="flex-1">
                 <div className={`flex items-center ${gapSmall}`}>
@@ -384,7 +386,7 @@ export default function DataIOView({
                   <Trash2 className={`${iconMd} text-red-600`} />
                 </IconButton>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

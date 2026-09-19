@@ -13,7 +13,7 @@ import {
   ModbusConfigSection,
 } from "./config-sections";
 import { SecondaryButton, PrimaryButton } from "../../../components/forms";
-
+import { Alert } from "../../../components/Alert";
 export type UnifiedConfigDialogProps = {
   open: boolean;
   onCancel: () => void;
@@ -176,7 +176,7 @@ export default function UnifiedConfigDialog({
       <div className={`${bgSurface} rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto`}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-[var(--bg-accent)] rounded-lg">
+          <div className="p-2 bg-[var(--accent-bg)] rounded-lg">
             <Settings className={`${iconLg} text-[color:var(--text-accent)]`} />
           </div>
           <div>
@@ -265,12 +265,10 @@ export default function UnifiedConfigDialog({
           </div>
 
           {/* Info box */}
-          <div className="p-3 bg-[var(--bg-surface)] rounded-lg border border-[color:var(--border-default)]">
-            <p className="text-xs text-[color:var(--text-muted)]">
-              <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
-              Add a configuration for each protocol you plan to use in this catalog.
-            </p>
-          </div>
+          <Alert tone="info" size="sm">
+            <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
+            Add a configuration for each protocol you plan to use in this catalog.
+          </Alert>
         </div>
 
         {/* Footer */}

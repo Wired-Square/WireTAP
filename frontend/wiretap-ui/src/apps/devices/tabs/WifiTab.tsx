@@ -19,11 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import {
-  alertDanger,
-  alertInfo,
-  alertSuccess,
   iconMd,
-  textDanger,
   textPrimary,
   textSecondary,
 } from "../../../styles";
@@ -49,6 +45,7 @@ import {
 } from "../../../api/bleProvision";
 import { tlog } from "../../../api/settings";
 import { IconButton } from "../../../components/Button";
+import { Alert } from "../../../components/Alert";
 
 type WifiPhase = "form" | "writing" | "result";
 
@@ -202,7 +199,7 @@ export default function WifiTab() {
   if (connectError && !transports.bleProv) {
     return (
       <div className="p-4">
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{connectError}</div>
+        <Alert tone="danger">{connectError}</Alert>
       </div>
     );
   }
@@ -245,7 +242,7 @@ export default function WifiTab() {
         </div>
         {statusMessage && <div className={`text-sm ${textSecondary}`}>{statusMessage}</div>}
         {provError && (
-          <div className={`${alertDanger} ${textDanger} text-sm w-full max-w-sm`}>{provError}</div>
+          <Alert tone="danger" className="w-full max-w-sm">{provError}</Alert>
         )}
       </div>
     );
@@ -264,14 +261,13 @@ export default function WifiTab() {
             <div className={`text-lg font-medium ${textPrimary}`}>
               {t("complete.wifiConnected")}
             </div>
-            <div className={`${alertSuccess} w-full max-w-sm text-sm`}>
+            <Alert tone="success" className="w-full max-w-sm">
               <div className="space-y-1">
                 <div>
-                  <span className={textSecondary}>{t("complete.networkLabel")}</span>{" "}
-                  <span className="font-medium">{ssid}</span>
+                  {t("complete.networkLabel")} <span className="font-medium">{ssid}</span>
                 </div>
                 <div>
-                  <span className={textSecondary}>{t("complete.securityLabel")}</span>{" "}
+                  {t("complete.securityLabel")}{" "}
                   <span className="font-medium">
                     {security === SECURITY_OPEN
                       ? t("complete.open")
@@ -282,12 +278,11 @@ export default function WifiTab() {
                 </div>
                 {deviceIpAddress && (
                   <div>
-                    <span className={textSecondary}>{t("complete.ipAddressLabel")}</span>{" "}
-                    <span className="font-medium">{deviceIpAddress}</span>
+                    {t("complete.ipAddressLabel")} <span className="font-medium">{deviceIpAddress}</span>
                   </div>
                 )}
               </div>
-            </div>
+            </Alert>
             <div className="flex gap-3 mt-4">
               <SecondaryButton onClick={handleRetry}>{t("device.changeWifi")}</SecondaryButton>
               {hasSmpCapability && (
@@ -304,7 +299,7 @@ export default function WifiTab() {
               {t("complete.failedTitle")}
             </div>
             {provError && (
-              <div className={`${alertDanger} w-full max-w-sm text-sm`}>{provError}</div>
+              <Alert tone="danger" className="w-full max-w-sm">{provError}</Alert>
             )}
             <div className="flex gap-3 mt-4">
               <PrimaryButton onClick={handleRetry}>{t("complete.retry")}</PrimaryButton>
@@ -339,26 +334,24 @@ export default function WifiTab() {
       )}
 
       {deviceSsid && (
-        <div className={`${alertInfo} text-sm`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wifi className={`${iconMd} text-blue-500`} />
-              <span>
-                {t("credentials.currentDeviceWifi")} <strong>{deviceSsid}</strong>
-              </span>
-            </div>
+        <Alert
+          tone="info"
+          icon={<Wifi />}
+          action={
             <SecondaryButton onClick={handleWifiDisconnect} disabled={disconnectingWifi}>
               <span className="flex items-center gap-1">
                 <WifiOff className={iconMd} />
                 {disconnectingWifi ? "..." : t("credentials.disconnectWifi")}
               </span>
             </SecondaryButton>
-          </div>
-        </div>
+          }
+        >
+          {t("credentials.currentDeviceWifi")} <strong>{deviceSsid}</strong>
+        </Alert>
       )}
 
       {provError && (
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{provError}</div>
+        <Alert tone="danger">{provError}</Alert>
       )}
 
       <FormField label={t("credentials.ssidLabel")} required>

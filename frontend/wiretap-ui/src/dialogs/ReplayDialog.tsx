@@ -18,7 +18,7 @@ import { getCaptureFramesPaginatedById } from "../api/capture";
 import type { ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
 import { Input, Select, Checkbox } from "../components/forms";
-
+import { Alert } from "../components/Alert";
 function formatDuration(us: number): string {
   const ms = us / 1000;
   if (ms < 1000) return `${ms.toFixed(0)} ms`;
@@ -218,10 +218,10 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
 
         {/* No transmit session warning */}
         {noSession ? (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-            <p className="text-sm text-amber-300 font-medium">{t("replay.noSessionTitle")}</p>
-            <p className="text-xs text-amber-300/80 mt-0.5">{t("replay.noSessionBody")}</p>
-          </div>
+          <Alert tone="warning">
+            <p className="font-medium">{t("replay.noSessionTitle")}</p>
+            <p className="text-xs mt-0.5">{t("replay.noSessionBody")}</p>
+          </Alert>
         ) : (
           <>
             {/* Frame index range */}

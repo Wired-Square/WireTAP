@@ -9,8 +9,6 @@ import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useRulesStore, type RulesTab } from "./stores/rulesStore";
 import {
   textTertiary,
-  bgDanger,
-  borderDanger,
   textDanger,
   bgDataView,
   bgDataToolbar,
@@ -33,7 +31,8 @@ import DeviceOverview from "./views/DeviceOverview";
 import LogView from "./views/LogView";
 import type { IOProfile } from "../../hooks/useSettings";
 import { PrimaryButton } from "../../components/forms";
-
+import { Button } from "../../components/Button";
+import { Alert } from "../../components/Alert";
 const TAB_KEYS: { id: RulesTab; i18nKey: string }[] = [
   { id: "frame-defs", i18nKey: "frameDefs" },
   { id: "bridges", i18nKey: "bridges" },
@@ -204,18 +203,18 @@ export default function Rules() {
     <AppLayout topBar={topBar}>
       {/* Inline recoverable error banner */}
       {error && (
-        <div
-          className={`mx-2 mt-1 px-3 py-2 text-xs rounded-lg flex justify-between items-center border ${bgDanger} ${borderDanger} ${textDanger}`}
+        <Alert
+          tone="danger"
+          size="sm"
+          className="mx-2 mt-1"
+          action={
+            <Button variant="link" tone="danger" size="sm" onClick={clearError}>
+              {t("topBar.dismiss", "Dismiss")}
+            </Button>
+          }
         >
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={clearError}
-            className="ml-2 underline hover:brightness-125"
-          >
-            {t("topBar.dismiss", "Dismiss")}
-          </button>
-        </div>
+          {error}
+        </Alert>
       )}
 
       {/* No devices configured */}

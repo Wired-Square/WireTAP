@@ -16,6 +16,7 @@ import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnaly
 import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge, type BadgeTone } from "../../../components/Badge";
 import { PrimaryButton, SecondaryButton, Select, Checkbox, Input } from "../../../components/forms";
 
 interface Props {
@@ -25,11 +26,7 @@ interface Props {
 
 const BIT_LENGTH_OPTIONS = [8, 12, 16, 24, 32];
 
-const scoreBadgeCls = (score: number) => {
-  if (score >= 70) return "bg-emerald-600/20 text-emerald-400 border-emerald-600/30";
-  if (score >= 30) return "bg-amber-600/20 text-amber-400 border-amber-600/30";
-  return "bg-[var(--bg-secondary)] text-[color:var(--text-muted)] border-[var(--border-default)]";
-};
+const scoreTone = (score: number): BadgeTone => (score >= 70 ? "success" : score >= 30 ? "warning" : "neutral");
 
 export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   const { t } = useTranslation("dashboard");
@@ -492,12 +489,9 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                         {formatFrameId(c.frameId)}
                       </span>
                     )}
-                    <span
-                      className={`px-1.5 py-0.5 text-[10px] font-medium rounded border shrink-0 tabular-nums ${scoreBadgeCls(c.score)}`}
-                      title={c.reason}
-                    >
+                    <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={c.reason}>
                       {c.score}
-                    </span>
+                    </Badge>
                   </button>
                 ))}
                 {candidates.length === 0 && (

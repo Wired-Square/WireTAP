@@ -6,7 +6,7 @@ import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textTertiary } from "../../../styles";
-import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
+import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
 import SignalCombobox from "../components/SignalCombobox";
@@ -15,7 +15,8 @@ import { FRAME_DEF_ID_DEVICE, DEFAULT_SIGNAL_MASK, nextAvailableId } from "../ut
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
-
+import { Card } from "../../../components/Card";
+import { Alert } from "../../../components/Alert";
 interface MappingRow {
   source_signal_id: number;
   dest_signal_id: number;
@@ -130,7 +131,7 @@ export default function TransformerDialog({
         </h2>
 
         {validationError && (
-          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+          <Alert tone="danger" size="sm" className="mb-3">{validationError}</Alert>
         )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -248,7 +249,7 @@ export default function TransformerDialog({
             {mappings.map((m, idx) => {
               const srcSignal = selectableSignals.find((s) => s.signal_id === m.source_signal_id);
               return (
-              <div key={idx} className={`${cardDefault} ${cardPadding.sm}`}>
+              <Card key={idx} padding="sm">
                 <div className="flex items-start gap-3">
                   {/* Source → Dest vertical flow */}
                   <div className="flex-1 space-y-1">
@@ -330,7 +331,7 @@ export default function TransformerDialog({
                     </IconButton>
                   </div>
                 </div>
-              </div>
+              </Card>
               ); })}
           </div>
         </div>

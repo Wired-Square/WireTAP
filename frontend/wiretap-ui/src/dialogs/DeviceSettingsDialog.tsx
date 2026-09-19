@@ -12,7 +12,7 @@
 
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, Loader2, RefreshCw, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import Dialog from "../components/Dialog";
 import IOConnectionFields from "../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../components/io/useConnectionProbe";
@@ -28,13 +28,12 @@ import {
   borderDefault,
   paddingCard,
   caption,
-  alertInfo,
-  alertWarning,
-  cardElevated,
 } from "../styles";
 import type { IOProfile, ConnectionFieldValue } from "../settings/appSettings";
 import { IconButton } from "../components/Button";
 import { Badge } from "../components/Badge";
+import { Alert } from "../components/Alert";
+import { Card } from "../components/Card";
 
 export default function DeviceSettingsDialog() {
   const request = useDeviceEditorStore((s) => s.request);
@@ -121,7 +120,7 @@ function DeviceSettingsForm({
 
   return (
     <Dialog isOpen onBackdropClick={busy ? undefined : onClose} maxWidth="max-w-lg">
-      <div className={`${cardElevated} shadow-xl overflow-hidden`}>
+      <Card padding="none" className="shadow-xl overflow-hidden">
         <div className={`${paddingCard} border-b ${borderDefault} flex items-start justify-between gap-3`}>
           <div className="min-w-0">
             <h2 className={`${h3} truncate`}>{profile.name}</h2>
@@ -156,21 +155,11 @@ function DeviceSettingsForm({
           />
 
           {isLive && (
-            <div className={`${alertInfo} mt-4`}>
-              <p className="text-sm text-[color:var(--text-info)] flex items-start gap-2">
-                <RefreshCw className={`${iconSm} mt-0.5 shrink-0`} />
-                <span>{t("deviceSettings.liveHint")}</span>
-              </p>
-            </div>
+            <Alert tone="info" className="mt-4">{t("deviceSettings.liveHint")}</Alert>
           )}
 
           {error && (
-            <div className={`${alertWarning} mt-4`}>
-              <p className="text-sm text-[color:var(--text-amber)] flex items-start gap-2">
-                <AlertCircle className={`${iconSm} mt-0.5 shrink-0`} />
-                <span>{error}</span>
-              </p>
-            </div>
+            <Alert tone="warning" className="mt-4">{error}</Alert>
           )}
         </div>
 
@@ -190,7 +179,7 @@ function DeviceSettingsForm({
             </PrimaryButton>
           </div>
         </div>
-      </div>
+      </Card>
     </Dialog>
   );
 }

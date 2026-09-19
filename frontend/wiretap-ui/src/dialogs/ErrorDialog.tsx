@@ -6,7 +6,6 @@ import { iconLg, iconXl } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { SecondaryButton } from "../components/forms/DialogButtons";
 import {
-  detailBox,
   labelSmall,
   h2,
   textSecondary,
@@ -18,6 +17,7 @@ import {
   gapSmall,
 } from "../styles";
 import { IconButton } from "../components/Button";
+import { Card } from "../components/Card";
 
 export interface ErrorDialogProps {
   isOpen: boolean;
@@ -68,11 +68,11 @@ export default function ErrorDialog({
         {details && (
           <div className="mb-4">
             <div className={`${labelSmall} mb-2`}>{t("error.technicalDetails")}</div>
-            <div className={detailBox}>
+            <Card padding="lg">
               <pre className="text-xs text-[color:var(--text-primary)] font-mono whitespace-pre-wrap break-words">
                 {details}
               </pre>
-            </div>
+            </Card>
           </div>
         )}
 

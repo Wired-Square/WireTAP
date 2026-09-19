@@ -5,10 +5,11 @@ import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateC
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
 import { isCaptureProfileId } from "../../hooks/useIOSessionManager";
-import { panelFooter, errorBoxCompact } from "../../styles";
+import { panelFooter } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
 import { SuccessButton, PrimaryButton } from "../../components/forms";
+import { Alert } from "../../components/Alert";
 
 type Props = {
   /** Dialog mode: "streaming" shows Connect/Load, "connect" shows just Connect */
@@ -164,9 +165,9 @@ export default function ActionButtons({
             {releaseButton}
           </div>
           {importError && (
-            <div className={errorBoxCompact}>
+            <Alert tone="danger" size="sm">
               {importError}
-            </div>
+            </Alert>
           )}
         </div>
       ) : mode === "connect" && checkedSourceId ? (
