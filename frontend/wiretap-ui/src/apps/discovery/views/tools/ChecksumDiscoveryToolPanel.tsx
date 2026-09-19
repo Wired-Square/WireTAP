@@ -2,8 +2,9 @@
 
 import { useTranslation } from "react-i18next";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import { toolPanelLabel } from "../../../../styles/inputStyles";
-import { textMuted, textSecondary, borderDefault, bgSurface } from "../../../../styles/colourTokens";
+import { toolPanelLabel } from "../../../../styles/typography";
+import { textMuted, textSecondary, borderDefault } from "../../../../styles/colourTokens";
+import { Select, Checkbox } from "../../../../components/forms";
 
 /**
  * How checksum-shaped a byte has to look before the solver is asked about it.
@@ -28,17 +29,16 @@ export default function ChecksumDiscoveryToolPanel() {
     <div className="space-y-3 text-xs">
       <div className="space-y-1">
         <label className={toolPanelLabel}>{t("checksumDiscovery.sensitivity")}</label>
-        <select
+        <Select
           value={options.minLikeness ?? 50}
           onChange={(e) => updateOptions({ minLikeness: Number(e.target.value) })}
-          className={`w-full px-2 py-1 rounded border ${borderDefault} ${bgSurface} text-[color:var(--text-primary)]`}
         >
           {SENSITIVITY.map(({ value, key }) => (
             <option key={key} value={value}>
               {t(`checksumDiscovery.sensitivityLevel.${key}`)}
             </option>
           ))}
-        </select>
+        </Select>
         <span className={`block ${textMuted}`}>
           {t(`checksumDiscovery.sensitivityHint.${
             SENSITIVITY.find((s) => s.value === (options.minLikeness ?? 50))?.key ?? "balanced"
@@ -47,11 +47,10 @@ export default function ChecksumDiscoveryToolPanel() {
       </div>
 
       <label className="flex items-start gap-2 cursor-pointer">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={options.searchCustomPolynomials}
           onChange={(e) => updateOptions({ searchCustomPolynomials: e.target.checked })}
-          className="rounded mt-0.5"
+          className="mt-0.5"
         />
         <span>
           <span className={textSecondary}>{t("checksumDiscovery.searchCustomPolynomials")}</span>

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
@@ -14,7 +14,7 @@ import { useRulesStore } from "../stores/rulesStore";
 import { FRAME_DEF_ID_DEVICE, DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
 
 interface MappingRow {
   source_signal_id: number;
@@ -136,8 +136,8 @@ export default function TransformerDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.name")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("transformerDialog.fields.namePlaceholder")}
@@ -145,8 +145,8 @@ export default function TransformerDialog({
           </div>
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.description")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("transformerDialog.fields.namePlaceholder")}
@@ -157,9 +157,9 @@ export default function TransformerDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.transformerId")}</label>
-            <input
+            <Input
               type="number"
-              className={inputSimple}
+              size="lg"
               value={transformerId}
               onChange={(e) => setTransformerId(parseInt(e.target.value) || 0)}
             />
@@ -169,8 +169,8 @@ export default function TransformerDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.sourceFrameDef")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={sourceFrameDefId}
               onChange={(e) => setSourceFrameDefId(parseInt(e.target.value))}
             >
@@ -179,12 +179,12 @@ export default function TransformerDialog({
                   {fd.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.sourceInterface")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={sourceInterface}
               onChange={(e) => setSourceInterface(parseInt(e.target.value))}
             >
@@ -193,15 +193,15 @@ export default function TransformerDialog({
                   {iface.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("transformerDialog.fields.destination")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={destFrameDefId}
               onChange={(e) => setDestFrameDefId(parseInt(e.target.value))}
             >
@@ -211,13 +211,13 @@ export default function TransformerDialog({
                   {fd.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           {destFrameDefId !== FRAME_DEF_ID_DEVICE && (
             <div>
               <label className={labelDefault}>{t("transformerDialog.fields.destInterface")}</label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={destInterface}
                 onChange={(e) => setDestInterface(parseInt(e.target.value))}
               >
@@ -226,7 +226,7 @@ export default function TransformerDialog({
                     {iface.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
         </div>
@@ -273,8 +273,8 @@ export default function TransformerDialog({
                   </div>
                   {/* Transform + params + delete */}
                   <div className="flex flex-col items-end gap-2 pt-5">
-                    <select
-                      className={inputSimple}
+                    <Select
+                      size="lg"
                       value={m.transform_type}
                       onChange={(e) =>
                         updateMapping(idx, "transform_type", e.target.value)
@@ -284,23 +284,23 @@ export default function TransformerDialog({
                       <option value="scale">{t("transformerDialog.transforms.scale")}</option>
                       <option value="invert">{t("transformerDialog.transforms.invert")}</option>
                       <option value="mask">{t("transformerDialog.transforms.mask")}</option>
-                    </select>
+                    </Select>
                     {m.transform_type === "scale" && (
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="number"
                           step="0.1"
-                          className={inputSimple}
+                          size="lg"
                           value={m.scale}
                           placeholder={t("transformerDialog.fields.scale")}
                           onChange={(e) =>
                             updateMapping(idx, "scale", parseFloat(e.target.value) || 1)
                           }
                         />
-                        <input
+                        <Input
                           type="number"
                           step="0.1"
-                          className={inputSimple}
+                          size="lg"
                           value={m.offset}
                           placeholder={t("transformerDialog.fields.offset")}
                           onChange={(e) =>
@@ -310,9 +310,10 @@ export default function TransformerDialog({
                       </div>
                     )}
                     {m.transform_type === "mask" && (
-                      <input
+                      <Input
                         type="text"
-                        className={`${inputSimple} font-mono`}
+                        size="lg"
+                        mono
                         value={m.mask.toString(16).toUpperCase()}
                         onChange={(e) =>
                           updateMapping(idx, "mask", parseInt(e.target.value, 16) || 0)

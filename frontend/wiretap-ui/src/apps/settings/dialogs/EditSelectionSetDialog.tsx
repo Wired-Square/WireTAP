@@ -30,7 +30,7 @@ export default function EditSelectionSetDialog({
         <div className="space-y-4">
           <FormField label={t("dialogs.editSelectionSet.name")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
               placeholder={t("dialogs.editSelectionSet.namePlaceholder")}

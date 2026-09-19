@@ -7,9 +7,6 @@ import { iconSm, iconLg } from "../../../styles/spacing";
 import {
   bgSurface,
   borderDivider,
-  checkboxDefault,
-  inputSimple,
-  selectSimple,
   textSecondary,
 } from "../../../styles";
 import Dialog from "../../../components/Dialog";
@@ -19,7 +16,7 @@ import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnaly
 import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
-import { PrimaryButton, SecondaryButton } from "../../../components/forms";
+import { PrimaryButton, SecondaryButton, Select, Checkbox, Input } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -244,10 +241,10 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   </Button>
                 </div>
                 {frameMode === 'single' && (
-                  <select
+                  <Select
                     value={selectedFrameId}
                     onChange={(e) => setSelectedFrameId(e.target.value)}
-                    className={`${selectSimple} w-full`}
+                    size="lg"
                   >
                     <option value="">{t("hypothesis.fields.selectFrameId")}</option>
                     {sortedFrameIds.map((id) => (
@@ -255,7 +252,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                         {formatFrameId(id)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 )}
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
@@ -316,11 +313,9 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     {t("hypothesis.fields.bitRange")}
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={byteAligned}
                       onChange={(e) => setByteAligned(e.target.checked)}
-                      className={checkboxDefault}
                     />
                     <span className="text-[10px] text-[color:var(--text-muted)]">
                       {t("hypothesis.fields.byteAligned")}
@@ -329,27 +324,27 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       max={63}
                       step={byteAligned ? 8 : 1}
                       value={startBit}
                       onChange={(e) => setStartBit(e.target.value)}
-                      className={`${inputSimple} w-full`}
+                      size="lg"
                       placeholder={t("hypothesis.fields.startBit")}
                     />
                   </div>
                   <span className="text-[color:var(--text-muted)] self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
                   <div className="flex-1">
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       max={63}
                       step={byteAligned ? 8 : 1}
                       value={endBit}
                       onChange={(e) => setEndBit(e.target.value)}
-                      className={`${inputSimple} w-full`}
+                      size="lg"
                       placeholder={t("hypothesis.fields.endBit")}
                     />
                   </div>
@@ -358,11 +353,9 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
               {/* Signed toggle */}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={signed}
                   onChange={(e) => setSigned(e.target.checked)}
-                  className={checkboxDefault}
                 />
                 <span className="text-xs text-[color:var(--text-secondary)]">
                   {t("hypothesis.fields.signed")}
@@ -372,11 +365,9 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {/* Analysis hints toggle */}
               {hasAnalysis && (
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={useAnalysisHints}
                     onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                    className={checkboxDefault}
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
                     {t("hypothesis.fields.useHints")}
@@ -399,24 +390,24 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
                         {t("hypothesis.fields.factor")}
                       </label>
-                      <input
+                      <Input
                         type="number"
                         step="any"
                         value={factor}
                         onChange={(e) => setFactor(e.target.value)}
-                        className={`${inputSimple} w-full`}
+                        size="lg"
                       />
                     </div>
                     <div className="flex-1">
                       <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
                         {t("hypothesis.fields.offset")}
                       </label>
-                      <input
+                      <Input
                         type="number"
                         step="any"
                         value={offset}
                         onChange={(e) => setOffset(e.target.value)}
-                        className={`${inputSimple} w-full`}
+                        size="lg"
                       />
                     </div>
                   </div>
@@ -488,11 +479,10 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                         : "bg-[var(--bg-primary)] border border-transparent hover:bg-[var(--hover-bg)]"
                     }`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedCandidates.has(c.signalName)}
                       readOnly
-                      className={`${checkboxDefault} pointer-events-none`}
+                      className="pointer-events-none"
                     />
                     <span className="text-[color:var(--text-primary)] font-mono truncate flex-1">
                       {c.signalName}

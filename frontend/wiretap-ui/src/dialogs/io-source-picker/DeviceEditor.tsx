@@ -130,7 +130,7 @@ export default function DeviceEditor({
 
         <FormField label={t("ioSourcePicker.deviceEditor.kind")} variant="default">
           <Select
-            variant="default"
+            size="lg"
             value={draft.kind}
             onChange={(e) =>
               setDraft(
@@ -155,7 +155,7 @@ export default function DeviceEditor({
 
         <FormField label={t("ioSourcePicker.deviceEditor.name")} variant="default">
           <Input
-            variant="default"
+            size="lg"
             value={effectiveName}
             onChange={(e) => setCustomName(e.target.value)}
             placeholder={t("ioSourcePicker.deviceEditor.namePlaceholder")}

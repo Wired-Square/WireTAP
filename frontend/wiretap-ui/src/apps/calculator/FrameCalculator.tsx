@@ -8,7 +8,7 @@ import AppLayout from "../../components/AppLayout";
 import ByteBits from "../../components/ByteBits";
 import Dialog from "../../components/Dialog";
 import FlexSeparator from "../../components/FlexSeparator";
-import { SecondaryButton, PrimaryButton } from "../../components/forms";
+import { SecondaryButton, PrimaryButton, Input } from "../../components/forms";
 import { useSettings } from "../../hooks/useSettings";
 import { readClipboardText, writeClipboardText } from "../../api/clipboard";
 import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
@@ -497,11 +497,12 @@ export default function FrameCalculator() {
 
       {/* Second row: Input only */}
       <div className={flexRowGap2}>
-        <input
+        <Input
           type="text"
           value={rawInput}
           onChange={(e) => setRawInput(e.target.value)}
-          className="flex-1 min-w-32 px-3 py-1.5 rounded border bg-[var(--data-bg)] border-[color:var(--border-default)] font-ubuntu-mono text-base text-[color:var(--data-text-primary)] tracking-wider uppercase"
+          size="lg"
+          className="flex-1 min-w-32 font-ubuntu-mono text-base tracking-wider uppercase"
           placeholder={
             inputMode === "hex"
               ? "01020304"
@@ -739,11 +740,12 @@ export default function FrameCalculator() {
               <label className={`block ${sectionHeaderText} mb-2`}>
                 Group Sizes
               </label>
-              <input
+              <Input
                 type="text"
                 value={dialogInput}
                 onChange={(e) => setDialogInput(e.target.value)}
-                className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
+                size="lg"
+                mono
                 placeholder={dialogUnit === "bits" ? t("dialogs.groupingMode.customPlaceholderBits") : t("dialogs.groupingMode.customPlaceholderBytes")}
               />
               <p className={`${caption} mt-1`}>
@@ -921,11 +923,12 @@ export default function FrameCalculator() {
               <label className={`block ${sectionHeaderText} mb-1`}>
                 Target Value (desired result)
               </label>
-              <input
+              <Input
                 type="text"
                 value={targetValueInput}
                 onChange={(e) => setTargetValueInput(e.target.value)}
-                className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
+                size="lg"
+                mono
                 placeholder={t("dialogs.scale.valuePlaceholder")}
                 autoFocus
               />

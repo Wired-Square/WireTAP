@@ -31,6 +31,7 @@ import { parseFrameKey } from "../../../../utils/frameKey";
 import { interpretPair, interpretRegister, type WordOrder } from "../../../../utils/modbusValues";
 import CheckboxField from "../../../../components/forms/CheckboxField";
 import { Button, IconButton } from "../../../../components/Button";
+import { Select } from "../../../../components/forms";
 
 type Props = {
   results: ModbusScanResults;
@@ -163,15 +164,15 @@ export default function ModbusScanResultView({
                 labelClass={textMuted}
               />
               {showWide && (
-                <select
+                <Select
                   value={wordOrder}
                   onChange={(e) => setWordOrder(e.target.value as WordOrder)}
-                  className={`px-1 py-0.5 rounded border ${borderDefault} bg-[var(--bg-surface)] ${textSecondary}`}
+                  className="w-auto"
                   title={t("modbusScan.wordOrder")}
                 >
                   <option value="big">{t("modbusScan.wordOrderBig")}</option>
                   <option value="little">{t("modbusScan.wordOrderLittle")}</option>
-                </select>
+                </Select>
               )}
             </>
           )}

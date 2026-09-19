@@ -90,7 +90,7 @@ export default function ExportFramesDialog({
 
         <FormField label={t("exportFrames.format")} variant="simple">
           <Select
-            variant="simple"
+            size="lg"
             value={format}
             onChange={(e) => setFormat(e.target.value as ExportFormat)}
           >

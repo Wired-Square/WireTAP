@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Select from './Select';
-import Input from './Input';
+import Input, { type InputSize } from './Input';
 import { Button } from '../Button';
 
 const STANDARD_RATES = [
@@ -31,7 +31,7 @@ interface BaudRateSelectProps {
   defaultRate?: string;
   /** Text appended to the default rate label (e.g. "default for CANable") */
   defaultLabel?: string;
-  variant?: 'default' | 'simple';
+  size?: InputSize;
 }
 
 export default function BaudRateSelect({
@@ -39,7 +39,7 @@ export default function BaudRateSelect({
   onChange,
   defaultRate = '115200',
   defaultLabel,
-  variant = 'default',
+  size,
 }: BaudRateSelectProps) {
   const { t } = useTranslation('common');
   const isStandard = STANDARD_RATES.includes(value);
@@ -56,7 +56,7 @@ export default function BaudRateSelect({
     return (
       <div className="flex gap-2">
         <Input
-          variant={variant}
+          size={size}
           type="number"
           min="1"
           value={value}
@@ -72,6 +72,7 @@ export default function BaudRateSelect({
             }
           }}
           variant="ghost"
+          size={size}
           title={t('baudRate.switchBack')}
         >
           {t('baudRate.presets')}
@@ -82,7 +83,7 @@ export default function BaudRateSelect({
 
   return (
     <Select
-      variant={variant}
+      size={size}
       value={value}
       onChange={(e) => {
         if (e.target.value === '__custom__') {

@@ -23,6 +23,7 @@ export default function BoundedNumberInput({
   const { min, max, step } = SETTINGS_BOUNDS[boundKey];
   return (
     <Input
+      size="lg"
       type="number"
       min={min}
       max={max}

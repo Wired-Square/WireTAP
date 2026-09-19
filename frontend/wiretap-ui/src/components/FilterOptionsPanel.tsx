@@ -10,7 +10,8 @@
 
 import { useState, useEffect } from "react";
 import { caption, captionMuted } from "../styles/typography";
-import { bgDataInput, bgSurface, borderDataView, textDataMuted, textDataPrimary, textDataSecondary } from "../styles";
+import { textDataMuted, textDataSecondary } from "../styles";
+import { Input } from "./forms";
 
 /** Filter configuration */
 export interface FilterConfig {
@@ -54,12 +55,13 @@ export default function FilterOptionsPanel({
       <div className="space-y-3">
         <label className="block text-sm">
           <span className={textDataSecondary}>Minimum frame length:</span>
-          <input
+          <Input
             type="number"
             value={minLength}
             onChange={(e) => handleMinLengthChange(Number(e.target.value))}
             disabled={disabled}
-            className={`w-full mt-1 px-3 py-2 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
+            size="lg"
+            className="mt-1"
             min={0}
           />
           <span className={`text-xs mt-1 block ${textDataMuted}`}>
@@ -77,13 +79,12 @@ export default function FilterOptionsPanel({
         <label className={`block ${caption} mb-1`}>
           Min frame length
         </label>
-        <input
+        <Input
           type="number"
           min="0"
           value={minLength}
           onChange={(e) => handleMinLengthChange(Number(e.target.value))}
           disabled={disabled}
-          className={`w-full px-2 py-1.5 text-xs rounded border-[color:var(--border-default)] border ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
         />
         <div className={`${captionMuted} mt-0.5`}>
           {minLength === 0 ? "No filter" : `Discard frames < ${minLength} bytes`}

@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textTertiary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import ColourPicker from "../components/ColourPicker";
@@ -23,7 +23,7 @@ import {
 import SignalCombobox from "../components/SignalCombobox";
 import { useRulesStore } from "../stores/rulesStore";
 import { Button } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
 
 const COLOUR_WRITE_DEBOUNCE_MS = 150;
 const DEFAULT_CAN_ID_HEX = "100";
@@ -249,9 +249,10 @@ export default function IndicatorConfigDialog({
           <div className="mb-4">
             <label className={labelDefault}>{t("indicatorConfigDialog.fields.blinkPeriod")}</label>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="number"
-                className={`${inputSimple} w-24 text-xs py-1 px-2`}
+                size="sm"
+                className="w-24"
                 value={blinkPeriod}
                 min={50}
                 max={10000}
@@ -291,34 +292,36 @@ export default function IndicatorConfigDialog({
           <div className="space-y-4">
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.interface")}</label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={activityInterface}
                 onChange={(e) => setActivityInterface(parseInt(e.target.value))}
               >
                 {interfaces.map((iface) => (
                   <option key={iface.index} value={iface.index}>{iface.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.trigger")}</label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={triggerMode}
                 onChange={(e) => setTriggerMode(e.target.value as "any" | "id" | "match")}
               >
                 <option value="any">{t("indicatorConfigDialog.triggers.any")}</option>
                 <option value="id">{t("indicatorConfigDialog.triggers.id")}</option>
                 <option value="match">{t("indicatorConfigDialog.triggers.match")}</option>
-              </select>
+              </Select>
             </div>
             {(triggerMode === "id" || triggerMode === "match") && (
               <div>
                 <label className={labelDefault}>{t("indicatorConfigDialog.fields.canId")}</label>
-                <input
+                <Input
                   type="text"
-                  className={`${inputSimple} font-mono w-32`}
+                  size="lg"
+                  mono
+                  className="w-32"
                   value={canId}
                   onChange={(e) => setCanId(e.target.value)}
                 />
@@ -327,9 +330,10 @@ export default function IndicatorConfigDialog({
             {triggerMode === "match" && (
               <div>
                 <label className={labelDefault}>{t("indicatorConfigDialog.fields.dataMask")}</label>
-                <input
+                <Input
                   type="text"
-                  className={`${inputSimple} font-mono`}
+                  size="lg"
+                  mono
                   value={dataMask}
                   onChange={(e) => setDataMask(e.target.value)}
                   placeholder="FF00000000000000"
@@ -352,21 +356,21 @@ export default function IndicatorConfigDialog({
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.palette")}</label>
-              <select className={inputSimple} value={selectedPalette} onChange={(e) => setSelectedPalette(parseInt(e.target.value))}>
+              <Select size="lg" value={selectedPalette} onChange={(e) => setSelectedPalette(parseInt(e.target.value))}>
                 {palettes.map((p, i) => (
                   <option key={i} value={i}>
                     {p.description ? t("indicatorConfigDialog.fields.paletteWithDesc", { name: p.name, description: p.description }) : p.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.signalMax")}</label>
-              <input type="number" className={`${inputSimple} w-32`} value={signalMax} onChange={(e) => setSignalMax(parseInt(e.target.value) || 1000)} />
+              <Input type="number" size="lg" className="w-32" value={signalMax} onChange={(e) => setSignalMax(parseInt(e.target.value) || 1000)} />
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
-              <input type="text" className={`${inputSimple} font-mono w-32`} value={gateSignalId} onChange={(e) => setGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
+              <Input type="text" size="lg" mono className="w-32" value={gateSignalId} onChange={(e) => setGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
               <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>
@@ -385,7 +389,7 @@ export default function IndicatorConfigDialog({
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.thresholdValue")}</label>
-              <input type="number" className={`${inputSimple} w-32`} value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value) || 0)} />
+              <Input type="number" size="lg" className="w-32" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value) || 0)} />
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.colourAbove")}</label>
@@ -397,7 +401,7 @@ export default function IndicatorConfigDialog({
             </div>
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
-              <input type="text" className={`${inputSimple} font-mono w-32`} value={thrGateSignalId} onChange={(e) => setThrGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
+              <Input type="text" size="lg" mono className="w-32" value={thrGateSignalId} onChange={(e) => setThrGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
               <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>

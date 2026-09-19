@@ -55,7 +55,7 @@ export default function SerialPortPicker({ value, onChange }: Props) {
     <div className={spaceYSmall}>
       <div className="flex gap-2">
         <Select
-          variant="default"
+          size="lg"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="flex-1"
@@ -84,12 +84,11 @@ export default function SerialPortPicker({ value, onChange }: Props) {
       {/* Manual entry fallback */}
       <div>
         <Input
-          variant="default"
+          size="lg"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={t("serialPortPicker.manualEntryPlaceholder")}
-          className="text-sm"
         />
       </div>
 

@@ -363,11 +363,11 @@ export default function WifiTab() {
 
       <FormField label={t("credentials.ssidLabel")} required>
         <Input
+          size="lg"
           value={ssid}
           onChange={(e) => setSsid(e.target.value)}
           placeholder={t("credentials.ssidPlaceholder")}
           maxLength={32}
-          className="h-10"
         />
       </FormField>
 
@@ -376,12 +376,13 @@ export default function WifiTab() {
           <FormField label={t("credentials.passphraseLabel")} required className="flex-1 min-w-0">
             <div className="relative">
               <Input
+                size="lg"
                 type={showPassphrase ? "text" : "password"}
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
                 placeholder={t("credentials.passphrasePlaceholder")}
                 maxLength={64}
-                className="h-10 pr-10"
+                className="pr-10"
               />
               <IconButton
                 onClick={() => setShowPassphrase((v) => !v)}
@@ -396,9 +397,9 @@ export default function WifiTab() {
         )}
         <FormField label={t("credentials.securityType")} className="w-44 shrink-0">
           <Select
+            size="lg"
             value={security}
             onChange={(e) => setSecurity(Number(e.target.value))}
-            className="h-10"
           >
             <option value={SECURITY_WPA2_PSK}>{t("credentials.wpa2Psk")}</option>
             <option value={SECURITY_OPEN}>{t("credentials.open")}</option>

@@ -82,7 +82,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
         <div className={`grid grid-cols-1 ${gapSmall}`}>
           <FormField label={t('saveFrames.name')} variant="simple">
             <Input
-              variant="simple"
+              size="lg"
               value={meta.name}
               onChange={(e) => onChange({ ...meta, name: e.target.value })}
             />
@@ -90,7 +90,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
 
           <FormField label={t('saveFrames.version')} variant="simple">
             <Input
-              variant="simple"
+              size="lg"
               type="number"
               min={1}
               value={meta.version}
@@ -101,7 +101,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
           <FormField label={t('saveFrames.byteOrder')} variant="simple">
             <div className={flexRowGap2}>
               <Select
-                variant="simple"
+                size="lg"
                 value={knowledgeEndianness ?? meta.default_byte_order}
                 onChange={(e) =>
                   onChange({
@@ -127,7 +127,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
           <FormField label={t('saveFrames.interval')} variant="simple">
             <div className={flexRowGap2}>
               <Input
-                variant="simple"
+                size="lg"
                 type="number"
                 min={0}
                 value={displayInterval}
@@ -147,7 +147,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
           <FormField label={t('saveFrames.filename')} variant="simple">
             <div className="space-y-1">
               <Input
-                variant="simple"
+                size="lg"
                 value={meta.filename}
                 onChange={(e) => onChange({ ...meta, filename: e.target.value })}
                 placeholder={t('saveFrames.filenamePlaceholder')}

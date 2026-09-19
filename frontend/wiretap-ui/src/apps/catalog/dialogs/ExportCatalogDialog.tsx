@@ -13,7 +13,7 @@ import { generateCatalogReport, type CatalogReportFormat } from "../../../utils/
 import { useSettings } from "../../../hooks/useSettings";
 import type { CatalogDoc } from "../../../types/catalog";
 import { Button } from "../../../components/Button";
-import { SecondaryButton } from "../../../components/forms";
+import { SecondaryButton, Select, Radio } from "../../../components/forms";
 
 export type CatalogExportFormat = "toml" | "dbc" | "html-screen" | "html-print" | "markdown" | "text";
 
@@ -177,13 +177,13 @@ export default function ExportCatalogDialog({
             <label className={`block ${sectionHeaderText} mb-2`}>
               Export Format
             </label>
-            <select
+            <Select
               value={format}
               onChange={(e) => {
                 setFormat(e.target.value as CatalogExportFormat);
                 setError(null);
               }}
-              className="w-full px-4 py-2 rounded-lg border border-[color:var(--border-default)] bg-[var(--bg-surface)] text-[color:var(--text-primary)]"
+              size="lg"
             >
               <optgroup label="Data Formats">
                 {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "data").map(opt => (
@@ -195,7 +195,7 @@ export default function ExportCatalogDialog({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </optgroup>
-            </select>
+            </Select>
           </div>
 
           <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
@@ -219,13 +219,12 @@ export default function ExportCatalogDialog({
               </label>
               <div className="space-y-2">
                 <label className={selectableOptionBox}>
-                  <input
-                    type="radio"
+                  <Radio
                     name="dbcMuxMode"
                     value="extended"
                     checked={dbcMuxMode === "extended"}
                     onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5 w-4 h-4 text-orange-600 border-[color:var(--border-default)] focus:ring-orange-500"
+                    className="mt-0.5"
                   />
                   <div>
                     <div className="font-medium text-[color:var(--text-primary)] text-sm">
@@ -237,13 +236,12 @@ export default function ExportCatalogDialog({
                   </div>
                 </label>
                 <label className={selectableOptionBox}>
-                  <input
-                    type="radio"
+                  <Radio
                     name="dbcMuxMode"
                     value="flattened"
                     checked={dbcMuxMode === "flattened"}
                     onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5 w-4 h-4 text-orange-600 border-[color:var(--border-default)] focus:ring-orange-500"
+                    className="mt-0.5"
                   />
                   <div>
                     <div className="font-medium text-[color:var(--text-primary)] text-sm">

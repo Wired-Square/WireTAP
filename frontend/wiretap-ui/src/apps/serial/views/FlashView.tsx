@@ -51,6 +51,7 @@ import type {
   FlasherProgressEvent,
 } from "../utils/flasherTypes";
 import { Button } from "../../../components/Button";
+import { Checkbox } from "../../../components/forms";
 
 interface Props {
   /** Active serial port name (null when the user picked a DFU device). */
@@ -485,8 +486,7 @@ export default function FlashView({
           <label
             className={`flex items-center gap-1 text-xs ${textSecondary} cursor-pointer`}
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={backupFullChip}
               onChange={(e) => setBackupFullChip(e.target.checked)}
             />

@@ -14,7 +14,6 @@ import { useSettingsStore } from "../stores/settingsStore";
 import {
   labelDefault,
   helpText,
-  inputSimple,
   h2,
   textPrimary,
   textSuccess,
@@ -23,7 +22,7 @@ import {
 import { SETTINGS_BOUNDS } from "../../../settings/bounds";
 import { SettingRow, SettingToggleRow } from "../components/rows";
 import { Button } from "../../../components/Button";
-import { PrimaryButton, SecondaryButton } from "../../../components/forms";
+import { PrimaryButton, SecondaryButton, Input } from "../../../components/forms";
 
 interface McpStatus {
   running: boolean;
@@ -276,7 +275,7 @@ export default function McpServerView() {
 
       {/* Port */}
       <SettingRow label="Port" htmlFor="mcp-port" className="max-w-xs">
-        <input
+        <Input
           id="mcp-port"
           type="number"
           min={SETTINGS_BOUNDS.mcpServerPort.min}
@@ -286,7 +285,7 @@ export default function McpServerView() {
             setServerPort(Number(e.target.value) || 8787);
             stageChange();
           }}
-          className={inputSimple}
+          size="lg"
         />
       </SettingRow>
 
@@ -296,7 +295,7 @@ export default function McpServerView() {
           Bearer token
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <Input
             id="mcp-token"
             type="text"
             value={serverToken}
@@ -305,7 +304,7 @@ export default function McpServerView() {
               setServerToken(e.target.value);
               stageChange();
             }}
-            className={`${inputSimple} font-mono text-xs`}
+            mono
           />
           <Button
             title="Generate a new token"

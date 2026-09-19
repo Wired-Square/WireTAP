@@ -30,10 +30,10 @@ import {
 import { getCaptureFramesTail } from '../../../../api/capture';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { alertWarning } from '../../../../styles/cardStyles';
-import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
+import { bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
 import { byteHighlight } from '../../../../styles/badgeStyles';
 import { Button, IconButton } from '../../../../components/Button';
-import { SecondaryButton, DangerButton } from '../../../../components/forms';
+import { SecondaryButton, DangerButton, Select, Input } from '../../../../components/forms';
 
 /**
  * Only used when detection finds nothing and the caller supplied no config — a
@@ -321,37 +321,37 @@ export default function ChecksumExtractionDialog({
         <div className={`grid grid-cols-2 gap-4 pt-2 border-t ${borderDefault}`}>
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
             {t("serial.algorithm")}
-            <select
+            <Select
               value={config.algorithm}
               onChange={(e) => handleAlgorithmChange(e.target.value as ChecksumAlgorithm)}
-              className={`px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
+              size="lg"
             >
               {CHECKSUM_ALGORITHMS.map(algo => (
                 <option key={algo.value} value={algo.value}>{algo.label}</option>
               ))}
-            </select>
+            </Select>
           </label>
 
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
             {t("serial.byteOrder")}
-            <select
+            <Select
               value={config.endianness}
               onChange={(e) => setConfig(prev => ({ ...prev, endianness: e.target.value as 'big' | 'little' }))}
               disabled={config.numBytes < 2}
-              className={`px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary} disabled:opacity-50`}
+              size="lg"
             >
               <option value="little">{t("serial.littleEndian")}</option>
               <option value="big">{t("serial.bigEndian")}</option>
-            </select>
+            </Select>
           </label>
 
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
             {t("serial.checksumPosition")}
-            <input
+            <Input
               type="number"
               value={config.startByte}
               onChange={(e) => setPosition({ startByte: Number(e.target.value) })}
-              className={`px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
+              size="lg"
             />
             <span className={`text-xs ${textMuted}`}>{t("serial.negativeHint")}</span>
           </label>
@@ -359,18 +359,20 @@ export default function ChecksumExtractionDialog({
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
             {t("serial.calcDataRange")}
             <div className={flexRowGap2}>
-              <input
+              <Input
                 type="number"
                 value={config.calcStartByte}
                 onChange={(e) => setPosition({ calcStartByte: Number(e.target.value) })}
-                className={`w-16 px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary} text-center`}
+                size="lg"
+                className="w-16 text-center"
               />
               <span className={textMuted}>{t("serial.rangeTo")}</span>
-              <input
+              <Input
                 type="number"
                 value={config.calcEndByte}
                 onChange={(e) => setPosition({ calcEndByte: Number(e.target.value) })}
-                className={`w-16 px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary} text-center`}
+                size="lg"
+                className="w-16 text-center"
               />
             </div>
           </label>

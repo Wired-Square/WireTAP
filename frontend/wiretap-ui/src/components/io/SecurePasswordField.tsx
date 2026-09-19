@@ -71,7 +71,7 @@ export default function SecurePasswordField({
 
       <div className="relative">
         <Input
-          variant="default"
+          size="lg"
           type={showPassword ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}

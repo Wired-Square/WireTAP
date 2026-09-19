@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
@@ -14,7 +14,7 @@ import { useRulesStore } from "../stores/rulesStore";
 import { DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
 
 interface MappingRow {
   source_signal_id: number;
@@ -139,8 +139,8 @@ export default function GeneratorDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.name")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("generatorDialog.fields.namePlaceholder")}
@@ -148,8 +148,8 @@ export default function GeneratorDialog({
           </div>
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.description")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("generatorDialog.fields.namePlaceholder")}
@@ -160,17 +160,17 @@ export default function GeneratorDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.generatorId")}</label>
-            <input
+            <Input
               type="number"
-              className={inputSimple}
+              size="lg"
               value={generatorId}
               onChange={(e) => setGeneratorId(parseInt(e.target.value) || 0)}
             />
           </div>
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.frameDef")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={frameDefId}
               onChange={(e) => setFrameDefId(parseInt(e.target.value))}
             >
@@ -179,15 +179,15 @@ export default function GeneratorDialog({
                   {fd.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.outputInterface")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={interfaceIndex}
               onChange={(e) => setInterfaceIndex(parseInt(e.target.value))}
             >
@@ -196,13 +196,13 @@ export default function GeneratorDialog({
                   {iface.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.periodMs")}</label>
-            <input
+            <Input
               type="number"
-              className={inputSimple}
+              size="lg"
               value={periodMs}
               min={1}
               onChange={(e) => setPeriodMs(parseInt(e.target.value) || 100)}
@@ -210,8 +210,8 @@ export default function GeneratorDialog({
           </div>
           <div>
             <label className={labelDefault}>{t("generatorDialog.fields.trigger")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={triggerType}
               onChange={(e) => setTriggerType(parseInt(e.target.value))}
             >
@@ -220,7 +220,7 @@ export default function GeneratorDialog({
                   {t(`generatorDialog.triggers.${tt.key}`)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -266,8 +266,8 @@ export default function GeneratorDialog({
                   </div>
                   {/* Transform + delete */}
                   <div className="flex flex-col items-end gap-2 pt-5">
-                    <select
-                      className={inputSimple}
+                    <Select
+                      size="lg"
                       value={m.transform_type}
                       onChange={(e) =>
                         updateMapping(idx, "transform_type", e.target.value)
@@ -277,7 +277,7 @@ export default function GeneratorDialog({
                       <option value="scale">{t("generatorDialog.transforms.scale")}</option>
                       <option value="invert">{t("generatorDialog.transforms.invert")}</option>
                       <option value="mask">{t("generatorDialog.transforms.mask")}</option>
-                    </select>
+                    </Select>
                     <IconButton
                       onClick={() => removeMapping(idx)}
                       tone="danger"

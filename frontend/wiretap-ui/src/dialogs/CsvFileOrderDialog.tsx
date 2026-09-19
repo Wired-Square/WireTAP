@@ -29,6 +29,7 @@ import {
 } from "../styles";
 import { iconSm, iconMd } from "../styles/spacing";
 import { IconButton } from "../components/Button";
+import { Checkbox } from "../components/forms";
 
 export type CsvFileOrderDialogProps = {
   isOpen: boolean;
@@ -398,11 +399,9 @@ export default function CsvFileOrderDialog({
                       className={`${iconSm} animate-spin ${textMuted}`}
                     />
                   ) : (
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={entry.hasHeader}
                       onChange={() => toggleHeader(i)}
-                      className="accent-blue-500"
                       title={
                         entry.hasHeader
                           ? "First row is a header"

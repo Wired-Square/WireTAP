@@ -4,13 +4,13 @@ import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
 import { Button, IconButton } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
 
 // ============================================================================
 // Constants
@@ -188,9 +188,10 @@ export default function UserSignalDialog({
           {/* Signal ID */}
           <div>
             <label className={labelDefault}>{t("userSignalDialog.fields.signalId")}</label>
-            <input
+            <Input
               type="text"
-              className={`${inputSimple} font-mono`}
+              size="lg"
+              mono
               value={signalIdHex}
               onChange={(e) => setSignalIdHex(e.target.value)}
               placeholder={t("userSignalDialog.fields.signalIdPlaceholder")}
@@ -200,9 +201,9 @@ export default function UserSignalDialog({
           {/* Name */}
           <div>
             <label className={labelDefault}>{t("userSignalDialog.fields.name")}</label>
-            <input
+            <Input
               type="text"
-              className={inputSimple}
+              size="lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("userSignalDialog.fields.namePlaceholder")}
@@ -213,9 +214,9 @@ export default function UserSignalDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelDefault}>{t("userSignalDialog.fields.group")}</label>
-              <input
+              <Input
                 type="text"
-                className={inputSimple}
+                size="lg"
                 value={group}
                 onChange={(e) => setGroup(e.target.value)}
                 placeholder={DEFAULT_GROUP}
@@ -223,8 +224,8 @@ export default function UserSignalDialog({
             </div>
             <div>
               <label className={labelDefault}>{t("userSignalDialog.fields.format")}</label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
               >
@@ -233,16 +234,16 @@ export default function UserSignalDialog({
                     {t(`userSignalDialog.formats.${opt.key}`)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
           {/* Unit */}
           <div>
             <label className={labelDefault}>{t("userSignalDialog.fields.unit")}</label>
-            <input
+            <Input
               type="text"
-              className={inputSimple}
+              size="lg"
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
               placeholder={t("userSignalDialog.fields.unitPlaceholder")}
@@ -268,18 +269,21 @@ export default function UserSignalDialog({
                 <div className="space-y-2">
                   {enumRows.map((row, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <input
+                      <Input
                         type="text"
-                        className={`${inputSimple} font-mono w-20 shrink-0`}
+                        size="lg"
+                        mono
+                        className="w-20 shrink-0"
                         value={row.value}
                         onChange={(e) =>
                           updateEnumRow(idx, "value", e.target.value)
                         }
                         placeholder={t("userSignalDialog.fields.valuePlaceholder")}
                       />
-                      <input
+                      <Input
                         type="text"
-                        className={`${inputSimple} flex-1`}
+                        size="lg"
+                        className="flex-1"
                         value={row.label}
                         onChange={(e) =>
                           updateEnumRow(idx, "label", e.target.value)

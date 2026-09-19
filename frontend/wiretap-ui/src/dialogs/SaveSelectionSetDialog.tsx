@@ -48,7 +48,7 @@ export default function SaveSelectionSetDialog({
           <div className="space-y-1">
             <label className={labelSmall}>{t("saveSelectionSet.name")}</label>
             <Input
-              variant="simple"
+              size="lg"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}

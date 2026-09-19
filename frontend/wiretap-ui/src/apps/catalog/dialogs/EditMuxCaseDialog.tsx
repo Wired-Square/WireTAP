@@ -43,7 +43,7 @@ export default function EditMuxCaseDialog({
         <div className="space-y-4">
           <FormField label="Case Value" required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={caseValue}
               onChange={(e) => {
                 setCaseValue(e.target.value);
@@ -66,7 +66,7 @@ export default function EditMuxCaseDialog({
 
           <FormField label="Notes" variant="default">
             <Textarea
-              variant="default"
+              size="lg"
               value={caseNotes}
               onChange={(e) => setCaseNotes(e.target.value)}
               placeholder="Optional notes about this case..."

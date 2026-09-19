@@ -14,7 +14,6 @@ import type {
 } from "../../api/capture";
 import {
   bgSurface,
-  textSecondary,
   borderDefault,
   textMuted,
   textDataGreen,
@@ -23,6 +22,7 @@ import {
   textDataOrange,
   textDataAmber,
 } from "../../styles";
+import { Select } from "../../components/forms";
 
 const ROLE_KEYS: CsvColumnRole[] = [
   "ignore",
@@ -195,7 +195,7 @@ export default function PreviewTable({
                     key={colIdx}
                     className={`px-1 py-1.5 border-b ${borderDefault} ${isIgnored ? "opacity-40" : ""}`}
                   >
-                    <select
+                    <Select
                       value={role}
                       onChange={(e) =>
                         onMappingChange(
@@ -203,14 +203,15 @@ export default function PreviewTable({
                           e.target.value as CsvColumnRole
                         )
                       }
-                      className={`w-full min-w-24 px-1.5 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textSecondary}`}
+                      size="sm"
+                      className="min-w-24"
                     >
                       {ROLE_KEYS.map((roleKey) => (
                         <option key={roleKey} value={roleKey}>
                           {t(`csvColumnMapperPreview.roles.${roleKey}`)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </th>
                 );
               })}

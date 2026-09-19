@@ -84,6 +84,22 @@ export const captionMuted = "text-xs text-[color:var(--text-secondary)] opacity-
 export const sectionHeaderText = "text-sm font-medium text-[color:var(--text-secondary)]";
 
 // =============================================================================
+// Form labels and help text
+// =============================================================================
+
+/** Block label above a form control */
+export const labelDefault = "block text-sm font-medium text-[color:var(--text-primary)] mb-2";
+
+/** Inline label beside a control in a compact form */
+export const labelSimple = "text-sm text-[color:var(--text-secondary)]";
+
+/** Description under a control */
+export const helpText = "text-xs text-[color:var(--text-secondary)]";
+
+/** Label above a field in the Discovery tool option panels */
+export const toolPanelLabel = "text-[color:var(--text-muted)]";
+
+// =============================================================================
 // Empty State Text (for "Not connected", "No data", etc.)
 // =============================================================================
 // These provide consistent styling for empty/placeholder states across apps.

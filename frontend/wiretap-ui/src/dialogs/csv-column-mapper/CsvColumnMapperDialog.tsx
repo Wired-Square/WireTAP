@@ -35,6 +35,7 @@ import {
 } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
+import { Select, Checkbox } from "../../components/forms";
 
 /** Format import summary as plain text for copying */
 function formatImportSummary(
@@ -369,25 +370,24 @@ export default function CsvColumnMapperDialog({
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <label className={`text-xs ${textSecondary} whitespace-nowrap`}>{t("csvColumnMapper.delimiter")}</label>
-            <select
+            <Select
               value={delimiter}
               onChange={(e) => handleDelimiterChange(e.target.value as Delimiter)}
               disabled={isLoading}
-              className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
+              size="sm"
+              className="w-auto"
             >
               <option value="comma">{t("csvColumnMapper.delimiterOptions.comma")}</option>
               <option value="tab">{t("csvColumnMapper.delimiterOptions.tab")}</option>
               <option value="space">{t("csvColumnMapper.delimiterOptions.space")}</option>
               <option value="semicolon">{t("csvColumnMapper.delimiterOptions.semicolon")}</option>
-            </select>
+            </Select>
           </div>
           <label className={`flex items-center gap-2 ${caption} cursor-pointer select-none`}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={hasHeader}
               onChange={(e) => handleHeaderToggle(e.target.checked)}
               disabled={isLoading}
-              className="accent-blue-500"
             />
             <span>{t("csvColumnMapper.firstRowHeader")}</span>
           </label>
@@ -427,27 +427,26 @@ export default function CsvColumnMapperDialog({
                 <label className={`text-xs ${textSecondary} whitespace-nowrap`}>
                   {t("csvColumnMapper.timestampUnit")}
                 </label>
-                <select
+                <Select
                   value={timestampUnit}
                   onChange={(e) => setTimestampUnit(e.target.value as TimestampUnit)}
-                  className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
+                  size="sm"
+                  className="w-auto"
                 >
                   <option value="seconds">{t("csvColumnMapper.tsUnits.seconds")}</option>
                   <option value="milliseconds">{t("csvColumnMapper.tsUnits.milliseconds")}</option>
                   <option value="microseconds">{t("csvColumnMapper.tsUnits.microseconds")}</option>
                   <option value="nanoseconds">{t("csvColumnMapper.tsUnits.nanoseconds")}</option>
-                </select>
+                </Select>
                 {estimatedDuration && (
                   <span className={`text-xs ${textMuted}`}>
                     {t("csvColumnMapper.estimatedDuration", { duration: estimatedDuration })}
                   </span>
                 )}
                 <label className={`flex items-center gap-1.5 text-xs ${textSecondary} cursor-pointer select-none ml-auto`}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={negateTimestamps}
                     onChange={(e) => setNegateTimestamps(e.target.checked)}
-                    className="accent-blue-500"
                   />
                   <span>{t("csvColumnMapper.negateTimestamps")}</span>
                 </label>

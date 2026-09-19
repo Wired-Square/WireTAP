@@ -67,7 +67,7 @@ export default function AddBookmarkDialog({
           <div className="space-y-1">
             <label className={labelSmall}>{t("addBookmark.name")}</label>
             <Input
-              variant="simple"
+              size="lg"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}

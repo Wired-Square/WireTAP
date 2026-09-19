@@ -4,9 +4,10 @@ import { useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { borderDivider, focusRing } from "../../../styles";
+import { borderDivider } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import { IconButton } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 export type TextFindBarProps = {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -128,14 +129,14 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
 
   return (
     <div className={`flex items-center gap-2 px-4 py-2 bg-[var(--bg-surface)] ${borderDivider}`}>
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={textFind.query}
         onChange={(e) => setTextFindQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={t("findBar.placeholderText")}
-        className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
+        className="flex-1"
       />
 
       <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center">

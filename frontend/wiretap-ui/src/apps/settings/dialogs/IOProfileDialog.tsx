@@ -19,7 +19,7 @@ import {
   type SignalDescriptor,
 } from "../../../api/framelink";
 import { baseQuantity, QTY_DATARATE } from "../../../api/framelinkAxes";
-import { Input, Select, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
+import { Input, Select, FormField, PrimaryButton, SecondaryButton, Checkbox } from "../../../components/forms";
 import IOConnectionFields from "../../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../../components/io/useConnectionProbe";
 import {
@@ -291,8 +291,7 @@ export default function IOProfileDialog({
 
           {anyPersistable && (
             <label className={`flex items-center gap-2 ${caption} mt-3`}>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={flPersist}
                 onChange={(e) => setFlPersist(e.target.checked)}
               />
@@ -323,7 +322,7 @@ export default function IOProfileDialog({
           {/* Profile Type - filtered based on platform availability */}
           <FormField label={t("ioProfileDialog.type")} variant="default">
             <Select
-              variant="default"
+              size="lg"
               value={profileForm.kind}
               onChange={(e) =>
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
@@ -340,7 +339,7 @@ export default function IOProfileDialog({
           {/* Profile Name */}
           <FormField label={t("ioProfileDialog.profileName")} required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={profileForm.name}
               onChange={(e) => onUpdateProfileField("name", e.target.value)}
               placeholder={t("ioProfileDialog.profileNamePlaceholder")}
@@ -350,7 +349,7 @@ export default function IOProfileDialog({
           {/* Preferred Decoder */}
           <FormField label={t("ioProfileDialog.preferredDecoder")} variant="default">
             <Select
-              variant="default"
+              size="lg"
               value={profileForm.preferred_catalog || ""}
               onChange={(e) => onUpdateProfileField("preferred_catalog", e.target.value || undefined)}
             >

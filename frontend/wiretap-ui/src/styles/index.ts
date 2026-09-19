@@ -4,9 +4,6 @@
 // What is not yet a component: framing cards, data view tabs, the launcher
 export * from './buttonStyles';
 
-// Input and form field styles
-export * from './inputStyles';
-
 // Badge and status indicator styles
 export * from './badgeStyles';
 

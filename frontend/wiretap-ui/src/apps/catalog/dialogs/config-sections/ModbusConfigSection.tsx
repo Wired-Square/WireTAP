@@ -4,8 +4,9 @@
 import { Network, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles/typography";
-import { focusRing, expandableRowContainer } from "../../../../styles";
+import { expandableRowContainer } from "../../../../styles";
 import { Button } from "../../../../components/Button";
+import { Select, Input } from "../../../../components/forms";
 
 export type ModbusConfigSectionProps = {
   isConfigured: boolean;
@@ -109,14 +110,14 @@ export default function ModbusConfigSection({
             <label className={`block ${textMedium} mb-2`}>
               Register Base <span className="text-red-500">*</span>
             </label>
-            <select
+            <Select
               value={registerBase}
               onChange={(e) => setRegisterBase(parseInt(e.target.value) as 0 | 1)}
-              className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+              size="lg"
             >
               <option value={0}>0-based (register 0 = address 0)</option>
               <option value={1}>1-based (register 1 = address 0)</option>
-            </select>
+            </Select>
             <p className={`mt-1 ${caption}`}>
               Register addressing convention used by the device
             </p>
@@ -128,7 +129,7 @@ export default function ModbusConfigSection({
               Default Poll Interval
             </label>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="number"
                 min={100}
                 max={3600000}
@@ -138,7 +139,7 @@ export default function ModbusConfigSection({
                   const val = e.target.value === "" ? undefined : parseInt(e.target.value);
                   setDefaultInterval(val !== undefined && !isNaN(val) ? val : undefined);
                 }}
-                className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               />
               <span className="text-sm text-[color:var(--text-muted)] whitespace-nowrap">ms</span>
             </div>
@@ -153,14 +154,14 @@ export default function ModbusConfigSection({
               <label className={`block ${textMedium} mb-2`}>
                 Default Byte Order
               </label>
-              <select
+              <Select
                 value={defaultByteOrder}
                 onChange={(e) => setDefaultByteOrder(e.target.value as "big" | "little")}
-                className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               >
                 <option value="big">Big-endian</option>
                 <option value="little">Little-endian</option>
-              </select>
+              </Select>
               <p className={`mt-1 ${caption}`}>
                 Byte order within each register
               </p>
@@ -170,14 +171,14 @@ export default function ModbusConfigSection({
               <label className={`block ${textMedium} mb-2`}>
                 Default Word Order
               </label>
-              <select
+              <Select
                 value={defaultWordOrder}
                 onChange={(e) => setDefaultWordOrder(e.target.value as "big" | "little")}
-                className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               >
                 <option value="big">Big-endian (high word first)</option>
                 <option value="little">Little-endian (low word first)</option>
-              </select>
+              </Select>
               <p className={`mt-1 ${caption}`}>
                 Word order for multi-register values
               </p>

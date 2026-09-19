@@ -5,12 +5,8 @@
 // can compose them without copy-pasting class strings.
 
 import type { ReactNode } from "react";
-import {
-  bgPrimary,
-  borderDivider,
-  textPrimary,
-} from "../../../styles/colourTokens";
 import { Button } from "../../../components/Button";
+import { Input, Select as SelectField } from "../../../components/forms";
 
 interface FieldProps {
   label: string;
@@ -38,29 +34,23 @@ interface SelectProps {
   onChange: (value: string) => void;
   options: SelectOption[];
   disabled?: boolean;
-  className?: string;
 }
 
-export function Select({
-  value,
-  onChange,
-  options,
-  disabled,
-  className,
-}: SelectProps) {
+export function Select({ value, onChange, options, disabled }: SelectProps) {
   return (
-    <select
+    <SelectField
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider} disabled:opacity-50 ${className ?? ""}`}
+      size="sm"
+      className="w-auto"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
         </option>
       ))}
-    </select>
+    </SelectField>
   );
 }
 
@@ -81,12 +71,14 @@ export function TextInput({
   widthClass = "w-28",
 }: TextInputProps) {
   return (
-    <input
+    <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       placeholder={placeholder}
-      className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider} font-mono ${widthClass} disabled:opacity-50`}
+      size="sm"
+      mono
+      className={widthClass}
     />
   );
 }

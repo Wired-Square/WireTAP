@@ -23,7 +23,7 @@ import Alert from "../../components/Alert";
 import Dialog from "../../components/Dialog";
 import OverflowMenu, { type OverflowMenuItems } from "../../components/OverflowMenu";
 import TabStrip, { type TabDef } from "../../components/TabStrip";
-import { FormField, Input, PrimaryButton, SecondaryButton, Select } from "../../components/forms";
+import { FormField, Input, PrimaryButton, SecondaryButton, Select, Checkbox } from "../../components/forms";
 import { iconMd, iconSm } from "../../styles/spacing";
 import {
   bgSurface,
@@ -102,8 +102,7 @@ function CandidateRow({
         disabled ? "opacity-60" : "cursor-pointer"
       }`}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         className="mt-1"
         checked={checked}
         disabled={disabled}
@@ -333,6 +332,7 @@ function RepoPropertiesDialog({
           <div className="p-4 space-y-3">
             <FormField label={t("repository.saved.labelLabel")}>
               <Input
+                size="lg"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder={t("repository.saved.labelPlaceholder", {
@@ -343,6 +343,7 @@ function RepoPropertiesDialog({
             </FormField>
             <FormField label={t("repository.saved.branchLabel")}>
               <Input
+                size="lg"
                 value={gitRef}
                 onChange={(e) => setGitRef(e.target.value)}
                 placeholder={t("repository.saved.branchPlaceholder")}
@@ -350,6 +351,7 @@ function RepoPropertiesDialog({
             </FormField>
             <FormField label={t("repository.saved.directoryLabel")}>
               <Input
+                size="lg"
                 value={directory}
                 onChange={(e) => setDirectory(e.target.value)}
                 placeholder={t("repository.saved.directoryPlaceholder")}
@@ -562,6 +564,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
           <div className="flex gap-2 items-start">
             <div className="flex-1">
               <Input
+                size="lg"
                 value={browse.url}
                 onChange={(e) => setUrl(e.target.value)}
                 onBlur={() => void validateUrl()}
@@ -704,6 +707,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
             <div>
               <label className={caption}>{t("repository.collisionLabel")}</label>
               <Select
+                size="lg"
                 value={onCollision}
                 onChange={(e) => setCollisionPolicy(e.target.value as CollisionPolicy)}
               >

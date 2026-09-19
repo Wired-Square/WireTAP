@@ -3,7 +3,7 @@
 // A checkbox with its label — the shape a checkbox always appears in.
 
 import type { ReactNode } from "react";
-import { checkboxDefault } from "../../styles/inputStyles";
+import { Checkbox } from "./Checkbox";
 import { caption } from "../../styles/typography";
 
 export interface CheckboxFieldProps {
@@ -24,13 +24,7 @@ export default function CheckboxField({
 }: CheckboxFieldProps) {
   return (
     <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        className={checkboxDefault}
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-      />
+      <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled} />
       <span className={labelClass}>{label}</span>
     </label>
   );

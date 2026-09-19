@@ -1,7 +1,8 @@
 // ui/src/apps/catalog/dialogs/config-sections/MetadataSection.tsx
 // Catalog metadata section for unified config dialog
 
-import { textMedium, focusRing } from "../../../../styles";
+import { textMedium } from "../../../../styles";
+import { Input } from "../../../../components/forms";
 
 export type MetadataSectionProps = {
   name: string;
@@ -27,11 +28,11 @@ export default function MetadataSection({
           <label className={`block ${textMedium} mb-2`}>
             Name <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+            size="lg"
             placeholder="My Catalog"
           />
         </div>
@@ -39,7 +40,7 @@ export default function MetadataSection({
           <label className={`block ${textMedium} mb-2`}>
             Version <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             type="number"
             min={1}
             value={version || ""}
@@ -47,11 +48,8 @@ export default function MetadataSection({
               const val = e.target.value;
               setVersion(val === "" ? 0 : parseInt(val));
             }}
-            className={`w-full px-4 py-2 border rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
-              !version || version < 1
-                ? "bg-[var(--status-danger-bg)] border-[color:var(--status-danger-border)]"
-                : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
-            }`}
+            size="lg"
+            aria-invalid={!version || version < 1}
             placeholder="1"
           />
         </div>

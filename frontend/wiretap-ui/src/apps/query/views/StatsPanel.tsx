@@ -31,6 +31,7 @@ import {
   bgSurface,
 } from "../../../styles/colourTokens";
 import { Button, IconButton } from "../../../components/Button";
+import { Select } from "../../../components/forms";
 
 interface Props {
   profileId: string | null;
@@ -134,18 +135,19 @@ export default function StatsPanel({ profileId }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {/* Auto-refresh selector */}
-          <select
+          <Select
             value={autoRefreshInterval ?? ""}
             onChange={(e) =>
               setAutoRefreshInterval(e.target.value ? parseInt(e.target.value) : null)
             }
-            className={`text-xs px-2 py-1 rounded border border-[var(--border-default)] ${bgSurface} ${textPrimary}`}
+            size="sm"
+            className="w-auto"
           >
             <option value="">{t("stats.manual")}</option>
             <option value="5">5s</option>
             <option value="10">10s</option>
             <option value="30">30s</option>
-          </select>
+          </Select>
           {/* Refresh button */}
           <Button
             onClick={handleRefresh}

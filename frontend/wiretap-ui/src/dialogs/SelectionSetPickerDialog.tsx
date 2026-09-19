@@ -17,6 +17,7 @@ import {
 } from "../utils/selectionSets";
 import { useSessionStore } from "../stores/sessionStore";
 import { Button, IconButton } from "../components/Button";
+import { Input } from "../components/forms";
 
 type Props = {
   isOpen: boolean;
@@ -196,13 +197,13 @@ export default function SelectionSetPickerDialog({
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("selectionSetPicker.name")}</label>
-                  <input
+                  <Input
                     type="text"
                     value={editForm.name}
                     onChange={(e) =>
                       setEditForm((prev) => ({ ...prev, name: e.target.value }))
                     }
-                    className="w-full px-3 py-2 text-sm rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)]"
+                    size="lg"
                   />
                 </div>
 

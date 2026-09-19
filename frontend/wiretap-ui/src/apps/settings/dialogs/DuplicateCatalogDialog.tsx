@@ -33,7 +33,7 @@ export default function DuplicateCatalogDialog({
         <div className="space-y-4">
           <FormField label={t("dialogs.duplicateCatalog.newName")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
               placeholder={t("dialogs.duplicateCatalog.namePlaceholder")}
@@ -42,7 +42,7 @@ export default function DuplicateCatalogDialog({
 
           <FormField label={t("dialogs.duplicateCatalog.newFilename")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={filename}
               onChange={(e) => onChangeFilename(e.target.value)}
               placeholder={t("dialogs.duplicateCatalog.filenamePlaceholder")}

@@ -10,10 +10,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Globe } from "lucide-react";
 import { iconXs } from "../styles/spacing";
 import { caption } from "../styles/typography";
-import { bgSurface } from "../styles/colourTokens";
 import { getLocalTimezoneAbbr, convertDatetimeLocal } from "../utils/timezone";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../utils/favorites";
+import { Select, Input, inputClass } from "./forms";
 
 /**
  * Convert a datetime-local string (YYYY-MM-DDTHH:mm:ss) to a Date object.
@@ -179,7 +179,6 @@ export default function TimeBoundsInput({
     [value, onChange]
   );
 
-  const inputClasses = `w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`;
 
   return (
     <div className="space-y-3">
@@ -187,11 +186,10 @@ export default function TimeBoundsInput({
       {showBookmarks && bookmarks.length > 0 && (
         <div>
           <label className={`block ${caption} mb-1`}>{t("timeBounds.bookmarks")}</label>
-          <select
+          <Select
             value={bookmarks.find((b) => b.name === value.bookmarkName)?.id ?? ""}
             onChange={handleBookmarkChange}
             disabled={disabled}
-            className={inputClasses}
           >
             <option value="">{t("timeBounds.selectBookmark")}</option>
             {bookmarks.map((bm) => (
@@ -199,7 +197,7 @@ export default function TimeBoundsInput({
                 {bm.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -248,7 +246,7 @@ export default function TimeBoundsInput({
             dateFormat="dd/MM/yyyy, h:mm:ss aa"
             maxDate={maxDate}
             disabled={disabled}
-            className={inputClasses}
+            className={inputClass()}
             placeholderText={t("timeBounds.startPlaceholder")}
             isClearable
           />
@@ -265,7 +263,7 @@ export default function TimeBoundsInput({
             maxDate={maxDate}
             minDate={startDate ?? undefined}
             disabled={disabled}
-            className={inputClasses}
+            className={inputClass()}
             placeholderText={t("timeBounds.endPlaceholder")}
             isClearable
           />
@@ -276,14 +274,13 @@ export default function TimeBoundsInput({
       {showMaxFrames && (
         <div>
           <label className={`block ${caption} mb-1`}>{t("timeBounds.maxFrames")}</label>
-          <input
+          <Input
             type="number"
             min={1}
             placeholder={t("timeBounds.noLimitPlaceholder")}
             value={value.maxFrames ?? ""}
             onChange={handleMaxFramesChange}
             disabled={disabled}
-            className={inputClasses}
           />
         </div>
       )}

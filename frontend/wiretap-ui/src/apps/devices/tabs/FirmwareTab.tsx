@@ -12,7 +12,6 @@ import {
   alertDanger,
   cardDefault,
   labelSimple,
-  selectSimple,
   textDanger,
   textPrimary,
   textSecondary,
@@ -27,7 +26,7 @@ import {
   type Transport,
 } from "../../../api/smpUpgrade";
 import { pickFileToOpen } from "../../../api/dialogs";
-import { PrimaryButton, DangerButton } from "../../../components/forms";
+import { PrimaryButton, DangerButton, Select } from "../../../components/forms";
 
 const TERMINATOR_TYPES = new Set(["Complete", "Cancelled", "Error"]);
 const EVENT_LOG_MAX = 200;
@@ -243,16 +242,16 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
         {availableTransports.length > 1 && (
           <div className="flex items-center gap-2">
             <label className={`text-sm ${labelSimple}`}>{t("firmware.transport")}</label>
-            <select
+            <Select
               value={transport}
               onChange={(e) => setTransport(e.target.value as Transport)}
               disabled={running}
-              className={`${selectSimple} w-32 py-1 px-2 text-sm`}
+              className="w-32"
             >
               {availableTransports.map((t) => (
                 <option key={t} value={t}>{t === "ble" ? "BLE" : "UDP"}</option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
 

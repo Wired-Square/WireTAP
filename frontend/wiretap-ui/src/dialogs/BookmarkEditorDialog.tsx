@@ -8,7 +8,7 @@ import type { IOProfile } from "../apps/settings/stores/settingsStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 import Dialog from "../components/Dialog";
-import { Input, SecondaryButton, PrimaryButton, DangerButton } from "../components/forms";
+import { Input, SecondaryButton, PrimaryButton, DangerButton, Select } from "../components/forms";
 import { h2, labelSmall, captionMuted, borderDefault, bgSecondary, sectionHeaderText, emptyStateText } from "../styles";
 import {
   getAllFavorites,
@@ -352,23 +352,23 @@ export default function BookmarkEditorDialog({
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
-                  <select
+                  <Select
                     value={createProfileId}
                     onChange={(e) => setCreateProfileId(e.target.value)}
-                    className={`w-full px-3 py-2 text-sm rounded border ${borderDefault} bg-[var(--bg-surface)] text-[color:var(--text-primary)]`}
+                    size="lg"
                   >
                     {availableProfiles?.map((profile) => (
                       <option key={profile.id} value={profile.id}>
                         {profile.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
                   <Input
-                    variant="simple"
+                    size="lg"
                     type="text"
                     placeholder={t("bookmarkEditor.namePlaceholder")}
                     value={createName}
@@ -400,7 +400,7 @@ export default function BookmarkEditorDialog({
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
                   <Input
-                    variant="simple"
+                    size="lg"
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}

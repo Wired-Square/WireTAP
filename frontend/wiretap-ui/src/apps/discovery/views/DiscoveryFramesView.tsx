@@ -22,7 +22,7 @@ import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import ModbusScanResultView from "./tools/ModbusScanResultView";
 import ModbusFcProbeResultView from "./tools/ModbusFcProbeResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, bgSurface, textDataSecondary, textMuted, textPrimary, borderDefault } from "../../../styles";
+import { bgDataView, textDataSecondary, textMuted } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, groupKeysByProtocol, wholeProtocol } from "../../../utils/frameKey";
 import { isMessageProtocol, protocolFamily } from "../../../utils/profileTraits";
@@ -43,6 +43,7 @@ import BulkAddToTransmitDialog from "../../../dialogs/BulkAddToTransmitDialog";
 import ReplayDialog from "../../../dialogs/ReplayDialog";
 import type { TimeDisplayFormat } from "../../../types/common";
 import { IconButton } from "../../../components/Button";
+import { Input, Select } from "../../../components/forms";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 
@@ -745,24 +746,27 @@ function DiscoveryFramesView({
   const timeRangeInputs = showTimeRange && onStartTimeChange && onEndTimeChange ? (
     <div className={flexRowGap2}>
       <label className={`text-xs ${textMuted}`}>{t("framesView.timeRange.start")}</label>
-      <input
+      <Input
         type="datetime-local"
         value={startTime || ""}
         onChange={(e) => onStartTimeChange(e.target.value)}
-        className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
+        size="sm"
+        className="w-auto"
       />
       <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.timeRange.end")}</label>
-      <input
+      <Input
         type="datetime-local"
         value={endTime || ""}
         onChange={(e) => onEndTimeChange(e.target.value)}
-        className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
+        size="sm"
+        className="w-auto"
       />
       <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.timeRange.buffer")}</label>
-      <select
+      <Select
         value={maxBuffer}
         onChange={(e) => onMaxBufferChange(Number(e.target.value))}
-        className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
+        size="sm"
+        className="w-auto"
         title={t("framesView.timeRange.historySize")}
       >
         <option value={10000}>10k</option>
@@ -770,7 +774,7 @@ function DiscoveryFramesView({
         <option value={500000}>500k</option>
         <option value={1000000}>1M</option>
         <option value={3000000}>3M</option>
-      </select>
+      </Select>
     </div>
   ) : null;
 
@@ -965,10 +969,11 @@ function DiscoveryFramesView({
 
   // Speed selector for the toolbar right zone
   const speedSelector = showPlaybackControls && (capabilities?.supports_speed_control ?? false) && onSpeedChange ? (
-    <select
+    <Select
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
-      className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
+      size="xs"
+      className="w-auto"
       title={t("framesView.actions.playbackSpeed")}
     >
       {DEFAULT_SPEED_OPTIONS.map((s) => (
@@ -976,7 +981,7 @@ function DiscoveryFramesView({
           {s === 1 ? "1x (realtime)" : `${s}x`}
         </option>
       ))}
-    </select>
+    </Select>
   ) : null;
 
   return (

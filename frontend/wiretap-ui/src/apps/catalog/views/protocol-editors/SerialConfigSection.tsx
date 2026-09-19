@@ -2,7 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 import type { SerialConfig, SerialEncoding } from "../../types";
-import { caption, textMedium, focusRing } from "../../../../styles";
+import { caption, textMedium } from "../../../../styles";
+import { Input } from "../../../../components/forms";
 
 export type SerialConfigSectionProps = {
   config: SerialConfig;
@@ -45,11 +46,11 @@ export default function SerialConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.serialFrameIdLabel")} <span className="text-red-500">{t("protocolEditors.serialFrameIdRequired")}</span>
         </label>
-        <input
+        <Input
           type="text"
           value={config.frame_id ?? ""}
           onChange={(e) => onChange({ ...config, frame_id: e.target.value || undefined })}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
           placeholder={t("protocolEditors.serialFrameIdPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
@@ -63,14 +64,15 @@ export default function SerialConfigSection({
           <label className={`block ${textMedium} mb-2`}>
             {t("protocolEditors.serialDelimiterLabel")}
           </label>
-          <input
+          <Input
             type="text"
             value={delimiterToString(config.delimiter)}
             onChange={(e) => {
               const delimiter = parseDelimiter(e.target.value);
               onChange({ ...config, delimiter });
             }}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
+            size="lg"
+            mono
             placeholder={t("protocolEditors.serialDelimiterPlaceholder")}
           />
           <p className={`${caption} mt-1`}>

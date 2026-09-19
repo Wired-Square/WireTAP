@@ -29,6 +29,11 @@ textarea:focus-visible,
   outline-offset: 1px;
 }
 
+/* A field's ring replaces its border rather than haloing it. */
+.input:focus-visible {
+  outline-offset: -1px;
+}
+
 /* Prevent the entire webview from scrolling/bouncing on macOS */
 html, body {
   overflow: hidden;

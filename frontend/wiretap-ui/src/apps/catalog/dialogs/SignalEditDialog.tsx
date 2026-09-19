@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { List, X } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { Input, Select, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { Input, Select, Textarea, Checkbox, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2, h3, labelSmall, badgeInfo } from "../../../styles";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
@@ -164,7 +164,7 @@ export default function SignalEditDialog({
           <div className="space-y-4">
             <FormField label={t("signalEdit.name")} required variant="default">
               <Input
-                variant="default"
+                size="lg"
                 value={fields.name}
                 onChange={(e) => setFields({ ...fields, name: e.target.value })}
               />
@@ -173,7 +173,7 @@ export default function SignalEditDialog({
             <div className="grid grid-cols-2 gap-3">
               <FormField label={t("signalEdit.startBit")} required variant="default">
                 <Input
-                  variant="default"
+                  size="lg"
                   type="number"
                   value={fields.start_bit}
                   onChange={(e) => setFields({ ...fields, start_bit: parseInt(e.target.value, 10) || 0 })}
@@ -181,7 +181,7 @@ export default function SignalEditDialog({
               </FormField>
               <FormField label={t("signalEdit.bitLength")} required variant="default">
                 <Input
-                  variant="default"
+                  size="lg"
                   type="number"
                   value={fields.bit_length}
                   onChange={(e) => setFields({ ...fields, bit_length: parseInt(e.target.value, 10) || 1 })}
@@ -192,7 +192,7 @@ export default function SignalEditDialog({
             <div className="grid grid-cols-2 gap-3">
               <FormField label={t("signalEdit.format")} variant="default">
                 <Select
-                  variant="default"
+                  size="lg"
                   value={fields.format || "number"}
                   onChange={(e) => setFields({ ...fields, format: e.target.value })}
                 >
@@ -205,12 +205,10 @@ export default function SignalEditDialog({
                 </Select>
               </FormField>
               <div className="flex items-center gap-2 self-end pb-2">
-                <input
+                <Checkbox
                   id="signal-signed"
-                  type="checkbox"
                   checked={!!fields.signed}
                   disabled={isFormatDisabled}
-                  className={isFormatDisabled ? "opacity-50 cursor-not-allowed" : ""}
                   onChange={(e) => setFields({ ...fields, signed: e.target.checked })}
                 />
                 <label
@@ -254,7 +252,7 @@ export default function SignalEditDialog({
               <div className="grid grid-cols-3 gap-3">
                 <FormField label={t("signalEdit.factor")} variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     step="any"
                     value={fields.factor ?? ""}
@@ -266,7 +264,7 @@ export default function SignalEditDialog({
                 </FormField>
                 <FormField label={t("signalEdit.offset")} variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     step="any"
                     value={fields.offset ?? ""}
@@ -278,7 +276,7 @@ export default function SignalEditDialog({
                 </FormField>
                 <FormField label={t("signalEdit.unit")} variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     value={fields.unit ?? ""}
                     placeholder={t("signalEdit.unitPlaceholder")}
                     onChange={(e) => setFields({ ...fields, unit: e.target.value || undefined })}
@@ -290,7 +288,7 @@ export default function SignalEditDialog({
             <div className="grid grid-cols-2 gap-3 items-end">
               <FormField label={t("signalEdit.confidence")} variant="default">
                 <Select
-                  variant="default"
+                  size="lg"
                   value={fields.confidence || "none"}
                   onChange={(e) => setFields({ ...fields, confidence: e.target.value })}
                 >
@@ -312,7 +310,7 @@ export default function SignalEditDialog({
                 variant="default"
               >
                 <Select
-                  variant="default"
+                  size="lg"
                   className={!fields.endianness ? "text-[color:var(--text-muted)]" : ""}
                   value={fields.endianness || ""}
                   onChange={(e) => setFields({ ...fields, endianness: e.target.value === "" ? undefined : e.target.value as "little" | "big" })}
@@ -332,7 +330,7 @@ export default function SignalEditDialog({
 
             <FormField label={t("signalEdit.notes")} variant="default">
               <Textarea
-                variant="default"
+                size="lg"
                 value={fields.notes ?? ""}
                 onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
                 placeholder={t("signalEdit.notesPlaceholder")}

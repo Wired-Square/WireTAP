@@ -7,13 +7,10 @@ import { useTranslation } from "react-i18next";
 import { useTransmitStore, CAN_FD_DLC_VALUES } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  borderDataView,
-  textDataPrimary,
-  bgDataInput,
   textDataSecondary,
-  focusBorder,
 } from "../../../styles/colourTokens";
 import { Button } from "../../../components/Button";
+import { Input, Select } from "../../../components/forms";
 
 export default function CanFrameEditor() {
   const { t } = useTranslation("transmit");
@@ -135,14 +132,15 @@ export default function CanFrameEditor() {
             <span className={`${textDataSecondary} text-[10px] mb-0.5`}>
               {i.toString().padStart(2, "0")}
             </span>
-            <input
+            <Input
               type="text"
               value={displayValue}
               onChange={(e) => handleDataByteChange(i, e.target.value)}
               onFocus={() => setFocusedByteIndex(i)}
               onBlur={() => setFocusedByteIndex(null)}
               maxLength={2}
-              className={`w-8 h-8 ${bgDataInput} ${textDataPrimary} text-center font-mono text-sm rounded border ${borderDataView} ${focusBorder} uppercase`}
+              mono
+              className="w-8 text-center uppercase"
             />
           </div>
         );
@@ -174,13 +172,14 @@ export default function CanFrameEditor() {
           <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.frameId")}</label>
           <div className="flex items-center">
             <span className={`${textDataSecondary} text-sm mr-1`}>0x</span>
-            <input
+            <Input
               type="text"
               value={canEditor.frameId}
               onChange={handleFrameIdChange}
               maxLength={canEditor.isExtended ? 8 : 3}
               placeholder={canEditor.isExtended ? t("canEditor.frameIdPlaceholderExt") : t("canEditor.frameIdPlaceholderStd")}
-              className={`w-24 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
+              mono
+              className="w-24 uppercase"
             />
           </div>
         </div>
@@ -188,34 +187,34 @@ export default function CanFrameEditor() {
         {/* DLC */}
         <div className="flex flex-col">
           <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.dlc")}</label>
-          <select
+          <Select
             value={canEditor.dlc}
             onChange={handleDlcChange}
-            className={`w-20 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder}`}
+            className="w-20"
           >
             {dlcValues.map((dlc) => (
               <option key={dlc} value={dlc}>
                 {dlc}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Bus (only for multi-bus) */}
         {isMultiBus && (
           <div className="flex flex-col">
             <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.bus")}</label>
-            <select
+            <Select
               value={canEditor.bus}
               onChange={handleBusChange}
-              className={`w-24 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder}`}
+              className="w-24"
             >
               {availableBuses.map((bus) => (
                 <option key={bus} value={bus}>
                   {t("canEditor.busLabel", { bus })}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>

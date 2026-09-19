@@ -8,7 +8,7 @@
 
 import { useId } from "react";
 import { textMedium } from "../../../../styles";
-import { helpText } from "../../../../styles/inputStyles";
+import { helpText } from "../../../../styles/typography";
 import { CheckboxField, FormField, Input, Textarea } from "../../../../components/forms";
 import type { PublishPlan } from "../../../../api/catalogShare";
 import { tabScroll } from "./parts";
@@ -31,6 +31,7 @@ export default function BranchTab({ t, plan, form, onChange, disabled }: Props) 
     <div className={tabScroll}>
       <FormField label={t("publish.pathLabel")}>
         <Input
+          size="lg"
           value={form.targetPath}
           onChange={(e) => onChange("targetPath", e.target.value)}
           disabled={disabled}
@@ -45,6 +46,7 @@ export default function BranchTab({ t, plan, form, onChange, disabled }: Props) 
           would silently turn the default direct push into an explicit branch name. */}
       <FormField label={t("publish.branchLabel")}>
         <Input
+          size="lg"
           value={form.branch}
           onChange={(e) => onChange("branch", e.target.value)}
           placeholder={form.openPr ? plan.suggestedBranch : plan.baseBranch}
@@ -76,6 +78,7 @@ export default function BranchTab({ t, plan, form, onChange, disabled }: Props) 
         <>
           <FormField label={t("publish.prTitleLabel")}>
             <Input
+              size="lg"
               value={form.prTitle}
               onChange={(e) => onChange("prTitle", e.target.value)}
               disabled={disabled}
@@ -83,6 +86,7 @@ export default function BranchTab({ t, plan, form, onChange, disabled }: Props) 
           </FormField>
           <FormField label={t("publish.prBodyLabel")}>
             <Textarea
+              size="lg"
               value={form.prBody}
               onChange={(e) => onChange("prBody", e.target.value)}
               rows={4}

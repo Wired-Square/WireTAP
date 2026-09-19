@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { DialogFooter } from "../components/forms/DialogFooter";
-import { helpText, labelSmall, inputSimple } from "../styles";
+import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import {
   getDiscoveryFrameBuffer,
@@ -18,6 +18,7 @@ import { parseFrameKey } from "../utils/frameKey";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { Button } from "../components/Button";
+import { Select, Input } from "../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -155,17 +156,17 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
         {availableBuses.length > 1 && (
           <div className="space-y-1">
             <label className={labelSmall}>{t("bulkAddToTransmit.outputBus")}</label>
-            <select
+            <Select
               value={bus}
               onChange={(e) => setBus(Number(e.target.value))}
-              className={inputSimple}
+              size="lg"
             >
               {availableBuses.map((b) => (
                 <option key={b} value={b}>
                   {t("bulkAddToTransmit.busLabel", { bus: b })}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
 
@@ -173,21 +174,25 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
         <div className="space-y-2">
           <label className={labelSmall}>{t("bulkAddToTransmit.frameIdRange")}</label>
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={minIdRaw}
               onChange={(e) => setMinIdRaw(e.target.value.toUpperCase())}
               placeholder={t("bulkAddToTransmit.minPlaceholder")}
-              className={`${inputSimple} flex-1 font-mono text-sm`}
+              size="lg"
+              mono
+              className="flex-1"
               maxLength={8}
             />
             <span className="text-[color:var(--text-secondary)] text-sm">–</span>
-            <input
+            <Input
               type="text"
               value={maxIdRaw}
               onChange={(e) => setMaxIdRaw(e.target.value.toUpperCase())}
               placeholder={t("bulkAddToTransmit.maxPlaceholder")}
-              className={`${inputSimple} flex-1 font-mono text-sm`}
+              size="lg"
+              mono
+              className="flex-1"
               maxLength={8}
             />
             <Button
@@ -213,27 +218,27 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
         <div className="space-y-1">
           <label className={labelSmall}>{t("bulkAddToTransmit.repeatInterval")}</label>
-          <input
+          <Input
             type="number"
             min={10}
             max={60000}
             step={10}
             value={intervalMs}
             onChange={(e) => setIntervalMs(Math.max(10, Number(e.target.value)))}
-            className={inputSimple}
+            size="lg"
           />
           <p className={helpText}>{t("bulkAddToTransmit.repeatHelp")}</p>
         </div>
 
         <div className="space-y-1">
           <label className={labelSmall}>{t("bulkAddToTransmit.groupLabel")}</label>
-          <input
+          <Input
             type="text"
             list="bulk-add-groups"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             placeholder={t("bulkAddToTransmit.groupPlaceholder")}
-            className={inputSimple}
+            size="lg"
           />
           <datalist id="bulk-add-groups">
             {getGroupNames().map((g) => (

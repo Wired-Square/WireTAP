@@ -13,7 +13,7 @@ import { type ExtractionConfig } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
 import { Button, IconButton } from '../../../../components/Button';
-import { DangerButton, SecondaryButton } from '../../../../components/forms';
+import { DangerButton, SecondaryButton, Checkbox, Input, Select } from '../../../../components/forms';
 
 interface ByteExtractionDialogProps {
   isOpen: boolean;
@@ -160,8 +160,7 @@ export default function ByteExtractionDialog({
         <div className={`flex items-center gap-4 pt-2 border-t ${borderDefault} flex-wrap`}>
           {supportsNegativeIndex && (
             <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={useNegativeIndex}
                 onChange={(e) => {
                   setUseNegativeIndex(e.target.checked);
@@ -172,43 +171,42 @@ export default function ByteExtractionDialog({
                     setStartByte(representativeLength + startByte);
                   }
                 }}
-                className="rounded"
               />
               {t("serial.fromEnd")}
             </label>
           )}
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
             {useNegativeIndex ? t("serial.offsetFromEnd") : t("serial.startByte")}
-            <input
+            <Input
               type="number"
               value={startByte}
               onChange={(e) => setStartByte(Number(e.target.value))}
-              className={`w-16 px-2 py-1 ${bgSurface} ${borderDefault} rounded ${textPrimary} text-center`}
+              className="w-16 text-center"
             />
           </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
             {t("serial.length")}
-            <select
+            <Select
               value={numBytes}
               onChange={(e) => setNumBytes(Number(e.target.value))}
-              className={`px-2 py-1 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
+              className="w-auto"
             >
               <option value={1}>{t("serial.lengthBytes", { count: 1 })}</option>
               <option value={2}>{t("serial.lengthBytes", { count: 2 })}</option>
               <option value={3}>{t("serial.lengthBytes", { count: 3 })}</option>
               <option value={4}>{t("serial.lengthBytes", { count: 4 })}</option>
-            </select>
+            </Select>
           </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
             {t("serial.byteOrder")}
-            <select
+            <Select
               value={endianness}
               onChange={(e) => setEndianness(e.target.value as 'big' | 'little')}
-              className={`px-2 py-1 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
+              className="w-auto"
             >
               <option value="big">{t("serial.bigEndian")}</option>
               <option value="little">{t("serial.littleEndian")}</option>
-            </select>
+            </Select>
           </label>
         </div>
 

@@ -2,11 +2,12 @@
 
 import { useTranslation } from "react-i18next";
 import { sectionHeader, caption, captionMuted } from "../../styles/typography";
-import { borderDivider, bgSurface } from "../../styles";
+import { borderDivider } from "../../styles";
 import type { IOProfile } from "../../hooks/useSettings";
 import type { TimeRangeFavorite } from "../../utils/favorites";
 import TimeBoundsInput, { type TimeBounds } from "../../components/TimeBoundsInput";
 import { SPEED_OPTIONS, CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
+import { Select } from "../../components/forms";
 
 type Props = {
   checkedSourceId: string | null;
@@ -62,17 +63,16 @@ export default function LoadOptions({
             <label className={`block ${caption} mb-1`}>
               {t("ioSourcePicker.playbackSpeed")}
             </label>
-            <select
+            <Select
               value={selectedSpeed}
               onChange={(e) => onSpeedChange(Number(e.target.value))}
-              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`}
             >
               {SPEED_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className={`${captionMuted} mt-1`}>
               {t("ioSourcePicker.loadingMaxSpeed")}
             </div>

@@ -1,7 +1,8 @@
 // ui/src/apps/discovery/views/tools/MessageOrderToolPanel.tsx
 
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import { toolPanelInput, toolPanelLabel } from "../../../../styles/inputStyles";
+import { toolPanelLabel } from "../../../../styles/typography";
+import { Input } from "../../../../components/forms";
 
 export default function MessageOrderToolPanel() {
   const options = useDiscoveryStore((s) => s.toolbox.messageOrder);
@@ -13,7 +14,7 @@ export default function MessageOrderToolPanel() {
         <label className={toolPanelLabel}>
           Start Message ID <span className="text-[color:var(--text-muted)]">(optional)</span>
         </label>
-        <input
+        <Input
           type="text"
           placeholder="Auto-detect"
           value={options.startMessageId !== null ? `0x${options.startMessageId.toString(16).toUpperCase()}` : ""}
@@ -28,7 +29,7 @@ export default function MessageOrderToolPanel() {
               }
             }
           }}
-          className={`${toolPanelInput} font-mono`}
+          mono
         />
         <p className="text-[color:var(--text-muted)] text-[10px]">
           Leave empty to auto-detect from gap analysis

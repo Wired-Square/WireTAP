@@ -11,8 +11,9 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex, byteToHex } from "../utils/byteUtils";
-import { toggleCardClass, bgDataInput, borderDataView, textDataPrimary, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
+import { toggleCardClass, textDataSecondary, caption, captionMuted } from "../styles";
 import { Button } from "./Button";
+import { Checkbox, Input } from "./forms";
 
 // Re-export for backwards compatibility (used by other components)
 export { hexToBytes, bytesToHex };
@@ -84,15 +85,12 @@ export function ModbusRtuFields({
   // parse; the config only ever holds codes that parsed.
   const [vendorText, setVendorText] = useState(() => formatFunctionCodes(config.vendorFunctions));
 
-  const fieldClass = `w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} ${textDataSecondary} disabled:opacity-50`;
   const tick = (label: string, checked: boolean, onToggle: (value: boolean) => void) => (
     <label className={`flex items-center gap-2 text-xs ${textDataSecondary} cursor-pointer`}>
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
         onChange={(e) => onToggle(e.target.checked)}
         disabled={disabled}
-        className="rounded border-[color:var(--border-default)]"
       />
       <span>{label}</span>
     </label>
@@ -116,7 +114,7 @@ export function ModbusRtuFields({
         <label className={`block ${caption} mb-1`}>
           {t("framingOptions.deviceAddressLabel")}
         </label>
-        <input
+        <Input
           type="number"
           min="1"
           max="247"
@@ -128,14 +126,13 @@ export function ModbusRtuFields({
           }
           disabled={disabled}
           placeholder={t("framingOptions.deviceAddressPlaceholder")}
-          className={fieldClass}
         />
       </div>
       <div>
         <label className={`block ${caption} mb-1`}>
           {t("framingOptions.vendorFunctionsLabel")}
         </label>
-        <input
+        <Input
           type="text"
           value={vendorText}
           onChange={(e) => {
@@ -144,7 +141,6 @@ export function ModbusRtuFields({
           }}
           disabled={disabled}
           placeholder={t("framingOptions.vendorFunctionsPlaceholder")}
-          className={fieldClass}
         />
         <div className={`${captionMuted} mt-0.5`}>
           {t("framingOptions.vendorFunctionsHint")}
@@ -292,23 +288,25 @@ export default function FramingOptionsPanel({
           <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
             <label className="block text-sm">
               <span className={textDataSecondary}>{t("framingOptions.delimiterHexLabel")}</span>
-              <input
+              <Input
                 type="text"
                 value={delimiterHex}
                 onChange={(e) => handleDelimiterChange(e.target.value)}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
+                size="lg"
+                className="mt-1"
                 placeholder={t("framingOptions.delimiterPlaceholder")}
               />
             </label>
             <label className="block text-sm">
               <span className={textDataSecondary}>{t("framingOptions.maxFrameLengthLabel")}</span>
-              <input
+              <Input
                 type="number"
                 value={maxLength}
                 onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
+                size="lg"
+                className="mt-1"
               />
             </label>
           </div>
@@ -331,12 +329,10 @@ export default function FramingOptionsPanel({
         {/* Emit raw bytes toggle */}
         {showEmitRawBytes && currentMode !== "raw" && (
           <label className={`flex items-center gap-2 text-sm mt-3 cursor-pointer ${textDataSecondary}`}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={emitRawBytes}
               onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
               disabled={disabled}
-              className="rounded"
             />
             {t("framingOptions.captureRawBytes")}
           </label>
@@ -404,13 +400,12 @@ export default function FramingOptionsPanel({
             <label className={`block ${caption} mb-1`}>
               {t("framingOptions.delimiterHexLabelShort")}
             </label>
-            <input
+            <Input
               type="text"
               value={delimiterHex}
               onChange={(e) => handleDelimiterChange(e.target.value)}
               disabled={disabled}
               placeholder={t("framingOptions.delimiterPlaceholder")}
-              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
             />
             <div className={`${captionMuted} mt-0.5`}>
               {t("framingOptions.delimiterHint")}
@@ -420,14 +415,13 @@ export default function FramingOptionsPanel({
             <label className={`block ${caption} mb-1`}>
               {t("framingOptions.maxFrameLengthLabelShort")}
             </label>
-            <input
+            <Input
               type="number"
               min="1"
               max="65535"
               value={maxLength}
               onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
               disabled={disabled}
-              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
             />
           </div>
         </div>
@@ -443,12 +437,10 @@ export default function FramingOptionsPanel({
       {/* Emit raw bytes toggle (when framing is enabled) */}
       {showEmitRawBytes && currentMode !== "raw" && (
         <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={emitRawBytes}
             onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
             disabled={disabled}
-            className="rounded border-[color:var(--border-default)]"
           />
           <span>{t("framingOptions.captureRawBytes")}</span>
         </label>

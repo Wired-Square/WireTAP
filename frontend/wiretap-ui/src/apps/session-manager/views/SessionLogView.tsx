@@ -36,11 +36,10 @@ import {
   emptyStateText,
   emptyStateHeading,
   emptyStateDescription,
-  focusRingThin,
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
-import { toolbarElementHeight } from "../../../styles/inputStyles";
 import { Button, IconButton } from "../../../components/Button";
+import { Input, Select } from "../../../components/forms";
 
 /** Format timestamp as HH:MM:SS.mmm */
 function formatTime(timestamp: number): string {
@@ -254,12 +253,13 @@ export default function SessionLogView() {
         </div>
 
         {/* Session Filter */}
-        <select
+        <Select
           value={filter.sessionId ?? ""}
           onChange={(e) =>
             setFilter({ sessionId: e.target.value || null })
           }
-          className={`text-xs px-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
+          size="sm"
+          className="w-auto"
         >
           <option value="">{t("log.allSessions")}</option>
           {uniqueSessionIds.map((sessionId) => (
@@ -267,17 +267,18 @@ export default function SessionLogView() {
               {truncateSessionId(sessionId, 24)}
             </option>
           ))}
-        </select>
+        </Select>
 
         {/* Search Input */}
         <div className="relative flex-1 max-w-[200px]">
           <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 ${textMuted}`} />
-          <input
+          <Input
             type="text"
             placeholder={t("log.search")}
             value={filter.searchText}
             onChange={(e) => setFilter({ searchText: e.target.value })}
-            className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} ${focusRingThin}`}
+            size="sm"
+            className="pl-7"
           />
         </div>
 

@@ -35,7 +35,7 @@ export default function EditBookmarkDialog({
         <div className="space-y-4">
           <FormField label={t("dialogs.editBookmark.name")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
               placeholder={t("dialogs.editBookmark.namePlaceholder")}

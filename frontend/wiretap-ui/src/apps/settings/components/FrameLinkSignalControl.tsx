@@ -144,7 +144,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
           <Select
-            variant="default"
+            size="lg"
             value={String(signal.value)}
             disabled={disabled}
             onChange={(e) => handleWrite(Number(e.target.value))}
@@ -167,7 +167,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
           <Select
-            variant="default"
+            size="lg"
             value={String(signal.value)}
             disabled={disabled}
             onChange={(e) => handleWrite(Number(e.target.value))}
@@ -190,7 +190,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
           <Select
-            variant="default"
+            size="lg"
             value={String(signal.value)}
             disabled={disabled}
             onChange={(e) => handleWrite(Number(e.target.value))}
@@ -213,7 +213,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
           <Select
-            variant="default"
+            size="lg"
             value={String(signal.value)}
             disabled={disabled}
             onChange={(e) => handleWrite(Number(e.target.value))}
@@ -235,7 +235,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
     <FormField label={signal.name} variant="default">
       <div className="flex items-center gap-2 relative">
         <Input
-          variant="default"
+          size="lg"
           type="number"
           value={localValue}
           disabled={disabled}

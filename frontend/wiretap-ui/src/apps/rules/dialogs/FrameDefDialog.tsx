@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import type { FrameHeader } from "../utils/bitGrid";
 import { nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select, Checkbox } from "../../../components/forms";
 
 interface FrameDefDialogProps {
   isOpen: boolean;
@@ -96,8 +96,8 @@ export default function FrameDefDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("frameDefDialog.fields.name")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("frameDefDialog.fields.namePlaceholder")}
@@ -105,8 +105,8 @@ export default function FrameDefDialog({
           </div>
           <div>
             <label className={labelDefault}>{t("frameDefDialog.fields.description")}</label>
-            <input
-              className={inputSimple}
+            <Input
+              size="lg"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("frameDefDialog.fields.namePlaceholder")}
@@ -117,17 +117,17 @@ export default function FrameDefDialog({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelDefault}>{t("frameDefDialog.fields.frameDefId")}</label>
-            <input
+            <Input
               type="number"
-              className={inputSimple}
+              size="lg"
               value={frameDefId}
               onChange={(e) => setFrameDefId(parseInt(e.target.value) || 0)}
             />
           </div>
           <div>
             <label className={labelDefault}>{t("frameDefDialog.fields.interfaceType")}</label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={interfaceType}
               onChange={(e) => setInterfaceType(parseInt(e.target.value))}
             >
@@ -136,7 +136,7 @@ export default function FrameDefDialog({
                   {iface.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -144,9 +144,10 @@ export default function FrameDefDialog({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={labelDefault}>{t("frameDefDialog.fields.canId")}</label>
-              <input
+              <Input
                 type="text"
-                className={`${inputSimple} font-mono`}
+                size="lg"
+                mono
                 value={canId}
                 onChange={(e) => setCanId(e.target.value)}
                 placeholder={t("frameDefDialog.fields.canIdPlaceholder")}
@@ -154,9 +155,9 @@ export default function FrameDefDialog({
             </div>
             <div>
               <label className={labelDefault}>{t("frameDefDialog.fields.dlc")}</label>
-              <input
+              <Input
                 type="number"
-                className={inputSimple}
+                size="lg"
                 value={dlc}
                 min={1}
                 max={64}
@@ -165,8 +166,7 @@ export default function FrameDefDialog({
             </div>
             <div className="flex items-end pb-2">
               <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={extended}
                   onChange={(e) => setExtended(e.target.checked)}
                 />
@@ -180,9 +180,9 @@ export default function FrameDefDialog({
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelDefault}>{t("frameDefDialog.fields.payloadLength")}</label>
-              <input
+              <Input
                 type="number"
-                className={inputSimple}
+                size="lg"
                 value={payloadLength}
                 min={1}
                 max={512}

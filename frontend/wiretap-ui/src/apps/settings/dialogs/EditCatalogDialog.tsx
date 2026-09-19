@@ -33,7 +33,7 @@ export default function EditCatalogDialog({
         <div className="space-y-4">
           <FormField label={t("dialogs.editCatalog.name")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
               placeholder={t("dialogs.editCatalog.namePlaceholder")}
@@ -42,7 +42,7 @@ export default function EditCatalogDialog({
 
           <FormField label={t("dialogs.editCatalog.filename")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={filename}
               onChange={(e) => onChangeFilename(e.target.value)}
               placeholder={t("dialogs.editCatalog.filenamePlaceholder")}

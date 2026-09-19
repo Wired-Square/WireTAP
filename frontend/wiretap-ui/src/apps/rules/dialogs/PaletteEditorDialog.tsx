@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
@@ -21,7 +21,7 @@ import {
   type PaletteInfo,
 } from "../../../api/framelinkRules";
 import { Button, IconButton } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Select } from "../../../components/forms";
 
 interface PaletteEditorDialogProps {
   isOpen: boolean;
@@ -145,8 +145,8 @@ export default function PaletteEditorDialog({
             {/* Palette selector */}
             <div>
               <label className={labelDefault}>{t("paletteDialog.fields.palette")}</label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={selectedIdx}
                 onChange={(e) => handleSelectPalette(parseInt(e.target.value))}
               >
@@ -157,7 +157,7 @@ export default function PaletteEditorDialog({
                       : p.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Gradient preview */}

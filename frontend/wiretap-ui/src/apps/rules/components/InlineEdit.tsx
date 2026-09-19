@@ -1,8 +1,8 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { useState, useRef, useEffect } from "react";
-import { inputSimple } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { Input } from "../../../components/forms";
 
 interface InlineEditProps {
   value: string;
@@ -41,9 +41,9 @@ export function InlineEdit({ value, placeholder, variant = "primary", onCommit }
 
   if (editing) {
     return (
-      <input
+      <Input
         ref={inputRef}
-        className={inputSimple}
+        size="lg"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

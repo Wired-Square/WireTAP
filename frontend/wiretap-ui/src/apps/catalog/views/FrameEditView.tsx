@@ -5,7 +5,7 @@ import { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { caption, textMedium, focusRing } from "../../../styles";
+import { caption, textMedium } from "../../../styles";
 import type {
   ProtocolType,
   ProtocolConfig,
@@ -17,7 +17,7 @@ import type {
 } from "../types";
 import { protocolRegistry } from "../protocols";
 import { CANConfigSection, ModbusConfigSection, SerialConfigSection } from "./protocol-editors";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select, Checkbox, Textarea } from "../../../components/forms";
 
 // Icon mapping for protocols
 const protocolIcons: Record<ProtocolType, React.ComponentType<{ className?: string }>> = {
@@ -269,13 +269,13 @@ export default function FrameEditView({
                 {t("frameEditView.lengthLabel")} {fields.protocol === "can" && t("frameEditView.lengthDlcSuffix")}{" "}
                 {fields.protocol === "modbus" && t("frameEditView.lengthRegistersSuffix")}
               </label>
-              <input
+              <Input
                 type="number"
                 min="0"
                 max={fields.protocol === "can" ? 64 : 256}
                 value={fields.base.length}
                 onChange={(e) => handleBaseChange({ length: parseInt(e.target.value) || 0 })}
-                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               />
             </div>
 
@@ -285,10 +285,10 @@ export default function FrameEditView({
                 <label className={`block ${textMedium} mb-2`}>
                   {t("frameEditView.transmitterLabel")}
                 </label>
-                <select
+                <Select
                   value={fields.base.transmitter || ""}
                   onChange={(e) => handleBaseChange({ transmitter: e.target.value || undefined })}
-                  className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                  size="lg"
                 >
                   <option value="">{t("frameEditView.transmitterNone")}</option>
                   {availablePeers.map((peer) => (
@@ -296,7 +296,7 @@ export default function FrameEditView({
                       {peer}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -308,17 +308,16 @@ export default function FrameEditView({
                 </label>
                 {defaults?.interval !== undefined && (
                   <label className={`flex items-center gap-2 ${caption}`}>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={fields.isIntervalInherited ?? false}
                       onChange={(e) => handleInheritanceChange("isIntervalInherited", e.target.checked)}
-                      className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
+                      size="sm"
                     />
                     {t("frameEditView.useDefault", { value: defaults.interval })}
                   </label>
                 )}
               </div>
-              <input
+              <Input
                 type="number"
                 min="0"
                 value={fields.base.interval ?? ""}
@@ -328,9 +327,7 @@ export default function FrameEditView({
                   })
                 }
                 disabled={fields.isIntervalInherited}
-                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
-                  fields.isIntervalInherited ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                size="lg"
                 placeholder={t("frameEditView.intervalPlaceholder")}
               />
             </div>
@@ -340,7 +337,7 @@ export default function FrameEditView({
               <label className={`block ${textMedium} mb-2`}>
                 {t("frameEditView.notesLabel")}
               </label>
-              <textarea
+              <Textarea
                 rows={3}
                 value={
                   Array.isArray(fields.base.notes)
@@ -358,7 +355,8 @@ export default function FrameEditView({
                     });
                   }
                 }}
-                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
+                size="lg"
+                mono
                 placeholder={t("frameEditView.notesPlaceholder")}
               />
             </div>

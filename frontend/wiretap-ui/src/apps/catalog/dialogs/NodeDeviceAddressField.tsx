@@ -16,7 +16,7 @@ export default function NodeDeviceAddressField({ show, value, onChange }: NodeDe
   return (
     <FormField label="Device Address" variant="default">
       <Input
-        variant="default"
+        size="lg"
         type="number"
         min={1}
         max={247}

@@ -3,7 +3,8 @@
 import { useTranslation } from "react-i18next";
 import type { ModbusConfig, SlaveOption } from "../../types";
 import { isRegisterKey, modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
-import { caption, textMedium, focusRing } from "../../../../styles";
+import { caption, textMedium } from "../../../../styles";
+import { Input, Select } from "../../../../components/forms";
 
 export type ModbusConfigSectionProps = {
   config: ModbusConfig;
@@ -36,11 +37,11 @@ export default function ModbusConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.modbusFrameNameLabel")} <span className="text-red-500">{t("protocolEditors.modbusFrameNameRequired")}</span>
         </label>
-        <input
+        <Input
           type="text"
           value={frameKey}
           onChange={(e) => onFrameKeyChange(e.target.value)}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
           placeholder={t("protocolEditors.modbusFrameNamePlaceholder")}
         />
         <p className={`${caption} mt-1`}>
@@ -53,7 +54,7 @@ export default function ModbusConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.modbusRegisterNumberLabel")}
         </label>
-        <input
+        <Input
           type="number"
           min="0"
           max="65535"
@@ -63,7 +64,7 @@ export default function ModbusConfigSection({
             const n = Number.parseInt(v, 10);
             onChange({ ...config, register_number: v === "" || Number.isNaN(n) ? undefined : n });
           }}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
           placeholder={keyIsRegister ? `${parseInt(frameKey)} (from name)` : t("protocolEditors.modbusRegisterNumberPlaceholder")}
         />
         {needsRegisterNumber ? (
@@ -84,12 +85,12 @@ export default function ModbusConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.modbusSlaveLabel")}
         </label>
-        <select
+        <Select
           value={config.node_address ?? ""}
           onChange={(e) =>
             onChange({ ...config, node_address: e.target.value === "" ? undefined : Number(e.target.value) })
           }
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
         >
           <option value="">{t("protocolEditors.modbusSlaveNone")}</option>
           {availableSlaves.map((slave) => (
@@ -97,7 +98,7 @@ export default function ModbusConfigSection({
               {slave.name} (#{slave.address})
             </option>
           ))}
-        </select>
+        </Select>
         <p className={`${caption} mt-1`}>
           {t("protocolEditors.modbusSlaveHint")}
         </p>
@@ -108,7 +109,7 @@ export default function ModbusConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.modbusRegisterTypeLabel")}
         </label>
-        <select
+        <Select
           value={config.register_type ?? "holding"}
           onChange={(e) =>
             onChange({
@@ -116,13 +117,13 @@ export default function ModbusConfigSection({
               register_type: e.target.value as ModbusConfig["register_type"],
             })
           }
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
         >
           <option value="holding">{t("protocolEditors.modbusRegisterTypeHolding")}</option>
           <option value="input">{t("protocolEditors.modbusRegisterTypeInput")}</option>
           <option value="coil">{t("protocolEditors.modbusRegisterTypeCoil")}</option>
           <option value="discrete">{t("protocolEditors.modbusRegisterTypeDiscrete")}</option>
-        </select>
+        </Select>
       </div>
 
       {/* Register Base - Optional (uses catalog default if not specified) */}
@@ -130,7 +131,7 @@ export default function ModbusConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.modbusRegisterBaseLabel")}
         </label>
-        <select
+        <Select
           value={config.register_base ?? ""}
           onChange={(e) =>
             onChange({
@@ -138,7 +139,7 @@ export default function ModbusConfigSection({
               register_base: e.target.value === "" ? undefined : (parseInt(e.target.value) as 0 | 1),
             })
           }
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
         >
           <option value="">
             {defaultRegisterBase !== undefined
@@ -147,7 +148,7 @@ export default function ModbusConfigSection({
           </option>
           <option value="0">{t("protocolEditors.modbusRegisterBase0")}</option>
           <option value="1">{t("protocolEditors.modbusRegisterBase1")}</option>
-        </select>
+        </Select>
         <p className={`${caption} mt-1`}>
           {t("protocolEditors.modbusRegisterBaseHint")}
         </p>

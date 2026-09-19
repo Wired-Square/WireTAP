@@ -2,9 +2,10 @@
 
 import { useTranslation } from "react-i18next";
 import { textSecondary, textTertiary, textDanger } from "../../../styles";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { Button } from "../../../components/Button";
 import { type PlacedSignal, VALUE_TYPES, BYTE_ORDER_LE, BYTE_ORDER_BE } from "../utils/bitGrid";
+import { Input, Select } from "../../../components/forms";
 
 interface SignalPropertiesProps {
   signal: PlacedSignal | null;
@@ -35,9 +36,9 @@ export default function SignalProperties({
       {/* Name */}
       <div>
         <label className={labelDefault}>{t("signalProperties.name")}</label>
-        <input
+        <Input
           type="text"
-          className={inputSimple}
+          size="lg"
           value={signal.name}
           onChange={(e) => onChange("name", e.target.value)}
           placeholder={t("signalProperties.namePlaceholder")}
@@ -59,21 +60,21 @@ export default function SignalProperties({
       {/* Byte Order */}
       <div>
         <label className={labelDefault}>{t("signalProperties.byteOrder")}</label>
-        <select
-          className={inputSimple}
+        <Select
+          size="lg"
           value={signal.byteOrder}
           onChange={(e) => onChange("byteOrder", parseInt(e.target.value))}
         >
           <option value={BYTE_ORDER_LE}>{t("signalProperties.littleEndian")}</option>
           <option value={BYTE_ORDER_BE}>{t("signalProperties.bigEndian")}</option>
-        </select>
+        </Select>
       </div>
 
       {/* Value Type */}
       <div>
         <label className={labelDefault}>{t("signalProperties.valueType")}</label>
-        <select
-          className={inputSimple}
+        <Select
+          size="lg"
           value={signal.valueType}
           onChange={(e) => onChange("valueType", parseInt(e.target.value))}
         >
@@ -82,7 +83,7 @@ export default function SignalProperties({
               {vt.label}
             </option>
           ))}
-        </select>
+        </Select>
         {validationError && (
           <p className={`text-xs mt-1 ${textDanger}`}>{validationError}</p>
         )}
@@ -91,10 +92,10 @@ export default function SignalProperties({
       {/* Scale */}
       <div>
         <label className={labelDefault}>{t("signalProperties.scale")}</label>
-        <input
+        <Input
           type="number"
           step="0.1"
-          className={inputSimple}
+          size="lg"
           value={signal.scale}
           onChange={(e) => onChange("scale", parseFloat(e.target.value))}
         />
@@ -103,10 +104,10 @@ export default function SignalProperties({
       {/* Offset */}
       <div>
         <label className={labelDefault}>{t("signalProperties.offset")}</label>
-        <input
+        <Input
           type="number"
           step="0.1"
-          className={inputSimple}
+          size="lg"
           value={signal.offset}
           onChange={(e) => onChange("offset", parseFloat(e.target.value))}
         />

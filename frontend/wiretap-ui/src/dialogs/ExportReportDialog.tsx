@@ -56,7 +56,7 @@ export default function ExportReportDialog({
         <div className="grid grid-cols-1 gap-3">
           <FormField label="Format" variant="simple">
             <Select
-              variant="simple"
+              size="lg"
               value={format}
               onChange={(e) => setFormat(e.target.value as ExportFormat)}
             >

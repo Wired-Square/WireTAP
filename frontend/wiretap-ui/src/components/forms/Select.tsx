@@ -1,40 +1,22 @@
-// ui/src/components/forms/Select.tsx
+// A `<select>` in the `.input` look, wrapped so its chevron is the app's rather
+// than the platform's. `className` sizes the wrapper; `ref` reaches the select.
 
-import { SelectHTMLAttributes, forwardRef } from 'react';
-import { focusRing } from '../../styles';
-import { formElementHeight } from '../../styles/inputStyles';
+import { forwardRef, type SelectHTMLAttributes } from "react";
+import { ChevronDown } from "lucide-react";
+import { inputClass, type InputStyleProps } from "./Input";
 
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  variant?: 'default' | 'simple';
-}
+export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "size">, InputStyleProps {}
 
-/**
- * Reusable select component with consistent styling across the app.
- * - variant='default': Full styling with focus ring (for Settings, IOProfile dialogs)
- * - variant='simple': Minimal styling (for SaveFrames and simple dialogs)
- */
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ variant = 'default', className = '', children, ...props }, ref) => {
-    // Uses CSS variables for cross-platform dark mode support (Windows WebView)
-    const baseClasses = `w-full border transition-colors text-[color:var(--text-primary)] ${formElementHeight}`;
-
-    const variantClasses = {
-      default: `px-4 py-2 bg-[var(--bg-surface)] border-[color:var(--border-default)] rounded-lg ${focusRing}`,
-      simple: 'px-3 py-2 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded',
-    };
-
-    return (
-      <select
-        ref={ref}
-        className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-        {...props}
-      >
+  ({ size = "md", tone, mono, className, children, ...rest }, ref) => (
+    <span className={["select", size !== "md" && `select--${size}`, className].filter(Boolean).join(" ")}>
+      <select ref={ref} className={inputClass({ size, tone, mono })} {...rest}>
         {children}
       </select>
-    );
-  }
+      <ChevronDown className="select__icon" aria-hidden />
+    </span>
+  ),
 );
-
-Select.displayName = 'Select';
+Select.displayName = "Select";
 
 export default Select;

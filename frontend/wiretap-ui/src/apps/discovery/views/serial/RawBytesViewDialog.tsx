@@ -100,10 +100,10 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                 <span className={labelSmall}>{t("serial.calculateFromBaud")}</span>
                 <div className={flexRowGap2}>
                   <Select
-                    variant="simple"
+                    size="lg"
                     value={baudRate}
                     onChange={(e) => setBaudRate(Number(e.target.value))}
-                    className="flex-1 text-sm"
+                    className="flex-1"
                   >
                     {COMMON_BAUD_RATES.map((rate) => (
                       <option key={rate} value={rate}>{t("serial.baudUnit", { rate: rate.toLocaleString() })}</option>
@@ -111,10 +111,10 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                   </Select>
                   <span className="text-slate-400 text-sm">×</span>
                   <Select
-                    variant="simple"
+                    size="lg"
                     value={idleMultiplier}
                     onChange={(e) => setIdleMultiplier(Number(e.target.value))}
-                    className="w-20 text-sm"
+                    className="w-20"
                   >
                     <option value={1.5}>1.5×</option>
                     <option value={2}>2×</option>
@@ -138,7 +138,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
               <div className="space-y-1">
                 <label className={labelSmall}>{t("serial.chunkGapLabel")}</label>
                 <Input
-                  variant="simple"
+                  size="lg"
                   type="number"
                   value={chunkGapUs}
                   onChange={(e) => setChunkGapUs(Math.max(1, Number(e.target.value)))}

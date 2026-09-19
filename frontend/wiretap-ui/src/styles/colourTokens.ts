@@ -132,15 +132,6 @@ export const bgInteractive = "bg-[var(--accent-primary)] hover:brightness-110";
 /** Primary action text - uses CSS variable */
 export const textInteractive = "text-[color:var(--accent-primary)] hover:brightness-110";
 
-/** Focus ring — uses the user's accent colour CSS variable */
-export const focusRing = "focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:outline-none";
-
-/** Compact focus ring — narrower variant for tight controls (ring-1) */
-export const focusRingThin = "focus:ring-1 focus:ring-[color:var(--accent-primary)] focus:outline-none";
-
-/** Focus border — for inputs that highlight via border colour rather than a ring */
-export const focusBorder = "focus:outline-none focus:border-[color:var(--accent-primary)]";
-
 // =============================================================================
 // Data View Colors (CSS variable-based for Windows compatibility)
 // =============================================================================
@@ -171,9 +162,6 @@ export const textDataPlaceholder = "text-[color:var(--text-secondary)] opacity-6
 
 /** Disabled/inactive data text — pair with a themed accent for active state */
 export const textDataDisabled = "text-[color:var(--text-muted)] opacity-50";
-
-/** Input placeholder text - muted via CSS variable so it tracks the theme */
-export const placeholderMuted = "placeholder:text-[color:var(--text-muted)]";
 
 // =============================================================================
 // Hover States - use brightness filter for cross-platform support

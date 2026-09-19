@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { labelDefault, helpText, textWarning } from "../../../../styles";
+import { Checkbox } from "../../../../components/forms";
 
 interface SettingToggleRowProps {
   label: ReactNode;
@@ -30,8 +31,7 @@ export default function SettingToggleRow({
   return (
     <div className="space-y-2">
       <label className="flex items-start gap-3 cursor-pointer">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={checked}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}

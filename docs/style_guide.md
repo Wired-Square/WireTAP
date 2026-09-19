@@ -17,9 +17,10 @@ import { textPrimary, paddingDialog, h2 } from "../../../styles";
 import { Button, IconButton } from "../../../components/Button";
 ```
 
-Buttons are components, not class strings — see *Buttons* under the token
-reference. The other families (inputs, badges, cards, tabs, tables) are still
-class-string tokens and move to components one family at a time.
+Buttons and form controls are components, not class strings — see *Buttons*
+and *Inputs* under the token reference. The other families (badges, cards,
+tabs, tables) are still class-string tokens and move to components one family
+at a time.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -40,11 +41,13 @@ These are non-negotiable in this codebase:
    "centralised", "organisation". Project-wide rule from
    [../CLAUDE.md](../CLAUDE.md).
 3. **Every user-facing string goes through `t(…)`.** No JSX text literals.
-4. **A button is `<Button>` or `<IconButton>`.** The primitive carries the
-   look (`variant`, `tone`, `size`, `pressed`) and the wiring (`type="button"`,
-   `aria-pressed`, `aria-label`); a raw `<button>` is for the families that
-   have no primitive yet — list rows, menu items, tabs, cards. For those,
-   raw `<input>` and a class-string token is still the convention.
+4. **A button is `<Button>` or `<IconButton>`; a form control is `<Input>`,
+   `<Select>`, `<Textarea>`, `<Checkbox>` or `<Radio>`.** The primitive carries
+   the look (`variant`, `tone`, `size`, `pressed`) and the wiring
+   (`type="button"`, `aria-pressed`, `aria-label`, the select's chevron); a raw
+   `<button>` is for the families that have no primitive yet — list rows, menu
+   items, tabs, cards — and a raw `<input>` is a colour swatch, a range
+   slider or an inline rename field.
 5. **Hover states use `hover:brightness-{n}`**, not `hover:bg-{color}-{n}`.
    Brightness filters work uniformly against a CSS-variable background; bg
    classes don't. (The button classes mix with `color-mix()` instead, which
@@ -59,9 +62,9 @@ order:
 - [reset.css](../frontend/wiretap-ui/src/styles/reset.css) — the browser
   reset, `@layer reset`.
 - [components.css](../frontend/wiretap-ui/src/styles/components.css) — the
-  semantic classes the primitives render (`.btn` and its modifiers),
-  `@layer components`. Below the utilities on purpose: a `className` on a
-  `<Button>` still wins.
+  semantic classes the primitives render (`.btn`, `.input`, `.select`,
+  `.check` and their modifiers), `@layer components`. Below the utilities on
+  purpose: a `className` on a `<Button>` or `<Input>` still wins.
 - [utilities.css](../frontend/wiretap-ui/src/styles/utilities.css) — every
   utility class the code uses, `@layer utilities`. It is **generated**:
   `npm run gen:css` scans the class strings under `src/` and writes the sheet,
@@ -123,9 +126,6 @@ styling goes through the variables.
 | `textDataGreen` / `-Yellow` / `-Orange` / `-Purple` / `-Amber` / `-Cyan` | (text-{colour} CSS vars) | Cell / syntax highlighting |
 | `bgInteractive` | `bg-[var(--accent-primary)] hover:brightness-110` | Primary action background |
 | `textInteractive` | `text-[color:var(--accent-primary)] hover:brightness-110` | Primary action text |
-| `focusRing` | `focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:outline-none` | Focus outline; tracks the user's accent colour |
-| `focusRingThin` | `focus:ring-1 focus:ring-[color:var(--accent-primary)] focus:outline-none` | Compact variant for tight controls (small inputs, toolbars) |
-| `focusBorder` | `focus:outline-none focus:border-[color:var(--accent-primary)]` | For inputs that highlight via border colour rather than a ring |
 | `hoverBg` / `hoverLight` / `hoverSubtle` / `hoverDataItem` / `hoverDataRow` | brightness or `var(--hover-bg)` | Hover states |
 | `dataViewContainer` | `rounded-lg border border-… overflow-hidden` | Standard data "bubble" |
 
@@ -196,18 +196,31 @@ what other families own: `toggleCardClass(active)` (framing option cards),
 `dataViewTabClass(active, hasIndicator)` (data view tabs), the launcher
 tokens and `disabledState` for non-button controls.
 
-### Inputs — [inputStyles.ts](../frontend/wiretap-ui/src/styles/inputStyles.ts)
+### Inputs — [components/forms](../frontend/wiretap-ui/src/components/forms/)
 
-| Token | Use |
-|---|---|
-| `inputDefault` | Settings, IO profile dialog forms |
-| `inputSimple` | Compact / save dialogs |
-| `selectDefault` / `selectSimple` | Match input variants |
-| `toolbarSelect` | Dark theme for data view toolbars |
-| `labelDefault` / `labelSimple` | Label variants |
-| `helpText` | Description text below inputs |
-| `formElementHeight` / `toolbarElementHeight` | `h-[42px]` / `h-[26px]` |
-| `checkboxDefault` / `radioDefault` | Themed checkbox / radio styling |
+`<Input>`, `<Select>` and `<Textarea>` render the `.input` classes in
+[components.css](../frontend/wiretap-ui/src/styles/components.css);
+`<Checkbox>` and `<Radio>` render `.check`. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `size` | `xs` 20 px · `sm` 26 px · `md` 32 px (default) · `lg` 40 px | The button scale, so a control and the button beside it share a row. Dialog and settings forms are `lg`, toolbars `sm`, table cells `xs` |
+| `tone` | `danger` · `warning` | Validation state: tinted background and border. `aria-invalid` renders as `danger` on its own |
+| `mono` | `boolean` | Monospace text for ids, hex and paths |
+| `size` (`Checkbox` / `Radio`) | `sm` 14 px · `md` 16 px (default) | The 14 px box is for table rows and dense lists |
+
+Every control is `--bg-primary` on a 1 px `--border-default` at
+`--radius-control`, full width unless told otherwise (`w-auto` for an
+intrinsic-width toolbar select, `w-24` for a narrow number), and takes the
+accent on focus and 50 % opacity when disabled. `<Select>` wraps the element
+to draw the app's own chevron, so its `className` sizes the wrapper and
+`ref` reaches the `<select>`. `inputClass({ size, tone, mono })` is the same
+class string for a control rendered by a library (the date picker).
+
+`<CheckboxField>` is a checkbox with its label; `<FormField>` a label over a
+control; `<BaudRateSelect>` the preset-or-custom baud picker.
+[typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) holds the
+form text tokens: `labelDefault`, `labelSimple`, `helpText`, `toolPanelLabel`.
 
 ### Badges — [badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts)
 
@@ -309,12 +322,13 @@ import { PrimaryButton, SecondaryButton } from "../../components/forms";
 ### Form field with label and help
 
 ```tsx
-import { labelDefault, helpText, inputDefault } from "../../../styles";
+import { labelDefault, helpText } from "../../../styles";
+import { Input } from "../../../components/forms";
 
 <div className="space-y-2">
   <label className={labelDefault}>{t("section.field.label")}</label>
   <p className={helpText}>{t("section.field.help")}</p>
-  <input className={inputDefault} value={v} onChange={(e) => setV(e.target.value)} />
+  <Input size="lg" value={v} onChange={(e) => setV(e.target.value)} />
 </div>
 ```
 
@@ -718,7 +732,9 @@ value.toLocaleString(i18n.language);
 |---|---|
 | `text-gray-400` in data tables | `textDataSecondary` / `textDataTertiary` / `textDataMuted` |
 | `bg-blue-600/30 text-blue-400` ad-hoc chip | `badgeInfo` / `badgeColorClass(...)` / `badgeDarkPanelInfo` |
-| `focus:ring-blue-500 focus:outline-none` | `focusRing` |
+| `<input className="w-full px-4 py-2 rounded-lg border …">` | `<Input size="lg">` — the class carries the look, the border and the focus ring |
+| `<select className={…}>` | `<Select>` — draws the app's chevron on both platforms |
+| `<input type="checkbox" className="accent-blue-500">` | `<Checkbox>` — the theme's accent, drawn the same on WebKit and WebView2 |
 | `style={{ color: 'var(--text-secondary)' }}` | `className={textSecondary}` |
 | `<Button>Save</Button>` | `<Button>{t("common:actions.save")}</Button>` |
 | `<button className="px-3 py-1.5 rounded bg-blue-600 text-white …">` | `<Button variant="solid" tone="primary">` — the tone reads the theme's accent |
@@ -836,10 +852,9 @@ adjacency so related tooling is visible at a glance.
 | Directory | What's there |
 |---|---|
 | [../frontend/wiretap-ui/src/styles/colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) | Surfaces, text, borders, status, data accents, hover, interactive |
-| [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, labels, empty-state, truncation |
+| [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
 | [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Button variants, toggle helpers, launcher, dialog options |
-| [../frontend/wiretap-ui/src/styles/inputStyles.ts](../frontend/wiretap-ui/src/styles/inputStyles.ts) | Input/select variants, label / help / heights |
 | [../frontend/wiretap-ui/src/styles/badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts) | Standard, small, dark-panel, metadata badges |
 | [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Card/alert variants, detail box, panel footer, expandable row, selectable option |
 | [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
@@ -856,8 +871,8 @@ adjacency so related tooling is visible at a glance.
 ## Future improvements (non-blocking)
 
 - The remaining families as primitives, in the order of the Tailwind Removal
-  Handover: inputs and selects, badges, cards and alerts, dialogs, tabs and
-  menus (the segmented controls and list rows still written as raw
-  `<button>`s belong here), data tables.
+  Handover: badges, cards and alerts, dialogs, tabs and menus (the segmented
+  controls and list rows still written as raw `<button>`s belong here), data
+  tables.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Play, Pause, Square, Clock, Zap } from "lucide-react";
 import TimeDisplay from "./TimeDisplay";
 import type { IOCapabilities } from '../api/io';
-import { disabledState } from "../styles";
 import { Button } from "./Button";
+import { Input, Select } from "./forms";
 import { iconSm, iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 
 export type PlaybackSpeed = 0.125 | 0.25 | 0.5 | 1 | 2 | 10 | 30 | 60;
@@ -112,6 +112,8 @@ export default function TimeController({
   const isPlaying = state === "playing";
   const isPaused = state === "paused";
 
+  const controlSize = compact ? "sm" : "md";
+
   return (
     <div className={`flex items-center gap-3 ${compact ? "text-sm" : ""}`}>
       {/* Playback controls */}
@@ -122,7 +124,7 @@ export default function TimeController({
             disabled={disabled}
             variant="solid"
             tone="success"
-            size={compact ? "sm" : "md"}
+            size={controlSize}
             title={t("timeController.play")}
           >
             <Play className={compact ? iconSm : iconMd} />
@@ -134,7 +136,7 @@ export default function TimeController({
             disabled={disabled}
             variant="solid"
             tone="warning"
-            size={compact ? "sm" : "md"}
+            size={controlSize}
             title={t("timeController.pausePlayback")}
           >
             <Pause className={compact ? iconSm : iconMd} />
@@ -146,7 +148,7 @@ export default function TimeController({
             disabled
             variant="solid"
             tone="success"
-            size={compact ? "sm" : "md"}
+            size={controlSize}
             title={t("timeController.streaming")}
           >
             <Play className={compact ? iconSm : iconMd} />
@@ -159,7 +161,7 @@ export default function TimeController({
           disabled={disabled || isPaused}
           variant="solid"
           tone="danger"
-          size={compact ? "sm" : "md"}
+          size={controlSize}
           title={t("timeController.pause")}
         >
           <Square className={compact ? iconSm : iconMd} />
@@ -189,22 +191,21 @@ export default function TimeController({
           <Zap
             className={`${compact ? iconMd : iconLg} text-[color:var(--text-orange)]`}
           />
-          <select
+          <Select
             value={speed}
             onChange={(e) =>
               onSpeedChange?.(Number(e.target.value) as PlaybackSpeed)
             }
             disabled={disabled}
-            className={`${
-              compact ? "px-2 py-0.5 text-xs" : "px-3 py-1"
-            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState}`}
+            size={controlSize}
+            className="w-auto"
           >
             {SPEED_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -214,28 +215,28 @@ export default function TimeController({
           <label className="text-xs text-[color:var(--text-muted)]">
             {t("timeController.from")}
           </label>
-          <input
+          <Input
             type="datetime-local"
             value={localStartTime}
             onChange={(e) => setLocalStartTime(e.target.value)}
             onBlur={handleStartTimeBlur}
             disabled={disabled || !isPaused}
-            className={`${
-              compact ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
-            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState} font-mono`}
+            size={controlSize}
+            mono
+            className="w-auto"
           />
           <label className="text-xs text-[color:var(--text-muted)]">
             {t("timeController.to")}
           </label>
-          <input
+          <Input
             type="datetime-local"
             value={localEndTime}
             onChange={(e) => setLocalEndTime(e.target.value)}
             onBlur={handleEndTimeBlur}
             disabled={disabled || !isPaused}
-            className={`${
-              compact ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
-            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState} font-mono`}
+            size={controlSize}
+            mono
+            className="w-auto"
           />
         </div>
       )}

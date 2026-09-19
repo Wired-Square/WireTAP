@@ -10,11 +10,11 @@ import {
   textMedium,
   textMuted,
   textWarning,
-  focusRing,
   iconLg,
   iconMd,
 } from "../../../../styles";
 import { Button } from "../../../../components/Button";
+import { Input } from "../../../../components/forms";
 
 interface SettingDirectoryRowProps {
   label: ReactNode;
@@ -42,11 +42,12 @@ export default function SettingDirectoryRow({
     <div className="mb-6">
       <label className={`block ${textMedium} mb-2`}>{label}</label>
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
+          className="flex-1"
           placeholder={placeholder}
         />
         <Button onClick={onPick} size="lg" title={browseTooltip}>

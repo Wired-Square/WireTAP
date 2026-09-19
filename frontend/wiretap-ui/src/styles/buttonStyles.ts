@@ -54,8 +54,3 @@ export const launcherButtonLabel =
  */
 export const launcherGrid =
   "flex flex-wrap justify-center gap-2 px-4";
-
-/**
- * Disabled state styling for non-button controls (a <Button> gets it from `.btn`)
- */
-export const disabledState = "disabled:opacity-50 disabled:cursor-not-allowed";

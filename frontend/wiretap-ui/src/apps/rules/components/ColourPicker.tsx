@@ -5,8 +5,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { textSecondary, textTertiary } from "../../../styles";
-import { inputSimple } from "../../../styles/inputStyles";
 import { brgbComponents, cssToBrgb } from "../utils/brgbColour";
+import { Input } from "../../../components/forms";
 
 interface ColourPickerProps {
   /** BRGB u32 value */
@@ -100,9 +100,11 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           title={`Dimmed preview (brightness ${localBrightness})`}
         />
         {/* Hex input */}
-        <input
+        <Input
           type="text"
-          className={`${inputSimple} font-mono w-24 text-xs py-1 px-2`}
+          size="sm"
+          mono
+          className="w-24"
           value={`#${hexInput}`}
           onChange={(e) => handleHexChange(e.target.value)}
           placeholder="#FF0000"

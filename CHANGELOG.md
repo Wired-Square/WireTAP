@@ -6,6 +6,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Text fields, dropdowns, checkboxes and radio buttons are now drawn from one system.** Every form control shares the buttons' heights and corner radius, so a field and the button beside it line up; dropdowns show the same chevron on macOS and Windows; checkboxes and radios are drawn by the app in the theme's accent instead of the platform's. Fields in dialogs and Settings are slightly shorter with smaller text, toolbar fields match the toolbar buttons, and invalid values tint the field rather than only its border. The Catalog Editor's protocol configuration fields, which had no background before, now look like every other field.
+
 - **Every button is now drawn from one system.** Toolbars, dialogs, chips and icon buttons share the same heights, one corner radius, the same hover and press feedback, and their colours follow the theme's accent settings rather than fixed palette values — so a primary button changes with the accent you pick in Settings. Toggles show their "on" state as a tint instead of a solid fill, and disabled buttons dim the same way everywhere. Text buttons and dialog actions are slightly larger and heavier than before.
 
 - **The app no longer depends on Tailwind CSS.** The frontend ships its own reset and a utility sheet generated from the class names the code uses, so the rendered UI is pixel-identical in both themes and the built CSS is smaller. Tailwind, PostCSS and autoprefixer are gone from the dependencies; after pulling, run `npm install` at the root once. Adding a utility class now means running `npm run gen:css`, and a test fails until the committed sheet matches.

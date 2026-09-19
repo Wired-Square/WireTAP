@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown, Loader } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
-import { borderDivider, focusRing } from "../../../styles";
+import { borderDivider } from "../../../styles";
 import { IconButton } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 export type FindSearchMode = 'id' | 'data' | 'both';
 
@@ -70,14 +71,14 @@ export default function DiscoveryFindBar({
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-surface)] ${borderDivider}`}>
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={t("findBar.placeholderFrames")}
-        className={`w-48 px-2.5 py-1 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
+        className="w-48"
       />
 
       {/* Mode toggle */}

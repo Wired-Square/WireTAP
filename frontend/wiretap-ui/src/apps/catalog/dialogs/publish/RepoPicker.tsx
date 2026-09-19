@@ -64,6 +64,7 @@ export default function RepoPicker({ t, value, onPick, onCreateRepo, trackedHere
         <div className="flex-1 min-w-0">
           <FormField label={t("publish.repoLabel")}>
             <Select
+              size="lg"
               value={addingUrl === null ? (value ?? "") : ADD_REPO_OPTION}
               onChange={(e) => {
                 if (e.target.value === ADD_REPO_OPTION) {
@@ -99,6 +100,7 @@ export default function RepoPicker({ t, value, onPick, onCreateRepo, trackedHere
           <div className="flex-1 min-w-0">
             <FormField label={t("publish.repoUrlLabel")}>
               <Input
+                size="lg"
                 value={addingUrl}
                 onChange={(e) => setAddingUrl(e.target.value)}
                 placeholder="https://github.com/owner/repo"

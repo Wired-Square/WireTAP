@@ -5,14 +5,13 @@ import {
   textPrimary,
   textSecondary,
   textTertiary,
-  bgPrimary,
   bgSurface,
   borderDefault,
   hoverBg,
-  focusRing,
 } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";
 import type { SelectableSignal } from "../../../api/framelinkRules";
+import { Input } from "../../../components/forms";
 
 // ============================================================================
 // Types
@@ -222,10 +221,10 @@ export default function SignalCombobox({
 
   return (
     <div ref={containerRef} className="relative">
-      <input
+      <Input
         ref={inputRef}
         type="text"
-        className={`w-full text-xs py-1 px-2 border rounded ${bgPrimary} ${textPrimary} ${borderDefault} ${focusRing} transition-colors`}
+        size="sm"
         placeholder={placeholder}
         value={displayText}
         onFocus={open}

@@ -12,13 +12,12 @@ import { iconSm } from "../styles/spacing";
 import {
   bgDataToolbar,
   borderDataView,
-  bgDataInput,
-  textDataPrimary,
   textDataSecondary,
   gapDefault,
 } from "../styles";
 import { pageSizeFromOptionValue, pageSizeToOptionValue, type PageSize } from "../utils/pageSize";
 import { IconButton } from "./Button";
+import { Select } from "./forms";
 
 export interface PageSizeOption {
   value: PageSize;
@@ -150,17 +149,18 @@ export default function DataViewPaginationToolbar({
       {rightContent}
 
       {!hidePageSize && (
-        <select
+        <Select
           value={pageSizeToOptionValue(pageSize)}
           onChange={(e) => onPageSizeChange(pageSizeFromOptionValue(e.target.value))}
-          className={`text-xs px-2 py-1 rounded border ${borderDataView} ${bgDataInput} ${textDataPrimary}`}
+          size="sm"
+          className="w-auto"
           title={t("pagination.rowsPerPage")}
         >
           {options.map((opt) => {
             const value = pageSizeToOptionValue(opt.value);
             return <option key={value} value={value}>{opt.label}</option>;
           })}
-        </select>
+        </Select>
       )}
     </div>
   );

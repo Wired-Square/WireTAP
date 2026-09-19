@@ -14,6 +14,7 @@ import { emptyStateText } from "../../../styles/typography";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
 import { Button, IconButton } from "../../../components/Button";
+import { Checkbox, Input, Select } from "../../../components/forms";
 
 interface SessionDetailPanelProps {
   sessions: ActiveSessionInfo[];
@@ -712,15 +713,14 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
         {busStates.map((bs) => (
           <div key={bs.bus} className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 shrink-0">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={bs.enabled}
                 onChange={(e) => handleToggle(bs.bus, e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
+                size="sm"
               />
               <span className="text-xs text-[color:var(--text-primary)] w-10">{t("detail.signalGen.busLabel", { bus: bs.bus })}</span>
             </label>
-            <input
+            <Input
               type="number"
               min="1"
               max="1000"
@@ -728,7 +728,8 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
               value={bs.frame_rate_hz}
               onChange={(e) => handleCadenceChange(bs.bus, e.target.value)}
               disabled={!bs.enabled}
-              className="w-16 px-1.5 py-0.5 text-xs rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] disabled:opacity-40"
+              size="xs"
+              className="w-16"
             />
             <span className="text-xs text-[color:var(--text-muted)]">{t("detail.signalGen.hz")}</span>
             {busStates.length > 1 && (
@@ -793,8 +794,8 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
       <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
         {t("detail.labels.decoder")}
       </label>
-      <select
-        className="mt-1 w-full px-2 py-1 text-sm rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)]"
+      <Select
+        className="mt-1"
         value={currentFilename}
         onChange={(e) => handleChange(e.target.value)}
       >
@@ -804,7 +805,7 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
             {c.name}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }

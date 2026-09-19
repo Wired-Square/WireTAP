@@ -4,10 +4,10 @@ import { useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Search, ChevronUp, ChevronDown } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { focusRing } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 /** DOM id for the sidebar search input, so the Find menu (⌘F) can focus it. */
 export const CATALOG_SEARCH_INPUT_ID = "catalog-tree-search";
@@ -140,7 +140,7 @@ export default function FindBar() {
     <div className="flex items-center gap-1.5">
       <div className="relative flex-1">
         <Search className={`${iconSm} absolute left-2 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)] pointer-events-none`} />
-        <input
+        <Input
           ref={inputRef}
           id={CATALOG_SEARCH_INPUT_ID}
           type="text"
@@ -148,7 +148,7 @@ export default function FindBar() {
           onChange={(e) => setFindQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t("findBar.placeholderCatalog")}
-          className={`w-full pl-7 pr-2 py-1.5 text-xs rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
+          className="pl-7"
         />
       </div>
 

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, HelpCircle } from "lucide-react";
 import Dialog from "../../../components/Dialog";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
@@ -18,7 +18,7 @@ import type {
   BridgeDefaultAction,
 } from "../../../api/framelinkRules";
 import { Button, IconButton } from "../../../components/Button";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input, Select, Checkbox } from "../../../components/forms";
 
 interface FilterRow {
   kind: BridgeFilterKind;
@@ -180,9 +180,9 @@ export default function BridgeDialog({
             >
               {t("bridgeDialog.fields.bridgeId")}
             </label>
-            <input
+            <Input
               type="number"
-              className={inputSimple}
+              size="lg"
               value={bridgeId}
               onChange={(e) => setBridgeId(parseInt(e.target.value) || 0)}
             />
@@ -196,8 +196,8 @@ export default function BridgeDialog({
               >
                 {t("bridgeDialog.fields.sourceInterface")}
               </label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={sourceInterface}
                 onChange={(e) => setSourceInterface(parseInt(e.target.value))}
               >
@@ -206,7 +206,7 @@ export default function BridgeDialog({
                     {iface.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label
@@ -215,8 +215,8 @@ export default function BridgeDialog({
               >
                 {t("bridgeDialog.fields.destInterface")}
               </label>
-              <select
-                className={inputSimple}
+              <Select
+                size="lg"
                 value={destInterface}
                 onChange={(e) => setDestInterface(parseInt(e.target.value))}
               >
@@ -225,7 +225,7 @@ export default function BridgeDialog({
                     {iface.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -233,8 +233,7 @@ export default function BridgeDialog({
             className={`flex items-center gap-2 text-sm ${textSecondary}`}
             title={t("bridgeDialog.tooltips.bidirectional")}
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={bidirectional}
               onChange={(e) => setBidirectional(e.target.checked)}
             />
@@ -248,15 +247,15 @@ export default function BridgeDialog({
             >
               {t("bridgeDialog.fields.defaultAction")}
             </label>
-            <select
-              className={inputSimple}
+            <Select
+              size="lg"
               value={defaultAction}
               onChange={(e) => setDefaultAction(e.target.value as BridgeDefaultAction)}
               title={t("bridgeDialog.tooltips.defaultAction")}
             >
               <option value="pass">{t("bridgeDialog.action.pass")}</option>
               <option value="block">{t("bridgeDialog.action.block")}</option>
-            </select>
+            </Select>
           </div>
 
           {/* Filters */}
@@ -305,8 +304,8 @@ export default function BridgeDialog({
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex-none w-28">
-                          <select
-                            className={inputSimple}
+                          <Select
+                            size="lg"
                             value={f.kind}
                             onChange={(e) =>
                               updateFilter(idx, 'kind', e.target.value as BridgeFilterKind)
@@ -315,11 +314,11 @@ export default function BridgeDialog({
                           >
                             <option value="mask">{t("bridgeDialog.kind.mask")}</option>
                             <option value="range">{t("bridgeDialog.kind.range")}</option>
-                          </select>
+                          </Select>
                         </div>
                         <div className="flex-none w-24">
-                          <select
-                            className={inputSimple}
+                          <Select
+                            size="lg"
                             value={f.ide}
                             onChange={(e) =>
                               updateFilter(idx, 'ide', e.target.value as BridgeFilterIde)
@@ -329,7 +328,7 @@ export default function BridgeDialog({
                             <option value="any">{t("bridgeDialog.ide.any")}</option>
                             <option value="std">{t("bridgeDialog.ide.std")}</option>
                             <option value="ext">{t("bridgeDialog.ide.ext")}</option>
-                          </select>
+                          </Select>
                         </div>
                         <div className="flex-1" />
                         <IconButton
@@ -357,9 +356,10 @@ export default function BridgeDialog({
                           <label className={`block text-xs ${textSecondary} mb-1`}>
                             {aLabel}
                           </label>
-                          <input
+                          <Input
                             type="text"
-                            className={`${inputSimple} font-mono w-full`}
+                            size="lg"
+                            mono
                             value={f.a}
                             onChange={(e) => updateFilter(idx, 'a', e.target.value)}
                             placeholder={aPlaceholder}
@@ -370,9 +370,10 @@ export default function BridgeDialog({
                           <label className={`block text-xs ${textSecondary} mb-1`}>
                             {bLabel}
                           </label>
-                          <input
+                          <Input
                             type="text"
-                            className={`${inputSimple} font-mono w-full`}
+                            size="lg"
+                            mono
                             value={f.b}
                             onChange={(e) => updateFilter(idx, 'b', e.target.value)}
                             placeholder={bPlaceholder}

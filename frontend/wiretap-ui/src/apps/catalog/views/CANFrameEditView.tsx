@@ -2,8 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 import type { CanidFields } from "../types";
-import { textMedium, focusRing } from "../../../styles";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { textMedium } from "../../../styles";
+import { SecondaryButton, PrimaryButton, Input, Select, Textarea } from "../../../components/forms";
 
 export type CANFrameEditViewProps = {
   title?: string;
@@ -49,11 +49,12 @@ export default function CANFrameEditView({
           <label className={`block ${textMedium} mb-2`}>
             {t("canFrameEditView.id")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
           </label>
-          <input
+          <Input
             type="text"
             value={idFields.id}
             onChange={(e) => setIdFields({ ...idFields, id: e.target.value })}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
+            size="lg"
+            mono
             placeholder={t("canFrameEditView.idPlaceholder")}
           />
         </div>
@@ -63,13 +64,13 @@ export default function CANFrameEditView({
           <label className={`block ${textMedium} mb-2`}>
             {t("canFrameEditView.lengthDlc")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
           </label>
-          <input
+          <Input
             type="number"
             min="0"
             max="64"
             value={idFields.length}
             onChange={(e) => setIdFields({ ...idFields, length: parseInt(e.target.value) || 0 })}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+            size="lg"
           />
         </div>
 
@@ -78,10 +79,10 @@ export default function CANFrameEditView({
           <label className={`block ${textMedium} mb-2`}>
             {t("canFrameEditView.transmitter")}
           </label>
-          <select
+          <Select
             value={idFields.transmitter || ""}
             onChange={(e) => setIdFields({ ...idFields, transmitter: e.target.value || undefined })}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+            size="lg"
           >
             <option value="">{t("canFrameEditView.transmitterNone")}</option>
             {availablePeers.map((peer) => (
@@ -89,7 +90,7 @@ export default function CANFrameEditView({
                 {peer}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Interval (ms) - Optional */}
@@ -97,7 +98,7 @@ export default function CANFrameEditView({
           <label className={`block ${textMedium} mb-2`}>
             {t("canFrameEditView.interval")}
           </label>
-          <input
+          <Input
             type="number"
             min="0"
             value={idFields.interval !== undefined ? idFields.interval : ""}
@@ -107,7 +108,7 @@ export default function CANFrameEditView({
                 interval: e.target.value ? parseInt(e.target.value) : undefined,
               })
             }
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+            size="lg"
             placeholder={t("canFrameEditView.intervalPlaceholder")}
           />
         </div>
@@ -117,7 +118,7 @@ export default function CANFrameEditView({
           <label className={`block ${textMedium} mb-2`}>
             {t("canFrameEditView.notes")}
           </label>
-          <textarea
+          <Textarea
             rows={4}
             value={
               Array.isArray(idFields.notes)
@@ -136,7 +137,8 @@ export default function CANFrameEditView({
                 });
               }
             }}
-            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
+            size="lg"
+            mono
             placeholder={t("canFrameEditView.notesPlaceholder")}
           />
         </div>

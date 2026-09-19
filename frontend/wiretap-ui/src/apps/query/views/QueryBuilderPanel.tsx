@@ -21,16 +21,12 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { FrameIdFormat } from "../../../hooks/useSettings";
 import { formatFrameId, formatFrameIdInput, parseFrameId } from "../../../utils/frameIds";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
-import { labelSmallMuted, monoBody } from "../../../styles/typography";
+import { labelSmallMuted } from "../../../styles/typography";
 import { iconSm, flexRowGap2 } from "../../../styles/spacing";
-import { focusRing, bgSurface, borderDefault, textSecondary, textMuted } from "../../../styles/colourTokens";
+import { bgSurface, borderDefault, textSecondary, textMuted } from "../../../styles/colourTokens";
 import { Button } from "../../../components/Button";
-import { PrimaryButton } from "../../../components/forms";
+import { PrimaryButton, Checkbox, Input, Select, Textarea } from "../../../components/forms";
 
-// Compact form controls tuned to the Decoder data-view density. Width is applied
-// at each call site so narrow numeric fields can opt out of the full width.
-const fieldClass =
-  `h-8 px-2 text-sm rounded border box-border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] transition-colors ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`;
 const sectionCard = `${bgSurface} ${borderDefault} rounded-lg p-2`;
 const sectionLabel = `text-xs font-medium ${textSecondary}`;
 
@@ -675,12 +671,10 @@ ORDER BY id, extended`;
 
   const extendedCheckbox = (
     <label className={`${flexRowGap2} h-8 ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-      <input
-        type="checkbox"
+      <Checkbox
         checked={queryParams.isExtended === true}
         onChange={handleExtendedChange}
         disabled={disabled}
-        className="disabled:cursor-not-allowed"
       />
       {t("builder.extended")}
     </label>
@@ -690,14 +684,14 @@ ORDER BY id, extended`;
   const byteIndexField = (
     <div className={hasCatalogFrames ? undefined : "w-24"}>
       <label className={labelSmallMuted}>{byteIndexLabel}</label>
-      <input
+      <Input
         type="number"
         min={0}
         max={63}
         value={queryParams.byteIndex}
         onChange={handleByteIndexChange}
         disabled={disabled || !!selectedSignal}
-        className={`${fieldClass} w-full mt-1`}
+        className="mt-1"
       />
     </div>
   );
@@ -707,11 +701,11 @@ ORDER BY id, extended`;
     <div className="space-y-2">
       <div>
         <label className={labelSmallMuted}>{t("builder.frame")}</label>
-        <select
+        <Select
           value={queryParams.frameId}
           onChange={handleCatalogFrameChange}
           disabled={disabled}
-          className={`${fieldClass} w-full mt-1`}
+          className="mt-1"
         >
           {catalogFrames.map(({ id, frame }) => (
             <option key={id} value={id}>
@@ -719,18 +713,18 @@ ORDER BY id, extended`;
               {frame.transmitter ? ` — ${frame.transmitter}` : ""}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {/* Signal Picker (for byte_changes / distribution) */}
       {showByteIndex && currentFrameSignals.length > 0 && (
         <div>
           <label className={labelSmallMuted}>{t("builder.signal")}</label>
-          <select
+          <Select
             value={selectedSignal?.signalName ?? ""}
             onChange={handleCatalogSignalChange}
             disabled={disabled}
-            className={`${fieldClass} w-full mt-1`}
+            className="mt-1"
           >
             <option value="">{t("builder.selectSignalOrByte")}</option>
             {currentFrameSignals
@@ -742,7 +736,7 @@ ORDER BY id, extended`;
                   {t("builder.signalOption", { byte: Math.floor((signal.start_bit ?? 0) / 8) })}
                 </option>
               ))}
-          </select>
+          </Select>
           {selectedSignal && (
             <p className={`text-xs ${textMuted} mt-1`}>
               {t("builder.signalPosition", { startBit: selectedSignal.startBit, bitLength: selectedSignal.bitLength, byteIndex: selectedSignal.byteIndex })}
@@ -759,13 +753,13 @@ ORDER BY id, extended`;
     <div className="flex gap-2 items-end">
       <div className="flex-1">
         <label className={labelSmallMuted}>{frameIdLabel}</label>
-        <input
+        <Input
           type="text"
           value={frameIdText}
           onChange={handleFrameIdInput(setFrameIdText, "frameId")}
           disabled={disabled}
           placeholder={frameIdPlaceholder}
-          className={`${fieldClass} w-full mt-1`}
+          className="mt-1"
         />
       </div>
       {showByteIndex && byteIndexField}
@@ -781,7 +775,7 @@ ORDER BY id, extended`;
         <div className="space-y-2">
           <div>
             <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
-            <input
+            <Input
               type="number"
               min={0}
               max={7}
@@ -791,12 +785,12 @@ ORDER BY id, extended`;
                 if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
               }}
               disabled={disabled}
-              className={`${fieldClass} w-full mt-1`}
+              className="mt-1"
             />
           </div>
           <div>
             <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
-            <input
+            <Input
               type="number"
               min={1}
               max={64}
@@ -806,16 +800,14 @@ ORDER BY id, extended`;
                 if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
               }}
               disabled={disabled}
-              className={`${fieldClass} w-full mt-1`}
+              className="mt-1"
             />
           </div>
           <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={queryParams.include16Bit}
               onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
               disabled={disabled}
-              className="disabled:cursor-not-allowed"
             />
             {t("builder.include16Bit")}
           </label>
@@ -827,7 +819,7 @@ ORDER BY id, extended`;
         <div>
           <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
           <div className={`${flexRowGap2} mt-1`}>
-            <input
+            <Input
               type="number"
               min={1}
               max={60000}
@@ -837,7 +829,7 @@ ORDER BY id, extended`;
                 if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
               }}
               disabled={disabled}
-              className={`${fieldClass} w-24`}
+              className="w-24"
             />
             <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
           </div>
@@ -849,7 +841,7 @@ ORDER BY id, extended`;
         <div>
           <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
           <div className={`${flexRowGap2} mt-1`}>
-            <input
+            <Input
               type="number"
               min={10}
               max={60000}
@@ -860,7 +852,7 @@ ORDER BY id, extended`;
                 if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
               }}
               disabled={disabled}
-              className={`${fieldClass} w-24`}
+              className="w-24"
             />
             <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
           </div>
@@ -876,18 +868,18 @@ ORDER BY id, extended`;
         {/* Query Type */}
         <div>
           <label className={labelSmallMuted}>{t("builder.queryType")}</label>
-          <select
+          <Select
             value={queryType}
             onChange={handleQueryTypeChange}
             disabled={disabled}
-            className={`${fieldClass} w-full mt-1`}
+            className="mt-1"
           >
             {Object.entries(QUERY_TYPE_INFO).map(([key, info]) => (
               <option key={key} value={key}>
                 {info.label}
               </option>
             ))}
-          </select>
+          </Select>
           <p className={`text-xs ${textSecondary} mt-1`}>{queryInfo.description}</p>
         </div>
 
@@ -898,11 +890,11 @@ ORDER BY id, extended`;
             {mirrorFrames.length > 0 ? (
               <div>
                 <label className={labelSmallMuted}>{t("builder.mirrorFrame")}</label>
-                <select
+                <Select
                   value={queryParams.mirrorFrameId}
                   onChange={handleCatalogMirrorFrameChange}
                   disabled={disabled}
-                  className={`${fieldClass} w-full mt-1`}
+                  className="mt-1"
                 >
                   <option value={0}>{t("builder.selectMirror")}</option>
                   {mirrorFrames.map(({ id, frame }) => {
@@ -920,7 +912,7 @@ ORDER BY id, extended`;
                       </option>
                     );
                   })}
-                </select>
+                </Select>
                 {queryParams.mirrorFrameId > 0 && (
                   <p className={`text-xs ${textMuted} mt-1`}>
                     {t("builder.mirrorsTo", { id: fmtId(queryParams.sourceFrameId) })}
@@ -933,26 +925,26 @@ ORDER BY id, extended`;
                 <div>
                   <label className={labelSmallMuted}>{t("builder.mirrorFrameId")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
-                    <input
+                    <Input
                       type="text"
                       value={mirrorFrameIdText}
                       onChange={handleFrameIdInput(setMirrorFrameIdText, "mirrorFrameId")}
                       disabled={disabled}
                       placeholder={frameIdPlaceholder}
-                      className={`${fieldClass} flex-1`}
+                      className="flex-1"
                     />
                     {extendedCheckbox}
                   </div>
                 </div>
                 <div>
                   <label className={labelSmallMuted}>{t("builder.sourceFrameId")}</label>
-                  <input
+                  <Input
                     type="text"
                     value={sourceFrameIdText}
                     onChange={handleFrameIdInput(setSourceFrameIdText, "sourceFrameId")}
                     disabled={disabled}
                     placeholder={frameIdPlaceholder}
-                    className={`${fieldClass} w-full mt-1`}
+                    className="mt-1"
                   />
                 </div>
               </>
@@ -961,14 +953,14 @@ ORDER BY id, extended`;
             <div>
               <label className={labelSmallMuted}>{t("builder.tolerance")}</label>
               <div className={`${flexRowGap2} mt-1`}>
-                <input
+                <Input
                   type="number"
                   min={0}
                   max={1000}
                   value={queryParams.toleranceMs}
                   onChange={handleToleranceChange}
                   disabled={disabled}
-                  className={`${fieldClass} w-20`}
+                  className="w-20"
                 />
                 <span className={`text-xs ${textMuted}`}>{t("builder.toleranceHint")}</span>
               </div>
@@ -981,13 +973,14 @@ ORDER BY id, extended`;
           /* Pattern Search — no frame ID, just a hex pattern input */
           <div>
             <label className={labelSmallMuted}>{t("builder.bytePattern")}</label>
-            <input
+            <Input
               type="text"
               value={patternText}
               onChange={handlePatternTextChange}
               disabled={disabled}
               placeholder={t("builder.patternPlaceholder")}
-              className={`${fieldClass} w-full mt-1 font-mono`}
+              mono
+              className="mt-1"
             />
             <p className={`text-xs ${textMuted} mt-1`}>
               {queryParams.pattern.length > 0
@@ -1029,13 +1022,12 @@ ORDER BY id, extended`;
               <div className="flex-1">
                 <label className={`text-xs ${textMuted}`}>{t("builder.before")}</label>
                 <div className={flexRowGap2}>
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     value={contextWindow.beforeMs}
                     onChange={handleContextBeforeChange}
                     disabled={disabled}
-                    className={`${fieldClass} w-full`}
                   />
                   <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
@@ -1043,13 +1035,12 @@ ORDER BY id, extended`;
               <div className="flex-1">
                 <label className={`text-xs ${textMuted}`}>{t("builder.after")}</label>
                 <div className={flexRowGap2}>
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     value={contextWindow.afterMs}
                     onChange={handleContextAfterChange}
                     disabled={disabled}
-                    className={`${fieldClass} w-full`}
                   />
                   <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
@@ -1084,10 +1075,11 @@ ORDER BY id, extended`;
             {t("builder.sqlPreview")}
           </button>
           {sqlOpen && (
-            <textarea
+            <Textarea
               readOnly
               value={sqlPreview}
-              className={`${monoBody} text-xs w-full mt-2 p-2 rounded border ${borderDefault} bg-[var(--bg-primary)] ${textSecondary} resize-none`}
+              mono
+              className="mt-2"
               rows={8}
               onClick={(e) => (e.target as HTMLTextAreaElement).select()}
             />
@@ -1100,7 +1092,7 @@ ORDER BY id, extended`;
         {/* Result limit input */}
         <div className="flex items-center justify-center gap-2">
           <label className={`text-xs ${textMuted}`}>{showMuxStatistics ? t("builder.scanUpTo") : t("builder.limitResults")}</label>
-          <input
+          <Input
             type="number"
             min={100}
             max={maxLimit}
@@ -1108,7 +1100,7 @@ ORDER BY id, extended`;
             value={limitOverride}
             onChange={handleLimitChange}
             disabled={disabled}
-            className={`${fieldClass} ${showMuxStatistics ? "w-32" : "w-24"} text-center`}
+            className={`${showMuxStatistics ? "w-32" : "w-24"} text-center`}
           />
           <span className={`text-xs ${textMuted}`}>{t("builder.rows")}</span>
         </div>

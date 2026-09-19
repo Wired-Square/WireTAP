@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import {
   BIT_WIDTH_STD,
@@ -18,6 +18,7 @@ import { formatHexId } from "../utils/formatHex";
 import MaskBitRow from "../components/MaskBitRow";
 import type { BridgeFilterKind, BridgeFilterIde } from "../../../api/framelinkRules";
 import { Button } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 interface BridgeFilterHelpProps {
   kind: BridgeFilterKind;
@@ -91,9 +92,11 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
             <label className={labelDefault}>{t("bridgeDialog.help.maskCalcCanId")}</label>
-            <input
+            <Input
               type="text"
-              className={`${inputSimple} font-mono ${idValid ? "" : "border-red-500"}`}
+              size="lg"
+              mono
+              aria-invalid={!idValid}
               value={calcId}
               onChange={(e) => setCalcId(e.target.value)}
               placeholder={t("bridgeDialog.fields.canIdHex")}
@@ -101,9 +104,11 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
           </div>
           <div>
             <label className={labelDefault}>{t("bridgeDialog.help.maskCalcMask")}</label>
-            <input
+            <Input
               type="text"
-              className={`${inputSimple} font-mono ${maskValid ? "" : "border-red-500"}`}
+              size="lg"
+              mono
+              aria-invalid={!maskValid}
               value={calcMask}
               onChange={(e) => setCalcMask(e.target.value)}
               placeholder={t("bridgeDialog.fields.maskHex")}

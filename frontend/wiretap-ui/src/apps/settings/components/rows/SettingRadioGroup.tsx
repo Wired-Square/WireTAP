@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 import { labelDefault, helpText, flexRowGap2, textPrimary } from "../../../../styles";
+import { Radio } from "../../../../components/forms";
 
 interface RadioOption<T extends string> {
   value: T;
@@ -50,8 +51,7 @@ export default function SettingRadioGroup<T extends string>({
             key={opt.value}
             className={`${stacked ? "flex items-start gap-2" : flexRowGap2} text-sm ${textPrimary} cursor-pointer`}
           >
-            <input
-              type="radio"
+            <Radio
               name={name}
               value={opt.value}
               checked={value === opt.value}

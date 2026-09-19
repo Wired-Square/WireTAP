@@ -133,7 +133,7 @@ export default function NewCatalogDialog({
           {/* Name */}
           <FormField label={t("newCatalog.name")} required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={metaFields.name}
               onChange={(e) => setMetaFields({ ...metaFields, name: e.target.value })}
               placeholder={currentProtocolConfig?.namePlaceholder ?? t("newCatalog.namePlaceholderDefault")}
@@ -143,7 +143,7 @@ export default function NewCatalogDialog({
           {/* Version */}
           <FormField label={t("newCatalog.version")} required variant="default">
             <Input
-              variant="default"
+              size="lg"
               type="number"
               min={1}
               value={metaFields.version || ""}
@@ -161,7 +161,7 @@ export default function NewCatalogDialog({
               {/* Default Byte Order */}
               <FormField label={t("newCatalog.defaultByteOrder")} required variant="default">
                 <Select
-                  variant="default"
+                  size="lg"
                   value={canDefaultEndianness}
                   onChange={(e) => setCanDefaultEndianness(e.target.value as "little" | "big")}
                 >
@@ -173,7 +173,7 @@ export default function NewCatalogDialog({
               {/* Default Interval */}
               <FormField label={t("newCatalog.defaultIntervalOptional")} variant="default">
                 <Input
-                  variant="default"
+                  size="lg"
                   type="number"
                   min={0}
                   value={canDefaultInterval !== undefined ? canDefaultInterval : ""}
@@ -190,7 +190,7 @@ export default function NewCatalogDialog({
               {/* Device Address */}
               <FormField label={t("newCatalog.deviceAddress")} required variant="default">
                 <Input
-                  variant="default"
+                  size="lg"
                   type="number"
                   min={1}
                   max={247}
@@ -206,7 +206,7 @@ export default function NewCatalogDialog({
               {/* Register Base */}
               <FormField label={t("newCatalog.registerAddressing")} required variant="default">
                 <Select
-                  variant="default"
+                  size="lg"
                   value={modbusRegisterBase}
                   onChange={(e) => setModbusRegisterBase(parseInt(e.target.value) as 0 | 1)}
                 >
@@ -221,7 +221,7 @@ export default function NewCatalogDialog({
           {selectedProtocol === "serial" && (
             <FormField label={t("newCatalog.encoding")} required variant="default">
               <Select
-                variant="default"
+                size="lg"
                 value={serialEncoding}
                 onChange={(e) => setSerialEncoding(e.target.value as SerialEncoding)}
               >

@@ -13,6 +13,7 @@ import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
 import { Button, IconButton } from "./Button";
+import { Select, Checkbox } from "./forms";
 
 type FrameWarning = {
   type: "length-mismatch";
@@ -228,7 +229,7 @@ function FramePicker({
               </div>
               {/* Selection set dropdown */}
               {selectionSets && (
-                <select
+                <Select
                   value={activeSelectionSetId ?? ""}
                   onChange={(e) => {
                     const id = e.target.value;
@@ -239,7 +240,8 @@ function FramePicker({
                       if (set) onLoadSelectionSet?.(set);
                     }
                   }}
-                  className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--border-default)] bg-[var(--bg-surface)] text-[color:var(--text-primary)] max-w-[140px]"
+                  size="xs"
+                  className="max-w-[140px] w-auto"
                   title={t("framePicker.selectionSet")}
                 >
                   <option value="">-- None --</option>
@@ -248,7 +250,7 @@ function FramePicker({
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
             </div>
           )}
@@ -313,11 +315,10 @@ function FramePicker({
                   title={f.lenMismatch ? "Payload length varies across frames" : undefined}
                 >
                   <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selected.has(f.id)}
                       onChange={() => onToggle(f.id)}
-                      className="w-3 h-3"
+                      size="sm"
                     />
                     <span className="font-mono">{formatId(f)}</span>
                     <span className="text-[10px] text-[color:var(--text-muted)]">

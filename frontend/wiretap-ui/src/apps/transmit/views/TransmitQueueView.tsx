@@ -12,21 +12,17 @@ import {
   bgDataToolbar,
   borderDataView,
   textDataMuted,
-  textDataPrimary,
-  bgDataInput,
   textDataSecondary,
   hoverDataRow,
-  focusBorder,
-  placeholderMuted,
 } from "../../../styles/colourTokens";
 import { badgeColorClass } from "../../../styles/badgeStyles";
-import { toolbarSelect } from "../../../styles/inputStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { formatBusLabel } from "../../../utils/busFormat";
 import { resolveQueueItemSession } from "../../../stores/transmitRowSession";
 import { Button, IconButton } from "../../../components/Button";
+import { Select, Input, Checkbox } from "../../../components/forms";
 
 interface TransmitQueueViewProps {
   outputBusToSource: Map<number, BusSourceInfo>;
@@ -358,20 +354,21 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         )}
                       </div>
                       {item.type === "can" && item.canFrame && (
-                        <select
+                        <Select
                           value={item.canFrame.bus}
                           onChange={(e) =>
                             updateQueueItemBus(item.id, parseInt(e.target.value))
                           }
                           disabled={item.isRepeating || isGroupRepeating}
-                          className={`${toolbarSelect} w-16`}
+                          size="sm"
+                          className="w-16"
                         >
                           {GVRET_BUSES.map((b) => (
                             <option key={b.value} value={b.value}>
                               {b.label}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       )}
                     </div>
                   </td>
@@ -414,7 +411,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   {/* Interval */}
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1">
-                      <input
+                      <Input
                         type="number"
                         value={item.repeatIntervalMs}
                         onChange={(e) =>
@@ -422,7 +419,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         }
                         disabled={item.isRepeating || isGroupRepeating}
                         min={1}
-                        className={`w-16 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50`}
+                        size="sm"
+                        className="w-16"
                       />
                       <span className={`${textDataSecondary} text-xs`}>ms</span>
                     </div>
@@ -430,13 +428,14 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
 
                   {/* Group */}
                   <td className="px-4 py-2">
-                    <input
+                    <Input
                       type="text"
                       value={item.groupName ?? ""}
                       onChange={(e) => handleGroupChange(item.id, e.target.value)}
                       disabled={item.isRepeating || isGroupRepeating}
                       placeholder={t("queue.groupPlaceholder")}
-                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50 ${placeholderMuted}`}
+                      size="sm"
+                      className="w-20"
                       title={t("queue.groupTooltip")}
                     />
                   </td>
@@ -444,12 +443,11 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   {/* Actions */}
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={item.enabled}
                         onChange={() => toggleQueueEnabled(item.id)}
                         disabled={item.isRepeating || isGroupRepeating}
-                        className={`h-3.5 w-3.5 rounded ${borderDataView} bg-transparent accent-[var(--accent-primary)] cursor-pointer disabled:cursor-not-allowed`}
+                        size="sm"
                         title={item.enabled ? t("queue.actions.disableItem") : t("queue.actions.enableItem")}
                       />
                       {isOrphaned && activeSession && (

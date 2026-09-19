@@ -64,7 +64,7 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
     <div className={spaceYSmall}>
       <div className="flex gap-2">
         <Select
-          variant="default"
+          size="lg"
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           className="flex-1"

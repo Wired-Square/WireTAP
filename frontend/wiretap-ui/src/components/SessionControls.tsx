@@ -19,6 +19,7 @@ import { getIOKindLabel } from "../utils/ioKindLabel";
 import { useSessionStore } from "../stores/sessionStore";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { Button } from "./Button";
+import { Input } from "./forms";
 
 // ============================================================================
 // Activity dot - status dot that emits a sonar ripple whose cadence scales with
@@ -535,7 +536,7 @@ export function IOSessionControls({
       {/* Rename popover */}
       {isRenaming && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg shadow-xl p-2">
-          <input
+          <Input
             ref={renameInputRef}
             type="text"
             value={renameValue}
@@ -545,7 +546,7 @@ export function IOSessionControls({
               if (e.key === "Enter") commitRename();
               if (e.key === "Escape") cancelRename();
             }}
-            className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
+            className="w-48"
             placeholder={t("session.captureName")}
           />
         </div>

@@ -52,7 +52,7 @@ export default function EditNodeDialog({
         <div className="space-y-4">
           <FormField label="Node Name" required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={nodeName}
               onChange={(e) => {
                 setNodeName(e.target.value);
@@ -81,7 +81,7 @@ export default function EditNodeDialog({
 
           <FormField label="Notes" variant="default">
             <Textarea
-              variant="default"
+              size="lg"
               value={nodeNotes}
               onChange={(e) => setNodeNotes(e.target.value)}
               placeholder="Optional notes about this node..."

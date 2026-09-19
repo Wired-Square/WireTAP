@@ -4,14 +4,14 @@ import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Sparkles, ChevronRight } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, checkboxDefault, inputSimple, selectSimple } from "../../../styles";
+import { bgSurface, borderDivider } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult, ByteRole } from "../../../utils/analysis/payloadAnalysis";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
-import { PrimaryButton, SecondaryButton } from "../../../components/forms";
+import { PrimaryButton, SecondaryButton, Select, Input, Checkbox } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -175,10 +175,10 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                   {t("candidates.fields.frameId")}
                 </label>
-                <select
+                <Select
                   value={selectedFrameId}
                   onChange={(e) => setSelectedFrameId(e.target.value)}
-                  className={`${selectSimple} w-full`}
+                  size="lg"
                 >
                   <option value="">{t("candidates.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
@@ -186,7 +186,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                       {formatFrameId(id)}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
                     {t("candidates.fields.noFrames")}
@@ -245,26 +245,26 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     {t("candidates.fields.startByte")}
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     max={7}
                     value={startByte}
                     onChange={(e) => setStartByte(e.target.value)}
-                    className={`${inputSimple} w-full`}
+                    size="lg"
                   />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     {t("candidates.fields.endByte")}
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min={0}
                     max={7}
                     value={endByte}
                     onChange={(e) => setEndByte(e.target.value)}
-                    className={`${inputSimple} w-full`}
+                    size="lg"
                   />
                 </div>
               </div>
@@ -272,11 +272,9 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {/* Analysis hints toggle */}
               {analysisResult && (
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={useAnalysisHints}
                     onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                    className={checkboxDefault}
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
                     {t("candidates.fields.useHints")}

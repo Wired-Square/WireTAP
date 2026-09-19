@@ -1,38 +1,30 @@
-// ui/src/components/forms/Input.tsx
+// The text-field primitive: renders the `.input` classes in styles/components.css.
+// `Select` and `Textarea` share `inputClass`, so the three read as one control.
 
-import { InputHTMLAttributes, forwardRef } from 'react';
-import { focusRing } from '../../styles';
-import { formElementHeight } from '../../styles/inputStyles';
+import { forwardRef, type InputHTMLAttributes } from "react";
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  variant?: 'default' | 'simple';
+export type InputSize = "xs" | "sm" | "md" | "lg";
+export type InputTone = "danger" | "warning";
+
+export interface InputStyleProps {
+  /** Height: `xs` 20 px · `sm` 26 px · `md` 32 px · `lg` 40 px — the button scale */
+  size?: InputSize;
+  /** Validation state; `aria-invalid` renders as `danger` on its own */
+  tone?: InputTone;
+  mono?: boolean;
 }
 
-/**
- * Reusable input component with consistent styling across the app.
- * - variant='default': Full styling with focus ring (for Settings, IOProfile dialogs)
- * - variant='simple': Minimal styling (for SaveFrames and simple dialogs)
- */
-const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ variant = 'default', className = '', ...props }, ref) => {
-    // Uses CSS variables for cross-platform dark mode support (Windows WebView)
-    const baseClasses = `w-full border transition-colors text-[color:var(--text-primary)] ${formElementHeight}`;
+export function inputClass({ size = "md", tone, mono }: InputStyleProps = {}, className = ""): string {
+  return ["input", size !== "md" && `input--${size}`, tone && `input--${tone}`, mono && "font-mono", className]
+    .filter(Boolean)
+    .join(" ");
+}
 
-    const variantClasses = {
-      default: `px-4 py-2 bg-[var(--bg-surface)] border-[color:var(--border-default)] rounded-lg ${focusRing}`,
-      simple: 'px-3 py-2 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded',
-    };
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size">, InputStyleProps {}
 
-    return (
-      <input
-        ref={ref}
-        className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-        {...props}
-      />
-    );
-  }
-);
-
-Input.displayName = 'Input';
+const Input = forwardRef<HTMLInputElement, InputProps>(({ size, tone, mono, className, ...rest }, ref) => (
+  <input ref={ref} className={inputClass({ size, tone, mono }, className)} {...rest} />
+));
+Input.displayName = "Input";
 
 export default Input;

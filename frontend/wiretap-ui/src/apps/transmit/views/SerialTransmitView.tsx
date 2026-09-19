@@ -12,16 +12,14 @@ import { applyFraming } from "../utils/slipFraming";
 import {
   bgDataToolbar,
   borderDataView,
-  textDataPrimary,
-  bgDataInput,
   textDataSecondary,
   textDataTertiary,
-  focusBorder,
 } from "../../../styles/colourTokens";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex, hexToBytes } from "../../../utils/byteUtils";
 import { Button } from "../../../components/Button";
+import { Textarea, Input } from "../../../components/forms";
 
 export default function SerialTransmitView() {
   const { t } = useTranslation("transmit");
@@ -168,12 +166,14 @@ export default function SerialTransmitView() {
             <label className={`${textDataSecondary} text-xs mb-1 block`}>
               {t("serialView.hexBytes")}
             </label>
-            <textarea
+            <Textarea
               value={serialEditor.hexInput}
               onChange={handleHexInputChange}
               placeholder={t("serialView.hexPlaceholder")}
               rows={4}
-              className={`w-full ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-3 py-2 border ${borderDataView} ${focusBorder} uppercase resize-none`}
+              size="lg"
+              mono
+              className="uppercase"
             />
           </div>
 
@@ -217,12 +217,13 @@ export default function SerialTransmitView() {
               <label className={`${textDataSecondary} text-xs mb-1 block`}>
                 {t("serialView.delimiterLabel")}
               </label>
-              <input
+              <Input
                 type="text"
                 value={serialEditor.delimiter.map(byteToHex).join(" ")}
                 onChange={handleDelimiterChange}
                 placeholder={t("serialView.delimiterPlaceholder")}
-                className={`w-32 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
+                mono
+                className="w-32 uppercase"
               />
               <p className={`${textDataSecondary} text-xs mt-1`}>
                 {t("serialView.delimiterDefault")}

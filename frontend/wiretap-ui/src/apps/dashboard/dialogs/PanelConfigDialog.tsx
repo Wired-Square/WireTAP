@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, GripVertical, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, inputSimple, selectSimple } from "../../../styles";
+import { bgSurface, borderDivider } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore, getSignalLabel, getConfidenceColour } from "../../../stores/dashboardStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
-import { PrimaryButton } from "../../../components/forms";
+import { PrimaryButton, Input, Select, Textarea } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -151,12 +151,12 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
               {t("panelConfig.fields.title")}
             </label>
-            <input
+            <Input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              className={`${inputSimple} w-full`}
+              size="lg"
               placeholder={t("panelConfig.fields.titlePlaceholder")}
             />
           </div>
@@ -168,26 +168,26 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                   {t("panelConfig.fields.minValue")}
                 </label>
-                <input
+                <Input
                   type="text"
                   inputMode="decimal"
                   value={minValue}
                   onChange={(e) => setMinValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className={`${inputSimple} w-full`}
+                  size="lg"
                 />
               </div>
               <div className="flex-1">
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                   {t("panelConfig.fields.maxValue")}
                 </label>
-                <input
+                <Input
                   type="text"
                   inputMode="decimal"
                   value={maxValue}
                   onChange={(e) => setMaxValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className={`${inputSimple} w-full`}
+                  size="lg"
                 />
               </div>
             </div>
@@ -199,17 +199,17 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                 {t("panelConfig.fields.primaryDisplay")}
               </label>
-              <select
+              <Select
                 value={primarySignalIndex}
                 onChange={(e) => setPrimarySignalIndex(e.target.value)}
-                className={`${selectSimple} w-full`}
+                size="lg"
               >
                 {panel.signals.map((sig, i) => (
                   <option key={`${sig.frameId}:${sig.signalName}`} value={String(i)}>
                     {getSignalLabel(sig)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 
@@ -220,10 +220,10 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                   {t("panelConfig.fields.frameId")}
                 </label>
-                <select
+                <Select
                   value={targetFrameId}
                   onChange={(e) => setTargetFrameId(e.target.value)}
-                  className={`${selectSimple} w-full`}
+                  size="lg"
                 >
                   <option value="">{t("panelConfig.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
@@ -231,7 +231,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       {formatFrameId(id)}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
                     {t("panelConfig.fields.noFrames")}
@@ -243,14 +243,15 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     {t("panelConfig.fields.byteCount")}
                   </label>
-                  <input
+                  <Input
                     type="number"
                     min={1}
                     max={8}
                     value={byteCount}
                     onChange={(e) => setByteCount(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className={`${inputSimple} w-24`}
+                    size="lg"
+                    className="w-24"
                   />
                 </div>
               )}
@@ -263,14 +264,15 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                 {t("panelConfig.fields.binCount")}
               </label>
-              <input
+              <Input
                 type="number"
                 min={5}
                 max={200}
                 value={histogramBins}
                 onChange={(e) => setHistogramBins(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className={`${inputSimple} w-24`}
+                size="lg"
+                className="w-24"
               />
             </div>
           )}
@@ -283,14 +285,14 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     {t("panelConfig.fields.svgMode")}
                   </label>
-                  <select
+                  <Select
                     value={svgMode}
                     onChange={(e) => setSvgMode(e.target.value as "scene" | "script")}
-                    className={`${selectSimple} w-full`}
+                    size="lg"
                   >
                     <option value="scene">{t("panelConfig.fields.svgModeScene")}</option>
                     <option value="script">{t("panelConfig.fields.svgModeScript")}</option>
-                  </select>
+                  </Select>
                 </div>
               )}
               {(panel.type === "raw-canvas" || svgMode === "script") && (
@@ -300,12 +302,12 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       ? t("panelConfig.fields.canvasCode")
                       : t("panelConfig.fields.svgCode")}
                   </label>
-                  <textarea
+                  <Textarea
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     rows={8}
                     spellCheck={false}
-                    className={`${inputSimple} w-full font-mono text-xs`}
+                    mono
                     placeholder={panel.type === "raw-canvas"
                       ? "(ctx, { signals, width, height, time, dt }) => {\n  ctx.fillStyle = '#3b82f6';\n  ctx.fillRect(0, 0, signals[0] ?? 0, height);\n}"
                       : "(signals, { width, height, time, dt }) =>\n  `<circle cx=50 cy=50 r=${signals[0] ?? 0} fill=\"#3b82f6\" />`"}
@@ -396,14 +398,15 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                         </button>
                       </div>
                     )}
-                    <input
+                    <Input
                       type="text"
                       value={signal.displayName ?? ""}
                       onChange={(e) =>
                         updateSignalDisplayName(panel.id, signal.frameId, signal.signalName, e.target.value)
                       }
                       placeholder={signal.signalName}
-                      className={`${inputSimple} flex-1 text-sm`}
+                      size="lg"
+                      className="flex-1"
                     />
                     {/* Confidence indicator */}
                     {signal.confidence && (

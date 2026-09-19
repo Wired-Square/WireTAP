@@ -4,11 +4,12 @@
 import { useState, useCallback, useMemo } from "react";
 import { Network, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
+import { caption, textMedium, expandableRowContainer } from "../../../../styles";
 import type { CanHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { HeaderFieldFormat } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { Button, IconButton } from "../../../../components/Button";
+import { Select, Input } from "../../../../components/forms";
 
 /** Predefined CAN header field types */
 type CanFieldType = "source_address" | "custom";
@@ -257,14 +258,14 @@ export default function CanConfigSection({
             <label className={`block ${textMedium} mb-2`}>
               Default Byte Order <span className="text-red-500">*</span>
             </label>
-            <select
+            <Select
               value={defaultEndianness}
               onChange={(e) => setDefaultEndianness(e.target.value as "little" | "big")}
-              className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+              size="lg"
             >
               <option value="little">Little Endian</option>
               <option value="big">Big Endian</option>
-            </select>
+            </Select>
             <p className={`mt-1 ${caption}`}>
               Byte order used for multi-byte signals
             </p>
@@ -275,7 +276,7 @@ export default function CanConfigSection({
             <label className={`block ${textMedium} mb-2`}>
               Default Interval (ms) <span className="text-slate-400 text-xs font-normal">(optional)</span>
             </label>
-            <input
+            <Input
               type="number"
               min={0}
               value={defaultInterval ?? ""}
@@ -283,7 +284,7 @@ export default function CanConfigSection({
                 const val = e.target.value;
                 setDefaultInterval(val === "" ? undefined : parseInt(val));
               }}
-              className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+              size="lg"
               placeholder="1000"
             />
             <p className={`mt-1 ${caption}`}>
@@ -298,18 +299,18 @@ export default function CanConfigSection({
               <label className={`block ${textMedium} mb-2`}>
                 Default Extended ID <span className="text-slate-400 text-xs font-normal">(optional)</span>
               </label>
-              <select
+              <Select
                 value={defaultExtended === undefined ? "auto" : defaultExtended ? "true" : "false"}
                 onChange={(e) => {
                   const val = e.target.value;
                   setDefaultExtended(val === "auto" ? undefined : val === "true");
                 }}
-                className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               >
                 <option value="auto">Auto-detect from ID</option>
                 <option value="false">No (11-bit standard)</option>
                 <option value="true">Yes (29-bit extended)</option>
-              </select>
+              </Select>
               <p className={`mt-1 ${caption}`}>
                 Default ID type for frames without explicit setting
               </p>
@@ -320,18 +321,18 @@ export default function CanConfigSection({
               <label className={`block ${textMedium} mb-2`}>
                 Default CAN FD <span className="text-slate-400 text-xs font-normal">(optional)</span>
               </label>
-              <select
+              <Select
                 value={defaultFd === undefined ? "auto" : defaultFd ? "true" : "false"}
                 onChange={(e) => {
                   const val = e.target.value;
                   setDefaultFd(val === "auto" ? undefined : val === "true");
                 }}
-                className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                size="lg"
               >
                 <option value="auto">Classic CAN (default)</option>
                 <option value="false">No (Classic CAN)</option>
                 <option value="true">Yes (CAN FD)</option>
-              </select>
+              </Select>
               <p className={`mt-1 ${caption}`}>
                 Default to CAN FD frames (64-byte payload, BRS)
               </p>
@@ -355,24 +356,27 @@ export default function CanConfigSection({
               </Button>
             </div>
             <div className={flexRowGap2}>
-              <input
+              <Input
                 type="text"
                 value={frameIdMask}
                 onChange={(e) => setFrameIdMask(e.target.value)}
-                className={`flex-1 px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
+                size="lg"
+                mono
+                className="flex-1"
                 placeholder="0x1FFFFF00"
               />
               <div className="flex items-center gap-1">
                 <span className={caption}>ID type:</span>
-                <select
+                <Select
                   value={useExtendedId ? "extended" : "standard"}
                   onChange={(e) => setUseExtendedId(e.target.value === "extended")}
-                  className={`w-24 px-1 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-sm text-[color:var(--text-primary)] ${focusRing}`}
+                  size="lg"
+                  className="w-24"
                   title="CAN ID type"
                 >
                   <option value="extended">29-bit</option>
                   <option value="standard">11-bit</option>
-                </select>
+                </Select>
               </div>
             </div>
             {showFrameIdMaskPicker && (
@@ -447,24 +451,28 @@ export default function CanConfigSection({
                         </span>
 
                         {/* Mask value */}
-                        <input
+                        <Input
                           type="text"
                           value={field.mask}
                           onChange={(e) => handleUpdateField(index, { mask: e.target.value })}
-                          className="w-28 px-2 py-0.5 bg-[var(--bg-tertiary)] border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-secondary)] ${focusRingThin}"
+                          size="xs"
+                          mono
+                          className="w-28"
                           title="Mask (hex)"
                         />
 
                         {/* Shift value input */}
                         <div className="flex items-center gap-1">
                           <span className={caption}>&gt;&gt;</span>
-                          <input
+                          <Input
                             type="number"
                             min={0}
                             max={31}
                             value={fieldShift}
                             onChange={(e) => handleUpdateField(index, { shift: parseInt(e.target.value) || 0 })}
-                            className={`w-12 px-1 py-0.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-primary)] ${focusRingThin} text-center`}
+                            size="xs"
+                            mono
+                            className="w-12 text-center"
                             title="Right shift (bits)"
                           />
                         </div>
@@ -478,14 +486,15 @@ export default function CanConfigSection({
                         <div className="flex-1" />
 
                         {/* Format */}
-                        <select
+                        <Select
                           value={field.format}
                           onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
-                          className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
+                          size="sm"
+                          className="w-16"
                         >
                           <option value="hex">Hex</option>
                           <option value="decimal">Dec</option>
-                        </select>
+                        </Select>
 
                         {/* Remove button */}
                         <IconButton
@@ -521,39 +530,39 @@ export default function CanConfigSection({
               <div className="p-3 bg-[var(--bg-green-subtle)] rounded-lg border border-[color:var(--border-green)]">
                 <div className="flex items-center gap-2 mb-3">
                   {/* Field type dropdown */}
-                  <select
+                  <Select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as CanFieldType)}
-                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
+                    className="w-40"
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
                         {opt.label}{opt.disabled ? " (exists)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
 
                   {/* Custom name input (only shown for custom type) */}
                   {newFieldType === "custom" && (
-                    <input
+                    <Input
                       type="text"
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
-                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
+                      className="flex-1"
                       placeholder="Field name"
                       autoFocus
                     />
                   )}
 
                   {/* Format */}
-                  <select
+                  <Select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
+                    className="w-16"
                   >
                     <option value="hex">Hex</option>
                     <option value="decimal">Dec</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="flex items-center justify-between">

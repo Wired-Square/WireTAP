@@ -352,6 +352,7 @@ export default function DevicesScanView() {
             <div className="w-32">
               <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualType")}</label>
               <Select
+                size="lg"
                 value={manualProtocol}
                 onChange={(e) => {
                   const proto = e.target.value as "smp" | "framelink";
@@ -366,6 +367,7 @@ export default function DevicesScanView() {
             <div className="flex-1">
               <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualIpAddress")}</label>
               <Input
+                size="lg"
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
                 placeholder={t("scan.manualIpPlaceholder")}
@@ -374,6 +376,7 @@ export default function DevicesScanView() {
             <div className="w-20">
               <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualPort")}</label>
               <Input
+                size="lg"
                 value={manualPort}
                 onChange={(e) => setManualPort(e.target.value)}
                 placeholder={manualProtocol === "framelink" ? "120" : "1337"}

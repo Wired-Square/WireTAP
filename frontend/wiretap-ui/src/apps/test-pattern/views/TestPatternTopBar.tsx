@@ -8,11 +8,12 @@ import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDefault, textPrimary, textSecondary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import type { IOProfile } from "../../../types/common";
 import type { TestMode, TestRole } from "../../../api/testPattern";
 import AppTopBar from "../../../components/AppTopBar";
 import { Button } from "../../../components/Button";
+import { Input, Select } from "../../../components/forms";
 
 const TEST_MODE_KEYS: { value: TestMode; i18nKey: string }[] = [
   { value: "auto", i18nKey: "auto" },
@@ -109,8 +110,6 @@ export default function TestPatternTopBar({
   error = null,
 }: Props) {
   const { t } = useTranslation("testPattern");
-  const selectClass = `h-7 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
-  const inputClass = `h-7 w-16 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
 
   // A responder runs until it is stopped: it adopts whatever run an initiator
   // starts, so it has no duration or rate of its own. Auto sets both itself,
@@ -160,8 +159,9 @@ export default function TestPatternTopBar({
 
           {/* Role (hidden for Auto — always initiator) */}
           {mode !== "auto" && (
-            <select
-              className={selectClass}
+            <Select
+              size="sm"
+              className="w-auto"
               value={role}
               onChange={(e) => onRoleChange(e.target.value as TestRole)}
               disabled={isRunning}
@@ -170,12 +170,13 @@ export default function TestPatternTopBar({
               {ROLE_KEYS.map((r) => (
                 <option key={r.value} value={r.value}>{t(`roles.${r.i18nKey}`)}</option>
               ))}
-            </select>
+            </Select>
           )}
 
           {/* Mode */}
-          <select
-            className={selectClass}
+          <Select
+            size="sm"
+            className="w-auto"
             value={mode}
             onChange={(e) => onModeChange(e.target.value as TestMode)}
             disabled={isRunning}
@@ -184,13 +185,13 @@ export default function TestPatternTopBar({
             {TEST_MODE_KEYS.map((m) => (
               <option key={m.value} value={m.value}>{m.value === "auto" ? `${t("modes.auto")} (Full Suite)` : t(`modes.${m.i18nKey}`)}</option>
             ))}
-          </select>
+          </Select>
 
           {showRate && (
             <div className="flex items-center gap-1">
               <span className={`text-xs ${textSecondary}`}>{t("topBar.rate")}</span>
               <NumericInput
-                className={inputClass}
+                className="w-16"
                 value={rateHz}
                 onChange={onRateChange}
                 disabled={isRunning}
@@ -205,7 +206,7 @@ export default function TestPatternTopBar({
             <div className="flex items-center gap-1">
               <span className={`text-xs ${textSecondary}`}>{t("topBar.duration")}</span>
               <NumericInput
-                className={inputClass}
+                className="w-16"
                 value={durationSec}
                 onChange={onDurationChange}
                 disabled={isRunning}
@@ -222,7 +223,7 @@ export default function TestPatternTopBar({
               <div className="flex items-center gap-1">
                 <span className={`text-xs ${textSecondary}`}>{t("topBar.bus")}</span>
                 <NumericInput
-                  className={`${inputClass} w-10`}
+                  className="w-10"
                   value={bus}
                   onChange={onBusChange}
                   disabled={isRunning}
@@ -319,8 +320,9 @@ function NumericInput({
   }, []);
 
   return (
-    <input
+    <Input
       type="number"
+      size="sm"
       className={className}
       value={localValue ?? value}
       onChange={(e) => setLocalValue(e.target.value)}

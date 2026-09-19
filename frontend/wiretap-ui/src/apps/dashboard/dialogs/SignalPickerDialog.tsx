@@ -4,12 +4,12 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Check, Search } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple } from "../../../styles";
+import { bgSurface, borderDivider, textSecondary, hoverLight } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
-import { SecondaryButton, PrimaryButton } from "../../../components/forms";
+import { SecondaryButton, PrimaryButton, Input } from "../../../components/forms";
 
 /** Key used to identify a signal selection. */
 function signalKey(frameId: number, signalName: string): string {
@@ -204,12 +204,13 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         <div className="px-4 py-2 border-b border-[var(--border-default)]">
           <div className="relative">
             <Search className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`} />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("signalPicker.search")}
-              className={`${inputSimple} w-full pl-8`}
+              size="lg"
+              className="pl-8"
               autoFocus
             />
           </div>

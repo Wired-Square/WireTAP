@@ -3,7 +3,8 @@
 import { useTranslation } from "react-i18next";
 import type { CANConfig } from "../../types";
 import { flexRowGap2 } from "../../../../styles/spacing";
-import { caption, textMedium, focusRing, checkboxDefault } from "../../../../styles";
+import { caption, textMedium } from "../../../../styles";
+import { Input, Checkbox } from "../../../../components/forms";
 
 export type CANConfigSectionProps = {
   config: CANConfig;
@@ -24,11 +25,12 @@ export default function CANConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.canIdLabel")} <span className="text-red-500">{t("protocolEditors.canIdRequired")}</span>
         </label>
-        <input
+        <Input
           type="text"
           value={config.id}
           onChange={(e) => onChange({ ...config, id: e.target.value })}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
+          size="lg"
+          mono
           placeholder={t("protocolEditors.canIdPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
@@ -38,12 +40,10 @@ export default function CANConfigSection({
 
       {/* Extended ID checkbox */}
       <div className={flexRowGap2}>
-        <input
-          type="checkbox"
+        <Checkbox
           id="extended"
           checked={config.extended ?? false}
           onChange={(e) => onChange({ ...config, extended: e.target.checked || undefined })}
-          className={checkboxDefault}
         />
         <label htmlFor="extended" className="text-sm text-[color:var(--text-secondary)]">
           {t("protocolEditors.canExtendedLabel")}
@@ -55,7 +55,7 @@ export default function CANConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.canBusLabel")}
         </label>
-        <input
+        <Input
           type="number"
           min="0"
           value={config.bus ?? ""}
@@ -65,7 +65,7 @@ export default function CANConfigSection({
               bus: e.target.value ? parseInt(e.target.value) : undefined,
             })
           }
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+          size="lg"
           placeholder={t("protocolEditors.canBusPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
@@ -78,7 +78,7 @@ export default function CANConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.canCopyFromLabel")}
         </label>
-        <input
+        <Input
           type="text"
           value={config.copy ?? ""}
           onChange={(e) =>
@@ -89,7 +89,8 @@ export default function CANConfigSection({
             })
           }
           disabled={!!config.mirror_of}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
+          size="lg"
+          mono
           placeholder={t("protocolEditors.canCopyFromPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
@@ -102,7 +103,7 @@ export default function CANConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           {t("protocolEditors.canMirrorOfLabel")}
         </label>
-        <input
+        <Input
           type="text"
           value={config.mirror_of ?? ""}
           onChange={(e) =>
@@ -113,7 +114,8 @@ export default function CANConfigSection({
             })
           }
           disabled={!!config.copy}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
+          size="lg"
+          mono
           placeholder={t("protocolEditors.canMirrorOfPlaceholder")}
         />
         <p className={`${caption} mt-1`}>

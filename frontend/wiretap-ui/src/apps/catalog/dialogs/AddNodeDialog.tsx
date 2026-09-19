@@ -43,7 +43,7 @@ export default function AddNodeDialog({
         <div className="space-y-4">
           <FormField label="Node Name" required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={nodeName}
               onChange={(e) => setNodeName(e.target.value)}
               placeholder="inverter, battery, etc."
@@ -66,7 +66,7 @@ export default function AddNodeDialog({
 
           <FormField label="Notes" variant="default">
             <Textarea
-              variant="default"
+              size="lg"
               value={nodeNotes}
               onChange={(e) => setNodeNotes(e.target.value)}
               placeholder="Optional notes about this node..."

@@ -20,7 +20,7 @@ import {
   type CaptureUploadProgress,
 } from "../api/backendApi";
 import { labelDefault, helpText, textPrimary } from "../styles";
-import { SecondaryButton, PrimaryButton } from "../components/forms";
+import { SecondaryButton, PrimaryButton, Checkbox } from "../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -145,7 +145,7 @@ export default function SendCaptureToBackendDialog({
           <>
             <div className="space-y-2">
               <label className={labelDefault}>{t("sendToBackend.profile")}</label>
-              <Select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
+              <Select size="lg" value={profileId} onChange={(e) => setProfileId(e.target.value)}>
                 {wiretapProfiles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -158,12 +158,13 @@ export default function SendCaptureToBackendDialog({
               <label className={labelDefault}>{t("sendToBackend.database")}</label>
               {newDatabase ? (
                 <Input
+                  size="lg"
                   value={database}
                   onChange={(e) => setDatabase(e.target.value.toLowerCase())}
                   placeholder="vehicle_2"
                 />
               ) : (
-                <Select value={database} onChange={(e) => setDatabase(e.target.value)}>
+                <Select size="lg" value={database} onChange={(e) => setDatabase(e.target.value)}>
                   {databases.map((d) => (
                     <option key={d.name} value={d.name}>
                       {d.name}
@@ -173,8 +174,7 @@ export default function SendCaptureToBackendDialog({
                 </Select>
               )}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={newDatabase}
                   onChange={(e) => {
                     setNewDatabase(e.target.checked);

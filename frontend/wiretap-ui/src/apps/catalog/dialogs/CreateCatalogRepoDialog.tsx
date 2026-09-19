@@ -63,6 +63,7 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
         <div className="p-4 space-y-4">
           <FormField label={t("createRepo.nameLabel")}>
             <Input
+              size="lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="wiretap-catalogs"
@@ -72,6 +73,7 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
 
           <FormField label={t("createRepo.descriptionLabel")}>
             <Input
+              size="lg"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("createRepo.descriptionPlaceholder")}

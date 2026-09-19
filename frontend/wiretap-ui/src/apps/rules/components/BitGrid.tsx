@@ -5,9 +5,10 @@
 // to anchor selection and complete ranges for placing signals.
 
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
-import { textPrimary, textSecondary, textTertiary, focusRingThin } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { type PlacedSignal, buildBitOwnerMap } from "../utils/bitGrid";
 import { Button } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 // Column indices 0..7 display bits 7..0 (MSB first)
 const COLUMN_HEADERS = [7, 6, 5, 4, 3, 2, 1, 0] as const;
@@ -97,7 +98,7 @@ export default function BitGrid({
         ))}
         {/* Jump-to-byte input */}
         <div className="ml-2 flex items-center gap-1">
-          <input
+          <Input
             type="number"
             min={0}
             max={payloadBytes - 1}
@@ -105,7 +106,9 @@ export default function BitGrid({
             onChange={(e) => setJumpInput(e.target.value)}
             onKeyDown={handleJumpKeyDown}
             placeholder="Go to"
-            className={`w-16 h-5 text-[10px] font-mono px-1 rounded border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${focusRingThin}`}
+            size="xs"
+            mono
+            className="w-16"
           />
           <Button
             onClick={handleJump}

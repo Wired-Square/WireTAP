@@ -10,6 +10,7 @@ import { iconMd, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
 import type { DeviceProbeResult, FramingEncoding, InterfaceFramingConfig } from "../../api/io";
 import { ModbusRtuFields } from "../../components/FramingOptionsPanel";
+import { Checkbox, Input, Select } from "../../components/forms";
 
 export type { InterfaceFramingConfig } from "../../api/io";
 
@@ -111,11 +112,84 @@ export default function SingleBusConfig({
   }
 
   // Success state - show status and bus selector
-  if (compact) {
-    const showDelimiterOptions = isSerial && effectiveFraming === "delimiter";
-    const showModbusOptions = isSerial && effectiveFraming === "modbus_rtu";
-    const showRawBytesOption = isSerial && effectiveFraming !== "raw";
+  const showDelimiterOptions = isSerial && effectiveFraming === "delimiter";
+  const showModbusOptions = isSerial && effectiveFraming === "modbus_rtu";
+  const showRawBytesOption = isSerial && effectiveFraming !== "raw";
+  const controlSize = compact ? "xs" : "md";
+  const patchFraming = (patch: Partial<InterfaceFramingConfig>) =>
+    onFramingChange?.({ ...framingConfig, encoding: effectiveFraming, ...patch });
 
+  const busSelect = (
+    <Select
+      value={effectiveBus}
+      onChange={(e) => {
+        const val = parseInt(e.target.value, 10);
+        onBusOverrideChange(val === 0 ? undefined : val);
+      }}
+      disabled={configLocked}
+      size={controlSize}
+      tone={isDuplicate ? "warning" : undefined}
+      className="w-auto"
+    >
+      {Array.from({ length: 8 }, (_, i) => (
+        <option key={i} value={i}>
+          {t("ioSourcePicker.busConfig.busLabel", { bus: i })}
+        </option>
+      ))}
+    </Select>
+  );
+  const framingSelect = (
+    <Select
+      value={effectiveFraming}
+      onChange={(e) => onFramingChange?.({ ...framingConfig, encoding: e.target.value as FramingEncoding })}
+      disabled={configLocked}
+      size={controlSize}
+      className="w-auto"
+    >
+      {FRAMING_KEYS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {t(`ioSourcePicker.singleBusConfig.framingOptions.${opt.key}`)}
+        </option>
+      ))}
+    </Select>
+  );
+  const delimiterInput = (
+    <Input
+      type="text"
+      value={framingConfig?.delimiterHex ?? "0A"}
+      onChange={(e) => patchFraming({ delimiterHex: e.target.value })}
+      placeholder={t("ioSourcePicker.singleBusConfig.delimiterPlaceholder")}
+      disabled={configLocked}
+      size={controlSize}
+      mono
+      className={compact ? "w-12" : "w-16"}
+    />
+  );
+  const maxLengthInput = (
+    <Input
+      type="number"
+      value={framingConfig?.maxFrameLength ?? 1024}
+      onChange={(e) => patchFraming({ maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
+      disabled={configLocked}
+      size={controlSize}
+      className={compact ? "w-16" : "w-20"}
+    />
+  );
+  const modbusFields = (
+    <div className="w-full max-w-xs">
+      <ModbusRtuFields config={framingConfig ?? {}} onChange={patchFraming} disabled={configLocked} />
+    </div>
+  );
+  const rawBytesCheckbox = (
+    <Checkbox
+      checked={framingConfig?.emitRawBytes ?? false}
+      onChange={(e) => patchFraming({ emitRawBytes: e.target.checked })}
+      disabled={configLocked}
+      size={compact ? "sm" : undefined}
+    />
+  );
+
+  if (compact) {
     return (
       <div className={wrapperClass}>
         <div className="flex items-center gap-2 text-xs">
@@ -132,27 +206,7 @@ export default function SingleBusConfig({
         <div className="flex items-center gap-2 mt-1 text-xs">
           <Bus className={`${iconXs} text-slate-400 flex-shrink-0`} />
           <span className="text-[color:var(--text-muted)]">{t("ioSourcePicker.singleBusConfig.bus")}</span>
-          <select
-            value={effectiveBus}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              onBusOverrideChange(val === 0 ? undefined : val);
-            }}
-            disabled={configLocked}
-            className={`px-1 py-0.5 rounded border text-xs ${
-              configLocked
-                ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                : isDuplicate
-                ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
-                : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-            } focus:ring-1 focus:ring-cyan-500`}
-          >
-            {Array.from({ length: 8 }, (_, i) => (
-              <option key={i} value={i}>
-                {t("ioSourcePicker.busConfig.busLabel", { bus: i })}
-              </option>
-            ))}
-          </select>
+          {busSelect}
           {isDuplicate && !configLocked && (
             <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
           )}
@@ -167,24 +221,7 @@ export default function SingleBusConfig({
             <>
               <span className="text-[color:var(--text-muted)]">|</span>
               <Layers className={`${iconXs} text-slate-400 flex-shrink-0`} />
-              <select
-                value={effectiveFraming}
-                onChange={(e) => {
-                  onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
-                }}
-                disabled={configLocked}
-                className={`px-1 py-0.5 rounded border text-xs ${
-                  configLocked
-                    ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                    : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-                } focus:ring-1 focus:ring-cyan-500`}
-              >
-                {FRAMING_KEYS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {t(`ioSourcePicker.singleBusConfig.framingOptions.${opt.key}`)}
-                  </option>
-                ))}
-              </select>
+              {framingSelect}
             </>
           )}
         </div>
@@ -197,59 +234,22 @@ export default function SingleBusConfig({
               <>
                 <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
                   <span>{t("ioSourcePicker.singleBusConfig.delimiter")}</span>
-                  <input
-                    type="text"
-                    value={framingConfig?.delimiterHex ?? "0A"}
-                    onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
-                    placeholder={t("ioSourcePicker.singleBusConfig.delimiterPlaceholder")}
-                    disabled={configLocked}
-                    className={`w-12 px-1 py-0.5 rounded border text-xs font-mono ${
-                      configLocked
-                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-                    } focus:ring-1 focus:ring-cyan-500`}
-                  />
+                  {delimiterInput}
                 </label>
                 <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
                   <span>{t("ioSourcePicker.singleBusConfig.max")}</span>
-                  <input
-                    type="number"
-                    value={framingConfig?.maxFrameLength ?? 1024}
-                    onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                    disabled={configLocked}
-                    className={`w-16 px-1 py-0.5 rounded border text-xs ${
-                      configLocked
-                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-                    } focus:ring-1 focus:ring-cyan-500`}
-                  />
+                  {maxLengthInput}
                 </label>
               </>
             )}
 
             {/* Modbus RTU options */}
-            {showModbusOptions && (
-              <div className="w-full max-w-xs">
-                <ModbusRtuFields
-                  config={framingConfig ?? {}}
-                  onChange={(patch) =>
-                    onFramingChange({ ...framingConfig, encoding: effectiveFraming, ...patch })
-                  }
-                  disabled={configLocked}
-                />
-              </div>
-            )}
+            {showModbusOptions && modbusFields}
 
             {/* Raw bytes option (for any framing mode except raw) */}
             {showRawBytesOption && (
               <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)] cursor-not-allowed" : "cursor-pointer"}`}>
-                <input
-                  type="checkbox"
-                  checked={framingConfig?.emitRawBytes ?? false}
-                  onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                  disabled={configLocked}
-                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
-                />
+                {rawBytesCheckbox}
                 <span>{t("ioSourcePicker.singleBusConfig.captureRawBytes")}</span>
               </label>
             )}
@@ -258,11 +258,6 @@ export default function SingleBusConfig({
       </div>
     );
   }
-
-  // Full mode - separate section display
-  const showDelimiterOptionsFull = isSerial && effectiveFraming === "delimiter";
-  const showModbusOptionsFull = isSerial && effectiveFraming === "modbus_rtu";
-  const showRawBytesOptionFull = isSerial && effectiveFraming !== "raw";
 
   return (
     <div className="border-t border-[color:var(--border-default)] px-4 py-3">
@@ -283,27 +278,7 @@ export default function SingleBusConfig({
       <div className="flex items-center gap-2 mt-2 text-sm">
         <Bus className={`${iconMd} text-slate-400`} />
         <span className="text-[color:var(--text-secondary)]">{t("ioSourcePicker.singleBusConfig.outputBus")}</span>
-        <select
-          value={effectiveBus}
-          onChange={(e) => {
-            const val = parseInt(e.target.value, 10);
-            onBusOverrideChange(val === 0 ? undefined : val);
-          }}
-          disabled={configLocked}
-          className={`px-2 py-1 rounded border text-sm ${
-            configLocked
-              ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-              : isDuplicate
-              ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
-              : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-          } focus:ring-1 focus:ring-cyan-500`}
-        >
-          {Array.from({ length: 8 }, (_, i) => (
-            <option key={i} value={i}>
-              Bus {i}
-            </option>
-          ))}
-        </select>
+        {busSelect}
         {isDuplicate && !configLocked && (
           <span className="text-amber-500 text-sm" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>
             {t("ioSourcePicker.singleBusConfig.duplicate")}
@@ -322,87 +297,33 @@ export default function SingleBusConfig({
           <div className="flex items-center gap-2 mt-2 text-sm">
             <Layers className={`${iconMd} text-slate-400`} />
             <span className="text-[color:var(--text-secondary)]">{t("ioSourcePicker.singleBusConfig.framing")}</span>
-            <select
-              value={effectiveFraming}
-              onChange={(e) => {
-                onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
-              }}
-              disabled={configLocked}
-              className={`px-2 py-1 rounded border text-sm ${
-                configLocked
-                  ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                  : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-              } focus:ring-1 focus:ring-cyan-500`}
-            >
-              {FRAMING_KEYS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t(`ioSourcePicker.singleBusConfig.framingOptions.${opt.key}`)}
-                </option>
-              ))}
-            </select>
+            {framingSelect}
           </div>
 
           {/* Framing sub-options */}
-          {(showDelimiterOptionsFull || showModbusOptionsFull || showRawBytesOptionFull) && (
+          {(showDelimiterOptions || showModbusOptions || showRawBytesOption) && (
             <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm ${configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}`}>
               {/* Delimiter options */}
-              {showDelimiterOptionsFull && (
+              {showDelimiterOptions && (
                 <>
                   <label className="flex items-center gap-1.5">
                     <span>{t("ioSourcePicker.singleBusConfig.delimiterHex")}</span>
-                    <input
-                      type="text"
-                      value={framingConfig?.delimiterHex ?? "0A"}
-                      onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
-                      placeholder={t("ioSourcePicker.singleBusConfig.delimiterPlaceholder")}
-                      disabled={configLocked}
-                      className={`w-16 px-2 py-1 rounded border text-sm font-mono ${
-                        configLocked
-                          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-                      } focus:ring-1 focus:ring-cyan-500`}
-                    />
+                    {delimiterInput}
                   </label>
                   <label className="flex items-center gap-1.5">
                     <span>{t("ioSourcePicker.singleBusConfig.maxLength")}</span>
-                    <input
-                      type="number"
-                      value={framingConfig?.maxFrameLength ?? 1024}
-                      onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                      disabled={configLocked}
-                      className={`w-20 px-2 py-1 rounded border text-sm ${
-                        configLocked
-                          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-                          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-                      } focus:ring-1 focus:ring-cyan-500`}
-                    />
+                    {maxLengthInput}
                   </label>
                 </>
               )}
 
               {/* Modbus RTU options */}
-              {showModbusOptionsFull && (
-                <div className="w-full max-w-xs">
-                  <ModbusRtuFields
-                    config={framingConfig ?? {}}
-                    onChange={(patch) =>
-                      onFramingChange({ ...framingConfig, encoding: effectiveFraming, ...patch })
-                    }
-                    disabled={configLocked}
-                  />
-                </div>
-              )}
+              {showModbusOptions && modbusFields}
 
               {/* Raw bytes option (for any framing mode except raw) */}
-              {showRawBytesOptionFull && (
+              {showRawBytesOption && (
                 <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                  <input
-                    type="checkbox"
-                    checked={framingConfig?.emitRawBytes ?? false}
-                    onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                    disabled={configLocked}
-                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
-                  />
+                  {rawBytesCheckbox}
                   <span>{t("ioSourcePicker.singleBusConfig.captureRawBytes")}</span>
                 </label>
               )}

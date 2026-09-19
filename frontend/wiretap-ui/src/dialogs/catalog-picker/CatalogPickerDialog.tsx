@@ -121,7 +121,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                 className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`}
               />
               <Input
-                variant="simple"
+                size="lg"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("catalogPicker.search")}

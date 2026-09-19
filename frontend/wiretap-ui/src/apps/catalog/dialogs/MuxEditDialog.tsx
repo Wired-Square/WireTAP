@@ -120,7 +120,7 @@ export default function MuxEditDialog({
           {/* Name */}
           <FormField label="Name" required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={fields.name}
               onChange={(e) => setFields({ ...fields, name: e.target.value })}
               placeholder="selector_name"
@@ -131,7 +131,7 @@ export default function MuxEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Start Bit" required variant="default">
               <Input
-                variant="default"
+                size="lg"
                 type="number"
                 value={fields.start_bit}
                 onChange={(e) => {
@@ -144,7 +144,7 @@ export default function MuxEditDialog({
             </FormField>
             <FormField label="Bit Length" required variant="default">
               <Input
-                variant="default"
+                size="lg"
                 type="number"
                 value={fields.bit_length}
                 onChange={(e) => {
@@ -163,7 +163,7 @@ export default function MuxEditDialog({
           {/* Notes */}
           <FormField label="Notes" variant="default">
             <Textarea
-              variant="default"
+              size="lg"
               value={fields.notes ?? ""}
               onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
               placeholder="Optional notes about this mux..."

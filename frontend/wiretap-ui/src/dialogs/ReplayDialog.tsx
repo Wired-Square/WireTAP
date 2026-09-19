@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { DialogFooter } from "../components/forms/DialogFooter";
-import { focusRingThin, helpText, inputSimple, labelSmall } from "../styles";
+import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
 import { openPanel } from "../utils/windowCommunication";
@@ -17,6 +17,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { getCaptureFramesPaginatedById } from "../api/capture";
 import type { ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
+import { Input, Select, Checkbox } from "../components/forms";
 
 function formatDuration(us: number): string {
   const ms = us / 1000;
@@ -229,24 +230,28 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                 {t("replay.frameRangeLabel", { total: bufferLength.toLocaleString(i18n.language) })}
               </label>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="number"
                   min={1}
                   max={bufferLength}
                   value={startRaw}
                   onChange={(e) => setStartRaw(e.target.value)}
                   placeholder={t("replay.startPlaceholder")}
-                  className={`${inputSimple} flex-1 font-mono text-sm`}
+                  size="lg"
+                  mono
+                  className="flex-1"
                 />
                 <span className="text-[color:var(--text-secondary)] text-sm">–</span>
-                <input
+                <Input
                   type="number"
                   min={1}
                   max={bufferLength}
                   value={endRaw}
                   onChange={(e) => setEndRaw(e.target.value)}
                   placeholder={t("replay.endPlaceholder")}
-                  className={`${inputSimple} flex-1 font-mono text-sm`}
+                  size="lg"
+                  mono
+                  className="flex-1"
                 />
                 <Button
                   onClick={() => { setStartRaw("1"); setEndRaw(String(bufferLength)); }}
@@ -281,17 +286,17 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
             {transmitSessions.length > 1 && (
               <div className="space-y-1">
                 <label className={labelSmall}>{t("replay.transmitSession")}</label>
-                <select
+                <Select
                   value={selectedSessionId ?? ""}
                   onChange={(e) => setSelectedSessionId(e.target.value)}
-                  className={inputSimple}
+                  size="lg"
                 >
                   {transmitSessions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.profileName || s.id}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -341,24 +346,23 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                     {p.label}
                   </Button>
                 ))}
-                <input
+                <Input
                   type="number"
                   min={0.01}
                   step={0.25}
                   value={customSpeed}
                   onChange={(e) => handleCustomSpeedChange(e.target.value)}
-                  className={`w-16 text-xs px-2 py-1 rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRingThin}`}
+                  size="sm"
+                  className="w-16"
                   placeholder="1.0"
                 />
               </div>
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={loop}
                 onChange={(e) => setLoop(e.target.checked)}
-                className="rounded"
               />
               <span className="text-sm text-[color:var(--text-secondary)]">{t("replay.loopLabel")}</span>
             </label>

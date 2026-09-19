@@ -3,7 +3,6 @@
 import { Gauge, Plus, Save, Layout, X, AlertTriangle, Glasses, Sparkles, FlaskConical, Trash2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
-import { inputBase } from "../../../styles/inputStyles";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import { textSecondary } from "../../../styles/colourTokens";
 import { useDashboardStore } from "../../../stores/dashboardStore";
@@ -17,6 +16,7 @@ import type { DashboardLayout } from "../../../utils/dashboardLayouts";
 import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
 import { Button, IconButton } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 /** Dropdown menu item style */
 const menuItem = "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors";
@@ -279,7 +279,7 @@ export default function DashboardTopBar({
               </button>
             ) : (
               <div className="flex items-center gap-1 px-3 py-1.5">
-                <input
+                <Input
                   type="text"
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
@@ -288,7 +288,8 @@ export default function DashboardTopBar({
                     if (e.key === "Escape") { setIsSaving(false); setSaveName(""); }
                   }}
                   placeholder={t("topBar.layouts.namePlaceholder")}
-                  className={`${inputBase} flex-1 text-xs py-1`}
+                  size="sm"
+                  className="flex-1"
                   autoFocus
                 />
                 <Button

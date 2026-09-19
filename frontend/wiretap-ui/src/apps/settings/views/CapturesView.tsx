@@ -63,7 +63,7 @@ export default function CapturesView({
 
       <SettingSection title={t("captures.storage.title")} divider={false}>
         <SettingRow label={t("captures.storage.label")} help={t("captures.storage.help")}>
-          <Select value={captureStorage} onChange={(e) => onChangeCaptureStorage(e.target.value)}>
+          <Select size="lg" value={captureStorage} onChange={(e) => onChangeCaptureStorage(e.target.value)}>
             <option value="sqlite">{t("captures.storage.options.sqlite")}</option>
           </Select>
         </SettingRow>

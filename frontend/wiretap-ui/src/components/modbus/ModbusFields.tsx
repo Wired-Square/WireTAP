@@ -8,14 +8,12 @@ import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Play } from "lucide-react";
-import { bgSurface, borderDefault, textMuted } from "../../styles";
+import { borderDefault, textMuted } from "../../styles";
 import { iconMd } from "../../styles/spacing";
 import CheckboxField, { type CheckboxFieldProps } from "../forms/CheckboxField";
 import type { ModbusRegisterType } from "../../api/io";
 import { Button } from "../../components/Button";
-
-const CONTROL =
-  "w-full px-2 py-1 rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)]";
+import { Input, Select } from "../forms";
 
 /** A labelled control in the compact scan-panel layout. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -50,14 +48,13 @@ export function NumberField({
 }) {
   return (
     <Field label={label}>
-      <input
+      <Input
         type="number"
         min={min}
         max={max}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || 0)))}
-        className={`${CONTROL} ${bgSurface} disabled:opacity-50`}
       />
     </Field>
   );
@@ -77,12 +74,11 @@ export function TextField({
 }) {
   return (
     <Field label={label}>
-      <input
+      <Input
         type="text"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={`${CONTROL} ${bgSurface}`}
       />
     </Field>
   );
@@ -104,18 +100,17 @@ export function SelectField<T extends string>({
 }) {
   return (
     <Field label={label}>
-      <select
+      <Select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         disabled={disabled}
-        className={`${CONTROL} ${bgSurface} disabled:opacity-50`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
     </Field>
   );
 }

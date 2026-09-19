@@ -23,6 +23,7 @@ import type {
 } from "../utils/flasherTypes";
 import { Field, Select } from "./formHelpers";
 import type { DriverOptionsPanelProps, FlasherDriver } from "./types";
+import { Checkbox } from "../../../components/forms";
 
 const PIN_OPTIONS: { value: Stm32PinSelection; label: string }[] = [
   { value: "dtr", label: "DTR" },
@@ -64,8 +65,7 @@ function Stm32OptionsPanel(_props: DriverOptionsPanelProps<Stm32ChipInfo>) {
         <label
           className={`flex items-center gap-1 text-xs ${textSecondary} px-1 py-1 cursor-pointer`}
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={options.boot0_invert ?? false}
             onChange={(e) => setOptions({ boot0_invert: e.target.checked })}
           />
@@ -76,8 +76,7 @@ function Stm32OptionsPanel(_props: DriverOptionsPanelProps<Stm32ChipInfo>) {
         <label
           className={`flex items-center gap-1 text-xs ${textSecondary} px-1 py-1 cursor-pointer`}
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={options.reset_invert ?? true}
             onChange={(e) => setOptions({ reset_invert: e.target.checked })}
           />

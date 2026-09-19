@@ -58,6 +58,7 @@ export default function GeneralView({
         help={t("general.defaultFrameType.help")}
       >
         <Select
+          size="lg"
           value={defaultFrameType}
           onChange={(e) => onChangeDefaultFrameType(e.target.value as DefaultFrameType)}
         >
@@ -69,7 +70,7 @@ export default function GeneralView({
 
       <SettingSection title={t("general.language.title")}>
         <SettingRow label={t("general.language.label")} help={t("general.language.help")}>
-          <Select value={language} onChange={(e) => onChangeLanguage(e.target.value)}>
+          <Select size="lg" value={language} onChange={(e) => onChangeLanguage(e.target.value)}>
             {SUPPORTED_LANGUAGES.map((code) => (
               <option key={code} value={code}>
                 {t(`general.language.options.${code}`, code)}
@@ -117,7 +118,7 @@ export default function GeneralView({
           label={t("general.diagnostics.logLevel.label")}
           help={t("general.diagnostics.logLevel.help")}
         >
-          <Select value={logLevel} onChange={(e) => onChangeLogLevel(e.target.value)}>
+          <Select size="lg" value={logLevel} onChange={(e) => onChangeLogLevel(e.target.value)}>
             <option value="off">{t("general.diagnostics.logLevel.options.off")}</option>
             <option value="info">{t("general.diagnostics.logLevel.options.info")}</option>
             <option value="debug">{t("general.diagnostics.logLevel.options.debug")}</option>

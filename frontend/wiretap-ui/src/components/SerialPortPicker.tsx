@@ -27,6 +27,7 @@ import type { SerialPortInfo } from "../api/serial";
 import type { IOProfile } from "../hooks/useSettings";
 import type { DfuDeviceInfo } from "../apps/serial/utils/flasherTypes";
 import { Button } from "./Button";
+import { Select } from "./forms";
 
 export type Parity = "none" | "odd" | "even";
 
@@ -353,8 +354,9 @@ export default function SerialPortPicker({
             className={`flex flex-wrap items-end gap-2 px-3 py-3 ${borderDivider} border-t`}
           >
             <Field label={t("serialPortPicker.fields.baud")}>
-              <select
-                className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider}`}
+              <Select
+                size="sm"
+                className="w-auto"
                 value={settings.baudRate}
                 onChange={(e) =>
                   onSettingsChange({ baudRate: Number(e.target.value) || 115200 })
@@ -366,11 +368,12 @@ export default function SerialPortPicker({
                     {b}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label={t("serialPortPicker.fields.data")}>
-              <select
-                className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider}`}
+              <Select
+                size="sm"
+                className="w-auto"
                 value={settings.dataBits}
                 onChange={(e) =>
                   onSettingsChange({
@@ -384,11 +387,12 @@ export default function SerialPortPicker({
                     {v}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label={t("serialPortPicker.fields.stop")}>
-              <select
-                className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider}`}
+              <Select
+                size="sm"
+                className="w-auto"
                 value={settings.stopBits}
                 onChange={(e) =>
                   onSettingsChange({
@@ -402,11 +406,12 @@ export default function SerialPortPicker({
                     {v}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label={t("serialPortPicker.fields.parity")}>
-              <select
-                className={`${bgPrimary} ${textPrimary} text-xs px-2 py-1 rounded border ${borderDivider}`}
+              <Select
+                size="sm"
+                className="w-auto"
                 value={settings.parity}
                 onChange={(e) =>
                   onSettingsChange({ parity: e.target.value as Parity })
@@ -416,7 +421,7 @@ export default function SerialPortPicker({
                 <option value="none">{t("serialPortPicker.parity.none")}</option>
                 <option value="odd">{t("serialPortPicker.parity.odd")}</option>
                 <option value="even">{t("serialPortPicker.parity.even")}</option>
-              </select>
+              </Select>
             </Field>
             <div className="ml-auto flex items-center">
               {isConnected ? (

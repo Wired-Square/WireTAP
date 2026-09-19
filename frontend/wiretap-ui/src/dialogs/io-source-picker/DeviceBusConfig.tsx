@@ -10,6 +10,7 @@ import { iconMd, iconXs } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
 import type { GvretDeviceInfo, BusMapping, Protocol } from "../../api/io";
 import { PROTOCOL_LABELS } from "../../utils/profileTraits";
+import { Checkbox, Select } from "../../components/forms";
 
 // Generic bus names - actual meaning varies by device
 const BUS_NAMES: Record<number, string> = {
@@ -72,34 +73,27 @@ export default function DeviceBusConfig({
     );
   };
 
-  /**
-   * One row's dropdown. The compact and full layouts differ only in padding, so
-   * they share this rather than keeping two copies of the styling in step.
-   */
+  /** One row's dropdown, shared by the compact and full layouts. */
   const busSelect = (
     value: number | string,
     onChange: (value: string) => void,
     options: { value: number | string; label: string }[],
     highlight = false,
   ) => (
-    <select
+    <Select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={configLocked}
-      className={`${compact ? "px-1" : "px-1.5"} py-0.5 rounded border text-xs ${
-        configLocked
-          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
-          : highlight
-          ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
-          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
-      } focus:ring-1 focus:ring-cyan-500`}
+      size="xs"
+      tone={highlight ? "warning" : undefined}
+      className="w-auto"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 
   /**
@@ -195,12 +189,11 @@ export default function DeviceBusConfig({
               >
                 {/* Enable/disable checkbox */}
                 <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={mapping.enabled}
                     onChange={() => updateBus(mapping.deviceBus, { enabled: !mapping.enabled })}
                     disabled={configLocked}
-                    className="w-3 h-3 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)] disabled:cursor-not-allowed"
+                    size="sm"
                   />
                   <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}>
                     {BUS_NAMES[mapping.deviceBus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.deviceBus })}
@@ -269,12 +262,10 @@ export default function DeviceBusConfig({
             >
               {/* Enable/disable checkbox */}
               <label className={`flex items-center gap-2 flex-1 min-w-0 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={mapping.enabled}
                   onChange={() => updateBus(mapping.deviceBus, { enabled: !mapping.enabled })}
                   disabled={configLocked}
-                  className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)] disabled:cursor-not-allowed"
                 />
                 <span className={configLocked ? "text-sm font-medium text-[color:var(--text-muted)]" : sectionHeaderText}>
                   {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}

@@ -351,7 +351,7 @@ export default function PublishCatalogDialog({
           )}
 
           <FormField label={t("publish.messageLabel")}>
-            <Input value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)} />
+            <Input size="lg" value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)} />
           </FormField>
 
           {/* Where this is going, in one line, visible from every tab. */}

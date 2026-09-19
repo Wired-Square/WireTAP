@@ -213,9 +213,203 @@
     transform: none;
   }
 
+  /* ---- Inputs ------------------------------------------------------------
+     .input [.input--xs|--sm|--lg] (md when none) [.input--danger|--warning]
+     on an <input>, <select> or <textarea>; .select [.select--<size>] wraps a
+     <select> to draw its chevron; .check [.check--radio] [.check--sm] on a
+     checkbox or radio. Heights match the button scale so a control and the
+     button beside it share a row. */
+  .input {
+    --input-h: 32px;
+    --input-px: 8px;
+
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--input-h);
+    padding: 0 var(--input-px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition-property: color, background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input:focus {
+    border-color: var(--accent-primary);
+  }
+
+  .input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .input[readonly] {
+    background-color: var(--bg-surface);
+    color: var(--text-secondary);
+  }
+
+  .input--xs {
+    --input-h: 20px;
+    --input-px: 4px;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+
+  .input--sm {
+    --input-h: 26px;
+    --input-px: 6px;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .input--lg {
+    --input-h: 40px;
+    --input-px: 12px;
+  }
+
+  .input--danger,
+  .input[aria-invalid="true"] {
+    border-color: var(--status-danger-border);
+    background-color: var(--status-danger-bg);
+    color: var(--status-danger-text);
+  }
+
+  .input--warning {
+    border-color: var(--status-warning-border);
+    background-color: var(--status-warning-bg);
+    color: var(--status-warning-text);
+  }
+
+  textarea.input {
+    height: auto;
+    padding-block: 6px;
+    resize: none;
+  }
+
+  .select {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .select > .input {
+    padding-right: calc(var(--input-px) + 18px);
+    appearance: none;
+  }
+
+  .select__icon {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .select--xs .select__icon,
+  .select--sm .select__icon {
+    right: 4px;
+    width: 14px;
+    height: 14px;
+  }
+
+  .check {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    vertical-align: middle;
+    transition-property: background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .check::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background-color: #fff;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    transform: scale(0);
+    transition: transform 100ms ease-out;
+  }
+
+  .check:hover:not(:disabled) {
+    border-color: var(--text-muted);
+  }
+
+  .check:checked,
+  .check:indeterminate {
+    border-color: var(--accent-primary);
+    background-color: var(--accent-primary);
+  }
+
+  .check:checked::before,
+  .check:indeterminate::before {
+    transform: scale(1);
+  }
+
+  .check:indeterminate::before {
+    height: 2px;
+    clip-path: none;
+  }
+
+  .check:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .check--radio {
+    border-radius: 50%;
+  }
+
+  .check--radio::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    clip-path: none;
+  }
+
+  .check--sm {
+    width: 14px;
+    height: 14px;
+  }
+
+  .check--sm::before {
+    width: 8px;
+    height: 8px;
+  }
+
+  .check--sm.check--radio::before {
+    width: 5px;
+    height: 5px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;
+    }
+
+    .check::before {
+      transition: none;
     }
   }
 }

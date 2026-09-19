@@ -142,14 +142,14 @@ export default function EnumEditorDialog({
           {values.map((v, i) => (
             <div key={i} className="grid grid-cols-[1fr_2fr_auto] gap-2 items-center">
               <Input
-                variant="default"
+                size="lg"
                 type="text"
                 value={v.rawValue}
                 onChange={(e) => handleChange(i, "rawValue", e.target.value)}
                 placeholder="0 or 0x1F"
               />
               <Input
-                variant="default"
+                size="lg"
                 type="text"
                 value={v.label}
                 onChange={(e) => handleChange(i, "label", e.target.value)}

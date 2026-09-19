@@ -9,7 +9,7 @@ import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
-import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault } from "../../../styles";
+import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
@@ -35,6 +35,7 @@ import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
 import { signalByteIndices } from "../../../utils/mirrorBytes";
 import { IconButton } from "../../../components/Button";
+import { Input, Select } from "../../../components/forms";
 
 type Props = {
   frames: FrameDetail[];
@@ -1450,18 +1451,20 @@ export default function DecoderFramesView({
   const timeRangeInputs = showTimeRange && onStartTimeChange && onEndTimeChange ? (
     <div className={flexRowGap2}>
       <label className={`text-xs ${textMuted}`}>{t("framesView.start")}</label>
-      <input
+      <Input
         type="datetime-local"
         value={startTime || ""}
         onChange={(e) => onStartTimeChange(e.target.value)}
-        className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
+        size="sm"
+        className="w-auto"
       />
       <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.end")}</label>
-      <input
+      <Input
         type="datetime-local"
         value={endTime || ""}
         onChange={(e) => onEndTimeChange(e.target.value)}
-        className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
+        size="sm"
+        className="w-auto"
       />
     </div>
   ) : null;
@@ -1511,10 +1514,11 @@ export default function DecoderFramesView({
 
   // Speed selector for the toolbar right zone
   const speedSelector = supportsSpeedControl && onSpeedChange ? (
-    <select
+    <Select
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
-      className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
+      size="xs"
+      className="w-auto"
       title={t("framesView.playbackSpeed")}
     >
       {([0.125, 0.25, 0.5, 1, 2, 10, 30, 60] as PlaybackSpeed[]).map((s) => (
@@ -1522,7 +1526,7 @@ export default function DecoderFramesView({
           {s === 1 ? "1x (realtime)" : `${s}x`}
         </option>
       ))}
-    </select>
+    </Select>
   ) : null;
 
   return (

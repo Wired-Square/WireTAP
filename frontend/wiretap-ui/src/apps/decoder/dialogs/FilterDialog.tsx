@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { DialogFooter } from "../../../components/forms/DialogFooter";
-import { caption, sectionHeaderText, focusRing, bgSurface } from "../../../styles";
+import { caption, sectionHeaderText } from "../../../styles";
 import { Button } from "../../../components/Button";
+import { Input } from "../../../components/forms";
 
 type Props = {
   isOpen: boolean;
@@ -58,12 +59,13 @@ export default function FilterDialog({
           <label className={`block ${sectionHeaderText}`}>
             {t("filterDialog.frameIdsLabel")}
           </label>
-          <input
+          <Input
             type="text"
             value={idFilter}
             onChange={(e) => setIdFilter(e.target.value)}
             placeholder={t("filterDialog.frameIdsPlaceholder")}
-            className={`w-full px-3 py-2 rounded-lg border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)] font-mono ${focusRing}`}
+            size="lg"
+            mono
           />
           <p className={caption}>{t("filterDialog.frameIdsHelp")}</p>
         </div>
@@ -73,13 +75,13 @@ export default function FilterDialog({
           <label className={`block ${sectionHeaderText}`}>
             {t("filterDialog.minLengthLabel")}
           </label>
-          <input
+          <Input
             type="number"
             min={0}
             max={255}
             value={lengthValue}
             onChange={(e) => setLengthValue(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full px-3 py-2 rounded-lg border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)] ${focusRing}`}
+            size="lg"
           />
           <p className={caption}>{t("filterDialog.minLengthHelp")}</p>
         </div>

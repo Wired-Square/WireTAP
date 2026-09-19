@@ -2,8 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
-import { Input, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, borderDefault } from "../../../styles";
+import { Input, FormField, SecondaryButton, PrimaryButton, Select } from "../../../components/forms";
+import { h2 } from "../../../styles";
 import type { IOProfile } from "../stores/settingsStore";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 
@@ -42,22 +42,22 @@ export default function CreateBookmarkDialog({
 
         <div className="space-y-4">
           <FormField label={t("dialogs.createBookmark.profile")} variant="default">
-            <select
+            <Select
               value={profileId}
               onChange={(e) => onChangeProfileId(e.target.value)}
-              className={`w-full px-3 py-2 text-sm rounded border ${borderDefault} bg-[var(--bg-surface)] text-[color:var(--text-primary)]`}
+              size="lg"
             >
               {availableProfiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profile.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </FormField>
 
           <FormField label={t("dialogs.createBookmark.name")} variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
               placeholder={t("dialogs.createBookmark.namePlaceholder")}

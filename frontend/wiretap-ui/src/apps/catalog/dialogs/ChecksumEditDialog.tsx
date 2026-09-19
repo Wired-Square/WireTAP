@@ -73,7 +73,7 @@ export default function ChecksumEditDialog({
           {/* Name */}
           <FormField label="Name" required variant="default">
             <Input
-              variant="default"
+              size="lg"
               value={fields.name}
               onChange={(e) => setFields({ ...fields, name: e.target.value })}
               placeholder="e.g., frame_checksum"
@@ -84,7 +84,7 @@ export default function ChecksumEditDialog({
           <div>
             <FormField label="Algorithm" required variant="default">
               <Select
-                variant="default"
+                size="lg"
                 value={fields.algorithm}
                 onChange={(e) => {
                   const algo = e.target.value as ChecksumAlgorithm;
@@ -121,7 +121,7 @@ export default function ChecksumEditDialog({
               <div>
                 <FormField label="Start Byte" required variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     min={-frameLength}
                     max={frameLength - 1}
@@ -138,7 +138,7 @@ export default function ChecksumEditDialog({
               <div>
                 <FormField label="Byte Length" required variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     min={1}
                     max={4}
@@ -154,7 +154,7 @@ export default function ChecksumEditDialog({
               </div>
               <FormField label="Endianness" variant="default">
                 <Select
-                  variant="default"
+                  size="lg"
                   value={fields.endianness || "big"}
                   onChange={(e) =>
                     setFields({ ...fields, endianness: e.target.value as "little" | "big" })
@@ -181,7 +181,7 @@ export default function ChecksumEditDialog({
               <div>
                 <FormField label="Start Byte" required variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     min={-frameLength}
                     max={frameLength - 1}
@@ -200,7 +200,7 @@ export default function ChecksumEditDialog({
               <div>
                 <FormField label="End Byte (exclusive)" required variant="default">
                   <Input
-                    variant="default"
+                    size="lg"
                     type="number"
                     min={-frameLength + 1}
                     max={frameLength}
@@ -293,7 +293,7 @@ export default function ChecksumEditDialog({
           {/* Notes */}
           <FormField label="Notes" variant="default">
             <Textarea
-              variant="default"
+              size="lg"
               value={fields.notes || ""}
               onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
               placeholder="Optional notes about this checksum..."
