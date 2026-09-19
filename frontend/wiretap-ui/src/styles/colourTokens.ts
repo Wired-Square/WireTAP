@@ -2,13 +2,10 @@
 //
 // Centralised colour tokens for consistent palette across the app.
 // Core colours use CSS variables (set by useTheme) for user customisation.
-// Status and accent colours use Tailwind classes for simplicity.
 
 // =============================================================================
 // CSS Variable-based Colours (User Customisable)
 // =============================================================================
-// These use Tailwind arbitrary value syntax to reference CSS variables.
-// The variables are set by useTheme based on user settings.
 
 /** Primary surface (main app background) - uses CSS variable */
 export const bgPrimary = "bg-[var(--bg-primary)]";

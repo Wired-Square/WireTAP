@@ -79,9 +79,9 @@ WireTAP-Server repository.
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Zustand, Tailwind CSS
+- **Frontend**: React 19, TypeScript, Vite, Zustand
 - **Backend**: Tauri 2 (Rust)
-- **UI**: Dockview panels, Radix UI, Lucide icons
+- **UI**: Dockview panels, Lucide icons
 
 ## Development
 

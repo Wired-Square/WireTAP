@@ -2,7 +2,7 @@
 //
 // Shared form primitives used by every driver's OptionsPanel and the
 // unified Flash view. Kept tiny and unstyled-by-default so each driver
-// can compose them without copy-pasting Tailwind classes.
+// can compose them without copy-pasting class strings.
 
 import type { ReactNode } from "react";
 import {
@@ -68,7 +68,7 @@ interface TextInputProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  /** Tailwind width class (`w-28`, `w-32`, …). */
+  /** Width utility class (`w-28`, `w-32`, …). */
   widthClass?: string;
 }
 

@@ -37,7 +37,7 @@ function ripplePeriodMs(rate: number): number {
 
 interface ActivityDotProps {
   sessionId?: string | null;
-  /** Tailwind colour class(es) for the dot (carries animate-pulse for "starting"). */
+  /** Colour class(es) for the dot (carries animate-pulse for "starting"). */
   colourClass: string;
   /** Only ripple while the session is actively streaming. */
   active: boolean;

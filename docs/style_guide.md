@@ -26,32 +26,49 @@ effects from [../frontend/wiretap-ui/src/main.tsx](../frontend/wiretap-ui/src/ma
 
 These are non-negotiable in this codebase:
 
-1. **No `dark:` Tailwind variants.** They don't get generated in Windows WebView
-   when written inside string constants. Use CSS variable tokens instead.
-2. **Use CSS variable tokens, not raw Tailwind colour classes.** `text-gray-400`
-   becomes `textDataSecondary` (or another data-text token). The tokens read
-   from `:root` CSS variables set by `useTheme`, so themes work cross-platform.
-3. **Australian English** in all UI strings, comments, identifiers. "Colour",
+1. **Use the CSS-variable tokens.** `text-gray-400` becomes `textDataSecondary`
+   (or another data-text token); `bg-zinc-800` becomes `bgSurface`. The tokens
+   read `:root` variables that `useTheme` sets, so one variable change re-themes
+   every use. A raw palette class is fixed to one theme and looks wrong in the
+   other.
+2. **Australian English** in all UI strings, comments, identifiers. "Colour",
    "centralised", "organisation". Project-wide rule from
    [../CLAUDE.md](../CLAUDE.md).
-4. **Every user-facing string goes through `t(…)`.** No JSX text literals.
-5. **Raw `<button>` and `<input>` + style constants** is the convention, not
+3. **Every user-facing string goes through `t(…)`.** No JSX text literals.
+4. **Raw `<button>` and `<input>` + style constants** is the convention, not
    wrapper components. Centralising the *classes* gives reuse without locking
    in props.
-6. **Hover states use `hover:brightness-{n}`**, not `hover:bg-{color}-{n}`.
+5. **Hover states use `hover:brightness-{n}`**, not `hover:bg-{color}-{n}`.
    Brightness filters work uniformly against a CSS-variable background; bg
    classes don't.
 
 ## Theming model
 
-`useTheme` ([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts)) sets CSS
-variables on `:root` based on the user's theme settings:
+There is no CSS framework. [WireTAP.css](../frontend/wiretap-ui/src/WireTAP.css)
+declares two layers and imports the app's own sheets into them, in cascade
+order:
+
+- [reset.css](../frontend/wiretap-ui/src/styles/reset.css) — the browser
+  reset, `@layer reset`.
+- [utilities.css](../frontend/wiretap-ui/src/styles/utilities.css) — every
+  utility class the code uses, `@layer utilities`. It is **generated**:
+  `npm run gen:css` scans the class strings under `src/` and writes the sheet,
+  and the `utilitiesCss` test fails until the committed sheet matches. A class
+  the generator cannot resolve, or a variant it does not have (`dark:`, `md:`,
+  `[&…]:`), fails the run rather than silently emitting nothing — a typo in a
+  class name is a test failure, not a missing rule.
+- The rest of `WireTAP.css` — theme variables, fonts and the app's own rules —
+  is unlayered, so it wins over both.
+
+`useTheme` ([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts))
+toggles `.dark` on `<html>` and sets the theme variables on `:root` from the
+user's settings:
 
 - `--bg-primary`, `--bg-surface`, `--text-primary`, `--text-secondary`,
   `--border-default`, `--data-bg`, `--accent-primary`, status colours, etc.
 
-Tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) are Tailwind
-arbitrary-value classes that read those variables:
+Tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts)
+are arbitrary-value utilities that read those variables:
 
 ```ts
 export const textPrimary = "text-[color:var(--text-primary)]";
@@ -60,6 +77,14 @@ export const bgSurface = "bg-[var(--bg-surface)]";
 
 Result: a single CSS variable change at runtime re-themes everything that uses
 the token. Hardcoded `text-zinc-100` will not update.
+
+The class vocabulary is Tailwind 4's, kept when the framework was removed so no
+component had to change. The old rule that `dark:` variants "don't work on
+Windows WebView" was never a WebView limit: Tailwind's `dark:` compiled to
+`@media (prefers-color-scheme: dark)` because no `@custom-variant dark` pointed
+it at the app's `.dark` class, so it diverged whenever the OS and the app
+setting disagreed. The generator rejects `dark:` outright; theme-dependent
+styling goes through the variables.
 
 ## Token reference
 
@@ -561,8 +586,8 @@ try {
 
 ### Don'ts
 
-- Don't use raw Tailwind `bg-red-500/10`, `text-red-400` etc. — these
-  bypass theming and look broken on Windows WebView.
+- Don't use raw palette classes — `bg-red-500/10`, `text-red-400` — these
+  bypass theming and are wrong in one of the two themes.
 - Don't `console.error` user-facing failures and leave them invisible.
   Surface them in the matching banner / dialog / toast.
 - Don't stack two surfaces for the same failure (e.g. banner *and*
@@ -671,7 +696,6 @@ value.toLocaleString(i18n.language);
 
 | ❌ Don't | ✅ Do |
 |---|---|
-| `dark:text-white` | `textPrimary` |
 | `text-gray-400` in data tables | `textDataSecondary` / `textDataTertiary` / `textDataMuted` |
 | `bg-blue-600/30 text-blue-400` ad-hoc chip | `badgeInfo` / `badgeColorClass(...)` / `badgeDarkPanelInfo` |
 | `focus:ring-blue-500 focus:outline-none` | `focusRing` |

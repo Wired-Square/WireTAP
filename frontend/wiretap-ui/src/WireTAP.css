@@ -502,8 +502,6 @@ html, body {
   --signal-fuchsia-1: #e879f9;
 }
 
-/* Utility class for secondary text using CSS variables */
-/* Used in tree views and other places where dark: variants don't work on Windows */
 .tree-secondary-text {
   color: var(--text-secondary);
 }

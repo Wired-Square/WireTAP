@@ -1,11 +1,10 @@
 // ui/src/styles/buttonStyles.ts
 // Centralized button styles for consistent appearance across the app
-// Uses CSS variables for cross-platform dark mode support (Windows WebView).
 
 /**
  * Tactile press feedback — a gentle scale-down while held that eases back on
  * release. Backed by the unlayered `.btn-press` rule in WireTAP.css, which wins
- * over (and folds in) a button's Tailwind `transition-*` classes so there's a
+ * over (and folds in) a button's `transition-*` utilities so there's a
  * single, smooth transition rather than a truncated keyframe pulse. Baked into
  * the shared button bases below, so most buttons get it for free; append to any
  * other button as well:  className={`${someButtonClass} ${buttonPress}`}
@@ -327,9 +326,7 @@ export function dataViewTabClass(isActive: boolean, hasIndicator = false): strin
 }
 
 /**
- * Get badge color classes for protocol badges. Uses status CSS variables so
- * badges respect the active theme on Windows WebView (where Tailwind `dark:`
- * variants don't get generated inside string constants).
+ * Get badge color classes for protocol badges.
  * @param color - Badge color variant
  */
 export function badgeColorClass(color: 'green' | 'blue' | 'purple' | 'gray' | 'amber' | 'cyan' | 'red'): string {

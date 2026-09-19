@@ -1,8 +1,5 @@
 // ui/src/styles/cardStyles.ts
 // Centralized card, panel, and container styles
-//
-// NOTE: Cards use CSS variables for backgrounds to work correctly on Windows WebView
-// where Tailwind dark: variants in string constants don't get generated.
 
 /**
  * Card base - common border and rounding

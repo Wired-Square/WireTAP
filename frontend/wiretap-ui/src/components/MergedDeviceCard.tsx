@@ -24,8 +24,8 @@ import {
   bgPurple,
 } from "../styles";
 
-// Tailwind ring utility needs ring-{color}; the border-{color} status tokens
-// only set border-color, not --tw-ring-color. Define the ring variants here.
+// The ring utility needs ring-{color}; the border-{color} status tokens only set
+// border-color, not --tw-ring-color. Define the ring variants here.
 const ringInfo = "ring-[color:var(--status-info-border)]";
 const ringWarning = "ring-[color:var(--status-warning-border)]";
 const ringSuccess = "ring-[color:var(--status-success-border)]";

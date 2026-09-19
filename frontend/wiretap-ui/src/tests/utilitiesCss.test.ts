@@ -84,8 +84,7 @@ describe("utilities.css", () => {
     expect(stale, "registered as undefined but now defined or unused — remove from the list").toEqual([]);
   });
 
-  // Enabled by Stage 3 of the Tailwind Removal Handover, when the dependency goes.
-  it.skip("has no Tailwind or PostCSS left in the package", () => {
+  it("has no Tailwind or PostCSS left in the package", () => {
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
     expect(deps.filter((d) => /tailwind|postcss|autoprefixer/.test(d))).toEqual([]);
     expect(WIRETAP_CSS).not.toMatch(/@import\s+["']tailwindcss["']/);

@@ -78,8 +78,8 @@ read a label, or see a dialog.
 
 `screencapture` on macOS, then read the PNG. No setup, and the right tool for
 "does this look correct in both themes" — which matters here because theming
-goes through CSS variables rather than Tailwind `dark:` variants, so a theme
-bug is invisible to every other surface.
+is CSS variables swapped at runtime, so a theme bug is invisible to every other
+surface.
 
 ### Playwright — possible, but understand what it tests
 
