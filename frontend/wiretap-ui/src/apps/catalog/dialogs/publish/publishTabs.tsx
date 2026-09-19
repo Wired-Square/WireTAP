@@ -8,7 +8,6 @@
 import * as ShareIcon from "../../../../components/catalogIcons";
 import type { TabDef } from "../../../../components/TabStrip";
 import type { PublishPlan } from "../../../../api/catalogShare";
-import { iconSm } from "../../../../styles/spacing";
 import type { Blocker, PublishTab, T } from "./types";
 import type { PublishDiffResult } from "./usePublishDiff";
 
@@ -39,20 +38,20 @@ export function publishTabs({
     {
       id: "push",
       label: t("publish.tabs.push"),
-      icon: <ShareIcon.Push className={iconSm} />,
+      icon: <ShareIcon.Push />,
       tone: tone("push", plan?.targetIsPublic),
     },
     {
       id: "branch",
       label: t("publish.tabs.branch"),
-      icon: <ShareIcon.Branch className={iconSm} />,
+      icon: <ShareIcon.Branch />,
       tone: tone("branch", plan?.forkNeeded),
       ...needsPlan,
     },
     {
       id: "diff",
       label: t("publish.tabs.diff"),
-      icon: <ShareIcon.Diff className={iconSm} />,
+      icon: <ShareIcon.Diff />,
       tone: tone("diff"),
       badge: diffBadge(diff, t),
       ...needsPlan,

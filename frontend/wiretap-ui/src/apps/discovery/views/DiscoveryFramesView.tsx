@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
 import { FileText, Hash, Network, Filter, Snowflake, RefreshCw, Target, Send, Gauge, Bookmark, Search, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
+import { iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
 import { protocolForToolTab } from "../../../stores/discoveryToolboxStore";
@@ -419,19 +419,19 @@ function DiscoveryFramesView({
       menuSeparator,
       {
         label: 'Filter',
-        icon: <Filter className={iconXs} />,
+        icon: <Filter />,
         onClick: () => toggleFrameSelection(keyOf(frame as FrameMessage)),
       },
       {
         label: 'Solo',
-        icon: <Target className={iconXs} />,
+        icon: <Target />,
         onClick: () => { deselectAllFrames(); toggleFrameSelection(keyOf(frame as FrameMessage)); },
       },
       menuSeparator,
       frameInspectMenuItem(frame, t),
       {
         label: 'Send to Transmit',
-        icon: <Send className={iconXs} />,
+        icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
@@ -448,17 +448,17 @@ function DiscoveryFramesView({
       },
       {
         label: 'Add to Transmit queue',
-        icon: <Send className={iconXs} />,
+        icon: <Send />,
         onClick: () => setShowBulkAddDialog(true),
       },
       {
         label: 'Replay frames',
-        icon: <Play className={iconXs} />,
+        icon: <Play />,
         onClick: () => setShowReplayDialog(true),
       },
       {
         label: 'Dashboard',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
           const store = useDashboardStore.getState();
@@ -474,7 +474,7 @@ function DiscoveryFramesView({
         { separator: true, label: '', onClick: () => {} },
         {
           label: 'Bookmark',
-          icon: <Bookmark className={iconXs} />,
+          icon: <Bookmark />,
           onClick: () => onBookmark(frame.frame_id, frame.timestamp_us),
         },
       );
@@ -508,13 +508,13 @@ function DiscoveryFramesView({
     if (hasFramesTab) {
       // Named for its one protocol; "Frames" when it holds several or nothing has said.
       const label = tableProtocols.length === 1 ? protocolLabel(tableProtocols[0]) : 'Frames';
-      result.push({ id: 'frames', label, count: frameCount, countColor: 'green' as const });
+      result.push({ id: 'frames', label, count: frameCount, countTone: "success" as const });
     }
     if (hasModbusTab) {
       // Counted while shown; a hidden tab keeps the count it last had.
-      result.push({ id: 'modbus', label: t("modbusView.tab"), count: modbusCount, countColor: 'green' as const });
+      result.push({ id: 'modbus', label: t("modbusView.tab"), count: modbusCount, countTone: "success" as const });
     }
-    result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countColor: 'orange' as const });
+    result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countTone: "warning" as const });
     if (toolboxResults.messageOrderResults) {
       result.push({ id: TOOL_TAB_CONFIG['message-order'].tabId, label: TOOL_TAB_CONFIG['message-order'].label, closeable: true });
     }
@@ -535,7 +535,7 @@ function DiscoveryFramesView({
         id: TOOL_TAB_CONFIG[key].tabId,
         label: TOOL_TAB_CONFIG[key].label,
         count: scan.isScanning ? undefined : scan.progress?.found_count,
-        countColor: 'purple' as const,
+        countTone: "purple" as const,
         closeable: !scan.isScanning,
       });
     }
@@ -545,7 +545,7 @@ function DiscoveryFramesView({
         id: TOOL_TAB_CONFIG['modbus-function-codes'].tabId,
         label: TOOL_TAB_CONFIG['modbus-function-codes'].label,
         count: probe.isProbing ? undefined : probe.entries.filter((e) => e.responded).length,
-        countColor: 'purple' as const,
+        countTone: "purple" as const,
         closeable: !probe.isProbing,
       });
     }

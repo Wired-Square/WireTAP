@@ -12,7 +12,6 @@ import { Calculator, ClipboardCopy, Copy } from "lucide-react";
 import type { TFunction } from "i18next";
 import type { ContextMenuItem } from "../../../components/ContextMenu";
 import type { FrameRow } from "./FrameDataTable";
-import { iconXs } from "../../../styles/spacing";
 import { byteToHex, bytesToHex } from "../../../utils/byteUtils";
 import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
 
@@ -42,13 +41,13 @@ export function frameCopyMenuItems({
     ...(includeId
       ? [{
           label: t("contextMenu.copyId"),
-          icon: <Copy className={iconXs} />,
+          icon: <Copy />,
           onClick: () => navigator.clipboard.writeText(formatId(frame.frame_id, frame.is_extended)),
         }]
       : []),
     {
       label: t("contextMenu.copyData"),
-      icon: <ClipboardCopy className={iconXs} />,
+      icon: <ClipboardCopy />,
       onClick: () => navigator.clipboard.writeText(hexData),
     },
   ];
@@ -58,7 +57,7 @@ export function frameCopyMenuItems({
 export function frameInspectMenuItem(frame: FrameRow, t: TFunction): ContextMenuItem {
   return {
     label: t("contextMenu.inspect"),
-    icon: <Calculator className={iconXs} />,
+    icon: <Calculator />,
     onClick: () => sendHexDataToCalculator(bytesToHex(frame.bytes)),
   };
 }

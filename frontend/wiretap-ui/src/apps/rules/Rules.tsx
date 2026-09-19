@@ -12,10 +12,9 @@ import {
   textDanger,
   bgDataView,
   bgDataToolbar,
-  borderDataView,
   dataViewContainer,
 } from "../../styles";
-import { dataViewTabClass } from "../../styles/buttonStyles";
+import { Tab, Tabs } from "../../components/Tabs";
 import RulesTopBar, { type RulesActiveState, type PersistState } from "./views/RulesTopBar";
 import {
   useFrameLinkDeviceLiveness,
@@ -273,21 +272,13 @@ export default function Rules() {
       {/* Connected — main content (data-view bubble) */}
       {device?.connected && (
         <div className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}>
-          {/* Tab bar — uses the shared dataViewTabClass styling */}
-          <div
-            className={`flex-shrink-0 flex items-center px-1 border-b ${borderDataView} ${bgDataToolbar}`}
-          >
+          <Tabs className={`flex-shrink-0 px-1 ${bgDataToolbar}`}>
             {TAB_KEYS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={dataViewTabClass(activeTab === tab.id)}
-              >
+              <Tab key={tab.id} selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
                 {t(`tabs.${tab.i18nKey}`)}
-              </button>
+              </Tab>
             ))}
-          </div>
+          </Tabs>
 
           {/* Tab content */}
           <div

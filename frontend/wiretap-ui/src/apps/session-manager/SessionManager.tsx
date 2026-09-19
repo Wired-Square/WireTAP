@@ -62,7 +62,6 @@ export default function SessionManager() {
         id: "log",
         label: t("tabs.log"),
         count: logEntryCount > 0 ? logEntryCount : undefined,
-        countColor: "gray" as const,
       },
       { id: "visual", label: t("tabs.visual") },
     ],

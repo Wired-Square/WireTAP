@@ -298,19 +298,19 @@ export default function SourceList({
     {
       id: "sessions" as const,
       label: t("ioSourcePicker.tabs.sessions"),
-      icon: <Play className={iconXs} />,
+      icon: <Play />,
       badge: joinableSessions.length,
     },
     {
       id: "captures" as const,
       label: t("ioSourcePicker.tabs.captures"),
-      icon: <Database className={iconXs} />,
+      icon: <Database />,
       badge: captureCount + recordedProfiles.length,
     },
     {
       id: "devices" as const,
       label: t("ioSourcePicker.tabs.devices"),
-      icon: <Wifi className={iconXs} />,
+      icon: <Wifi />,
       badge: realtimeProfiles.length,
     },
   ].filter((tab) => availableTabs.includes(tab.id));

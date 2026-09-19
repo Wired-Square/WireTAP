@@ -8,12 +8,12 @@ import { useTranslation } from "react-i18next";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Globe } from "lucide-react";
-import { iconXs } from "../styles/spacing";
 import { caption } from "../styles/typography";
 import { getLocalTimezoneAbbr, convertDatetimeLocal } from "../utils/timezone";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../utils/favorites";
 import { Select, Input, inputClass } from "./forms";
+import { Tab, Tabs } from "./Tabs";
 
 /**
  * Convert a datetime-local string (YYYY-MM-DDTHH:mm:ss) to a Date object.
@@ -204,33 +204,15 @@ export default function TimeBoundsInput({
       {/* Timezone toggle */}
       <div className="flex items-center justify-between">
         <label className={caption}>{t("timeBounds.timeZone")}</label>
-        <div className="flex items-center gap-1 bg-[var(--hover-bg)] rounded p-0.5">
-          <button
-            type="button"
-            onClick={() => handleTimezoneChange("local")}
-            disabled={disabled}
-            className={`px-2 py-0.5 text-xs rounded transition-colors ${
-              value.timezoneMode === "local"
-                ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)] shadow-sm"
-                : "text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]"
-            } disabled:opacity-50`}
-          >
+        <Tabs variant="segmented">
+          <Tab selected={value.timezoneMode === "local"} onClick={() => handleTimezoneChange("local")} disabled={disabled}>
             {localTzAbbr}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTimezoneChange("utc")}
-            disabled={disabled}
-            className={`px-2 py-0.5 text-xs rounded transition-colors flex items-center gap-1 ${
-              value.timezoneMode === "utc"
-                ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)] shadow-sm"
-                : "text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]"
-            } disabled:opacity-50`}
-          >
-            <Globe className={iconXs} />
+          </Tab>
+          <Tab selected={value.timezoneMode === "utc"} onClick={() => handleTimezoneChange("utc")} disabled={disabled}>
+            <Globe />
             UTC
-          </button>
-        </div>
+          </Tab>
+        </Tabs>
       </div>
 
       {/* Start/End time inputs using react-datepicker */}

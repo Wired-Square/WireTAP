@@ -9,6 +9,7 @@ import { useDashboardStore, getSignalLabel, getConfidenceColour } from "../../..
 import { useSettings } from "../../../hooks/useSettings";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
+import { Tab, Tabs } from "../../../components/Tabs";
 import { PrimaryButton, Input, Select, Textarea } from "../../../components/forms";
 
 interface Props {
@@ -357,30 +358,22 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   )}
                   {/* Y-axis toggle (line-chart with 2+ signals) */}
                   {panel.type === "line-chart" && panel.signals.length >= 2 && (
-                    <div className="flex shrink-0 rounded border border-[color:var(--border-default)] overflow-hidden">
-                      <button
+                    <Tabs variant="segmented" className="shrink-0">
+                      <Tab
+                        selected={(signal.yAxis ?? 'left') === 'left'}
                         onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'left')}
-                        className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                          (signal.yAxis ?? 'left') === 'left'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
-                        }`}
                         title={t("panelConfig.actions.leftAxis")}
                       >
                         L
-                      </button>
-                      <button
+                      </Tab>
+                      <Tab
+                        selected={signal.yAxis === 'right'}
                         onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'right')}
-                        className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                          signal.yAxis === 'right'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
-                        }`}
                         title={t("panelConfig.actions.rightAxis")}
                       >
                         R
-                      </button>
-                    </div>
+                      </Tab>
+                    </Tabs>
                   )}
                   <Input
                     type="text"

@@ -1,16 +1,15 @@
 // ui/src/components/LogoMenu.tsx
 
-import { useState, useRef, useEffect } from "react";
 import { ArrowUpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconMd, marginAppContent } from "../styles/spacing";
-import { bgSurface, borderDefault, textPrimary } from "../styles";
+import { iconMd } from "../styles/spacing";
 import { openUrl } from "@tauri-apps/plugin-opener";
 const logo = "/logo.svg";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 import { menuApps, menuGroupOrder, type PanelId } from "../apps/registry";
 import { Button } from "./Button";
+import { Menu, MenuItem, MenuSeparator, usePopover } from "./Menu";
 
 export type { PanelId };
 
@@ -29,8 +28,7 @@ const menuGroups = menuGroupOrder
 
 export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
   const { t } = useTranslation("menus");
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menu = usePopover();
   const availableUpdate = useUpdateStore((s) => s.availableUpdate);
 
   const handleUpdateClick = () => {
@@ -39,34 +37,6 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
     }
   };
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [isOpen]);
-
-  // Close menu on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isOpen]);
-
   const handleItemClick = (panelId: PanelId) => {
     const app = menuApps.find((a) => a.id === panelId);
     if (app?.singleton) {
@@ -74,17 +44,12 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
     } else {
       onPanelClick(panelId);
     }
-    setIsOpen(false);
   };
 
   return (
-    <div ref={menuRef} className="relative flex items-center px-2 gap-2" style={{ height: '35px' }}>
+    <div className="flex items-center px-2 gap-2" style={{ height: '35px' }}>
       {/* Logo button with white rounded background */}
-      <Button
-        onClick={() => setIsOpen(!isOpen)}
-        variant="link"
-        title={t("logo.tooltip")}
-      >
+      <Button {...menu.trigger} variant="link" title={t("logo.tooltip")}>
         <img
           src={logo}
           alt="WireTAP"
@@ -106,36 +71,26 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
         </Button>
       )}
 
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className={`absolute top-full left-2 mt-1 min-w-[180px] ${bgSurface} ${borderDefault} ${textPrimary} rounded-lg shadow-xl z-50`}>
-          {menuGroups.map((g, groupIndex) => (
-            <div key={g.group}>
-              {groupIndex > 0 && (
-                <div className={`my-2 mx-2 border-t ${borderDefault}`} />
-              )}
-              {g.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.id} className={marginAppContent}>
-                    <button
-                      onClick={() => handleItemClick(item.id)}
-                      className={`
-                        w-full flex items-center px-3 py-2 text-left rounded
-                        ${textPrimary} font-medium
-                        ${item.bgColour} transition-colors
-                      `}
-                    >
-                      <Icon className={`${iconMd} ${item.colour} shrink-0`} />
-                      <span className="text-sm ml-2">{t(`panels.${item.i18nKey}`)}</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
+      <Menu {...menu.popover} size="lg" className="min-w-[180px]">
+        {menuGroups.map((g, groupIndex) => (
+          <div key={g.group}>
+            {groupIndex > 0 && <MenuSeparator />}
+            {g.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <MenuItem
+                  key={item.id}
+                  onClick={() => handleItemClick(item.id)}
+                  icon={<Icon className={item.colour} />}
+                  className={`font-medium ${item.bgColour}`}
+                >
+                  {t(`panels.${item.i18nKey}`)}
+                </MenuItem>
+              );
+            })}
+          </div>
+        ))}
+      </Menu>
     </div>
   );
 }

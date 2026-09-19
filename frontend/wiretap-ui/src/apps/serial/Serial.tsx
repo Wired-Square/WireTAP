@@ -14,12 +14,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Terminal as TerminalIcon, Cpu, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppLayout from "../../components/AppLayout";
+import { Tab, Tabs } from "../../components/Tabs";
 import {
   bgSurface,
-  borderDivider,
   dataViewContainer,
-  textSecondary,
-  textPrimary,
   textMuted,
 } from "../../styles/colourTokens";
 import { iconSm } from "../../styles/spacing";
@@ -256,29 +254,17 @@ export default function Serial() {
       }
     >
       <div className={`flex-1 flex flex-col min-h-0 ${dataViewContainer}`}>
-        {/* Tab bar inside the viewport (mirrors Modbus / Decoder pattern) */}
-        <div
-          className={`flex items-center ${borderDivider} border-b ${bgSurface}`}
-        >
+        <Tabs className={bgSurface}>
           {tabs.map((tab) => {
             const TabIcon = tab.icon;
-            const active = tab.id === activeTab;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? `${textPrimary} border-b-2 border-sky-400`
-                    : `${textSecondary} hover:text-[color:var(--text-primary)]`
-                }`}
-              >
-                <TabIcon className={iconSm} />
+              <Tab key={tab.id} selected={tab.id === activeTab} onClick={() => setActiveTab(tab.id)}>
+                <TabIcon />
                 {tab.label}
-              </button>
+              </Tab>
             );
           })}
-        </div>
+        </Tabs>
 
         {/* Tab content */}
         {activeTab === "terminal" && (

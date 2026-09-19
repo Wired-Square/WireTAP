@@ -7,7 +7,6 @@ import {
   textTertiary,
   bgSurface,
   borderDefault,
-  hoverBg,
 } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";
 import type { SelectableSignal } from "../../../api/framelinkRules";
@@ -236,7 +235,7 @@ export default function SignalCombobox({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className={`max-h-64 overflow-y-auto border rounded shadow-lg ${bgSurface} ${borderDefault}`}
+          className="popover max-h-64 overflow-y-auto"
           style={dropdownStyle}
         >
           {filteredGroups.length === 0 && (
@@ -266,7 +265,7 @@ export default function SignalCombobox({
                   <button
                     key={signal.signal_id}
                     type="button"
-                    className={`w-full grid grid-cols-[1fr_auto_3rem_auto] gap-x-2 items-center px-2 py-1 text-left text-xs cursor-pointer ${hoverBg}`}
+                    className="menu__item grid grid-cols-[1fr_auto_3rem_auto] gap-x-2 px-2 text-xs"
                     onMouseDown={(e) => {
                       // Prevent input blur before we can handle the click
                       e.preventDefault();

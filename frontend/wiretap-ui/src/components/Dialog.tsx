@@ -15,6 +15,7 @@ import {
 } from "react";
 import { X } from "lucide-react";
 import { IconButton } from "./Button";
+import { useDismiss } from "./dismiss";
 import { iconLg } from "../styles/spacing";
 import { useTranslation } from "react-i18next";
 
@@ -43,33 +44,18 @@ interface DialogContextValue {
 
 const DialogContext = createContext<DialogContextValue>({ titleId: "" });
 
-// Escape reaches only the dialog opened last, so a picker hosted by another
-// dialog closes alone.
-const openDialogs: symbol[] = [];
-
 export function Dialog({ isOpen, onClose, size = "md", title, subtitle, icon, className = "", children }: DialogProps) {
   const titleId = useId();
   const frameRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useDismiss(isOpen, onClose);
 
+  // Focus moves into the frame on open and back to the opener on close.
   useEffect(() => {
     if (!isOpen) return;
-    const self = Symbol("dialog");
-    openDialogs.push(self);
     const opener = document.activeElement as HTMLElement | null;
     const frame = frameRef.current;
     if (frame && !frame.contains(document.activeElement)) frame.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || e.isComposing) return;
-      if (openDialogs[openDialogs.length - 1] !== self || !onCloseRef.current) return;
-      e.preventDefault();
-      onCloseRef.current();
-    };
-    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      openDialogs.splice(openDialogs.indexOf(self), 1);
       if (opener && document.contains(opener)) opener.focus();
     };
   }, [isOpen]);

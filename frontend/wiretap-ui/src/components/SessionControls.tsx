@@ -5,8 +5,7 @@
 // details and all actions (play/pause, speed, bookmark, rename, pin, clear,
 // disconnect). The chip width never changes as session state changes.
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square, Settings2 } from "lucide-react";
 import { iconSm, roundedDefault } from "../styles/spacing";
@@ -14,12 +13,12 @@ import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
-import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
 import { useSessionStore } from "../stores/sessionStore";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { Button } from "./Button";
 import { Input } from "./forms";
+import { Menu, MenuItem, MenuSeparator, Popover, usePopover } from "./Menu";
 
 // ============================================================================
 // Activity dot - status dot that emits a sonar ripple whose cadence scales with
@@ -414,7 +413,7 @@ export function IOSessionControls({
   };
 
   const commitRename = () => {
-    if (!isRenaming) return; // Guard against double-fire from blur after Enter/Escape
+    if (!isRenaming) return;
     const trimmed = renameValue.trim();
     const currentName = captureMetadata?.name || "";
     if (trimmed && trimmed !== currentName && onRenameCapture) {
@@ -425,69 +424,10 @@ export function IOSessionControls({
 
   const cancelRename = () => setIsRenaming(false);
 
-  // --- Kebab menu state (click-to-open, portal-rendered, viewport-clamped) ---
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = usePopover();
   // Reconfiguring a device is app-agnostic — the backend does the work — so the
   // menu opens the shared dialog directly rather than routing through the app.
   const openDeviceSettings = useDeviceEditorStore((s) => s.open);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRectRef = useRef<DOMRect | null>(null);
-
-  const handleButtonClick = useCallback(() => {
-    if (menuOpen) {
-      setMenuOpen(false);
-      return;
-    }
-    if (buttonRef.current) {
-      buttonRectRef.current = buttonRef.current.getBoundingClientRect();
-      setMenuStyle({ visibility: "hidden" }); // reset until measured
-    }
-    setMenuOpen(true);
-  }, [menuOpen]);
-
-  // Close on any click outside the button or the menu.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDocMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [menuOpen]);
-
-  // After the portal menu mounts, measure it and position within the viewport.
-  useLayoutEffect(() => {
-    if (!menuOpen || !menuRef.current || !buttonRectRef.current) return;
-    const menu = menuRef.current;
-    const btnRect = buttonRectRef.current;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const mw = menu.offsetWidth;
-    const mh = menu.offsetHeight;
-    const gap = 2;
-
-    // Vertical: prefer below button, flip above if it won't fit
-    let top = btnRect.bottom + gap;
-    if (top + mh > vh) top = btnRect.top - gap - mh;
-    top = Math.max(4, Math.min(top, vh - mh - 4));
-
-    // Horizontal: align left edge to button left edge, clamp to viewport
-    let left = btnRect.left;
-    if (left + mw > vw - 4) left = vw - 4 - mw;
-    if (left < 4) left = 4;
-
-    setMenuStyle({ top, left, visibility: "visible" });
-  }, [menuOpen]);
-
-  /** Run a menu action then dismiss the menu. */
-  const runAndClose = (fn?: () => void) => () => {
-    fn?.();
-    setMenuOpen(false);
-  };
 
   // --- Details + action visibility ---
   const { statusLabel, typeLabel, interfaceEntries } = getSessionDetails({
@@ -527,34 +467,32 @@ export function IOSessionControls({
         defaultReadProfileId={defaultReadProfileId}
         sessionId={sessionId}
         ioState={ioState}
-        onClick={hasSource ? handleButtonClick : onOpenIoSessionPicker}
-        buttonRef={buttonRef}
+        onClick={hasSource ? menu.toggle : onOpenIoSessionPicker}
+        buttonRef={menu.trigger.ref}
         title={hasSource ? "Session menu" : "Select source"}
         isCaptureMode={isCaptureMode}
       />
 
-      {/* Rename popover */}
-      {isRenaming && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg shadow-xl p-2">
-          <Input
-            ref={renameInputRef}
-            type="text"
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitRename();
-              if (e.key === "Escape") cancelRename();
-            }}
-            className="w-48"
-            placeholder={t("session.captureName")}
-          />
-        </div>
-      )}
+      {/* Rename popover: a click outside commits, as a blur did; Escape cancels */}
+      <Popover open={isRenaming} onClose={commitRename} anchorRef={menu.trigger.ref} className="p-2">
+        <Input
+          ref={renameInputRef}
+          type="text"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancelRename();
+            }
+          }}
+          className="w-48"
+          placeholder={t("session.captureName")}
+        />
+      </Popover>
 
-      {/* Dropdown menu — rendered in a portal to escape overflow clipping */}
-      {menuOpen && createPortal(
-        <div ref={menuRef} className={`${menuClasses} max-w-[280px]`} style={menuStyle}>
+      <Menu {...menu.popover} className="max-w-[280px]">
           {/* Details */}
           <div className="px-3 py-2 text-xs cursor-default">
             {statusLabel && (
@@ -599,7 +537,7 @@ export function IOSessionControls({
                     <button
                       key={entry.profileId}
                       onClick={() => {
-                        setMenuOpen(false);
+                        menu.close();
                         openDeviceSettings(entry.profileId, isStreaming ? sessionId ?? null : null);
                       }}
                       title={t("session.interfaceSettings", { name: entry.label })}
@@ -619,105 +557,95 @@ export function IOSessionControls({
             )}
           </div>
 
-          <div className={menuDivider} />
+          <MenuSeparator />
 
           {/* Change source */}
-          <button
-            onClick={runAndClose(onOpenIoSessionPicker)}
+          <MenuItem
+            onClick={onOpenIoSessionPicker}
             disabled={changeSourceDisabled}
-            className={menuItem}
+            icon={<ArrowRightLeft />}
             title={changeSourceDisabled ? "Pause or disconnect to change source" : undefined}
           >
-            <ArrowRightLeft className={iconSm} />
             Change source
-          </button>
+          </MenuItem>
 
           {/* Playback / capture actions */}
           {showPlay && (
-            <button onClick={runAndClose(onPlay)} className={menuItem}>
-              <Play className={iconSm} />
+            <MenuItem onClick={onPlay} icon={<Play />}>
               {isStopped ? t("session.resumeIo") : t("playback.play")}
-            </button>
+            </MenuItem>
           )}
           {showPause && (
-            <button onClick={runAndClose(onPause)} className={menuItem}>
-              <Pause className={iconSm} />
+            <MenuItem onClick={onPause} icon={<Pause />}>
               {t("playback.pause")}
-            </button>
+            </MenuItem>
           )}
           {showSpeed && (
-            <button
-              onClick={supportsSpeed ? runAndClose(onOpenSpeedPicker) : undefined}
+            <MenuItem
+              onClick={onOpenSpeedPicker}
               disabled={!supportsSpeed}
-              className={menuItem}
+              icon={<Gauge />}
               title={supportsSpeed ? undefined : "Speed control (available for captures)"}
             >
-              <Gauge className={iconSm} />
-              <span className="flex-1 text-left">Speed</span>
+              <span className="flex-1">Speed</span>
               <span className="text-[color:var(--text-muted)]">{speedLabel}</span>
-            </button>
+            </MenuItem>
           )}
           {showBookmark && (
-            <button onClick={runAndClose(onOpenBookmarkPicker)} className={menuItem}>
-              <Bookmark className={iconSm} />
+            <MenuItem onClick={onOpenBookmarkPicker} icon={<Bookmark />}>
               {t("session.loadBookmark")}
-            </button>
+            </MenuItem>
           )}
           {showRename && (
-            <button onClick={() => { startRename(); setMenuOpen(false); }} className={menuItem}>
-              <Pencil className={iconSm} />
+            <MenuItem onClick={startRename} icon={<Pencil />}>
               {t("session.renameCapture")}
-            </button>
+            </MenuItem>
           )}
           {showPin && (
-            <button onClick={runAndClose(onToggleCapturePin)} className={menuItem}>
-              {capturePersistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
+            <MenuItem onClick={onToggleCapturePin} icon={capturePersistent ? <Pin /> : <PinOff />}>
               {capturePersistent ? t("session.unpinCapture") : t("session.pinCapture")}
-            </button>
+            </MenuItem>
           )}
           {showClear && (
-            <button
-              onClick={runAndClose(onClearCapture)}
+            <MenuItem
+              onClick={onClearCapture}
               disabled={!hasData}
-              className={`${menuItem} text-red-400 ${hasData ? "hover:!bg-red-500/10" : ""}`}
+              tone="danger"
+              icon={<Trash2 />}
               title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
             >
-              <Trash2 className={iconSm} />
               {isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
-            </button>
+            </MenuItem>
           )}
 
           {/* Exit controls: Leave (this app) / Stop (all apps) / Destroy (all apps) */}
-          {(showLeave || showStop || showDestroy) && <div className={menuDivider} />}
+          {(showLeave || showStop || showDestroy) && <MenuSeparator />}
           {showLeave && (
-            <button onClick={runAndClose(onLeave)} className={`${menuItem} text-amber-500 hover:!bg-amber-500/10`}>
-              <LogOut className={iconSm} />
+            <MenuItem onClick={onLeave} tone="warning" icon={<LogOut />}>
               {isCaptureMode ? "Disconnect" : "Leave session"}
-            </button>
+            </MenuItem>
           )}
           {showStop && (
-            <button
-              onClick={runAndClose(onStop)}
-              className={`${menuItem} text-amber-500 hover:!bg-amber-500/10`}
+            <MenuItem
+              onClick={onStop}
+              tone="warning"
+              icon={<Square />}
               title="Stop the session for all connected apps and review the capture"
             >
-              <Square className={iconSm} />
               Stop session
-            </button>
+            </MenuItem>
           )}
           {showDestroy && (
-            <button
-              onClick={runAndClose(onDestroy)}
-              className={`${menuItem} text-red-400 hover:!bg-red-500/10`}
+            <MenuItem
+              onClick={onDestroy}
+              tone="danger"
+              icon={<Power />}
               title="Destroy this session and reset all connected apps to No source"
             >
-              <Power className={iconSm} />
               Destroy session
-            </button>
+            </MenuItem>
           )}
-        </div>,
-        document.body,
-      )}
+      </Menu>
     </div>
   );
 }

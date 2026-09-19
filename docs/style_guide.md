@@ -189,8 +189,7 @@ Where each goes:
 string for the rare element that must not be a `<button>`.
 
 [buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) keeps
-what other families own: `dataViewTabClass(active, hasIndicator)` (data view
-tabs) and the launcher tokens.
+what the app-hues family owns: the launcher tokens.
 
 ### Inputs — [components/forms](../frontend/wiretap-ui/src/components/forms/)
 
@@ -309,6 +308,61 @@ can sit between the slots as a direct child; only the body gives way when the
 window is short. Escape reaches only the dialog opened last, so a picker
 hosted by another dialog closes alone. Focus moves into the dialog on open and
 back to the opener on close.
+
+### Tabs — [Tabs.tsx](../frontend/wiretap-ui/src/components/Tabs.tsx)
+
+`<Tabs>` is the strip (a `tablist`; ← → Home End move along it and select
+as they go) and `<Tab selected>` one choice in it, rendering `.tabs` and
+`.tabs__tab`. One look: 12 px / 500 text at 32 px, `--text-secondary`
+lifting to `--text-primary`, the current tab underlined 2 px in
+`--accent-primary` over the strip's hairline. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `variant` | `underline` (default) · `segmented` | Segmented is the pill form for a mode switch (Local / UTC, Both / ID / Data, Edit / Diff): a `--bg-tertiary` trough at `--radius-control`, the current tab lifted on `--bg-primary`, 26 px tall to sit beside `sm` controls |
+| `inline` | `boolean` | No hairline of its own — the strip sits in a bar that draws one (`DataViewTabBar`) |
+
+A tab trails `<TabCount tone>` (`neutral` · `success` · `warning` ·
+`purple` — what the count is, not decoration) and `<TabDot tone>` (`purple`
+default · `danger` · `warning` · `info`: something is happening on a tab that
+is not current). A glyph before the label is a bare `<Icon />`; the strip
+sizes it to 14 px. The declarative forms are
+[TabStrip.tsx](../frontend/wiretap-ui/src/components/TabStrip.tsx) (a list of
+`TabDef`s inside a dialog) and `DataViewTabBar` (through `AppTabView`); write
+`<Tabs>` / `<Tab>` directly when the strip carries anything else.
+
+### Menus — [Menu.tsx](../frontend/wiretap-ui/src/components/Menu.tsx)
+
+`<Popover>` is the floating surface (`.popover`: `--bg-surface`, a hairline,
+`--radius-panel`, the `xl` shadow), portalled to the body so no scroller
+clips it, placed under its `anchorRef` — above when there is no room, clamped
+to the window — or `at` a point, and dismissed by Escape and a mousedown
+outside it. `<Menu>` is a popover with `role="menu"`, ↑ ↓ Home End between its
+items, and focus returned to the opener. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `open` / `onClose` | | The opener toggles `open`; the menu calls `onClose` for Escape, an outside click and after an item |
+| `anchorRef` | `RefObject<HTMLElement>` | The trigger; put `aria-haspopup` and `aria-expanded` on it |
+| `at` | `{ x, y }` | A context menu at the pointer instead of an anchor |
+| `align` | `start` (default) · `end` | Which edge lines up with the anchor's — `end` for a kebab at the end of a row |
+| `matchWidth` | `boolean` | As wide as the anchor — a list under its field |
+| `size` | `md` (default) · `lg` | `lg` is the app launcher: 14 px text, 32 px rows, 18 px glyphs |
+
+`usePopover(popup)` holds the open state between a trigger and its popover:
+spread its `trigger` on the button (ref, toggle, `aria-haspopup`,
+`aria-expanded`) and its `popover` on the `<Menu>`; `close` for a row that
+must close by hand. Rows are `<MenuItem>` (12 px text, 28 px, `icon` in a 14 px well, `hint` for
+a second line, `tone="danger" | "warning"` for a destructive or a leaving
+action, `checked` for a toggle — lit in the info tint like a pressed button;
+an item closes the menu after its click unless `keepOpen`),
+`<MenuSeparator>` and `<MenuHeading>` (a 10 px uppercase caption). A picker's
+option list is a `<Popover role="listbox">` of `<MenuItem role="option"
+aria-selected>` rows. Escape reaches only the layer opened last — dialogs,
+menus and popovers share one stack in
+[dismiss.ts](../frontend/wiretap-ui/src/components/dismiss.ts) — so a menu
+over a dialog closes alone. `ContextMenu` (items at a point) and
+`OverflowMenu` (a kebab with items) are the declarative forms.
 
 ### Data tables — [tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts)
 
@@ -528,45 +582,33 @@ bundles `DataViewController` (tab bar + protocol badge + streaming
 status + optional pagination toolbar + optional timeline scrubber)
 inside `dataViewContainer` with a `bgDataView` content area.
 
-### Configuration / control apps — bubble + `dataViewTabClass`
+### Configuration / control apps — bubble + `Tabs`
 
 Apps that present static configuration tabs (Rules, future settings-style
 panels) don't need the streaming machinery. Wrap content in
-`dataViewContainer` directly and use `dataViewTabClass(isActive)` for
-the tab buttons:
+`dataViewContainer` directly and draw the strip with `<Tabs>` / `<Tab>`:
 
 ```tsx
-import {
-  dataViewContainer,
-  bgDataView,
-  bgDataToolbar,
-  borderDataView,
-} from "../../styles";
-import { dataViewTabClass } from "../../styles/buttonStyles";
+import { dataViewContainer, bgDataView, bgDataToolbar } from "../../styles";
+import { Tab, Tabs } from "../../components/Tabs";
 
 <div className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}>
-  <div className={`flex-shrink-0 flex items-center px-1 border-b ${borderDataView} ${bgDataToolbar}`}>
+  <Tabs className={`flex-shrink-0 px-1 ${bgDataToolbar}`}>
     {tabs.map((tab) => (
-      <button
-        key={tab.id}
-        type="button"
-        onClick={() => setActiveTab(tab.id)}
-        className={dataViewTabClass(activeTab === tab.id)}
-      >
+      <Tab key={tab.id} selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
         {tab.label}
-      </button>
+      </Tab>
     ))}
-  </div>
+  </Tabs>
   <div className={`flex-1 overflow-auto p-4 rounded-b-lg ${bgDataView}`}>
     {/* tab content */}
   </div>
 </div>
 ```
 
-Don't reinvent tab styling with custom `bg-indigo-500/20` highlights —
-`dataViewTabClass` gives the consistent bottom-border-with-accent look
-used across the app. Wrap the bubble in `p-2 gap-2` if the panel also
-needs a status footer below it.
+Don't reinvent tab styling with custom highlights — `<Tabs>` gives the
+consistent underline-with-accent look used across the app. Wrap the bubble
+in `p-2 gap-2` if the panel also needs a status footer below it.
 
 ### Activity log (Log tab)
 
@@ -601,8 +643,9 @@ Two pickers, one visual language:
 | `FrameLinkDevicePicker` | Apps bound to a single FrameLink device (Rules) | [FrameLinkDevicePicker.tsx](../frontend/wiretap-ui/src/components/FrameLinkDevicePicker.tsx) |
 
 Both render as a compact surface `<Button>`: `[type icon] [status dot] [label]`.
-Click opens a popover (never a native `<select>` — popovers can show
-status dots and host-port hints; native selects can't on every platform).
+Click opens a `<Popover>` of `<MenuItem role="option">` rows (never a native
+`<select>` — popovers can show status dots and host-port hints; native
+selects can't on every platform).
 
 ### Status-dot vocabulary
 

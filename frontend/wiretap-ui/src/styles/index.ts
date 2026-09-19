@@ -1,7 +1,7 @@
 // ui/src/styles/index.ts
 // Barrel export for all centralized styles
 
-// What is not yet a component: data view tabs, the launcher
+// What is not yet a component: the launcher tiles
 export * from './buttonStyles';
 
 // Colour tokens for consistent palette

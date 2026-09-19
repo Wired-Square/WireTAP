@@ -1088,16 +1088,15 @@ export default function DecoderFramesView({
     const unmatchedAtMax = unmatchedFrames.length >= decoderMaxUnmatchedFrames;
     const filteredAtMax = filteredFrames.length >= decoderMaxFilteredFrames;
     const tabDefs: TabDefinition[] = [
-      { id: 'signals', label: 'Signals', count: selectedFrames.length, countColor: 'green' as const },
-      { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countColor: 'orange' as const, countPrefix: unmatchedAtMax ? '>' : undefined },
-      { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countColor: 'purple' as const, countPrefix: filteredAtMax ? '>' : undefined },
+      { id: 'signals', label: 'Signals', count: selectedFrames.length, countTone: "success" as const },
+      { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countTone: "warning" as const, countPrefix: unmatchedAtMax ? '>' : undefined },
+      { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countTone: "purple" as const, countPrefix: filteredAtMax ? '>' : undefined },
     ];
     if (hasTunnel) {
       tabDefs.push({
         id: 'tunnel',
         label: t("tunnelView.tab"),
         count: tunnelTransactions.length,
-        countColor: 'gray' as const,
         countPrefix: tunnelTransactions.length >= MAX_TUNNEL_TRANSACTIONS ? '>' : undefined,
       });
     }
@@ -1186,23 +1185,23 @@ export default function DecoderFramesView({
     return [
       {
         label: 'Copy ID',
-        icon: <Copy className={iconXs} />,
+        icon: <Copy />,
         onClick: () => { navigator.clipboard.writeText(formattedId); },
       },
       {
         label: 'Copy Data',
-        icon: <ClipboardCopy className={iconXs} />,
+        icon: <ClipboardCopy />,
         onClick: () => { navigator.clipboard.writeText(hexData); },
       },
       { separator: true, label: '', onClick: () => {} },
       {
         label: 'Filter',
-        icon: <Filter className={iconXs} />,
+        icon: <Filter />,
         onClick: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.id)); },
       },
       {
         label: 'Solo',
-        icon: <Target className={iconXs} />,
+        icon: <Target />,
         onClick: () => {
           const store = useDecoderStore.getState();
           store.deselectAllFrames();
@@ -1212,12 +1211,12 @@ export default function DecoderFramesView({
       { separator: true, label: '', onClick: () => {} },
       {
         label: 'Inspect',
-        icon: <Calculator className={iconXs} />,
+        icon: <Calculator />,
         onClick: () => { sendHexDataToCalculator(bytesToHex(rawBytes)); },
       },
       {
         label: 'Send to Transmit',
-        icon: <Send className={iconXs} />,
+        icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
@@ -1234,7 +1233,7 @@ export default function DecoderFramesView({
       },
       {
         label: 'Dashboard Frame',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useDashboardStore.getState();
@@ -1251,7 +1250,7 @@ export default function DecoderFramesView({
       },
       {
         label: 'Dashboard All Signals',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const allSignals = getAllFrameSignals(frame);
@@ -1280,7 +1279,7 @@ export default function DecoderFramesView({
       },
       {
         label: 'Edit in Catalog',
-        icon: <Pencil className={iconXs} />,
+        icon: <Pencil />,
         onClick: () => { navigateToCatalogFrame(frame.id); },
       },
     ];
@@ -1293,7 +1292,7 @@ export default function DecoderFramesView({
     return [
       {
         label: 'Dashboard Frame',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useDashboardStore.getState();
@@ -1310,7 +1309,7 @@ export default function DecoderFramesView({
       },
       {
         label: 'Dashboard Signal',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useDashboardStore.getState();
@@ -1327,12 +1326,12 @@ export default function DecoderFramesView({
       },
       {
         label: 'Copy Signal Name',
-        icon: <Copy className={iconXs} />,
+        icon: <Copy />,
         onClick: () => { navigator.clipboard.writeText(signal.name); },
       },
       {
         label: 'Copy Value',
-        icon: <ClipboardCopy className={iconXs} />,
+        icon: <ClipboardCopy />,
         onClick: () => { navigator.clipboard.writeText(formatSignalValue(signal)); },
       },
     ];
@@ -1348,23 +1347,23 @@ export default function DecoderFramesView({
     return [
       {
         label: 'Copy ID',
-        icon: <Copy className={iconXs} />,
+        icon: <Copy />,
         onClick: () => { navigator.clipboard.writeText(formattedId); },
       },
       {
         label: 'Copy Data',
-        icon: <ClipboardCopy className={iconXs} />,
+        icon: <ClipboardCopy />,
         onClick: () => { navigator.clipboard.writeText(hexData); },
       },
       { separator: true, label: '', onClick: () => {} },
       {
         label: 'Inspect',
-        icon: <Calculator className={iconXs} />,
+        icon: <Calculator />,
         onClick: () => { sendHexDataToCalculator(hexData.replace(/\s+/g, '')); },
       },
       {
         label: 'Send to Transmit',
-        icon: <Send className={iconXs} />,
+        icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
@@ -1381,7 +1380,7 @@ export default function DecoderFramesView({
       },
       {
         label: 'Dashboard Frame',
-        icon: <Gauge className={iconXs} />,
+        icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useDashboardStore.getState();

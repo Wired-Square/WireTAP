@@ -218,7 +218,7 @@ export default function SessionLogView() {
           </Button>
           {/* Dropdown */}
           <div
-            className={`absolute left-0 top-full mt-1 z-50 p-2 rounded-lg border ${borderDefault} ${bgSurface} shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-[200px]`}
+            className="popover absolute left-0 top-full mt-1 p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-[200px]"
           >
             {eventTypeGroups.map((group) => (
               <div key={group.label} className="mb-2 last:mb-0">

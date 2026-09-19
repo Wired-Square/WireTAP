@@ -11,13 +11,11 @@
 // button only appear in serial mode — DFU devices have no persistent
 // connection and no framing settings.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Bluetooth, CircleDot, HardDrive, RefreshCcw, Usb } from "lucide-react";
 import {
   bgPrimary,
-  bgSurface,
-  borderDefault,
   borderDivider,
   textPrimary,
   textSecondary,
@@ -29,6 +27,7 @@ import type { DfuDeviceInfo } from "../apps/serial/utils/flasherTypes";
 import { Button } from "./Button";
 import { Badge } from "./Badge";
 import { Select } from "./forms";
+import { MenuItem, Popover, usePopover } from "./Menu";
 
 export type Parity = "none" | "odd" | "even";
 
@@ -134,8 +133,7 @@ export default function SerialPortPicker({
   dfuLoading = false,
 }: SerialPortPickerProps) {
   const { t } = useTranslation("common");
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const picker = usePopover("dialog");
 
   const matchedRow = useMemo(
     () => ports.find((p) => p.info.port_name === activePort) ?? null,
@@ -147,39 +145,14 @@ export default function SerialPortPicker({
     [dfuDevices, activeDfu],
   );
 
-  // Close on outside click.
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleMouseDown(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isOpen]);
-
-  // Close on Escape.
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsOpen(false);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen]);
-
   // Refresh both lists each time the popover opens — devices come and go.
   useEffect(() => {
-    if (isOpen) {
+    if (picker.open) {
       onRefresh();
       onRefreshDfu?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [picker.open]);
 
   const buttonState =
     mode === "dfu"
@@ -204,9 +177,9 @@ export default function SerialPortPicker({
         : t("serialPortPicker.buttonChoose");
 
   return (
-    <div ref={containerRef} className="relative shrink-0">
+    <div className="shrink-0">
       <Button
-        onClick={() => setIsOpen((v) => !v)}
+        {...picker.trigger}
         title={activePort ? activePort : t("serialPortPicker.buttonTitle")}
       >
         <span
@@ -216,11 +189,7 @@ export default function SerialPortPicker({
         <span className="max-w-56 truncate">{buttonLabel}</span>
       </Button>
 
-      {isOpen && (
-        <div
-          className={`absolute left-0 top-full mt-1 z-50 w-[420px] rounded-lg border ${borderDefault} ${bgSurface} shadow-xl flex flex-col`}
-          role="dialog"
-        >
+      <Popover {...picker.popover} role="dialog" className="w-[420px] flex flex-col text-xs">
           {/* Header */}
           <div
             className={`flex items-center justify-between px-3 py-2 ${borderDivider} border-b`}
@@ -252,7 +221,7 @@ export default function SerialPortPicker({
                 {t("serialPortPicker.empty")}
               </div>
             )}
-            <ul role="listbox">
+            <ul role="listbox" className="py-1">
               {ports.map((p) => {
                 const Icon = portIcon(p.info.port_type);
                 const selected = mode === "serial" && p.info.port_name === activePort;
@@ -261,18 +230,14 @@ export default function SerialPortPicker({
                   .join(" — ");
                 return (
                   <li key={p.info.port_name}>
-                    <button
-                      type="button"
+                    <MenuItem
                       role="option"
                       aria-selected={selected}
                       onClick={() =>
                         onSelectPort(p.info.port_name, p.profile?.name ?? null)
                       }
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b ${borderDivider} ${
-                        selected ? "bg-sky-500/10" : "hover:bg-[var(--hover-bg)]"
-                      }`}
+                      icon={<Icon className={textMuted} />}
                     >
-                      <Icon size={14} className={textMuted} />
                       <div className="flex-1 min-w-0">
                         <div className={`font-mono ${textPrimary} truncate`}>
                           {p.info.port_name}
@@ -286,7 +251,7 @@ export default function SerialPortPicker({
                           {p.profile.name} · {p.profile.connection.baud_rate ?? "?"}
                         </Badge>
                       )}
-                    </button>
+                    </MenuItem>
                   </li>
                 );
               })}
@@ -312,23 +277,17 @@ export default function SerialPortPicker({
                     {t("serialPortPicker.dfuEmpty")}
                   </div>
                 ) : (
-                  <ul role="listbox">
+                  <ul role="listbox" className="py-1">
                     {dfuDevices.map((d) => {
                       const selected = mode === "dfu" && d.serial === activeDfu;
                       return (
                         <li key={d.serial}>
-                          <button
-                            type="button"
+                          <MenuItem
                             role="option"
                             aria-selected={selected}
                             onClick={() => onSelectDfu(d.serial)}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b ${borderDivider} ${
-                              selected
-                                ? "bg-amber-500/10"
-                                : "hover:bg-[var(--hover-bg)]"
-                            }`}
+                            icon={<Usb className="text-[color:var(--status-warning-text)]" />}
                           >
-                            <Usb size={14} className="text-amber-300" />
                             <div className="flex-1 min-w-0">
                               <div className={`${textPrimary} truncate`}>
                                 {d.display_name}
@@ -337,7 +296,7 @@ export default function SerialPortPicker({
                                 {hexId(d.vid)}:{hexId(d.pid)} · {d.serial}
                               </div>
                             </div>
-                          </button>
+                          </MenuItem>
                         </li>
                       );
                     })}
@@ -429,7 +388,7 @@ export default function SerialPortPicker({
                 <Button
                   onClick={() => {
                     onDisconnect();
-                    setIsOpen(false);
+                    picker.close();
                   }}
                   variant="tonal"
                   tone="danger"
@@ -441,7 +400,7 @@ export default function SerialPortPicker({
                 <Button
                   onClick={() => {
                     onConnect(matchedRow?.profile?.id);
-                    setIsOpen(false);
+                    picker.close();
                   }}
                   disabled={!activePort || connecting}
                   variant="tonal"
@@ -456,8 +415,7 @@ export default function SerialPortPicker({
             </div>
           </div>
           )}
-        </div>
-      )}
+      </Popover>
     </div>
   );
 }

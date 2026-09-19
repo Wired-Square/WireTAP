@@ -1,19 +1,15 @@
 // ui/src/components/ContextMenu.tsx
 //
-// Reusable context menu component.
-// Renders a positioned dropdown at mouse coordinates with item actions.
+// A menu at the pointer from a list of items — the right-click menus on the
+// frame tables and the terminal.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Check } from 'lucide-react';
-import { bgSurface, borderDefault, textPrimary } from '../styles';
-import { iconXs } from '../styles/spacing';
+import type { ReactNode } from "react";
+import { Menu, MenuItem, MenuSeparator } from "./Menu";
 
 export interface ContextMenuItem {
   label: string;
   icon?: ReactNode;
   onClick: () => void;
-  /** When defined, renders a checkmark toggle indicator */
-  checked?: boolean;
   /** Renders a horizontal divider instead of a button (label/onClick ignored) */
   separator?: boolean;
 }
@@ -28,69 +24,17 @@ interface ContextMenuProps {
 }
 
 export default function ContextMenu({ items, position, onClose }: ContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [adjustedPos, setAdjustedPos] = useState(position);
-
-  // Clamp to viewport after render so the menu never overflows edges
-  useLayoutEffect(() => {
-    const el = menuRef.current;
-    if (!el) return;
-    const { offsetWidth: w, offsetHeight: h } = el;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const MARGIN = 8;
-    setAdjustedPos({
-      x: Math.min(position.x, vw - w - MARGIN),
-      y: Math.min(position.y, vh - h - MARGIN),
-    });
-  }, [position]);
-
-  // Close on outside click
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [onClose]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   return (
-    <div
-      ref={menuRef}
-      className={`fixed py-1 min-w-[160px] ${bgSurface} border ${borderDefault} ${textPrimary} rounded-lg shadow-xl z-50`}
-      style={{ left: adjustedPos.x, top: adjustedPos.y }}
-    >
-      {items.map((item, idx) => {
-        if (item.separator) {
-          return <div key={idx} className={`my-1 border-t ${borderDefault}`} />;
-        }
-        const hasCheckIndicator = item.checked !== undefined;
-        return (
-          <button
-            key={idx}
-            onClick={() => { item.onClick(); onClose(); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm ${textPrimary} hover:bg-[var(--hover-bg)] transition-colors`}
-          >
-            {hasCheckIndicator ? (
-              item.checked
-                ? <Check className={iconXs} />
-                : <span className={`${iconXs} inline-block`} />
-            ) : item.icon}
-            <span>{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
+    <Menu open at={position} onClose={onClose}>
+      {items.map((item, idx) =>
+        item.separator ? (
+          <MenuSeparator key={idx} />
+        ) : (
+          <MenuItem key={idx} icon={item.icon} onClick={item.onClick}>
+            {item.label}
+          </MenuItem>
+        ),
+      )}
+    </Menu>
   );
 }

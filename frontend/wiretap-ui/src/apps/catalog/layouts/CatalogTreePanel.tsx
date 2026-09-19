@@ -10,6 +10,7 @@ import FindBar from "../components/FindBar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
 import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
 import { Button, IconButton } from "../../../components/Button";
+import { Tab, Tabs } from "../../../components/Tabs";
 import { protocolTone } from "../../../utils/profileTraits";
 
 const VIEW_MODES: CatalogViewMode[] = ["tree", "frames", "nodes"];
@@ -222,21 +223,13 @@ export default function CatalogTreePanel({
         </div>
 
         {/* View-mode selector */}
-        <div className="flex mb-3 rounded-lg border border-[color:var(--border-default)] overflow-hidden text-xs">
+        <Tabs variant="segmented" className="flex mb-3">
             {VIEW_MODES.map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`flex-1 px-2 py-1.5 transition-colors ${
-                  viewMode === mode
-                    ? "bg-[var(--accent-blue)] text-white font-medium"
-                    : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)]"
-                }`}
-              >
+              <Tab key={mode} selected={viewMode === mode} onClick={() => setViewMode(mode)}>
                 {t(`tree.viewMode.${mode}`)}
-              </button>
+              </Tab>
             ))}
-          </div>
+          </Tabs>
       </div>
       )}
 

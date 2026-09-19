@@ -23,8 +23,7 @@ import {
   dataViewContainer,
   textDataSecondary,
 } from "../../styles/colourTokens";
-import { dataViewTabClass } from "../../styles/buttonStyles";
-import { tabCountColorClass } from "../../styles/buttonStyles";
+import { Tab, TabCount, TabDot, Tabs } from "../../components/Tabs";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../styles/typography";
 import ProtocolBadge from "../../components/ProtocolBadge";
 import AppLayout from "../../components/AppLayout";
@@ -356,53 +355,28 @@ function TransmitInner() {
               />
             </div>
 
-            {/* Tabs */}
-            <button
-              onClick={() => handlers.handleTabClick("frame")}
-              className={dataViewTabClass(activeTab === "frame")}
-            >
-              {/* Show "Bytes" for serial protocol, "Frame" for CAN */}
-              {isSerialProtocol && !isCanProtocol ? t("tabs.bytes") : t("tabs.frame")}
-            </button>
-            <button
-              onClick={() => handlers.handleTabClick("queue")}
-              className={dataViewTabClass(activeTab === "queue", activeRepeats > 0)}
-            >
-              {t("tabs.queue")}
-              {queue.length > 0 && (
-                <span
-                  className={`ml-1.5 text-xs ${
-                    activeRepeats > 0
-                      ? tabCountColorClass("green")
-                      : tabCountColorClass("gray")
-                  }`}
-                >
-                  ({queue.length})
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => handlers.handleTabClick("replay")}
-              className={dataViewTabClass(activeTab === "replay", activeReplays.size > 0)}
-            >
-              {t("tabs.replay")}
-              {activeReplays.size > 0 && (
-                <span className={`ml-1.5 text-xs ${tabCountColorClass("green")}`}>
-                  ({activeReplays.size})
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => handlers.handleTabClick("history")}
-              className={dataViewTabClass(activeTab === "history")}
-            >
-              {t("tabs.history")}
-              {historyDbCount > 0 && (
-                <span className={`ml-1.5 text-xs ${tabCountColorClass("gray")}`}>
-                  ({historyDbCount.toLocaleString()})
-                </span>
-              )}
-            </button>
+            <Tabs inline>
+              <Tab selected={activeTab === "frame"} onClick={() => handlers.handleTabClick("frame")}>
+                {/* Show "Bytes" for serial protocol, "Frame" for CAN */}
+                {isSerialProtocol && !isCanProtocol ? t("tabs.bytes") : t("tabs.frame")}
+              </Tab>
+              <Tab selected={activeTab === "queue"} onClick={() => handlers.handleTabClick("queue")}>
+                {t("tabs.queue")}
+                {queue.length > 0 && (
+                  <TabCount tone={activeRepeats > 0 ? "success" : "neutral"}>({queue.length})</TabCount>
+                )}
+                {activeRepeats > 0 && activeTab !== "queue" && <TabDot />}
+              </Tab>
+              <Tab selected={activeTab === "replay"} onClick={() => handlers.handleTabClick("replay")}>
+                {t("tabs.replay")}
+                {activeReplays.size > 0 && <TabCount tone="success">({activeReplays.size})</TabCount>}
+                {activeReplays.size > 0 && activeTab !== "replay" && <TabDot />}
+              </Tab>
+              <Tab selected={activeTab === "history"} onClick={() => handlers.handleTabClick("history")}>
+                {t("tabs.history")}
+                {historyDbCount > 0 && <TabCount>({historyDbCount.toLocaleString()})</TabCount>}
+              </Tab>
+            </Tabs>
 
             {/* Spacer */}
             <div className="flex-1" />

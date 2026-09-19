@@ -16,8 +16,8 @@ import {
 } from '../styles';
 import { iconXs } from '../styles/spacing';
 import { textDataPrimary } from '../styles/colourTokens';
-import { dataViewTabClass, tabCountColorClass } from '../styles/buttonStyles';
 import { Badge, type BadgeTone } from './Badge';
+import { Tab, TabCount, TabDot, Tabs, type TabCountTone } from './Tabs';
 
 // Re-export StreamingStatus for backwards compatibility
 export type { StreamingStatus } from './ProtocolBadge';
@@ -26,7 +26,7 @@ export interface TabDefinition {
   id: string;
   label: string;
   count?: number;
-  countColor?: 'green' | 'gray' | 'purple' | 'orange';
+  countTone?: TabCountTone;
   /** Optional prefix to show before count (e.g., ">" for truncated buffers) */
   countPrefix?: string;
   /** Show purple dot indicator when true and tab is not active */
@@ -152,30 +152,25 @@ export default function DataViewTabBar({
         </Badge>
       )}
 
-      {/* Tabs */}
-      <div role="tablist" className="contents">
+      <Tabs inline>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         const canClose = tab.closeable === true && onTabClose !== undefined;
 
         return (
-          <button
+          <Tab
             key={tab.id}
-            role="tab"
-            aria-selected={isActive}
+            selected={isActive}
             onClick={() => onTabChange(tab.id)}
             onContextMenu={canClose ? (e) => handleTabContextMenu(e, tab.id) : undefined}
-            className={dataViewTabClass(isActive, tab.hasIndicator)}
           >
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span className={`ml-1.5 text-xs ${tabCountColorClass(tab.countColor ?? 'gray')}`}>
+              <TabCount tone={tab.countTone}>
                 ({tab.countPrefix ?? ''}{tab.count.toLocaleString()})
-              </span>
+              </TabCount>
             )}
-            {tab.hasIndicator && !isActive && (
-              <span className="ml-1 w-1.5 h-1.5 bg-purple-500 rounded-full inline-block" />
-            )}
+            {tab.hasIndicator && !isActive && <TabDot />}
             {/*
               A span rather than a nested <button>: the tab itself is a button, and
               interactive content cannot nest. role/tabIndex/onKeyDown give it the
@@ -195,15 +190,15 @@ export default function DataViewTabBar({
                     onTabClose?.(tab.id);
                   }
                 }}
-                className={`ml-1.5 -mr-1 p-0.5 rounded inline-flex items-center align-middle ${hoverBg}`}
+                className={`-mr-1 p-0.5 rounded inline-flex items-center align-middle ${hoverBg}`}
               >
                 <X className={iconXs} />
               </span>
             )}
-          </button>
+          </Tab>
         );
       })}
-      </div>
+      </Tabs>
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -220,7 +215,7 @@ export default function DataViewTabBar({
         <ContextMenu
           items={[{
             label: t("tabs.close"),
-            icon: <X className={iconXs} />,
+            icon: <X />,
             onClick: () => onTabClose?.(contextMenu.tabId),
           }]}
           position={contextMenu.position}

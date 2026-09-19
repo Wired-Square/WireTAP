@@ -27,7 +27,6 @@ import { useTranslation } from "react-i18next";
 import "@xterm/xterm/css/xterm.css";
 
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
-import { iconXs } from "../../../styles/spacing";
 import { tlog } from "../../../api/settings";
 import { readClipboardText, writeClipboardText } from "../../../api/clipboard";
 
@@ -262,25 +261,25 @@ const SerialTerminalView = forwardRef<SerialTerminalHandle, Props>(
       if (term?.hasSelection()) {
         items.push({
           label: t("contextMenu.copy"),
-          icon: <Copy className={iconXs} />,
+          icon: <Copy />,
           onClick: () => term && copySelection(term),
         });
       }
       items.push(
         {
           label: t("contextMenu.paste"),
-          icon: <ClipboardPaste className={iconXs} />,
+          icon: <ClipboardPaste />,
           onClick: () => term && pasteClipboard(term),
         },
         { separator: true, label: "", onClick: () => {} },
         {
           label: t("contextMenu.selectAll"),
-          icon: <TextSelect className={iconXs} />,
+          icon: <TextSelect />,
           onClick: () => term?.selectAll(),
         },
         {
           label: t("contextMenu.copyAll"),
-          icon: <CopyPlus className={iconXs} />,
+          icon: <CopyPlus />,
           onClick: () => term && copyAll(term),
         },
       );

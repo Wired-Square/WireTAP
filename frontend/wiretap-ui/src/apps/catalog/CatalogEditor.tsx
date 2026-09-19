@@ -41,6 +41,7 @@ import { sourcesFor } from "../../hooks/useCatalogSources";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
 import { IconButton } from "../../components/Button";
+import { Tab, TabDot, Tabs } from "../../components/Tabs";
 import { Alert } from "../../components/Alert";
 function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
@@ -609,22 +610,16 @@ function CatalogEditorInner() {
           {editMode === "text" ? (
             <>
               {catalogPath && (
-                <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
-                  <button
-                    type="button"
-                    onClick={() => setTextView("edit")}
-                    className={`px-2.5 py-1 text-xs rounded ${textView === "edit" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
-                  >
-                    {t("editor.textViewEdit", "Edit")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTextView("diff")}
-                    className={`px-2.5 py-1 text-xs rounded ${textView === "diff" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
-                  >
-                    {t("editor.textViewDiff", "Diff")}
-                    {hasUnsavedChanges && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--status-warning-text,#d97706)] align-middle" />}
-                  </button>
+                <div className="flex items-center px-3 py-1.5 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
+                  <Tabs variant="segmented">
+                    <Tab selected={textView === "edit"} onClick={() => setTextView("edit")}>
+                      {t("editor.textViewEdit", "Edit")}
+                    </Tab>
+                    <Tab selected={textView === "diff"} onClick={() => setTextView("diff")}>
+                      {t("editor.textViewDiff", "Diff")}
+                      {hasUnsavedChanges && <TabDot tone="warning" />}
+                    </Tab>
+                  </Tabs>
                 </div>
               )}
               {textView === "diff" && catalogPath ? (

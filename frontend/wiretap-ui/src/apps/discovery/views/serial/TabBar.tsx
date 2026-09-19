@@ -85,14 +85,14 @@ export default function TabBar({
 
     // Only show Raw Bytes tab if session emits bytes and framing hasn't been accepted
     if (emitsRawBytes && !framingAccepted) {
-      result.push({ id: 'raw', label: t("serial.tabRawBytes"), count: byteCount, countColor: 'gray' as const });
+      result.push({ id: 'raw', label: t("serial.tabRawBytes"), count: byteCount });
     }
 
-    result.push({ id: 'framed', label: t("serial.tabFramedBytes"), count: frameCount, countColor: 'green' as const });
+    result.push({ id: 'framed', label: t("serial.tabFramedBytes"), count: frameCount, countTone: "success" as const });
 
     // Show Filtered tab when there are filtered frames (frames excluded by minFrameLength filter)
     if (filteredCount > 0) {
-      result.push({ id: 'filtered', label: t("serial.tabFiltered"), count: filteredCount, countColor: 'orange' as const });
+      result.push({ id: 'filtered', label: t("serial.tabFiltered"), count: filteredCount, countTone: "warning" as const });
     }
 
     // Dynamic tool output tabs

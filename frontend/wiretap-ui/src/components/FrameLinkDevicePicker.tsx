@@ -7,19 +7,18 @@
 //
 // Liveness comes from useFrameLinkDeviceLiveness; this component is pure.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   textPrimary,
   textSecondary,
-  bgSurface,
-  borderDefault,
   textDanger,
   textWarning,
   textSuccess,
 } from "../styles/colourTokens";
 import type { FrameLinkLiveness } from "../hooks/useFrameLinkDeviceLiveness";
 import { Button } from "./Button";
+import { MenuItem, Popover, usePopover } from "./Menu";
 
 export interface FramelinkDevice {
   /** Capability device_id (e.g. "WiredFlexLink-9D04"), or `${host}:${port}` fallback. */
@@ -124,42 +123,16 @@ export default function FrameLinkDevicePicker({
   onProbe,
 }: FrameLinkDevicePickerProps) {
   const { t } = useTranslation("common");
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const picker = usePopover("listbox");
 
   const activeDevice = useMemo(
     () => devices.find((d) => d.deviceId === activeDeviceId) ?? null,
     [devices, activeDeviceId],
   );
 
-  // Close on click outside.
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleMouseDown(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isOpen]);
-
-  // Close on Escape.
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsOpen(false);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen]);
-
   // Lazy probe on open: anything we haven't classified as "connectable" yet.
   useEffect(() => {
-    if (!isOpen || !onProbe) return;
+    if (!picker.open || !onProbe) return;
     for (const d of devices) {
       const hp = `${d.host}:${d.port}`;
       const live =
@@ -171,7 +144,7 @@ export default function FrameLinkDevicePicker({
     // We intentionally only run when the popover opens — re-running on
     // every liveness map change would re-trigger probes mid-resolution.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [picker.open]);
 
   const buttonState: DeviceVisualState = activeDevice
     ? effectiveState(
@@ -186,9 +159,9 @@ export default function FrameLinkDevicePicker({
   const buttonLabel = activeDevice?.label ?? t("framelinkPicker.selectDevice");
 
   return (
-    <div ref={containerRef} className="relative shrink-0">
+    <div className="shrink-0">
       <Button
-        onClick={() => setIsOpen((v) => !v)}
+        {...picker.trigger}
         title={
           activeDevice
             ? activeDevice.label
@@ -199,13 +172,9 @@ export default function FrameLinkDevicePicker({
         <span className="max-w-40 truncate">{buttonLabel}</span>
       </Button>
 
-      {isOpen && (
-        <div
-          className={`absolute left-0 top-full mt-1 z-50 min-w-[260px] max-w-[360px] rounded-lg border ${borderDefault} ${bgSurface} shadow-xl py-1`}
-          role="listbox"
-        >
+      <Popover {...picker.popover} role="listbox" className="menu min-w-[260px] max-w-[360px]">
           {devices.length === 0 ? (
-            <div className={`px-3 py-2 text-xs ${textSecondary}`}>
+            <div className={`px-3 py-2 ${textSecondary}`}>
               {t("framelinkPicker.empty")}
             </div>
           ) : (
@@ -219,18 +188,14 @@ export default function FrameLinkDevicePicker({
                 livenessByHostPort,
               );
               return (
-                <button
+                <MenuItem
                   key={d.deviceId}
-                  type="button"
                   role="option"
                   aria-selected={isActive}
                   onClick={() => {
                     onSelect(d);
-                    setIsOpen(false);
+                    picker.close();
                   }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--hover-bg)] ${
-                    isActive ? "bg-[var(--hover-bg)]" : ""
-                  }`}
                 >
                   <StatusDot state={state} />
                   <span className={`flex-1 min-w-0 truncate ${textPrimary}`}>
@@ -242,12 +207,11 @@ export default function FrameLinkDevicePicker({
                     {d.host}:{d.port}
                   </span>
                   <StateSuffix state={state} />
-                </button>
+                </MenuItem>
               );
             })
           )}
-        </div>
-      )}
+      </Popover>
     </div>
   );
 }

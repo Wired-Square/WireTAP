@@ -264,7 +264,7 @@ export default function CsvFileOrderDialog({
     return [
       {
         label: "Remove from list",
-        icon: <Trash2 className={`${iconSm} text-[color:var(--text-muted)]`} />,
+        icon: <Trash2 className="text-[color:var(--text-muted)]" />,
         onClick: () => removeEntry(idx),
       },
     ];

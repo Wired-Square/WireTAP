@@ -771,6 +771,247 @@
     border-top: 1px solid var(--border-default);
   }
 
+  /* ---- Tabs --------------------------------------------------------------
+     .tabs [.tabs--inline] [.tabs--segmented] > .tabs__tab [aria-selected="true"]
+       (.tabs__count [--success|--warning|--purple], .tabs__dot [--danger|--warning|--info])
+     A strip of choices with one current. The underline form draws a hairline
+     under the strip that the current tab's underline cuts; inline drops the
+     hairline for a strip inside a bar that draws its own. Segmented is the
+     pill form for a mode switch: a tinted trough, the current tab lifted. */
+  .tabs {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .tabs--inline {
+    align-self: stretch;
+    border-bottom: 0;
+  }
+
+  .tabs__tab {
+    --tab-h: 32px;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    min-height: var(--tab-h);
+    margin-bottom: -1px;
+    padding: 0 12px;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+    transition-property: color, background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .tabs__tab > svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+  }
+
+  .tabs__tab:hover:not(:disabled) {
+    color: var(--text-primary);
+  }
+
+  .tabs__tab[aria-selected="true"] {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-primary);
+  }
+
+  .tabs__tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .tabs__count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabs__count--success {
+    color: var(--status-success-text);
+  }
+
+  .tabs__count--warning {
+    color: var(--status-warning-text);
+  }
+
+  .tabs__count--purple {
+    color: var(--status-purple-text);
+  }
+
+  .tabs__dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--status-purple-text);
+  }
+
+  .tabs__dot--danger {
+    background-color: var(--status-danger-text);
+  }
+
+  .tabs__dot--warning {
+    background-color: var(--status-warning-text);
+  }
+
+  .tabs__dot--info {
+    background-color: var(--status-info-text);
+  }
+
+  .tabs--segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background-color: var(--bg-tertiary);
+  }
+
+  .tabs--segmented .tabs__tab {
+    --tab-h: 22px;
+
+    flex: 1 1 auto;
+    justify-content: center;
+    margin: 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 4px;
+  }
+
+  .tabs--segmented .tabs__tab[aria-selected="true"] {
+    background-color: var(--bg-primary);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  }
+
+  /* ---- Menus -------------------------------------------------------------
+     .popover — the floating surface; .menu [.menu--lg] > .menu__item
+       [.menu__item--danger|--warning] [aria-checked|aria-selected="true"]
+       (.menu__icon, .menu__hint) · .menu__separator · .menu__heading
+     One surface for everything that floats over the page: a command menu, a
+     picker's option list, a rename box. An item is a full-width row; its tone
+     colours the text and the hover tint, and a checked or selected item lights
+     like a pressed button. */
+  .popover {
+    --menu-item-h: 28px;
+    --menu-icon: 14px;
+    --menu-px: 12px;
+
+    position: fixed;
+    z-index: 60;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  }
+
+  .menu {
+    min-width: 160px;
+    padding: 4px 0;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .menu--lg {
+    --menu-item-h: 32px;
+    --menu-icon: 18px;
+
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .menu__item {
+    --menu-tint: var(--hover-bg);
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: var(--menu-item-h);
+    padding: 4px var(--menu-px);
+    color: var(--text-primary);
+    text-align: left;
+    white-space: nowrap;
+    transition-property: color, background-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .menu__item:hover:not(:disabled),
+  .menu__item:focus-visible {
+    background-color: var(--menu-tint);
+  }
+
+  .menu__item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .menu__item--danger {
+    --menu-tint: var(--status-danger-bg);
+
+    color: var(--status-danger-text);
+  }
+
+  .menu__item--warning {
+    --menu-tint: var(--status-warning-bg);
+
+    color: var(--status-warning-text);
+  }
+
+  .menu__item[aria-checked="true"],
+  .menu__item[aria-selected="true"] {
+    --menu-tint: color-mix(in srgb, var(--status-info-bg), var(--status-info-text) 12%);
+
+    background-color: var(--status-info-bg);
+    color: var(--status-info-text);
+  }
+
+  .menu__icon {
+    display: flex;
+    flex-shrink: 0;
+    width: var(--menu-icon);
+    height: var(--menu-icon);
+  }
+
+  .menu__icon > svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .menu__hint {
+    display: block;
+    color: var(--text-muted);
+    white-space: normal;
+  }
+
+  .menu__separator {
+    margin: 4px 0;
+    border-top: 1px solid var(--border-default);
+  }
+
+  .menu__heading {
+    padding: 4px var(--menu-px);
+    color: var(--text-muted);
+    font-size: 0.625rem;
+    line-height: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;

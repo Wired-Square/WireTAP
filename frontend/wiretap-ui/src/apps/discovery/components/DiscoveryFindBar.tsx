@@ -6,6 +6,7 @@ import { X, ChevronUp, ChevronDown, Loader } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { borderDivider } from "../../../styles";
 import { IconButton } from "../../../components/Button";
+import { Tab, Tabs } from "../../../components/Tabs";
 import { Input } from "../../../components/forms";
 
 export type FindSearchMode = 'id' | 'data' | 'both';
@@ -82,22 +83,13 @@ export default function DiscoveryFindBar({
       />
 
       {/* Mode toggle */}
-      <div className="flex items-center rounded border border-[color:var(--border-default)] overflow-hidden text-xs">
+      <Tabs variant="segmented">
         {MODES.map(({ key, labelKey, tooltipKey }) => (
-          <button
-            key={key}
-            onClick={() => onSearchModeChange(key)}
-            className={`px-2 py-1 transition-colors ${
-              searchMode === key
-                ? 'bg-gray-600 text-white'
-                : 'bg-[var(--bg-primary)] text-[color:var(--text-secondary)] hover:brightness-95'
-            }`}
-            title={t(tooltipKey)}
-          >
+          <Tab key={key} selected={searchMode === key} onClick={() => onSearchModeChange(key)} title={t(tooltipKey)}>
             {t(labelKey)}
-          </button>
+          </Tab>
         ))}
-      </div>
+      </Tabs>
 
       {/* Match counter / spinner */}
       <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center flex items-center justify-center gap-1">

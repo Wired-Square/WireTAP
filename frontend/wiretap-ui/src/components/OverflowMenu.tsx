@@ -1,33 +1,13 @@
 // ui/src/components/OverflowMenu.tsx
 /**
- * A kebab (⋮) button that opens a portalled, viewport-clamped menu.
- *
- * Extracted rather than hand-rolled a fourth time: `SessionControls`,
- * `PanelWrapper` and `DashboardTopBar` each grew their own copy of the same
- * portal-plus-positioner, and this is that pattern with the bespoke row content
- * replaced by a plain item list. Those three still have their own — their rows carry
- * toggles and colour states this does not model — so this is a new shared component,
- * not yet their replacement.
- *
- * Portalled to `document.body` because the trigger usually sits inside a scrolling or
- * `overflow: hidden` container that would otherwise clip the menu.
+ * A kebab (⋮) button that opens a menu from a plain item list.
  */
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react";
-import { createPortal } from "react-dom";
+import type { ComponentType, ReactNode } from "react";
 import { EllipsisVertical } from "lucide-react";
 
-import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { iconSm } from "../styles/spacing";
-import { textDanger } from "../styles/colourTokens";
 import { IconButton, type ButtonVariant } from "./Button";
+import { Menu, MenuItem, MenuSeparator, usePopover } from "./Menu";
 
 /**
  * A union rather than one optional-everything shape, so a divider is written
@@ -78,10 +58,6 @@ type Props = {
   trigger?: ReactNode;
 };
 
-/** Gap between the trigger and the menu, and the minimum inset from the viewport. */
-const GAP = 2;
-const MARGIN = 4;
-
 export default function OverflowMenu({
   items: rawItems,
   title,
@@ -90,107 +66,34 @@ export default function OverflowMenu({
   trigger = <EllipsisVertical className={iconSm} />,
 }: Props) {
   const items = rawItems.filter(Boolean) as OverflowMenuItem[];
-  const [open, setOpen] = useState(false);
-  // Hidden until measured, so the menu never paints at 0,0 before being positioned.
-  const [style, setStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRect = useRef<DOMRect | null>(null);
-
-  const toggle = useCallback(() => {
-    setOpen((wasOpen) => {
-      if (wasOpen) return false;
-      buttonRect.current = buttonRef.current?.getBoundingClientRect() ?? null;
-      setStyle({ visibility: "hidden" });
-      return true;
-    });
-  }, []);
-
-  // Close on a click outside, or on Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  // Measure once mounted, then place: below the trigger if it fits, above if not,
-  // left-aligned and clamped to the viewport either way.
-  useLayoutEffect(() => {
-    if (!open || !menuRef.current || !buttonRect.current) return;
-    const { offsetWidth: width, offsetHeight: height } = menuRef.current;
-    const rect = buttonRect.current;
-
-    let top = rect.bottom + GAP;
-    if (top + height > window.innerHeight) top = rect.top - GAP - height;
-    top = Math.max(MARGIN, Math.min(top, window.innerHeight - height - MARGIN));
-
-    // Right-align to the trigger: the kebab sits at the end of a row, so a
-    // left-aligned menu would hang off the edge more often than not.
-    let left = rect.right - width;
-    left = Math.max(MARGIN, Math.min(left, window.innerWidth - width - MARGIN));
-
-    setStyle({ top, left, visibility: "visible" });
-  }, [open]);
+  const menu = usePopover();
 
   return (
     <>
-      <IconButton
-        ref={buttonRef}
-        onClick={toggle}
-        title={title}
-        aria-label={title}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        variant={variant}
-        className={className}
-      >
+      <IconButton {...menu.trigger} title={title} aria-label={title} variant={variant} className={className}>
         {trigger}
       </IconButton>
 
-      {open &&
-        createPortal(
-          <div ref={menuRef} role="menu" className={menuClasses} style={style}>
-            {items.map((item, i) =>
-              item.separator ? (
-                <div key={`sep-${i}`} className={menuDivider} />
-              ) : (
-                <button
-                  key={item.label}
-                  role="menuitem"
-                  disabled={item.disabled}
-                  onClick={() => {
-                    setOpen(false);
-                    item.onClick();
-                  }}
-                  className={`${menuItem} ${item.hint ? "items-start" : ""} ${item.danger ? textDanger : ""}`}
-                >
-                  {item.icon && <item.icon className={`${iconSm} ${item.hint ? "mt-0.5" : ""}`} />}
-                  {item.hint ? (
-                    <span className="text-left">
-                      {item.label}
-                      <span className="block text-[color:var(--text-muted)]">{item.hint}</span>
-                    </span>
-                  ) : (
-                    item.label
-                  )}
-                </button>
-              ),
-            )}
-          </div>,
-          document.body,
+      {/* Right-aligned to the trigger: the kebab sits at the end of a row, so a
+          left-aligned menu would hang off the edge more often than not. */}
+      <Menu {...menu.popover} align="end">
+        {items.map((item, i) =>
+          item.separator ? (
+            <MenuSeparator key={`sep-${i}`} />
+          ) : (
+            <MenuItem
+              key={item.label}
+              disabled={item.disabled}
+              tone={item.danger ? "danger" : undefined}
+              icon={item.icon && <item.icon />}
+              hint={item.hint}
+              onClick={item.onClick}
+            >
+              {item.label}
+            </MenuItem>
+          ),
         )}
+      </Menu>
     </>
   );
 }

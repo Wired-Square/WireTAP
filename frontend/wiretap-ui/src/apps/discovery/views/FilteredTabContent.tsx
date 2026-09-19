@@ -15,7 +15,6 @@ import { PaginationToolbar } from "../components";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bgDataView } from "../../../styles";
 import { emptyStateText } from "../../../styles/typography";
-import { iconXs } from "../../../styles/spacing";
 import { formatFrameId } from "../../../utils/frameIds";
 import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
 import type { FrameMessage } from "../../../types/frame";
@@ -264,7 +263,7 @@ export default function FilteredTabContent({
       menuSeparator,
       {
         label: 'Unfilter',
-        icon: <Filter className={iconXs} />,
+        icon: <Filter />,
         onClick: () => toggleFrameSelection(keyOf(frame)),
       },
       menuSeparator,
