@@ -259,7 +259,7 @@ export default function SessionCanvas({
   );
 
   return (
-    <div className="w-full h-full">
+    <div className="session-canvas w-full h-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -284,10 +284,7 @@ export default function SessionCanvas({
           color="var(--text-muted)"
           style={{ opacity: 0.3 }}
         />
-        <Controls
-          showInteractive={false}
-          className="!bg-[var(--bg-surface)] !border-[color:var(--border-default)] !shadow-lg [&_button]:!bg-[var(--bg-surface)] [&_button]:!border-[color:var(--border-default)] [&_button]:!fill-[var(--text-primary)] [&_button:hover]:!bg-[var(--bg-hover)] [&_svg]:!fill-[var(--text-primary)]"
-        />
+        <Controls showInteractive={false} />
         <MiniMap
           nodeColor={(node) => {
             switch (node.type) {
@@ -298,7 +295,6 @@ export default function SessionCanvas({
             }
           }}
           maskColor="rgba(0, 0, 0, 0.7)"
-          className="!bg-[var(--bg-surface)] !border-[color:var(--border-default)]"
         />
       </ReactFlow>
     </div>

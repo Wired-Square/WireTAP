@@ -86,7 +86,7 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
           {renderScene(cfg!.scene!, valueOf)}
         </svg>
       ) : (
-        <div ref={containerRef} className="h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: markup }} />
+        <div ref={containerRef} className="custom-svg-host h-full w-full" dangerouslySetInnerHTML={{ __html: markup }} />
       )}
       {error && <WidgetError>{error}</WidgetError>}
     </div>

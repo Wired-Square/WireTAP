@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@layer reset, utilities;
+@import "./styles/reset.css";
+@import "./styles/utilities.css";
 
 /* Use default cursor everywhere; inputs and textareas still show text cursor via browser UA styles */
 * {
@@ -125,13 +127,35 @@ html, body {
   height: 6px !important;
 }
 
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
+/* Theme the xyflow controls and minimap on the session canvas. Unlayered, so
+   these beat xyflow's own sheet on specificity alone. */
+.session-canvas .react-flow__controls {
+  background-color: var(--bg-surface);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
+.session-canvas .react-flow__controls button {
+  background-color: var(--bg-surface);
+  border-color: var(--border-default);
 }
+
+.session-canvas .react-flow__controls button:hover {
+  background-color: var(--bg-hover);
+}
+
+.session-canvas .react-flow__controls svg {
+  fill: var(--text-primary);
+}
+
+.session-canvas .react-flow__minimap {
+  background-color: var(--bg-surface);
+}
+
+.custom-svg-host > svg {
+  width: 100%;
+  height: 100%;
+}
+
 :root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Ubuntu', Roboto, sans-serif;
   font-size: 16px;
@@ -156,83 +180,6 @@ html, body {
   --accent-success: #16a34a;
   --accent-danger: #dc2626;
   --accent-warning: #d97706;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-/* Scope form styles to avoid affecting Dockview's internal elements */
-.container input,
-.container button,
-form input,
-form button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-.container button:hover,
-form button:hover {
-  border-color: #396cd8;
-}
-.container button:active,
-form button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-.container input,
-.container button,
-form input,
-form button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
 }
 
 @keyframes fade-in {
@@ -275,7 +222,7 @@ form button {
    never truncated mid-scale — the earlier animation flickered because releasing
    or disabling ended the `:active` state part-way through.
 
-   This rule is unlayered, so it wins over Tailwind's layered `transition-*`
+   This rule is unlayered, so it wins over the layered `transition-*`
    utilities; the property list keeps the button's hover colour/filter
    transitions smooth too. Reuse via the `buttonPress` token in
    src/styles/buttonStyles.ts (or the `btn-press` class directly). Skipped for
@@ -565,22 +512,6 @@ form button {
   :root {
     color: #f6f6f6;
     background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  .container input,
-  .container button,
-  form input,
-  form button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  .container button:active,
-  form button:active {
-    background-color: #0f0f0f69;
   }
 }
 

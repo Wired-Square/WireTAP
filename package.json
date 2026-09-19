@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "npm run dev -w frontend/wiretap-ui",
     "build": "npm run build -w frontend/wiretap-ui",
+    "gen:css": "npm run gen:css -w frontend/wiretap-ui",
     "preview": "npm run preview -w frontend/wiretap-ui",
     "test": "npm run test -w frontend/wiretap-ui",
     "test:run": "npm run test:run -w frontend/wiretap-ui",

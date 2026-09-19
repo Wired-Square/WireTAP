@@ -382,7 +382,7 @@ export default function IOConnectionFields({
         />
 
         <div className={`border-t ${borderDefault} pt-4 mt-6`}>
-          <h4 className="text-md font-semibold text-[color:var(--text-primary)] mb-4">
+          <h4 className="font-semibold text-[color:var(--text-primary)] mb-4">
             {t("ioProfileDialog.mqtt.messageFormats")}
           </h4>
 

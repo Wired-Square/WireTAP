@@ -7,8 +7,8 @@ obvious.
 
 ## What exists
 
-**vitest only.** 23 files, ~180 tests, `environment: "node"`
-([vite.config.ts](../vite.config.ts)). There is **no jsdom, no
+**vitest only.** 25 files, ~200 tests, `environment: "node"`
+([vite.config.ts](../frontend/wiretap-ui/vite.config.ts)). There is **no jsdom, no
 @testing-library, no Playwright, no WebDriver**. Nothing renders: every test is
 a pure-logic test over stores, utils, and hook logic.
 
@@ -19,6 +19,7 @@ Keep new logic testable that way before adding a rendering dependency.
 ```
 npm run test:run    # vitest, one shot
 npm run build       # tsc && vite build — the type check
+npm run gen:css     # regenerate src/styles/utilities.css after adding a utility class
 ```
 
 ## The four surfaces
@@ -39,7 +40,13 @@ Two patterns worth copying rather than inventing:
   dispatched). Types cannot catch that class — an optional callback with no
   dispatcher is well-typed — and neither can a behavioural test, because it only
   covers the case you remembered to write. Reach for this whenever the invariant
-  is "these two lists agree".
+  is "these two lists agree". `src/tests/utilitiesCss.test.ts` is the same shape
+  over the utility sheet: `src/styles/utilities.css` is generated from the class
+  names in the source by `scripts/gen-utilities.mjs`, and the guard asserts the
+  committed sheet matches a fresh generation, that every class the token layer
+  names compiles, and that every `var(--x)` a component or `WireTAP.css` reads is
+  declared. A new utility class fails the first assertion until `npm run gen:css`
+  is run; a typo in a class name fails generation outright.
 - **Cross-language pins.** There is no ts-rs or specta in this project, so a
   shared shape is pinned by a test that parses the *other* language's source. It
   already runs in both directions: a Rust test parses
