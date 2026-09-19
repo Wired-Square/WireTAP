@@ -7,12 +7,13 @@ import { iconSm } from "../styles/spacing";
 import { labelSmall, captionMuted, emptyStateText } from "../styles/typography";
 import { hoverLight } from "../styles";
 import { formatProtocolFrameId } from "../utils/frameIds";
-import { protocolLabel } from "../utils/profileTraits";
+import { protocolLabel, protocolTone } from "../utils/profileTraits";
 import { useFrameIdFormat } from "../hooks/useFrameIdFormat";
 import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
 import { Button, IconButton } from "./Button";
+import { Badge } from "./Badge";
 import { Select, Checkbox } from "./forms";
 
 type FrameWarning = {
@@ -330,13 +331,9 @@ function FramePicker({
                       </span>
                     )}
                     {isMultiProtocol && f.protocol && (
-                      <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${
-                        f.protocol === 'modbus' || f.protocol === 'modbus_rtu' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
-                        f.protocol === 'serial' ? 'bg-purple-500/15 text-[color:var(--text-purple)]' :
-                        'bg-blue-500/15 text-[color:var(--text-blue)]'
-                      }`}>
+                      <Badge tone={protocolTone(f.protocol)} size="sm">
                         {protocolLabel(f.protocol)}
-                      </span>
+                      </Badge>
                     )}
                   </span>
                   {f.detail && (

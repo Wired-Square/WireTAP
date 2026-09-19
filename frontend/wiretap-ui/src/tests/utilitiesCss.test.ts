@@ -36,12 +36,9 @@ const UNDEFINED = undefinedVariables();
 // whose variable is defined, or no longer referenced, fails the guard until it is removed.
 const UNDEFINED_VARIABLES_IN_REGISTER = [
   "--accent", "--accent-green", "--accent-info", "--accent-yellow",
-  "--badge-cyan-bg", "--badge-cyan-text", "--badge-orange-bg", "--badge-orange-text",
-  "--badge-purple-bg", "--badge-purple-text", "--badge-rose-bg", "--badge-rose-text",
   "--bg-accent", "--bg-card", "--bg-green", "--bg-green-subtle", "--bg-hover", "--bg-light",
   "--bg-purple-subtle", "--bg-secondary", "--bg-subtle", "--bg-surface-2",
   "--border", "--border-green",
-  "--status-info-badge-bg", "--status-info-badge-text",
   "--status-info-text-bold", "--status-purple-text-bold", "--status-warning",
   "--text-data-green", "--text-emerald", "--text-rose", "--text-tertiary",
 ];

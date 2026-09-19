@@ -24,7 +24,7 @@ import {
   textDataSecondary,
 } from "../../styles/colourTokens";
 import { dataViewTabClass } from "../../styles/buttonStyles";
-import { tabCountColorClass } from "../../styles/badgeStyles";
+import { tabCountColorClass } from "../../styles/buttonStyles";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../styles/typography";
 import ProtocolBadge from "../../components/ProtocolBadge";
 import AppLayout from "../../components/AppLayout";

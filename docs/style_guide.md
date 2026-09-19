@@ -17,10 +17,10 @@ import { textPrimary, paddingDialog, h2 } from "../../../styles";
 import { Button, IconButton } from "../../../components/Button";
 ```
 
-Buttons and form controls are components, not class strings — see *Buttons*
-and *Inputs* under the token reference. The other families (badges, cards,
-tabs, tables) are still class-string tokens and move to components one family
-at a time.
+Buttons, form controls and badges are components, not class strings — see
+*Buttons*, *Inputs* and *Badges* under the token reference. The other families
+(cards, tabs, tables) are still class-string tokens and move to components one
+family at a time.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -151,7 +151,6 @@ styling goes through the variables.
 | `paddingSection` | `p-8` | Large sections |
 | `paddingButton` / `paddingButtonSm` | `px-4 py-2` / `px-3 py-1.5` | Button padding |
 | `paddingIconButton` | `p-2` | Icon buttons |
-| `paddingBadge` | `px-2 py-1` | Badges, chips |
 | `paddingAppBarX` / `marginAppContent` | `px-4` / `m-2` | App-bar / panel chrome |
 | `gapTight` / `gapSmall` / `gapDefault` / `gapLarge` / `gapXLarge` | `gap-1`/`-2`/`-4`/`-6`/`-8` | Flex/grid gaps |
 | `spaceYTight` / `-Small` / `-Default` / `-Large` | `space-y-1`/`-2`/`-4`/`-6` | Vertical spacing |
@@ -222,14 +221,28 @@ control; `<BaudRateSelect>` the preset-or-custom baud picker.
 [typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) holds the
 form text tokens: `labelDefault`, `labelSimple`, `helpText`, `toolPanelLabel`.
 
-### Badges — [badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts)
+### Badges — [components/Badge.tsx](../frontend/wiretap-ui/src/components/Badge.tsx)
 
-| Token | Use |
-|---|---|
-| `badgeSuccess` / `badgeDanger` / `badgeWarning` / `badgeInfo` / `badgeNeutral` / `badgePurple` / `badgeCyan` | Standard badges |
-| `badgeSmall…` (Neutral / Success / Warning / Purple / Info / Danger) | Compact badges |
-| `badgeDarkPanelInfo` / `-Success` / `-Danger` / `-Purple` / `-Cyan` | Mono data-panel badges |
-| `badgeMetadata` | Filename / type pills |
+`<Badge>` renders the `.badge` classes in
+[components.css](../frontend/wiretap-ui/src/styles/components.css). A badge
+is a label, not a control: one that answers a click is a
+`<Button variant="tonal">` (or `variant="outline"` with `pressed` for a
+filter toggle). Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `tone` | `neutral` (default) · `primary` · `success` · `danger` · `warning` · `purple` · `cyan` | The buttons' tint sets; neutral is `--bg-tertiary` |
+| `variant` | `tonal` (default) · `outline` | Outline is transparent with the tone's border — a coloured edge with no fill |
+| `size` | `sm` 16 px · `md` 20 px (default) · `lg` 24 px | Its own scale, not the control scale: `sm` for dense lists and log rows, `md` beside table text and in top bars, `lg` in cards, dialogs and Settings |
+| `mono` | `boolean` | Monospace for ids, addresses and hex |
+
+`<SummaryBadge label value>` is the `label: value` pair the device cards and
+Data IO profiles show. A protocol's badge takes its tone from
+`protocolTone()` in [utils/profileTraits.ts](../frontend/wiretap-ui/src/utils/profileTraits.ts)
+(CAN green, CAN FD cyan, Modbus amber, Serial purple) and a Modbus register
+type from `MODBUS_REGISTER_TONES` beside it, so the same thing wears the same
+hue on every screen. `badgeClass({ tone, variant, size, mono })` is the class
+string for an element that cannot be a `<span>`.
 
 ### Cards & alerts — [cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts)
 
@@ -335,9 +348,9 @@ import { Input } from "../../../components/forms";
 ### Status badge inline
 
 ```tsx
-import { badgeSuccess } from "../../styles";
+import { Badge } from "../../components/Badge";
 
-<span className={badgeSuccess}>{t("status.connected")}</span>
+<Badge tone="success" size="lg">{t("status.connected")}</Badge>
 ```
 
 ### Empty state
@@ -731,7 +744,7 @@ value.toLocaleString(i18n.language);
 | ❌ Don't | ✅ Do |
 |---|---|
 | `text-gray-400` in data tables | `textDataSecondary` / `textDataTertiary` / `textDataMuted` |
-| `bg-blue-600/30 text-blue-400` ad-hoc chip | `badgeInfo` / `badgeColorClass(...)` / `badgeDarkPanelInfo` |
+| `bg-blue-600/30 text-blue-400` ad-hoc chip | `<Badge tone="primary">` — `mono` in a data panel |
 | `<input className="w-full px-4 py-2 rounded-lg border …">` | `<Input size="lg">` — the class carries the look, the border and the focus ring |
 | `<select className={…}>` | `<Select>` — draws the app's chevron on both platforms |
 | `<input type="checkbox" className="accent-blue-500">` | `<Checkbox>` — the theme's accent, drawn the same on WebKit and WebView2 |
@@ -855,7 +868,6 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
 | [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Button variants, toggle helpers, launcher, dialog options |
-| [../frontend/wiretap-ui/src/styles/badgeStyles.ts](../frontend/wiretap-ui/src/styles/badgeStyles.ts) | Standard, small, dark-panel, metadata badges |
 | [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Card/alert variants, detail box, panel footer, expandable row, selectable option |
 | [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
@@ -871,7 +883,7 @@ adjacency so related tooling is visible at a glance.
 ## Future improvements (non-blocking)
 
 - The remaining families as primitives, in the order of the Tailwind Removal
-  Handover: badges, cards and alerts, dialogs, tabs and menus (the segmented
+  Handover: cards and alerts, dialogs, tabs and menus (the segmented
   controls and list rows still written as raw `<button>`s belong here), data
   tables.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is

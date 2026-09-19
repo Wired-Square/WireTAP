@@ -11,7 +11,6 @@ import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { textDataSecondary, textDataGreen } from "../../../styles/colourTokens";
 import { textDanger } from "../../../styles";
-import { badgeColorClass } from "../../../styles/badgeStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -208,18 +207,16 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                 <span className={`${textDataSecondary} text-sm`}>
                   {t("history.frameSummary", { count: totalCount, formatted: totalCount.toLocaleString(i18n.language) })}
                 </span>
-                <button
+                <Button
+                  variant="tonal"
+                  tone={isLive ? "success" : "warning"}
+                  size="xs"
                   onClick={() => setIsLive(!isLive)}
-                  className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
-                    isLive
-                      ? badgeColorClass('green')
-                      : badgeColorClass('amber')
-                  }`}
                   title={isLive ? t("history.liveTooltip") : t("history.browsingTooltip")}
                 >
                   <Radio size={10} />
                   {isLive ? t("history.live") : t("history.browsing")}
-                </button>
+                </Button>
               </div>
             }
             rightContent={

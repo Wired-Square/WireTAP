@@ -6,6 +6,8 @@
 // This is the single source of truth for all profile capabilities.
 
 import type { IOProfile } from "../hooks/useSettings";
+import type { BadgeTone } from "../components/Badge";
+import type { ModbusRegisterType } from "../api/io";
 
 // ============================================================================
 // Types
@@ -37,6 +39,27 @@ export const PROTOCOL_LABELS: Record<Protocol, string> = {
 export function protocolLabel(protocol: string): string {
   return PROTOCOL_LABELS[protocol as Protocol] ?? protocol;
 }
+
+/** The hue a protocol's badge wears, the same on every screen that tags one. */
+export const PROTOCOL_TONES: Record<Protocol, BadgeTone> = {
+  can: "success",
+  canfd: "cyan",
+  modbus: "warning",
+  modbus_rtu: "warning",
+  serial: "purple",
+};
+
+export function protocolTone(protocol: string): BadgeTone {
+  return PROTOCOL_TONES[protocol as Protocol] ?? "neutral";
+}
+
+/** The hue a Modbus register type's badge wears, in the Decoder and the catalogue tree alike. */
+export const MODBUS_REGISTER_TONES: Record<ModbusRegisterType, BadgeTone> = {
+  holding: "primary",
+  input: "success",
+  coil: "warning",
+  discrete: "purple",
+};
 
 /**
  * Whether a frame of this protocol is one whole message off a line — a Modbus RTU

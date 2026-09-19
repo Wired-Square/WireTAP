@@ -324,7 +324,6 @@
   .\!border-green-600 { border-color: oklch(62.7% 0.194 149.214) !important }
   .\!border-purple-300 { border-color: oklch(82.7% 0.119 306.383) !important }
   .border-\[color\:var\(--accent-primary\)\] { border-color: var(--accent-primary) }
-  .border-\[color\:var\(--accent-purple\)\] { border-color: var(--accent-purple) }
   .border-\[color\:var\(--border-default\)\] { border-color: var(--border-default) }
   .border-\[color\:var\(--border-default\)\]\/30 { border-color: color-mix(in oklab, var(--border-default) 30%, transparent) }
   .border-\[color\:var\(--border-green\)\] { border-color: var(--border-green) }
@@ -389,11 +388,10 @@
   .bg-\[color\:var\(--text-muted\)\] { background-color: var(--text-muted) }
   .bg-\[var\(--accent-bg\)\] { background-color: var(--accent-bg) }
   .bg-\[var\(--accent-blue\)\] { background-color: var(--accent-blue) }
+  .bg-\[var\(--accent-danger\)\] { background-color: var(--accent-danger) }
   .bg-\[var\(--accent-primary\)\] { background-color: var(--accent-primary) }
-  .bg-\[var\(--badge-cyan-bg\)\] { background-color: var(--badge-cyan-bg) }
-  .bg-\[var\(--badge-orange-bg\)\] { background-color: var(--badge-orange-bg) }
-  .bg-\[var\(--badge-purple-bg\)\] { background-color: var(--badge-purple-bg) }
-  .bg-\[var\(--badge-rose-bg\)\] { background-color: var(--badge-rose-bg) }
+  .bg-\[var\(--accent-success\)\] { background-color: var(--accent-success) }
+  .bg-\[var\(--accent-warning\)\] { background-color: var(--accent-warning) }
   .bg-\[var\(--bg-accent\)\] { background-color: var(--bg-accent) }
   .bg-\[var\(--bg-amber\)\] { background-color: var(--bg-amber) }
   .bg-\[var\(--bg-blue\)\] { background-color: var(--bg-blue) }
@@ -436,7 +434,6 @@
   .bg-\[var\(--status-cyan-bg\)\] { background-color: var(--status-cyan-bg) }
   .bg-\[var\(--status-danger-bg\)\] { background-color: var(--status-danger-bg) }
   .bg-\[var\(--status-danger-text\)\] { background-color: var(--status-danger-text) }
-  .bg-\[var\(--status-info-badge-bg\)\] { background-color: var(--status-info-badge-bg) }
   .bg-\[var\(--status-info-bg\)\] { background-color: var(--status-info-bg) }
   .bg-\[var\(--status-info-text\)\] { background-color: var(--status-info-text) }
   .bg-\[var\(--status-purple-bg\)\] { background-color: var(--status-purple-bg) }
@@ -458,79 +455,53 @@
   .bg-\[var\(--text-purple\)\] { background-color: var(--text-purple) }
   .bg-\[var\(--text-yellow\)\] { background-color: var(--text-yellow) }
   .bg-amber-500\/10 { background-color: color-mix(in oklab, oklch(76.9% 0.188 70.08) 10%, transparent) }
-  .bg-amber-500\/15 { background-color: color-mix(in oklab, oklch(76.9% 0.188 70.08) 15%, transparent) }
-  .bg-amber-500\/20 { background-color: color-mix(in oklab, oklch(76.9% 0.188 70.08) 20%, transparent) }
   .bg-amber-600\/20 { background-color: color-mix(in oklab, oklch(66.6% 0.179 58.318) 20%, transparent) }
   .bg-amber-900\/50 { background-color: color-mix(in oklab, oklch(41.4% 0.112 45.904) 50%, transparent) }
   .bg-black\/50 { background-color: color-mix(in oklab, #000 50%, transparent) }
   .bg-blue-500 { background-color: oklch(62.3% 0.214 259.815) }
   .bg-blue-500\/5 { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 5%, transparent) }
   .bg-blue-500\/10 { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 10%, transparent) }
-  .bg-blue-500\/15 { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 15%, transparent) }
-  .bg-blue-500\/20 { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 20%, transparent) }
   .bg-blue-500\/60 { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 60%, transparent) }
   .bg-blue-600 { background-color: oklch(54.6% 0.245 262.881) }
   .bg-blue-600\/10 { background-color: color-mix(in oklab, oklch(54.6% 0.245 262.881) 10%, transparent) }
   .bg-blue-600\/15 { background-color: color-mix(in oklab, oklch(54.6% 0.245 262.881) 15%, transparent) }
-  .bg-blue-600\/20 { background-color: color-mix(in oklab, oklch(54.6% 0.245 262.881) 20%, transparent) }
   .bg-blue-900\/30 { background-color: color-mix(in oklab, oklch(37.9% 0.146 265.522) 30%, transparent) }
-  .bg-cyan-100\/50 { background-color: color-mix(in oklab, oklch(95.6% 0.045 203.388) 50%, transparent) }
   .bg-cyan-500\/10 { background-color: color-mix(in oklab, oklch(71.5% 0.143 215.221) 10%, transparent) }
-  .bg-cyan-500\/20 { background-color: color-mix(in oklab, oklch(71.5% 0.143 215.221) 20%, transparent) }
-  .bg-cyan-600\/20 { background-color: color-mix(in oklab, oklch(60.9% 0.126 221.723) 20%, transparent) }
   .bg-cyan-900\/50 { background-color: color-mix(in oklab, oklch(39.8% 0.07 227.392) 50%, transparent) }
   .bg-emerald-500\/10 { background-color: color-mix(in oklab, oklch(69.6% 0.17 162.48) 10%, transparent) }
   .bg-emerald-600\/20 { background-color: color-mix(in oklab, oklch(59.6% 0.145 163.225) 20%, transparent) }
   .bg-gray-500 { background-color: oklch(55.1% 0.027 264.364) }
   .bg-gray-600 { background-color: oklch(44.6% 0.03 256.802) }
   .bg-green-50 { background-color: oklch(98.2% 0.018 155.826) }
-  .bg-green-100 { background-color: oklch(96.2% 0.044 156.743) }
   .bg-green-400 { background-color: oklch(79.2% 0.209 151.711) }
   .bg-green-500 { background-color: oklch(72.3% 0.219 149.579) }
   .bg-green-500\/10 { background-color: color-mix(in oklab, oklch(72.3% 0.219 149.579) 10%, transparent) }
-  .bg-green-500\/20 { background-color: color-mix(in oklab, oklch(72.3% 0.219 149.579) 20%, transparent) }
-  .bg-green-600\/20 { background-color: color-mix(in oklab, oklch(62.7% 0.194 149.214) 20%, transparent) }
   .bg-green-900\/20 { background-color: color-mix(in oklab, oklch(39.3% 0.095 152.535) 20%, transparent) }
   .bg-green-900\/30 { background-color: color-mix(in oklab, oklch(39.3% 0.095 152.535) 30%, transparent) }
   .bg-indigo-500\/10 { background-color: color-mix(in oklab, oklch(58.5% 0.233 277.117) 10%, transparent) }
-  .bg-neutral-500\/20 { background-color: color-mix(in oklab, oklch(55.6% 0 0) 20%, transparent) }
-  .bg-orange-100\/50 { background-color: color-mix(in oklab, oklch(95.4% 0.038 75.164) 50%, transparent) }
-  .bg-orange-500 { background-color: oklch(70.5% 0.213 47.604) }
   .bg-orange-500\/10 { background-color: color-mix(in oklab, oklch(70.5% 0.213 47.604) 10%, transparent) }
-  .bg-orange-500\/20 { background-color: color-mix(in oklab, oklch(70.5% 0.213 47.604) 20%, transparent) }
   .bg-pink-50\/50 { background-color: color-mix(in oklab, oklch(97.1% 0.014 343.198) 50%, transparent) }
-  .bg-pink-100\/50 { background-color: color-mix(in oklab, oklch(94.8% 0.028 342.258) 50%, transparent) }
   .bg-pink-500\/10 { background-color: color-mix(in oklab, oklch(65.6% 0.241 354.308) 10%, transparent) }
   .bg-purple-100 { background-color: oklch(94.6% 0.033 307.174) }
   .bg-purple-500 { background-color: oklch(62.7% 0.265 303.9) }
   .bg-purple-500\/5 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 5%, transparent) }
   .bg-purple-500\/10 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 10%, transparent) }
-  .bg-purple-500\/15 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 15%, transparent) }
-  .bg-purple-500\/20 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 20%, transparent) }
   .bg-purple-500\/30 { background-color: color-mix(in oklab, oklch(62.7% 0.265 303.9) 30%, transparent) }
   .bg-purple-600\/10 { background-color: color-mix(in oklab, oklch(55.8% 0.288 302.321) 10%, transparent) }
   .bg-purple-600\/15 { background-color: color-mix(in oklab, oklch(55.8% 0.288 302.321) 15%, transparent) }
-  .bg-purple-600\/20 { background-color: color-mix(in oklab, oklch(55.8% 0.288 302.321) 20%, transparent) }
   .bg-purple-900\/50 { background-color: color-mix(in oklab, oklch(38.1% 0.176 304.987) 50%, transparent) }
   .bg-red-50 { background-color: oklch(97.1% 0.013 17.38) }
   .bg-red-500 { background-color: oklch(63.7% 0.237 25.331) }
   .bg-red-500\/10 { background-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 10%, transparent) }
   .bg-red-500\/40 { background-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 40%, transparent) }
-  .bg-red-600\/20 { background-color: color-mix(in oklab, oklch(57.7% 0.245 27.325) 20%, transparent) }
   .bg-red-900\/30 { background-color: color-mix(in oklab, oklch(39.6% 0.141 25.723) 30%, transparent) }
   .bg-red-900\/50 { background-color: color-mix(in oklab, oklch(39.6% 0.141 25.723) 50%, transparent) }
   .bg-red-950\/70 { background-color: color-mix(in oklab, oklch(25.8% 0.092 26.042) 70%, transparent) }
   .bg-sky-400 { background-color: oklch(74.6% 0.16 232.661) }
   .bg-sky-500\/10 { background-color: color-mix(in oklab, oklch(68.5% 0.169 237.323) 10%, transparent) }
-  .bg-sky-500\/20 { background-color: color-mix(in oklab, oklch(68.5% 0.169 237.323) 20%, transparent) }
-  .bg-sky-600\/20 { background-color: color-mix(in oklab, oklch(58.8% 0.158 241.966) 20%, transparent) }
-  .bg-slate-500\/20 { background-color: color-mix(in oklab, oklch(55.4% 0.046 257.417) 20%, transparent) }
   .bg-slate-900 { background-color: oklch(20.8% 0.042 265.755) }
   .bg-teal-500\/10 { background-color: color-mix(in oklab, oklch(70.4% 0.14 182.503) 10%, transparent) }
-  .bg-teal-500\/20 { background-color: color-mix(in oklab, oklch(70.4% 0.14 182.503) 20%, transparent) }
-  .bg-teal-600\/30 { background-color: color-mix(in oklab, oklch(60% 0.118 184.704) 30%, transparent) }
   .bg-transparent { background-color: transparent }
-  .bg-violet-600\/20 { background-color: color-mix(in oklab, oklch(54.1% 0.281 293.009) 20%, transparent) }
   .bg-white { background-color: #fff }
   .bg-white\/5 { background-color: color-mix(in oklab, #fff 5%, transparent) }
   .bg-yellow-400\/40 { background-color: color-mix(in oklab, oklch(85.2% 0.199 91.936) 40%, transparent) }
@@ -638,10 +609,6 @@
   .text-\[color\:var\(--accent-secondary\)\] { color: var(--accent-secondary) }
   .text-\[color\:var\(--accent-success\)\] { color: var(--accent-success) }
   .text-\[color\:var\(--accent-text\)\] { color: var(--accent-text) }
-  .text-\[color\:var\(--badge-cyan-text\)\] { color: var(--badge-cyan-text) }
-  .text-\[color\:var\(--badge-orange-text\)\] { color: var(--badge-orange-text) }
-  .text-\[color\:var\(--badge-purple-text\)\] { color: var(--badge-purple-text) }
-  .text-\[color\:var\(--badge-rose-text\)\] { color: var(--badge-rose-text) }
   .text-\[color\:var\(--danger\)\] { color: var(--danger) }
   .text-\[color\:var\(--data-text-primary\)\] { color: var(--data-text-primary) }
   .text-\[color\:var\(--info-text\)\] { color: var(--info-text) }
@@ -650,7 +617,6 @@
   .text-\[color\:var\(--status-cyan-text\)\] { color: var(--status-cyan-text) }
   .text-\[color\:var\(--status-danger-text\)\] { color: var(--status-danger-text) }
   .text-\[color\:var\(--status-info\)\] { color: var(--status-info) }
-  .text-\[color\:var\(--status-info-badge-text\)\] { color: var(--status-info-badge-text) }
   .text-\[color\:var\(--status-info-text\)\] { color: var(--status-info-text) }
   .text-\[color\:var\(--status-info-text-bold\)\] { color: var(--status-info-text-bold) }
   .text-\[color\:var\(--status-purple-text\)\] { color: var(--status-purple-text) }
@@ -684,24 +650,18 @@
   .text-amber-400 { color: oklch(82.8% 0.189 84.429) }
   .text-amber-500 { color: oklch(76.9% 0.188 70.08) }
   .text-amber-600 { color: oklch(66.6% 0.179 58.318) }
-  .text-blue-300 { color: oklch(80.9% 0.105 251.813) }
   .text-blue-400 { color: oklch(70.7% 0.165 254.624) }
   .text-blue-500 { color: oklch(62.3% 0.214 259.815) }
-  .text-blue-600 { color: oklch(54.6% 0.245 262.881) }
   .text-cyan-400 { color: oklch(78.9% 0.154 211.53) }
   .text-cyan-500 { color: oklch(71.5% 0.143 215.221) }
-  .text-cyan-600 { color: oklch(60.9% 0.126 221.723) }
   .text-emerald-400 { color: oklch(76.5% 0.177 163.223) }
   .text-emerald-500 { color: oklch(69.6% 0.17 162.48) }
   .text-gray-400 { color: oklch(70.7% 0.022 261.325) }
   .text-gray-500 { color: oklch(55.1% 0.027 264.364) }
-  .text-green-300 { color: oklch(87.1% 0.15 154.449) }
   .text-green-400 { color: oklch(79.2% 0.209 151.711) }
   .text-green-500 { color: oklch(72.3% 0.219 149.579) }
-  .text-green-600 { color: oklch(62.7% 0.194 149.214) }
   .text-green-700 { color: oklch(52.7% 0.154 150.069) }
   .text-indigo-400 { color: oklch(67.3% 0.182 276.935) }
-  .text-neutral-400 { color: oklch(70.8% 0 0) }
   .text-orange-400 { color: oklch(75% 0.183 55.934) }
   .text-orange-500 { color: oklch(70.5% 0.213 47.604) }
   .text-pink-400 { color: oklch(71.8% 0.202 349.761) }
@@ -715,15 +675,12 @@
   .text-red-500 { color: oklch(63.7% 0.237 25.331) }
   .text-red-600 { color: oklch(57.7% 0.245 27.325) }
   .text-rose-500 { color: oklch(64.5% 0.246 16.439) }
-  .text-sky-300 { color: oklch(82.8% 0.111 230.318) }
   .text-sky-400 { color: oklch(74.6% 0.16 232.661) }
   .text-sky-500 { color: oklch(68.5% 0.169 237.323) }
-  .text-sky-600 { color: oklch(58.8% 0.158 241.966) }
   .text-slate-400 { color: oklch(70.4% 0.04 256.788) }
   .text-slate-500 { color: oklch(55.4% 0.046 257.417) }
   .text-teal-400 { color: oklch(77.7% 0.152 181.912) }
   .text-violet-300 { color: oklch(81.1% 0.111 293.571) }
-  .text-violet-600 { color: oklch(54.1% 0.281 293.009) }
   .text-white { color: #fff }
   .text-yellow-400 { color: oklch(85.2% 0.199 91.936) }
   .text-yellow-500 { color: oklch(79.5% 0.184 86.047) }
@@ -756,12 +713,9 @@
   .ring-1 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .ring-2 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .shadow-red-500\/30 { --tw-shadow-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 30%, transparent) }
-  .ring-\[color\:currentColor\] { --tw-ring-color: currentColor }
   .ring-\[color\:var\(--border-default\)\] { --tw-ring-color: var(--border-default) }
   .ring-\[color\:var\(--status-cyan-border\)\] { --tw-ring-color: var(--status-cyan-border) }
   .ring-\[color\:var\(--status-info-border\)\] { --tw-ring-color: var(--status-info-border) }
-  .ring-\[color\:var\(--status-purple-border\)\] { --tw-ring-color: var(--status-purple-border) }
-  .ring-\[color\:var\(--status-success-border\)\] { --tw-ring-color: var(--status-success-border) }
   .ring-\[color\:var\(--status-warning-border\)\] { --tw-ring-color: var(--status-warning-border) }
   .ring-blue-500\/50 { --tw-ring-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 50%, transparent) }
   .ring-current { --tw-ring-color: currentcolor }
@@ -798,11 +752,8 @@
   @media (hover: hover) { .hover\:bg-\[var\(--hover-bg\)\]:hover { background-color: var(--hover-bg) } }
   @media (hover: hover) { .hover\:bg-\[var\(--status-danger-bg\)\]:hover { background-color: var(--status-danger-bg) } }
   @media (hover: hover) { .hover\:bg-\[var\(--status-info-bg\)\]:hover { background-color: var(--status-info-bg) } }
-  @media (hover: hover) { .hover\:bg-\[var\(--status-purple-bg-hover\)\]:hover { background-color: var(--status-purple-bg-hover) } }
   @media (hover: hover) { .hover\:bg-\[var\(--status-success-bg\)\]:hover { background-color: var(--status-success-bg) } }
-  @media (hover: hover) { .hover\:bg-\[var\(--status-success-bg-hover\)\]:hover { background-color: var(--status-success-bg-hover) } }
   @media (hover: hover) { .hover\:bg-\[var\(--status-warning-bg\)\]:hover { background-color: var(--status-warning-bg) } }
-  @media (hover: hover) { .hover\:bg-\[var\(--status-warning-bg-hover\)\]:hover { background-color: var(--status-warning-bg-hover) } }
   @media (hover: hover) { .hover\:bg-blue-500\/10:hover { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 10%, transparent) } }
   @media (hover: hover) { .hover\:bg-blue-500\/20:hover { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 20%, transparent) } }
   @media (hover: hover) { .hover\:bg-blue-500\/60:hover { background-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 60%, transparent) } }
@@ -835,7 +786,6 @@
   @media (hover: hover) { .hover\:no-underline:hover { text-decoration-line: none } }
   @media (hover: hover) { .hover\:underline:hover { text-decoration-line: underline } }
   @media (hover: hover) { .hover\:decoration-dotted:hover { text-decoration-style: dotted } }
-  @media (hover: hover) { .hover\:opacity-80:hover { opacity: 0.8 } }
   @media (hover: hover) { .hover\:opacity-100:hover { opacity: 1 } }
   @media (hover: hover) { .hover\:ring-2:hover { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) } }
   @media (hover: hover) { .hover\:ring-\[color\:var\(--accent-primary\)\]:hover { --tw-ring-color: var(--accent-primary) } }

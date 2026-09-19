@@ -1,6 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { Badge } from "../../../components/Badge";
 import { type PlacedSignal, BYTE_ORDER_LE } from "../utils/bitGrid";
 
 interface SignalListProps {
@@ -49,9 +50,9 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
             </span>
 
             {/* Byte order badge */}
-            <span className={`text-[10px] font-mono shrink-0 px-1 rounded border border-[color:var(--border-default)] ${textTertiary}`}>
+            <Badge variant="outline" size="sm" mono>
               {signal.byteOrder === BYTE_ORDER_LE ? "LE" : "BE"}
-            </span>
+            </Badge>
           </button>
         );
       })}

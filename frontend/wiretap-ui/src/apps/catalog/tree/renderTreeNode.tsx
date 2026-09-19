@@ -13,6 +13,9 @@ import { formatFrameId as formatId } from "../../../utils/frameIds";
 import { parseCanIdToNumber } from "../utils";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
+import { MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
+import type { ModbusRegisterType } from "../../../api/io";
 
 export type RenderTreeNode = (node: TomlNode, depth?: number) => React.ReactNode;
 
@@ -43,18 +46,6 @@ const NODE_ICON: Record<string, { Icon: LucideIcon; cls: string }> = {
   mux:             { Icon: Shuffle,       cls: "text-[color:var(--accent-blue)]" },
   "mux-case":      { Icon: MapPin,        cls: textMuted },
 };
-
-/**
- * Modbus register-number badge tint per register type — the colour conveys the
- * type (holding/input/coil/discrete), so the row drops the `[holding]` text.
- */
-const REGISTER_TONE: Record<string, string> = {
-  holding:  "bg-[var(--status-info-bg)] text-[color:var(--accent-blue)]",
-  input:    "bg-[var(--status-success-bg)] text-[color:var(--text-green)]",
-  coil:     "bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]",
-  discrete: "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)]",
-};
-const REGISTER_TONE_DEFAULT = `bg-[var(--bg-surface)] ${textMuted}`;
 
 /**
  * Creates a stable `renderTreeNode` function that can be passed into CatalogTreePanel.
@@ -147,16 +138,14 @@ export function createRenderTreeNode({
               const address = typeof regNum === "number"
                 ? formatId(regNum, displayFrameIdFormat)
                 : undefined;
-              const tone = (regType && REGISTER_TONE[regType]) || REGISTER_TONE_DEFAULT;
+              // The colour conveys the register type, so the row drops the `[holding]` text.
+              const tone = regType ? MODBUS_REGISTER_TONES[regType as ModbusRegisterType] : undefined;
               return (
                 <span className="flex items-center gap-1.5">
                   {address && (
-                    <span
-                      title={regType}
-                      className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${tone}`}
-                    >
+                    <Badge tone={tone} size="sm" mono title={regType} className="font-semibold tabular-nums">
                       {address}
-                    </span>
+                    </Badge>
                   )}
                   <span>{node.key}</span>
                 </span>
@@ -218,12 +207,9 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
                     {typeof sigReg === "number" && (
-                      <span
-                        title="Register"
-                        className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${REGISTER_TONE_DEFAULT}`}
-                      >
+                      <Badge size="sm" mono title="Register" className="font-semibold tabular-nums">
                         {formatId(sigReg, displayFrameIdFormat)}
-                      </span>
+                      </Badge>
                     )}
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (

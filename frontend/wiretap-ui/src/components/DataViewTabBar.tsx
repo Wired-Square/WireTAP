@@ -11,14 +11,13 @@ import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
 import ContextMenu from './ContextMenu';
 import {
   bgDataToolbar,
-  bgSurface,
   borderDataView,
   hoverBg,
 } from '../styles';
 import { iconXs } from '../styles/spacing';
-import { textDataPrimary, textDataSecondary } from '../styles/colourTokens';
-import { dataViewTabClass } from '../styles/buttonStyles';
-import { badgeColorClass, tabCountColorClass } from '../styles/badgeStyles';
+import { textDataPrimary } from '../styles/colourTokens';
+import { dataViewTabClass, tabCountColorClass } from '../styles/buttonStyles';
+import { Badge, type BadgeTone } from './Badge';
 
 // Re-export StreamingStatus for backwards compatibility
 export type { StreamingStatus } from './ProtocolBadge';
@@ -39,7 +38,7 @@ export interface TabDefinition {
 /** Badge to display next to the protocol label */
 export interface ProtocolBadge {
   label: string;
-  color?: 'green' | 'blue' | 'purple' | 'gray' | 'amber' | 'cyan';
+  tone?: BadgeTone;
 }
 
 export interface DataViewTabBarProps {
@@ -54,8 +53,6 @@ export interface DataViewTabBarProps {
   protocolLabel: string;
   /** Optional badges to show next to the protocol label (e.g., framing mode, filter) */
   protocolBadges?: ProtocolBadge[];
-  /** Called when the protocol badge is clicked (for future functionality) */
-  onProtocolClick?: () => void;
   /** Streaming status: 'stopped' (red), 'live' (green), or 'paused' (orange) */
   status?: StreamingStatus;
   /** @deprecated Use status instead. Whether data is currently streaming */
@@ -87,7 +84,6 @@ export default function DataViewTabBar({
   onTabChange,
   protocolLabel,
   protocolBadges,
-  onProtocolClick,
   status,
   isStreaming,
   timestamp,
@@ -119,18 +115,14 @@ export default function DataViewTabBar({
           status={status}
           isStreaming={isStreaming}
           isRecorded={isRecorded}
-          onClick={onProtocolClick}
         />
       </div>
 
       {/* Protocol configuration badges (framing, filter, etc.) */}
-      {protocolBadges && protocolBadges.length > 0 && protocolBadges.map((badge, idx) => (
-        <div
-          key={idx}
-          className={`flex items-center gap-1 ml-1 px-2 py-0.5 rounded text-xs ${badgeColorClass(badge.color ?? 'gray')}`}
-        >
+      {protocolBadges?.map((badge, idx) => (
+        <Badge key={idx} tone={badge.tone} className="ml-1">
           {badge.label}
-        </div>
+        </Badge>
       ))}
 
       {/* Time display with timezone support */}
@@ -148,7 +140,7 @@ export default function DataViewTabBar({
 
       {/* Frame index display (for debugging/playback position) */}
       {frameIndex != null && (
-        <div className={`flex items-center gap-1 ml-2 px-1.5 py-0.5 ${bgSurface} rounded text-xs font-mono ${textDataSecondary}`}>
+        <Badge mono className="ml-2">
           <span>Frame</span>
           <span className={textDataPrimary}>{(frameIndex + 1).toLocaleString()}</span>
           {totalFrames != null && (
@@ -157,7 +149,7 @@ export default function DataViewTabBar({
               <span className={textDataPrimary}>{totalFrames.toLocaleString()}</span>
             </>
           )}
-        </div>
+        </Badge>
       )}
 
       {/* Tabs */}

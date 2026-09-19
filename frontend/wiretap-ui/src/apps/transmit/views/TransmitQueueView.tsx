@@ -15,7 +15,7 @@ import {
   textDataSecondary,
   hoverDataRow,
 } from "../../../styles/colourTokens";
-import { badgeColorClass } from "../../../styles/badgeStyles";
+import { Badge } from "../../../components/Badge";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
@@ -345,12 +345,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           {formatBusLabel(item.profileName, item.canFrame?.bus, outputBusToSource)}
                         </span>
                         {item.origin === "agent" && (
-                          <span
-                            className="text-[10px] uppercase tracking-wide px-1 rounded bg-[var(--bg-info)] text-[color:var(--text-info)]"
-                            title={t("queue.agentRepeat")}
-                          >
+                          <Badge tone="primary" size="sm" className="uppercase tracking-wide" title={t("queue.agentRepeat")}>
                             {t("queue.agentBadge")}
-                          </span>
+                          </Badge>
                         )}
                       </div>
                       {item.type === "can" && item.canFrame && (
@@ -375,15 +372,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
 
                   {/* Type */}
                   <td className="px-4 py-2">
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded ${
-                        formatted.type === "CAN"
-                          ? badgeColorClass('blue')
-                          : badgeColorClass('purple')
-                      }`}
-                    >
+                    <Badge tone={formatted.type === "CAN" ? "primary" : "purple"}>
                       {formatted.type}
-                    </span>
+                    </Badge>
                   </td>
 
                   {/* Frame / Data */}

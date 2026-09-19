@@ -6,14 +6,13 @@ import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
-import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
 import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
-import { protocolLabel } from "../../../utils/profileTraits";
+import { protocolLabel, MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
 import MessageBytes from "../../../components/MessageBytes";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
@@ -34,8 +33,9 @@ import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
 import { signalByteIndices } from "../../../utils/mirrorBytes";
-import { IconButton } from "../../../components/Button";
+import { Button, IconButton } from "../../../components/Button";
 import { Input, Select } from "../../../components/forms";
+import { Badge, type BadgeTone } from "../../../components/Badge";
 
 type Props = {
   frames: FrameDetail[];
@@ -299,14 +299,6 @@ function navigateToCatalogFrame(frameId: number) {
  */
 // Minimum time between flashes (ms) - ensures consistent flash rate across all frames
 const MIN_FLASH_INTERVAL = 500;
-
-// Badge styling per Modbus register type (only used for Modbus catalogues).
-const MODBUS_TYPE_BADGE: Record<'holding' | 'input' | 'coil' | 'discrete', string> = {
-  holding: badgeDarkPanelInfo,
-  input: badgeDarkPanelSuccess,
-  coil: badgeDarkPanelCyan,
-  discrete: badgeDarkPanelPurple,
-};
 
 /** A Modbus signal's register, as "13019" or a span "13021–13022". */
 /** One raw frame as the Unmatched and Filtered lists show it; extras (a reason, a button) ride as children. */
@@ -638,16 +630,9 @@ function FrameCard({
     }
   };
 
-  // Get badge style based on field name (built-in vs custom)
-  const getFieldBadgeStyle = (name: string): string => {
-    switch (name) {
-      case 'source_address':
-      case 'destination_address':
-        return badgeDarkPanelInfo; // Blue for built-in fields
-      default:
-        return badgeDarkPanelPurple; // Purple for custom fields
-    }
-  };
+  // Built-in fields are blue, custom fields purple
+  const fieldBadgeTone = (name: string): BadgeTone =>
+    name === 'source_address' || name === 'destination_address' ? 'primary' : 'purple';
 
   return (
     <div className="space-y-2">
@@ -663,9 +648,9 @@ function FrameCard({
         {/* Modbus register adornments (modbusRegisterType only set for Modbus catalogues) */}
         {frame.modbusRegisterType && (
           <>
-            <span className={MODBUS_TYPE_BADGE[frame.modbusRegisterType]}>
+            <Badge tone={MODBUS_REGISTER_TONES[frame.modbusRegisterType]} mono>
               {frame.modbusRegisterType}
-            </span>
+            </Badge>
             {frame.interval !== undefined && (
               <span className={caption} title="Poll interval">
                 {frame.interval >= 1000 ? `${(frame.interval / 1000).toFixed(1)}s` : `${frame.interval}ms`}
@@ -675,21 +660,16 @@ function FrameCard({
         )}
         {/* Mirror frame badge */}
         {frame.mirrorOf && (
-          <span className={badgeDarkPanelCyan} title={`Inherits signals from frame ${frame.mirrorOf}`}>
+          <Badge tone="cyan" mono title={`Inherits signals from frame ${frame.mirrorOf}`}>
             <Layers className={iconXs} />
             Mirror of {formatFrameId(parseCanId(frame.mirrorOf) ?? 0, displayFrameIdFormat)}
-          </span>
+          </Badge>
         )}
         {/* Mirror validation badge */}
         {mirrorValidation && (
-          <span
-            className={
-              mirrorValidation.isValid === true
-                ? badgeDarkPanelSuccess
-                : mirrorValidation.isValid === false
-                  ? badgeDarkPanelDanger
-                  : badgeDarkPanelInfo
-            }
+          <Badge
+            tone={mirrorValidation.isValid === true ? 'success' : mirrorValidation.isValid === false ? 'danger' : 'primary'}
+            mono
             title={`Last comparison: ${mirrorValidation.timeDeltaMs.toFixed(0)}ms apart`}
           >
             {mirrorValidation.isValid === true && <Check className={iconXs} />}
@@ -697,47 +677,53 @@ function FrameCard({
             {mirrorValidation.isValid === null && <Clock className={iconXs} />}
             {mirrorValidation.isValid === true ? 'Match' :
              mirrorValidation.isValid === false ? 'Mismatch' : 'Pending'}
-          </span>
+          </Badge>
         )}
         {/* Header field badges - clickable to toggle filter */}
         {headerFields.length > 0 && headerFields.map((field) => (
           onToggleHeaderFieldFilter ? (
-            <button
+            <Button
               key={field.name}
+              variant="tonal"
+              tone={fieldBadgeTone(field.name)}
+              size="xs"
+              className="font-mono"
               onClick={() => onToggleHeaderFieldFilter(field.name, field.value)}
-              className={`${getFieldBadgeStyle(field.name)} cursor-pointer hover:opacity-80 transition-opacity`}
               title={`Click to filter by ${getFriendlyFieldName(field.name)}: ${field.display}`}
             >
               {getFriendlyFieldName(field.name)}: {field.display}
-            </button>
+            </Button>
           ) : (
-            <span key={field.name} className={getFieldBadgeStyle(field.name)}>
+            <Badge key={field.name} tone={fieldBadgeTone(field.name)} mono>
               {getFriendlyFieldName(field.name)}: {field.display}
-            </span>
+            </Badge>
           )
         ))}
         {/* Legacy source address badge (for CAN/J1939) - clickable to toggle filter */}
         {sourceAddressLabel !== undefined && headerFields.length === 0 && (
           onToggleHeaderFieldFilter ? (
-            <button
+            <Button
+              variant="tonal"
+              tone="primary"
+              size="xs"
+              className="font-mono"
               onClick={() => onToggleHeaderFieldFilter('source_address', sourceAddressLabel)}
-              className={`${badgeDarkPanelInfo} cursor-pointer hover:opacity-80 transition-opacity`}
               title={`Click to filter by Source: 0x${sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}`}
             >
               Source: 0x{sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}
-            </button>
+            </Button>
           ) : (
-            <span className={badgeDarkPanelInfo}>
+            <Badge tone="primary" mono>
               Source: 0x{sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}
-            </span>
+            </Badge>
           )
         )}
         {/* Checksum badge - always last */}
         {checksumResult && (
-          <span className={checksumResult.valid ? badgeDarkPanelSuccess : badgeDarkPanelDanger}>
+          <Badge tone={checksumResult.valid ? "success" : "danger"} mono>
             {checksumResult.valid ? <Check className={iconXs} /> : <X className={iconXs} />}
             Checksum: 0x{checksumResult.extracted.toString(16).toUpperCase().padStart(2, '0')}
-          </span>
+          </Badge>
         )}
       </div>
       {/* Raw bytes on separate line — only for non-mux frames; mux frames show
@@ -1012,24 +998,24 @@ export default function DecoderFramesView({
     // Framing badge - show encoding or "None" if no framing configured
     if (serialConfig?.encoding) {
       const encodingLabel = serialConfig.encoding.toUpperCase();
-      badges.push({ label: encodingLabel, color: 'blue' });
+      badges.push({ label: encodingLabel, tone: 'primary' });
     } else {
-      badges.push({ label: 'None', color: 'gray' });
+      badges.push({ label: 'None' });
     }
 
     // Header length badge
     if (serialConfig?.header_length && serialConfig.header_length > 0) {
-      badges.push({ label: `${serialConfig.header_length}B hdr`, color: 'cyan' });
+      badges.push({ label: `${serialConfig.header_length}B hdr`, tone: 'cyan' });
     }
 
     // Min frame length filter badge
     if (serialConfig?.min_frame_length && serialConfig.min_frame_length > 0) {
-      badges.push({ label: `≥${serialConfig.min_frame_length}B`, color: 'purple' });
+      badges.push({ label: `≥${serialConfig.min_frame_length}B`, tone: 'purple' });
     }
 
     // Checksum badge
     if (serialConfig?.checksum?.algorithm) {
-      badges.push({ label: serialConfig.checksum.algorithm.toUpperCase(), color: 'amber' });
+      badges.push({ label: serialConfig.checksum.algorithm.toUpperCase(), tone: 'warning' });
     }
 
     return badges;

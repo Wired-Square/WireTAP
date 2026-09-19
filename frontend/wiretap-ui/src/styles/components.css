@@ -403,6 +403,89 @@
     height: 5px;
   }
 
+  /* ---- Badges ------------------------------------------------------------
+     .badge [.badge--outline] (tonal when none)
+            [.badge--primary|--success|--danger|--warning|--purple|--cyan]
+            (neutral when none) [.badge--sm|--lg] (md when none)
+     A label, not a control, so its own scale: sm 16 · md 20 · lg 24. The tones
+     are the buttons' tint sets; a badge that answers a click is a tonal
+     button. */
+  .badge {
+    --badge-h: 20px;
+    --badge-px: 6px;
+    --badge-bg: var(--bg-tertiary);
+    --badge-text: var(--text-secondary);
+    --badge-border: var(--border-default);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    min-height: var(--badge-h);
+    padding: 0 var(--badge-px);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: var(--badge-bg);
+    color: var(--badge-text);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .badge--sm {
+    --badge-h: 16px;
+    --badge-px: 4px;
+    font-size: 0.625rem;
+    line-height: 0.75rem;
+  }
+
+  .badge--lg {
+    --badge-h: 24px;
+    --badge-px: 8px;
+  }
+
+  .badge--outline {
+    background-color: transparent;
+    border-color: var(--badge-border);
+  }
+
+  .badge--primary {
+    --badge-bg: var(--status-info-bg);
+    --badge-text: var(--status-info-text);
+    --badge-border: var(--status-info-border);
+  }
+
+  .badge--success {
+    --badge-bg: var(--status-success-bg);
+    --badge-text: var(--status-success-text);
+    --badge-border: var(--status-success-border);
+  }
+
+  .badge--danger {
+    --badge-bg: var(--status-danger-bg);
+    --badge-text: var(--status-danger-text);
+    --badge-border: var(--status-danger-border);
+  }
+
+  .badge--warning {
+    --badge-bg: var(--status-warning-bg);
+    --badge-text: var(--status-warning-text);
+    --badge-border: var(--status-warning-border);
+  }
+
+  .badge--purple {
+    --badge-bg: var(--status-purple-bg);
+    --badge-text: var(--status-purple-text);
+    --badge-border: var(--status-purple-border);
+  }
+
+  .badge--cyan {
+    --badge-bg: var(--status-cyan-bg);
+    --badge-text: var(--status-cyan-text);
+    --badge-border: var(--status-cyan-border);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;

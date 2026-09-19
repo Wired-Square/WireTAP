@@ -14,6 +14,7 @@ import { createDefaultSignalsForFrame } from "../utils/decoderKnowledge";
 import { formatFrameId } from "../utils/frameIds";
 import { formatMs } from "../utils/reportExport";
 import { IconButton } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -210,9 +211,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
             {t("decoderInfo.frames.bytesLabel", { count: frame.length })}
           </span>
           {frame.isExtended && (
-            <span className="px-1 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] rounded">
-              {t("decoderInfo.frames.extBadge")}
-            </span>
+            <Badge tone="warning" size="sm">{t("decoderInfo.frames.extBadge")}</Badge>
           )}
         </div>
         <div className={flexRowGap2}>
@@ -232,22 +231,22 @@ function FrameCard({ frame, t }: FrameCardProps) {
       {/* Flags */}
       <div className="flex flex-wrap gap-1 mb-2">
         {frame.mux && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--text-orange)] rounded">
+          <Badge tone="warning" size="sm">
             <Shuffle className={iconXs} />
             {frame.mux.isTwoByte ? t("decoderInfo.frames.muxBadgeTwoByte") : t("decoderInfo.frames.muxBadge")}
-          </span>
+          </Badge>
         )}
         {frame.isBurst && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-info-bg)] text-[color:var(--text-cyan)] rounded">
+          <Badge tone="cyan" size="sm">
             <Zap className={iconXs} />
             {t("decoderInfo.frames.burstBadge")}
-          </span>
+          </Badge>
         )}
         {frame.isMultiBus && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)] rounded">
+          <Badge tone="danger" size="sm">
             <GitBranch className={iconXs} />
             {t("decoderInfo.frames.multiBusBadge")}
-          </span>
+          </Badge>
         )}
       </div>
 
@@ -352,12 +351,9 @@ function MuxDetails({ mux, t }: MuxDetailsProps) {
       <div className="flex flex-wrap gap-1">
         <span className="text-[color:var(--text-muted)]">{t("decoderInfo.mux.casesLabel")}</span>
         {mux.cases.slice(0, 16).map((c) => (
-          <span
-            key={c}
-            className="px-1 py-0.5 bg-[var(--status-warning-bg)] text-[color:var(--text-orange)] rounded font-mono"
-          >
+          <Badge key={c} tone="warning" size="sm" mono>
             {mux.isTwoByte ? `${Math.floor(c / 256)}.${c % 256}` : c}
-          </span>
+          </Badge>
         ))}
         {mux.cases.length > 16 && (
           <span className="text-[color:var(--text-muted)]">

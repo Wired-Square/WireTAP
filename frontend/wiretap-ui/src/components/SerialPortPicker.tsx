@@ -27,6 +27,7 @@ import type { SerialPortInfo } from "../api/serial";
 import type { IOProfile } from "../hooks/useSettings";
 import type { DfuDeviceInfo } from "../apps/serial/utils/flasherTypes";
 import { Button } from "./Button";
+import { Badge } from "./Badge";
 import { Select } from "./forms";
 
 export type Parity = "none" | "odd" | "even";
@@ -281,9 +282,9 @@ export default function SerialPortPicker({
                         )}
                       </div>
                       {p.profile && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-sky-500/20 text-sky-300">
+                        <Badge tone="primary" size="sm">
                           {p.profile.name} · {p.profile.connection.baud_rate ?? "?"}
-                        </span>
+                        </Badge>
                       )}
                     </button>
                   </li>

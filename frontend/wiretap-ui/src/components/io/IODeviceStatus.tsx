@@ -8,8 +8,8 @@ import { useTranslation } from "react-i18next";
 import { CircleCheck, CircleX, Loader2, RefreshCw } from "lucide-react";
 import { iconMd, iconLg } from "../../styles/spacing";
 import { caption } from "../../styles";
-import { badgeSmallSuccess, badgeSmallNeutral } from "../../styles/badgeStyles";
 import { IconButton } from "../Button";
+import { Badge } from "../Badge";
 
 export type DeviceProbeState = "idle" | "probing" | "success" | "error";
 
@@ -106,10 +106,10 @@ export default function IODeviceStatus({
               </span>
             )}
             {result.supports_fd === true && (
-              <span className={`ml-2 ${badgeSmallSuccess}`}>{t("ioDeviceStatus.canFd")}</span>
+              <Badge tone="success" size="sm" className="ml-2">{t("ioDeviceStatus.canFd")}</Badge>
             )}
             {result.supports_fd === false && (
-              <span className={`ml-2 ${badgeSmallNeutral}`}>{t("ioDeviceStatus.can20")}</span>
+              <Badge size="sm" className="ml-2">{t("ioDeviceStatus.can20")}</Badge>
             )}
           </div>
         )}

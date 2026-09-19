@@ -5,9 +5,10 @@
 
 import { Bluetooth, Globe, Wifi, HardDriveDownload, Plug, Cable } from "lucide-react";
 import { cardDefault } from "../styles/cardStyles";
-import { textPrimary, textSecondary, badgeInfo, badgeWarning, badgeSuccess } from "../styles";
+import { textPrimary } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import { PrimaryButton } from "./forms";
+import { Badge, SummaryBadge } from "./Badge";
 
 /**
  * Polymorphic device type — works with both provisioning's BleDevice
@@ -57,15 +58,6 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
   );
 }
 
-const SummaryBadge = ({ label, value }: { label: string; value: string }) => (
-  <span
-    className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)] ${textSecondary}`}
-  >
-    <span className="opacity-70">{label}:</span>
-    <span className={`font-mono ${textPrimary}`}>{value}</span>
-  </span>
-);
-
 export default function DeviceCard({ device, onConnect, connectingDeviceId }: DeviceCardProps) {
   const isThisConnecting = connectingDeviceId === device.id;
   const anyConnecting = connectingDeviceId !== null;
@@ -85,19 +77,19 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
           <h3 className={`font-medium ${textPrimary}`}>{device.name}</h3>
           {caps.length > 0 && (
             <>
-              <span className={`${badgeInfo} gap-1${caps.includes("wifi-provision") ? "" : " opacity-15"}`}>
+              <Badge tone="primary" size="lg" className={caps.includes("wifi-provision") ? "" : "opacity-15"}>
                 <Wifi className="w-3 h-3" />
                 WiFi
-              </span>
-              <span className={`${badgeWarning} gap-1${caps.includes("smp") ? "" : " opacity-15"}`}>
+              </Badge>
+              <Badge tone="warning" size="lg" className={caps.includes("smp") ? "" : "opacity-15"}>
                 <HardDriveDownload className="w-3 h-3" />
                 SMP
-              </span>
+              </Badge>
               {caps.includes("framelink") && (
-                <span className={`${badgeSuccess} gap-1`}>
+                <Badge tone="success" size="lg">
                   <Cable className="w-3 h-3" />
                   FrameLink
-                </span>
+                </Badge>
               )}
             </>
           )}

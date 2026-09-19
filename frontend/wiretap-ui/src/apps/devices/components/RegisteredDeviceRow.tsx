@@ -10,11 +10,11 @@ import { Globe, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cardDefault } from "../../../styles/cardStyles";
 import { textPrimary, textSecondary } from "../../../styles";
-import { badgeWarning } from "../../../styles/badgeStyles";
 import { iconMd, gapSmall } from "../../../styles/spacing";
 import type { DeviceRegistryEntry } from "../../../api/deviceRegistry";
 import { IconButton } from "../../../components/Button";
 import { SecondaryButton } from "../../../components/forms";
+import { Badge } from "../../../components/Badge";
 
 interface RegisteredDeviceRowProps {
   entry: DeviceRegistryEntry;
@@ -37,7 +37,7 @@ export default function RegisteredDeviceRow({
         <div className={`flex items-center flex-wrap ${gapSmall}`}>
           <h3 className={`font-medium ${textPrimary} truncate`}>{entry.device_id}</h3>
           {entry.resolution === "manual" && (
-            <span className={badgeWarning}>{t("registered.manualBadge")}</span>
+            <Badge tone="warning" size="lg">{t("registered.manualBadge")}</Badge>
           )}
         </div>
         {entry.host && (

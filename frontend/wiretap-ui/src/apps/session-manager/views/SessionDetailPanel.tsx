@@ -14,6 +14,8 @@ import { emptyStateText } from "../../../styles/typography";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
+import { protocolLabel, protocolTone } from "../../../utils/profileTraits";
 import { Checkbox, Input, Select } from "../../../components/forms";
 
 interface SessionDetailPanelProps {
@@ -117,34 +119,6 @@ export default function SessionDetailPanel({
       </div>
     </div>
   );
-}
-
-/** Protocol display label (uppercase for acronyms, title-case for others) */
-function protocolLabel(protocol: string): string {
-  switch (protocol) {
-    case "can": return "CAN";
-    case "canfd": return "CAN FD";
-    case "modbus": return "Modbus";
-    case "modbus_rtu": return "Modbus RTU";
-    case "serial": return "Serial";
-    default: return protocol.toUpperCase();
-  }
-}
-
-/** Protocol badge colour classes */
-function protocolBadgeStyle(protocol: string): string {
-  switch (protocol) {
-    case "can":
-    case "canfd":
-      return "bg-cyan-500/20 text-cyan-400";
-    case "modbus":
-    case "modbus_rtu":
-      return "bg-teal-500/20 text-teal-400";
-    case "serial":
-      return "bg-orange-500/20 text-orange-400";
-    default:
-      return "bg-slate-500/20 text-slate-400";
-  }
 }
 
 // Session details sub-component
@@ -308,29 +282,21 @@ function SessionDetails({
         </label>
         <div className="flex flex-wrap gap-1 mt-1">
           {session.capabilities.traits.protocols.map((protocol) => (
-            <span key={protocol} className={`px-1.5 py-0.5 text-xs rounded ${protocolBadgeStyle(protocol)}`}>
+            <Badge key={protocol} tone={protocolTone(protocol)}>
               {protocolLabel(protocol)}
-            </span>
+            </Badge>
           ))}
           {session.capabilities.traits.temporal_mode === "realtime" && (
-            <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">
-              {t("detail.values.realtime")}
-            </span>
+            <Badge tone="warning">{t("detail.values.realtime")}</Badge>
           )}
           {session.capabilities.traits.tx_frames && (
-            <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">
-              {t("detail.values.transmit")}
-            </span>
+            <Badge tone="primary">{t("detail.values.transmit")}</Badge>
           )}
           {session.capabilities.can_pause && (
-            <span className="px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">
-              {t("detail.values.pause")}
-            </span>
+            <Badge tone="purple">{t("detail.values.pause")}</Badge>
           )}
           {session.capabilities.supports_time_range && (
-            <span className="px-1.5 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
-              {t("detail.values.timeRange")}
-            </span>
+            <Badge tone="success">{t("detail.values.timeRange")}</Badge>
           )}
         </div>
       </div>

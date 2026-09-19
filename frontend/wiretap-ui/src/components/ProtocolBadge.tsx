@@ -1,93 +1,44 @@
 // src/components/ProtocolBadge.tsx
 //
-// Shared protocol badge component showing streaming status, protocol label,
-// and optional recorded indicator. Used in Decoder, Discovery, and Transmit top bars.
+// Shared protocol badge showing streaming status, protocol label and an
+// optional recorded indicator. Used in Decoder, Discovery, and Transmit top bars.
 
 import { History } from "lucide-react";
 import { iconXs } from "../styles/spacing";
-import { bgSurface, textDataSecondary } from "../styles";
-
-// ============================================================================
-// Types
-// ============================================================================
+import { Badge } from "./Badge";
 
 export type StreamingStatus = "stopped" | "live" | "paused";
 
 export interface ProtocolBadgeProps {
-  /** Protocol or mode label (e.g., "CAN", "Serial"). Used as fallback if capabilities not provided. */
+  /** Protocol or mode label (e.g., "CAN", "Serial") */
   label?: string;
-  /** Whether the device supports CAN transmission. If true, shows "CAN" label. */
-  canTransmit?: boolean;
-  /** Whether the device supports serial transmission. If true and canTransmit is false, shows "Serial" label. */
-  canTransmitSerial?: boolean;
   /** Streaming status: 'stopped' (red), 'live' (green), or 'paused' (orange) */
   status?: StreamingStatus;
   /** @deprecated Use status instead. Whether data is currently streaming */
   isStreaming?: boolean;
   /** Whether the data source is recorded (e.g., WireTAP backend, CSV) vs live */
   isRecorded?: boolean;
-  /** Called when the badge is clicked (for future functionality) */
-  onClick?: () => void;
 }
 
-// ============================================================================
-// Status Light Component
-// ============================================================================
-
-function StatusLight({ status }: { status: StreamingStatus }) {
-  const colorClass =
-    status === "live"
-      ? "bg-green-500"
-      : status === "paused"
-        ? "bg-orange-500"
-        : "bg-red-500";
-
-  return (
-    <span
-      className={`w-2 h-2 rounded-full ${colorClass}`}
-      title={
-        status === "live" ? "Live" : status === "paused" ? "Paused" : "Stopped"
-      }
-    />
-  );
-}
-
-// ============================================================================
-// Component
-// ============================================================================
+const LIGHT: Record<StreamingStatus, { colour: string; title: string }> = {
+  live: { colour: "bg-[var(--accent-success)]", title: "Live" },
+  paused: { colour: "bg-[var(--accent-warning)]", title: "Paused" },
+  stopped: { colour: "bg-[var(--accent-danger)]", title: "Stopped" },
+};
 
 export default function ProtocolBadge({
   label,
-  canTransmit,
-  canTransmitSerial,
   status,
   isStreaming,
   isRecorded = false,
-  onClick,
 }: ProtocolBadgeProps) {
-  // Support both new status prop and legacy isStreaming prop
-  const effectiveStatus: StreamingStatus =
-    status ?? (isStreaming ? "live" : "stopped");
-
-  // Determine label from capabilities if provided, otherwise use label prop
-  const effectiveLabel = canTransmit
-    ? "CAN"
-    : canTransmitSerial
-      ? "Serial"
-      : label ?? "—";
+  const light = LIGHT[status ?? (isStreaming ? "live" : "stopped")];
 
   return (
-    <button
-      onClick={onClick}
-      disabled={!onClick}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded ${bgSurface} ${
-        onClick ? "hover:brightness-95 cursor-pointer" : "cursor-default"
-      }`}
-      title={isRecorded ? "Recorded data source" : "Live data source"}
-    >
-      <StatusLight status={effectiveStatus} />
-      <span className={`text-xs font-medium ${textDataSecondary}`}>{effectiveLabel}</span>
-      {isRecorded && <History className={`${iconXs} ${textDataSecondary}`} />}
-    </button>
+    <Badge size="lg" className="gap-1.5" title={isRecorded ? "Recorded data source" : "Live data source"}>
+      <span className={`w-2 h-2 rounded-full ${light.colour}`} title={light.title} />
+      {label ?? "—"}
+      {isRecorded && <History className={iconXs} />}
+    </Badge>
   );
 }

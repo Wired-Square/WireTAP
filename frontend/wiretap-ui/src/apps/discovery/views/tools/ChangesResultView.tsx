@@ -16,6 +16,7 @@ import { saveCatalog } from "../../../../api/catalog";
 import { useSettings } from "../../../../hooks/useSettings";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
 import { Button, IconButton } from "../../../../components/Button";
+import { Badge, type BadgeStyleProps, type BadgeTone } from "../../../../components/Badge";
 
 // Helper to build a set of byte indices that are part of multi-byte patterns
 function getBytesInMultiBytePatterns(patterns: MultiBytePattern[]): Set<number> {
@@ -137,35 +138,33 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
 
         {/* Summary badges row */}
         {summary && (summary.identicalCount > 0 || summary.varyingLengthCount > 0 || summary.muxCount > 0 || summary.burstCount > 0 || summary.mirrorGroupCount > 0) && (
-          <div className="flex flex-wrap gap-2 text-[10px]">
+          <div className="flex flex-wrap gap-2">
             {summary.mirrorGroupCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-pink-100/50 text-pink-600">
+              <Badge tone="purple" size="sm">
                 <GitMerge className={iconXs} />
                 {t("changes.mirrorGroup", { count: summary.mirrorGroupCount })}
-              </span>
+              </Badge>
             )}
             {summary.identicalCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--hover-bg)] text-[color:var(--text-secondary)]">
+              <Badge size="sm">
                 <Copy className={iconXs} />
                 {t("changes.identical", { count: summary.identicalCount })}
-              </span>
+              </Badge>
             )}
             {summary.varyingLengthCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)]">
+              <Badge tone="warning" size="sm">
                 <Ruler className={iconXs} />
                 {t("changes.varyingLength", { count: summary.varyingLengthCount })}
-              </span>
+              </Badge>
             )}
             {summary.muxCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-100/50 text-[color:var(--text-orange)]">
+              <Badge tone="warning" size="sm">
                 <Layers className={iconXs} />
                 {t("changes.multiplexed", { count: summary.muxCount })}
-              </span>
+              </Badge>
             )}
             {summary.burstCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-100/50 text-[color:var(--text-cyan)]">
-                {t("changes.burst", { count: summary.burstCount })}
-              </span>
+              <Badge tone="cyan" size="sm">{t("changes.burst", { count: summary.burstCount })}</Badge>
             )}
           </div>
         )}
@@ -339,33 +338,29 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
             {t("changes.samples", { count: result.sampleCount })}
           </span>
           {result.isBurstFrame && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-cyan-100/50 text-[color:var(--text-cyan)] rounded">
-              {t("changes.burstBadge")}
-            </span>
+            <Badge tone="cyan" size="sm">{t("changes.burstBadge")}</Badge>
           )}
           {result.isMuxFrame && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-orange-100/50 text-[color:var(--text-orange)] rounded flex items-center gap-0.5">
+            <Badge tone="warning" size="sm">
               <Layers className={iconXs} />
               {t("changes.muxBadge")}
-            </span>
+            </Badge>
           )}
           {result.hasVaryingLength && result.lengthRange && (
-            <span
-              className="px-1.5 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)] rounded flex items-center gap-0.5"
+            <Badge
+              tone="warning"
+              size="sm"
               title={t("changes.lengthRangeTooltip", { min: result.lengthRange.min, max: result.lengthRange.max })}
             >
               <Ruler className={iconXs} />
               {t("changes.lengthRangeBadge", { min: result.lengthRange.min, max: result.lengthRange.max })}
-            </span>
+            </Badge>
           )}
           {result.isIdentical && (
-            <span
-              className="px-1.5 py-0.5 text-[10px] bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded flex items-center gap-0.5"
-              title={t("changes.identicalTooltip")}
-            >
+            <Badge size="sm" title={t("changes.identicalTooltip")}>
               <Copy className={iconXs} />
               {t("changes.identicalBadge")}
-            </span>
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2 text-[10px]">
@@ -557,17 +552,14 @@ type ByteChipProps = {
 
 function ByteChip({ byte }: ByteChipProps) {
   const { t } = useTranslation("discovery");
-  let bgClass = "bg-[var(--hover-bg)]";
-  let textClass = "text-[color:var(--text-secondary)]";
+  let style: BadgeStyleProps = {};
   let title = t("changes.byteTooltipUnknown", { idx: byte.byteIndex });
 
   if (byte.role === 'static') {
-    bgClass = "bg-[var(--border-default)]";
-    textClass = "text-[color:var(--text-primary)]";
+    style = { variant: 'outline' };
     title = t("changes.byteTooltipStatic", { idx: byte.byteIndex, value: byte.staticValue!.toString(16).toUpperCase().padStart(2, '0') });
   } else if (byte.role === 'counter') {
-    bgClass = "bg-[var(--status-success-bg)]";
-    textClass = "text-[color:var(--status-success-text)]";
+    style = { tone: 'success' };
     const dir = byte.counterDirection === 'up' ? '↑' : '↓';
     if (byte.isLoopingCounter && byte.loopingRange && byte.loopingModulo) {
       title = t("changes.byteTooltipLoopingCounter", {
@@ -583,22 +575,17 @@ function ByteChip({ byte }: ByteChipProps) {
       title = t("changes.byteTooltipCounter", { idx: byte.byteIndex, dir, step: byte.counterStep, rollover });
     }
   } else if (byte.role === 'sensor') {
-    bgClass = "bg-orange-100/50";
-    textClass = "text-[color:var(--text-orange)]";
+    style = { tone: 'warning' };
     const trend = byte.sensorTrend === 'increasing' ? '↑' : byte.sensorTrend === 'decreasing' ? '↓' : '↕';
     const strength = byte.trendStrength ? t("changes.byteTooltipSensorStrength", { percent: Math.round(byte.trendStrength * 100) }) : '';
     title = t("changes.byteTooltipSensor", { idx: byte.byteIndex, trend, min: byte.min, max: byte.max, strength });
   } else if (byte.role === 'value') {
-    bgClass = "bg-[var(--status-info-bg)]";
-    textClass = "text-[color:var(--status-info-text)]";
+    style = { tone: 'primary' };
     title = t("changes.byteTooltipValue", { idx: byte.byteIndex, min: byte.min, max: byte.max, count: byte.uniqueValues.size });
   }
 
   return (
-    <span
-      className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${bgClass} ${textClass}`}
-      title={title}
-    >
+    <Badge size="sm" mono {...style} title={title}>
       {byte.byteIndex}
       {byte.role === 'static' && (
         <span className="ml-0.5 opacity-60">
@@ -624,7 +611,7 @@ function ByteChip({ byte }: ByteChipProps) {
       {byte.role === 'value' && (
         <span className="ml-0.5 opacity-60">~</span>
       )}
-    </span>
+    </Badge>
   );
 }
 
@@ -637,30 +624,24 @@ type MultiByteChipProps = {
 };
 
 function MultiByteChip({ pattern }: MultiByteChipProps) {
-  let bgClass = "bg-[var(--status-purple-bg)]";
-  let textClass = "text-[color:var(--text-purple)]";
+  let tone: BadgeTone = 'purple';
   let label = '';
   let icon = '';
   let displayText = '';
 
   if (pattern.pattern === 'sensor16') {
-    bgClass = "bg-[var(--status-purple-bg)]";
-    textClass = "text-[color:var(--text-purple)]";
     label = 'sensor16';
     icon = '⚡';
   } else if (pattern.pattern === 'counter16') {
-    bgClass = "bg-[var(--status-success-bg)]";
-    textClass = "text-[color:var(--status-success-text)]";
+    tone = 'success';
     label = 'counter16';
     icon = '↻';
   } else if (pattern.pattern === 'counter32') {
-    bgClass = "bg-[var(--status-success-bg)]";
-    textClass = "text-[color:var(--status-success-text)]";
+    tone = 'success';
     label = 'counter32';
     icon = '↻';
   } else if (pattern.pattern === 'text') {
-    bgClass = "bg-[var(--status-warning-bg)]";
-    textClass = "text-[color:var(--text-amber)]";
+    tone = 'warning';
     label = 'text';
     icon = 'Aa';
     displayText = pattern.sampleText ? ` "${pattern.sampleText}"` : '';
@@ -676,15 +657,12 @@ function MultiByteChip({ pattern }: MultiByteChipProps) {
   const title = `${label} @ byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]${endianChar ? ` ${endianChar}` : ''}${rangeStr}${textSample}${pattern.correlatedRollover ? ' (rollover correlation)' : ''}`;
 
   return (
-    <span
-      className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${bgClass} ${textClass}`}
-      title={title}
-    >
+    <Badge tone={tone} size="sm" mono title={title}>
       {pattern.startByte}–{pattern.startByte + pattern.length - 1}
       <span className="ml-0.5">{icon}</span>
       {endianChar && <span className="ml-0.5 opacity-60 text-[8px]">{endianChar}</span>}
       {displayText && <span className="ml-1 opacity-80">{displayText}</span>}
-    </span>
+    </Badge>
   );
 }
 

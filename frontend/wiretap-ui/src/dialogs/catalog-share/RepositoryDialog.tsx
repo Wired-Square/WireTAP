@@ -41,7 +41,6 @@ import {
   textWarning,
 } from "../../styles";
 import { alertWarning, panelFooter } from "../../styles/cardStyles";
-import { badgeMetadata } from "../../styles/badgeStyles";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
 import { savedRepoName, revealRepoClone, GIT_PROGRESS_EVENT } from "../../api/catalogShare";
 import type {
@@ -55,6 +54,7 @@ import type {
 import { writeClipboardText } from "../../api/clipboard";
 import { useIsIOS } from "../../hooks/useIsIOS";
 import { IconButton } from "../../components/Button";
+import { Badge } from "../../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -111,16 +111,16 @@ function CandidateRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={textMedium}>{meta?.name ?? entry.filename}</span>
-          {meta?.protocol && <span className={badgeMetadata}>{meta.protocol}</span>}
+          {meta?.protocol && <Badge size="lg">{meta.protocol}</Badge>}
           {meta?.valid && <ShareIcon.Success className={`${iconSm} ${textSuccess}`} />}
           {disabled && (
             <span className={`${caption} ${textDanger}`}>{t("repository.invalid")}</span>
           )}
           {entry.alreadyTracked && (
-            <span className={badgeMetadata}>{t("repository.tracked")}</span>
+            <Badge size="lg">{t("repository.tracked")}</Badge>
           )}
           {entry.nameCollides && (
-            <span className={badgeMetadata}>{t("repository.collides")}</span>
+            <Badge size="lg">{t("repository.collides")}</Badge>
           )}
         </div>
         <div className={`${caption} truncate`}>{entry.path}</div>
@@ -216,8 +216,8 @@ function RepoRow({
           <span className={caption}>
             {repo.owner}/{repo.repo}
           </span>
-          {repo.gitRef && <span className={badgeMetadata}>{repo.gitRef}</span>}
-          {repo.directory && <span className={badgeMetadata}>{repo.directory}</span>}
+          {repo.gitRef && <Badge size="lg">{repo.gitRef}</Badge>}
+          {repo.directory && <Badge size="lg">{repo.directory}</Badge>}
           {isFavourite && (
             <span className={caption}>· {t("repository.saved.isFavourite")}</span>
           )}
@@ -629,15 +629,15 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               <div className="flex items-center gap-2 flex-wrap">
                 <ShareIcon.Branch className={`${iconSm} ${textSecondary}`} />
                 <span className={textMedium}>{browse.result.repo.fullName}</span>
-                <span className={badgeMetadata}>{browse.result.gitRef}</span>
+                <Badge size="lg">{browse.result.gitRef}</Badge>
                 {browse.result.repo.private && (
-                  <span className={badgeMetadata}>
+                  <Badge size="lg">
                     <Lock className={iconSm} />
                     {t("repository.private")}
-                  </span>
+                  </Badge>
                 )}
                 {!browse.result.authenticated && (
-                  <span className={badgeMetadata}>{t("repository.anonymous")}</span>
+                  <Badge size="lg">{t("repository.anonymous")}</Badge>
                 )}
               </div>
               <div className="flex items-start gap-2">

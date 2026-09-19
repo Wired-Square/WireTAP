@@ -12,6 +12,7 @@ import type { BridgeDescriptor } from "../../../api/framelinkRules";
 import BridgeDialog from "../dialogs/BridgeDialog";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export default function BridgesView() {
   const { t } = useTranslation("rules");
@@ -86,16 +87,12 @@ export default function BridgesView() {
                 <span className={`text-sm font-mono font-medium ${textPrimary}`}>
                   {formatHexId(b.bridge_id)}
                 </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
-                >
+                <Badge tone={isTemp ? "warning" : "success"}>
                   {isTemp ? t("common.temporary") : t("common.existing")}
-                </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${b.enabled ? "bg-blue-500/20 text-blue-300" : "bg-neutral-500/20 text-neutral-400"}`}
-                >
+                </Badge>
+                <Badge tone={b.enabled ? "primary" : "neutral"}>
                   {b.enabled ? t("common.enabled") : t("common.disabled")}
-                </span>
+                </Badge>
               </div>
               <div className={`mt-1 text-xs ${textSecondary}`}>
                 {b.source_interface_name} → {b.dest_interface_name}

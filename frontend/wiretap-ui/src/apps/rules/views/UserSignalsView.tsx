@@ -12,6 +12,7 @@ import { formatHexId } from "../utils/formatHex";
 import UserSignalDialog from "../dialogs/UserSignalDialog";
 import type { UserSignalMetadata } from "../dialogs/UserSignalDialog";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export default function UserSignalsView() {
   const { t } = useTranslation("rules");
@@ -94,9 +95,7 @@ export default function UserSignalsView() {
                 {signal.group}
               </span>
               {isTemporary && (
-                <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  {t("common.temporary")}
-                </span>
+                <Badge tone="warning">{t("common.temporary")}</Badge>
               )}
             </div>
             <IconButton

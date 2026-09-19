@@ -10,6 +10,7 @@ import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import type { TomlNode, ValidationError } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type SignalViewProps = {
   selectedNode: TomlNode;
@@ -187,9 +188,7 @@ export default function SignalView({
               <div className={`${flexRowGap2} mb-1`}>
                 <span className={labelSmall}>{t("signalDetails.byteOrderLabel")}</span>
                 {isInherited && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--bg-accent)] text-[color:var(--accent-primary)] rounded">
-                    {t("signalDetails.inheritedBadge")}
-                  </span>
+                  <Badge tone="primary" size="sm">{t("signalDetails.inheritedBadge")}</Badge>
                 )}
               </div>
               <div className={`${monoBody} break-all`}>

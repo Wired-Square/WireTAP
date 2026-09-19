@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { List, X } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { Input, Select, Textarea, Checkbox, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, h3, labelSmall, badgeInfo } from "../../../styles";
+import { h2, h3, labelSmall } from "../../../styles";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import type { TomlNode } from "../types";
@@ -13,6 +13,7 @@ import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import EnumEditorDialog from "./EnumEditorDialog";
 import { Button } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type SignalFields = {
   name: string;
@@ -303,7 +304,7 @@ export default function SignalEditDialog({
                   <span className="inline-flex items-center gap-2">
                     {t("signalEdit.byteOrder")}
                     {!fields.endianness && inheritedByteOrder && (
-                      <span className={badgeInfo}>{t("signalEdit.inheritedBadge")}</span>
+                      <Badge tone="primary" size="lg">{t("signalEdit.inheritedBadge")}</Badge>
                     )}
                   </span>
                 }

@@ -10,6 +10,7 @@ import { getFrameByteLengthFromPath } from "../utils";
 import { getAlgorithmInfo, resolveByteIndexSync } from "../checksums";
 import type { TomlNode, ValidationError, ChecksumAlgorithm } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type ChecksumViewProps = {
   selectedNode: TomlNode;
@@ -124,9 +125,9 @@ export default function ChecksumView({
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">🔐</span>
             <span className="font-semibold text-[color:var(--status-info-text)]">{algorithmInfo.name}</span>
-            <span className="px-2 py-0.5 text-xs font-medium bg-[var(--status-info-badge-bg)] text-[color:var(--status-info-badge-text)] rounded">
+            <Badge tone="primary" variant="outline">
               {t("checksumDetails.outputBytes", { count: algorithmInfo.outputBytes })}
-            </span>
+            </Badge>
           </div>
           <p className="text-sm text-[color:var(--status-info-text)]">{algorithmInfo.description}</p>
         </div>

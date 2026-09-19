@@ -4,36 +4,19 @@
 // by name). The four capability badges encode discovery state on two layers:
 //   • edge (ring)   = capability advertised over BLE
 //   • centre (fill) = capability confirmed via mDNS (i.e. live on the network)
-// Metadata bubbles (rssi / addr / ports) are ringed in the colour of their
+// Metadata badges (rssi / addr / ports) are outlined in the colour of their
 // transport. Two connect buttons (BLE blue, IP purple) light up when their
 // transport is present.
 
 import { Bluetooth, Globe, Wifi, HardDriveDownload, Cable, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cardDefault } from "../styles/cardStyles";
-import {
-  textPrimary,
-  textSecondary,
-  textInfo,
-  textWarning,
-  textSuccess,
-  textPurple,
-  bgInfo,
-  bgWarning,
-  bgSuccess,
-  bgPurple,
-} from "../styles";
-
-// The ring utility needs ring-{color}; the border-{color} status tokens only set
-// border-color, not --tw-ring-color. Define the ring variants here.
-const ringInfo = "ring-[color:var(--status-info-border)]";
-const ringWarning = "ring-[color:var(--status-warning-border)]";
-const ringSuccess = "ring-[color:var(--status-success-border)]";
-const ringPurple = "ring-[color:var(--status-purple-border)]";
+import { textPrimary } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import type { MergedDevice } from "../apps/devices/utils/mergedDevices";
 import { bleHasCap, preferredAddress } from "../apps/devices/utils/mergedDevices";
 import { Button } from "./Button";
+import { Badge, SummaryBadge, type BadgeTone } from "./Badge";
 
 export type ConnectVia = "ble" | "ip";
 
@@ -78,72 +61,33 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
 // Capability badge — two-layer encoding
 // ---------------------------------------------------------------------------
 
-type BadgeColour = "info" | "warning" | "success" | "purple";
-
-const BADGE_COLOUR_CLASSES: Record<BadgeColour, { bg: string; text: string }> = {
-  info: { bg: bgInfo, text: textInfo },
-  warning: { bg: bgWarning, text: textWarning },
-  success: { bg: bgSuccess, text: textSuccess },
-  purple: { bg: bgPurple, text: textPurple },
-};
+// The edge always reads blue when asserted — it represents "BLE says this
+// exists", independent of the capability's own colour family.
+const BLE_RING = "ring-1 ring-[color:var(--status-info-border)]";
 
 function CapabilityBadge({
   label,
   icon,
-  colour,
+  tone,
   edge,
   centre,
 }: {
   label: string;
   icon: React.ReactNode;
-  colour: BadgeColour;
+  tone: BadgeTone;
   edge: boolean;     // BLE-advertised → blue ring
   centre: boolean;   // mDNS-confirmed → filled in the badge's own colour
 }) {
-  const { bg, text } = BADGE_COLOUR_CLASSES[colour];
-  const base = "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium";
-  // Edge always reads blue when asserted — it represents "BLE says this exists",
-  // independent of the capability's own colour family.
-
-  let classes: string;
-  if (!edge && !centre) {
-    classes = `${base} ${bg} ${text} opacity-15`;
-  } else if (edge && !centre) {
-    classes = `${base} ${text} ring-1 ${ringInfo} opacity-70`;
-  } else if (!edge && centre) {
-    classes = `${base} ${bg} ${text}`;
-  } else {
-    classes = `${base} ${bg} ${text} ring-1 ${ringInfo}`;
-  }
-
+  const layers =
+    !edge && !centre ? "opacity-15" :
+    edge && !centre ? `bg-transparent ${BLE_RING} opacity-70` :
+    !edge && centre ? "" :
+    BLE_RING;
   return (
-    <span className={classes}>
+    <Badge tone={tone} size="lg" className={layers}>
       {icon}
       {label}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Metadata bubble — coloured edge, neutral fill
-// ---------------------------------------------------------------------------
-
-function MetaBubble({
-  label,
-  value,
-  ringClass,
-}: {
-  label: string;
-  value: string;
-  ringClass: string;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)] ${textSecondary} ring-1 ${ringClass}`}
-    >
-      <span className="opacity-70">{label}:</span>
-      <span className={`font-mono ${textPrimary}`}>{value}</span>
-    </span>
+    </Badge>
   );
 }
 
@@ -222,28 +166,28 @@ export default function MergedDeviceCard({ device, onConnect, connecting }: Merg
           <CapabilityBadge
             label={t("card.badges.ble")}
             icon={<Bluetooth className="w-3 h-3" />}
-            colour="info"
+            tone="primary"
             edge={hasBle}
             centre={hasBle}
           />
           <CapabilityBadge
             label={t("card.badges.wifi")}
             icon={<Wifi className="w-3 h-3" />}
-            colour="purple"
+            tone="purple"
             edge={wifiEdge}
             centre={wifiCentre}
           />
           <CapabilityBadge
             label={t("card.badges.smp")}
             icon={<HardDriveDownload className="w-3 h-3" />}
-            colour="warning"
+            tone="warning"
             edge={smpEdge}
             centre={smpCentre}
           />
           <CapabilityBadge
             label={t("card.badges.frameLink")}
             icon={<Cable className="w-3 h-3" />}
-            colour="success"
+            tone="success"
             edge={flEdge}
             centre={flCentre}
           />
@@ -252,27 +196,30 @@ export default function MergedDeviceCard({ device, onConnect, connecting }: Merg
         {/* Row 2: metadata bubbles (only those with data) */}
         <div className="mt-2 flex flex-wrap gap-2">
           {device.ble?.rssi != null && (
-            <MetaBubble
+            <SummaryBadge
               label={t("card.meta.rssi")}
               value={t("card.meta.rssiValue", { rssi: device.ble.rssi })}
-              ringClass={ringInfo}
+              tone="primary"
+              variant="outline"
             />
           )}
           {addr && (
-            <MetaBubble label={t("card.meta.addr")} value={addr} ringClass={ringPurple} />
+            <SummaryBadge label={t("card.meta.addr")} value={addr} tone="purple" variant="outline" />
           )}
           {device.smp && (
-            <MetaBubble
+            <SummaryBadge
               label={t("card.meta.smpPort")}
               value={String(device.smp.port)}
-              ringClass={ringWarning}
+              tone="warning"
+              variant="outline"
             />
           )}
           {device.framelink && (
-            <MetaBubble
+            <SummaryBadge
               label={t("card.meta.frameLinkPort")}
               value={String(device.framelink.port)}
-              ringClass={ringSuccess}
+              tone="success"
+              variant="outline"
             />
           )}
         </div>

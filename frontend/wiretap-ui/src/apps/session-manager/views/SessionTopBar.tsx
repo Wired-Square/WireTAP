@@ -6,6 +6,7 @@ import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { iconLg, iconMd } from "../../../styles/spacing";
 import FlexSeparator from "../../../components/FlexSeparator";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 interface SessionTopBarProps {
   sessionCount: number;
@@ -24,9 +25,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
       <div className="flex items-center gap-3">
         <Network className={`${iconLg} text-cyan-400 shrink-0`} />
         <FlexSeparator />
-        <span className="px-2 py-0.5 text-xs rounded-full bg-cyan-500/20 text-cyan-400">
-          {t("topBar.activeCount", { count: sessionCount })}
-        </span>
+        <Badge tone="cyan">{t("topBar.activeCount", { count: sessionCount })}</Badge>
       </div>
 
       {/* Right: Controls */}

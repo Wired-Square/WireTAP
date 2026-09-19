@@ -91,7 +91,6 @@ interface AppTabViewProps {
 
   // === Tab Bar (optional) ===
   protocolBadges?: ProtocolBadge[];
-  onProtocolClick?: () => void;
   isStreaming?: boolean;
   timestamp?: number | null;
   /** @deprecated Use timestamp instead */
@@ -155,7 +154,6 @@ export default function AppTabView({
   protocolLabel,
   // Tab bar (optional)
   protocolBadges,
-  onProtocolClick,
   isStreaming = false,
   timestamp,
   displayTime,
@@ -197,7 +195,6 @@ export default function AppTabView({
         onTabChange={onTabChange}
         protocolLabel={protocolLabel}
         protocolBadges={protocolBadges}
-        onProtocolClick={onProtocolClick}
         isStreaming={isStreaming}
         timestamp={timestamp}
         displayTime={displayTime}

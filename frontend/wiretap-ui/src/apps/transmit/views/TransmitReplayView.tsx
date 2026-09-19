@@ -13,7 +13,7 @@ import {
   textDataSecondary,
   hoverDataRow,
 } from "../../../styles/colourTokens";
-import { badgeColorClass } from "../../../styles/badgeStyles";
+import { Badge } from "../../../components/Badge";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -203,11 +203,11 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
     <X size={14} className="text-red-400" />;
 
   const kindBadge =
-    kind === "started" ? <span className="text-xs px-1.5 py-0.5 rounded bg-teal-600/30 text-teal-400">{t("replay.kindStarted")}</span> :
-    kind === "completed" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('green')}`}>{t("replay.kindCompleted")}</span> :
-    kind === "loopRestarted" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('blue')}`}>{t("replay.kindLoop")}</span> :
-    kind === "stoppedByUser" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('amber')}`}>{t("replay.kindStopped")}</span> :
-    <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('red')}`}>{t("replay.kindError")}</span>;
+    kind === "started" ? <Badge tone="cyan">{t("replay.kindStarted")}</Badge> :
+    kind === "completed" ? <Badge tone="success">{t("replay.kindCompleted")}</Badge> :
+    kind === "loopRestarted" ? <Badge tone="primary">{t("replay.kindLoop")}</Badge> :
+    kind === "stoppedByUser" ? <Badge tone="warning">{t("replay.kindStopped")}</Badge> :
+    <Badge tone="danger">{t("replay.kindError")}</Badge>;
 
   const fmt = (n: number) => n.toLocaleString(i18n.language);
 

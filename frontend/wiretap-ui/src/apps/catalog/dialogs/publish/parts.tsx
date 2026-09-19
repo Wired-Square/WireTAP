@@ -19,10 +19,10 @@ import {
   textWarning,
 } from "../../../../styles";
 import { alertDanger, alertWarning } from "../../../../styles/cardStyles";
-import { badgeMetadata, badgeMetadataIcon } from "../../../../styles/badgeStyles";
 import { CheckboxField } from "../../../../components/forms";
 import type { PublishPlan, PublishStep, SecretFinding } from "../../../../api/catalogShare";
 import type { Blocker, PublishTab, T } from "./types";
+import { Badge } from "../../../../components/Badge";
 
 /** A tab body that scrolls its own content. The panel around it is a fixed-height
  *  flex column, so each body owns its scrolling rather than nesting inside one. */
@@ -56,14 +56,14 @@ export function PlanSummary({ plan, t }: { plan: PublishPlan; t: T }) {
     <div className={`${cardCompact} space-y-2`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={textMedium}>{plan.upstream}</span>
-        <span className={badgeMetadata}>{plan.baseBranch}</span>
-        <span className={badgeMetadataIcon}>
+        <Badge size="lg">{plan.baseBranch}</Badge>
+        <Badge size="lg">
           {plan.targetIsPublic ? <Globe className={iconSm} /> : <Lock className={iconSm} />}
           {plan.targetIsPublic ? t("publish.public") : t("publish.private")}
-        </span>
-        <span className={badgeMetadata}>
+        </Badge>
+        <Badge size="lg">
           {plan.forkNeeded ? t("publish.viaFork") : t("publish.directPush")}
-        </span>
+        </Badge>
       </div>
       <p className={caption}>
         {t("publish.willCommit", { path: plan.targetPath, bytes: plan.contentBytes })}

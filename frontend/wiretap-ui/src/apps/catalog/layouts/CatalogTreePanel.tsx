@@ -9,7 +9,8 @@ import ResizableSidebar from "../../../components/ResizableSidebar";
 import FindBar from "../components/FindBar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
 import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
-import { IconButton } from "../../../components/Button";
+import { Button, IconButton } from "../../../components/Button";
+import { protocolTone } from "../../../utils/profileTraits";
 
 const VIEW_MODES: CatalogViewMode[] = ["tree", "frames", "nodes"];
 
@@ -101,7 +102,6 @@ export default function CatalogTreePanel({
       Icon: Network,
       label: "CAN",
       configured: !!canConfig,
-      tone: "bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:bg-[var(--status-success-bg-hover)]",
     },
     {
       protocol: "modbus" as ProtocolType,
@@ -109,7 +109,6 @@ export default function CatalogTreePanel({
       Icon: Server,
       label: "Modbus",
       configured: !!modbusConfig,
-      tone: "bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg-hover)]",
     },
     {
       protocol: "serial" as ProtocolType,
@@ -117,7 +116,6 @@ export default function CatalogTreePanel({
       Icon: Cable,
       label: "Serial",
       configured: !!serialConfig,
-      tone: "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:bg-[var(--status-purple-bg-hover)]",
     },
   ].filter((b) => b.show);
   const hasAnyBadge = protocolBadges.length > 0;
@@ -148,25 +146,22 @@ export default function CatalogTreePanel({
   // collapse toggle. Clicking one filters the tree to that protocol.
   const badgeHeader = catalogPath && hasAnyBadge ? (
     <div className="flex flex-wrap items-center gap-2">
-      {protocolBadges.map(({ protocol, Icon, label, configured, tone }) => {
+      {protocolBadges.map(({ protocol, Icon, label, configured }) => {
         const active = selectedProtocol === protocol;
         return (
-          <button
+          <Button
             key={protocol}
+            variant="outline"
+            tone={protocolTone(protocol)}
+            size="sm"
+            pressed={active}
             onClick={() => setSelectedProtocol(active ? null : protocol)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${tone} ${
-              active
-                ? "ring-2 ring-inset ring-[color:currentColor]"
-                : selectedProtocol
-                  ? "opacity-50 hover:opacity-100"
-                  : ""
-            }`}
             title={active ? t("tree.showAllProtocols") : t("tree.filterToProtocol", { protocol: label })}
           >
             <Icon className={iconXs} />
             {label}
             {!configured && <span title={t("tree.noProtocolConfig", { protocol: label })}>!</span>}
-          </button>
+          </Button>
         );
       })}
     </div>

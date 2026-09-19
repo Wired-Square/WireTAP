@@ -27,6 +27,7 @@ import {
 } from "../../../api/smpUpgrade";
 import { pickFileToOpen } from "../../../api/dialogs";
 import { PrimaryButton, DangerButton, Select } from "../../../components/forms";
+import { Badge } from "../../../components/Badge";
 
 const TERMINATOR_TYPES = new Set(["Complete", "Cancelled", "Error"]);
 const EVENT_LOG_MAX = 200;
@@ -107,15 +108,9 @@ function UploadProgressBar({
 
 function SlotBadge({ label, active = true }: { label: string; active?: boolean }) {
   return (
-    <span
-      className={`text-xs px-1.5 py-0.5 rounded font-medium min-w-[72px] text-center inline-block ${
-        active
-          ? "bg-green-100 text-green-700"
-          : "bg-[var(--bg-tertiary)] text-[color:var(--text-secondary)]"
-      }`}
-    >
+    <Badge tone={active ? "success" : "neutral"} className="min-w-[72px] justify-center">
       {label}
-    </span>
+    </Badge>
   );
 }
 

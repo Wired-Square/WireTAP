@@ -15,6 +15,7 @@ import FrameDefEditor from "./FrameDefEditor";
 import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export default function FrameDefsView() {
   const { t } = useTranslation("rules");
@@ -168,11 +169,9 @@ export default function FrameDefsView() {
                 <span className={`text-xs font-mono ${textTertiary}`}>
                   #{formatHexId(fd.frame_def_id)}
                 </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
-                >
+                <Badge tone={isTemp ? "warning" : "success"}>
                   {isTemp ? t("common.temporary") : t("common.existing")}
-                </span>
+                </Badge>
                 <span className={`text-xs ${textSecondary}`}>
                   {fd.interface_type_name}
                 </span>

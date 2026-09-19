@@ -3,15 +3,9 @@
 // Renders a coloured badge identifying the chip family of the device the
 // user is flashing. Used by the Serial app's unified Flash view to make
 // the active driver visually obvious — cyan for ESP32, amber for ESP8266,
-// sky for STM32 (UART bootloader), violet for STM32 DFU.
+// blue for STM32 (UART bootloader), purple for STM32 DFU.
 
-import {
-  badgeManufacturerEsp32,
-  badgeManufacturerEsp8266,
-  badgeManufacturerStm32,
-  badgeManufacturerStm32Dfu,
-  badgeManufacturerUnknown,
-} from "../styles/badgeStyles";
+import { Badge, type BadgeTone } from "./Badge";
 
 export type Manufacturer =
   | "ESP32"
@@ -27,25 +21,18 @@ interface Props {
   className?: string;
 }
 
-function classFor(m: string): string {
-  switch (m) {
-    case "ESP32":
-      return badgeManufacturerEsp32;
-    case "ESP8266":
-      return badgeManufacturerEsp8266;
-    case "STM32":
-      return badgeManufacturerStm32;
-    case "STM32 DFU":
-      return badgeManufacturerStm32Dfu;
-    default:
-      return badgeManufacturerUnknown;
-  }
-}
+const TONES: Record<Manufacturer, BadgeTone> = {
+  ESP32: "cyan",
+  ESP8266: "warning",
+  STM32: "primary",
+  "STM32 DFU": "purple",
+  Unknown: "neutral",
+};
 
 export default function ManufacturerBadge({ manufacturer, className }: Props) {
   return (
-    <span className={`${classFor(manufacturer)} ${className ?? ""}`.trim()}>
+    <Badge tone={TONES[manufacturer as Manufacturer] ?? "neutral"} size="lg" className={className}>
       {manufacturer}
-    </span>
+    </Badge>
   );
 }

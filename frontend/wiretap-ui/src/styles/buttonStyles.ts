@@ -31,6 +31,17 @@ export function dataViewTabClass(isActive: boolean, hasIndicator = false): strin
   return `${base} text-[color:var(--text-secondary)] border-transparent hover:brightness-110`;
 }
 
+/** The count beside a data view tab's label */
+export function tabCountColorClass(color: 'green' | 'purple' | 'gray' | 'orange'): string {
+  const colorMap = {
+    green: 'text-green-500',
+    purple: 'text-purple-500',
+    gray: 'text-gray-500',
+    orange: 'text-orange-500',
+  };
+  return colorMap[color];
+}
+
 // =============================================================================
 // Launcher Button Styles (for dashboard watermark)
 // =============================================================================

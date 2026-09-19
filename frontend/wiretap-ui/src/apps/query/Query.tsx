@@ -359,10 +359,10 @@ function QueryInner() {
 
   // Protocol badge for data source
   const protocolBadges: ProtocolBadge[] = useMemo(() => {
-    if (captureId) return [{ label: t("protocols.capture"), color: "amber" as const }];
+    if (captureId) return [{ label: t("protocols.capture"), tone: "warning" as const }];
     if (profileId) {
       const profile = allIOProfiles.find((p) => p.id === profileId);
-      return [{ label: getIOKindLabel(profile?.kind), color: "blue" as const }];
+      return [{ label: getIOKindLabel(profile?.kind), tone: "primary" as const }];
     }
     return [];
   }, [captureId, profileId]);

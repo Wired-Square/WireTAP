@@ -17,7 +17,6 @@ import {
   emptyStateHeading,
   emptyStateDescription,
 } from "../../../styles/typography";
-import { badgeMetadata } from "../../../styles/badgeStyles";
 import { caption, textDanger } from "../../../styles";
 import { SecondaryButton } from "../../../components/forms";
 import OverflowMenu, { type OverflowMenuItems } from "../../../components/OverflowMenu";
@@ -28,6 +27,7 @@ import { useCatalogSources, type CatalogWithSources } from "../../../hooks/useCa
 import { hasLocalChanges, hasRemoteChanges } from "../../../utils/catalogSync";
 import { CatalogSyncBadge } from "../../../components/catalogSyncPresentation";
 import type { TrackedCatalog } from "../../../api/catalogShare";
+import { Badge } from "../../../components/Badge";
 
 type CatalogsViewProps = {
   decoderDir: string;
@@ -252,7 +252,7 @@ export default function CatalogsView({
                   <h3 className="font-medium text-[color:var(--text-primary)]">
                     {catalog.name}
                   </h3>
-                  <span className={badgeMetadata}>{catalog.filename}</span>
+                  <Badge size="lg">{catalog.filename}</Badge>
                   {/* The fold. The per-repository badges below are what it was folded
                       from, so this card is where a reader learns to read either. */}
                   <CatalogSyncBadge status={catalog.syncStatus} />
@@ -274,11 +274,11 @@ export default function CatalogsView({
                             {source.repoLabel} · {source.remotePath} · {source.gitRef}
                           </span>
                           {source.prNumber && (
-                            <span className={badgeMetadata}>
+                            <Badge size="lg">
                               {source.prMerged
                                 ? t("catalogs.prMerged", { number: source.prNumber })
                                 : t("catalogs.prOpen", { number: source.prNumber })}
-                            </span>
+                            </Badge>
                           )}
                         </div>
                         {pullErrors[source.id] && (

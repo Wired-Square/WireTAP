@@ -6,7 +6,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff, UploadCloud } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
-import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { CaptureMetadata } from "../../api/capture";
@@ -15,6 +14,7 @@ import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
 import SendCaptureToBackendDialog from "../SendCaptureToBackendDialog";
 import { Button, IconButton } from "../../components/Button";
+import { Badge } from "../../components/Badge";
 
 type Props = {
   captures: CaptureMetadata[];
@@ -181,19 +181,15 @@ export default function CaptureList({
                   </div>
                 )}
                 <div className={`${caption} flex items-center gap-2`}>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
-                    {capture.id}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
+                  <Badge size="sm">{capture.id}</Badge>
+                  <Badge size="sm">
                     {t("ioSourcePicker.captures.kindCount", { count: capture.count.toLocaleString(), kind: capture.kind })}
-                  </span>
+                  </Badge>
                   {isInSession && (
-                    <span className={badgeSmallInfo}>{sessionId}</span>
+                    <Badge tone="primary" size="sm">{sessionId}</Badge>
                   )}
                   {capture.persistent && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]">
-                      {t("ioSourcePicker.captures.pinned")}
-                    </span>
+                    <Badge tone="warning" size="sm">{t("ioSourcePicker.captures.pinned")}</Badge>
                   )}
                 </div>
               </div>

@@ -13,6 +13,7 @@ import { InlineEdit } from "../components/InlineEdit";
 import TransformerDialog from "../dialogs/TransformerDialog";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export default function TransformersView() {
   const { t } = useTranslation("rules");
@@ -107,16 +108,12 @@ export default function TransformersView() {
                 <span className={`text-xs font-mono ${textTertiary}`}>
                   {formatHexId(xf.transformer_id)}
                 </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
-                >
+                <Badge tone={isTemp ? "warning" : "success"}>
                   {isTemp ? t("common.temporary") : t("common.existing")}
-                </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${xf.enabled ? "bg-blue-500/20 text-blue-300" : "bg-neutral-500/20 text-neutral-400"}`}
-                >
+                </Badge>
+                <Badge tone={xf.enabled ? "primary" : "neutral"}>
                   {xf.enabled ? t("common.enabled") : t("common.disabled")}
-                </span>
+                </Badge>
               </div>
               <div className={`mt-1 text-xs ${textSecondary}`}>
                 {xf.source_frame_def_name} ({xf.source_interface_name}) →{" "}

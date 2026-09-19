@@ -12,6 +12,7 @@ import { Hash, Shield, Info, CheckCircle2, AlertCircle, Check, Layers, Radio, Ma
 import { iconMd, iconXs, iconLg, icon2xl, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, captionMuted, textMedium, sectionHeaderText } from "../../../../styles";
 import { Button, IconButton } from "../../../../components/Button";
+import { Badge } from "../../../../components/Badge";
 
 type Props = {
   /** Which results to display. When omitted, shows whichever results exist. */
@@ -265,15 +266,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                                 : candidate.mode.replace('_', ' ')}
                             </span>
                             {!isApplied && idx === 0 && candidate.confidence >= 70 && (
-                              <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                                {t("serialAnalysis.bestMatch")}
-                              </span>
+                              <Badge tone="success">{t("serialAnalysis.bestMatch")}</Badge>
                             )}
                             {isApplied && (
-                              <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
+                              <Badge tone="primary">
                                 <Check className={iconXs} />
                                 {t("serialAnalysis.applied")}
-                              </span>
+                              </Badge>
                             )}
                           </div>
                           <div className="text-sm text-[color:var(--text-secondary)] mt-1">
@@ -431,15 +430,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                               : t("serialAnalysis.byteRangeSingle", { start: candidate.startByte })}
                           </span>
                           {!isApplied && idx === 0 && (
-                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                              {t("serialAnalysis.bestMatch")}
-                            </span>
+                            <Badge tone="success">{t("serialAnalysis.bestMatch")}</Badge>
                           )}
                           {isApplied && (
-                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
+                            <Badge tone="primary">
                               <Check className={iconXs} />
                               {t("serialAnalysis.appliedWithCount", { count: getUniqueIdCount() })}
-                            </span>
+                            </Badge>
                           )}
                         </div>
                         <div className="text-sm text-[color:var(--text-secondary)] mt-1">
@@ -483,12 +480,9 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                         <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleValues")}</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
-                            <span
-                              key={i}
-                              className="px-1.5 py-0.5 font-mono text-xs bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded"
-                            >
+                            <Badge key={i} mono>
                               0x{val.toString(16).toUpperCase().padStart(candidate.length * 2, "0")}
-                            </span>
+                            </Badge>
                           ))}
                           {candidate.uniqueValues.length > 16 && (
                             <span className="text-xs text-slate-400">
@@ -546,15 +540,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                               : t("serialAnalysis.byteRangeSingle", { start: candidate.startByte })}
                           </span>
                           {!isApplied && idx === 0 && (
-                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] rounded">
-                              {t("serialAnalysis.bestMatch")}
-                            </span>
+                            <Badge tone="purple">{t("serialAnalysis.bestMatch")}</Badge>
                           )}
                           {isApplied && (
-                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
+                            <Badge tone="primary">
                               <Check className={iconXs} />
                               {t("serialAnalysis.applied")}
-                            </span>
+                            </Badge>
                           )}
                         </div>
                         <div className="text-sm text-[color:var(--text-secondary)] mt-1">
@@ -598,12 +590,9 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                         <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleAddresses")}</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
-                            <span
-                              key={i}
-                              className="px-1.5 py-0.5 font-mono text-xs bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded"
-                            >
+                            <Badge key={i} mono>
                               0x{val.toString(16).toUpperCase().padStart(candidate.length * 2, "0")}
-                            </span>
+                            </Badge>
                           ))}
                           {candidate.uniqueValues.length > 16 && (
                             <span className="text-xs text-slate-400">

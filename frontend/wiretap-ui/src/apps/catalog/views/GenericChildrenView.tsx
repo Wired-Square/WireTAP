@@ -6,6 +6,7 @@ import { iconMd } from "../../../styles/spacing";
 import { caption, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type GenericChildrenViewProps = {
   selectedNode: TomlNode;
@@ -71,13 +72,13 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
                   )}
                 </div>
 
-                <div className="text-xs px-2 py-1 bg-[var(--bg-primary)] rounded text-[color:var(--text-muted)]">
+                <Badge size="lg">
                   {child.type === "section" && t("genericChildren.typeTable")}
                   {child.type === "table-array" && t("genericChildren.typeArray")}
                   {child.type === "signal" && t("genericChildren.typeSignal")}
                   {child.type === "array" && t("genericChildren.typeArraySize", { count: child.metadata?.arrayItems?.length || 0 })}
                   {child.type === "value" && t("genericChildren.typeValue")}
-                </div>
+                </Badge>
               </div>
             </div>
           ))}

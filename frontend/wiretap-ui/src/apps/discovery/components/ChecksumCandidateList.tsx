@@ -14,6 +14,7 @@ import { flexRowGap2, iconXs } from "../../../styles/spacing";
 import { textMedium } from "../../../styles/typography";
 import { MatchRateIcon, matchRateTextClass, matchRateToneClasses } from "./checksumTone";
 import { Button } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 interface ChecksumCandidateListProps {
   candidates: ChecksumCandidate[];
@@ -55,11 +56,11 @@ export default function ChecksumCandidateList({
                   <span className={`${textMedium} font-mono`}>{algorithmName}</span>
                   {/* Endianness only means something for a multi-byte checksum. */}
                   {candidate.length > 1 && (
-                    <span className="px-1.5 py-0.5 text-xs font-mono rounded bg-[var(--hover-bg)] text-[color:var(--text-secondary)]">
+                    <Badge mono>
                       {candidate.bigEndian
                         ? t("serial.bigEndianShort")
                         : t("serial.littleEndianShort")}
-                    </span>
+                    </Badge>
                   )}
                   <span className="text-sm text-[color:var(--text-secondary)]">
                     {t("serialAnalysis.atByte", { position: candidate.position })}
@@ -68,15 +69,13 @@ export default function ChecksumCandidateList({
                       : ""}
                   </span>
                   {index === 0 && !isApplied && candidate.confidence >= 70 && (
-                    <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                      {t("serialAnalysis.bestMatch")}
-                    </span>
+                    <Badge tone="success">{t("serialAnalysis.bestMatch")}</Badge>
                   )}
                   {isApplied && (
-                    <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
+                    <Badge tone="primary">
                       <Check className={iconXs} />
                       {t("serialAnalysis.applied")}
-                    </span>
+                    </Badge>
                   )}
                 </div>
 

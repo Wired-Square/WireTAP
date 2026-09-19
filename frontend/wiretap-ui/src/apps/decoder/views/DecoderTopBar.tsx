@@ -10,6 +10,7 @@ import type { CaptureMetadata } from "../../../api/capture";
 import type { BusSourceInfo } from "../../../utils/busFormat";
 import AppTopBar from "../../../components/AppTopBar";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 
 type Props = {
@@ -252,10 +253,10 @@ export default function DecoderTopBar({
             </Button>
           )}
           {modbus.pollGroupCount > 0 && (
-            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)]">
+            <Badge>
               <Server size={10} />
               {t("modbus.pollRegisterCount", { polls: modbus.pollGroupCount, registers: modbus.registerCount })}
-            </span>
+            </Badge>
           )}
         </>
       )}

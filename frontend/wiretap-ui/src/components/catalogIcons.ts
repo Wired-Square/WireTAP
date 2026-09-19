@@ -55,13 +55,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { CatalogSyncStatus } from "../api/catalogShare";
-import {
-  badgeSmallDanger,
-  badgeSmallInfo,
-  badgeSmallNeutral,
-  badgeSmallSuccess,
-  badgeSmallWarning,
-} from "../styles/badgeStyles";
+import type { BadgeTone } from "./Badge";
 import {
   textDanger,
   textInfo,
@@ -74,20 +68,20 @@ import {
  * State — how a catalogue stands against its repository. Arrows, because that is what
  * "ahead" and "behind" mean, and because the action vocabulary below owns the clouds.
  *
- * Icon, glyph colour and pill class together: the one tone decision, so a glyph and
+ * Icon, glyph colour and badge tone together: the one tone decision, so a glyph and
  * the label beside it can never disagree.
  */
 export const SYNC_STATUS_DRESS: Record<
   CatalogSyncStatus,
-  { Icon: LucideIcon; tone: string; badge: string }
+  { Icon: LucideIcon; tone: string; badge: BadgeTone }
 > = {
-  localOnly: { Icon: HardDrive, tone: textMuted, badge: badgeSmallNeutral },
-  inSync: { Icon: CircleCheck, tone: textSuccess, badge: badgeSmallSuccess },
-  localAhead: { Icon: ArrowUp, tone: textInfo, badge: badgeSmallInfo },
-  remoteAhead: { Icon: ArrowDown, tone: textWarning, badge: badgeSmallWarning },
-  diverged: { Icon: ArrowUpDown, tone: textDanger, badge: badgeSmallDanger },
-  missing: { Icon: FileX, tone: textDanger, badge: badgeSmallDanger },
-  unchecked: { Icon: CircleDashed, tone: textMuted, badge: badgeSmallNeutral },
+  localOnly: { Icon: HardDrive, tone: textMuted, badge: "neutral" },
+  inSync: { Icon: CircleCheck, tone: textSuccess, badge: "success" },
+  localAhead: { Icon: ArrowUp, tone: textInfo, badge: "primary" },
+  remoteAhead: { Icon: ArrowDown, tone: textWarning, badge: "warning" },
+  diverged: { Icon: ArrowUpDown, tone: textDanger, badge: "danger" },
+  missing: { Icon: FileX, tone: textDanger, badge: "danger" },
+  unchecked: { Icon: CircleDashed, tone: textMuted, badge: "neutral" },
 };
 
 /**

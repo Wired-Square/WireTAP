@@ -1,9 +1,6 @@
 // ui/src/utils/timezone.ts
 //
-// Timezone helpers used by `TimezoneBadge` and `TimeBoundsInput`.
-// Separated from the component file so React Fast Refresh can hot-
-// reload `TimezoneBadge.tsx` without falling back to a full page
-// reload (rule: a *.tsx file should export only React components).
+// Timezone helpers used by `TimeBoundsInput`.
 
 export type TimezoneMode = "default" | "local" | "utc";
 

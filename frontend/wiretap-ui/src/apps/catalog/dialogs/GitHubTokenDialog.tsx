@@ -18,9 +18,9 @@ import SecurePasswordField from "../../../components/io/SecurePasswordField";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, caption, h2, textMedium } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
-import { badgeMetadata } from "../../../styles/badgeStyles";
 import { gitTokenSetupUrl } from "../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
+import { Badge } from "../../../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -65,13 +65,13 @@ export default function GitHubTokenDialog({ isOpen, onClose }: Props) {
               <span className={textMedium}>{identity.login}</span>
               {identity.scopes.length > 0 ? (
                 identity.scopes.map((scope) => (
-                  <span key={scope} className={badgeMetadata}>
+                  <Badge key={scope} size="lg">
                     {scope}
-                  </span>
+                  </Badge>
                 ))
               ) : (
                 // Fine-grained tokens report no scopes at all, which is not an error.
-                <span className={badgeMetadata}>{t("account.fineGrained")}</span>
+                <Badge size="lg">{t("account.fineGrained")}</Badge>
               )}
             </div>
           )}

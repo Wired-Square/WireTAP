@@ -30,11 +30,11 @@ import {
   caption,
   alertInfo,
   alertWarning,
-  badgeNeutral,
   cardElevated,
 } from "../styles";
 import type { IOProfile, ConnectionFieldValue } from "../settings/appSettings";
 import { IconButton } from "../components/Button";
+import { Badge } from "../components/Badge";
 
 export default function DeviceSettingsDialog() {
   const request = useDeviceEditorStore((s) => s.request);
@@ -126,7 +126,7 @@ function DeviceSettingsForm({
           <div className="min-w-0">
             <h2 className={`${h3} truncate`}>{profile.name}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className={badgeNeutral}>{getIOKindLabel(profile.kind)}</span>
+              <Badge size="lg">{getIOKindLabel(profile.kind)}</Badge>
               {profile.ephemeral && (
                 <span className={caption}>{t("deviceSettings.unsaved")}</span>
               )}

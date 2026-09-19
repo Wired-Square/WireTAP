@@ -9,6 +9,7 @@ import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type NodeViewProps = {
   selectedNode: TomlNode;
@@ -263,9 +264,7 @@ export default function NodeView({
                   )}
                 </div>
 
-                <div className="text-xs px-2 py-1 bg-[var(--bg-primary)] rounded text-[color:var(--text-muted)]">
-                  {child.type}
-                </div>
+                <Badge size="lg">{child.type}</Badge>
               </div>
             </div>
           ))}

@@ -31,12 +31,11 @@ import {
   textMedium,
   textMuted,
   textWarning,
-  badgeNeutral,
-  badgeCyan,
 } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -244,9 +243,9 @@ export default function IOProfileDialog({
                         <span className={`${textMuted} text-xs ml-2 truncate`}>{bitrateText}</span>
                       )}
                     </div>
-                    <span className={isCanFd ? badgeCyan : badgeNeutral}>
+                    <Badge tone={isCanFd ? "cyan" : "neutral"} size="lg">
                       {iface.type_name ?? t("ioProfileDialog.framelink.interfaceUnknown")}
-                    </span>
+                    </Badge>
                   </button>
 
                   {expanded && (

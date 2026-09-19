@@ -11,6 +11,7 @@ import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { CHECKSUM_ALGORITHMS } from "../../../../utils/analysis/checksums";
 import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input, Checkbox } from "../../../../components/forms";
+import { Badge } from "../../../../components/Badge";
 
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
@@ -417,9 +418,7 @@ export default function SerialConfigSection({
                       </span>
 
                       {/* Mask value */}
-                      <code className="px-2 py-0.5 bg-[var(--bg-tertiary)] rounded text-xs font-mono text-[color:var(--text-secondary)]">
-                        {formatMaskHex(field.mask, effectiveHeaderLength)}
-                      </code>
+                      <Badge mono>{formatMaskHex(field.mask, effectiveHeaderLength)}</Badge>
 
                       {/* Byte info */}
                       <span className={caption}>

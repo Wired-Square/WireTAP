@@ -18,6 +18,7 @@ import { saveCatalog } from "../../../../api/catalog";
 import { generateFrameOrderReport } from "../../../../utils/frameOrderReport";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
 import { Button, IconButton } from "../../../../components/Button";
+import { Badge } from "../../../../components/Badge";
 
 type Props = {
   embedded?: boolean;
@@ -263,16 +264,9 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
       {/* Sequence */}
       <div className="flex flex-wrap gap-1 mb-2">
         {pattern.sequence.map((id, i) => (
-          <span
-            key={i}
-            className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-              i === 0
-                ? "bg-[var(--badge-purple-bg)] text-[color:var(--badge-purple-text)]"
-                : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)]"
-            }`}
-          >
+          <Badge key={i} tone={i === 0 ? "purple" : "neutral"} mono>
             {formatFrameId(id)}
-          </span>
+          </Badge>
         ))}
       </div>
 
@@ -417,23 +411,17 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
                         const b0 = Math.floor(val / 256);
                         const b1 = val % 256;
                         return (
-                          <span
-                            key={val}
-                            className="px-1.5 py-0.5 bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)] rounded text-[10px] font-mono"
-                          >
+                          <Badge key={val} tone="warning" size="sm" mono>
                             {b0}.{b1}
-                          </span>
+                          </Badge>
                         );
                       })
                     ) : (
                       // Single-byte mux
                       mux.selectorValues.map((val) => (
-                        <span
-                          key={val}
-                          className="px-1.5 py-0.5 bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)] rounded text-[10px] font-mono"
-                        >
+                        <Badge key={val} tone="warning" size="sm" mono>
                           {val}
-                        </span>
+                        </Badge>
                       ))
                     )}
                   </div>
@@ -502,12 +490,9 @@ function BurstSection({ bursts }: BurstSectionProps) {
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {burst.dlcVariation.map((dlc) => (
-                      <span
-                        key={dlc}
-                        className="px-1.5 py-0.5 bg-[var(--badge-cyan-bg)] text-[color:var(--badge-cyan-text)] rounded text-[10px] font-mono"
-                      >
+                      <Badge key={dlc} tone="cyan" size="sm" mono>
                         {dlc}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </td>
@@ -523,12 +508,9 @@ function BurstSection({ bursts }: BurstSectionProps) {
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {burst.flags.map((flag) => (
-                      <span
-                        key={flag}
-                        className="px-1.5 py-0.5 bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded text-[10px]"
-                      >
+                      <Badge key={flag} size="sm">
                         {flag}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </td>
@@ -587,24 +569,18 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {frame.buses.map((bus) => (
-                      <span
-                        key={bus}
-                        className="px-1.5 py-0.5 bg-[var(--badge-rose-bg)] text-[color:var(--badge-rose-text)] rounded text-[10px] font-mono"
-                      >
+                      <Badge key={bus} tone="danger" size="sm" mono>
                         {t("messageOrder.busLabel", { bus })}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {frame.buses.map((bus) => (
-                      <span
-                        key={bus}
-                        className="px-1.5 py-0.5 bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded text-[10px]"
-                      >
+                      <Badge key={bus} size="sm">
                         {bus}: {frame.countPerBus[bus]}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </td>
@@ -663,21 +639,16 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                 const isMux = multiplexedIds.has(id);
                 const isBurst = burstIds.has(id);
                 return (
-                  <span
+                  <Badge
                     key={id}
-                    className={`px-1 py-0.5 rounded text-[10px] font-mono ${
-                      isMux
-                        ? "bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)]"
-                        : isBurst
-                        ? "bg-[var(--badge-cyan-bg)] text-[color:var(--badge-cyan-text)]"
-                        : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)]"
-                    }`}
+                    tone={isMux ? "warning" : isBurst ? "cyan" : "neutral"}
+                    size="sm"
+                    mono
                     title={isMux ? t("messageOrder.tooltipMultiplexed") : isBurst ? t("messageOrder.tooltipBurst") : undefined}
                   >
                     {formatFrameId(id)}
-                    {isMux && <span className="ml-0.5 text-orange-500">⚡</span>}
-                    {isBurst && !isMux && <span className="ml-0.5 text-cyan-500">⚡</span>}
-                  </span>
+                    {(isMux || isBurst) && <span>⚡</span>}
+                  </Badge>
                 );
               })}
             </div>

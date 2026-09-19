@@ -1,6 +1,5 @@
 // ui/src/apps/settings/views/DataIOView.tsx
 
-import React from "react";
 import { Cable, Plus, Copy, Edit2, Trash2, Star, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -8,7 +7,7 @@ import { iconMd } from "../../../styles/spacing";
 import type { IOProfile } from "../stores/settingsStore";
 import { isReaderRealtime } from "../../../hooks/useSettings";
 import { getIOKindLabel } from "../../../utils/ioKindLabel";
-import { displayProtocols, protocolLabel } from "../../../utils/profileTraits";
+import { displayProtocols, protocolLabel, protocolTone } from "../../../utils/profileTraits";
 import { PrimaryButton } from "../../../components/forms/DialogButtons";
 import {
   h2,
@@ -19,15 +18,9 @@ import {
   spaceYLarge,
   spaceYSmall,
   gapSmall,
-  badgeSuccess,
-  badgePurple,
-  badgeWarning,
-  badgeNeutral,
-  badgeDanger,
-  badgeInfo,
-  badgeCyan,
 } from "../../../styles";
 import { IconButton } from "../../../components/Button";
+import { Badge, SummaryBadge } from "../../../components/Badge";
 
 type DataIOViewProps = {
   ioProfiles: IOProfile[];
@@ -47,30 +40,6 @@ type DataIOViewProps = {
 
 
 
-const getProtocolBadgeStyle = (protocol: string) => {
-  switch (protocol) {
-    case "can":
-      return badgeSuccess;
-    case "canfd":
-      return badgeCyan;
-    case "serial":
-      return badgePurple;
-    case "modbus":
-      return badgeWarning;
-    default:
-      return badgeNeutral;
-  }
-};
-
-
-const SummaryBadge = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <span
-    className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)] ${textSecondary}`}
-  >
-    <span className="opacity-70">{label}:</span>
-    <span className={`font-mono ${textPrimary}`}>{value}</span>
-  </span>
-);
 
 const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   const c: any = profile.connection || {};
@@ -309,25 +278,22 @@ export default function DataIOView({
               <div className="flex-1">
                 <div className={`flex items-center ${gapSmall}`}>
                   <h3 className={`font-medium ${textPrimary}`}>{profile.name}</h3>
-                  <span className={badgeInfo}>
+                  <Badge tone="primary" size="lg">
                     {getIOKindLabel(profile.kind)}
-                  </span>
+                  </Badge>
 
                   {/* Protocol badge(s) */}
                   {displayProtocols(profile).map((protocol) => (
-                    <span
-                      key={protocol}
-                      className={getProtocolBadgeStyle(protocol)}
-                    >
+                    <Badge key={protocol} tone={protocolTone(protocol)} size="lg">
                       {protocolLabel(protocol)}
-                    </span>
+                    </Badge>
                   ))}
 
                   {/* Realtime indicator */}
                   {!isReaderRealtime(profile.kind) && (
-                    <span className={badgeDanger}>
+                    <Badge tone="danger" size="lg">
                       {t("dataIO.badges.recorded")}
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
@@ -397,8 +363,8 @@ export default function DataIOView({
               <div className="flex-1">
                 <div className={`flex items-center ${gapSmall}`}>
                   <h3 className={`font-medium ${textPrimary}`}>{profile.name}</h3>
-                  <span className={badgeInfo}>{getIOKindLabel(profile.kind)}</span>
-                  <span className={badgeNeutral}>{t("dataIO.unsaved.badge")}</span>
+                  <Badge tone="primary" size="lg">{getIOKindLabel(profile.kind)}</Badge>
+                  <Badge size="lg">{t("dataIO.unsaved.badge")}</Badge>
                 </div>
                 <div className="mt-2">{renderConnectionSummary(profile, t)}</div>
               </div>

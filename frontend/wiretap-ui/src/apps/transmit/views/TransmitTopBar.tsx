@@ -6,7 +6,7 @@
 import { Send, GitMerge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { flexRowGap2 } from "../../../styles/spacing";
-import { badgeColorClass } from "../../../styles/badgeStyles";
+import { Badge } from "../../../components/Badge";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
 import { textDataSecondary } from "../../../styles/colourTokens";
@@ -141,20 +141,16 @@ export default function TransmitTopBar({
       {capabilities && (
         <div className={flexRowGap2}>
           {showAsMultiBus && (
-            <span className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${badgeColorClass('purple')}`}>
+            <Badge tone="purple">
               <GitMerge size={10} />
               {t("topBar.multiSourceLabel")}
-            </span>
+            </Badge>
           )}
           {capabilities.protocols.includes("canfd") && (
-            <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('green')}`}>
-              {t("topBar.fdLabel")}
-            </span>
+            <Badge tone="success">{t("topBar.fdLabel")}</Badge>
           )}
           {capabilities.available_buses.length > 1 && (
-            <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('amber')}`}>
-              {t("topBar.extendedLabel")}
-            </span>
+            <Badge tone="warning">{t("topBar.extendedLabel")}</Badge>
           )}
         </div>
       )}

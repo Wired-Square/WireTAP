@@ -16,8 +16,6 @@ interface DataViewControllerProps {
   protocolLabel: string;
   /** Optional badges to show next to the protocol label (e.g., framing mode, filter) */
   protocolBadges?: ProtocolBadge[];
-  /** Called when the protocol badge is clicked (for future functionality) */
-  onProtocolClick?: () => void;
   isStreaming?: boolean;
   /** Current timestamp in epoch seconds */
   timestamp?: number | null;
@@ -93,7 +91,6 @@ export default function DataViewController({
   onTabChange,
   protocolLabel,
   protocolBadges,
-  onProtocolClick,
   isStreaming = false,
   timestamp,
   displayTime,
@@ -144,7 +141,6 @@ export default function DataViewController({
         onTabChange={onTabChange}
         protocolLabel={protocolLabel}
         protocolBadges={protocolBadges}
-        onProtocolClick={onProtocolClick}
         isStreaming={isStreaming}
         timestamp={timestamp}
         displayTime={displayTime}

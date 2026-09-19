@@ -40,12 +40,11 @@ interface ExtractionBadgeProps {
   config: ExtractionConfig | null;
   isActive: boolean;
   onClick: () => void;
-  color: 'cyan' | 'purple' | 'amber';
+  tone: 'cyan' | 'purple' | 'warning';
 }
 
-function ExtractionBadge({ label, config, isActive, onClick, color }: ExtractionBadgeProps) {
+function ExtractionBadge({ label, config, isActive, onClick, tone }: ExtractionBadgeProps) {
   const { t } = useTranslation("discovery");
-  const tone = color === 'amber' ? 'warning' : color;
 
   // Format the byte range - handle negative indices nicely
   const formatRange = (cfg: ExtractionConfig) => {
@@ -651,14 +650,14 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
             config={idConfig}
             isActive={idConfig !== null}
             onClick={() => setShowIdDialog(true)}
-            color="cyan"
+            tone="cyan"
           />
           <ExtractionBadge
             label={t("serial.extractionLabelSource")}
             config={srcConfig}
             isActive={srcConfig !== null}
             onClick={() => setShowSrcDialog(true)}
-            color="purple"
+            tone="purple"
           />
           <ChecksumBadge
             config={checksumConfig}

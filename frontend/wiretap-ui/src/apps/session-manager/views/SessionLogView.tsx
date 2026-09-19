@@ -20,7 +20,7 @@ import {
   useFilteredEntries,
   useUniqueSessionIds,
   EVENT_TYPE_LABELS,
-  EVENT_TYPE_COLOURS,
+  EVENT_TYPE_BADGE,
   ALL_EVENT_TYPES,
   type SessionLogEventType,
 } from "../stores/sessionLogStore";
@@ -39,6 +39,7 @@ import {
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 import { Input, Select } from "../../../components/forms";
 
 /** Format timestamp as HH:MM:SS.mmm */
@@ -211,9 +212,7 @@ export default function SessionLogView() {
             <Filter className="w-3 h-3" />
             <span>{t("log.filter.events")}</span>
             {filter.eventTypes && (
-              <span className="px-1 bg-blue-500/20 text-blue-400 rounded text-[10px]">
-                {filter.eventTypes.size}
-              </span>
+              <Badge tone="primary" size="sm">{filter.eventTypes.size}</Badge>
             )}
             <ChevronDown className="w-3 h-3" />
           </Button>
@@ -228,15 +227,16 @@ export default function SessionLogView() {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {group.types.map((eventType) => (
-                    <button
+                    <Button
                       key={eventType}
+                      variant="outline"
+                      tone={EVENT_TYPE_BADGE[eventType].tone}
+                      size="xs"
+                      pressed={isEventTypeActive(eventType)}
                       onClick={() => toggleEventType(eventType)}
-                      className={`px-1.5 py-0.5 text-[10px] rounded transition-opacity ${
-                        EVENT_TYPE_COLOURS[eventType]
-                      } ${isEventTypeActive(eventType) ? "opacity-100" : "opacity-40"}`}
                     >
                       {EVENT_TYPE_LABELS[eventType]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -389,9 +389,9 @@ export default function SessionLogView() {
                     {formatTime(entry.timestamp)}
                   </td>
                   <td className="px-2 py-1">
-                    <span className={EVENT_TYPE_COLOURS[entry.eventType]}>
+                    <Badge size="sm" {...EVENT_TYPE_BADGE[entry.eventType]}>
                       {EVENT_TYPE_LABELS[entry.eventType]}
-                    </span>
+                    </Badge>
                   </td>
                   <td
                     className={`px-2 py-1 font-mono ${textSecondary} cursor-default`}

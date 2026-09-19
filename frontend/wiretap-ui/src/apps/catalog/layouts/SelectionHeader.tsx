@@ -4,6 +4,7 @@ import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
 import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export type SelectionHeaderProps = {
   selectedNode: TomlNode;
@@ -96,17 +97,13 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
       </div>
 
       <div className={`${flexRowGap2} text-sm text-[color:var(--text-muted)]`}>
-        <span className="px-2 py-1 bg-[var(--bg-surface)] rounded">{labelForNode(selectedNode)}</span>
+        <Badge size="lg">{labelForNode(selectedNode)}</Badge>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
         {selectedNode.metadata?.isCopy && (
-          <span className="text-xs bg-[var(--accent-bg)] text-[color:var(--accent-primary)] px-2 py-1 rounded">
-            Copy of {selectedNode.metadata?.copyFrom}
-          </span>
+          <Badge tone="primary" size="lg">Copy of {selectedNode.metadata?.copyFrom}</Badge>
         )}
         {selectedNode.metadata?.isMirror && (
-          <span className="text-xs bg-[var(--bg-surface)] text-[color:var(--accent-purple)] px-2 py-1 rounded border border-[color:var(--accent-purple)]">
-            Mirror of {selectedNode.metadata?.mirrorOf}
-          </span>
+          <Badge tone="purple" variant="outline" size="lg">Mirror of {selectedNode.metadata?.mirrorOf}</Badge>
         )}
       </div>
     </div>

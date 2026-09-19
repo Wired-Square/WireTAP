@@ -44,7 +44,6 @@ import {
   textSuccess,
 } from "../../../../styles";
 import { panelFooter } from "../../../../styles/cardStyles";
-import { badgeMetadataIcon } from "../../../../styles/badgeStyles";
 import {
   PUBLISH_PROGRESS_EVENT,
   type PublishProgress,
@@ -65,6 +64,7 @@ import { publishTabs } from "./publishTabs";
 import { publishBlockers } from "./publishBlockers";
 import { usePublishDiff } from "./usePublishDiff";
 import { EMPTY_PUBLISH_FORM, type PublishForm, type PublishTab, type T } from "./types";
+import { Badge } from "../../../../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -502,10 +502,10 @@ function PublishHeader({
         {/* Which account this would push as. Pushing under the wrong identity is quiet
             and awkward to undo, so the answer is always on screen. */}
         {login && (
-          <span className={badgeMetadataIcon} title={t("publish.connectedAs", { login })}>
+          <Badge size="lg" title={t("publish.connectedAs", { login })}>
             <ShareIcon.GitHub className={iconSm} />
             {login}
-          </span>
+          </Badge>
         )}
       </div>
     </div>

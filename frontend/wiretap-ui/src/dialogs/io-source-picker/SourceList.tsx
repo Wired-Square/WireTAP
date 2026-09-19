@@ -8,13 +8,13 @@ import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
 import TabStrip from "../../components/TabStrip";
 import type { SourceTab } from "./types";
-import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple, badgeSmallInfo } from "../../styles/badgeStyles";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { IconButton } from "../../components/Button";
+import { Badge } from "../../components/Badge";
 
 /**
  * Map buffer device type to a human-readable storage backend label.
@@ -390,10 +390,10 @@ export default function SourceList({
           <Wifi className={iconXs} />
           <span>{t("ioSourcePicker.sources.realtime")}</span>
           {isMultiBusMode && (
-            <span className={badgeSmallPurple}>
+            <Badge tone="purple" size="sm">
               <GitMerge className={`${iconXs} inline mr-1`} />
               {t("ioSourcePicker.sources.busesCount", { count: checkedSourceIds.length })}
-            </span>
+            </Badge>
           )}
         </div>
       </div>
@@ -500,13 +500,13 @@ export default function SourceList({
                 </div>
                 <div className={`${caption} flex items-center gap-2`}>
                   {session.state === "stopped" ? (
-                    <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
+                    <Badge tone="warning" size="sm">{t("ioSourcePicker.sources.stopped")}</Badge>
                   ) : session.state === "paused" && session.sourceType === "capture" ? (
-                    <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.paused")}</span>
+                    <Badge tone="primary" size="sm">{t("ioSourcePicker.sources.paused")}</Badge>
                   ) : session.sourceType === "capture" ? (
-                    <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.playing")}</span>
+                    <Badge tone="primary" size="sm">{t("ioSourcePicker.sources.playing")}</Badge>
                   ) : (
-                    <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
+                    <Badge tone="success" size="sm">{t("ioSourcePicker.sources.live")}</Badge>
                   )}
                   <span>{info.subtitle}</span>
                   {session.captureId && (
@@ -670,22 +670,22 @@ function SourceButton({
             {profile.name}
           </span>
           {busNumber !== undefined && (
-            <span className={badgeSmallNeutral}>
+            <Badge size="sm">
               {t("ioSourcePicker.sources.busLabel", { bus: busNumber })}
-            </span>
+            </Badge>
           )}
           {profile.ephemeral && (
-            <span className={badgeSmallNeutral} title={t("ioSourcePicker.sources.unsavedHint")}>
+            <Badge size="sm" title={t("ioSourcePicker.sources.unsavedHint")}>
               {t("ioSourcePicker.sources.unsaved")}
-            </span>
+            </Badge>
           )}
           {isLive && !isDisabled && (
             isStopped ? (
-              <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
+              <Badge tone="warning" size="sm">{t("ioSourcePicker.sources.stopped")}</Badge>
             ) : isRunning ? (
-              <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
+              <Badge tone="success" size="sm">{t("ioSourcePicker.sources.live")}</Badge>
             ) : (
-              <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.active")}</span>
+              <Badge tone="success" size="sm">{t("ioSourcePicker.sources.active")}</Badge>
             )
           )}
         </div>
@@ -701,9 +701,9 @@ function SourceButton({
                 </span>
               )}
               {usageInfo.sessionIds.slice(0, 2).map((sid) => (
-                <span key={sid} className={isRealtime ? badgeSmallPurple : badgeSmallSuccess}>
+                <Badge key={sid} tone={isRealtime ? "purple" : "success"} size="sm">
                   {sid}
-                </span>
+                </Badge>
               ))}
               {usageInfo.sessionCount > 2 && (
                 <span className="text-[color:var(--text-muted)]">+{usageInfo.sessionCount - 2}</span>

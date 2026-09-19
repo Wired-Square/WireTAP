@@ -18,6 +18,7 @@ import type { TFunction } from "i18next";
 import type { CatalogSyncStatus } from "../api/catalogShare";
 import { iconMd, iconSm } from "../styles/spacing";
 import { SYNC_STATUS_DRESS } from "./catalogIcons";
+import { Badge } from "./Badge";
 
 /**
  * The status as one glyph, for lists with no room for a word.
@@ -55,10 +56,10 @@ export function CatalogSyncBadge({ status }: { status: CatalogSyncStatus }) {
   const label = useStatusLabel(status);
   const { Icon, badge } = SYNC_STATUS_DRESS[status];
   return (
-    <span className={`${badge} inline-flex items-center gap-1`}>
+    <Badge tone={badge} size="sm">
       <Icon className={iconSm} aria-hidden="true" />
       {label}
-    </span>
+    </Badge>
   );
 }
 

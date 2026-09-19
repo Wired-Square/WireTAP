@@ -13,6 +13,7 @@ import { InlineEdit } from "../components/InlineEdit";
 import GeneratorDialog from "../dialogs/GeneratorDialog";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
+import { Badge } from "../../../components/Badge";
 
 export default function GeneratorsView() {
   const { t } = useTranslation("rules");
@@ -110,16 +111,12 @@ export default function GeneratorsView() {
                 <span className={`text-xs font-mono ${textTertiary}`}>
                   {formatHexId(g.generator_id)}
                 </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
-                >
+                <Badge tone={isTemp ? "warning" : "success"}>
                   {isTemp ? t("common.temporary") : t("common.existing")}
-                </span>
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${g.enabled ? "bg-blue-500/20 text-blue-300" : "bg-neutral-500/20 text-neutral-400"}`}
-                >
+                </Badge>
+                <Badge tone={g.enabled ? "primary" : "neutral"}>
                   {g.enabled ? t("common.enabled") : t("common.disabled")}
-                </span>
+                </Badge>
               </div>
               <div className={`mt-1 text-xs ${textSecondary}`}>
                 {g.frame_def_name} → {g.interface_name}

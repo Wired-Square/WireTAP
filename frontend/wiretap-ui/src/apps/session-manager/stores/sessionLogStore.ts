@@ -5,14 +5,7 @@
 
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import {
-  badgeSmallSuccess,
-  badgeSmallDanger,
-  badgeSmallWarning,
-  badgeSmallInfo,
-  badgeSmallPurple,
-  badgeSmallNeutral,
-} from "../../../styles";
+import type { BadgeStyleProps } from "../../../components/Badge";
 
 // ============================================================================
 // Types
@@ -237,27 +230,27 @@ export const EVENT_TYPE_LABELS: Record<SessionLogEventType, string> = {
   "mcp-disconnected": "MCP Disconnect",
 };
 
-/** Badge classes for event types (using standard badge styles) */
-export const EVENT_TYPE_COLOURS: Record<SessionLogEventType, string> = {
-  "session-created": badgeSmallSuccess,
-  "session-joined": badgeSmallInfo,
-  "session-left": badgeSmallWarning,
-  "session-destroyed": badgeSmallDanger,
-  "state-change": badgeSmallInfo,
-  "stream-ended": badgeSmallWarning,
-  "stream-complete": badgeSmallSuccess,
-  "session-error": badgeSmallDanger,
-  "speed-changed": badgeSmallInfo,
-  "session-mode": badgeSmallPurple,
-  "session-reconfigured": badgeSmallInfo,
-  "session-stats": `${badgeSmallNeutral} border border-[color:var(--border-default)]`,
-  "buffer-orphaned": badgeSmallPurple,
-  "buffer-created": badgeSmallSuccess,
-  "buffer-changed": badgeSmallInfo,
-  "device-connected": badgeSmallSuccess,
-  "device-probe": badgeSmallInfo,
-  "mcp-connected": badgeSmallPurple,
-  "mcp-disconnected": badgeSmallNeutral,
+/** Badge tone per event type */
+export const EVENT_TYPE_BADGE: Record<SessionLogEventType, BadgeStyleProps> = {
+  "session-created": { tone: "success" },
+  "session-joined": { tone: "primary" },
+  "session-left": { tone: "warning" },
+  "session-destroyed": { tone: "danger" },
+  "state-change": { tone: "primary" },
+  "stream-ended": { tone: "warning" },
+  "stream-complete": { tone: "success" },
+  "session-error": { tone: "danger" },
+  "speed-changed": { tone: "primary" },
+  "session-mode": { tone: "purple" },
+  "session-reconfigured": { tone: "primary" },
+  "session-stats": { variant: "outline" },
+  "buffer-orphaned": { tone: "purple" },
+  "buffer-created": { tone: "success" },
+  "buffer-changed": { tone: "primary" },
+  "device-connected": { tone: "success" },
+  "device-probe": { tone: "primary" },
+  "mcp-connected": { tone: "purple" },
+  "mcp-disconnected": {},
 };
 
 /** All event types for filter dropdown */

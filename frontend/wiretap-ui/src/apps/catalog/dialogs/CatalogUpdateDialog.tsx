@@ -24,7 +24,6 @@ import DiffView from "../views/DiffView";
 import { diffCatalog, type DiffLine } from "../../../api/catalog";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import {
-  badgeMetadata,
   bgSurface,
   borderDefault,
   borderDivider,
@@ -39,6 +38,7 @@ import {
 } from "../../../styles";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 import { sendUpdateToCatalogEditor } from "../../../utils/windowCommunication";
+import { Badge } from "../../../components/Badge";
 
 type Props = {
   isOpen: boolean;
@@ -148,7 +148,7 @@ export default function CatalogUpdateDialog({
             <>
               <div className={`${cardCompact} flex items-center gap-2 flex-wrap`}>
                 <span className={textMedium}>{t("update.upstreamVersion")}</span>
-                <span className={badgeMetadata}>{review.remoteBlobSha.slice(0, 7)}</span>
+                <Badge size="lg">{review.remoteBlobSha.slice(0, 7)}</Badge>
                 {review.transmitFrameCount > 0 && (
                   <span className={`${caption} ${textWarning} inline-flex items-center gap-1`}>
                     <ShareIcon.TransmitRisk className={iconSm} />

@@ -31,7 +31,6 @@ import { getCaptureFramesTail } from '../../../../api/capture';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { alertWarning } from '../../../../styles/cardStyles';
 import { bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
-import { byteHighlight } from '../../../../styles/badgeStyles';
 import { Button, IconButton } from '../../../../components/Button';
 import { SecondaryButton, DangerButton, Select, Input } from '../../../../components/forms';
 
@@ -51,6 +50,19 @@ const FALLBACK_CHECKSUM_CONFIG: ChecksumConfig = {
 
 /** Debounce before re-checking a hand-edited configuration. */
 const MATCH_RATE_DEBOUNCE_MS = 200;
+
+/** A byte in the frame preview: the checksum, its input, or neither. */
+function byteHighlight(state: 'checksum' | 'calcData' | 'default'): string {
+  const base = "px-1 py-0.5 rounded text-xs";
+  switch (state) {
+    case 'checksum':
+      return `${base} bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] ring-1 ring-[color:var(--status-warning-border)]`;
+    case 'calcData':
+      return `${base} bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]`;
+    case 'default':
+      return `${base} text-[color:var(--text-secondary)]`;
+  }
+}
 
 /**
  * Frames read from the capture for detection. The engine caps its own sample at

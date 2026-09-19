@@ -13,10 +13,10 @@ import { SecondaryButton } from "../../../../components/forms";
 import { formatDisplayTime } from "../../../../utils/timeFormat";
 import { iconMd, iconSm } from "../../../../styles/spacing";
 import { borderDefault, caption, textDanger, textSecondary } from "../../../../styles";
-import { badgeMetadataIcon } from "../../../../styles/badgeStyles";
 import { PlanAlert, TabMessage, tabScroll } from "./parts";
 import type { T } from "./types";
 import type { PublishDiffResult } from "./usePublishDiff";
+import { Badge } from "../../../../components/Badge";
 
 type Props = {
   t: T;
@@ -65,15 +65,15 @@ export default function DiffTab({
   return (
     <div className="flex-1 min-h-0 flex flex-col p-4 gap-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={badgeMetadataIcon}>
+        <Badge size="lg">
           <ShareIcon.Branch className={iconSm} />
           {diff.comparedRef}
-        </span>
+        </Badge>
         {!diff.exists && (
-          <span className={badgeMetadataIcon}>
+          <Badge size="lg">
             <ShareIcon.NewCatalog className={iconSm} />
             {t("publish.diffNewFile")}
-          </span>
+          </Badge>
         )}
         {diff.lastChange && (
           <span className={`${caption} inline-flex items-center gap-1`}>

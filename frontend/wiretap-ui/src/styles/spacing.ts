@@ -41,9 +41,6 @@ export const paddingButtonSm = "px-3 py-1.5";
 /** Icon button padding */
 export const paddingIconButton = "p-2";
 
-/** Badge/chip padding */
-export const paddingBadge = "px-2 py-1";
-
 // =============================================================================
 // Gaps - Flex/Grid Spacing
 // =============================================================================

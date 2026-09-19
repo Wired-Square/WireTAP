@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, flexRowGap2 } from "../../../../styles/spacing";
 import { cardBase, cardDefault } from "../../../../styles/cardStyles";
-import { badgeSmallNeutral, badgeSmallSuccess } from "../../../../styles/badgeStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -43,6 +42,7 @@ import type {
   FrameChecksumFinding,
 } from "../../../../api/checksums";
 import { IconButton } from "../../../../components/Button";
+import { Badge } from "../../../../components/Badge";
 
 type Props = {
   embedded?: boolean;
@@ -308,12 +308,12 @@ function CandidateRow({ candidate }: { candidate: DiscoveredChecksum }) {
       <div className="flex items-baseline gap-2 flex-wrap">
         <span className={`font-mono text-sm ${textPrimary}`}>{describeSpecification(spec)}</span>
         {spec.kind === "crc" && spec.wellKnown && (
-          <span className={badgeSmallSuccess}>{t("checksumDiscovery.wellKnownPolynomial")}</span>
+          <Badge tone="success" size="sm">{t("checksumDiscovery.wellKnownPolynomial")}</Badge>
         )}
         {candidate.length > 1 && (
-          <span className={`${badgeSmallNeutral} font-mono`}>
+          <Badge size="sm" mono>
             {candidate.bigEndian ? t("serial.bigEndianShort") : t("serial.littleEndianShort")}
-          </span>
+          </Badge>
         )}
         <span className={`text-xs ${textSecondary}`}>
           {t("serialAnalysis.atByte", { position: candidate.position })}

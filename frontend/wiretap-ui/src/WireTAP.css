@@ -332,9 +332,6 @@ html, body {
   --border-success: var(--status-success-border);
   --bg-warning: var(--status-warning-bg);
   --hover-bg-warning: var(--status-warning-bg);
-  --status-success-bg-hover: var(--status-success-bg);
-  --status-warning-bg-hover: var(--status-warning-bg);
-  --status-purple-bg-hover: var(--status-purple-bg);
 
   /* Signal colours for BitPreview (byte layout visualisation) */
   --signal-blue-1: #3b82f6;
@@ -460,9 +457,6 @@ html, body {
   --border-success: var(--status-success-border);
   --bg-warning: var(--status-warning-bg);
   --hover-bg-warning: var(--status-warning-bg);
-  --status-success-bg-hover: var(--status-success-bg);
-  --status-warning-bg-hover: var(--status-warning-bg);
-  --status-purple-bg-hover: var(--status-purple-bg);
 
   /* Signal colours for BitPreview (byte layout visualisation) */
   --signal-blue-1: #60a5fa;
