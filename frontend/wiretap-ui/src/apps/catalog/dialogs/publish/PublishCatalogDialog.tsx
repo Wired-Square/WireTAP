@@ -30,19 +30,11 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import * as ShareIcon from "../../../../components/catalogIcons";
-import Dialog from "../../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../../../components/Dialog";
 import TabStrip from "../../../../components/TabStrip";
 import { FormField, Input, PrimaryButton, SecondaryButton } from "../../../../components/forms";
 import { iconMd, iconSm } from "../../../../styles/spacing";
-import {
-  borderDivider,
-  caption,
-  h2,
-  textMedium,
-  textSecondary,
-  textSuccess,
-} from "../../../../styles";
-import { panelFooter } from "../../../../styles/cardStyles";
+import { borderDivider, caption, textMedium, textSecondary, textSuccess } from "../../../../styles";
 import {
   PUBLISH_PROGRESS_EVENT,
   type PublishProgress,
@@ -273,7 +265,7 @@ export default function PublishCatalogDialog({
   // that no longer applies to anything.
   if (publishState.result) {
     return (
-      <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-4xl">
+      <Dialog isOpen={isOpen} onClose={onClose} size="2xl">
         <PublishSuccess result={publishState.result} filename={filename} onClose={onClose} t={t} />
       </Dialog>
     );
@@ -296,19 +288,15 @@ export default function PublishCatalogDialog({
       : blockers[0]?.message;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-4xl">
-      {/* No surface or shadow — Dialog owns both. This wrapper exists to clip the tab
-          strip and the footer to the rounded corners, and to make the tab panel the
-          only thing that scrolls. */}
-      <div className="flex flex-col overflow-hidden rounded-xl">
-        <div className={`px-4 pt-4 pb-3 space-y-3 ${borderDivider}`}>
-          <PublishHeader
-            t={t}
-            filename={filename}
-            login={hasToken ? login : null}
-            planning={publishState.planning}
-          />
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="2xl">
+      <PublishHeader
+        t={t}
+        filename={filename}
+        login={hasToken ? login : null}
+        planning={publishState.planning}
+      />
+      <DialogBody padding="none">
+        <div className={`px-4 py-3 space-y-3 ${borderDivider}`}>
           {!hasToken && (
             <PlanAlert
               tone="warning"
@@ -434,40 +422,39 @@ export default function PublishCatalogDialog({
             </PlanAlert>
           </div>
         )}
-
-        <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>{t("publish.cancel")}</SecondaryButton>
-          {/* The way out of the one dead end here: bytes that already match upstream
-              cannot be pushed, so without this there is no route to being tracked. */}
-          {canLink && (
-            <span title={t("publish.linkHint")}>
-              <SecondaryButton
-                onClick={() => void handleLink()}
-                disabled={publishState.linking}
-              >
-                {publishState.linking ? (
-                  <ShareIcon.Busy className={`${iconMd} animate-spin`} />
-                ) : (
-                  <ShareIcon.Link className={iconMd} />
-                )}
-                {t("publish.linkAction")}
-              </SecondaryButton>
-            </span>
-          )}
-          {/* Wrapped, because a disabled button does not fire hover events on every
-              platform and the tooltip is the last "why is this off?" backstop. */}
-          <span title={canPublish ? undefined : disabledReason}>
-            <PrimaryButton onClick={() => void handlePublish()} disabled={!canPublish}>
-              {publishState.inFlight ? (
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("publish.cancel")}</SecondaryButton>
+        {/* The way out of the one dead end here: bytes that already match upstream
+            cannot be pushed, so without this there is no route to being tracked. */}
+        {canLink && (
+          <span title={t("publish.linkHint")}>
+            <SecondaryButton
+              onClick={() => void handleLink()}
+              disabled={publishState.linking}
+            >
+              {publishState.linking ? (
                 <ShareIcon.Busy className={`${iconMd} animate-spin`} />
               ) : (
-                <ShareIcon.Push className={iconMd} />
+                <ShareIcon.Link className={iconMd} />
               )}
-              {form.openPr ? t("publish.pushAndPrAction") : t("publish.pushAction")}
-            </PrimaryButton>
+              {t("publish.linkAction")}
+            </SecondaryButton>
           </span>
-        </div>
-      </div>
+        )}
+        {/* Wrapped, because a disabled button does not fire hover events on every
+            platform and the tooltip is the last "why is this off?" backstop. */}
+        <span title={canPublish ? undefined : disabledReason}>
+          <PrimaryButton onClick={() => void handlePublish()} disabled={!canPublish}>
+            {publishState.inFlight ? (
+              <ShareIcon.Busy className={`${iconMd} animate-spin`} />
+            ) : (
+              <ShareIcon.Push className={iconMd} />
+            )}
+            {form.openPr ? t("publish.pushAndPrAction") : t("publish.pushAction")}
+          </PrimaryButton>
+        </span>
+      </DialogFooter>
     </Dialog>
   );
 }
@@ -485,9 +472,9 @@ function PublishHeader({
   planning: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className={h2}>{t("publish.title")}</h2>
+    <DialogHeader>
+      <div>
+        <DialogTitle>{t("publish.title")}</DialogTitle>
         <p className={caption}>
           {filename ? t("publish.subtitle", { filename }) : t("publish.noCatalog")}
         </p>
@@ -508,7 +495,7 @@ function PublishHeader({
           </Badge>
         )}
       </div>
-    </div>
+    </DialogHeader>
   );
 }
 
@@ -524,11 +511,9 @@ function PublishSuccess({
   t: T;
 }) {
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl">
-      <div className={`px-4 pt-4 pb-3 ${borderDivider}`}>
-        <PublishHeader t={t} filename={filename} login={null} planning={false} />
-      </div>
-      <div className="p-4">
+    <>
+      <PublishHeader t={t} filename={filename} login={null} planning={false} />
+      <DialogBody>
         <Card className="space-y-2">
           <div className="flex items-center gap-2">
             <ShareIcon.Success className={`${iconMd} ${textSuccess}`} />
@@ -562,10 +547,10 @@ function PublishSuccess({
             )}
           </div>
         </Card>
-      </div>
-      <div className={`${panelFooter} flex justify-end gap-2`}>
+      </DialogBody>
+      <DialogFooter>
         <SecondaryButton onClick={onClose}>{t("publish.done")}</SecondaryButton>
-      </div>
-    </div>
+      </DialogFooter>
+    </>
   );
 }

@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Select, FormField, SecondaryButton, SuccessButton } from "../../../components/forms";
-import { h2, caption } from "../../../styles";
+import { caption } from "../../../styles";
 import type { MetaFields, ValidationError, ProtocolType, SerialEncoding } from "../types";
 import { Button } from "../../../components/Button";
 import { Alert } from "../../../components/Alert";
@@ -89,10 +89,8 @@ export default function NewCatalogDialog({
   const currentProtocolConfig = protocols.find((p) => p.type === selectedProtocol);
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-2xl">
-      <div className="p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className={`${h2} mb-6`}>{t("newCatalog.title")}</h2>
-
+    <Dialog isOpen={open} size="xl" title={t("newCatalog.title")}>
+      <DialogBody>
         {metaError && (
           <Alert tone="danger" className="mb-4">
             {metaError.message}
@@ -237,14 +235,13 @@ export default function NewCatalogDialog({
             </FormField>
           )}
         </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>{t("newCatalog.cancel")}</SecondaryButton>
-          <SuccessButton onClick={() => onCreate(selectedProtocol)} disabled={nameInvalid || versionInvalid}>
-            {t("newCatalog.createButton")}
-          </SuccessButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("newCatalog.cancel")}</SecondaryButton>
+        <SuccessButton onClick={() => onCreate(selectedProtocol)} disabled={nameInvalid || versionInvalid}>
+          {t("newCatalog.createButton")}
+        </SuccessButton>
+      </DialogFooter>
     </Dialog>
   );
 }

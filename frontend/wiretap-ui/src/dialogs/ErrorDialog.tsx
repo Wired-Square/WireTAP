@@ -1,22 +1,11 @@
 // ui/src/dialogs/ErrorDialog.tsx
 
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconLg, iconXl } from "../styles/spacing";
-import Dialog from "../components/Dialog";
+import { iconXl } from "../styles/spacing";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../components/Dialog";
 import { SecondaryButton } from "../components/forms/DialogButtons";
-import {
-  labelSmall,
-  h2,
-  textSecondary,
-  bgDanger,
-  textDanger,
-  paddingDialog,
-  marginHeading,
-  roundedDefault,
-  gapSmall,
-} from "../styles";
-import { IconButton } from "../components/Button";
+import { labelSmall, textSecondary, bgDanger, textDanger, roundedDefault, gapSmall } from "../styles";
 import { Card } from "../components/Card";
 
 export interface ErrorDialogProps {
@@ -38,35 +27,20 @@ export default function ErrorDialog({
   const headingTitle = title ?? t("error.defaultTitle");
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className={paddingDialog}>
-        {/* Header */}
-        <div className={`flex items-start justify-between ${marginHeading}`}>
-          <div className={`flex items-center ${gapSmall}`}>
-            <div className={`w-12 h-12 ${bgDanger} ${roundedDefault} flex items-center justify-center`}>
-              <AlertTriangle className={`${iconXl} ${textDanger}`} />
-            </div>
-            <div>
-              <h2 className={h2}>{headingTitle}</h2>
-            </div>
+    <Dialog isOpen={isOpen} size="xl" onClose={onClose}>
+      <DialogHeader>
+        <div className={`flex items-center ${gapSmall}`}>
+          <div className={`w-12 h-12 ${bgDanger} ${roundedDefault} flex items-center justify-center`}>
+            <AlertTriangle className={`${iconXl} ${textDanger}`} />
           </div>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
+          <DialogTitle>{headingTitle}</DialogTitle>
         </div>
+      </DialogHeader>
+      <DialogBody className="space-y-4">
+        <p className={textSecondary}>{message}</p>
 
-        {/* Message */}
-        <div className={marginHeading}>
-          <p className={textSecondary}>{message}</p>
-        </div>
-
-        {/* Details (if provided) */}
         {details && (
-          <div className="mb-4">
+          <div>
             <div className={`${labelSmall} mb-2`}>{t("error.technicalDetails")}</div>
             <Card padding="lg">
               <pre className="text-xs text-[color:var(--text-primary)] font-mono whitespace-pre-wrap break-words">
@@ -75,12 +49,10 @@ export default function ErrorDialog({
             </Card>
           </div>
         )}
-
-        {/* Actions */}
-        <div className={`flex justify-end ${gapSmall}`}>
-          <SecondaryButton onClick={onClose}>{t("common:actions.close")}</SecondaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.close")}</SecondaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

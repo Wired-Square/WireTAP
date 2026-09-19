@@ -7,18 +7,9 @@
 import type { LucideIcon } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 import { iconXl } from "../styles/spacing";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../components/forms/DialogButtons";
-import {
-  h2,
-  textSecondary,
-  bgInfo,
-  textInfo,
-  paddingDialog,
-  marginHeading,
-  roundedDefault,
-  gapSmall,
-} from "../styles";
+import { textSecondary, bgInfo, textInfo, roundedDefault, gapSmall } from "../styles";
 
 export interface ConsentDialogProps {
   isOpen: boolean;
@@ -40,29 +31,24 @@ export default function ConsentDialog({
 
   return (
     <Dialog isOpen={isOpen}>
-      <div className={paddingDialog}>
-        {/* Header */}
-        <div className={`flex items-center ${gapSmall} ${marginHeading}`}>
+      <DialogHeader>
+        <div className={`flex items-center ${gapSmall}`}>
           <div className={`w-12 h-12 ${bgInfo} ${roundedDefault} flex items-center justify-center`}>
             <Icon className={`${iconXl} ${textInfo}`} />
           </div>
-          <h2 className={h2}>{t(`${i18nKey}.title`)}</h2>
+          <DialogTitle>{t(`${i18nKey}.title`)}</DialogTitle>
         </div>
-
-        {/* Message */}
-        <div className={`${textSecondary} space-y-3 mb-6`}>
-          <p>{t(`${i18nKey}.intro`)}</p>
-          <p>
-            <Trans i18nKey={`dialogs:${i18nKey}.details`} components={{ strong: <strong /> }} />
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className={`flex justify-end ${gapSmall}`}>
-          <SecondaryButton onClick={onDecline}>{t(`${i18nKey}.decline`)}</SecondaryButton>
-          <PrimaryButton onClick={onAccept}>{t(`${i18nKey}.accept`)}</PrimaryButton>
-        </div>
-      </div>
+      </DialogHeader>
+      <DialogBody className={`${textSecondary} space-y-3`}>
+        <p>{t(`${i18nKey}.intro`)}</p>
+        <p>
+          <Trans i18nKey={`dialogs:${i18nKey}.details`} components={{ strong: <strong /> }} />
+        </p>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onDecline}>{t(`${i18nKey}.decline`)}</SecondaryButton>
+        <PrimaryButton onClick={onAccept}>{t(`${i18nKey}.accept`)}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

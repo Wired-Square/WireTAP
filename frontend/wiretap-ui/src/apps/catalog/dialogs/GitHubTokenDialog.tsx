@@ -12,12 +12,11 @@ import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import * as ShareIcon from "../../../components/catalogIcons";
 import Alert from "../../../components/Alert";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 import SecurePasswordField from "../../../components/io/SecurePasswordField";
 import { iconMd, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, caption, h2, textMedium } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { caption, textMedium } from "../../../styles";
 import { gitTokenSetupUrl } from "../../../api/catalogShare";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 import { Badge } from "../../../components/Badge";
@@ -51,86 +50,84 @@ export default function GitHubTokenDialog({ isOpen, onClose }: Props) {
   const identity = account.identity;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-lg">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className={h2}>{t("account.title")}</h2>
-          <p className={caption}>{t("account.subtitle")}</p>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {identity && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <ShareIcon.Success className={`${iconMd} text-[color:var(--accent-success)]`} />
-              <span className={textMedium}>{identity.login}</span>
-              {identity.scopes.length > 0 ? (
-                identity.scopes.map((scope) => (
-                  <Badge key={scope} size="lg">
-                    {scope}
-                  </Badge>
-                ))
-              ) : (
-                // Fine-grained tokens report no scopes at all, which is not an error.
-                <Badge size="lg">{t("account.fineGrained")}</Badge>
-              )}
-            </div>
-          )}
-
-          <SecurePasswordField
-            value={token}
-            onChange={setToken}
-            isSecurelyStored={identity !== null}
-            hasLegacyPassword={false}
-            placeholder="ghp_…"
-            label={t("account.tokenLabel")}
-          />
-
-          <div className={caption}>
-            <p>{t("account.scopeAdvice")}</p>
-            <button
-              onClick={() => void gitTokenSetupUrl().then(openUrl)}
-              className="mt-1 inline-flex items-center gap-1 underline hover:no-underline"
-            >
-              <ShareIcon.GitHub className={iconSm} />
-              {t("account.createToken")}
-            </button>
-          </div>
-
-          {account.error && (
-            <Alert tone="danger">
-              <p className="text-xs">{account.error.message}</p>
-            </Alert>
-          )}
-        </div>
-
-        <div className={`${panelFooter} flex justify-between gap-2`}>
-          <div className="flex gap-2">
-            {identity && (
-              <>
-                <SecondaryButton onClick={() => void verifyAccount()} disabled={account.busy}>
-                  {t("account.verify")}
-                </SecondaryButton>
-                <SecondaryButton
-                  onClick={() => void disconnectAccount()}
-                  disabled={account.busy}
-                >
-                  {t("account.disconnect")}
-                </SecondaryButton>
-              </>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={t("account.title")}
+      subtitle={t("account.subtitle")}
+    >
+      <DialogBody className="space-y-4">
+        {identity && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <ShareIcon.Success className={`${iconMd} text-[color:var(--accent-success)]`} />
+            <span className={textMedium}>{identity.login}</span>
+            {identity.scopes.length > 0 ? (
+              identity.scopes.map((scope) => (
+                <Badge key={scope} size="lg">
+                  {scope}
+                </Badge>
+              ))
+            ) : (
+              // Fine-grained tokens report no scopes at all, which is not an error.
+              <Badge size="lg">{t("account.fineGrained")}</Badge>
             )}
           </div>
-          <div className="flex gap-2">
-            <SecondaryButton onClick={onClose}>{t("account.close")}</SecondaryButton>
-            <PrimaryButton
-              onClick={() => void handleConnect()}
-              disabled={!token.trim() || account.busy}
-            >
-              {account.busy && <ShareIcon.Busy className={`${iconMd} animate-spin`} />}
-              {t("account.connect")}
-            </PrimaryButton>
-          </div>
+        )}
+
+        <SecurePasswordField
+          value={token}
+          onChange={setToken}
+          isSecurelyStored={identity !== null}
+          hasLegacyPassword={false}
+          placeholder="ghp_…"
+          label={t("account.tokenLabel")}
+        />
+
+        <div className={caption}>
+          <p>{t("account.scopeAdvice")}</p>
+          <button
+            onClick={() => void gitTokenSetupUrl().then(openUrl)}
+            className="mt-1 inline-flex items-center gap-1 underline hover:no-underline"
+          >
+            <ShareIcon.GitHub className={iconSm} />
+            {t("account.createToken")}
+          </button>
         </div>
-      </div>
+
+        {account.error && (
+          <Alert tone="danger">
+            <p className="text-xs">{account.error.message}</p>
+          </Alert>
+        )}
+      </DialogBody>
+      <DialogFooter className="justify-between">
+        <div className="flex gap-2">
+          {identity && (
+            <>
+              <SecondaryButton onClick={() => void verifyAccount()} disabled={account.busy}>
+                {t("account.verify")}
+              </SecondaryButton>
+              <SecondaryButton
+                onClick={() => void disconnectAccount()}
+                disabled={account.busy}
+              >
+                {t("account.disconnect")}
+              </SecondaryButton>
+            </>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={onClose}>{t("account.close")}</SecondaryButton>
+          <PrimaryButton
+            onClick={() => void handleConnect()}
+            disabled={!token.trim() || account.busy}
+          >
+            {account.busy && <ShareIcon.Busy className={`${iconMd} animate-spin`} />}
+            {t("account.connect")}
+          </PrimaryButton>
+        </div>
+      </DialogFooter>
     </Dialog>
   );
 }

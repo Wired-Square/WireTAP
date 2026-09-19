@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
-import { iconLg } from "../styles/spacing";
 import { emit, listen } from "@tauri-apps/api/event";
-import Dialog from "../components/Dialog";
-import {
-  h3,
-  borderDefault,
-  paddingCard,
-} from "../styles";
+import Dialog, { DialogBody } from "../components/Dialog";
 import { useSettings, type IOProfile } from "../hooks/useSettings";
 import { buildCatalogPath } from "../utils/catalogUtils";
 import { isMultiBusProfile, busProtocol } from "../utils/profileTraits";
@@ -84,8 +77,6 @@ import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { newSavedProfileId, storeProfileSecrets } from "../settings/ioProfileForm";
 import { withAppError } from "../utils/appError";
-import { IconButton } from "../components/Button";
-import { Card } from "../components/Card";
 
 /** Options passed when starting a load or connect operation */
 export interface LoadOptions {
@@ -2030,58 +2021,48 @@ export default function IoSourcePickerDialog({
       </div>
 
       <DecoderPicker catalogPath={selectedCatalogPath} onSelect={handleCatalogSelect} />
-
-      <ActionButtons
-        mode={mode}
-        isLoading={isLoading}
-        loadProfileId={loadProfileId}
-        checkedSourceId={checkedSourceId}
-        checkedProfile={checkedProfile}
-        isCaptureSelected={isCaptureSelected}
-        isCheckedProfileLive={isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)}
-        isCheckedProfileStopped={isCheckedProfileStopped && !isCheckedProfileCapture}
-        isImporting={isImporting}
-        importError={importError}
-        onImport={handleImport}
-        onLoadClick={handleLoadClick}
-        onConnectClick={handleConnectClick}
-        onJoinClick={handleJoinClick}
-        onStartClick={handleStartClick}
-        onClose={handleCaptureOkClick}
-        onSkip={onSkip}
-        multiSelectMode={isMultiBusMode}
-        multiSelectCount={checkedSourceIds.length}
-        onMultiConnectClick={handleMultiWatchClick}
-        onRelease={subscriberId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)) ? handleRelease : undefined}
-        // Only show Restart for profiles, not for selecting existing sessions
-        onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
-        isMultiSourceLive={isMultiSourceLive}
-        onMultiRestartClick={isMultiSourceLive ? handleMultiRestartClick : undefined}
-        onCaptureConnectClick={selectedCaptureId ? handleCaptureConnectClick : undefined}
-        onConnectOnlyClick={checkedSourceId && onConnect ? () => {
-          onConnect(checkedSourceId);
-          onClose();
-        } : undefined}
-      />
     </>
+  );
+
+  const pickerFooter = (
+    <ActionButtons
+      mode={mode}
+      isLoading={isLoading}
+      loadProfileId={loadProfileId}
+      checkedSourceId={checkedSourceId}
+      checkedProfile={checkedProfile}
+      isCaptureSelected={isCaptureSelected}
+      isCheckedProfileLive={isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)}
+      isCheckedProfileStopped={isCheckedProfileStopped && !isCheckedProfileCapture}
+      isImporting={isImporting}
+      importError={importError}
+      onImport={handleImport}
+      onLoadClick={handleLoadClick}
+      onConnectClick={handleConnectClick}
+      onJoinClick={handleJoinClick}
+      onStartClick={handleStartClick}
+      onClose={handleCaptureOkClick}
+      onSkip={onSkip}
+      multiSelectMode={isMultiBusMode}
+      multiSelectCount={checkedSourceIds.length}
+      onMultiConnectClick={handleMultiWatchClick}
+      onRelease={subscriberId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)) ? handleRelease : undefined}
+      // Only show Restart for profiles, not for selecting existing sessions
+      onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
+      isMultiSourceLive={isMultiSourceLive}
+      onMultiRestartClick={isMultiSourceLive ? handleMultiRestartClick : undefined}
+      onCaptureConnectClick={selectedCaptureId ? handleCaptureConnectClick : undefined}
+      onConnectOnlyClick={checkedSourceId && onConnect ? () => {
+        onConnect(checkedSourceId);
+        onClose();
+      } : undefined}
+    />
   );
 
   return (
     <>
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
-      <Card padding="none" className="shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
-          <h2 className={h3}>{t("ioSourcePicker.title")}</h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} onClose={onClose} title={t("ioSourcePicker.title")}>
+      <DialogBody padding="none">
         <LoadStatus
           isLoading={isLoading}
           loadFrameCount={loadFrameCount}
@@ -2089,7 +2070,7 @@ export default function IoSourcePickerDialog({
           onStopLoad={handleStopLoad}
         />
 
-      {creatingDevice ? (
+        {creatingDevice ? (
           <div className="max-h-[70vh] overflow-y-auto">
             <DeviceEditor
               takenNames={takenDeviceNames}
@@ -2100,7 +2081,9 @@ export default function IoSourcePickerDialog({
           </div>
         ) : (
           pickerBody
-        )}      </Card>
+        )}
+      </DialogBody>
+      {!creatingDevice && pickerFooter}
     </Dialog>
 
     {/* File order dialog (opens when multiple files selected) */}

@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText, X } from "lucide-react";
-import { borderDefault, paddingCard, caption, textMedium } from "../../styles";
+import { borderDefault, caption, textMedium } from "../../styles";
 import { sectionHeader } from "../../styles/typography";
 import { iconMd, iconXs } from "../../styles/spacing";
 import CatalogPickerDialog from "../catalog-picker";
@@ -30,7 +30,7 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
 
   return (
     <>
-      <div className={`${paddingCard} border-t ${borderDefault}`}>
+      <div className={`p-4 border-t ${borderDefault}`}>
         <div className={`${sectionHeader} mb-2`}>{t("ioSourcePicker.decoder.label")}</div>
 
         {catalogPath ? (

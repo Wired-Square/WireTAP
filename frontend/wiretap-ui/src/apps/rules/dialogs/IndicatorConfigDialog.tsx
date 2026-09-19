@@ -6,10 +6,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textPrimary, textTertiary } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { textTertiary } from "../../../styles";
 import ColourPicker from "../components/ColourPicker";
 import { cssToBrgb } from "../utils/brgbColour";
 import {
@@ -208,12 +207,13 @@ export default function IndicatorConfigDialog({
   // Note: activityColour is derived from led.colour, included in deps via led
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={closeWithValues} maxWidth="max-w-2xl">
-      <div className="p-6 max-h-[80vh] overflow-y-auto">
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          {t("indicatorConfigDialog.title", { label: led.label })}
-        </h2>
-
+    <Dialog
+      isOpen={isOpen}
+      onClose={closeWithValues}
+      size="xl"
+      title={t("indicatorConfigDialog.title", { label: led.label })}
+    >
+      <DialogBody>
         {error && (
           <Alert tone="danger" size="sm" className="mb-3">{error}</Alert>
         )}
@@ -404,9 +404,8 @@ export default function IndicatorConfigDialog({
             </div>
           </div>
         )}
-      </div>
-
-      <div className={`${panelFooter} flex justify-between`}>
+      </DialogBody>
+      <DialogFooter className="justify-between">
         <Button
           onClick={handleClear}
           variant="ghost"
@@ -426,7 +425,7 @@ export default function IndicatorConfigDialog({
             {submitting ? t("indicatorConfigDialog.configuring") : t("indicatorConfigDialog.apply")}
           </PrimaryButton>
         </div>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

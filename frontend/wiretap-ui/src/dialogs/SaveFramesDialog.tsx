@@ -4,18 +4,11 @@ import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { iconXs, flexRowGap2 } from '../styles/spacing';
-import Dialog from '../components/Dialog';
+import Dialog, { DialogBody, DialogFooter } from '../components/Dialog';
 import { Input, Select, FormField, SuccessButton } from '../components/forms';
 import { SecondaryButton } from '../components/forms/DialogButtons';
 import { listCatalogs } from '../api/catalog';
-import {
-  h3,
-  paddingDialog,
-  spaceYDefault,
-  gapSmall,
-  textSuccess,
-  textMuted,
-} from '../styles';
+import { h3, spaceYDefault, gapSmall, textSuccess, textMuted } from '../styles';
 
 export type FrameMetadata = {
   name: string;
@@ -75,8 +68,8 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
   const displayInterval = knowledgeInterval ?? meta.default_interval;
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-lg">
-      <div className={`${paddingDialog} ${spaceYDefault}`}>
+    <Dialog isOpen={open} size="lg">
+      <DialogBody className={spaceYDefault}>
         <div className={h3}>{t('saveFrames.title')}</div>
 
         <div className={`grid grid-cols-1 ${gapSmall}`}>
@@ -162,16 +155,15 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
             </div>
           </FormField>
         </div>
-
-        <div className={`flex justify-end ${gapSmall} pt-2`}>
-          <SecondaryButton onClick={onCancel}>{t('common:actions.cancel')}</SecondaryButton>
-          <SuccessButton
-            onClick={onSave}
-          >
-            {t('common:actions.save')}
-          </SuccessButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t('common:actions.cancel')}</SecondaryButton>
+        <SuccessButton
+          onClick={onSave}
+        >
+          {t('common:actions.save')}
+        </SuccessButton>
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -6,10 +6,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { textSecondary, textTertiary, borderDefault } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import ColourPicker from "../components/ColourPicker";
 import PalettePreview from "../components/PalettePreview";
@@ -115,12 +114,8 @@ export default function PaletteEditorDialog({
   }, [selectedPalette, deviceId, entries]);
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
-      <div className="p-6">
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          {t("paletteDialog.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="xl" title={t("paletteDialog.title")}>
+      <DialogBody>
         {loading && (
           <div className={`flex items-center justify-center py-8 ${textTertiary}`}>
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -234,9 +229,8 @@ export default function PaletteEditorDialog({
             )}
           </div>
         )}
-      </div>
-
-      <div className={`${panelFooter} flex justify-end gap-2`}>
+      </DialogBody>
+      <DialogFooter>
         <SecondaryButton
           onClick={onClose}
         >
@@ -248,7 +242,7 @@ export default function PaletteEditorDialog({
         >
           {uploading ? t("paletteDialog.uploading") : t("paletteDialog.upload")}
         </PrimaryButton>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

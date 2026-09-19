@@ -1,9 +1,9 @@
 // ui/src/dialogs/UnsavedChangesDialog.tsx
 
 import { useTranslation } from "react-i18next";
-import Dialog from '../components/Dialog';
+import Dialog, { DialogBody, DialogFooter } from '../components/Dialog';
 import { SecondaryButton, DangerButton } from '../components/forms';
-import { h2, bodyDefault, paddingDialog, gapDefault } from '../styles';
+import { bodyDefault } from '../styles';
 
 export type UnsavedChangesDialogProps = {
   isOpen: boolean;
@@ -19,15 +19,14 @@ export default function UnsavedChangesDialog({ isOpen, onCancel, onConfirmLeave 
   const { t } = useTranslation("dialogs");
 
   return (
-    <Dialog isOpen={isOpen}>
-      <div className={paddingDialog}>
-        <h2 className={`${h2} mb-4`}>{t("unsavedChanges.title")}</h2>
-        <p className={`${bodyDefault} mb-6`}>{t("unsavedChanges.message")}</p>
-        <div className={`flex justify-end ${gapDefault}`}>
-          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-          <DangerButton onClick={onConfirmLeave}>{t("unsavedChanges.leaveWithoutSaving")}</DangerButton>
-        </div>
-      </div>
+    <Dialog isOpen={isOpen} title={t("unsavedChanges.title")}>
+      <DialogBody>
+        <p className={bodyDefault}>{t("unsavedChanges.message")}</p>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+        <DangerButton onClick={onConfirmLeave}>{t("unsavedChanges.leaveWithoutSaving")}</DangerButton>
+      </DialogFooter>
     </Dialog>
   );
 }

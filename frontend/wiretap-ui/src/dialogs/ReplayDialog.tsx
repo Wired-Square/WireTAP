@@ -7,8 +7,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../components/Dialog";
-import { DialogFooter } from "../components/forms/DialogFooter";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
@@ -17,7 +16,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { getCaptureFramesPaginatedById } from "../api/capture";
 import type { ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
-import { Input, Select, Checkbox } from "../components/forms";
+import { Input, Select, Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
 import { Alert } from "../components/Alert";
 function formatDuration(us: number): string {
   const ms = us / 1000;
@@ -210,12 +209,8 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const noSession = transmitSessions.length === 0;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          {t("replay.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("replay.title")}>
+      <DialogBody className="space-y-4">
         {/* No transmit session warning */}
         {noSession ? (
           <Alert tone="warning">
@@ -368,20 +363,15 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
             </label>
           </>
         )}
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleConfirm}
-          confirmLabel={
-            isStarting
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleConfirm} disabled={!canConfirm}>{isStarting
               ? t("replay.starting")
               : expectedCount > 0
                 ? t("replay.replayFrames", { count: expectedCount.toLocaleString(i18n.language) })
-                : t("replay.replayFramesEmpty")
-          }
-          confirmDisabled={!canConfirm}
-        />
-      </div>
+                : t("replay.replayFramesEmpty")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

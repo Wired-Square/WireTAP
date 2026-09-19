@@ -4,8 +4,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Check, Search } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, textSecondary, hoverLight } from "../../../styles";
-import Dialog from "../../../components/Dialog";
+import { textSecondary, hoverLight } from "../../../styles";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
@@ -172,10 +172,10 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
 
   if (!panel && !instrumentsMode) {
     return (
-      <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
-        <div className={`${bgSurface} rounded-xl shadow-xl p-4`}>
+      <Dialog isOpen={isOpen} onClose={onClose}>
+        <DialogBody>
           <p className="text-sm text-[color:var(--text-muted)]">{t("signalPicker.panelNotFound")}</p>
-        </div>
+        </DialogBody>
       </Dialog>
     );
   }
@@ -186,20 +186,23 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
   const AddInstrumentsButton = instrumentsMode ? PrimaryButton : SecondaryButton;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        {/* Header */}
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {isReplaceMode ? t("signalPicker.titleReplace") : instrumentsMode ? t("signalPicker.titleInstruments") : t("signalPicker.titleSelect")}
-          </h2>
-          {isReplaceMode && replacingSignal && (
-            <p className={`text-xs ${textSecondary} mt-0.5`}>
-              {t("signalPicker.replacing", { name: replacingSignal.displayName || replacingSignal.signalName })}
-            </p>
-          )}
-        </div>
-
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        isReplaceMode
+          ? t("signalPicker.titleReplace")
+          : instrumentsMode
+            ? t("signalPicker.titleInstruments")
+            : t("signalPicker.titleSelect")
+      }
+      subtitle={
+        isReplaceMode &&
+        replacingSignal &&
+        t("signalPicker.replacing", { name: replacingSignal.displayName || replacingSignal.signalName })
+      }
+    >
+      <DialogBody padding="none">
         {/* Search */}
         <div className="px-4 py-2 border-b border-[var(--border-default)]">
           <div className="relative">
@@ -322,30 +325,30 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         </div>
 
         {/* Footer — OK / Cancel */}
-        <div className={`p-4 border-t border-[var(--border-default)] flex justify-end gap-2`}>
-          <SecondaryButton
-            onClick={onClose}
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton
+          onClick={onClose}
+        >
+          {t("signalPicker.cancel")}
+        </SecondaryButton>
+        {!isReplaceMode && (
+          <AddInstrumentsButton
+            onClick={handleAddInstruments}
+            disabled={newSelectionCount === 0}
+            title={t("signalPicker.addInstrumentsHint")}
           >
-            {t("signalPicker.cancel")}
-          </SecondaryButton>
-          {!isReplaceMode && (
-            <AddInstrumentsButton
-              onClick={handleAddInstruments}
-              disabled={newSelectionCount === 0}
-              title={t("signalPicker.addInstrumentsHint")}
-            >
-              {t("signalPicker.addInstruments")}
-            </AddInstrumentsButton>
-          )}
-          {!instrumentsMode && (
-            <PrimaryButton
-              onClick={handleOk}
-            >
-              {t("signalPicker.ok")}
-            </PrimaryButton>
-          )}
-        </div>
-      </div>
+            {t("signalPicker.addInstruments")}
+          </AddInstrumentsButton>
+        )}
+        {!instrumentsMode && (
+          <PrimaryButton
+            onClick={handleOk}
+          >
+            {t("signalPicker.ok")}
+          </PrimaryButton>
+        )}
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -3,8 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
-import { iconLg } from "../../../styles/spacing";
-import { bgSurface } from "../../../styles";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import {
   MetadataSection,
@@ -165,127 +164,108 @@ export default function UnifiedConfigDialog({
     setModbusExpanded(false);
   };
 
-  if (!open) return null;
-
   // Validation
   const isMetaValid = metaFields.name.trim() !== "" && metaFields.version >= 1;
   const isValid = isMetaValid;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`${bgSurface} rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto`}>
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-[var(--accent-bg)] rounded-lg">
-            <Settings className={`${iconLg} text-[color:var(--text-accent)]`} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-              Catalog Configuration
-            </h2>
-            <p className="text-sm text-[color:var(--text-muted)]">
-              Configure catalog metadata and protocol settings
-            </p>
-          </div>
-        </div>
+    <Dialog
+      isOpen={open}
+      size="xl"
+      title="Catalog Configuration"
+      subtitle="Configure catalog metadata and protocol settings"
+      icon={<Settings className="text-[color:var(--text-accent)]" />}
+    >
+      <DialogBody className="space-y-6">
+        {/* Metadata Section */}
+        <MetadataSection
+          name={metaFields.name}
+          setName={(name) => setMetaFields({ ...metaFields, name })}
+          version={metaFields.version}
+          setVersion={(version) => setMetaFields({ ...metaFields, version })}
+        />
 
-        <div className="space-y-6">
-          {/* Metadata Section */}
-          <MetadataSection
-            name={metaFields.name}
-            setName={(name) => setMetaFields({ ...metaFields, name })}
-            version={metaFields.version}
-            setVersion={(version) => setMetaFields({ ...metaFields, version })}
+        {/* Protocol Configurations */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
+            Protocol Configurations
+          </h3>
+
+          <CanConfigSection
+            isConfigured={canEnabled}
+            hasFrames={hasCanFrames}
+            isExpanded={canExpanded}
+            onToggleExpanded={() => setCanExpanded(!canExpanded)}
+            onAdd={handleAddCanConfig}
+            onRemove={handleRemoveCanConfig}
+            defaultEndianness={canDefaultEndianness}
+            setDefaultEndianness={setCanDefaultEndianness}
+            defaultInterval={canDefaultInterval}
+            setDefaultInterval={setCanDefaultInterval}
+            defaultExtended={canDefaultExtended}
+            setDefaultExtended={setCanDefaultExtended}
+            defaultFd={canDefaultFd}
+            setDefaultFd={setCanDefaultFd}
+            frameIdMask={canFrameIdMask}
+            setFrameIdMask={setCanFrameIdMask}
+            headerFields={canHeaderFields}
+            setHeaderFields={setCanHeaderFields}
           />
 
-          {/* Protocol Configurations */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
-              Protocol Configurations
-            </h3>
+          <SerialConfigSection
+            isConfigured={serialEnabled}
+            hasFrames={hasSerialFrames}
+            isExpanded={serialExpanded}
+            onToggleExpanded={() => setSerialExpanded(!serialExpanded)}
+            onAdd={handleAddSerialConfig}
+            onRemove={handleRemoveSerialConfig}
+            encoding={serialEncoding}
+            setEncoding={setSerialEncoding}
+            byteOrder={serialByteOrder}
+            setByteOrder={setSerialByteOrder}
+            headerFields={serialHeaderFields}
+            setHeaderFields={setSerialHeaderFields}
+            headerLength={serialHeaderLength}
+            setHeaderLength={setSerialHeaderLength}
+            maxFrameLength={serialMaxFrameLength}
+            setMaxFrameLength={setSerialMaxFrameLength}
+            checksum={serialChecksum}
+            setChecksum={setSerialChecksum}
+          />
 
-            <CanConfigSection
-              isConfigured={canEnabled}
-              hasFrames={hasCanFrames}
-              isExpanded={canExpanded}
-              onToggleExpanded={() => setCanExpanded(!canExpanded)}
-              onAdd={handleAddCanConfig}
-              onRemove={handleRemoveCanConfig}
-              defaultEndianness={canDefaultEndianness}
-              setDefaultEndianness={setCanDefaultEndianness}
-              defaultInterval={canDefaultInterval}
-              setDefaultInterval={setCanDefaultInterval}
-              defaultExtended={canDefaultExtended}
-              setDefaultExtended={setCanDefaultExtended}
-              defaultFd={canDefaultFd}
-              setDefaultFd={setCanDefaultFd}
-              frameIdMask={canFrameIdMask}
-              setFrameIdMask={setCanFrameIdMask}
-              headerFields={canHeaderFields}
-              setHeaderFields={setCanHeaderFields}
-            />
-
-            <SerialConfigSection
-              isConfigured={serialEnabled}
-              hasFrames={hasSerialFrames}
-              isExpanded={serialExpanded}
-              onToggleExpanded={() => setSerialExpanded(!serialExpanded)}
-              onAdd={handleAddSerialConfig}
-              onRemove={handleRemoveSerialConfig}
-              encoding={serialEncoding}
-              setEncoding={setSerialEncoding}
-              byteOrder={serialByteOrder}
-              setByteOrder={setSerialByteOrder}
-              headerFields={serialHeaderFields}
-              setHeaderFields={setSerialHeaderFields}
-              headerLength={serialHeaderLength}
-              setHeaderLength={setSerialHeaderLength}
-              maxFrameLength={serialMaxFrameLength}
-              setMaxFrameLength={setSerialMaxFrameLength}
-              checksum={serialChecksum}
-              setChecksum={setSerialChecksum}
-            />
-
-            <ModbusConfigSection
-              isConfigured={modbusEnabled}
-              hasFrames={hasModbusFrames}
-              isExpanded={modbusExpanded}
-              onToggleExpanded={() => setModbusExpanded(!modbusExpanded)}
-              onAdd={handleAddModbusConfig}
-              onRemove={handleRemoveModbusConfig}
-              registerBase={modbusRegisterBase}
-              setRegisterBase={setModbusRegisterBase}
-              defaultInterval={modbusDefaultInterval}
-              setDefaultInterval={setModbusDefaultInterval}
-              defaultByteOrder={modbusDefaultByteOrder}
-              setDefaultByteOrder={setModbusDefaultByteOrder}
-              defaultWordOrder={modbusDefaultWordOrder}
-              setDefaultWordOrder={setModbusDefaultWordOrder}
-            />
-          </div>
-
-          {/* Info box */}
-          <Alert tone="info" size="sm">
-            <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
-            Add a configuration for each protocol you plan to use in this catalog.
-          </Alert>
+          <ModbusConfigSection
+            isConfigured={modbusEnabled}
+            hasFrames={hasModbusFrames}
+            isExpanded={modbusExpanded}
+            onToggleExpanded={() => setModbusExpanded(!modbusExpanded)}
+            onAdd={handleAddModbusConfig}
+            onRemove={handleRemoveModbusConfig}
+            registerBase={modbusRegisterBase}
+            setRegisterBase={setModbusRegisterBase}
+            defaultInterval={modbusDefaultInterval}
+            setDefaultInterval={setModbusDefaultInterval}
+            defaultByteOrder={modbusDefaultByteOrder}
+            setDefaultByteOrder={setModbusDefaultByteOrder}
+            defaultWordOrder={modbusDefaultWordOrder}
+            setDefaultWordOrder={setModbusDefaultWordOrder}
+          />
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton
-            onClick={onCancel}
-          >
-            Cancel
-          </SecondaryButton>
-          <PrimaryButton
-            onClick={() => onSave({ can: canEnabled, serial: serialEnabled, modbus: modbusEnabled })}
-            disabled={!isValid}
-          >
-            Save Changes
-          </PrimaryButton>
-        </div>
-      </div>
-    </div>
+        {/* Info box */}
+        <Alert tone="info" size="sm">
+          <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
+          Add a configuration for each protocol you plan to use in this catalog.
+        </Alert>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <PrimaryButton
+          onClick={() => onSave({ can: canEnabled, serial: serialEnabled, modbus: modbusEnabled })}
+          disabled={!isValid}
+        >
+          Save Changes
+        </PrimaryButton>
+      </DialogFooter>
+    </Dialog>
   );
 }

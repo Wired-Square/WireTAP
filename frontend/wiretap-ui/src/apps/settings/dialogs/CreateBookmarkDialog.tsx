@@ -1,9 +1,8 @@
 // ui/src/apps/settings/dialogs/CreateBookmarkDialog.tsx
 
 import { useTranslation } from "react-i18next";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, FormField, SecondaryButton, PrimaryButton, Select } from "../../../components/forms";
-import { h2 } from "../../../styles";
 import type { IOProfile } from "../stores/settingsStore";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 
@@ -36,48 +35,43 @@ export default function CreateBookmarkDialog({
   const isValid = profileId && name.trim() && timeBounds.startTime;
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6">
-        <h2 className={`${h2} mb-6`}>{t("dialogs.createBookmark.title")}</h2>
+    <Dialog isOpen={isOpen} title={t("dialogs.createBookmark.title")}>
+      <DialogBody className="space-y-4">
+        <FormField label={t("dialogs.createBookmark.profile")} variant="default">
+          <Select
+            value={profileId}
+            onChange={(e) => onChangeProfileId(e.target.value)}
+            size="lg"
+          >
+            {availableProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
-        <div className="space-y-4">
-          <FormField label={t("dialogs.createBookmark.profile")} variant="default">
-            <Select
-              value={profileId}
-              onChange={(e) => onChangeProfileId(e.target.value)}
-              size="lg"
-            >
-              {availableProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          <FormField label={t("dialogs.createBookmark.name")} variant="default">
-            <Input
-              size="lg"
-              value={name}
-              onChange={(e) => onChangeName(e.target.value)}
-              placeholder={t("dialogs.createBookmark.namePlaceholder")}
-            />
-          </FormField>
-
-          <TimeBoundsInput
-            value={timeBounds}
-            onChange={onChangeTimeBounds}
-            showBookmarks={false}
+        <FormField label={t("dialogs.createBookmark.name")} variant="default">
+          <Input
+            size="lg"
+            value={name}
+            onChange={(e) => onChangeName(e.target.value)}
+            placeholder={t("dialogs.createBookmark.namePlaceholder")}
           />
-        </div>
+        </FormField>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-          <PrimaryButton onClick={onCreate} disabled={!isValid}>
-            {t("common:actions.create")}
-          </PrimaryButton>
-        </div>
-      </div>
+        <TimeBoundsInput
+          value={timeBounds}
+          onChange={onChangeTimeBounds}
+          showBookmarks={false}
+        />
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={onCreate} disabled={!isValid}>
+          {t("common:actions.create")}
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

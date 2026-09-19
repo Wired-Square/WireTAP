@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X, GripVertical, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
-import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider } from "../../../styles";
-import Dialog from "../../../components/Dialog";
+import { GripVertical, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
+import { iconSm } from "../../../styles/spacing";
+import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore, getSignalLabel, getConfidenceColour } from "../../../stores/dashboardStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
@@ -129,339 +128,323 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        {/* Header */}
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {t("panelConfig.title")}
-          </h2>
-          <IconButton
-            onClick={onClose}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("panelConfig.title")}>
+      <DialogBody className="space-y-4">
+        {/* Title */}
+        <div>
+          <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+            {t("panelConfig.fields.title")}
+          </label>
+          <Input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            size="lg"
+            placeholder={t("panelConfig.fields.titlePlaceholder")}
+          />
         </div>
 
-        {/* Form */}
-        <div className="p-4 space-y-4">
-          {/* Title */}
+        {/* Value range (gauge, rotary, level bar) */}
+        {(panel.type === "gauge" || panel.type === "rotary" || panel.type === "level-bar") && (
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("panelConfig.fields.minValue")}
+              </label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={minValue}
+                onChange={(e) => setMinValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                size="lg"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("panelConfig.fields.maxValue")}
+              </label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={maxValue}
+                onChange={(e) => setMaxValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                size="lg"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Primary signal selector (gauge with multiple signals) */}
+        {panel.type === "gauge" && panel.signals.length > 1 && (
           <div>
             <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-              {t("panelConfig.fields.title")}
+              {t("panelConfig.fields.primaryDisplay")}
             </label>
-            <Input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={handleKeyDown}
+            <Select
+              value={primarySignalIndex}
+              onChange={(e) => setPrimarySignalIndex(e.target.value)}
               size="lg"
-              placeholder={t("panelConfig.fields.titlePlaceholder")}
-            />
+            >
+              {panel.signals.map((sig, i) => (
+                <option key={`${sig.frameId}:${sig.signalName}`} value={String(i)}>
+                  {getSignalLabel(sig)}
+                </option>
+              ))}
+            </Select>
           </div>
+        )}
 
-          {/* Value range (gauge, rotary, level bar) */}
-          {(panel.type === "gauge" || panel.type === "rotary" || panel.type === "level-bar") && (
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("panelConfig.fields.minValue")}
-                </label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={minValue}
-                  onChange={(e) => setMinValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  size="lg"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("panelConfig.fields.maxValue")}
-                </label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={maxValue}
-                  onChange={(e) => setMaxValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  size="lg"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Primary signal selector (gauge with multiple signals) */}
-          {panel.type === "gauge" && panel.signals.length > 1 && (
+        {/* Frame ID picker (flow + heatmap + bitfield panels) */}
+        {(panel.type === "flow" || panel.type === "heatmap" || panel.type === "bitfield") && (
+          <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                {t("panelConfig.fields.primaryDisplay")}
+                {t("panelConfig.fields.frameId")}
               </label>
               <Select
-                value={primarySignalIndex}
-                onChange={(e) => setPrimarySignalIndex(e.target.value)}
+                value={targetFrameId}
+                onChange={(e) => setTargetFrameId(e.target.value)}
                 size="lg"
               >
-                {panel.signals.map((sig, i) => (
-                  <option key={`${sig.frameId}:${sig.signalName}`} value={String(i)}>
-                    {getSignalLabel(sig)}
+                <option value="">{t("panelConfig.fields.selectFrameId")}</option>
+                {sortedFrameIds.map((id) => (
+                  <option key={id} value={String(id)}>
+                    {formatFrameId(id)}
                   </option>
                 ))}
               </Select>
+              {sortedFrameIds.length === 0 && (
+                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                  {t("panelConfig.fields.noFrames")}
+                </p>
+              )}
             </div>
-          )}
-
-          {/* Frame ID picker (flow + heatmap + bitfield panels) */}
-          {(panel.type === "flow" || panel.type === "heatmap" || panel.type === "bitfield") && (
-            <div className="space-y-3">
+            {(panel.type === "flow" || panel.type === "bitfield") && (
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("panelConfig.fields.frameId")}
+                  {t("panelConfig.fields.byteCount")}
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={byteCount}
+                  onChange={(e) => setByteCount(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  size="lg"
+                  className="w-24"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Histogram bin count */}
+        {panel.type === "histogram" && (
+          <div>
+            <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              {t("panelConfig.fields.binCount")}
+            </label>
+            <Input
+              type="number"
+              min={5}
+              max={200}
+              value={histogramBins}
+              onChange={(e) => setHistogramBins(e.target.value)}
+              onKeyDown={handleKeyDown}
+              size="lg"
+              className="w-24"
+            />
+          </div>
+        )}
+
+        {/* Custom widget code (raw-canvas + scripted custom-svg) */}
+        {(panel.type === "raw-canvas" || panel.type === "custom-svg") && (
+          <div className="space-y-2">
+            {panel.type === "custom-svg" && (
+              <div>
+                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                  {t("panelConfig.fields.svgMode")}
                 </label>
                 <Select
-                  value={targetFrameId}
-                  onChange={(e) => setTargetFrameId(e.target.value)}
+                  value={svgMode}
+                  onChange={(e) => setSvgMode(e.target.value as "scene" | "script")}
                   size="lg"
                 >
-                  <option value="">{t("panelConfig.fields.selectFrameId")}</option>
-                  {sortedFrameIds.map((id) => (
-                    <option key={id} value={String(id)}>
-                      {formatFrameId(id)}
-                    </option>
-                  ))}
+                  <option value="scene">{t("panelConfig.fields.svgModeScene")}</option>
+                  <option value="script">{t("panelConfig.fields.svgModeScript")}</option>
                 </Select>
-                {sortedFrameIds.length === 0 && (
-                  <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    {t("panelConfig.fields.noFrames")}
-                  </p>
-                )}
               </div>
-              {(panel.type === "flow" || panel.type === "bitfield") && (
-                <div>
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    {t("panelConfig.fields.byteCount")}
-                  </label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={byteCount}
-                    onChange={(e) => setByteCount(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    size="lg"
-                    className="w-24"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Histogram bin count */}
-          {panel.type === "histogram" && (
-            <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                {t("panelConfig.fields.binCount")}
-              </label>
-              <Input
-                type="number"
-                min={5}
-                max={200}
-                value={histogramBins}
-                onChange={(e) => setHistogramBins(e.target.value)}
-                onKeyDown={handleKeyDown}
-                size="lg"
-                className="w-24"
-              />
-            </div>
-          )}
-
-          {/* Custom widget code (raw-canvas + scripted custom-svg) */}
-          {(panel.type === "raw-canvas" || panel.type === "custom-svg") && (
-            <div className="space-y-2">
-              {panel.type === "custom-svg" && (
-                <div>
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    {t("panelConfig.fields.svgMode")}
-                  </label>
-                  <Select
-                    value={svgMode}
-                    onChange={(e) => setSvgMode(e.target.value as "scene" | "script")}
-                    size="lg"
-                  >
-                    <option value="scene">{t("panelConfig.fields.svgModeScene")}</option>
-                    <option value="script">{t("panelConfig.fields.svgModeScript")}</option>
-                  </Select>
-                </div>
-              )}
-              {(panel.type === "raw-canvas" || svgMode === "script") && (
-                <div>
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    {panel.type === "raw-canvas"
-                      ? t("panelConfig.fields.canvasCode")
-                      : t("panelConfig.fields.svgCode")}
-                  </label>
-                  <Textarea
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    rows={8}
-                    spellCheck={false}
-                    mono
-                    placeholder={panel.type === "raw-canvas"
-                      ? "(ctx, { signals, width, height, time, dt }) => {\n  ctx.fillStyle = '#3b82f6';\n  ctx.fillRect(0, 0, signals[0] ?? 0, height);\n}"
-                      : "(signals, { width, height, time, dt }) =>\n  `<circle cx=50 cy=50 r=${signals[0] ?? 0} fill=\"#3b82f6\" />`"}
-                  />
-                  <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    {t("panelConfig.fields.customCodeHint")}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Signals — drag reorder, colour, display name, replace */}
-          {panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && panel.signals.length > 0 && (
-            <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">
-                {t("panelConfig.fields.signals")}
-              </label>
-              <div className="space-y-1">
-                {panel.signals.map((signal, index) => (
-                  <div
-                    key={`${signal.frameId}:${signal.signalName}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                      setDragOverIndex(index);
-                    }}
-                    onDragLeave={() => setDragOverIndex(null)}
-                    onDrop={(e) => handleDrop(e, index)}
-                    className={`flex items-center gap-2 rounded px-1 py-1 transition-colors ${
-                      dragOverIndex === index ? "bg-[var(--hover-bg)]" : ""
-                    } ${dragIndex === index ? "opacity-50" : ""}`}
-                  >
-                    {/* Drag handle */}
-                    <div
-                      draggable
-                      onDragStart={(e) => {
-                        setDragIndex(index);
-                        e.dataTransfer.effectAllowed = "move";
-                        // Use the parent row as drag image
-                        const row = e.currentTarget.parentElement;
-                        if (row) e.dataTransfer.setDragImage(row, 0, 0);
-                      }}
-                      onDragEnd={() => {
-                        setDragIndex(null);
-                        setDragOverIndex(null);
-                      }}
-                      className="cursor-grab active:cursor-grabbing shrink-0"
-                      title={t("panelConfig.actions.dragReorder")}
-                    >
-                      <GripVertical className={`${iconSm} text-[color:var(--text-muted)]`} />
-                    </div>
-
-                    {panel.type !== "list" && (
-                      <input
-                        type="color"
-                        value={signal.colour}
-                        onChange={(e) =>
-                          updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
-                        }
-                        className="h-7 w-10 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded shrink-0"
-                      />
-                    )}
-                    {/* Y-axis toggle (line-chart with 2+ signals) */}
-                    {panel.type === "line-chart" && panel.signals.length >= 2 && (
-                      <div className="flex shrink-0 rounded border border-[color:var(--border-default)] overflow-hidden">
-                        <button
-                          onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'left')}
-                          className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                            (signal.yAxis ?? 'left') === 'left'
-                              ? 'bg-blue-600 text-white'
-                              : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
-                          }`}
-                          title={t("panelConfig.actions.leftAxis")}
-                        >
-                          L
-                        </button>
-                        <button
-                          onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'right')}
-                          className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                            signal.yAxis === 'right'
-                              ? 'bg-blue-600 text-white'
-                              : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
-                          }`}
-                          title={t("panelConfig.actions.rightAxis")}
-                        >
-                          R
-                        </button>
-                      </div>
-                    )}
-                    <Input
-                      type="text"
-                      value={signal.displayName ?? ""}
-                      onChange={(e) =>
-                        updateSignalDisplayName(panel.id, signal.frameId, signal.signalName, e.target.value)
-                      }
-                      placeholder={signal.signalName}
-                      size="lg"
-                      className="flex-1"
-                    />
-                    {/* Confidence indicator */}
-                    {signal.confidence && (
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: getConfidenceColour(signal.confidence, settings) }}
-                        title={t("panelConfig.actions.confidence", { level: signal.confidence })}
-                      />
-                    )}
-                    {/* Replace signal source */}
-                    {onReplaceSignal && (
-                      <IconButton
-                        onClick={() => onReplaceSignal(panel.id, index)}
-                        size="sm"
-                        title={t("panelConfig.actions.changeSource")}
-                      >
-                        <ArrowLeftRight className={iconSm} />
-                      </IconButton>
-                    )}
-                    {/* Remove signal */}
-                    <IconButton
-                      onClick={() => removeSignalFromPanel(panel.id, signal.frameId, signal.signalName)}
-                      tone="danger"
-                      size="sm"
-                      title={t("panelConfig.actions.removeSignal")}
-                    >
-                      <Trash2 className={iconSm} />
-                    </IconButton>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            {onAddSignals && panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && (
-              <Button
-                onClick={() => onAddSignals(panel.id)}
-                variant="outline"
-                title={t("panelConfig.actions.addSignals")}
-              >
-                <Plus className={iconSm} />
-                {t("panelConfig.actions.addSignalsLabel")}
-              </Button>
             )}
-            <PrimaryButton
-              onClick={handleSave}
-              className="flex-1"
-            >
-              {t("panelConfig.actions.save")}
-            </PrimaryButton>
+            {(panel.type === "raw-canvas" || svgMode === "script") && (
+              <div>
+                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                  {panel.type === "raw-canvas"
+                    ? t("panelConfig.fields.canvasCode")
+                    : t("panelConfig.fields.svgCode")}
+                </label>
+                <Textarea
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  rows={8}
+                  spellCheck={false}
+                  mono
+                  placeholder={panel.type === "raw-canvas"
+                    ? "(ctx, { signals, width, height, time, dt }) => {\n  ctx.fillStyle = '#3b82f6';\n  ctx.fillRect(0, 0, signals[0] ?? 0, height);\n}"
+                    : "(signals, { width, height, time, dt }) =>\n  `<circle cx=50 cy=50 r=${signals[0] ?? 0} fill=\"#3b82f6\" />`"}
+                />
+                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                  {t("panelConfig.fields.customCodeHint")}
+                </p>
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Signals — drag reorder, colour, display name, replace */}
+        {panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && panel.signals.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">
+              {t("panelConfig.fields.signals")}
+            </label>
+            <div className="space-y-1">
+              {panel.signals.map((signal, index) => (
+                <div
+                  key={`${signal.frameId}:${signal.signalName}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverIndex(index);
+                  }}
+                  onDragLeave={() => setDragOverIndex(null)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className={`flex items-center gap-2 rounded px-1 py-1 transition-colors ${
+                    dragOverIndex === index ? "bg-[var(--hover-bg)]" : ""
+                  } ${dragIndex === index ? "opacity-50" : ""}`}
+                >
+                  {/* Drag handle */}
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      setDragIndex(index);
+                      e.dataTransfer.effectAllowed = "move";
+                      // Use the parent row as drag image
+                      const row = e.currentTarget.parentElement;
+                      if (row) e.dataTransfer.setDragImage(row, 0, 0);
+                    }}
+                    onDragEnd={() => {
+                      setDragIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    className="cursor-grab active:cursor-grabbing shrink-0"
+                    title={t("panelConfig.actions.dragReorder")}
+                  >
+                    <GripVertical className={`${iconSm} text-[color:var(--text-muted)]`} />
+                  </div>
+
+                  {panel.type !== "list" && (
+                    <input
+                      type="color"
+                      value={signal.colour}
+                      onChange={(e) =>
+                        updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
+                      }
+                      className="h-7 w-10 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded shrink-0"
+                    />
+                  )}
+                  {/* Y-axis toggle (line-chart with 2+ signals) */}
+                  {panel.type === "line-chart" && panel.signals.length >= 2 && (
+                    <div className="flex shrink-0 rounded border border-[color:var(--border-default)] overflow-hidden">
+                      <button
+                        onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'left')}
+                        className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                          (signal.yAxis ?? 'left') === 'left'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
+                        }`}
+                        title={t("panelConfig.actions.leftAxis")}
+                      >
+                        L
+                      </button>
+                      <button
+                        onClick={() => updateSignalYAxis(panel.id, signal.frameId, signal.signalName, 'right')}
+                        className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                          signal.yAxis === 'right'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
+                        }`}
+                        title={t("panelConfig.actions.rightAxis")}
+                      >
+                        R
+                      </button>
+                    </div>
+                  )}
+                  <Input
+                    type="text"
+                    value={signal.displayName ?? ""}
+                    onChange={(e) =>
+                      updateSignalDisplayName(panel.id, signal.frameId, signal.signalName, e.target.value)
+                    }
+                    placeholder={signal.signalName}
+                    size="lg"
+                    className="flex-1"
+                  />
+                  {/* Confidence indicator */}
+                  {signal.confidence && (
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: getConfidenceColour(signal.confidence, settings) }}
+                      title={t("panelConfig.actions.confidence", { level: signal.confidence })}
+                    />
+                  )}
+                  {/* Replace signal source */}
+                  {onReplaceSignal && (
+                    <IconButton
+                      onClick={() => onReplaceSignal(panel.id, index)}
+                      size="sm"
+                      title={t("panelConfig.actions.changeSource")}
+                    >
+                      <ArrowLeftRight className={iconSm} />
+                    </IconButton>
+                  )}
+                  {/* Remove signal */}
+                  <IconButton
+                    onClick={() => removeSignalFromPanel(panel.id, signal.frameId, signal.signalName)}
+                    tone="danger"
+                    size="sm"
+                    title={t("panelConfig.actions.removeSignal")}
+                  >
+                    <Trash2 className={iconSm} />
+                  </IconButton>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          {onAddSignals && panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && (
+            <Button
+              onClick={() => onAddSignals(panel.id)}
+              variant="outline"
+              title={t("panelConfig.actions.addSignals")}
+            >
+              <Plus className={iconSm} />
+              {t("panelConfig.actions.addSignalsLabel")}
+            </Button>
+          )}
+          <PrimaryButton
+            onClick={handleSave}
+            className="flex-1"
+          >
+            {t("panelConfig.actions.save")}
+          </PrimaryButton>
         </div>
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }

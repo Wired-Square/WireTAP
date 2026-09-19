@@ -5,13 +5,10 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { iconLg } from '../../../../styles/spacing';
-import Dialog from '../../../../components/Dialog';
+import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
+import { SecondaryButton, PrimaryButton } from '../../../../components/forms';
 import FramingOptionsPanel, { type FramingPanelConfig, type FramingMode } from '../../../../components/FramingOptionsPanel';
-import { DialogFooter } from '../../../../components/forms/DialogFooter';
 import type { FramingConfig } from '../../../../stores/discoveryStore';
-import { IconButton } from '../../../../components/Button';
 
 interface FramingModeDialogProps {
   isOpen: boolean;
@@ -87,27 +84,18 @@ export default function FramingModeDialog({ isOpen, onClose, config, onApply }: 
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("serial.framingModeTitle")}</h2>
-          <IconButton onClick={onClose} size="sm">
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} onClose={onClose} title={t("serial.framingModeTitle")}>
+      <DialogBody className="space-y-4">
         <FramingOptionsPanel
           config={panelConfig}
           onChange={setPanelConfig}
           variant="card"
         />
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleApply}
-          confirmLabel={t("serial.apply")}
-        />
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleApply}>{t("serial.apply")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

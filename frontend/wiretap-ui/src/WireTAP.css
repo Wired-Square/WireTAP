@@ -34,6 +34,12 @@ textarea:focus-visible,
   outline-offset: -1px;
 }
 
+/* A dialog takes focus on open so Escape and Tab land inside it; the frame
+   itself is not a control and draws no ring. */
+.dialog:focus-visible {
+  outline: none;
+}
+
 /* Prevent the entire webview from scrolling/bouncing on macOS */
 html, body {
   overflow: hidden;
@@ -175,6 +181,7 @@ html, body {
 
   --radius-control: 6px;
   --radius-panel: 8px;
+  --radius-dialog: 12px;
 
   /* Theme CSS variables - defaults for light mode */
   /* These are overridden by useTheme hook based on settings */

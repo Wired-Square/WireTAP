@@ -8,7 +8,6 @@ export { Checkbox, Radio } from './Checkbox';
 export { default as FormField } from './FormField';
 export { default as CheckboxField } from './CheckboxField';
 export { PrimaryButton, SecondaryButton, DangerButton, SuccessButton } from './DialogButtons';
-export { DialogFooter } from './DialogFooter';
 
 export type { InputProps, InputSize, InputTone, InputStyleProps } from './Input';
 export type { SelectProps } from './Select';

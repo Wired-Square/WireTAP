@@ -5,7 +5,7 @@ import { Download, FileText, Database, FileCode, BookOpen } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, sectionHeaderText } from "../../../styles/typography";
 import { cardClass } from "../../../components/Card";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { pickFileToSave, CATALOG_FILTERS, DBC_FILTERS, HTML_FILTERS, MARKDOWN_FILTERS, TEXT_FILTERS, type DialogFilter } from "../../../api/dialogs";
 import { exportDbcWs, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
 import { tomlParse } from "../toml";
@@ -163,136 +163,129 @@ export default function ExportCatalogDialog({
   const FormatIcon = formatInfo.icon;
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-md" onBackdropClick={onCancel}>
-      <div className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-[var(--bg-orange)] rounded-lg">
-            <Download className={`${iconLg} text-[color:var(--text-orange)]`} />
-          </div>
-          <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
-            Export Catalog
-          </h2>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className={`block ${sectionHeaderText} mb-2`}>
-              Export Format
-            </label>
-            <Select
-              value={format}
-              onChange={(e) => {
-                setFormat(e.target.value as CatalogExportFormat);
-                setError(null);
-              }}
-              size="lg"
-            >
-              <optgroup label="Data Formats">
-                {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "data").map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Documentation Reports">
-                {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "report").map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </optgroup>
-            </Select>
-          </div>
-
-          <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-            <div className="flex items-start gap-3">
-              <FormatIcon className={`${iconLg} text-[color:var(--text-muted)] mt-0.5`} />
-              <div>
-                <div className="font-medium text-[color:var(--text-primary)]">
-                  {formatInfo.name}
-                </div>
-                <div className="text-sm text-[color:var(--text-muted)] mt-1">
-                  {formatInfo.description}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {format === "dbc" && (
-            <div>
-              <label className={`block ${sectionHeaderText} mb-2`}>
-                Multiplexing Mode
-              </label>
-              <div className="space-y-2">
-                <label className={optionCard}>
-                  <Radio
-                    name="dbcMuxMode"
-                    value="extended"
-                    checked={dbcMuxMode === "extended"}
-                    onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <div className="font-medium text-[color:var(--text-primary)] text-sm">
-                      Extended (SG_MUL_VAL_)
-                    </div>
-                    <div className={`${caption} mt-0.5`}>
-                      Uses SG_MUL_VAL_ section with mNM notation for nested multiplexors. Best for modern tools.
-                    </div>
-                  </div>
-                </label>
-                <label className={optionCard}>
-                  <Radio
-                    name="dbcMuxMode"
-                    value="flattened"
-                    checked={dbcMuxMode === "flattened"}
-                    onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <div className="font-medium text-[color:var(--text-primary)] text-sm">
-                      Flattened (Legacy)
-                    </div>
-                    <div className={`${caption} mt-0.5`}>
-                      Flattens nested mux into composite values. Compatible with older tools.
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 bg-[var(--bg-red)] border border-[color:var(--border-red)] rounded-lg text-sm text-[color:var(--text-red)]">
-              {error}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton
-            onClick={onCancel}
-            disabled={isExporting}
-          >
-            Cancel
-          </SecondaryButton>
-          <Button
-            onClick={handleExport}
-            disabled={isExporting}
-            variant="solid"
-            tone="warning"
+    <Dialog
+      isOpen={open}
+      onClose={onCancel}
+      title="Export Catalog"
+      icon={<Download className="text-[color:var(--text-orange)]" />}
+    >
+      <DialogBody className="space-y-4">
+        <div>
+          <label className={`block ${sectionHeaderText} mb-2`}>
+            Export Format
+          </label>
+          <Select
+            value={format}
+            onChange={(e) => {
+              setFormat(e.target.value as CatalogExportFormat);
+              setError(null);
+            }}
             size="lg"
           >
-            {isExporting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Download className={iconMd} />
-                Save As...
-              </>
-            )}
-          </Button>
+            <optgroup label="Data Formats">
+              {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "data").map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Documentation Reports">
+              {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "report").map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </optgroup>
+          </Select>
         </div>
-      </div>
+
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+          <div className="flex items-start gap-3">
+            <FormatIcon className={`${iconLg} text-[color:var(--text-muted)] mt-0.5`} />
+            <div>
+              <div className="font-medium text-[color:var(--text-primary)]">
+                {formatInfo.name}
+              </div>
+              <div className="text-sm text-[color:var(--text-muted)] mt-1">
+                {formatInfo.description}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {format === "dbc" && (
+          <div>
+            <label className={`block ${sectionHeaderText} mb-2`}>
+              Multiplexing Mode
+            </label>
+            <div className="space-y-2">
+              <label className={optionCard}>
+                <Radio
+                  name="dbcMuxMode"
+                  value="extended"
+                  checked={dbcMuxMode === "extended"}
+                  onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <div className="font-medium text-[color:var(--text-primary)] text-sm">
+                    Extended (SG_MUL_VAL_)
+                  </div>
+                  <div className={`${caption} mt-0.5`}>
+                    Uses SG_MUL_VAL_ section with mNM notation for nested multiplexors. Best for modern tools.
+                  </div>
+                </div>
+              </label>
+              <label className={optionCard}>
+                <Radio
+                  name="dbcMuxMode"
+                  value="flattened"
+                  checked={dbcMuxMode === "flattened"}
+                  onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <div className="font-medium text-[color:var(--text-primary)] text-sm">
+                    Flattened (Legacy)
+                  </div>
+                  <div className={`${caption} mt-0.5`}>
+                    Flattens nested mux into composite values. Compatible with older tools.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-[var(--bg-red)] border border-[color:var(--border-red)] rounded-lg text-sm text-[color:var(--text-red)]">
+            {error}
+          </div>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton
+          onClick={onCancel}
+          disabled={isExporting}
+        >
+          Cancel
+        </SecondaryButton>
+        <Button
+          onClick={handleExport}
+          disabled={isExporting}
+          variant="solid"
+          tone="warning"
+          size="lg"
+        >
+          {isExporting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Download className={iconMd} />
+              Save As...
+            </>
+          )}
+        </Button>
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -13,22 +13,13 @@ import {
   AlertTriangle,
   Trash2,
 } from "lucide-react";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import ContextMenu, { type ContextMenuItem } from "../components/ContextMenu";
-import { DialogFooter } from "../components/forms/DialogFooter";
 import { previewCsv } from "../api/capture";
-import {
-  h3,
-  caption,
-  textMuted,
-  textSecondary,
-  bgSurface,
-  borderDefault,
-} from "../styles";
+import { textMuted, textSecondary, bgSurface, borderDefault } from "../styles";
 import { iconSm, iconMd } from "../styles/spacing";
 import { IconButton } from "../components/Button";
-import { Checkbox } from "../components/forms";
-import { Card } from "../components/Card";
+import { Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
 
 export type CsvFileOrderDialogProps = {
   isOpen: boolean;
@@ -284,16 +275,14 @@ export default function CsvFileOrderDialog({
 
   return (
     <>
-    <Dialog isOpen={isOpen} onBackdropClick={onCancel} maxWidth="max-w-4xl">
-      <Card padding="lg" className="space-y-4">
-        <div>
-          <h3 className={h3}>Confirm File Order</h3>
-          <p className={caption}>
-            {entries.length} files selected. Files will be imported sequentially
-            into a single buffer.
-          </p>
-        </div>
-
+    <Dialog
+      isOpen={isOpen}
+      onClose={onCancel}
+      size="2xl"
+      title="Confirm File Order"
+      subtitle={`${entries.length} files selected. Files will be imported sequentially into a single buffer.`}
+    >
+      <DialogBody className="space-y-4">
         {/* File list */}
         <div
           className={`border ${borderDefault} rounded overflow-y-auto`}
@@ -457,19 +446,21 @@ export default function CsvFileOrderDialog({
             <span>Detecting headers...</span>
           </div>
         )}
-
-        <DialogFooter
-          onCancel={onCancel}
-          onConfirm={() =>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <PrimaryButton
+          onClick={() =>
             onConfirm(
               entries.map((e) => e.path),
               entries.map((e) => e.hasHeader)
             )
           }
-          confirmLabel="Next: Map Columns"
-          confirmDisabled={detecting || entries.length === 0}
-        />
-      </Card>
+          disabled={detecting || entries.length === 0}
+        >
+          Next: Map Columns
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
 
       {/* Context menu */}

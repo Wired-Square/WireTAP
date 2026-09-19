@@ -13,9 +13,9 @@
 
 import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Search, X } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import * as ShareIcon from "../../components/catalogIcons";
-import Dialog from "../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import { CatalogSyncIcon } from "../../components/catalogSyncPresentation";
 import Input from "../../components/forms/Input";
 import { openCatalog, importCatalog, importDbcWs } from "../../api/catalog";
@@ -23,10 +23,8 @@ import { pickFileToOpen } from "../../api/dialogs";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { buildCatalogPath, catalogBaseName } from "../../utils/catalogUtils";
-import { iconMd, iconLg, iconSm } from "../../styles/spacing";
-import { caption, textMedium, h3, borderDivider, emptyStateText } from "../../styles";
-import { panelFooter } from "../../styles/cardStyles";
-import { IconButton } from "../../components/Button";
+import { iconMd, iconSm } from "../../styles/spacing";
+import { caption, textMedium, emptyStateText } from "../../styles";
 import { PrimaryButton, SecondaryButton } from "../../components/forms";
 import { Alert } from "../../components/Alert";
 
@@ -103,82 +101,73 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
   return (
     <>
       {/* Hidden, not unmounted, while the repositories dialog it hosts is open. */}
-      <Dialog isOpen={!repositoryOpen} onBackdropClick={onClose} maxWidth="max-w-md">
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className={h3}>{title ?? t("catalogPicker.title")}</h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
-        {showSearch && (
-          <div className="px-4 pt-3">
-            <div className="relative">
-              <Search
-                className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`}
-              />
-              <Input
-                size="lg"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("catalogPicker.search")}
-                className="pl-8"
-                autoFocus
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="max-h-[50vh] overflow-y-auto">
-          {shown.length === 0 ? (
-            <div className={`p-4 ${emptyStateText}`}>
-              {needle ? t("catalogPicker.noMatches") : t("catalogPicker.empty")}
-            </div>
-          ) : (
-            // Rows read like the Data Source dialog's: tinted and bordered when
-            // selected, not a bare background swap.
-            <div className="px-3 py-2 space-y-1">
-              {shown.map((catalog) => {
-                const isSelected = catalog.path === selectedPath;
-                return (
-                  <button
-                    key={catalog.path}
-                    onClick={() => pick(catalog.path)}
-                    className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                      isSelected
-                        ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-                        : "hover:bg-[var(--hover-bg)] border border-transparent"
-                    }`}
-                  >
-                    {/* Leading, not trailing: the trailing slot holds the tick, which
-                        renders only when selected, so a status icon beside it would
-                        shift on every click. A left column also scans vertically past
-                        variable-length names. */}
-                    <CatalogSyncIcon
-                      status={catalog.syncStatus}
-                      repoCount={catalog.trackedRepoCount}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className={`${textMedium} truncate`}>{catalog.name}</span>
-                      <div className={`${caption} truncate`}>{catalog.filename}</div>
-                    </div>
-                    {isSelected && (
-                      <Check className={`${iconMd} text-[color:var(--text-success)] flex-shrink-0`} />
-                    )}
-                  </button>
-                );
-              })}
+      <Dialog isOpen={!repositoryOpen} onClose={onClose} title={title ?? t("catalogPicker.title")}>
+        <DialogBody padding="none">
+          {showSearch && (
+            <div className="px-4 pt-3">
+              <div className="relative">
+                <Search
+                  className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`}
+                />
+                <Input
+                  size="lg"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("catalogPicker.search")}
+                  className="pl-8"
+                  autoFocus
+                />
+              </div>
             </div>
           )}
-        </div>
 
-        {error && <Alert tone="danger" size="sm" className="mx-3 mb-2">{error}</Alert>}
+          <div className="max-h-[50vh] overflow-y-auto">
+            {shown.length === 0 ? (
+              <div className={`p-4 ${emptyStateText}`}>
+                {needle ? t("catalogPicker.noMatches") : t("catalogPicker.empty")}
+              </div>
+            ) : (
+              // Rows read like the Data Source dialog's: tinted and bordered when
+              // selected, not a bare background swap.
+              <div className="px-3 py-2 space-y-1">
+                {shown.map((catalog) => {
+                  const isSelected = catalog.path === selectedPath;
+                  return (
+                    <button
+                      key={catalog.path}
+                      onClick={() => pick(catalog.path)}
+                      className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
+                        isSelected
+                          ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+                          : "hover:bg-[var(--hover-bg)] border border-transparent"
+                      }`}
+                    >
+                      {/* Leading, not trailing: the trailing slot holds the tick, which
+                          renders only when selected, so a status icon beside it would
+                          shift on every click. A left column also scans vertically past
+                          variable-length names. */}
+                      <CatalogSyncIcon
+                        status={catalog.syncStatus}
+                        repoCount={catalog.trackedRepoCount}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className={`${textMedium} truncate`}>{catalog.name}</span>
+                        <div className={`${caption} truncate`}>{catalog.filename}</div>
+                      </div>
+                      {isSelected && (
+                        <Check className={`${iconMd} text-[color:var(--text-success)] flex-shrink-0`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        <div className={`${panelFooter} flex gap-2`}>
+          {error && <Alert tone="danger" size="sm" className="mx-3 mb-2">{error}</Alert>}
+        </DialogBody>
+
+        <DialogFooter>
           {onNewCatalog && (
             <PrimaryButton
               onClick={() => {
@@ -208,7 +197,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
             <ShareIcon.Repository className={iconMd} />
             {t("catalogPicker.actions.repository")}
           </SecondaryButton>
-        </div>
+        </DialogFooter>
       </Dialog>
 
       {repositoryOpen && (

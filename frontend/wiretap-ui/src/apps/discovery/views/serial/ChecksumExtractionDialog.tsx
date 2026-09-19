@@ -10,9 +10,8 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
-import Dialog from '../../../../components/Dialog';
+import { flexRowGap2 } from '../../../../styles/spacing';
+import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
 import { resolveByteIndexSync, type ChecksumAlgorithm } from '../../../../utils/analysis/checksums';
 import {
   detectChecksum,
@@ -29,8 +28,8 @@ import {
 } from './serialTypes';
 import { getCaptureFramesTail } from '../../../../api/capture';
 import { byteToHex } from '../../../../utils/byteUtils';
-import { bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
-import { Button, IconButton } from '../../../../components/Button';
+import { bgDataView, textSecondary, textMuted, borderDefault } from '../../../../styles';
+import { Button } from '../../../../components/Button';
 import { SecondaryButton, DangerButton, Select, Input } from '../../../../components/forms';
 import { Alert } from "../../../../components/Alert";
 
@@ -233,15 +232,8 @@ export default function ChecksumExtractionDialog({
   const matchPercentage = matchRate.total > 0 ? (matchRate.matches / matchRate.total) * 100 : 0;
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("serial.checksumDialogTitle")}</h2>
-          <IconButton onClick={onClose} size="sm" aria-label={t("common:actions.close")}>
-            <X className={`${iconLg} ${textSecondary}`} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} size="xl" onClose={onClose} title={t("serial.checksumDialogTitle")}>
+      <DialogBody className="space-y-4">
         {/*
           Three states, one expression: still searching, ranked candidates, or an
           explanation. A bare red 0% reads as "your data is wrong" — naming what
@@ -405,38 +397,36 @@ export default function ChecksumExtractionDialog({
             </SecondaryButton>
           )}
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          {onClear ? (
-            <DangerButton
-              onClick={() => {
-                onClear();
-                onClose();
-              }}
-            >
-              {t("serial.clear")}
-            </DangerButton>
-          ) : (
-            <SecondaryButton
-              onClick={onClose}
-            >
-              {t("modbusScan.cancel")}
-            </SecondaryButton>
-          )}
-          <Button
+      </DialogBody>
+      <DialogFooter>
+        {onClear ? (
+          <DangerButton
             onClick={() => {
-              onApply(config);
+              onClear();
               onClose();
             }}
-            variant="solid"
-            tone="warning"
-            size="lg"
           >
-            {t("serial.apply")}
-          </Button>
-        </div>
-      </div>
+            {t("serial.clear")}
+          </DangerButton>
+        ) : (
+          <SecondaryButton
+            onClick={onClose}
+          >
+            {t("modbusScan.cancel")}
+          </SecondaryButton>
+        )}
+        <Button
+          onClick={() => {
+            onApply(config);
+            onClose();
+          }}
+          variant="solid"
+          tone="warning"
+          size="lg"
+        >
+          {t("serial.apply")}
+        </Button>
+      </DialogFooter>
     </Dialog>
   );
 }

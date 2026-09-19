@@ -19,7 +19,7 @@ import {
   updateSourceBusMappings,
   type ActiveSessionInfo,
 } from "../../api/io";
-import Dialog from "../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import { useProfileBusStore, profileBusMappings } from "../../stores/profileBusStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useOpenAppsStore } from "../../stores/openAppsStore";
@@ -344,15 +344,8 @@ export default function SessionManager() {
       </AppTabView>
 
       {/* Add Source dialog */}
-      <Dialog
-        isOpen={addSourceSessionId !== null}
-        onBackdropClick={() => setAddSourceSessionId(null)}
-        maxWidth="max-w-sm"
-      >
-        <div className="p-4">
-          <h3 className="text-sm font-medium text-[color:var(--text-primary)] mb-3">
-            {t("addSource.title")}
-          </h3>
+      <Dialog isOpen={addSourceSessionId !== null} onClose={() => setAddSourceSessionId(null)} size="sm" title={t("addSource.title")}>
+        <DialogBody>
           {availableProfiles.length === 0 ? (
             <p className="text-sm text-[color:var(--text-muted)]">
               {t("addSource.noProfiles")}
@@ -373,16 +366,16 @@ export default function SessionManager() {
               ))}
             </div>
           )}
-          <div className="mt-3 flex justify-end">
-            <Button
-              onClick={() => setAddSourceSessionId(null)}
-              variant="ghost"
-              size="sm"
-            >
-              {t("addSource.cancel")}
-            </Button>
-          </div>
-        </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            onClick={() => setAddSourceSessionId(null)}
+            variant="ghost"
+            size="sm"
+          >
+            {t("addSource.cancel")}
+          </Button>
+        </DialogFooter>
       </Dialog>
     </AppLayout>
   );

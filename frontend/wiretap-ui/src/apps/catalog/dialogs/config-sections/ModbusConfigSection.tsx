@@ -1,13 +1,12 @@
 // ui/src/apps/catalog/dialogs/config-sections/ModbusConfigSection.tsx
 // Modbus protocol configuration section for unified config dialog
 
-import { Network, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
-import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
+import { Network } from "lucide-react";
+import { iconMd } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles/typography";
-import { expandableRowContainer } from "../../../../styles";
-import { Button } from "../../../../components/Button";
 import { Select, Input } from "../../../../components/forms";
 import { Card } from "../../../../components/Card";
+import { ConfigSectionHeader } from "./ConfigSectionHeader";
 export type ModbusConfigSectionProps = {
   isConfigured: boolean;
   hasFrames: boolean;
@@ -48,59 +47,17 @@ export default function ModbusConfigSection({
 
   return (
     <Card padding="none" className="overflow-hidden">
-      {/* Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpanded}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleExpanded(); }}
-        className={expandableRowContainer}
-      >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown className={`${iconMd} text-slate-500`} />
-          ) : (
-            <ChevronRight className={`${iconMd} text-slate-500`} />
-          )}
-          <div className="p-1.5 bg-[var(--status-warning-bg)] rounded">
-            <Network className={`${iconMd} text-[color:var(--text-amber)]`} />
-          </div>
-          <span className="font-medium text-[color:var(--text-primary)]">Modbus</span>
-          {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
-              <Check className={iconXs} />
-              configured
-            </span>
-          )}
-          {showWarning && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
-              <AlertTriangle className={iconXs} />
-              frames exist, no config
-            </span>
-          )}
-        </div>
-        <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
-          {isConfigured ? (
-            <Button
-              onClick={onRemove}
-              variant="ghost"
-              tone="danger"
-              size="sm"
-            >
-              Remove
-            </Button>
-          ) : (
-            <Button
-              onClick={onAdd}
-              variant="ghost"
-              tone="warning"
-              size="sm"
-            >
-              + Add
-            </Button>
-          )}
-        </div>
-      </div>
+      <ConfigSectionHeader
+        label="Modbus"
+        icon={<Network className={iconMd} />}
+        tone="warning"
+        isConfigured={isConfigured}
+        showWarning={showWarning}
+        isExpanded={isExpanded}
+        onToggleExpanded={onToggleExpanded}
+        onAdd={onAdd}
+        onRemove={onRemove}
+      />
 
       {/* Content */}
       {isExpanded && isConfigured && (

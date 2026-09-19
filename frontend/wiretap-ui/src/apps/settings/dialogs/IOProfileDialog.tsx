@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { iconMd, iconXs, iconLg } from "../../../styles/spacing";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../../components/Dialog";
 import type { IOProfile, ConnectionFieldValue } from "../../../hooks/useSettings";
 import { isProfileKind } from "../../../hooks/useSettings";
 import FrameLinkSignalControl, { signalSortKey } from "../components/FrameLinkSignalControl";
@@ -22,14 +22,7 @@ import { baseQuantity, QTY_DATARATE } from "../../../api/framelinkAxes";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton, Checkbox } from "../../../components/forms";
 import IOConnectionFields from "../../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../../components/io/useConnectionProbe";
-import {
-  h2,
-  borderDefault,
-  spaceYDefault,
-  caption,
-  textMedium,
-  textMuted,
-} from "../../../styles";
+import { borderDefault, spaceYDefault, caption, textMedium, textMuted } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
 import { IconButton } from "../../../components/Button";
@@ -300,86 +293,81 @@ export default function IOProfileDialog({
   );
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className="max-h-[90vh] overflow-y-auto">
-        <div className={`p-6 border-b ${borderDefault} flex items-center justify-between`}>
-          <h2 className={h2}>
-            {editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
-          </h2>
-          <IconButton
-            onClick={onCancel}
-            title={t("ioProfileDialog.back")}
+    <Dialog isOpen={isOpen} size="xl">
+      <DialogHeader>
+        <DialogTitle>
+          {editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
+        </DialogTitle>
+        <IconButton
+          onClick={onCancel}
+          title={t("ioProfileDialog.back")}
+        >
+          <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
+        </IconButton>
+      </DialogHeader>
+      <DialogBody className="space-y-4">
+        {/* Profile Type - filtered based on platform availability */}
+        <FormField label={t("ioProfileDialog.type")} variant="default">
+          <Select
+            size="lg"
+            value={profileForm.kind}
+            onChange={(e) =>
+              onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
+            }
           >
-            <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
-          </IconButton>
-        </div>
+            {platform.availableKinds.map((kind) => (
+              <option key={kind} value={kind}>
+                {t(`ioProfileDialog.kinds.${kind}`)}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
-        <div className="p-6 space-y-4">
-          {/* Profile Type - filtered based on platform availability */}
-          <FormField label={t("ioProfileDialog.type")} variant="default">
-            <Select
-              size="lg"
-              value={profileForm.kind}
-              onChange={(e) =>
-                onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
-              }
-            >
-              {platform.availableKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {t(`ioProfileDialog.kinds.${kind}`)}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          {/* Profile Name */}
-          <FormField label={t("ioProfileDialog.profileName")} required variant="default">
-            <Input
-              size="lg"
-              value={profileForm.name}
-              onChange={(e) => onUpdateProfileField("name", e.target.value)}
-              placeholder={t("ioProfileDialog.profileNamePlaceholder")}
-            />
-          </FormField>
-
-          {/* Preferred Decoder */}
-          <FormField label={t("ioProfileDialog.preferredDecoder")} variant="default">
-            <Select
-              size="lg"
-              value={profileForm.preferred_catalog || ""}
-              onChange={(e) => onUpdateProfileField("preferred_catalog", e.target.value || undefined)}
-            >
-              <option value="">{t("ioProfileDialog.none")}</option>
-              {catalogs.map((c) => (
-                <option key={c.filename} value={c.filename}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          <IOConnectionFields
-            profile={profileForm}
-            onUpdateConnectionField={onUpdateConnectionField}
-            probe={probe}
-            platform={platform}
-            canProbeByProfileId={!!editingProfileId}
-            isPasswordSecurelyStored={isPasswordSecurelyStored}
-            isApiKeySecurelyStored={isApiKeySecurelyStored}
-            hasLegacyPassword={hasLegacyPassword}
-            onMigratePassword={onMigratePassword}
-            frameLinkSignalPanel={frameLinkSignalPanel}
+        {/* Profile Name */}
+        <FormField label={t("ioProfileDialog.profileName")} required variant="default">
+          <Input
+            size="lg"
+            value={profileForm.name}
+            onChange={(e) => onUpdateProfileField("name", e.target.value)}
+            placeholder={t("ioProfileDialog.profileNamePlaceholder")}
           />
-        </div>
+        </FormField>
 
-        {/* Actions */}
-        <div className={`p-6 border-t ${borderDefault} flex justify-end gap-3`}>
-          <SecondaryButton onClick={onCancel}>{t("ioProfileDialog.cancel")}</SecondaryButton>
-          <PrimaryButton onClick={onSave}>
-            {editingProfileId ? t("ioProfileDialog.update") : t("ioProfileDialog.addBtn")}
-          </PrimaryButton>
-        </div>
-      </div>
+        {/* Preferred Decoder */}
+        <FormField label={t("ioProfileDialog.preferredDecoder")} variant="default">
+          <Select
+            size="lg"
+            value={profileForm.preferred_catalog || ""}
+            onChange={(e) => onUpdateProfileField("preferred_catalog", e.target.value || undefined)}
+          >
+            <option value="">{t("ioProfileDialog.none")}</option>
+            {catalogs.map((c) => (
+              <option key={c.filename} value={c.filename}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+
+        <IOConnectionFields
+          profile={profileForm}
+          onUpdateConnectionField={onUpdateConnectionField}
+          probe={probe}
+          platform={platform}
+          canProbeByProfileId={!!editingProfileId}
+          isPasswordSecurelyStored={isPasswordSecurelyStored}
+          isApiKeySecurelyStored={isApiKeySecurelyStored}
+          hasLegacyPassword={hasLegacyPassword}
+          onMigratePassword={onMigratePassword}
+          frameLinkSignalPanel={frameLinkSignalPanel}
+        />
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("ioProfileDialog.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={onSave}>
+          {editingProfileId ? t("ioProfileDialog.update") : t("ioProfileDialog.addBtn")}
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

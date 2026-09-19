@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, helpText, labelSmall } from "../../../styles";
+import { helpText, labelSmall } from "../../../styles";
 import { parseIntValue, isValidIntValue } from "../../../utils/numberUtils";
 import { Button, IconButton } from "../../../components/Button";
 import { Alert } from "../../../components/Alert";
@@ -126,9 +126,8 @@ export default function EnumEditorDialog({
   if (!open) return null;
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-lg" onBackdropClick={onCancel}>
-      <div className="p-6">
-        <h2 className={`${h2} mb-4`}>Edit Enum Values</h2>
+    <Dialog isOpen={open} size="lg" onClose={onCancel} title="Edit Enum Values">
+      <DialogBody>
         <p className={`${helpText} mb-4`}>
           Map raw signal values to human-readable labels.
         </p>
@@ -181,12 +180,11 @@ export default function EnumEditorDialog({
         {error && (
           <Alert tone="danger" className="mt-4">{error}</Alert>
         )}
-
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -2,7 +2,7 @@
 // Generic export dialog for analysis reports
 
 import { useState } from "react";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { Select, FormField, SecondaryButton } from "../components/forms";
 import {
   type ExportFormat,
@@ -44,8 +44,8 @@ export default function ExportReportDialog({
   };
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
+    <Dialog isOpen={open}>
+      <DialogBody className="space-y-4">
         <div className="text-lg font-semibold text-[color:var(--text-primary)]">
           {title}
         </div>
@@ -70,23 +70,22 @@ export default function ExportReportDialog({
             {FORMAT_DESCRIPTIONS[format]}
           </div>
         </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <SecondaryButton
-            onClick={onCancel}
-          >
-            Cancel
-          </SecondaryButton>
-          <Button
-            onClick={handleExport}
-            variant="solid"
-            tone="purple"
-            size="lg"
-          >
-            Save As...
-          </Button>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton
+          onClick={onCancel}
+        >
+          Cancel
+        </SecondaryButton>
+        <Button
+          onClick={handleExport}
+          variant="solid"
+          tone="purple"
+          size="lg"
+        >
+          Save As...
+        </Button>
+      </DialogFooter>
     </Dialog>
   );
 }

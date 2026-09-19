@@ -5,14 +5,13 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
-import Dialog from '../../../../components/Dialog';
+import { flexRowGap2 } from '../../../../styles/spacing';
+import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
 import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
 import { type ExtractionConfig } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
-import { Button, IconButton } from '../../../../components/Button';
+import { Button } from '../../../../components/Button';
 import { DangerButton, SecondaryButton, Checkbox, Input, Select } from '../../../../components/forms';
 
 interface ByteExtractionDialogProps {
@@ -117,15 +116,8 @@ export default function ByteExtractionDialog({
     : { text: 'text-amber-400', bgLight: 'bg-amber-900/50' };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-semibold ${textPrimary}`}>{title}</h2>
-          <IconButton onClick={onClose} size="sm">
-            <X className={`${iconLg} ${textSecondary}`} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} size="xl" onClose={onClose} title={title}>
+      <DialogBody className="space-y-4">
         <p className={`text-sm ${textSecondary}`}>
           {t("serial.byteExtractClickHint")}
         </p>
@@ -209,38 +201,36 @@ export default function ByteExtractionDialog({
             </Select>
           </label>
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          {onClear ? (
-            <DangerButton
-              onClick={() => {
-                onClear();
-                onClose();
-              }}
-            >
-              {t("serial.clear")}
-            </DangerButton>
-          ) : (
-            <SecondaryButton
-              onClick={onClose}
-            >
-              {t("modbusScan.cancel")}
-            </SecondaryButton>
-          )}
-          <Button
+      </DialogBody>
+      <DialogFooter>
+        {onClear ? (
+          <DangerButton
             onClick={() => {
-              onApply({ startByte, numBytes, endianness });
+              onClear();
               onClose();
             }}
-            variant="solid"
-            tone={color === 'amber' ? 'warning' : color === 'purple' ? 'purple' : 'cyan'}
-            size="lg"
           >
-            {t("serial.apply")}
-          </Button>
-        </div>
-      </div>
+            {t("serial.clear")}
+          </DangerButton>
+        ) : (
+          <SecondaryButton
+            onClick={onClose}
+          >
+            {t("modbusScan.cancel")}
+          </SecondaryButton>
+        )}
+        <Button
+          onClick={() => {
+            onApply({ startByte, numBytes, endianness });
+            onClose();
+          }}
+          variant="solid"
+          tone={color === 'amber' ? 'warning' : color === 'purple' ? 'purple' : 'cyan'}
+          size="lg"
+        >
+          {t("serial.apply")}
+        </Button>
+      </DialogFooter>
     </Dialog>
   );
 }

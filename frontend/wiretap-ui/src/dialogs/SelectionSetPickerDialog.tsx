@@ -2,12 +2,12 @@
 // Dialog for managing and loading selection sets
 
 import { useState, useEffect } from "react";
-import { Trash2, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
+import { iconMd, flexRowGap2 } from "../styles/spacing";
 import { labelSmall, captionMuted, sectionHeaderText } from "../styles/typography";
-import { borderDivider, bgSecondary } from "../styles";
-import Dialog from "../components/Dialog";
+import { bgSecondary } from "../styles";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import {
   getAllSelectionSets,
   updateSelectionSet,
@@ -16,7 +16,7 @@ import {
   type SelectionSet,
 } from "../utils/selectionSets";
 import { useSessionStore } from "../stores/sessionStore";
-import { Button, IconButton } from "../components/Button";
+import { Button } from "../components/Button";
 import { Input } from "../components/forms";
 
 type Props = {
@@ -140,23 +140,14 @@ export default function SelectionSetPickerDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className="flex flex-col h-[500px]">
-        {/* Header */}
-        <div className={`flex items-center justify-between px-4 py-3 ${borderDivider}`}>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {t("selectionSetPicker.title")}
-          </h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
-        {/* Content */}
+    <Dialog
+      isOpen={isOpen}
+      size="xl"
+      onClose={onClose}
+      title={t("selectionSetPicker.title")}
+      className="h-[500px]"
+    >
+      <DialogBody padding="none">
         <div className="flex flex-1 min-h-0">
           {/* Left: Selection Set List */}
           <div className="w-1/2 border-r border-[color:var(--border-default)] overflow-y-auto">
@@ -265,18 +256,14 @@ export default function SelectionSetPickerDialog({
           </div>
         </div>
 
-        {/* Footer with Clear button */}
-        {onClear && (
-          <div className="flex items-center justify-end px-4 py-3 border-t border-[color:var(--border-default)]">
-            <Button
-              onClick={handleClear}
-              variant="outline"
-            >
-              {t("selectionSetPicker.clear")}
-            </Button>
-          </div>
-        )}
-      </div>
+      </DialogBody>
+      {onClear && (
+        <DialogFooter>
+          <Button onClick={handleClear} variant="outline">
+            {t("selectionSetPicker.clear")}
+          </Button>
+        </DialogFooter>
+      )}
     </Dialog>
   );
 }

@@ -1,14 +1,12 @@
 // ui/src/dialogs/SpeedPickerDialog.tsx
 
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconMd, iconLg } from "../styles/spacing";
-import Dialog from "../components/Dialog";
+import { iconMd } from "../styles/spacing";
+import Dialog, { DialogBody } from "../components/Dialog";
 import type { PlaybackSpeed } from "../components/TimeController";
-import { h2, paddingCard, borderDefault, hoverLight, textSuccess, textMedium } from "../styles";
+import { hoverLight, textSuccess, textMedium } from "../styles";
 import { SPEED_OPTIONS } from "./io-source-picker/utils";
-import { IconButton } from "../components/Button";
-import { Card } from "../components/Card";
 
 type Props = {
   isOpen: boolean;
@@ -30,42 +28,30 @@ export default function SpeedPickerDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <Card padding="none" className="shadow-xl overflow-hidden">
-        <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
-          <h2 className={h2}>{t("speedPicker.title")}</h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("speedPicker.title")}>
+      <DialogBody padding="none" className="max-h-[50vh]">
+        <div className="py-1">
+          {SPEED_OPTIONS.map((opt) => {
+            const isSelected = opt.value === speed;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => handleSelect(opt.value)}
+                className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors ${
+                  isSelected ? "bg-[var(--hover-bg)]" : ""
+                }`}
+              >
+                <span className={`flex-1 ${textMedium}`}>
+                  {opt.label}
+                </span>
+                {isSelected && (
+                  <Check className={`${iconMd} ${textSuccess} flex-shrink-0`} />
+                )}
+              </button>
+            );
+          })}
         </div>
-        <div className="max-h-[50vh] overflow-y-auto">
-          <div className="py-1">
-            {SPEED_OPTIONS.map((opt) => {
-              const isSelected = opt.value === speed;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => handleSelect(opt.value)}
-                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors ${
-                    isSelected ? "bg-[var(--hover-bg)]" : ""
-                  }`}
-                >
-                  <span className={`flex-1 ${textMedium}`}>
-                    {opt.label}
-                  </span>
-                  {isSelected && (
-                    <Check className={`${iconMd} ${textSuccess} flex-shrink-0`} />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Card>
+      </DialogBody>
     </Dialog>
   );
 }

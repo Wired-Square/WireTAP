@@ -2,9 +2,9 @@
 // Serial protocol configuration section for unified config dialog
 
 import { useState, useCallback, useMemo } from "react";
-import { Cable, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
-import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { caption, textMedium, expandableRowContainer } from "../../../../styles";
+import { Cable, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { iconMd, flexRowGap2 } from "../../../../styles/spacing";
+import { caption, textMedium } from "../../../../styles";
 import type { SerialHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
@@ -13,6 +13,7 @@ import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input, Checkbox } from "../../../../components/forms";
 import { Badge } from "../../../../components/Badge";
 import { Card } from "../../../../components/Card";
+import { ConfigSectionHeader } from "./ConfigSectionHeader";
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
 
@@ -218,59 +219,17 @@ export default function SerialConfigSection({
 
   return (
     <Card padding="none" className="overflow-hidden">
-      {/* Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpanded}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleExpanded(); }}
-        className={expandableRowContainer}
-      >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown className={`${iconMd} text-slate-500`} />
-          ) : (
-            <ChevronRight className={`${iconMd} text-slate-500`} />
-          )}
-          <div className="p-1.5 bg-[var(--bg-purple)] rounded">
-            <Cable className={`${iconMd} text-[color:var(--text-purple)]`} />
-          </div>
-          <span className="font-medium text-[color:var(--text-primary)]">Serial</span>
-          {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
-              <Check className={iconXs} />
-              configured
-            </span>
-          )}
-          {showWarning && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
-              <AlertTriangle className={iconXs} />
-              frames exist, no config
-            </span>
-          )}
-        </div>
-        <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
-          {isConfigured ? (
-            <Button
-              onClick={onRemove}
-              variant="ghost"
-              tone="danger"
-              size="sm"
-            >
-              Remove
-            </Button>
-          ) : (
-            <Button
-              onClick={onAdd}
-              variant="ghost"
-              tone="purple"
-              size="sm"
-            >
-              + Add
-            </Button>
-          )}
-        </div>
-      </div>
+      <ConfigSectionHeader
+        label="Serial"
+        icon={<Cable className={iconMd} />}
+        tone="purple"
+        isConfigured={isConfigured}
+        showWarning={showWarning}
+        isExpanded={isExpanded}
+        onToggleExpanded={onToggleExpanded}
+        onAdd={onAdd}
+        onRemove={onRemove}
+      />
 
       {/* Content */}
       {isExpanded && isConfigured && (

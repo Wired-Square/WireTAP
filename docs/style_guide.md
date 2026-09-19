@@ -13,14 +13,14 @@ public surface is the barrel file [../frontend/wiretap-ui/src/styles/index.ts](.
 import tokens from there:
 
 ```tsx
-import { textPrimary, paddingDialog, h2 } from "../../../styles";
+import { textPrimary, spaceYDefault, h2 } from "../../../styles";
 import { Button, IconButton } from "../../../components/Button";
 ```
 
-Buttons, form controls and badges are components, not class strings — see
-*Buttons*, *Inputs* and *Badges* under the token reference. The other families
-(cards, tabs, tables) are still class-string tokens and move to components one
-family at a time.
+Buttons, form controls, badges, cards, alerts and dialogs are components, not
+class strings — see *Buttons*, *Inputs*, *Badges*, *Cards & alerts* and
+*Dialogs* under the token reference. The other families (tabs, menus, tables)
+are still class-string tokens and move to components one family at a time.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -146,8 +146,6 @@ styling goes through the variables.
 
 | Token | Class | Use |
 |---|---|---|
-| `paddingDialog` | `p-6` | Dialog/modal content |
-| `paddingCard` / `paddingCardSm` | `p-4` / `p-3` | Card content |
 | `paddingSection` | `p-8` | Large sections |
 | `paddingButton` / `paddingButtonSm` | `px-4 py-2` / `px-3 py-1.5` | Button padding |
 | `paddingIconButton` | `p-2` | Icon buttons |
@@ -278,9 +276,39 @@ Inside an alert, a heading line is `font-medium` and a detail line
 well — a summary header with a big icon, a row per finding with its own
 glyph — is a toned `<Card>`, not an alert.
 
-[cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) keeps
-what the dialogs family owns: `panelFooter` (the action footer) and
-`expandableRowContainer` (the config-section header).
+### Dialogs — [Dialog.tsx](../frontend/wiretap-ui/src/components/Dialog.tsx)
+
+`<Dialog>` renders `.dialog-backdrop > .dialog`: one surface at
+`--radius-dialog` in three slots — a pinned header, a body that scrolls, a
+pinned footer — so a tall dialog never grows past the window. The width is
+the `size`; the height is the content. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `isOpen` | `boolean` | Closed renders nothing |
+| `onClose` | `() => void` | Makes the dialog dismissible: the header ✕, Escape and a click on the backdrop all call it. Leave it off a dialog that must be answered (a confirm, a save-or-discard) |
+| `size` | `sm` 384 · `md` 448 (default) · `lg` 512 · `xl` 672 · `2xl` 896 · `3xl` 1280 px | `sm` confirms and one-field forms, `md` forms, `xl` editors with two columns, `2xl` tables and diffs, `3xl` the signal editor |
+| `title` / `subtitle` / `icon` | `ReactNode` | The standard header: an optional leading glyph, the title (18 px / 600), an optional caption under it, the ✕ when dismissible |
+| `className` | on the frame | Only for a fixed height (`h-[500px]`) when a list must not jump as it filters |
+
+The slots are named exports from the same module:
+
+- `<DialogBody>` — 16 px inset, scrolls. `padding="none"` when the children
+  draw their own rows (a picker list, a tab strip with its panes); a body
+  that stacks fields takes `className="space-y-4"`.
+- `<DialogFooter>` — right-aligned `lg` buttons, 8 px apart, above a
+  hairline. `className="justify-between"` for a hint or a left-hand action
+  beside them.
+- `<DialogHeader>` + `<DialogTitle>` — for a header the props cannot express
+  (a title with a "new" button beside it, a back arrow instead of ✕, a
+  48 px icon well). The header draws the ✕ itself when the dialog is
+  dismissible; the first child takes the slack.
+
+Anything that is not a body or footer — a `TabStrip`, a `LoadStatus` banner —
+can sit between the slots as a direct child; only the body gives way when the
+window is short. Escape reaches only the dialog opened last, so a picker
+hosted by another dialog closes alone. Focus moves into the dialog on open and
+back to the opener on close.
 
 ### Data tables — [tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts)
 
@@ -345,15 +373,15 @@ import { Play } from "lucide-react";
 ### Dialog with footer
 
 ```tsx
-import Dialog from "../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../../components/forms";
 
 <Dialog isOpen={open} onClose={onClose} title={t("dialog.title")}>
-  <div className="space-y-4">{/* body */}</div>
-  <div className="flex justify-end gap-2 mt-6">
+  <DialogBody className="space-y-4">{/* fields */}</DialogBody>
+  <DialogFooter>
     <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
     <PrimaryButton onClick={onConfirm}>{t("common:actions.confirm")}</PrimaryButton>
-  </div>
+  </DialogFooter>
 </Dialog>
 ```
 
@@ -900,8 +928,7 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
 | [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Data view tabs, launcher tiles |
-| [../frontend/wiretap-ui/src/styles/cardStyles.ts](../frontend/wiretap-ui/src/styles/cardStyles.ts) | Panel footer, config-section header (the dialogs family's) |
-| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert` and `forms/` — the primitives, over `styles/components.css` |
+| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog` and `forms/` — the primitives, over `styles/components.css` |
 | [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
 | [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
@@ -916,8 +943,7 @@ adjacency so related tooling is visible at a glance.
 ## Future improvements (non-blocking)
 
 - The remaining families as primitives, in the order of the Tailwind Removal
-  Handover: cards and alerts, dialogs, tabs and menus (the segmented
-  controls and list rows still written as raw `<button>`s belong here), data
-  tables.
+  Handover: tabs and menus (the segmented controls and list rows still
+  written as raw `<button>`s belong here), data tables.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

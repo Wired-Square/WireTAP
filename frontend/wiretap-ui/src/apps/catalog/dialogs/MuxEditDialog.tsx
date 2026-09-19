@@ -1,9 +1,9 @@
 // ui/src/apps/catalog/dialogs/MuxEditDialog.tsx
 
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, textMedium } from "../../../styles";
+import { textMedium } from "../../../styles";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
 
@@ -112,73 +112,68 @@ export default function MuxEditDialog({
   })();
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-2xl">
-      <div className="p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className={`${h2} mb-6`}>{title}</h2>
+    <Dialog isOpen={open} size="xl" title={title}>
+      <DialogBody className="space-y-4">
+        {/* Name */}
+        <FormField label="Name" required variant="default">
+          <Input
+            size="lg"
+            value={fields.name}
+            onChange={(e) => setFields({ ...fields, name: e.target.value })}
+            placeholder="selector_name"
+          />
+        </FormField>
 
-        <div className="space-y-4">
-          {/* Name */}
-          <FormField label="Name" required variant="default">
+        {/* Start Bit & Bit Length */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Start Bit" required variant="default">
             <Input
               size="lg"
-              value={fields.name}
-              onChange={(e) => setFields({ ...fields, name: e.target.value })}
-              placeholder="selector_name"
+              type="number"
+              value={fields.start_bit}
+              onChange={(e) => {
+                const newStartBit = parseInt(e.target.value) || 0;
+                const newName = generateMuxName(currentMuxPath, newStartBit, fields.bit_length, isAddingNestedMux);
+                setFields({ ...fields, start_bit: newStartBit, name: newName });
+              }}
+              min={0}
             />
           </FormField>
-
-          {/* Start Bit & Bit Length */}
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Start Bit" required variant="default">
-              <Input
-                size="lg"
-                type="number"
-                value={fields.start_bit}
-                onChange={(e) => {
-                  const newStartBit = parseInt(e.target.value) || 0;
-                  const newName = generateMuxName(currentMuxPath, newStartBit, fields.bit_length, isAddingNestedMux);
-                  setFields({ ...fields, start_bit: newStartBit, name: newName });
-                }}
-                min={0}
-              />
-            </FormField>
-            <FormField label="Bit Length" required variant="default">
-              <Input
-                size="lg"
-                type="number"
-                value={fields.bit_length}
-                onChange={(e) => {
-                  const newBitLength = parseInt(e.target.value) || 1;
-                  const newName = generateMuxName(currentMuxPath, fields.start_bit, newBitLength, isAddingNestedMux);
-                  setFields({ ...fields, bit_length: newBitLength, name: newName });
-                }}
-                min={1}
-              />
-            </FormField>
-          </div>
-
-          {/* Bit Preview */}
-          {bitPreview}
-
-          {/* Notes */}
-          <FormField label="Notes" variant="default">
-            <Textarea
+          <FormField label="Bit Length" required variant="default">
+            <Input
               size="lg"
-              value={fields.notes ?? ""}
-              onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
-              placeholder="Optional notes about this mux..."
-              rows={2}
+              type="number"
+              value={fields.bit_length}
+              onChange={(e) => {
+                const newBitLength = parseInt(e.target.value) || 1;
+                const newName = generateMuxName(currentMuxPath, fields.start_bit, newBitLength, isAddingNestedMux);
+                setFields({ ...fields, bit_length: newBitLength, name: newName });
+              }}
+              min={1}
             />
           </FormField>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={onSave} disabled={!fields.name || fields.bit_length < 1}>
-            OK
-          </PrimaryButton>
-        </div>
-      </div>
+        {/* Bit Preview */}
+        {bitPreview}
+
+        {/* Notes */}
+        <FormField label="Notes" variant="default">
+          <Textarea
+            size="lg"
+            value={fields.notes ?? ""}
+            onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
+            placeholder="Optional notes about this mux..."
+            rows={2}
+          />
+        </FormField>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <PrimaryButton onClick={onSave} disabled={!fields.name || fields.bit_length < 1}>
+          OK
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

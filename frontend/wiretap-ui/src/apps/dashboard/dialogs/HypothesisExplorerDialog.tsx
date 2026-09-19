@@ -2,20 +2,16 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X, FlaskConical, ChevronRight, ChevronLeft, CheckSquare, Square, ChevronsUp } from "lucide-react";
-import { iconSm, iconLg } from "../../../styles/spacing";
-import {
-  bgSurface,
-  borderDivider,
-  textSecondary,
-} from "../../../styles";
-import Dialog from "../../../components/Dialog";
+import { FlaskConical, ChevronRight, ChevronLeft, CheckSquare, Square, ChevronsUp } from "lucide-react";
+import { iconSm } from "../../../styles/spacing";
+import { textSecondary } from "../../../styles";
+import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnalysis";
 import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
-import { Button, IconButton } from "../../../components/Button";
+import { Button } from "../../../components/Button";
 import { Badge, type BadgeTone } from "../../../components/Badge";
 import { PrimaryButton, SecondaryButton, Select, Checkbox, Input } from "../../../components/forms";
 
@@ -193,335 +189,323 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
     : !!selectedFrameId && bitLengths.size > 0 && endianness.size > 0;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-lg">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        {/* Header */}
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <div className="flex items-center gap-2">
-            <FlaskConical className={`${iconSm} text-purple-400`} />
-            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-              {t("hypothesis.title")}
-            </h2>
-          </div>
-          <IconButton
-            onClick={handleClose}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {step === 1 && (
-            <>
-              {/* Frame ID selection */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("hypothesis.fields.frameId")}
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <Button
-                    onClick={() => setFrameMode('single')}
-                    variant="outline"
-                    size="sm"
-                    pressed={frameMode === 'single'}
-                  >
-                    {t("hypothesis.fields.single")}
-                  </Button>
-                  <Button
-                    onClick={() => setFrameMode('all')}
-                    variant="outline"
-                    size="sm"
-                    pressed={frameMode === 'all'}
-                  >
-                    {t("hypothesis.fields.allDiscovered", { count: sortedFrameIds.length })}
-                  </Button>
-                </div>
-                {frameMode === 'single' && (
-                  <Select
-                    value={selectedFrameId}
-                    onChange={(e) => setSelectedFrameId(e.target.value)}
-                    size="lg"
-                  >
-                    <option value="">{t("hypothesis.fields.selectFrameId")}</option>
-                    {sortedFrameIds.map((id) => (
-                      <option key={id} value={String(id)}>
-                        {formatFrameId(id)}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-                {sortedFrameIds.length === 0 && (
-                  <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    {t("hypothesis.fields.noFrames")}
-                  </p>
-                )}
-              </div>
-
-              {/* Bit lengths */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("hypothesis.fields.bitLengths")}
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {BIT_LENGTH_OPTIONS.map((bits) => (
-                    <Button
-                      key={bits}
-                      onClick={() => toggleBitLength(bits)}
-                      variant="outline"
-                      size="sm"
-                      pressed={bitLengths.has(bits)}
-                    >
-                      {t("hypothesis.fields.bitLabel", { bits })}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Endianness */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("hypothesis.fields.endianness")}
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => toggleEndianness("little")}
-                    variant="outline"
-                    size="sm"
-                    pressed={endianness.has("little")}
-                  >
-                    {t("hypothesis.fields.littleEndian")}
-                  </Button>
-                  <Button
-                    onClick={() => toggleEndianness("big")}
-                    variant="outline"
-                    size="sm"
-                    pressed={endianness.has("big")}
-                  >
-                    {t("hypothesis.fields.bigEndian")}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Bit range */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-medium text-[color:var(--text-secondary)]">
-                    {t("hypothesis.fields.bitRange")}
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <Checkbox
-                      checked={byteAligned}
-                      onChange={(e) => setByteAligned(e.target.checked)}
-                    />
-                    <span className="text-[10px] text-[color:var(--text-muted)]">
-                      {t("hypothesis.fields.byteAligned")}
-                    </span>
-                  </label>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={63}
-                      step={byteAligned ? 8 : 1}
-                      value={startBit}
-                      onChange={(e) => setStartBit(e.target.value)}
-                      size="lg"
-                      placeholder={t("hypothesis.fields.startBit")}
-                    />
-                  </div>
-                  <span className="text-[color:var(--text-muted)] self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
-                  <div className="flex-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={63}
-                      step={byteAligned ? 8 : 1}
-                      value={endBit}
-                      onChange={(e) => setEndBit(e.target.value)}
-                      size="lg"
-                      placeholder={t("hypothesis.fields.endBit")}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Signed toggle */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={signed}
-                  onChange={(e) => setSigned(e.target.checked)}
-                />
-                <span className="text-xs text-[color:var(--text-secondary)]">
-                  {t("hypothesis.fields.signed")}
-                </span>
+    <Dialog
+      isOpen={isOpen}
+      onClose={handleClose}
+      size="lg"
+      title={t("hypothesis.title")}
+      icon={<FlaskConical className="text-purple-400" />}
+    >
+      <DialogBody className="space-y-4">
+        {step === 1 && (
+          <>
+            {/* Frame ID selection */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("hypothesis.fields.frameId")}
               </label>
-
-              {/* Analysis hints toggle */}
-              {hasAnalysis && (
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={useAnalysisHints}
-                    onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                  />
-                  <span className="text-xs text-[color:var(--text-secondary)]">
-                    {t("hypothesis.fields.useHints")}
-                  </span>
-                </label>
-              )}
-
-              {/* Advanced: Factor / Offset */}
-              <div>
+              <div className="flex gap-2 mb-2">
                 <Button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  variant="link"
-                  className="text-xs"
+                  onClick={() => setFrameMode('single')}
+                  variant="outline"
+                  size="sm"
+                  pressed={frameMode === 'single'}
                 >
-                  {showAdvanced ? t("hypothesis.fields.advancedShown") : t("hypothesis.fields.advancedHidden")}
+                  {t("hypothesis.fields.single")}
                 </Button>
-                {showAdvanced && (
-                  <div className="flex gap-3 mt-2">
-                    <div className="flex-1">
-                      <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
-                        {t("hypothesis.fields.factor")}
-                      </label>
-                      <Input
-                        type="number"
-                        step="any"
-                        value={factor}
-                        onChange={(e) => setFactor(e.target.value)}
-                        size="lg"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
-                        {t("hypothesis.fields.offset")}
-                      </label>
-                      <Input
-                        type="number"
-                        step="any"
-                        value={offset}
-                        onChange={(e) => setOffset(e.target.value)}
-                        size="lg"
-                      />
-                    </div>
-                  </div>
-                )}
+                <Button
+                  onClick={() => setFrameMode('all')}
+                  variant="outline"
+                  size="sm"
+                  pressed={frameMode === 'all'}
+                >
+                  {t("hypothesis.fields.allDiscovered", { count: sortedFrameIds.length })}
+                </Button>
               </div>
-
-              {/* Candidate count preview */}
-              {canPreview && (
-                <p className="text-[10px] text-[color:var(--text-muted)]">
-                  {t("hypothesis.preview.summary", { count: candidates.length })}
-                  {candidates.length >= 500 && t("hypothesis.preview.cap")}
+              {frameMode === 'single' && (
+                <Select
+                  value={selectedFrameId}
+                  onChange={(e) => setSelectedFrameId(e.target.value)}
+                  size="lg"
+                >
+                  <option value="">{t("hypothesis.fields.selectFrameId")}</option>
+                  {sortedFrameIds.map((id) => (
+                    <option key={id} value={String(id)}>
+                      {formatFrameId(id)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+              {sortedFrameIds.length === 0 && (
+                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                  {t("hypothesis.fields.noFrames")}
                 </p>
               )}
+            </div>
 
-              {/* Next button */}
-              <PrimaryButton
-                onClick={handlePreview}
-                disabled={!canPreview || candidates.length === 0}
-                className="w-full"
-              >
-                {t("hypothesis.actions.next")}
-                <ChevronRight className={iconSm} />
-              </PrimaryButton>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              {/* Selection controls */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  onClick={handleSelectAll}
-                  variant="outline"
-                  size="sm"
-                >
-                  <CheckSquare className="w-3 h-3" />
-                  {t("hypothesis.actions.selectAll")}
-                </Button>
-                <Button
-                  onClick={handleDeselectAll}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Square className="w-3 h-3" />
-                  {t("hypothesis.actions.selectNone")}
-                </Button>
-                <Button
-                  onClick={() => handleSelectTopN(20)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <ChevronsUp className="w-3 h-3" />
-                  {t("hypothesis.actions.topN", { count: 20 })}
-                </Button>
-                <span className={`text-[10px] ${textSecondary} ml-auto`}>
-                  {t("hypothesis.actions.selectionSummary", { count: selectedCount, panels: estimatedPanels })}
-                </span>
-              </div>
-
-              {/* Candidate list */}
-              <div className="max-h-64 overflow-y-auto space-y-0.5 text-xs">
-                {candidates.map((c) => (
-                  <button
-                    key={c.signalName}
-                    onClick={() => toggleCandidate(c.signalName)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left ${
-                      selectedCandidates.has(c.signalName)
-                        ? "bg-blue-600/10 border border-blue-600/30"
-                        : "bg-[var(--bg-primary)] border border-transparent hover:bg-[var(--hover-bg)]"
-                    }`}
+            {/* Bit lengths */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("hypothesis.fields.bitLengths")}
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {BIT_LENGTH_OPTIONS.map((bits) => (
+                  <Button
+                    key={bits}
+                    onClick={() => toggleBitLength(bits)}
+                    variant="outline"
+                    size="sm"
+                    pressed={bitLengths.has(bits)}
                   >
-                    <Checkbox
-                      checked={selectedCandidates.has(c.signalName)}
-                      readOnly
-                      className="pointer-events-none"
-                    />
-                    <span className="text-[color:var(--text-primary)] font-mono truncate flex-1">
-                      {c.signalName}
-                    </span>
-                    {frameMode === 'all' && (
-                      <span className="text-[color:var(--text-muted)] shrink-0 tabular-nums">
-                        {formatFrameId(c.frameId)}
-                      </span>
-                    )}
-                    <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={c.reason}>
-                      {c.score}
-                    </Badge>
-                  </button>
+                    {t("hypothesis.fields.bitLabel", { bits })}
+                  </Button>
                 ))}
-                {candidates.length === 0 && (
-                  <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
-                    {t("hypothesis.preview.noMatches")}
-                  </p>
-                )}
               </div>
+            </div>
 
-              {/* Action buttons */}
+            {/* Endianness */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("hypothesis.fields.endianness")}
+              </label>
               <div className="flex gap-2">
-                <SecondaryButton
-                  onClick={() => setStep(1)}
+                <Button
+                  onClick={() => toggleEndianness("little")}
+                  variant="outline"
+                  size="sm"
+                  pressed={endianness.has("little")}
                 >
-                  <ChevronLeft className={iconSm} />
-                  {t("hypothesis.actions.back")}
-                </SecondaryButton>
-                <PrimaryButton
-                  onClick={handleGenerate}
-                  disabled={selectedCount === 0}
-                  className="flex-1"
+                  {t("hypothesis.fields.littleEndian")}
+                </Button>
+                <Button
+                  onClick={() => toggleEndianness("big")}
+                  variant="outline"
+                  size="sm"
+                  pressed={endianness.has("big")}
                 >
-                  <FlaskConical className={iconSm} />
-                  {t("hypothesis.actions.generate", { count: selectedCount })}
-                </PrimaryButton>
+                  {t("hypothesis.fields.bigEndian")}
+                </Button>
               </div>
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+
+            {/* Bit range */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-[color:var(--text-secondary)]">
+                  {t("hypothesis.fields.bitRange")}
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={byteAligned}
+                    onChange={(e) => setByteAligned(e.target.checked)}
+                  />
+                  <span className="text-[10px] text-[color:var(--text-muted)]">
+                    {t("hypothesis.fields.byteAligned")}
+                  </span>
+                </label>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={63}
+                    step={byteAligned ? 8 : 1}
+                    value={startBit}
+                    onChange={(e) => setStartBit(e.target.value)}
+                    size="lg"
+                    placeholder={t("hypothesis.fields.startBit")}
+                  />
+                </div>
+                <span className="text-[color:var(--text-muted)] self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={63}
+                    step={byteAligned ? 8 : 1}
+                    value={endBit}
+                    onChange={(e) => setEndBit(e.target.value)}
+                    size="lg"
+                    placeholder={t("hypothesis.fields.endBit")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Signed toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={signed}
+                onChange={(e) => setSigned(e.target.checked)}
+              />
+              <span className="text-xs text-[color:var(--text-secondary)]">
+                {t("hypothesis.fields.signed")}
+              </span>
+            </label>
+
+            {/* Analysis hints toggle */}
+            {hasAnalysis && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={useAnalysisHints}
+                  onChange={(e) => setUseAnalysisHints(e.target.checked)}
+                />
+                <span className="text-xs text-[color:var(--text-secondary)]">
+                  {t("hypothesis.fields.useHints")}
+                </span>
+              </label>
+            )}
+
+            {/* Advanced: Factor / Offset */}
+            <div>
+              <Button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                variant="link"
+                className="text-xs"
+              >
+                {showAdvanced ? t("hypothesis.fields.advancedShown") : t("hypothesis.fields.advancedHidden")}
+              </Button>
+              {showAdvanced && (
+                <div className="flex gap-3 mt-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
+                      {t("hypothesis.fields.factor")}
+                    </label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={factor}
+                      onChange={(e) => setFactor(e.target.value)}
+                      size="lg"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
+                      {t("hypothesis.fields.offset")}
+                    </label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={offset}
+                      onChange={(e) => setOffset(e.target.value)}
+                      size="lg"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Candidate count preview */}
+            {canPreview && (
+              <p className="text-[10px] text-[color:var(--text-muted)]">
+                {t("hypothesis.preview.summary", { count: candidates.length })}
+                {candidates.length >= 500 && t("hypothesis.preview.cap")}
+              </p>
+            )}
+
+            {/* Next button */}
+            <PrimaryButton
+              onClick={handlePreview}
+              disabled={!canPreview || candidates.length === 0}
+              className="w-full"
+            >
+              {t("hypothesis.actions.next")}
+              <ChevronRight className={iconSm} />
+            </PrimaryButton>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            {/* Selection controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                onClick={handleSelectAll}
+                variant="outline"
+                size="sm"
+              >
+                <CheckSquare className="w-3 h-3" />
+                {t("hypothesis.actions.selectAll")}
+              </Button>
+              <Button
+                onClick={handleDeselectAll}
+                variant="outline"
+                size="sm"
+              >
+                <Square className="w-3 h-3" />
+                {t("hypothesis.actions.selectNone")}
+              </Button>
+              <Button
+                onClick={() => handleSelectTopN(20)}
+                variant="outline"
+                size="sm"
+              >
+                <ChevronsUp className="w-3 h-3" />
+                {t("hypothesis.actions.topN", { count: 20 })}
+              </Button>
+              <span className={`text-[10px] ${textSecondary} ml-auto`}>
+                {t("hypothesis.actions.selectionSummary", { count: selectedCount, panels: estimatedPanels })}
+              </span>
+            </div>
+
+            {/* Candidate list */}
+            <div className="max-h-64 overflow-y-auto space-y-0.5 text-xs">
+              {candidates.map((c) => (
+                <button
+                  key={c.signalName}
+                  onClick={() => toggleCandidate(c.signalName)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left ${
+                    selectedCandidates.has(c.signalName)
+                      ? "bg-blue-600/10 border border-blue-600/30"
+                      : "bg-[var(--bg-primary)] border border-transparent hover:bg-[var(--hover-bg)]"
+                  }`}
+                >
+                  <Checkbox
+                    checked={selectedCandidates.has(c.signalName)}
+                    readOnly
+                    className="pointer-events-none"
+                  />
+                  <span className="text-[color:var(--text-primary)] font-mono truncate flex-1">
+                    {c.signalName}
+                  </span>
+                  {frameMode === 'all' && (
+                    <span className="text-[color:var(--text-muted)] shrink-0 tabular-nums">
+                      {formatFrameId(c.frameId)}
+                    </span>
+                  )}
+                  <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={c.reason}>
+                    {c.score}
+                  </Badge>
+                </button>
+              ))}
+              {candidates.length === 0 && (
+                <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
+                  {t("hypothesis.preview.noMatches")}
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <SecondaryButton
+                onClick={() => setStep(1)}
+              >
+                <ChevronLeft className={iconSm} />
+                {t("hypothesis.actions.back")}
+              </SecondaryButton>
+              <PrimaryButton
+                onClick={handleGenerate}
+                disabled={selectedCount === 0}
+                className="flex-1"
+              >
+                <FlaskConical className={iconSm} />
+                {t("hypothesis.actions.generate", { count: selectedCount })}
+              </PrimaryButton>
+            </div>
+          </>
+        )}
+      </DialogBody>
     </Dialog>
   );
 }

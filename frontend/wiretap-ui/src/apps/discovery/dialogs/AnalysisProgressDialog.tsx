@@ -1,7 +1,7 @@
 // ui/src/apps/discovery/dialogs/AnalysisProgressDialog.tsx
 
 import { Loader2 } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody } from "../../../components/Dialog";
 import { bgSecondary, captionMuted } from "../../../styles";
 
 export interface AnalysisProgressDialogProps {
@@ -16,8 +16,8 @@ export default function AnalysisProgressDialog({
   toolName,
 }: AnalysisProgressDialogProps) {
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-sm">
-      <div className="p-6 text-center">
+    <Dialog isOpen={isOpen} size="sm">
+      <DialogBody className="text-center">
         {/* Animated loader */}
         <div className="mb-4">
           <Loader2 className="w-12 h-12 mx-auto text-[color:var(--accent-secondary)] animate-spin" />
@@ -40,7 +40,7 @@ export default function AnalysisProgressDialog({
         <div className={`${captionMuted} px-4 py-2 ${bgSecondary} rounded`}>
           Running <span className="font-medium text-[color:var(--text-secondary)]">{toolName}</span> analysis...
         </div>
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }

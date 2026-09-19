@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
+import { SecondaryButton, PrimaryButton } from "../components/forms";
 import Input from "../components/forms/Input";
-import { DialogFooter } from "../components/forms/DialogFooter";
 import { labelSmall, helpText } from "../styles";
 
 type Props = {
@@ -37,12 +37,8 @@ export default function SaveSelectionSetDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          {t("saveSelectionSet.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} title={t("saveSelectionSet.title")}>
+      <DialogBody className="space-y-4">
         <div className="space-y-3">
           {/* Name input */}
           <div className="space-y-1">
@@ -64,14 +60,11 @@ export default function SaveSelectionSetDialog({
 
           <p className={helpText}>{t("saveSelectionSet.frameCount", { count: frameCount })}</p>
         </div>
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleSave}
-          confirmLabel={t("common:actions.save")}
-          confirmDisabled={!name.trim()}
-        />
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleSave} disabled={!name.trim()}>{t("common:actions.save")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

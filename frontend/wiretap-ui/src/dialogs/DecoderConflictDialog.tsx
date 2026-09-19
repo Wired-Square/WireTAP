@@ -1,14 +1,7 @@
-// ui/src/dialogs/DecoderConflictDialog.tsx
-//
-// Disambiguation dialog shown when a multi-source session has profiles with
-// different preferred decoders. Lets the user pick which one to use.
 
-import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconLg } from "../styles/spacing";
-import { textMedium, caption, borderDivider, hoverLight, bgSurface } from "../styles";
-import Dialog from "../components/Dialog";
-import { IconButton } from "../components/Button";
+import { textMedium, caption, hoverLight } from "../styles";
+import Dialog, { DialogBody } from "../components/Dialog";
 
 export interface DecoderConflictOption {
   /** Catalog filename (from profile.preferred_catalog) */
@@ -35,20 +28,8 @@ export default function DecoderConflictDialog({
   const { t } = useTranslation("dialogs");
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {t("decoderConflict.title")}
-          </h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("decoderConflict.title")}>
+      <DialogBody padding="none">
         <div className="px-4 py-2">
           <p className={`${caption}`}>{t("decoderConflict.intro")}</p>
         </div>
@@ -84,7 +65,7 @@ export default function DecoderConflictDialog({
             </span>
           </button>
         </div>
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }

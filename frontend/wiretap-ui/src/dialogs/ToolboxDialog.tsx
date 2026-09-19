@@ -1,18 +1,12 @@
 // ui/src/dialogs/ToolboxDialog.tsx
 
-import { X, ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck, Radar, Network, ScanSearch } from "lucide-react";
+import { ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck, Radar, Network, ScanSearch } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { iconMd, iconLg } from "../styles/spacing";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody } from "../components/Dialog";
 import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
-import {
-  h3,
-  borderDefault,
-  paddingCard,
-  spaceYSmall,
-  textTertiary,
-} from "../styles";
+import { borderDefault, spaceYSmall, textTertiary } from "../styles";
 import MessageOrderToolPanel from "../apps/discovery/views/tools/MessageOrderToolPanel";
 import ChangesToolPanel from "../apps/discovery/views/tools/ChangesToolPanel";
 import SerialFramingToolPanel from "../apps/discovery/views/tools/SerialFramingToolPanel";
@@ -29,8 +23,7 @@ import {
   type SessionShape,
   type ToolDataCounts,
 } from "./toolboxGating";
-import { Button, IconButton } from "../components/Button";
-import { Card } from "../components/Card";
+import { Button } from "../components/Button";
 
 type ToolConfig = {
   id: ToolboxView;
@@ -220,120 +213,103 @@ export default function ToolboxDialog({
   const isActiveModbusScan = effectiveTool != null && isModbusScanTool(effectiveTool);
 
   return (
-    <Dialog isOpen onBackdropClick={onClose} maxWidth="max-w-lg">
-      <Card padding="none" className="shadow-xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className={`${paddingCard} flex items-center justify-between border-b ${borderDefault}`}>
-          <h2 className={h3}>
-            {t("toolbox.titleAnalysisAndScanning")}
-          </h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
+    <Dialog isOpen onClose={onClose} size="lg" title={t("toolbox.titleAnalysisAndScanning")}>
+      <DialogBody className={spaceYSmall}>
+        {/* Tool selection */}
+        <div className={spaceYSmall}>
+          {visibleTools.map((tool) => {
+            const Icon = tool.icon;
+            const isActive = effectiveTool === tool.id;
+            const isDisabled = !isToolAvailable(tool);
+            const disabledReason = getDisabledReason(tool);
+            const label = t(`toolbox.tools.${tool.i18nKey}.label`);
+            const description = t(`toolbox.tools.${tool.i18nKey}.description`);
 
-        {/* Content */}
-        <div className={`${paddingCard} ${spaceYSmall}`}>
-          {/* Tool selection */}
-          <div className={spaceYSmall}>
-            {visibleTools.map((tool) => {
-              const Icon = tool.icon;
-              const isActive = effectiveTool === tool.id;
-              const isDisabled = !isToolAvailable(tool);
-              const disabledReason = getDisabledReason(tool);
-              const label = t(`toolbox.tools.${tool.i18nKey}.label`);
-              const description = t(`toolbox.tools.${tool.i18nKey}.description`);
-
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => handleToolClick(tool.id)}
-                  disabled={isDisabled}
-                  className={`flex items-start gap-3 w-full p-3 rounded-lg text-left transition-all ${
-                    isDisabled
-                      ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
-                      : isActive
-                        ? "bg-purple-100 text-[color:var(--text-purple)] ring-2 ring-purple-500"
-                        : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] ring-1 ring-[color:var(--border-default)] hover:ring-2 hover:ring-purple-400"
-                  }`}
-                  title={disabledReason ?? (isActive ? t("toolbox.showAllTools") : label)}
-                >
-                  <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-[color:var(--text-purple)]" : ""}`} />
-                  <div>
-                    <div className="font-medium text-sm">{label}</div>
-                    <div className={`text-xs mt-0.5 ${isActive ? "text-[color:var(--text-purple)] opacity-70" : "text-[color:var(--text-muted)]"}`}>
-                      {description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Tool-specific options panel */}
-          {effectiveTool && (
-            <div className={`border-t ${borderDefault} pt-3`}>
-              {effectiveTool === "message-order" && <MessageOrderToolPanel />}
-              {effectiveTool === "changes" && <ChangesToolPanel />}
-              {effectiveTool === "checksum-discovery" && <ChecksumDiscoveryToolPanel />}
-              {effectiveTool === "serial-framing" && <SerialFramingToolPanel bytesCount={serialBytesCount} />}
-              {effectiveTool === "serial-payload" && <SerialPayloadToolPanel framesCount={serialFrameCount} />}
-              {effectiveTool === "modbus-function-codes" && (
-                <ModbusFunctionCodePanel onStartProbe={runAndClose(onStartModbusFcProbe)} />
-              )}
-              {effectiveTool === "modbus-register-scan" && (
-                <ModbusRegisterScanPanel onStartScan={runAndClose(onStartModbusScan)} />
-              )}
-              {effectiveTool === "modbus-unit-scan" && (
-                <ModbusUnitIdScanPanel onStartScan={runAndClose(onStartModbusUnitIdScan)} />
-              )}
-            </div>
-          )}
-
-          {/* Selection count and run button (for analysis tools, not modbus scan) */}
-          {effectiveTool && !isActiveModbusScan && (
-            <div className={`border-t ${borderDefault} pt-3 ${spaceYSmall}`}>
-              <div className={`text-sm ${textTertiary}`}>
-                {getSelectionText(t, effectiveTool, effectiveSelectedCount, isSerialMode, isFilteredView)}
-              </div>
-              <Button
-                onClick={handleRunAnalysis}
-                disabled={effectiveSelectedCount === 0 || isRunning}
-                variant="solid"
-                tone="purple"
-                size="lg"
-                className="w-full"
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => handleToolClick(tool.id)}
+                disabled={isDisabled}
+                className={`flex items-start gap-3 w-full p-3 rounded-lg text-left transition-all ${
+                  isDisabled
+                    ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
+                    : isActive
+                      ? "bg-purple-100 text-[color:var(--text-purple)] ring-2 ring-purple-500"
+                      : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] ring-1 ring-[color:var(--border-default)] hover:ring-2 hover:ring-purple-400"
+                }`}
+                title={disabledReason ?? (isActive ? t("toolbox.showAllTools") : label)}
               >
-                {isRunning ? (
-                  <Loader2 className={`${iconMd} animate-spin`} />
-                ) : (
-                  <Play className={iconMd} />
-                )}
-                {isRunning ? t("toolbox.running") : t("toolbox.runAnalysis")}
-              </Button>
-            </div>
-          )}
-
-          {/* Help text when no tool selected */}
-          {!effectiveTool && availableTools.some((tool) => isToolAvailable(tool)) && (
-            <div className={`text-xs ${textTertiary} text-center py-2`}>
-              {t("toolbox.selectTool")}
-            </div>
-          )}
-
-          {/* Help text when no data */}
-          {!availableTools.some(t => isToolAvailable(t)) && (
-            <div className={`text-xs ${textTertiary} text-center py-2`}>
-              {isSerialMode ? t("toolbox.noDataSerial") : t("toolbox.noDataDefault")}
-            </div>
-          )}
+                <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-[color:var(--text-purple)]" : ""}`} />
+                <div>
+                  <div className="font-medium text-sm">{label}</div>
+                  <div className={`text-xs mt-0.5 ${isActive ? "text-[color:var(--text-purple)] opacity-70" : "text-[color:var(--text-muted)]"}`}>
+                    {description}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-      </Card>
+
+        {/* Tool-specific options panel */}
+        {effectiveTool && (
+          <div className={`border-t ${borderDefault} pt-3`}>
+            {effectiveTool === "message-order" && <MessageOrderToolPanel />}
+            {effectiveTool === "changes" && <ChangesToolPanel />}
+            {effectiveTool === "checksum-discovery" && <ChecksumDiscoveryToolPanel />}
+            {effectiveTool === "serial-framing" && <SerialFramingToolPanel bytesCount={serialBytesCount} />}
+            {effectiveTool === "serial-payload" && <SerialPayloadToolPanel framesCount={serialFrameCount} />}
+            {effectiveTool === "modbus-function-codes" && (
+              <ModbusFunctionCodePanel onStartProbe={runAndClose(onStartModbusFcProbe)} />
+            )}
+            {effectiveTool === "modbus-register-scan" && (
+              <ModbusRegisterScanPanel onStartScan={runAndClose(onStartModbusScan)} />
+            )}
+            {effectiveTool === "modbus-unit-scan" && (
+              <ModbusUnitIdScanPanel onStartScan={runAndClose(onStartModbusUnitIdScan)} />
+            )}
+          </div>
+        )}
+
+        {/* Selection count and run button (for analysis tools, not modbus scan) */}
+        {effectiveTool && !isActiveModbusScan && (
+          <div className={`border-t ${borderDefault} pt-3 ${spaceYSmall}`}>
+            <div className={`text-sm ${textTertiary}`}>
+              {getSelectionText(t, effectiveTool, effectiveSelectedCount, isSerialMode, isFilteredView)}
+            </div>
+            <Button
+              onClick={handleRunAnalysis}
+              disabled={effectiveSelectedCount === 0 || isRunning}
+              variant="solid"
+              tone="purple"
+              size="lg"
+              className="w-full"
+            >
+              {isRunning ? (
+                <Loader2 className={`${iconMd} animate-spin`} />
+              ) : (
+                <Play className={iconMd} />
+              )}
+              {isRunning ? t("toolbox.running") : t("toolbox.runAnalysis")}
+            </Button>
+          </div>
+        )}
+
+        {/* Help text when no tool selected */}
+        {!effectiveTool && availableTools.some((tool) => isToolAvailable(tool)) && (
+          <div className={`text-xs ${textTertiary} text-center py-2`}>
+            {t("toolbox.selectTool")}
+          </div>
+        )}
+
+        {/* Help text when no data */}
+        {!availableTools.some(t => isToolAvailable(t)) && (
+          <div className={`text-xs ${textTertiary} text-center py-2`}>
+            {isSerialMode ? t("toolbox.noDataSerial") : t("toolbox.noDataDefault")}
+          </div>
+        )}
+      </DialogBody>
     </Dialog>
   );
 }

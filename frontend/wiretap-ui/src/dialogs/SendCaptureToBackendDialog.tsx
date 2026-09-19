@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { UploadCloud } from "lucide-react";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import Input from "../components/forms/Input";
 import Select from "../components/forms/Select";
 import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
@@ -127,14 +127,13 @@ export default function SendCaptureToBackendDialog({
   const dbNameValid = /^[a-z][a-z0-9_]*$/.test(database);
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <UploadCloud className="w-5 h-5 text-[color:var(--accent)]" />
-          <h2 className={`text-lg font-semibold ${textPrimary}`}>
-            {t("sendToBackend.title")}
-          </h2>
-        </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={t("sendToBackend.title")}
+      icon={<UploadCloud className="text-[color:var(--accent-primary)]" />}
+    >
+      <DialogBody className="space-y-4">
         <p className={helpText}>{t("sendToBackend.description", { name: captureName })}</p>
 
         {wiretapProfiles.length === 0 ? (
@@ -191,18 +190,6 @@ export default function SendCaptureToBackendDialog({
             </div>
 
             {error && <p className="text-[color:var(--status-danger-text)] text-sm">{error}</p>}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <SecondaryButton onClick={handleClose}>
-                {t("actions.cancel")}
-              </SecondaryButton>
-              <PrimaryButton
-                disabled={!profileId || !database || (newDatabase && !dbNameValid)}
-                onClick={startUpload}
-              >
-                {t("sendToBackend.upload")}
-              </PrimaryButton>
-            </div>
           </>
         ) : phase === "uploading" ? (
           <div className="space-y-3">
@@ -222,18 +209,26 @@ export default function SendCaptureToBackendDialog({
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className={textPrimary}>
-              {t("sendToBackend.done", { count: imported.toLocaleString(), database })}
-            </p>
-            <div className="flex justify-end">
-              <PrimaryButton onClick={handleClose}>
-                {t("actions.close")}
-              </PrimaryButton>
-            </div>
-          </div>
+          <p className={textPrimary}>
+            {t("sendToBackend.done", { count: imported.toLocaleString(), database })}
+          </p>
         )}
-      </div>
+      </DialogBody>
+      {phase === "configure" || phase === "error" ? (
+        <DialogFooter>
+          <SecondaryButton onClick={handleClose}>{t("actions.cancel")}</SecondaryButton>
+          <PrimaryButton
+            disabled={!profileId || !database || (newDatabase && !dbNameValid)}
+            onClick={startUpload}
+          >
+            {t("sendToBackend.upload")}
+          </PrimaryButton>
+        </DialogFooter>
+      ) : phase === "done" ? (
+        <DialogFooter>
+          <PrimaryButton onClick={handleClose}>{t("actions.close")}</PrimaryButton>
+        </DialogFooter>
+      ) : null}
     </Dialog>
   );
 }

@@ -3,10 +3,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, HelpCircle } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textPrimary, textSecondary } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import { nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
@@ -162,12 +161,8 @@ export default function BridgeDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-xl">
-      <div className="p-6">
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          {t("bridgeDialog.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="xl" title={t("bridgeDialog.title")}>
+      <DialogBody>
         {validationError && (
           <Alert tone="danger" size="sm" className="mb-3">{validationError}</Alert>
         )}
@@ -399,9 +394,8 @@ export default function BridgeDialog({
             )}
           </div>
         </div>
-      </div>
-
-      <div className={`${panelFooter} flex justify-end gap-2`}>
+      </DialogBody>
+      <DialogFooter>
         <SecondaryButton
           onClick={onClose}
         >
@@ -412,7 +406,7 @@ export default function BridgeDialog({
         >
           {bidirectional ? t("bridgeDialog.submitTwo") : t("bridgeDialog.submitOne")}
         </PrimaryButton>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

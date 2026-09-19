@@ -5,7 +5,7 @@ import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateC
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
 import { isCaptureProfileId } from "../../hooks/useIOSessionManager";
-import { panelFooter } from "../../styles";
+import { DialogFooter } from "../../components/Dialog";
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
 import { SuccessButton, PrimaryButton } from "../../components/forms";
@@ -108,7 +108,7 @@ export default function ActionButtons({
   ) : null;
 
   return (
-    <div className={panelFooter}>
+    <DialogFooter className="block">
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--text-muted)]">
           <Loader2 className={`${iconMd} animate-spin`} />
@@ -302,6 +302,6 @@ export default function ActionButtons({
           {mode === "connect" ? t("ioSourcePicker.actions.selectDatabase") : t("ioSourcePicker.actions.selectSource")}
         </div>
       )}
-    </div>
+    </DialogFooter>
   );
 }

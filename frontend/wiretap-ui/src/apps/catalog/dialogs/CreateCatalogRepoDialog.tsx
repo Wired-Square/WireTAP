@@ -12,12 +12,11 @@ import { useTranslation } from "react-i18next";
 import { Globe, Lock } from "lucide-react";
 import * as ShareIcon from "../../../components/catalogIcons";
 import Alert from "../../../components/Alert";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { FormField, Input, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import SettingRadioGroup from "../../settings/components/rows/SettingRadioGroup";
 import { iconMd, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, caption, h2, textDanger } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { caption, textDanger } from "../../../styles";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 
 
@@ -54,90 +53,88 @@ export default function CreateCatalogRepoDialog({ isOpen, onClose, onCreated }: 
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-lg">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className={h2}>{t("createRepo.title")}</h2>
-          <p className={caption}>{t("createRepo.subtitle")}</p>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <FormField label={t("createRepo.nameLabel")}>
-            <Input
-              size="lg"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="wiretap-catalogs"
-              autoFocus
-            />
-          </FormField>
-
-          <FormField label={t("createRepo.descriptionLabel")}>
-            <Input
-              size="lg"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("createRepo.descriptionPlaceholder")}
-            />
-          </FormField>
-
-          {/* Shared group so the two options are one radio set — arrow-key
-              navigation and assistive tech depend on the shared `name`. */}
-          <SettingRadioGroup
-            name="repo-visibility"
-            value={isPrivate ? "private" : "public"}
-            onChange={(v) => setIsPrivate(v === "private")}
-            stacked
-            options={[
-              {
-                value: "private",
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <Lock className={iconSm} />
-                    {t("createRepo.private")}
-                  </span>
-                ),
-                description: t("createRepo.privateHint"),
-              },
-              {
-                value: "public",
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <Globe className={iconSm} />
-                    {t("createRepo.public")}
-                  </span>
-                ),
-                description: t("createRepo.publicHint"),
-              },
-            ]}
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={t("createRepo.title")}
+      subtitle={t("createRepo.subtitle")}
+    >
+      <DialogBody className="space-y-4">
+        <FormField label={t("createRepo.nameLabel")}>
+          <Input
+            size="lg"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="wiretap-catalogs"
+            autoFocus
           />
+        </FormField>
 
-          {!isPrivate && (
-            <Alert tone="warning">
-              <p className="text-xs">{t("createRepo.publicWarning")}</p>
-            </Alert>
-          )}
+        <FormField label={t("createRepo.descriptionLabel")}>
+          <Input
+            size="lg"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t("createRepo.descriptionPlaceholder")}
+          />
+        </FormField>
 
-          {!hasToken && <p className={`${caption} ${textDanger}`}>{t("createRepo.needsToken")}</p>}
+        {/* Shared group so the two options are one radio set — arrow-key
+            navigation and assistive tech depend on the shared `name`. */}
+        <SettingRadioGroup
+          name="repo-visibility"
+          value={isPrivate ? "private" : "public"}
+          onChange={(v) => setIsPrivate(v === "private")}
+          stacked
+          options={[
+            {
+              value: "private",
+              label: (
+                <span className="inline-flex items-center gap-2">
+                  <Lock className={iconSm} />
+                  {t("createRepo.private")}
+                </span>
+              ),
+              description: t("createRepo.privateHint"),
+            },
+            {
+              value: "public",
+              label: (
+                <span className="inline-flex items-center gap-2">
+                  <Globe className={iconSm} />
+                  {t("createRepo.public")}
+                </span>
+              ),
+              description: t("createRepo.publicHint"),
+            },
+          ]}
+        />
 
-          {account.error && (
-            <Alert tone="danger">
-              <p className="text-xs">{account.error.message}</p>
-            </Alert>
-          )}
-        </div>
+        {!isPrivate && (
+          <Alert tone="warning">
+            <p className="text-xs">{t("createRepo.publicWarning")}</p>
+          </Alert>
+        )}
 
-        <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>{t("createRepo.cancel")}</SecondaryButton>
-          <PrimaryButton
-            onClick={() => void handleCreate()}
-            disabled={!name.trim() || !hasToken || account.busy}
-          >
-            {account.busy && <ShareIcon.Busy className={`${iconMd} animate-spin`} />}
-            {t("createRepo.create")}
-          </PrimaryButton>
-        </div>
-      </div>
+        {!hasToken && <p className={`${caption} ${textDanger}`}>{t("createRepo.needsToken")}</p>}
+
+        {account.error && (
+          <Alert tone="danger">
+            <p className="text-xs">{account.error.message}</p>
+          </Alert>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("createRepo.cancel")}</SecondaryButton>
+        <PrimaryButton
+          onClick={() => void handleCreate()}
+          disabled={!name.trim() || !hasToken || account.busy}
+        >
+          {account.busy && <ShareIcon.Busy className={`${iconMd} animate-spin`} />}
+          {t("createRepo.create")}
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

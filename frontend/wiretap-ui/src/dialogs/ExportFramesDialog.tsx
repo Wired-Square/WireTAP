@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { Select, FormField, PrimaryButton, SecondaryButton } from "../components/forms";
 import { h3, bodyDefault, caption } from "../styles";
 
@@ -83,8 +83,8 @@ export default function ExportFramesDialog({
   const summaryKey = dataMode === "bytes" ? "exportFrames.summary_bytes" : "exportFrames.summary_frames";
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
+    <Dialog isOpen={open} size="sm">
+      <DialogBody className="space-y-4">
         <div className={h3}>{title}</div>
         <div className={bodyDefault}>{t(summaryKey, { count: itemCount })}</div>
 
@@ -101,12 +101,11 @@ export default function ExportFramesDialog({
         </FormField>
 
         <div className={caption}>{formatDescription}</div>
-
-        <div className="flex justify-end gap-3 pt-4">
-          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-          <PrimaryButton onClick={handleExport}>{t("common:actions.export")}</PrimaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleExport}>{t("common:actions.export")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

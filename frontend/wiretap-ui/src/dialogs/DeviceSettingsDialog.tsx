@@ -12,8 +12,8 @@
 
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, X } from "lucide-react";
-import Dialog from "../components/Dialog";
+import { Loader2 } from "lucide-react";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../components/Dialog";
 import IOConnectionFields from "../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../components/io/useConnectionProbe";
 import { PrimaryButton, SecondaryButton } from "../components/forms";
@@ -22,18 +22,11 @@ import { applyConnectionDefaults, validateProfileForm } from "../settings/ioProf
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
-import { iconLg, iconSm } from "../styles/spacing";
-import {
-  h3,
-  borderDefault,
-  paddingCard,
-  caption,
-} from "../styles";
+import { iconSm } from "../styles/spacing";
+import { caption } from "../styles";
 import type { IOProfile, ConnectionFieldValue } from "../settings/appSettings";
-import { IconButton } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Alert } from "../components/Alert";
-import { Card } from "../components/Card";
 
 export default function DeviceSettingsDialog() {
   const request = useDeviceEditorStore((s) => s.request);
@@ -119,67 +112,56 @@ function DeviceSettingsForm({
   }, [profile.id, draft, sessionId, onClose, t]);
 
   return (
-    <Dialog isOpen onBackdropClick={busy ? undefined : onClose} maxWidth="max-w-lg">
-      <Card padding="none" className="shadow-xl overflow-hidden">
-        <div className={`${paddingCard} border-b ${borderDefault} flex items-start justify-between gap-3`}>
-          <div className="min-w-0">
-            <h2 className={`${h3} truncate`}>{profile.name}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge size="lg">{getIOKindLabel(profile.kind)}</Badge>
-              {profile.ephemeral && (
-                <span className={caption}>{t("deviceSettings.unsaved")}</span>
-              )}
-            </div>
-          </div>
-          <IconButton
-            onClick={onClose}
-            disabled={busy}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
-        <div className="max-h-[65vh] overflow-y-auto px-6 pb-2">
-          <IOConnectionFields
-            profile={draft}
-            onUpdateConnectionField={updateConnectionField}
-            probe={probe}
-            platform={platform}
-            canProbeByProfileId
-            // Secrets are never read back out of the keyring: the stored marker
-            // is shown, and the value only changes if the user types a new one.
-            isPasswordSecurelyStored={!!conn._password_stored}
-            isApiKeySecurelyStored={!!conn._api_key_stored}
-          />
-
-          {isLive && (
-            <Alert tone="info" className="mt-4">{t("deviceSettings.liveHint")}</Alert>
-          )}
-
-          {error && (
-            <Alert tone="warning" className="mt-4">{error}</Alert>
-          )}
-        </div>
-
-        <div className={`${paddingCard} border-t ${borderDefault} flex items-center justify-between gap-3`}>
-          <p className={caption}>
-            {profile.ephemeral
-              ? t("deviceSettings.ephemeralFooter")
-              : t("deviceSettings.savedFooter")}
-          </p>
-          <div className="flex items-center gap-2">
-            <SecondaryButton onClick={onClose} disabled={busy}>
-              {t("deviceSettings.cancel")}
-            </SecondaryButton>
-            <PrimaryButton onClick={() => void apply()} disabled={busy}>
-              {busy && <Loader2 className={`${iconSm} animate-spin`} />}
-              {isLive ? t("deviceSettings.applyReconnect") : t("deviceSettings.apply")}
-            </PrimaryButton>
+    <Dialog isOpen onClose={busy ? undefined : onClose} size="lg">
+      <DialogHeader>
+        <div>
+          <DialogTitle className="truncate">{profile.name}</DialogTitle>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge size="lg">{getIOKindLabel(profile.kind)}</Badge>
+            {profile.ephemeral && (
+              <span className={caption}>{t("deviceSettings.unsaved")}</span>
+            )}
           </div>
         </div>
-      </Card>
+      </DialogHeader>
+      <DialogBody className="max-h-[65vh] pt-0">
+        <IOConnectionFields
+          profile={draft}
+          onUpdateConnectionField={updateConnectionField}
+          probe={probe}
+          platform={platform}
+          canProbeByProfileId
+          // Secrets are never read back out of the keyring: the stored marker
+          // is shown, and the value only changes if the user types a new one.
+          isPasswordSecurelyStored={!!conn._password_stored}
+          isApiKeySecurelyStored={!!conn._api_key_stored}
+        />
+
+        {isLive && (
+          <Alert tone="info" className="mt-4">{t("deviceSettings.liveHint")}</Alert>
+        )}
+
+        {error && (
+          <Alert tone="warning" className="mt-4">{error}</Alert>
+        )}
+      </DialogBody>
+
+      <DialogFooter className="justify-between">
+        <p className={caption}>
+          {profile.ephemeral
+            ? t("deviceSettings.ephemeralFooter")
+            : t("deviceSettings.savedFooter")}
+        </p>
+        <div className="flex items-center gap-2">
+          <SecondaryButton onClick={onClose} disabled={busy}>
+            {t("deviceSettings.cancel")}
+          </SecondaryButton>
+          <PrimaryButton onClick={() => void apply()} disabled={busy}>
+            {busy && <Loader2 className={`${iconSm} animate-spin`} />}
+            {isLive ? t("deviceSettings.applyReconnect") : t("deviceSettings.apply")}
+          </PrimaryButton>
+        </div>
+      </DialogFooter>
     </Dialog>
   );
 }

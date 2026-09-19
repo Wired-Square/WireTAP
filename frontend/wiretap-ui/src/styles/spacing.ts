@@ -6,15 +6,6 @@
 // Padding - Content Areas
 // =============================================================================
 
-/** Dialog/modal content padding */
-export const paddingDialog = "p-6";
-
-/** Card content padding */
-export const paddingCard = "p-4";
-
-/** Compact card padding */
-export const paddingCardSm = "p-3";
-
 /** Large section padding */
 export const paddingSection = "p-8";
 

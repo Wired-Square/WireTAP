@@ -1,14 +1,9 @@
-// ui/src/dialogs/FramePickerDialog.tsx
 
-import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconLg } from "../styles/spacing";
-import { borderDivider, bgSurface } from "../styles";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody } from "../components/Dialog";
 import FramePicker from "../components/FramePicker";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
-import { IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -48,40 +43,26 @@ export default function FramePickerDialog({
   const { t } = useTranslation("dialogs");
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {t("framePicker.title")}
-          </h2>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-        <div className="p-4 max-h-[60vh] overflow-y-auto">
-          <FramePicker
-            frames={frames}
-            selected={selectedFrames}
-            onToggle={onToggleFrame}
-            onBulkSelect={onBulkSelect}
-            onSelectAll={onSelectAll}
-            onDeselectAll={onDeselectAll}
-            activeSelectionSetId={activeSelectionSetId}
-            selectionSetDirty={selectionSetDirty}
-            onSaveSelectionSet={onSaveSelectionSet}
-            selectionSets={selectionSets}
-            onLoadSelectionSet={onLoadSelectionSet}
-            onClearSelectionSet={onClearSelectionSet}
-            onSaveAsNewSelectionSet={onSaveAsNewSelectionSet}
-            defaultExpanded={true}
-            noInnerScroll={true}
-          />
-        </div>
-      </div>
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("framePicker.title")}>
+      <DialogBody className="max-h-[60vh]">
+        <FramePicker
+          frames={frames}
+          selected={selectedFrames}
+          onToggle={onToggleFrame}
+          onBulkSelect={onBulkSelect}
+          onSelectAll={onSelectAll}
+          onDeselectAll={onDeselectAll}
+          activeSelectionSetId={activeSelectionSetId}
+          selectionSetDirty={selectionSetDirty}
+          onSaveSelectionSet={onSaveSelectionSet}
+          selectionSets={selectionSets}
+          onLoadSelectionSet={onLoadSelectionSet}
+          onClearSelectionSet={onClearSelectionSet}
+          onSaveAsNewSelectionSet={onSaveAsNewSelectionSet}
+          defaultExpanded={true}
+          noInnerScroll={true}
+        />
+      </DialogBody>
     </Dialog>
   );
 }

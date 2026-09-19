@@ -3,10 +3,9 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textPrimary, textSecondary } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
 import { Button, IconButton } from "../../../components/Button";
@@ -178,146 +177,139 @@ export default function UserSignalDialog({
   }, [signalIdHex, name, group, format, unit, enumRows, onAdd, resetForm, t, usedSignalIds]);
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-lg">
-      <div className="p-6">
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          {t("userSignalDialog.title")}
-        </h2>
-
-        <div className="space-y-4">
-          {/* Signal ID */}
-          <div>
-            <label className={labelDefault}>{t("userSignalDialog.fields.signalId")}</label>
-            <Input
-              type="text"
-              size="lg"
-              mono
-              value={signalIdHex}
-              onChange={(e) => setSignalIdHex(e.target.value)}
-              placeholder={t("userSignalDialog.fields.signalIdPlaceholder")}
-            />
-          </div>
-
-          {/* Name */}
-          <div>
-            <label className={labelDefault}>{t("userSignalDialog.fields.name")}</label>
-            <Input
-              type="text"
-              size="lg"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("userSignalDialog.fields.namePlaceholder")}
-            />
-          </div>
-
-          {/* Group + Format side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelDefault}>{t("userSignalDialog.fields.group")}</label>
-              <Input
-                type="text"
-                size="lg"
-                value={group}
-                onChange={(e) => setGroup(e.target.value)}
-                placeholder={DEFAULT_GROUP}
-              />
-            </div>
-            <div>
-              <label className={labelDefault}>{t("userSignalDialog.fields.format")}</label>
-              <Select
-                size="lg"
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-              >
-                {FORMAT_KEYS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {t(`userSignalDialog.formats.${opt.key}`)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          {/* Unit */}
-          <div>
-            <label className={labelDefault}>{t("userSignalDialog.fields.unit")}</label>
-            <Input
-              type="text"
-              size="lg"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              placeholder={t("userSignalDialog.fields.unitPlaceholder")}
-            />
-          </div>
-
-          {/* Enum values — shown only when format is "enum" */}
-          {format === "enum" && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className={labelDefault}>{t("userSignalDialog.fields.enumValues")}</label>
-                <Button
-                  onClick={addEnumRow}
-                  variant="link"
-                  tone="primary"
-                  className="text-xs"
-                >
-                  <Plus className={iconMd} /> {t("userSignalDialog.fields.addValue")}
-                </Button>
-              </div>
-
-              {enumRows.length > 0 && (
-                <div className="space-y-2">
-                  {enumRows.map((row, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        size="lg"
-                        mono
-                        className="w-20 shrink-0"
-                        value={row.value}
-                        onChange={(e) =>
-                          updateEnumRow(idx, "value", e.target.value)
-                        }
-                        placeholder={t("userSignalDialog.fields.valuePlaceholder")}
-                      />
-                      <Input
-                        type="text"
-                        size="lg"
-                        className="flex-1"
-                        value={row.label}
-                        onChange={(e) =>
-                          updateEnumRow(idx, "label", e.target.value)
-                        }
-                        placeholder={t("userSignalDialog.fields.labelPlaceholder")}
-                      />
-                      <IconButton
-                        onClick={() => removeEnumRow(idx)}
-                        tone="danger"
-                        size="sm"
-                      >
-                        <Trash2 className={iconMd} />
-                      </IconButton>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {enumRows.length === 0 && (
-                <p className={`text-xs ${textSecondary}`}>
-                  {t("userSignalDialog.fields.noEnums")}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Validation error */}
-          {validationError && (
-            <p className="text-xs text-red-400">{validationError}</p>
-          )}
+    <Dialog isOpen={isOpen} onClose={handleClose} size="lg" title={t("userSignalDialog.title")}>
+      <DialogBody className="space-y-4">
+        {/* Signal ID */}
+        <div>
+          <label className={labelDefault}>{t("userSignalDialog.fields.signalId")}</label>
+          <Input
+            type="text"
+            size="lg"
+            mono
+            value={signalIdHex}
+            onChange={(e) => setSignalIdHex(e.target.value)}
+            placeholder={t("userSignalDialog.fields.signalIdPlaceholder")}
+          />
         </div>
-      </div>
 
-      <div className={`${panelFooter} flex justify-end gap-2`}>
+        {/* Name */}
+        <div>
+          <label className={labelDefault}>{t("userSignalDialog.fields.name")}</label>
+          <Input
+            type="text"
+            size="lg"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("userSignalDialog.fields.namePlaceholder")}
+          />
+        </div>
+
+        {/* Group + Format side by side */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelDefault}>{t("userSignalDialog.fields.group")}</label>
+            <Input
+              type="text"
+              size="lg"
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              placeholder={DEFAULT_GROUP}
+            />
+          </div>
+          <div>
+            <label className={labelDefault}>{t("userSignalDialog.fields.format")}</label>
+            <Select
+              size="lg"
+              value={format}
+              onChange={(e) => setFormat(e.target.value)}
+            >
+              {FORMAT_KEYS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(`userSignalDialog.formats.${opt.key}`)}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* Unit */}
+        <div>
+          <label className={labelDefault}>{t("userSignalDialog.fields.unit")}</label>
+          <Input
+            type="text"
+            size="lg"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder={t("userSignalDialog.fields.unitPlaceholder")}
+          />
+        </div>
+
+        {/* Enum values — shown only when format is "enum" */}
+        {format === "enum" && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelDefault}>{t("userSignalDialog.fields.enumValues")}</label>
+              <Button
+                onClick={addEnumRow}
+                variant="link"
+                tone="primary"
+                className="text-xs"
+              >
+                <Plus className={iconMd} /> {t("userSignalDialog.fields.addValue")}
+              </Button>
+            </div>
+
+            {enumRows.length > 0 && (
+              <div className="space-y-2">
+                {enumRows.map((row, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      size="lg"
+                      mono
+                      className="w-20 shrink-0"
+                      value={row.value}
+                      onChange={(e) =>
+                        updateEnumRow(idx, "value", e.target.value)
+                      }
+                      placeholder={t("userSignalDialog.fields.valuePlaceholder")}
+                    />
+                    <Input
+                      type="text"
+                      size="lg"
+                      className="flex-1"
+                      value={row.label}
+                      onChange={(e) =>
+                        updateEnumRow(idx, "label", e.target.value)
+                      }
+                      placeholder={t("userSignalDialog.fields.labelPlaceholder")}
+                    />
+                    <IconButton
+                      onClick={() => removeEnumRow(idx)}
+                      tone="danger"
+                      size="sm"
+                    >
+                      <Trash2 className={iconMd} />
+                    </IconButton>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {enumRows.length === 0 && (
+              <p className={`text-xs ${textSecondary}`}>
+                {t("userSignalDialog.fields.noEnums")}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Validation error */}
+        {validationError && (
+          <p className="text-xs text-red-400">{validationError}</p>
+        )}
+      </DialogBody>
+      <DialogFooter>
         <SecondaryButton
           onClick={handleClose}
         >
@@ -328,7 +320,7 @@ export default function UserSignalDialog({
         >
           {t("userSignalDialog.submit")}
         </PrimaryButton>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
+import { SecondaryButton, PrimaryButton } from "../components/forms";
 import Input from "../components/forms/Input";
-import { DialogFooter } from "../components/forms/DialogFooter";
 import { labelSmall } from "../styles";
 import TimeBoundsInput, { type TimeBounds } from "../components/TimeBoundsInput";
 
@@ -56,12 +56,8 @@ export default function AddBookmarkDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          {t("addBookmark.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} title={t("addBookmark.title")}>
+      <DialogBody className="space-y-4">
         <div className="space-y-3">
           {/* Name input */}
           <div className="space-y-1">
@@ -82,14 +78,11 @@ export default function AddBookmarkDialog({
             showBookmarks={false}
           />
         </div>
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleSave}
-          confirmLabel={t("addBookmark.save")}
-          confirmDisabled={!name.trim() || !timeBounds.startTime}
-        />
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleSave} disabled={!name.trim() || !timeBounds.startTime}>{t("addBookmark.save")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

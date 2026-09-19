@@ -5,12 +5,9 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { iconLg } from '../../../../styles/spacing';
-import Dialog from '../../../../components/Dialog';
+import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
+import { SecondaryButton, PrimaryButton } from '../../../../components/forms';
 import FilterOptionsPanel, { type FilterConfig } from '../../../../components/FilterOptionsPanel';
-import { DialogFooter } from '../../../../components/forms/DialogFooter';
-import { IconButton } from '../../../../components/Button';
 
 interface FilterDialogProps {
   isOpen: boolean;
@@ -35,27 +32,18 @@ export default function FilterDialog({ isOpen, onClose, minLength: initialMinLen
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("serial.filterTitle")}</h2>
-          <IconButton onClick={onClose} size="sm">
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} size="sm" onClose={onClose} title={t("serial.filterTitle")}>
+      <DialogBody className="space-y-4">
         <FilterOptionsPanel
           config={config}
           onChange={setConfig}
           variant="card"
         />
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleApply}
-          confirmLabel={t("serial.apply")}
-        />
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleApply}>{t("serial.apply")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

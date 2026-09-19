@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../../../components/Dialog";
-import { DialogFooter } from "../../../components/forms/DialogFooter";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { caption, sectionHeaderText } from "../../../styles";
 import { Button } from "../../../components/Button";
-import { Input } from "../../../components/forms";
+import { Input, SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 type Props = {
   isOpen: boolean;
@@ -48,12 +47,8 @@ export default function FilterDialog({
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          {t("filterDialog.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} size="sm" title={t("filterDialog.title")}>
+      <DialogBody className="space-y-4">
         {/* Frame ID Filter */}
         <div className="space-y-2">
           <label className={`block ${sectionHeaderText}`}>
@@ -85,25 +80,20 @@ export default function FilterDialog({
           />
           <p className={caption}>{t("filterDialog.minLengthHelp")}</p>
         </div>
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleSave}
-          confirmLabel={t("filterDialog.apply")}
-          leftContent={
-            hasFilters ? (
-              <Button
-                onClick={handleClear}
-                variant="ghost"
-                tone="danger"
-                size="lg"
-              >
-                {t("filterDialog.clearAll")}
-              </Button>
-            ) : undefined
-          }
-        />
-      </div>
+      </DialogBody>
+      <DialogFooter className="justify-between">
+        <div>
+          {hasFilters && (
+            <Button onClick={handleClear} variant="ghost" tone="danger" size="lg">
+              {t("filterDialog.clearAll")}
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+          <PrimaryButton onClick={handleSave}>{t("filterDialog.apply")}</PrimaryButton>
+        </div>
+      </DialogFooter>
     </Dialog>
   );
 }

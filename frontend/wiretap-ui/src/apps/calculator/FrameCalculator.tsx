@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useCalculatorStore } from "../../stores/calculatorStore";
 import AppLayout from "../../components/AppLayout";
 import ByteBits from "../../components/ByteBits";
-import Dialog from "../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import FlexSeparator from "../../components/FlexSeparator";
 import { SecondaryButton, PrimaryButton, Input } from "../../components/forms";
 import { useSettings } from "../../hooks/useSettings";
@@ -15,7 +15,7 @@ import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
 import { caption, captionMuted, borderDivider, bgSurface } from "../../styles";
 import { borderDataView, bgDataView } from "../../styles/colourTokens";
 import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacing";
-import { h2, sectionHeaderText } from "../../styles/typography";
+import { sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
 import { Card } from "../../components/Card";
 export type Endianness = "little" | "big" | "mid-little" | "mid-big";
@@ -673,106 +673,104 @@ export default function FrameCalculator() {
       </AppLayout>
 
       {/* Grouping Dialog */}
-      <Dialog isOpen={showCustomDialog} maxWidth="max-w-sm" onBackdropClick={handleCustomCancel}>
-        <div className="p-6">
-          <h2 className={`${h2} mb-4`}>{t("dialogs.groupingMode.title")}</h2>
-
-          <div className="space-y-4">
-            {/* Preset options */}
-            <div>
-              <label className={`block ${sectionHeaderText} mb-2`}>
-                Preset
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {(["1B", "2B", "4B", "8B"] as GroupMode[]).map((mode) => (
-                  <Button
-                    key={mode}
-                    onClick={() => handlePresetSelect(mode)}
-                    variant="outline"
-                    tone="primary"
-                    pressed={groupMode === mode}
-                  >
-                    {mode}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-[var(--hover-bg)]" />
-              <span className={captionMuted}>or custom</span>
-              <div className="flex-1 h-px bg-[var(--hover-bg)]" />
-            </div>
-
-            {/* Custom unit selector */}
-            <div>
-              <label className={`block ${sectionHeaderText} mb-2`}>
-                Unit
-              </label>
-              <div className="flex gap-2">
+      <Dialog
+        isOpen={showCustomDialog}
+        size="sm"
+        onClose={handleCustomCancel}
+        title={t("dialogs.groupingMode.title")}
+      >
+        <DialogBody className="space-y-4">
+          {/* Preset options */}
+          <div>
+            <label className={`block ${sectionHeaderText} mb-2`}>
+              Preset
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {(["1B", "2B", "4B", "8B"] as GroupMode[]).map((mode) => (
                 <Button
-                  onClick={() => setDialogUnit("bits")}
+                  key={mode}
+                  onClick={() => handlePresetSelect(mode)}
                   variant="outline"
                   tone="primary"
-                  pressed={dialogUnit === "bits"}
-                  className="flex-1"
+                  pressed={groupMode === mode}
                 >
-                  Bits
+                  {mode}
                 </Button>
-                <Button
-                  onClick={() => setDialogUnit("bytes")}
-                  variant="outline"
-                  tone="primary"
-                  pressed={dialogUnit === "bytes"}
-                  className="flex-1"
-                >
-                  Bytes
-                </Button>
-              </div>
-            </div>
-
-            {/* Custom sizes input */}
-            <div>
-              <label className={`block ${sectionHeaderText} mb-2`}>
-                Group Sizes
-              </label>
-              <Input
-                type="text"
-                value={dialogInput}
-                onChange={(e) => setDialogInput(e.target.value)}
-                size="lg"
-                mono
-                placeholder={dialogUnit === "bits" ? t("dialogs.groupingMode.customPlaceholderBits") : t("dialogs.groupingMode.customPlaceholderBytes")}
-              />
-              <p className={`${caption} mt-1`}>
-                Comma-separated list of {dialogUnit === "bits" ? "bit" : "byte"} sizes
-              </p>
+              ))}
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
-            <SecondaryButton onClick={handleCustomCancel}>{t("common:actions.close")}</SecondaryButton>
-            <PrimaryButton
-              onClick={handleCustomOk}
-              disabled={!dialogInput.trim()}
-            >
-              Apply Custom
-            </PrimaryButton>
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-[var(--hover-bg)]" />
+            <span className={captionMuted}>or custom</span>
+            <div className="flex-1 h-px bg-[var(--hover-bg)]" />
           </div>
-        </div>
+
+          {/* Custom unit selector */}
+          <div>
+            <label className={`block ${sectionHeaderText} mb-2`}>
+              Unit
+            </label>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setDialogUnit("bits")}
+                variant="outline"
+                tone="primary"
+                pressed={dialogUnit === "bits"}
+                className="flex-1"
+              >
+                Bits
+              </Button>
+              <Button
+                onClick={() => setDialogUnit("bytes")}
+                variant="outline"
+                tone="primary"
+                pressed={dialogUnit === "bytes"}
+                className="flex-1"
+              >
+                Bytes
+              </Button>
+            </div>
+          </div>
+
+          {/* Custom sizes input */}
+          <div>
+            <label className={`block ${sectionHeaderText} mb-2`}>
+              Group Sizes
+            </label>
+            <Input
+              type="text"
+              value={dialogInput}
+              onChange={(e) => setDialogInput(e.target.value)}
+              size="lg"
+              mono
+              placeholder={dialogUnit === "bits" ? t("dialogs.groupingMode.customPlaceholderBits") : t("dialogs.groupingMode.customPlaceholderBytes")}
+            />
+            <p className={`${caption} mt-1`}>
+              Comma-separated list of {dialogUnit === "bits" ? "bit" : "byte"} sizes
+            </p>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton onClick={handleCustomCancel}>{t("common:actions.close")}</SecondaryButton>
+          <PrimaryButton
+            onClick={handleCustomOk}
+            disabled={!dialogInput.trim()}
+          >
+            Apply Custom
+          </PrimaryButton>
+        </DialogFooter>
       </Dialog>
 
       {/* History Picker Dialog */}
-      <Dialog isOpen={showHistoryDialog} maxWidth="max-w-md" onBackdropClick={handleHistoryDialogClose}>
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
-              <History className={`${iconLg} text-[color:var(--accent-primary)]`} />
-            </div>
-            <h2 className={h2}>{t("dialogs.memory.title")}</h2>
-          </div>
-
+      <Dialog
+        isOpen={showHistoryDialog}
+        onClose={handleHistoryDialogClose}
+        title={t("dialogs.memory.title")}
+        icon={<History className="text-[color:var(--accent-primary)]" />}
+      >
+        <DialogBody>
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {history.map((item, index) => {
               const isCurrentItem = item === rawInput.trim();
@@ -820,27 +818,30 @@ export default function FrameCalculator() {
               );
             })}
           </div>
-
-          <div className="flex justify-between mt-4">
-            <Button
-              onClick={handleHistoryCopyAll}
-              variant="tonal"
-              tone="primary"
-              size="lg"
-              title={t("tooltips.copyAllHistory")}
-            >
-              <CopyPlus className={iconMd} />
-              Copy All
-            </Button>
-            <SecondaryButton onClick={handleHistoryDialogClose}>{t("common:actions.close")}</SecondaryButton>
-          </div>
-        </div>
+        </DialogBody>
+        <DialogFooter className="justify-between">
+          <Button
+            onClick={handleHistoryCopyAll}
+            variant="tonal"
+            tone="primary"
+            size="lg"
+            title={t("tooltips.copyAllHistory")}
+          >
+            <CopyPlus className={iconMd} />
+            Copy All
+          </Button>
+          <SecondaryButton onClick={handleHistoryDialogClose}>{t("common:actions.close")}</SecondaryButton>
+        </DialogFooter>
       </Dialog>
 
       {/* Endianness Dialog */}
-      <Dialog isOpen={showEndiannessDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowEndiannessDialog(false)}>
-        <div className="p-6">
-          <h2 className={`${h2} mb-4`}>{t("dialogs.byteOrder.title")}</h2>
+      <Dialog
+        isOpen={showEndiannessDialog}
+        size="sm"
+        onClose={() => setShowEndiannessDialog(false)}
+        title={t("dialogs.byteOrder.title")}
+      >
+        <DialogBody>
           <div className="grid grid-cols-2 gap-2">
             {([
               { value: "little", label: "Little" },
@@ -862,16 +863,20 @@ export default function FrameCalculator() {
               </Button>
             ))}
           </div>
-          <div className="flex justify-end mt-4">
-            <SecondaryButton onClick={() => setShowEndiannessDialog(false)}>{t("common:actions.close")}</SecondaryButton>
-          </div>
-        </div>
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton onClick={() => setShowEndiannessDialog(false)}>{t("common:actions.close")}</SecondaryButton>
+        </DialogFooter>
       </Dialog>
 
       {/* Rotate Interval Dialog */}
-      <Dialog isOpen={showRotateDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowRotateDialog(false)}>
-        <div className="p-6">
-          <h2 className={`${h2} mb-4`}>{t("dialogs.rotationInterval.title")}</h2>
+      <Dialog
+        isOpen={showRotateDialog}
+        size="sm"
+        onClose={() => setShowRotateDialog(false)}
+        title={t("dialogs.rotationInterval.title")}
+      >
+        <DialogBody>
           <div className="grid grid-cols-3 gap-2">
             {[1, 2, 3, 5, 10, 15].map((interval) => (
               <Button
@@ -888,99 +893,95 @@ export default function FrameCalculator() {
               </Button>
             ))}
           </div>
-          <div className="flex justify-end mt-4">
-            <SecondaryButton onClick={() => setShowRotateDialog(false)}>{t("common:actions.close")}</SecondaryButton>
-          </div>
-        </div>
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton onClick={() => setShowRotateDialog(false)}>{t("common:actions.close")}</SecondaryButton>
+        </DialogFooter>
       </Dialog>
 
       {/* Scale Calculator Dialog */}
-      <Dialog isOpen={showScaleDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowScaleDialog(false)}>
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
-              <Divide className={`${iconLg} text-[color:var(--accent-primary)]`} />
+      <Dialog
+        isOpen={showScaleDialog}
+        size="sm"
+        onClose={() => setShowScaleDialog(false)}
+        title={t("dialogs.scale.title")}
+        icon={<Divide className="text-[color:var(--accent-primary)]" />}
+      >
+        <DialogBody className="space-y-4">
+          {/* Raw value display */}
+          <div>
+            <label className={`block ${sectionHeaderText} mb-1`}>
+              Raw Value (from hex)
+            </label>
+            <div className="px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm">
+              {groups.length > 0 ? groups[0].unsigned.toString() : "—"}
             </div>
-            <h2 className={h2}>{t("dialogs.scale.title")}</h2>
           </div>
 
-          <div className="space-y-4">
-            {/* Raw value display */}
-            <div>
-              <label className={`block ${sectionHeaderText} mb-1`}>
-                Raw Value (from hex)
-              </label>
-              <div className="px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm">
-                {groups.length > 0 ? groups[0].unsigned.toString() : "—"}
-              </div>
-            </div>
-
-            {/* Target value input */}
-            <div>
-              <label className={`block ${sectionHeaderText} mb-1`}>
-                Target Value (desired result)
-              </label>
-              <Input
-                type="text"
-                value={targetValueInput}
-                onChange={(e) => setTargetValueInput(e.target.value)}
-                size="lg"
-                mono
-                placeholder={t("dialogs.scale.valuePlaceholder")}
-                autoFocus
-              />
-            </div>
-
-            {/* Calculated scale */}
-            {(() => {
-              if (groups.length === 0) return null;
-              const rawValue = groups[0].unsigned;
-              const targetValue = (() => {
-                try {
-                  const trimmed = targetValueInput.trim();
-                  if (!trimmed) return null;
-                  return parseFloat(trimmed);
-                } catch {
-                  return null;
-                }
-              })();
-
-              if (targetValue === null || isNaN(targetValue) || Number(rawValue) === 0) return null;
-
-              const scale = targetValue / Number(rawValue);
-
-              return (
-                <Card tone="info" padding="lg">
-                  <div className="text-sm text-[color:var(--text-secondary)] mb-1">
-                    Scale Factor (DBC)
-                  </div>
-                  <div className={flexRowGap2}>
-                    <span className="text-2xl font-mono font-semibold text-[color:var(--accent-primary)]">
-                      {scale.toPrecision(6)}
-                    </span>
-                    <IconButton
-                      onClick={() => handleCopyValue(scale.toPrecision(6))}
-                      size="sm"
-                      title={t("tooltips.copyScaleFactor")}
-                    >
-                      <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
-                    </IconButton>
-                  </div>
-                  <div className={`${caption} mt-2 font-mono`}>
-                    {targetValue} ÷ {rawValue.toString()} = {scale.toPrecision(6)}
-                  </div>
-                  <div className={`${caption} mt-1`}>
-                    raw × {scale.toPrecision(6)} = physical
-                  </div>
-                </Card>
-              );
-            })()}
+          {/* Target value input */}
+          <div>
+            <label className={`block ${sectionHeaderText} mb-1`}>
+              Target Value (desired result)
+            </label>
+            <Input
+              type="text"
+              value={targetValueInput}
+              onChange={(e) => setTargetValueInput(e.target.value)}
+              size="lg"
+              mono
+              placeholder={t("dialogs.scale.valuePlaceholder")}
+              autoFocus
+            />
           </div>
 
-          <div className="flex justify-end mt-6">
-            <SecondaryButton onClick={() => setShowScaleDialog(false)}>{t("common:actions.close")}</SecondaryButton>
-          </div>
-        </div>
+          {/* Calculated scale */}
+          {(() => {
+            if (groups.length === 0) return null;
+            const rawValue = groups[0].unsigned;
+            const targetValue = (() => {
+              try {
+                const trimmed = targetValueInput.trim();
+                if (!trimmed) return null;
+                return parseFloat(trimmed);
+              } catch {
+                return null;
+              }
+            })();
+
+            if (targetValue === null || isNaN(targetValue) || Number(rawValue) === 0) return null;
+
+            const scale = targetValue / Number(rawValue);
+
+            return (
+              <Card tone="info" padding="lg">
+                <div className="text-sm text-[color:var(--text-secondary)] mb-1">
+                  Scale Factor (DBC)
+                </div>
+                <div className={flexRowGap2}>
+                  <span className="text-2xl font-mono font-semibold text-[color:var(--accent-primary)]">
+                    {scale.toPrecision(6)}
+                  </span>
+                  <IconButton
+                    onClick={() => handleCopyValue(scale.toPrecision(6))}
+                    size="sm"
+                    title={t("tooltips.copyScaleFactor")}
+                  >
+                    <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
+                  </IconButton>
+                </div>
+                <div className={`${caption} mt-2 font-mono`}>
+                  {targetValue} ÷ {rawValue.toString()} = {scale.toPrecision(6)}
+                </div>
+                <div className={`${caption} mt-1`}>
+                  raw × {scale.toPrecision(6)} = physical
+                </div>
+              </Card>
+            );
+          })()}
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton onClick={() => setShowScaleDialog(false)}>{t("common:actions.close")}</SecondaryButton>
+        </DialogFooter>
       </Dialog>
     </>
   );

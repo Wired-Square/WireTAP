@@ -1,12 +1,10 @@
 // ui/src/apps/catalog/dialogs/ValidationErrorsDialog.tsx
 
-import { AlertTriangle, CheckCircle, X } from "lucide-react";
-import { iconLg, iconXl } from "../../../styles/spacing";
-import Dialog from "../../../components/Dialog";
+import { AlertTriangle, CheckCircle } from "lucide-react";
+import { iconXl } from "../../../styles/spacing";
+import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../../components/Dialog";
 import { SecondaryButton } from "../../../components/forms";
-import { h2 } from "../../../styles";
 import type { ValidationError } from "../types";
-import { IconButton } from "../../../components/Button";
 import { Alert } from "../../../components/Alert";
 type Props = {
   open: boolean;
@@ -20,66 +18,53 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
   const isValidCatalog = isValid === true && !hasErrors;
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-2xl">
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                isValidCatalog
-                  ? "bg-[var(--status-success-bg)]"
-                  : "bg-[var(--status-warning-bg)]"
-              }`}
-            >
-              {isValidCatalog ? (
-                <CheckCircle className={`${iconXl} text-[color:var(--text-green)]`} />
-              ) : (
-                <AlertTriangle className={`${iconXl} text-[color:var(--text-amber)]`} />
-              )}
-            </div>
-            <div>
-              <h2 className={h2}>
-                {isValidCatalog ? "Validation Passed" : "Validation Warnings"}
-              </h2>
-              {hasErrors && (
-                <p className="text-sm text-[color:var(--text-muted)]">
-                  {errors.length} {errors.length === 1 ? "issue" : "issues"} found
-                </p>
-              )}
-            </div>
-          </div>
-          <IconButton
-            onClick={onClose}
-            size="sm"
+    <Dialog isOpen={open} size="xl" onClose={onClose}>
+      <DialogHeader>
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              isValidCatalog
+                ? "bg-[var(--status-success-bg)]"
+                : "bg-[var(--status-warning-bg)]"
+            }`}
           >
-            <X className={iconLg} />
-          </IconButton>
+            {isValidCatalog ? (
+              <CheckCircle className={`${iconXl} text-[color:var(--text-green)]`} />
+            ) : (
+              <AlertTriangle className={`${iconXl} text-[color:var(--text-amber)]`} />
+            )}
+          </div>
+          <div>
+            <DialogTitle>
+              {isValidCatalog ? "Validation Passed" : "Validation Warnings"}
+            </DialogTitle>
+            {hasErrors && (
+              <p className="text-sm text-[color:var(--text-muted)]">
+                {errors.length} {errors.length === 1 ? "issue" : "issues"} found
+              </p>
+            )}
+          </div>
         </div>
-
-        {/* Content */}
+      </DialogHeader>
+      <DialogBody>
         {isValidCatalog ? (
-          <p className="text-[color:var(--text-secondary)] mb-6">
+          <p className="text-[color:var(--text-secondary)]">
             The catalog is valid and ready for use.
           </p>
         ) : (
-          <div className="mb-6 max-h-80 overflow-y-auto">
-            <div className="space-y-2">
-              {errors.map((error, idx) => (
-                <Alert key={idx} tone="warning">
-                  <p>{error.message}</p>
-                  <p className="text-xs mt-1 font-mono">{error.field}</p>
-                </Alert>
-              ))}
-            </div>
+          <div className="space-y-2">
+            {errors.map((error, idx) => (
+              <Alert key={idx} tone="warning">
+                <p>{error.message}</p>
+                <p className="text-xs mt-1 font-mono">{error.field}</p>
+              </Alert>
+            ))}
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3">
-          <SecondaryButton onClick={onClose}>Close</SecondaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

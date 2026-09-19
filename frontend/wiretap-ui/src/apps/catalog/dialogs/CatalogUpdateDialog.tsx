@@ -18,23 +18,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as ShareIcon from "../../../components/catalogIcons";
 import Alert from "../../../components/Alert";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 import DiffView from "../views/DiffView";
 import { diffCatalog, type DiffLine } from "../../../api/catalog";
 import { iconMd, iconSm } from "../../../styles/spacing";
-import {
-  bgSurface,
-  borderDefault,
-  borderDivider,
-  caption,
-  h2,
-  panelFooter,
-  textDanger,
-  textMedium,
-  textSecondary,
-  textWarning,
-} from "../../../styles";
+import { borderDefault, caption, textDanger, textMedium, textSecondary, textWarning } from "../../../styles";
 import { useCatalogShareStore } from "../../../stores/catalogShareStore";
 import { sendUpdateToCatalogEditor } from "../../../utils/windowCommunication";
 import { Badge } from "../../../components/Badge";
@@ -118,98 +107,97 @@ export default function CatalogUpdateDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-4xl">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className={h2}>{t("update.title")}</h2>
-          {review && (
-            <p className={caption}>
-              {review.localFilename} · <ShareIcon.Branch className={`${iconSm} inline`} />{" "}
-              {review.repoLabel}
-            </p>
-          )}
-        </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      title={t("update.title")}
+      subtitle={
+        review && (
+          <>
+            {review.localFilename} · <ShareIcon.Branch className={`${iconSm} inline`} /> {review.repoLabel}
+          </>
+        )
+      }
+    >
+      <DialogBody className="space-y-3">
+        {updates.loadingReview && (
+          <div className="flex items-center gap-2">
+            <ShareIcon.Busy className={`${iconMd} ${textSecondary} animate-spin`} />
+            <span className={caption}>{t("update.loading")}</span>
+          </div>
+        )}
 
-        <div className="p-4 space-y-3">
-          {updates.loadingReview && (
-            <div className="flex items-center gap-2">
-              <ShareIcon.Busy className={`${iconMd} ${textSecondary} animate-spin`} />
-              <span className={caption}>{t("update.loading")}</span>
-            </div>
-          )}
+        {updates.reviewError && (
+          <Alert tone="danger">
+            <p className="text-xs">{updates.reviewError.message}</p>
+          </Alert>
+        )}
 
-          {updates.reviewError && (
-            <Alert tone="danger">
-              <p className="text-xs">{updates.reviewError.message}</p>
-            </Alert>
-          )}
+        {review && (
+          <>
+            <Card className="flex items-center gap-2 flex-wrap">
+              <span className={textMedium}>{t("update.upstreamVersion")}</span>
+              <Badge size="lg">{review.remoteBlobSha.slice(0, 7)}</Badge>
+              {review.transmitFrameCount > 0 && (
+                <span className={`${caption} ${textWarning} inline-flex items-center gap-1`}>
+                  <ShareIcon.TransmitRisk className={iconSm} />
+                  {t("update.transmitFrames", { count: review.transmitFrameCount })}
+                </span>
+              )}
+            </Card>
 
-          {review && (
-            <>
-              <Card className="flex items-center gap-2 flex-wrap">
-                <span className={textMedium}>{t("update.upstreamVersion")}</span>
-                <Badge size="lg">{review.remoteBlobSha.slice(0, 7)}</Badge>
-                {review.transmitFrameCount > 0 && (
-                  <span className={`${caption} ${textWarning} inline-flex items-center gap-1`}>
-                    <ShareIcon.TransmitRisk className={iconSm} />
-                    {t("update.transmitFrames", { count: review.transmitFrameCount })}
-                  </span>
+            {blocked && (
+              <Alert tone="danger">
+                <p className="font-medium">{t("update.invalid")}</p>
+                <p className="text-xs">{review.validationErrors.join("; ")}</p>
+              </Alert>
+            )}
+
+            {/* A diverged file is never overwritten — that is the whole point of
+                routing it through the editor instead. */}
+            {diverged && (
+              <Alert tone="warning">
+                <p className="text-xs">{t("update.divergedWarning")}</p>
+              </Alert>
+            )}
+
+            <div>
+              <p className={`${caption} mb-1`}>{t("update.diffLegend")}</p>
+              <div className={`max-h-[46vh] overflow-auto rounded-lg border ${borderDefault}`}>
+                {diffError ? (
+                  <p className={`p-4 ${caption} ${textDanger}`}>{diffError}</p>
+                ) : (
+                  <DiffView lines={lines} />
                 )}
-              </Card>
-
-              {blocked && (
-                <Alert tone="danger">
-                  <p className="font-medium">{t("update.invalid")}</p>
-                  <p className="text-xs">{review.validationErrors.join("; ")}</p>
-                </Alert>
-              )}
-
-              {/* A diverged file is never overwritten — that is the whole point of
-                  routing it through the editor instead. */}
-              {diverged && (
-                <Alert tone="warning">
-                  <p className="text-xs">{t("update.divergedWarning")}</p>
-                </Alert>
-              )}
-
-              <div>
-                <p className={`${caption} mb-1`}>{t("update.diffLegend")}</p>
-                <div className={`max-h-[46vh] overflow-auto rounded-lg border ${borderDefault}`}>
-                  {diffError ? (
-                    <p className={`p-4 ${caption} ${textDanger}`}>{diffError}</p>
-                  ) : (
-                    <DiffView lines={lines} />
-                  )}
-                </div>
               </div>
-            </>
-          )}
-        </div>
-
-        <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>{t("update.cancel")}</SecondaryButton>
-          {review && decoderDir && (
-            <SecondaryButton onClick={handleOpenInEditor}>
-              <ShareIcon.Edit className={iconMd} />
-              {t("update.openInEditor")}
-            </SecondaryButton>
-          )}
-          {/* Overwriting is offered only when there is nothing local to lose. */}
-          {review && !diverged && (
-            <PrimaryButton
-              onClick={() => void handleApply()}
-              disabled={blocked || updates.applying}
-            >
-              {updates.applying ? (
-                <ShareIcon.Busy className={`${iconMd} animate-spin`} />
-              ) : (
-                <ShareIcon.Pull className={iconMd} />
-              )}
-              {t("update.apply")}
-            </PrimaryButton>
-          )}
-        </div>
-      </div>
+            </div>
+          </>
+        )}
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("update.cancel")}</SecondaryButton>
+        {review && decoderDir && (
+          <SecondaryButton onClick={handleOpenInEditor}>
+            <ShareIcon.Edit className={iconMd} />
+            {t("update.openInEditor")}
+          </SecondaryButton>
+        )}
+        {/* Overwriting is offered only when there is nothing local to lose. */}
+        {review && !diverged && (
+          <PrimaryButton
+            onClick={() => void handleApply()}
+            disabled={blocked || updates.applying}
+          >
+            {updates.applying ? (
+              <ShareIcon.Busy className={`${iconMd} animate-spin`} />
+            ) : (
+              <ShareIcon.Pull className={iconMd} />
+            )}
+            {t("update.apply")}
+          </PrimaryButton>
+        )}
+      </DialogFooter>
     </Dialog>
   );
 }

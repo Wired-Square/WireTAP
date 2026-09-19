@@ -1,9 +1,8 @@
 // ui/src/apps/settings/dialogs/EditBookmarkDialog.tsx
 
 import { useTranslation } from "react-i18next";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2 } from "../../../styles";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 
 type EditBookmarkDialogProps = {
@@ -28,34 +27,29 @@ export default function EditBookmarkDialog({
   const { t } = useTranslation("settings");
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6">
-        <h2 className={`${h2} mb-6`}>{t("dialogs.editBookmark.title")}</h2>
-
-        <div className="space-y-4">
-          <FormField label={t("dialogs.editBookmark.name")} variant="default">
-            <Input
-              size="lg"
-              value={name}
-              onChange={(e) => onChangeName(e.target.value)}
-              placeholder={t("dialogs.editBookmark.namePlaceholder")}
-            />
-          </FormField>
-
-          <TimeBoundsInput
-            value={timeBounds}
-            onChange={onChangeTimeBounds}
-            showBookmarks={false}
+    <Dialog isOpen={isOpen} title={t("dialogs.editBookmark.title")}>
+      <DialogBody className="space-y-4">
+        <FormField label={t("dialogs.editBookmark.name")} variant="default">
+          <Input
+            size="lg"
+            value={name}
+            onChange={(e) => onChangeName(e.target.value)}
+            placeholder={t("dialogs.editBookmark.namePlaceholder")}
           />
-        </div>
+        </FormField>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-          <PrimaryButton onClick={onSave} disabled={!name.trim()}>
-            {t("common:actions.save")}
-          </PrimaryButton>
-        </div>
-      </div>
+        <TimeBoundsInput
+          value={timeBounds}
+          onChange={onChangeTimeBounds}
+          showBookmarks={false}
+        />
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={onSave} disabled={!name.trim()}>
+          {t("common:actions.save")}
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

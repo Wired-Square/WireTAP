@@ -3,10 +3,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textPrimary, textTertiary } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
+import { textTertiary } from "../../../styles";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
 import SignalCombobox from "../components/SignalCombobox";
@@ -127,12 +126,8 @@ export default function GeneratorDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
-      <div className="p-6">
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          {t("generatorDialog.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="xl" title={t("generatorDialog.title")}>
+      <DialogBody>
         {validationError && (
           <Alert tone="danger" size="sm" className="mb-3">{validationError}</Alert>
         )}
@@ -293,9 +288,8 @@ export default function GeneratorDialog({
               ); })}
           </div>
         </div>
-      </div>
-
-      <div className={`${panelFooter} flex justify-end gap-2`}>
+      </DialogBody>
+      <DialogFooter>
         <SecondaryButton
           onClick={onClose}
         >
@@ -306,7 +300,7 @@ export default function GeneratorDialog({
         >
           {t("generatorDialog.submit")}
         </PrimaryButton>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

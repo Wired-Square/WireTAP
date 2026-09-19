@@ -7,8 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Copy, Check } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import Dialog from "../../components/Dialog";
-import { DialogFooter } from "../../components/forms/DialogFooter";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import PreviewTable from "./PreviewTable";
 import {
   previewCsv,
@@ -22,19 +21,11 @@ import {
   type CaptureMetadata,
   type CsvImportResult,
 } from "../../api/capture";
-import {
-  h3,
-  caption,
-  textMuted,
-  bgSurface,
-  borderDefault,
-  textSecondary,
-} from "../../styles";
+import { caption, textMuted, bgSurface, borderDefault, textSecondary } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
-import { Select, Checkbox } from "../../components/forms";
+import { Select, Checkbox, SecondaryButton, PrimaryButton } from "../../components/forms";
 import { Alert } from "../../components/Alert";
-import { Card } from "../../components/Card";
 
 /** Format import summary as plain text for copying */
 function formatImportSummary(
@@ -344,27 +335,23 @@ export default function CsvColumnMapperDialog({
   }, [hasTimestamp, preview, mappings, timestampUnit, t]);
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onCancel} maxWidth="max-w-4xl">
-      <Card padding="lg" className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className={h3}>{t("csvColumnMapper.title")}</h3>
-            <div className={caption}>
-              {isMultiFile ? (
-                <>{t("csvColumnMapper.previewingFirst", { count: fileCount })}</>
-              ) : (
-                filename
-              )}
-              {preview && (
-                <span className={`ml-2 ${textMuted}`}>
-                  {t("csvColumnMapper.rowsCount", { count: preview.total_rows.toLocaleString() })}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
+    <Dialog
+      isOpen={isOpen}
+      onClose={onCancel}
+      size="2xl"
+      title={t("csvColumnMapper.title")}
+      subtitle={
+        <>
+          {isMultiFile ? t("csvColumnMapper.previewingFirst", { count: fileCount }) : filename}
+          {preview && (
+            <span className="ml-2">
+              {t("csvColumnMapper.rowsCount", { count: preview.total_rows.toLocaleString() })}
+            </span>
+          )}
+        </>
+      }
+    >
+      <DialogBody className="space-y-4">
         {/* Delimiter + header toggle */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
@@ -473,22 +460,6 @@ export default function CsvColumnMapperDialog({
           </div>
         )}
 
-        {/* Footer */}
-        {!importSummary && (
-          <DialogFooter
-            onCancel={onCancel}
-            onConfirm={handleImport}
-            confirmLabel={
-              isImporting
-                ? t("csvColumnMapper.importing")
-                : isMultiFile
-                  ? t("csvColumnMapper.importN", { count: fileCount })
-                  : t("csvColumnMapper.import")
-            }
-            confirmDisabled={!canImport}
-          />
-        )}
-
         {/* Post-import summary */}
         {importSummary && (
           <div className="space-y-3">
@@ -557,13 +528,27 @@ export default function CsvColumnMapperDialog({
                 </div>
               )}
             </div>
-            <DialogFooter
-              onConfirm={() => onImportComplete(importSummary.metadata)}
-              confirmLabel={t("csvColumnMapper.done")}
-            />
           </div>
         )}
-      </Card>
+      </DialogBody>
+      <DialogFooter>
+        {importSummary ? (
+          <PrimaryButton onClick={() => onImportComplete(importSummary.metadata)}>
+            {t("csvColumnMapper.done")}
+          </PrimaryButton>
+        ) : (
+          <>
+            <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+            <PrimaryButton onClick={handleImport} disabled={!canImport}>
+              {isImporting
+                ? t("csvColumnMapper.importing")
+                : isMultiFile
+                  ? t("csvColumnMapper.importN", { count: fileCount })
+                  : t("csvColumnMapper.import")}
+            </PrimaryButton>
+          </>
+        )}
+      </DialogFooter>
     </Dialog>
   );
 }

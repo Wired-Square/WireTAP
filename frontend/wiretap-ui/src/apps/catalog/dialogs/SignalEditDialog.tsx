@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { List, X } from "lucide-react";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Select, Textarea, Checkbox, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2, h3, labelSmall } from "../../../styles";
+import { h3, labelSmall } from "../../../styles";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import type { TomlNode } from "../types";
@@ -155,12 +155,12 @@ export default function SignalEditDialog({
   const isFormatDisabled = (fields.format || "number") !== "number";
 
   return (
-    <Dialog isOpen={open} maxWidth="max-w-7xl">
-      <div className="p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className={`${h2} mb-4`}>
-          {editingIndex !== null ? t("signalEdit.editTitle") : t("signalEdit.addTitle")}
-        </h2>
-
+    <Dialog
+      isOpen={open}
+      size="3xl"
+      title={editingIndex !== null ? t("signalEdit.editTitle") : t("signalEdit.addTitle")}
+    >
+      <DialogBody>
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-4">
             <FormField label={t("signalEdit.name")} required variant="default">
@@ -353,16 +353,16 @@ export default function SignalEditDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>{t("signalEdit.cancel")}</SecondaryButton>
-          <PrimaryButton
-            onClick={onSave}
-            disabled={!fields.name || fields.bit_length < 1}
-          >
-            {editingIndex !== null ? t("signalEdit.updateButton") : t("signalEdit.addButton")}
-          </PrimaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("signalEdit.cancel")}</SecondaryButton>
+        <PrimaryButton
+          onClick={onSave}
+          disabled={!fields.name || fields.bit_length < 1}
+        >
+          {editingIndex !== null ? t("signalEdit.updateButton") : t("signalEdit.addButton")}
+        </PrimaryButton>
+      </DialogFooter>
 
       <EnumEditorDialog
         open={showEnumEditor}

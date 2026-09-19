@@ -2,15 +2,14 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Sparkles, ChevronRight } from "lucide-react";
-import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider } from "../../../styles";
-import Dialog from "../../../components/Dialog";
+import { Sparkles, ChevronRight } from "lucide-react";
+import { iconSm } from "../../../styles/spacing";
+import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult, ByteRole } from "../../../utils/analysis/payloadAnalysis";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
-import { Button, IconButton } from "../../../components/Button";
+import { Button } from "../../../components/Button";
 import { PrimaryButton, SecondaryButton, Select, Input, Checkbox } from "../../../components/forms";
 
 interface Props {
@@ -149,204 +148,191 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
   }, [onClose]);
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-md">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        {/* Header */}
-        <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <div className="flex items-center gap-2">
-            <Sparkles className={`${iconSm} text-amber-400`} />
-            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-              {t("candidates.title")}
-            </h2>
-          </div>
-          <IconButton
-            onClick={handleClose}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {step === 1 && (
-            <>
-              {/* Frame ID */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("candidates.fields.frameId")}
-                </label>
-                <Select
-                  value={selectedFrameId}
-                  onChange={(e) => setSelectedFrameId(e.target.value)}
-                  size="lg"
-                >
-                  <option value="">{t("candidates.fields.selectFrameId")}</option>
-                  {sortedFrameIds.map((id) => (
-                    <option key={id} value={String(id)}>
-                      {formatFrameId(id)}
-                    </option>
-                  ))}
-                </Select>
-                {sortedFrameIds.length === 0 && (
-                  <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    {t("candidates.fields.noFrames")}
-                  </p>
-                )}
-              </div>
-
-              {/* Bit lengths */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("candidates.fields.bitLengths")}
-                </label>
-                <div className="flex gap-2">
-                  {[8, 16, 32].map((bits) => (
-                    <Button
-                      key={bits}
-                      onClick={() => toggleBitLength(bits)}
-                      variant="outline"
-                      size="sm"
-                      pressed={bitLengths.has(bits)}
-                    >
-                      {t("candidates.fields.bitLabel", { bits })}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Endianness */}
-              <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  {t("candidates.fields.endianness")}
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => toggleEndianness("le")}
-                    variant="outline"
-                    size="sm"
-                    pressed={endianness.has("le")}
-                  >
-                    {t("candidates.fields.littleEndian")}
-                  </Button>
-                  <Button
-                    onClick={() => toggleEndianness("be")}
-                    variant="outline"
-                    size="sm"
-                    pressed={endianness.has("be")}
-                  >
-                    {t("candidates.fields.bigEndian")}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Byte range */}
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    {t("candidates.fields.startByte")}
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={7}
-                    value={startByte}
-                    onChange={(e) => setStartByte(e.target.value)}
-                    size="lg"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    {t("candidates.fields.endByte")}
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={7}
-                    value={endByte}
-                    onChange={(e) => setEndByte(e.target.value)}
-                    size="lg"
-                  />
-                </div>
-              </div>
-
-              {/* Analysis hints toggle */}
-              {analysisResult && (
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={useAnalysisHints}
-                    onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                  />
-                  <span className="text-xs text-[color:var(--text-secondary)]">
-                    {t("candidates.fields.useHints")}
-                  </span>
-                </label>
-              )}
-
-              {/* Next button */}
-              <PrimaryButton
-                onClick={() => setStep(2)}
-                disabled={!selectedFrameId || bitLengths.size === 0 || endianness.size === 0}
-                className="w-full"
+    <Dialog
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={t("candidates.title")}
+      icon={<Sparkles className="text-amber-400" />}
+    >
+      <DialogBody className="space-y-4">
+        {step === 1 && (
+          <>
+            {/* Frame ID */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("candidates.fields.frameId")}
+              </label>
+              <Select
+                value={selectedFrameId}
+                onChange={(e) => setSelectedFrameId(e.target.value)}
+                size="lg"
               >
-                {t("candidates.actions.next")}
-                <ChevronRight className={iconSm} />
-              </PrimaryButton>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              {/* Preview list */}
-              <div>
-                <p className="text-xs text-[color:var(--text-secondary)] mb-2">
-                  {t("candidates.preview.summary", { count: candidates.length })}
+                <option value="">{t("candidates.fields.selectFrameId")}</option>
+                {sortedFrameIds.map((id) => (
+                  <option key={id} value={String(id)}>
+                    {formatFrameId(id)}
+                  </option>
+                ))}
+              </Select>
+              {sortedFrameIds.length === 0 && (
+                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                  {t("candidates.fields.noFrames")}
                 </p>
-                <div className="max-h-48 overflow-y-auto space-y-0.5 text-xs">
-                  {candidates.map((c) => (
-                    <div
-                      key={c.signalName}
-                      className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--bg-primary)]"
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: SIGNAL_COLOURS[candidates.indexOf(c) % SIGNAL_COLOURS.length] }}
-                      />
-                      <span className="text-[color:var(--text-primary)] font-mono">
-                        {c.signalName}
-                      </span>
-                      <span className="text-[color:var(--text-muted)] ml-auto">
-                        {c.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {candidates.length === 0 && (
-                  <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
-                    {t("candidates.preview.noMatches")}
-                  </p>
-                )}
-              </div>
+              )}
+            </div>
 
-              {/* Action buttons */}
+            {/* Bit lengths */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("candidates.fields.bitLengths")}
+              </label>
               <div className="flex gap-2">
-                <SecondaryButton
-                  onClick={() => setStep(1)}
-                >
-                  {t("candidates.actions.back")}
-                </SecondaryButton>
-                <PrimaryButton
-                  onClick={handleGenerate}
-                  disabled={candidates.length === 0}
-                  className="flex-1"
-                >
-                  <Sparkles className={iconSm} />
-                  {t("candidates.actions.generate", { count: candidates.length })}
-                </PrimaryButton>
+                {[8, 16, 32].map((bits) => (
+                  <Button
+                    key={bits}
+                    onClick={() => toggleBitLength(bits)}
+                    variant="outline"
+                    size="sm"
+                    pressed={bitLengths.has(bits)}
+                  >
+                    {t("candidates.fields.bitLabel", { bits })}
+                  </Button>
+                ))}
               </div>
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+
+            {/* Endianness */}
+            <div>
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                {t("candidates.fields.endianness")}
+              </label>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => toggleEndianness("le")}
+                  variant="outline"
+                  size="sm"
+                  pressed={endianness.has("le")}
+                >
+                  {t("candidates.fields.littleEndian")}
+                </Button>
+                <Button
+                  onClick={() => toggleEndianness("be")}
+                  variant="outline"
+                  size="sm"
+                  pressed={endianness.has("be")}
+                >
+                  {t("candidates.fields.bigEndian")}
+                </Button>
+              </div>
+            </div>
+
+            {/* Byte range */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                  {t("candidates.fields.startByte")}
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={7}
+                  value={startByte}
+                  onChange={(e) => setStartByte(e.target.value)}
+                  size="lg"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                  {t("candidates.fields.endByte")}
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={7}
+                  value={endByte}
+                  onChange={(e) => setEndByte(e.target.value)}
+                  size="lg"
+                />
+              </div>
+            </div>
+
+            {/* Analysis hints toggle */}
+            {analysisResult && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={useAnalysisHints}
+                  onChange={(e) => setUseAnalysisHints(e.target.checked)}
+                />
+                <span className="text-xs text-[color:var(--text-secondary)]">
+                  {t("candidates.fields.useHints")}
+                </span>
+              </label>
+            )}
+
+            {/* Next button */}
+            <PrimaryButton
+              onClick={() => setStep(2)}
+              disabled={!selectedFrameId || bitLengths.size === 0 || endianness.size === 0}
+              className="w-full"
+            >
+              {t("candidates.actions.next")}
+              <ChevronRight className={iconSm} />
+            </PrimaryButton>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            {/* Preview list */}
+            <div>
+              <p className="text-xs text-[color:var(--text-secondary)] mb-2">
+                {t("candidates.preview.summary", { count: candidates.length })}
+              </p>
+              <div className="max-h-48 overflow-y-auto space-y-0.5 text-xs">
+                {candidates.map((c) => (
+                  <div
+                    key={c.signalName}
+                    className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--bg-primary)]"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: SIGNAL_COLOURS[candidates.indexOf(c) % SIGNAL_COLOURS.length] }}
+                    />
+                    <span className="text-[color:var(--text-primary)] font-mono">
+                      {c.signalName}
+                    </span>
+                    <span className="text-[color:var(--text-muted)] ml-auto">
+                      {c.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {candidates.length === 0 && (
+                <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
+                  {t("candidates.preview.noMatches")}
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <SecondaryButton
+                onClick={() => setStep(1)}
+              >
+                {t("candidates.actions.back")}
+              </SecondaryButton>
+              <PrimaryButton
+                onClick={handleGenerate}
+                disabled={candidates.length === 0}
+                className="flex-1"
+              >
+                <Sparkles className={iconSm} />
+                {t("candidates.actions.generate", { count: candidates.length })}
+              </PrimaryButton>
+            </div>
+          </>
+        )}
+      </DialogBody>
     </Dialog>
   );
 }

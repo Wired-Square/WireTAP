@@ -4,13 +4,12 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
-import Dialog from '../../../../components/Dialog';
+import { flexRowGap2 } from '../../../../styles/spacing';
+import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
 import { Input, Select, SecondaryButton, PrimaryButton } from '../../../../components/forms';
-import { h2, labelSmall, helpText, borderDefault } from '../../../../styles';
+import { labelSmall, helpText } from '../../../../styles';
 import type { RawBytesViewConfig, RawBytesDisplayMode } from '../../../../stores/discoveryStore';
-import { Button, IconButton } from '../../../../components/Button';
+import { Button } from '../../../../components/Button';
 
 interface RawBytesViewDialogProps {
   isOpen: boolean;
@@ -53,15 +52,8 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className={h2}>{t("serial.rawBytesTitle")}</h2>
-          <IconButton onClick={onClose} size="sm">
-            <X className={`${iconLg} text-slate-400`} />
-          </IconButton>
-        </div>
-
+    <Dialog isOpen={isOpen} onClose={onClose} title={t("serial.rawBytesTitle")}>
+      <DialogBody className="space-y-4">
         <div className="space-y-3">
           {/* Display Mode Selection */}
           <div className="space-y-2">
@@ -152,19 +144,18 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
             </div>
           )}
         </div>
-
-        <div className={`flex justify-end gap-2 pt-2 border-t ${borderDefault}`}>
-          <SecondaryButton onClick={onClose}>{t("modbusScan.cancel")}</SecondaryButton>
-          <PrimaryButton
-            onClick={() => {
-              onApply({ displayMode, chunkGapUs });
-              onClose();
-            }}
-          >
-            {t("serial.apply")}
-          </PrimaryButton>
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("modbusScan.cancel")}</SecondaryButton>
+        <PrimaryButton
+          onClick={() => {
+            onApply({ displayMode, chunkGapUs });
+            onClose();
+          }}
+        >
+          {t("serial.apply")}
+        </PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

@@ -1,8 +1,7 @@
 // ui/src/apps/settings/dialogs/EditCatalogDialog.tsx
 import { useTranslation } from "react-i18next";
-import Dialog from "../../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
-import { h2 } from "../../../styles";
 
 type Props = {
   isOpen: boolean;
@@ -26,35 +25,30 @@ export default function EditCatalogDialog({
   const { t } = useTranslation("settings");
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-md">
-      <div className="p-6">
-        <h2 className={`${h2} mb-4`}>{t("dialogs.editCatalog.title")}</h2>
+    <Dialog isOpen={isOpen} title={t("dialogs.editCatalog.title")}>
+      <DialogBody className="space-y-4">
+        <FormField label={t("dialogs.editCatalog.name")} variant="default">
+          <Input
+            size="lg"
+            value={name}
+            onChange={(e) => onChangeName(e.target.value)}
+            placeholder={t("dialogs.editCatalog.namePlaceholder")}
+          />
+        </FormField>
 
-        <div className="space-y-4">
-          <FormField label={t("dialogs.editCatalog.name")} variant="default">
-            <Input
-              size="lg"
-              value={name}
-              onChange={(e) => onChangeName(e.target.value)}
-              placeholder={t("dialogs.editCatalog.namePlaceholder")}
-            />
-          </FormField>
-
-          <FormField label={t("dialogs.editCatalog.filename")} variant="default">
-            <Input
-              size="lg"
-              value={filename}
-              onChange={(e) => onChangeFilename(e.target.value)}
-              placeholder={t("dialogs.editCatalog.filenamePlaceholder")}
-            />
-          </FormField>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-          <PrimaryButton onClick={onSave}>{t("common:actions.save")}</PrimaryButton>
-        </div>
-      </div>
+        <FormField label={t("dialogs.editCatalog.filename")} variant="default">
+          <Input
+            size="lg"
+            value={filename}
+            onChange={(e) => onChangeFilename(e.target.value)}
+            placeholder={t("dialogs.editCatalog.filenamePlaceholder")}
+          />
+        </FormField>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={onSave}>{t("common:actions.save")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }

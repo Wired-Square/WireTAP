@@ -2,14 +2,14 @@
 // Global bookmark editor dialog for managing and loading time range bookmarks
 
 import { useState, useEffect, useCallback } from "react";
-import { Play, Plus, Trash2, X } from "lucide-react";
+import { Play, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../apps/settings/stores/settingsStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
-import Dialog from "../components/Dialog";
+import { iconMd, flexRowGap2 } from "../styles/spacing";
+import Dialog, { DialogBody, DialogHeader, DialogTitle } from "../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton, DangerButton, Select } from "../components/forms";
-import { h2, labelSmall, captionMuted, borderDefault, bgSecondary, sectionHeaderText, emptyStateText } from "../styles";
+import { labelSmall, captionMuted, borderDefault, bgSecondary, sectionHeaderText, emptyStateText } from "../styles";
 import {
   getAllFavorites,
   updateFavorite,
@@ -259,193 +259,181 @@ export default function BookmarkEditorDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
-      <div className="flex flex-col h-[500px]">
-        {/* Header */}
-        <div className={`flex items-center justify-between px-4 py-3 border-b ${borderDefault}`}>
-          <div className={flexRowGap2}>
-            <h2 className={h2}>{t("bookmarkEditor.title")}</h2>
-            {canCreate && (
-              <IconButton
-                onClick={handleStartCreate}
-                tone="primary"
-                size="sm"
-                title={t("bookmarkEditor.newTooltip")}
-              >
-                <Plus className={iconMd} />
-              </IconButton>
-            )}
-          </div>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
+    <Dialog isOpen={isOpen} size="xl" onClose={onClose} className="h-[500px]">
+      <DialogHeader>
+        <div className={flexRowGap2}>
+          <DialogTitle>{t("bookmarkEditor.title")}</DialogTitle>
+          {canCreate && (
+            <IconButton
+              onClick={handleStartCreate}
+              tone="primary"
+              size="sm"
+              title={t("bookmarkEditor.newTooltip")}
+            >
+              <Plus className={iconMd} />
+            </IconButton>
+          )}
+        </div>
+      </DialogHeader>
+      <DialogBody padding="none" className="flex">
+        {/* Left: Bookmark List */}
+        <div className={`w-1/2 border-r ${borderDefault} overflow-y-auto`}>
+          {isLoading ? (
+            <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.loading")}</div>
+          ) : bookmarks.length === 0 ? (
+            <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.empty")}</div>
+          ) : (
+            <div className="divide-y divide-[color:var(--border-default)]">
+              {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
+                <div key={pid}>
+                  {!profileId && (
+                    <div className={`px-3 py-2 bg-[var(--bg-surface)] ${labelSmall}`}>
+                      {pid}
+                    </div>
+                  )}
+                  {profileBookmarks.map((bookmark) => (
+                    <div
+                      key={bookmark.id}
+                      className={`flex items-center w-full hover:bg-[var(--hover-bg)] ${
+                        selectedId === bookmark.id
+                          ? "bg-[var(--status-info-bg)] border-l-2 border-[color:var(--status-info-text)]"
+                          : ""
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectBookmark(bookmark)}
+                        className="flex-1 text-left px-3 py-2"
+                      >
+                        <div className={sectionHeaderText}>
+                          {bookmark.name}
+                        </div>
+                        <div className={`${captionMuted} mt-0.5`}>
+                          {formatTimeRange(bookmark)}
+                        </div>
+                      </button>
+                      {onLoad && (
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onLoad(bookmark);
+                            onClose();
+                          }}
+                          title={t("bookmarkEditor.loadTooltip")}
+                          tone="primary"
+                          className="mr-1"
+                        >
+                          <Play className={iconMd} />
+                        </IconButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Content */}
-        <div className="flex flex-1 min-h-0">
-          {/* Left: Bookmark List */}
-          <div className={`w-1/2 border-r ${borderDefault} overflow-y-auto`}>
-            {isLoading ? (
-              <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.loading")}</div>
-            ) : bookmarks.length === 0 ? (
-              <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.empty")}</div>
-            ) : (
-              <div className="divide-y divide-[color:var(--border-default)]">
-                {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
-                  <div key={pid}>
-                    {!profileId && (
-                      <div className={`px-3 py-2 bg-[var(--bg-surface)] ${labelSmall}`}>
-                        {pid}
-                      </div>
-                    )}
-                    {profileBookmarks.map((bookmark) => (
-                      <div
-                        key={bookmark.id}
-                        className={`flex items-center w-full hover:bg-[var(--hover-bg)] ${
-                          selectedId === bookmark.id
-                            ? "bg-[var(--status-info-bg)] border-l-2 border-[color:var(--status-info-text)]"
-                            : ""
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSelectBookmark(bookmark)}
-                          className="flex-1 text-left px-3 py-2"
-                        >
-                          <div className={sectionHeaderText}>
-                            {bookmark.name}
-                          </div>
-                          <div className={`${captionMuted} mt-0.5`}>
-                            {formatTimeRange(bookmark)}
-                          </div>
-                        </button>
-                        {onLoad && (
-                          <IconButton
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onLoad(bookmark);
-                              onClose();
-                            }}
-                            title={t("bookmarkEditor.loadTooltip")}
-                            tone="primary"
-                            className="mr-1"
-                          >
-                            <Play className={iconMd} />
-                          </IconButton>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))}
+        {/* Right: Edit/Create Form */}
+        <div className="w-1/2 p-4">
+          {isCreating ? (
+            /* Create Form */
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
+                <Select
+                  value={createProfileId}
+                  onChange={(e) => setCreateProfileId(e.target.value)}
+                  size="lg"
+                >
+                  {availableProfiles?.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </Select>
               </div>
-            )}
-          </div>
 
-          {/* Right: Edit/Create Form */}
-          <div className="w-1/2 p-4">
-            {isCreating ? (
-              /* Create Form */
-              <div className="space-y-4">
+              <div className="space-y-1">
+                <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
+                <Input
+                  size="lg"
+                  type="text"
+                  placeholder={t("bookmarkEditor.namePlaceholder")}
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                />
+              </div>
+
+              <TimeBoundsInput
+                value={createTimeBounds}
+                onChange={handleCreateTimeBoundsChange}
+                showBookmarks={false}
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <SecondaryButton onClick={handleCancelCreate}>
+                  {t("common:actions.cancel")}
+                </SecondaryButton>
+                <PrimaryButton
+                  onClick={handleCreate}
+                  disabled={isCreatingBookmark || !createName.trim() || !createTimeBounds.startTime}
+                >
+                  {isCreatingBookmark ? t("bookmarkEditor.creating") : t("common:actions.create")}
+                </PrimaryButton>
+              </div>
+            </div>
+          ) : selectedBookmark ? (
+            /* Edit Form */
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
+                <Input
+                  size="lg"
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
+              </div>
+
+              <TimeBoundsInput
+                value={editTimeBounds}
+                onChange={handleEditTimeBoundsChange}
+                showBookmarks={false}
+              />
+
+              {!profileId && (
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
-                  <Select
-                    value={createProfileId}
-                    onChange={(e) => setCreateProfileId(e.target.value)}
-                    size="lg"
-                  >
-                    {availableProfiles?.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-[color:var(--text-secondary)]`}>
+                    {selectedBookmark.profileId}
+                  </div>
                 </div>
+              )}
 
-                <div className="space-y-1">
-                  <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
-                  <Input
-                    size="lg"
-                    type="text"
-                    placeholder={t("bookmarkEditor.namePlaceholder")}
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                  />
-                </div>
-
-                <TimeBoundsInput
-                  value={createTimeBounds}
-                  onChange={handleCreateTimeBoundsChange}
-                  showBookmarks={false}
-                />
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <SecondaryButton onClick={handleCancelCreate}>
-                    {t("common:actions.cancel")}
+              <div className="flex items-center justify-between pt-2">
+                <DangerButton onClick={handleDelete}>
+                  <Trash2 className={iconMd} />
+                  {t("common:actions.delete")}
+                </DangerButton>
+                <div className={flexRowGap2}>
+                  <SecondaryButton onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? t("bookmarkEditor.saving") : t("common:actions.save")}
                   </SecondaryButton>
-                  <PrimaryButton
-                    onClick={handleCreate}
-                    disabled={isCreatingBookmark || !createName.trim() || !createTimeBounds.startTime}
-                  >
-                    {isCreatingBookmark ? t("bookmarkEditor.creating") : t("common:actions.create")}
-                  </PrimaryButton>
+                  {onLoad && (
+                    <PrimaryButton onClick={handleLoad}>{t("bookmarkEditor.load")}</PrimaryButton>
+                  )}
                 </div>
               </div>
-            ) : selectedBookmark ? (
-              /* Edit Form */
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
-                  <Input
-                    size="lg"
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                  />
-                </div>
-
-                <TimeBoundsInput
-                  value={editTimeBounds}
-                  onChange={handleEditTimeBoundsChange}
-                  showBookmarks={false}
-                />
-
-                {!profileId && (
-                  <div className="space-y-1">
-                    <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
-                    <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-[color:var(--text-secondary)]`}>
-                      {selectedBookmark.profileId}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2">
-                  <DangerButton onClick={handleDelete}>
-                    <Trash2 className={iconMd} />
-                    {t("common:actions.delete")}
-                  </DangerButton>
-                  <div className={flexRowGap2}>
-                    <SecondaryButton onClick={handleSave} disabled={isSaving}>
-                      {isSaving ? t("bookmarkEditor.saving") : t("common:actions.save")}
-                    </SecondaryButton>
-                    {onLoad && (
-                      <PrimaryButton onClick={handleLoad}>{t("bookmarkEditor.load")}</PrimaryButton>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Empty state */
-              <div className="flex items-center justify-center h-full text-sm text-slate-400">
-                {canCreate ? t("bookmarkEditor.selectPromptCanCreate") : t("bookmarkEditor.selectPromptReadOnly")}
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            /* Empty state */
+            <div className="flex items-center justify-center h-full text-sm text-slate-400">
+              {canCreate ? t("bookmarkEditor.selectPromptCanCreate") : t("bookmarkEditor.selectPromptReadOnly")}
+            </div>
+          )}
         </div>
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }

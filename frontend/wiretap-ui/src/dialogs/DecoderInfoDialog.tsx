@@ -1,18 +1,16 @@
 // ui/src/dialogs/DecoderInfoDialog.tsx
 
-import { X, FileText, Shuffle, Zap, GitBranch, Clock, Layers } from "lucide-react";
+import { FileText, Shuffle, Zap, GitBranch, Clock, Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { iconMd, iconXs, iconLg, flexRowGap2 } from "../styles/spacing";
-import { caption, captionMuted, sectionHeaderText, emptyStateText } from "../styles/typography";
-import { borderDivider, bgSurface } from "../styles";
-import Dialog from "../components/Dialog";
+import { iconMd, iconXs, flexRowGap2 } from "../styles/spacing";
+import { captionMuted, emptyStateText } from "../styles/typography";
+import Dialog, { DialogBody } from "../components/Dialog";
 import { useDiscoveryStore } from "../stores/discoveryStore";
 import type { DecoderKnowledge, FrameKnowledge, MuxKnowledge } from "../utils/decoderKnowledge";
 import { createDefaultSignalsForFrame } from "../utils/decoderKnowledge";
 import { formatFrameId } from "../utils/frameIds";
 import { formatMs } from "../utils/reportExport";
-import { IconButton } from "../components/Button";
 import { Badge } from "../components/Badge";
 import { Card } from "../components/Card";
 
@@ -31,65 +29,53 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
   const multiBusCount = knowledge.multiBusFrames.length;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden max-h-[80vh] flex flex-col`}>
-        {/* Header */}
-        <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider} flex-shrink-0`}>
-          <FileText className={`${iconLg} text-[color:var(--status-info-text)]`} />
-          <div className="flex-1">
-            <h2 className={sectionHeaderText}>{t("decoderInfo.title")}</h2>
-            <p className={caption}>{t("decoderInfo.subtitle")}</p>
-          </div>
-          <IconButton
-            onClick={onClose}
-            aria-label={t("common:actions.close")}
-            size="sm"
-          >
-            <X className={iconLg} />
-          </IconButton>
-        </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="xl"
+      title={t("decoderInfo.title")}
+      subtitle={t("decoderInfo.subtitle")}
+      icon={<FileText className="text-[color:var(--status-info-text)]" />}
+    >
+      <DialogBody className="space-y-6">
+        {/* Meta Section */}
+        <MetaSection knowledge={knowledge} t={t} />
 
-        {/* Content */}
-        <div className="flex-1 p-4 overflow-auto space-y-6">
-          {/* Meta Section */}
-          <MetaSection knowledge={knowledge} t={t} />
-
-          {/* Stats Summary */}
-          <div className="flex flex-wrap gap-4 text-xs p-3 bg-[var(--bg-surface)] rounded-lg">
-            <span className="text-[color:var(--text-muted)]">
-              <span className="font-medium text-[color:var(--text-primary)]">{frameCount}</span> {t("decoderInfo.stats.frames")}
+        {/* Stats Summary */}
+        <div className="flex flex-wrap gap-4 text-xs p-3 bg-[var(--bg-surface)] rounded-lg">
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{frameCount}</span> {t("decoderInfo.stats.frames")}
+          </span>
+          {muxCount > 0 && (
+            <span className="text-[color:var(--text-orange)]">
+              <span className="font-medium">{muxCount}</span> {t("decoderInfo.stats.mux")}
             </span>
-            {muxCount > 0 && (
-              <span className="text-[color:var(--text-orange)]">
-                <span className="font-medium">{muxCount}</span> {t("decoderInfo.stats.mux")}
-              </span>
-            )}
-            {burstCount > 0 && (
-              <span className="text-[color:var(--text-cyan)]">
-                <span className="font-medium">{burstCount}</span> {t("decoderInfo.stats.burst")}
-              </span>
-            )}
-            {multiBusCount > 0 && (
-              <span className="text-[color:var(--status-danger-text)]">
-                <span className="font-medium">{multiBusCount}</span> {t("decoderInfo.stats.multiBus")}
-              </span>
-            )}
-            {knowledge.analysisRun && (
-              <span className="text-[color:var(--text-green)] ml-auto">
-                {t("decoderInfo.stats.analysisRun")}
-              </span>
-            )}
-            {!knowledge.analysisRun && (
-              <span className="text-[color:var(--text-amber)] ml-auto">
-                {t("decoderInfo.stats.runAnalysis")}
-              </span>
-            )}
-          </div>
-
-          {/* Frames Section */}
-          <FramesSection knowledge={knowledge} t={t} />
+          )}
+          {burstCount > 0 && (
+            <span className="text-[color:var(--text-cyan)]">
+              <span className="font-medium">{burstCount}</span> {t("decoderInfo.stats.burst")}
+            </span>
+          )}
+          {multiBusCount > 0 && (
+            <span className="text-[color:var(--status-danger-text)]">
+              <span className="font-medium">{multiBusCount}</span> {t("decoderInfo.stats.multiBus")}
+            </span>
+          )}
+          {knowledge.analysisRun && (
+            <span className="text-[color:var(--text-green)] ml-auto">
+              {t("decoderInfo.stats.analysisRun")}
+            </span>
+          )}
+          {!knowledge.analysisRun && (
+            <span className="text-[color:var(--text-amber)] ml-auto">
+              {t("decoderInfo.stats.runAnalysis")}
+            </span>
+          )}
         </div>
-      </div>
+
+        {/* Frames Section */}
+        <FramesSection knowledge={knowledge} t={t} />
+      </DialogBody>
     </Dialog>
   );
 }

@@ -4,9 +4,6 @@
 // What is not yet a component: data view tabs, the launcher
 export * from './buttonStyles';
 
-// What the dialogs family still owns: the panel footer, the config-section header
-export * from './cardStyles';
-
 // Colour tokens for consistent palette
 export * from './colourTokens';
 

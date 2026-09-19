@@ -20,26 +20,12 @@ import { useTranslation } from "react-i18next";
 import { Copy, Lock, Search } from "lucide-react";
 import * as ShareIcon from "../../components/catalogIcons";
 import Alert from "../../components/Alert";
-import Dialog from "../../components/Dialog";
+import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import OverflowMenu, { type OverflowMenuItems } from "../../components/OverflowMenu";
 import TabStrip, { type TabDef } from "../../components/TabStrip";
 import { FormField, Input, PrimaryButton, SecondaryButton, Select, Checkbox } from "../../components/forms";
 import { iconMd, iconSm } from "../../styles/spacing";
-import {
-  bgSurface,
-  borderDivider,
-  caption,
-  emptyStateHint,
-  emptyStateText,
-  h2,
-  hoverLight,
-  textDanger,
-  textMedium,
-  textSecondary,
-  textSuccess,
-  textWarning,
-} from "../../styles";
-import { panelFooter } from "../../styles/cardStyles";
+import { borderDivider, caption, emptyStateHint, emptyStateText, hoverLight, textDanger, textMedium, textSecondary, textSuccess, textWarning } from "../../styles";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
 import { savedRepoName, revealRepoClone, GIT_PROGRESS_EVENT } from "../../api/catalogShare";
 import type {
@@ -297,13 +283,13 @@ function RepoPropertiesDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   return (
-    <Dialog isOpen onBackdropClick={onClose} maxWidth="max-w-md">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className={h2}>{t("repository.saved.propertiesTitle")}</h2>
-          <p className={caption}>{savedRepoName(repo)}</p>
-        </div>
-
+    <Dialog
+      isOpen
+      onClose={onClose}
+      title={t("repository.saved.propertiesTitle")}
+      subtitle={savedRepoName(repo)}
+    >
+      <DialogBody padding="none">
         <div className={`p-4 space-y-2 ${borderDivider}`}>
           <PropertyRow
             label={t("repository.saved.repositoryLabel")}
@@ -363,27 +349,27 @@ function RepoPropertiesDialog({
         {/* A rejected directory would otherwise close the dialog and lose the edits,
             leaving the reason as small red text in the list behind it. */}
         {saveError && <p className={`${caption} ${textDanger} px-4`}>{saveError}</p>}
-        <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>
-            {onSave ? t("repository.cancel") : t("repository.close")}
-          </SecondaryButton>
-          {onSave && (
-            <PrimaryButton
-              disabled={saving}
-              onClick={() => {
-                setSaving(true);
-                setSaveError(null);
-                void onSave({ label, gitRef, directory }).then((ok) => {
-                  setSaving(false);
-                  if (!ok) setSaveError(t("repository.saved.saveFailed"));
-                });
-              }}
-            >
-              {t("repository.saved.apply")}
-            </PrimaryButton>
-          )}
-        </div>
-      </div>
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>
+          {onSave ? t("repository.cancel") : t("repository.close")}
+        </SecondaryButton>
+        {onSave && (
+          <PrimaryButton
+            disabled={saving}
+            onClick={() => {
+              setSaving(true);
+              setSaveError(null);
+              void onSave({ label, gitRef, directory }).then((ok) => {
+                setSaving(false);
+                if (!ok) setSaveError(t("repository.saved.saveFailed"));
+              });
+            }}
+          >
+            {t("repository.saved.apply")}
+          </PrimaryButton>
+        )}
+      </DialogFooter>
     </Dialog>
   );
 }
@@ -510,261 +496,260 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
-      <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
-        <div className={`p-4 ${borderDivider}`}>
-          <h2 className={h2}>{t("repository.title")}</h2>
-          <p className={caption}>{t("repository.subtitle")}</p>
-        </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      size="xl"
+      title={t("repository.title")}
+      subtitle={t("repository.subtitle")}
+    >
+      <TabStrip tabs={tabs} activeTab={mine ? "mine" : "community"} onTabChange={setPicked} />
 
-        <TabStrip tabs={tabs} activeTab={mine ? "mine" : "community"} onTabChange={setPicked} />
-
-        <div className="p-4 space-y-3">
-          <div className="space-y-2">
-            <p className={caption}>
-              {t(mine ? "repository.saved.hint" : "repository.community.hint")}
-            </p>
-            {reposError && (
-              <p className={`${caption} ${textDanger}`}>{reposError.message}</p>
-            )}
-            {repos.length === 0 ? (
-              <Card className="text-center py-4">
-                <p className={emptyStateText}>
-                  {t(mine ? "repository.saved.empty" : "repository.community.empty")}
-                </p>
-                <p className={emptyStateHint}>{t("repository.saved.emptyHint")}</p>
-              </Card>
-            ) : (
-              <div className="space-y-1">
-                {repos.map((repo) => (
-                  <RepoRow
-                    key={repo.id}
-                    repo={repo}
-                    showReveal={showReveal}
-                    isFavourite={mine && repo.id === favouriteRepoId}
-                    onBrowse={() => handleBrowseRepo(repo)}
-                    // Only a repository of the user's own can be the publish
-                    // default, and only their own entry is theirs to remove. The
-                    // star is gated on the tab, not just the id: a repository in
-                    // both lists would otherwise light up under Community too.
-                    onToggleFavourite={
-                      mine
-                        ? () =>
-                            void setFavouriteRepo(repo.id === favouriteRepoId ? null : repo.id)
-                        : undefined
-                    }
-                    onProperties={() => setProperties(repo.id)}
-                    onRemove={repo.builtin ? undefined : () => void forgetActive(repo.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2 items-start">
-            <div className="flex-1">
-              <Input
-                size="lg"
-                value={browse.url}
-                onChange={(e) => setUrl(e.target.value)}
-                onBlur={() => void validateUrl()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void runBrowse();
-                }}
-                placeholder={t("repository.urlPlaceholder")}
-              />
-              {browse.parseError && (
-                <p className={`${caption} ${textDanger} mt-1`}>{browse.parseError}</p>
-              )}
-              {parsed && (
-                <p className={`${caption} mt-1`}>
-                  {parsed.owner}/{parsed.repo}
-                  {parsed.reference ? ` @ ${parsed.reference}` : ""}
-                  {parsed.path ? ` — ${parsed.path}` : ""}
-                </p>
-              )}
-            </div>
-            <SecondaryButton onClick={() => void runBrowse()} disabled={browse.loading}>
-              {browse.loading ? (
-                <ShareIcon.Busy className={`${iconMd} animate-spin`} />
-              ) : (
-                <Search className={iconMd} />
-              )}
-              {t("repository.browse")}
-            </SecondaryButton>
-            {/* Adds to the list on show — the only way into Community, whose rows
-                are not otherwise the user's to change. */}
-            <SecondaryButton
-              onClick={() => void saveActive(browse.url.trim())}
-              disabled={!parsed || alreadySaved}
-            >
-              <ShareIcon.SaveRepository className={iconMd} />
-              {/* Worded per tab rather than tooltipped: which list this adds to is
-                  the one thing that changes, so it belongs on the button's face. */}
-              {mine
-                ? t(alreadySaved ? "repository.saved.saved" : "repository.saved.save")
-                : t(alreadySaved ? "repository.community.added" : "repository.community.add")}
-            </SecondaryButton>
-          </div>
-
-          {browse.loading && gitProgress && (
-            <p className={caption}>
-              {t(`repository.git.${gitProgress.phase}`, {
-                received: gitProgress.receivedObjects,
-                total: gitProgress.totalObjects,
-                kb: Math.round(gitProgress.receivedBytes / 1024),
-              })}
-            </p>
+      <DialogBody className="space-y-3">
+        <div className="space-y-2">
+          <p className={caption}>
+            {t(mine ? "repository.saved.hint" : "repository.community.hint")}
+          </p>
+          {reposError && (
+            <p className={`${caption} ${textDanger}`}>{reposError.message}</p>
           )}
-
-          {browse.error && (
-            <Alert tone="danger">
-              <p className="font-medium">{browse.error.message}</p>
-              {hintKey && <p className="text-xs">{t(hintKey)}</p>}
-            </Alert>
-          )}
-
-          {browse.result && (
-            <Card className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <ShareIcon.Branch className={`${iconSm} ${textSecondary}`} />
-                <span className={textMedium}>{browse.result.repo.fullName}</span>
-                <Badge size="lg">{browse.result.gitRef}</Badge>
-                {browse.result.repo.private && (
-                  <Badge size="lg">
-                    <Lock className={iconSm} />
-                    {t("repository.private")}
-                  </Badge>
-                )}
-                {!browse.result.authenticated && (
-                  <Badge size="lg">{t("repository.anonymous")}</Badge>
-                )}
-              </div>
-              <div className="flex items-start gap-2">
-                <ShareIcon.Alert className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
-                <p className={caption}>
-                  {t("repository.unreviewedWarning", { repo: browse.result.repo.fullName })}
-                </p>
-              </div>
-              {browse.result.dropped > 0 && (
-                <p className={`${caption} ${textWarning}`}>
-                  {t("repository.dropped", { count: browse.result.dropped })}
-                </p>
-              )}
+          {repos.length === 0 ? (
+            <Card className="text-center py-4">
+              <p className={emptyStateText}>
+                {t(mine ? "repository.saved.empty" : "repository.community.empty")}
+              </p>
+              <p className={emptyStateHint}>{t("repository.saved.emptyHint")}</p>
             </Card>
-          )}
-
-          {browse.result && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className={caption}>
-                  {t("repository.found", { count: entries.length })}
-                  {browse.resolving ? ` · ${t("repository.resolving")}` : ""}
-                </span>
-                {selectableCount > 0 && (
-                  <button
-                    onClick={selectAllValid}
-                    className={`${caption} underline hover:no-underline`}
-                  >
-                    {t("repository.selectAll", { count: selectableCount })}
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-[34vh] overflow-y-auto rounded-lg border border-[color:var(--border-default)]">
-                {entries.length === 0 ? (
-                  <p className={`p-4 ${caption}`}>{t("repository.noneFound")}</p>
-                ) : (
-                  entries.map((entry) => (
-                    <CandidateRow
-                      key={entry.path}
-                      entry={entry}
-                      meta={browse.resolved[entry.path]}
-                      checked={selection.includes(entry.path)}
-                      onToggle={() => toggleSelection(entry.path)}
-                      t={t}
-                    />
-                  ))
-                )}
-              </div>
-              {browse.resolveError && (
-                <p className={`${caption} ${textWarning} mt-1`}>{browse.resolveError.message}</p>
-              )}
+          ) : (
+            <div className="space-y-1">
+              {repos.map((repo) => (
+                <RepoRow
+                  key={repo.id}
+                  repo={repo}
+                  showReveal={showReveal}
+                  isFavourite={mine && repo.id === favouriteRepoId}
+                  onBrowse={() => handleBrowseRepo(repo)}
+                  // Only a repository of the user's own can be the publish
+                  // default, and only their own entry is theirs to remove. The
+                  // star is gated on the tab, not just the id: a repository in
+                  // both lists would otherwise light up under Community too.
+                  onToggleFavourite={
+                    mine
+                      ? () =>
+                          void setFavouriteRepo(repo.id === favouriteRepoId ? null : repo.id)
+                      : undefined
+                  }
+                  onProperties={() => setProperties(repo.id)}
+                  onRemove={repo.builtin ? undefined : () => void forgetActive(repo.id)}
+                />
+              ))}
             </div>
-          )}
-
-          {/* The one genuinely physical risk: an imported catalogue can define bus traffic. */}
-          {totalTransmitFrames > 0 && (
-            <Alert tone="warning" icon={<ShareIcon.TransmitRisk />}>
-              <p className="text-xs">{t("repository.transmitWarning", { count: totalTransmitFrames })}</p>
-            </Alert>
-          )}
-
-          {anyCollisions && (
-            <div>
-              <label className={caption}>{t("repository.collisionLabel")}</label>
-              <Select
-                size="lg"
-                value={onCollision}
-                onChange={(e) => setCollisionPolicy(e.target.value as CollisionPolicy)}
-              >
-                <option value="keepBoth">{t("repository.collision.keepBoth")}</option>
-                <option value="skip">{t("repository.collision.skip")}</option>
-                <option value="overwrite">{t("repository.collision.overwrite")}</option>
-              </Select>
-            </div>
-          )}
-
-          {importState.results && (
-            <Card className="space-y-1">
-              {importState.results.map((r) => {
-                const failed = r.outcome === "failed" || r.outcome === "skipped";
-                return (
-                  <div key={r.path} className="flex items-start gap-2">
-                    {failed ? (
-                      <ShareIcon.Alert
-                        className={`${iconSm} ${textWarning} flex-shrink-0 mt-0.5`}
-                      />
-                    ) : (
-                      <ShareIcon.Success
-                        className={`${iconSm} ${textSuccess} flex-shrink-0 mt-0.5`}
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <span className={textMedium}>{r.filename ?? r.path}</span>
-                      <div className={caption}>
-                        {t(`repository.outcome.${r.outcome}`)}
-                        {r.message ? ` — ${r.message}` : ""}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </Card>
-          )}
-
-          {importState.error && (
-            <p className={`${caption} ${textDanger}`}>{importState.error.message}</p>
           )}
         </div>
 
-        <div className={`${panelFooter} flex justify-end gap-2`}>
-          <SecondaryButton onClick={onClose}>
-            {importState.results ? t("repository.done") : t("repository.cancel")}
-          </SecondaryButton>
-          <PrimaryButton
-            onClick={() => void handleImport()}
-            disabled={selection.length === 0 || importState.inFlight}
-          >
-            {importState.inFlight ? (
+        <div className="flex gap-2 items-start">
+          <div className="flex-1">
+            <Input
+              size="lg"
+              value={browse.url}
+              onChange={(e) => setUrl(e.target.value)}
+              onBlur={() => void validateUrl()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void runBrowse();
+              }}
+              placeholder={t("repository.urlPlaceholder")}
+            />
+            {browse.parseError && (
+              <p className={`${caption} ${textDanger} mt-1`}>{browse.parseError}</p>
+            )}
+            {parsed && (
+              <p className={`${caption} mt-1`}>
+                {parsed.owner}/{parsed.repo}
+                {parsed.reference ? ` @ ${parsed.reference}` : ""}
+                {parsed.path ? ` — ${parsed.path}` : ""}
+              </p>
+            )}
+          </div>
+          <SecondaryButton onClick={() => void runBrowse()} disabled={browse.loading}>
+            {browse.loading ? (
               <ShareIcon.Busy className={`${iconMd} animate-spin`} />
             ) : (
-              <ShareIcon.ImportCatalog className={iconMd} />
+              <Search className={iconMd} />
             )}
-            {t("repository.import", { count: selection.length })}
-          </PrimaryButton>
+            {t("repository.browse")}
+          </SecondaryButton>
+          {/* Adds to the list on show — the only way into Community, whose rows
+              are not otherwise the user's to change. */}
+          <SecondaryButton
+            onClick={() => void saveActive(browse.url.trim())}
+            disabled={!parsed || alreadySaved}
+          >
+            <ShareIcon.SaveRepository className={iconMd} />
+            {/* Worded per tab rather than tooltipped: which list this adds to is
+                the one thing that changes, so it belongs on the button's face. */}
+            {mine
+              ? t(alreadySaved ? "repository.saved.saved" : "repository.saved.save")
+              : t(alreadySaved ? "repository.community.added" : "repository.community.add")}
+          </SecondaryButton>
         </div>
-      </div>
+
+        {browse.loading && gitProgress && (
+          <p className={caption}>
+            {t(`repository.git.${gitProgress.phase}`, {
+              received: gitProgress.receivedObjects,
+              total: gitProgress.totalObjects,
+              kb: Math.round(gitProgress.receivedBytes / 1024),
+            })}
+          </p>
+        )}
+
+        {browse.error && (
+          <Alert tone="danger">
+            <p className="font-medium">{browse.error.message}</p>
+            {hintKey && <p className="text-xs">{t(hintKey)}</p>}
+          </Alert>
+        )}
+
+        {browse.result && (
+          <Card className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <ShareIcon.Branch className={`${iconSm} ${textSecondary}`} />
+              <span className={textMedium}>{browse.result.repo.fullName}</span>
+              <Badge size="lg">{browse.result.gitRef}</Badge>
+              {browse.result.repo.private && (
+                <Badge size="lg">
+                  <Lock className={iconSm} />
+                  {t("repository.private")}
+                </Badge>
+              )}
+              {!browse.result.authenticated && (
+                <Badge size="lg">{t("repository.anonymous")}</Badge>
+              )}
+            </div>
+            <div className="flex items-start gap-2">
+              <ShareIcon.Alert className={`${iconMd} ${textWarning} flex-shrink-0 mt-0.5`} />
+              <p className={caption}>
+                {t("repository.unreviewedWarning", { repo: browse.result.repo.fullName })}
+              </p>
+            </div>
+            {browse.result.dropped > 0 && (
+              <p className={`${caption} ${textWarning}`}>
+                {t("repository.dropped", { count: browse.result.dropped })}
+              </p>
+            )}
+          </Card>
+        )}
+
+        {browse.result && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className={caption}>
+                {t("repository.found", { count: entries.length })}
+                {browse.resolving ? ` · ${t("repository.resolving")}` : ""}
+              </span>
+              {selectableCount > 0 && (
+                <button
+                  onClick={selectAllValid}
+                  className={`${caption} underline hover:no-underline`}
+                >
+                  {t("repository.selectAll", { count: selectableCount })}
+                </button>
+              )}
+            </div>
+
+            <div className="max-h-[34vh] overflow-y-auto rounded-lg border border-[color:var(--border-default)]">
+              {entries.length === 0 ? (
+                <p className={`p-4 ${caption}`}>{t("repository.noneFound")}</p>
+              ) : (
+                entries.map((entry) => (
+                  <CandidateRow
+                    key={entry.path}
+                    entry={entry}
+                    meta={browse.resolved[entry.path]}
+                    checked={selection.includes(entry.path)}
+                    onToggle={() => toggleSelection(entry.path)}
+                    t={t}
+                  />
+                ))
+              )}
+            </div>
+            {browse.resolveError && (
+              <p className={`${caption} ${textWarning} mt-1`}>{browse.resolveError.message}</p>
+            )}
+          </div>
+        )}
+
+        {/* The one genuinely physical risk: an imported catalogue can define bus traffic. */}
+        {totalTransmitFrames > 0 && (
+          <Alert tone="warning" icon={<ShareIcon.TransmitRisk />}>
+            <p className="text-xs">{t("repository.transmitWarning", { count: totalTransmitFrames })}</p>
+          </Alert>
+        )}
+
+        {anyCollisions && (
+          <div>
+            <label className={caption}>{t("repository.collisionLabel")}</label>
+            <Select
+              size="lg"
+              value={onCollision}
+              onChange={(e) => setCollisionPolicy(e.target.value as CollisionPolicy)}
+            >
+              <option value="keepBoth">{t("repository.collision.keepBoth")}</option>
+              <option value="skip">{t("repository.collision.skip")}</option>
+              <option value="overwrite">{t("repository.collision.overwrite")}</option>
+            </Select>
+          </div>
+        )}
+
+        {importState.results && (
+          <Card className="space-y-1">
+            {importState.results.map((r) => {
+              const failed = r.outcome === "failed" || r.outcome === "skipped";
+              return (
+                <div key={r.path} className="flex items-start gap-2">
+                  {failed ? (
+                    <ShareIcon.Alert
+                      className={`${iconSm} ${textWarning} flex-shrink-0 mt-0.5`}
+                    />
+                  ) : (
+                    <ShareIcon.Success
+                      className={`${iconSm} ${textSuccess} flex-shrink-0 mt-0.5`}
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <span className={textMedium}>{r.filename ?? r.path}</span>
+                    <div className={caption}>
+                      {t(`repository.outcome.${r.outcome}`)}
+                      {r.message ? ` — ${r.message}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        )}
+
+        {importState.error && (
+          <p className={`${caption} ${textDanger}`}>{importState.error.message}</p>
+        )}
+      </DialogBody>
+
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>
+          {importState.results ? t("repository.done") : t("repository.cancel")}
+        </SecondaryButton>
+        <PrimaryButton
+          onClick={() => void handleImport()}
+          disabled={selection.length === 0 || importState.inFlight}
+        >
+          {importState.inFlight ? (
+            <ShareIcon.Busy className={`${iconMd} animate-spin`} />
+          ) : (
+            <ShareIcon.ImportCatalog className={iconMd} />
+          )}
+          {t("repository.import", { count: selection.length })}
+        </PrimaryButton>
+      </DialogFooter>
 
       {propertiesRepo && (
         <RepoPropertiesDialog

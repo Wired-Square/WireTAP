@@ -650,6 +650,127 @@
     --alert-text: var(--status-danger-text);
   }
 
+  /* ---- Dialogs -----------------------------------------------------------
+     .dialog-backdrop > .dialog [.dialog--sm|--lg|--xl|--2xl|--3xl] (md when none)
+       > .dialog__header (.dialog__title, .dialog__subtitle) · .dialog__body · .dialog__footer
+     One surface in three slots: the header and footer are pinned and the body
+     scrolls, so a tall dialog never grows past the window. The width is the
+     size; the height is the content. */
+  .dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background-color: rgb(0 0 0 / 0.5);
+  }
+
+  .dialog {
+    --dialog-w: 28rem;
+    --dialog-px: 16px;
+
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: var(--dialog-w);
+    max-height: 100%;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-dialog);
+    background-color: var(--bg-surface);
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    overflow: hidden;
+  }
+
+  /* Only the body gives way when the window is short. */
+  .dialog > :not(.dialog__body) {
+    flex-shrink: 0;
+  }
+
+  .dialog--sm {
+    --dialog-w: 24rem;
+  }
+
+  .dialog--lg {
+    --dialog-w: 32rem;
+  }
+
+  .dialog--xl {
+    --dialog-w: 42rem;
+  }
+
+  .dialog--2xl {
+    --dialog-w: 56rem;
+  }
+
+  .dialog--3xl {
+    --dialog-w: 80rem;
+  }
+
+  .dialog__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px var(--dialog-px);
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .dialog__header > * {
+    min-width: 0;
+  }
+
+  /* The heading takes the slack, so whatever trails it — the ✕, a back arrow,
+     an account badge — sits at the far edge. */
+  .dialog__header > :first-child:not(.dialog__icon),
+  .dialog__heading {
+    flex: 1;
+  }
+
+  .dialog__title {
+    color: var(--text-primary);
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+  }
+
+  .dialog__subtitle {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .dialog__icon {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+
+  .dialog__icon > svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--dialog-px);
+    overflow-y: auto;
+  }
+
+  .dialog__body--flush {
+    padding: 0;
+  }
+
+  .dialog__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px var(--dialog-px);
+    border-top: 1px solid var(--border-default);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;

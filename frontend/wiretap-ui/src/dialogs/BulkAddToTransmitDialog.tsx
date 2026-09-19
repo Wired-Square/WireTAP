@@ -6,8 +6,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import Dialog from "../components/Dialog";
-import { DialogFooter } from "../components/forms/DialogFooter";
+import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import {
@@ -18,7 +17,7 @@ import { parseFrameKey } from "../utils/frameKey";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { Button } from "../components/Button";
-import { Select, Input } from "../components/forms";
+import { Select, Input, SecondaryButton, PrimaryButton } from "../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -132,12 +131,8 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
   const totalKnown = frameInfoMap.size;
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
-      <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          {t("bulkAddToTransmit.title")}
-        </h2>
-
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("bulkAddToTransmit.title")}>
+      <DialogBody className="space-y-4">
         {/* Session info */}
         <div className="space-y-1">
           <label className={labelSmall}>{t("bulkAddToTransmit.targetSession")}</label>
@@ -247,18 +242,13 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
           </datalist>
           <p className={helpText}>{t("bulkAddToTransmit.groupHelp")}</p>
         </div>
-
-        <DialogFooter
-          onCancel={onClose}
-          onConfirm={handleConfirm}
-          confirmLabel={
-            matchingIds.length > 0
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+        <PrimaryButton onClick={handleConfirm} disabled={!canConfirm}>{matchingIds.length > 0
               ? t("bulkAddToTransmit.addNToQueue", { count: matchingIds.length })
-              : t("bulkAddToTransmit.addToQueue")
-          }
-          confirmDisabled={!canConfirm}
-        />
-      </div>
+              : t("bulkAddToTransmit.addToQueue")}</PrimaryButton>
+      </DialogFooter>
     </Dialog>
   );
 }
