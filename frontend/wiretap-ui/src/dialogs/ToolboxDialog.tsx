@@ -11,8 +11,6 @@ import {
   h3,
   borderDefault,
   paddingCard,
-  hoverLight,
-  roundedDefault,
   spaceYSmall,
   textTertiary,
 } from "../styles";
@@ -32,6 +30,7 @@ import {
   type SessionShape,
   type ToolDataCounts,
 } from "./toolboxGating";
+import { Button, IconButton } from "../components/Button";
 
 type ToolConfig = {
   id: ToolboxView;
@@ -228,13 +227,13 @@ export default function ToolboxDialog({
           <h2 className={h3}>
             {t("toolbox.titleAnalysisAndScanning")}
           </h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Content */}
@@ -302,15 +301,13 @@ export default function ToolboxDialog({
               <div className={`text-sm ${textTertiary}`}>
                 {getSelectionText(t, effectiveTool, effectiveSelectedCount, isSerialMode, isFilteredView)}
               </div>
-              <button
-                type="button"
+              <Button
                 onClick={handleRunAnalysis}
                 disabled={effectiveSelectedCount === 0 || isRunning}
-                className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  effectiveSelectedCount === 0 || isRunning
-                    ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
-                    : "bg-purple-600 hover:bg-purple-700 text-white"
-                }`}
+                variant="solid"
+                tone="purple"
+                size="lg"
+                className="w-full"
               >
                 {isRunning ? (
                   <Loader2 className={`${iconMd} animate-spin`} />
@@ -318,7 +315,7 @@ export default function ToolboxDialog({
                   <Play className={iconMd} />
                 )}
                 {isRunning ? t("toolbox.running") : t("toolbox.runAnalysis")}
-              </button>
+              </Button>
             </div>
           )}
 

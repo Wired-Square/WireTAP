@@ -13,7 +13,7 @@ import {
   textDataSecondary,
   focusBorder,
 } from "../../../styles/colourTokens";
-import { toggleChipClass } from "../../../styles/buttonStyles";
+import { Button } from "../../../components/Button";
 
 export default function CanFrameEditor() {
   const { t } = useTranslation("transmit");
@@ -225,39 +225,51 @@ export default function CanFrameEditor() {
         <span className={`${textDataSecondary} text-xs mr-2`}>{t("canEditor.flags")}</span>
 
         {supportsExtended && (
-          <button
+          <Button
             onClick={handleExtendedToggle}
-            className={toggleChipClass(canEditor.isExtended)}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={canEditor.isExtended}
           >
             {t("canEditor.extendedFull")}
-          </button>
+          </Button>
         )}
 
         {supportsFd && (
-          <button
+          <Button
             onClick={handleFdToggle}
-            className={toggleChipClass(canEditor.isFd)}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={canEditor.isFd}
           >
             {t("canEditor.canFd")}
-          </button>
+          </Button>
         )}
 
         {supportsFd && canEditor.isFd && (
-          <button
+          <Button
             onClick={handleBrsToggle}
-            className={toggleChipClass(canEditor.isBrs)}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={canEditor.isBrs}
           >
             {t("canEditor.brs")}
-          </button>
+          </Button>
         )}
 
         {supportsRtr && !canEditor.isFd && (
-          <button
+          <Button
             onClick={handleRtrToggle}
-            className={toggleChipClass(canEditor.isRtr)}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={canEditor.isRtr}
           >
             {t("canEditor.rtr")}
-          </button>
+          </Button>
         )}
       </div>
 

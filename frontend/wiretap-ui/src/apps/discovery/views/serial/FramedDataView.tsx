@@ -26,9 +26,10 @@ import { PaginationToolbar, TimelineSection, FRAME_PAGE_SIZE_OPTIONS } from '../
 import ByteExtractionDialog from './ByteExtractionDialog';
 import ChecksumExtractionDialog from './ChecksumExtractionDialog';
 import { configFromSerialChecksum, serialChecksumFromConfig } from './checksumConfig';
-import { bgDataToolbar, borderDataView, bgSurface, textSecondary, borderDefault } from '../../../../styles';
+import { bgDataToolbar, borderDataView } from '../../../../styles';
 import { pageCount, pageForOffset, resolvePageSize } from "../../../../utils/pageSize";
 import type { TimeDisplayFormat } from "../../../../types/common";
+import { Button } from "../../../../components/Button";
 
 // ============================================================================
 // Extraction Badge
@@ -44,12 +45,7 @@ interface ExtractionBadgeProps {
 
 function ExtractionBadge({ label, config, isActive, onClick, color }: ExtractionBadgeProps) {
   const { t } = useTranslation("discovery");
-  const inactiveClasses = `${bgSurface} ${textSecondary} ${borderDefault}`;
-  const colorClasses = color === 'cyan'
-    ? { active: 'bg-cyan-700 text-cyan-200 border-cyan-600', inactive: inactiveClasses }
-    : color === 'purple'
-    ? { active: 'bg-purple-700 text-purple-200 border-purple-600', inactive: inactiveClasses }
-    : { active: 'bg-amber-700 text-amber-200 border-amber-600', inactive: inactiveClasses };
+  const tone = color === 'amber' ? 'warning' : color;
 
   // Format the byte range - handle negative indices nicely
   const formatRange = (cfg: ExtractionConfig) => {
@@ -62,11 +58,12 @@ function ExtractionBadge({ label, config, isActive, onClick, color }: Extraction
   };
 
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
-        isActive ? colorClasses.active : colorClasses.inactive
-      } hover:opacity-80`}
+      variant="outline"
+      tone={tone}
+      size="sm"
+      pressed={isActive}
       title={
         config
           ? t("serial.extractionTooltipBytes", {
@@ -81,7 +78,7 @@ function ExtractionBadge({ label, config, isActive, onClick, color }: Extraction
       {config && isActive && (
         <span className="ml-1 opacity-75">{formatRange(config)}</span>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -97,21 +94,18 @@ interface ChecksumBadgeProps {
 function ChecksumBadge({ config, onClick }: ChecksumBadgeProps) {
   const { t } = useTranslation("discovery");
   const isActive = config !== null;
-  const colorClasses = {
-    active: 'bg-amber-700 text-amber-200 border-amber-600',
-    inactive: `${bgSurface} ${textSecondary} ${borderDefault}`
-  };
 
   const getAlgoLabel = (algo: DiscoveryChecksumAlgorithm) => {
     return CHECKSUM_ALGORITHMS.find(a => a.value === algo)?.label ?? algo;
   };
 
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
-        isActive ? colorClasses.active : colorClasses.inactive
-      } hover:opacity-80`}
+      variant="outline"
+      tone="warning"
+      size="sm"
+      pressed={isActive}
       title={
         config
           ? t("serial.checksumTooltip", {
@@ -126,7 +120,7 @@ function ChecksumBadge({ config, onClick }: ChecksumBadgeProps) {
       {config && isActive && (
         <span className="ml-1 opacity-75">{getAlgoLabel(config.algorithm)}</span>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -673,12 +667,13 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
 
           <div className="flex-1" />
 
-          <button
+          <Button
             onClick={handleAccept}
-            className="px-4 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded font-medium"
+            variant="solid"
+            tone="success"
           >
             {t("serial.accept")}
-          </button>
+          </Button>
         </div>
       )}
 

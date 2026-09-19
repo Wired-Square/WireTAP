@@ -4,10 +4,11 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, textMedium, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, textMedium, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
+import { Button, IconButton } from "../../../components/Button";
 
 export type NodeViewProps = {
   selectedNode: TomlNode;
@@ -168,19 +169,21 @@ export default function NodeView({
                 ? { onClick: () => onAddRegisterForSlave?.(deviceAddress), label: t("nodeView.addRegister"), show: !!onAddRegisterForSlave }
                 : { onClick: () => onAddCanFrameForNode?.(nodeName), label: t("nodeView.addCanFrame"), show: !!onAddCanFrameForNode };
             return add.show ? (
-              <button
+              <Button
                 onClick={add.onClick}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                variant="solid"
+                tone="primary"
+                size="sm"
                 title={add.label}
               >
                 <Plus className={iconMd} />
                 {add.label}
-              </button>
+              </Button>
             ) : null;
           })()}
 
           {onEditNode && (
-            <button
+            <IconButton
               onClick={() => {
                 const notes = selectedNode.metadata?.properties?.notes;
                 const notesStr = notes
@@ -188,21 +191,20 @@ export default function NodeView({
                   : undefined;
                 onEditNode(nodeName, notesStr, deviceAddress);
               }}
-              className={iconButtonHover}
               title={t("nodeView.edit")}
             >
               <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-            </button>
+            </IconButton>
           )}
 
           {onDeleteNode && (
-            <button
+            <IconButton
               onClick={() => onDeleteNode(nodeName)}
-              className={iconButtonHoverDanger}
+              tone="danger"
               title={t("nodeView.deleteTooltip")}
             >
               <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
@@ -310,25 +312,24 @@ export default function NodeView({
                       {t("nodeView.bytesUnit", { count: frame.length })}
                     </div>
                   )}
-                  <button
+                  <IconButton
                     onClick={() => onSelectPath(["frame", frameProtocol, frame.id])}
-                    className={iconButtonHover}
                     title={t("nodeView.editFrame")}
                   >
                     <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-                  </button>
+                  </IconButton>
                   {(isModbus ? onRequestDeleteRegister : onRequestDeleteFrame) && (
-                    <button
+                    <IconButton
                       onClick={() =>
                         isModbus
                           ? onRequestDeleteRegister?.(frame.id)
                           : onRequestDeleteFrame?.(frame.id)
                       }
-                      className={iconButtonHoverDanger}
+                      tone="danger"
                       title={t("nodeView.deleteFrame")}
                     >
                       <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               </div>
@@ -361,15 +362,14 @@ export default function NodeView({
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
+                        <IconButton
                           onClick={() => onSelectPath(signal.path)}
-                          className={iconButtonHover}
                           title={t("nodeView.editSignal")}
                         >
                           <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-                        </button>
+                        </IconButton>
                         {onRequestDeleteSignal && (
-                          <button
+                          <IconButton
                             onClick={() =>
                               onRequestDeleteSignal(
                                 frame.id,
@@ -378,11 +378,11 @@ export default function NodeView({
                                 signal.name
                               )
                             }
-                            className={iconButtonHoverDanger}
+                            tone="danger"
                             title={t("nodeView.deleteSignal")}
                           >
                             <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                          </button>
+                          </IconButton>
                         )}
                       </div>
                     </div>

@@ -6,9 +6,9 @@
 
 import { Binary } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toggleButtonClass } from "../styles/buttonStyles";
 import { iconSm } from "../styles/spacing";
 import { useFrameIdFormat, nextFrameIdOverride } from "../hooks/useFrameIdFormat";
+import { Button } from "./Button";
 
 /** Map a hex/decimal format to its short i18n key (hex/dec). */
 const formatKey = (f: "hex" | "decimal") => (f === "hex" ? "frameIdFormat.hex" : "frameIdFormat.dec");
@@ -23,13 +23,14 @@ export default function FrameIdFormatToggle() {
     override === "default" ? t("frameIdFormat.auto") : t(formatKey(override));
 
   return (
-    <button
+    <Button
       onClick={() => setOverride(nextFrameIdOverride(override))}
-      className={toggleButtonClass(override !== "default", "blue")}
+      tone="primary"
+      pressed={override !== "default"}
       title={t("frameIdFormat.tooltip", { default: t(formatKey(defaultFormat)) })}
     >
-      <Binary className={`${iconSm} flex-shrink-0`} />
-      <span className="ml-1 text-sm w-9 text-center">{label}</span>
-    </button>
+      <Binary className={iconSm} />
+      <span className="w-9 text-center">{label}</span>
+    </Button>
   );
 }

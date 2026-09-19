@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, GripVertical, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
-import { iconButtonHover, iconButtonDanger } from "../../../styles/buttonStyles";
+import { bgSurface, borderDivider, inputSimple, selectSimple } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore, getSignalLabel, getConfidenceColour } from "../../../stores/dashboardStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
+import { Button, IconButton } from "../../../components/Button";
+import { PrimaryButton } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -135,12 +136,12 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             {t("panelConfig.title")}
           </h2>
-          <button
+          <IconButton
             onClick={onClose}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Form */}
@@ -414,22 +415,23 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                     )}
                     {/* Replace signal source */}
                     {onReplaceSignal && (
-                      <button
+                      <IconButton
                         onClick={() => onReplaceSignal(panel.id, index)}
-                        className={`${iconButtonHover} p-1 shrink-0`}
+                        size="sm"
                         title={t("panelConfig.actions.changeSource")}
                       >
                         <ArrowLeftRight className={iconSm} />
-                      </button>
+                      </IconButton>
                     )}
                     {/* Remove signal */}
-                    <button
+                    <IconButton
                       onClick={() => removeSignalFromPanel(panel.id, signal.frameId, signal.signalName)}
-                      className={`${iconButtonDanger} p-1 shrink-0`}
+                      tone="danger"
+                      size="sm"
                       title={t("panelConfig.actions.removeSignal")}
                     >
                       <Trash2 className={iconSm} />
-                    </button>
+                    </IconButton>
                   </div>
                 ))}
               </div>
@@ -439,21 +441,21 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           {/* Action buttons */}
           <div className="flex gap-2">
             {onAddSignals && panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && (
-              <button
+              <Button
                 onClick={() => onAddSignals(panel.id)}
-                className={`${iconButtonHover} flex items-center gap-1.5 px-3 py-2 rounded text-sm text-[color:var(--text-secondary)] border border-[var(--border-default)]`}
+                variant="outline"
                 title={t("panelConfig.actions.addSignals")}
               >
                 <Plus className={iconSm} />
                 {t("panelConfig.actions.addSignalsLabel")}
-              </button>
+              </Button>
             )}
-            <button
+            <PrimaryButton
               onClick={handleSave}
-              className={`${primaryButtonBase} flex-1`}
+              className="flex-1"
             >
               {t("panelConfig.actions.save")}
-            </button>
+            </PrimaryButton>
           </div>
         </div>
       </div>

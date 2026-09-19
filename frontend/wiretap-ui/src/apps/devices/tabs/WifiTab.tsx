@@ -48,6 +48,7 @@ import {
   SECURITY_WPA2_PSK,
 } from "../../../api/bleProvision";
 import { tlog } from "../../../api/settings";
+import { IconButton } from "../../../components/Button";
 
 type WifiPhase = "form" | "writing" | "result";
 
@@ -382,14 +383,14 @@ export default function WifiTab() {
                 maxLength={64}
                 className="h-10 pr-10"
               />
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setShowPassphrase((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
+                size="sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2"
                 tabIndex={-1}
               >
                 {showPassphrase ? <EyeOff className={iconMd} /> : <Eye className={iconMd} />}
-              </button>
+              </IconButton>
             </div>
           </FormField>
         )}

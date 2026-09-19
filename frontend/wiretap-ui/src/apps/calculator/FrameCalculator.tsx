@@ -8,14 +8,15 @@ import AppLayout from "../../components/AppLayout";
 import ByteBits from "../../components/ByteBits";
 import Dialog from "../../components/Dialog";
 import FlexSeparator from "../../components/FlexSeparator";
-import { SecondaryButton } from "../../components/forms";
+import { SecondaryButton, PrimaryButton } from "../../components/forms";
 import { useSettings } from "../../hooks/useSettings";
 import { readClipboardText, writeClipboardText } from "../../api/clipboard";
 import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
-import { buttonBase, iconButtonBase, toggleButtonClass, selectionButtonClass, groupButtonClass, disabledState, caption, captionMuted, borderDivider, hoverLight, bgSurface } from "../../styles";
+import { caption, captionMuted, borderDivider, bgSurface } from "../../styles";
 import { borderDataView, bgDataView } from "../../styles/colourTokens";
 import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacing";
 import { h2, sectionHeaderText } from "../../styles/typography";
+import { Button, IconButton } from "../../components/Button";
 
 export type Endianness = "little" | "big" | "mid-little" | "mid-big";
 export type GroupMode = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
@@ -374,126 +375,124 @@ export default function FrameCalculator() {
         <FlexSeparator />
 
         {/* Rotate button */}
-        <button
-          className={toggleButtonClass(isRotating, "yellow")}
+        <IconButton
+          variant="surface"
+          tone="warning"
+          pressed={isRotating}
           title={isRotating ? "Stop auto-rotation" : "Start auto-rotation"}
           onClick={toggleRotate}
         >
           <RotateCcw className={`${iconMd} ${isRotating ? "animate-spin" : ""}`} />
-        </button>
+        </IconButton>
 
         {/* Rotate interval button - opens dialog */}
-        <button
+        <Button
           onClick={() => setShowRotateDialog(true)}
-          className={buttonBase}
           title={t("tooltips.rotationInterval")}
         >
           {rotateInterval}s
-        </button>
+        </Button>
 
         {/* Endianness button - opens dialog */}
-        <button
+        <Button
           onClick={() => setShowEndiannessDialog(true)}
-          className={buttonBase}
           title={t("tooltips.byteOrder")}
         >
           {endianness === "little" ? "Little" : endianness === "big" ? "Big" : endianness === "mid-little" ? "Mid-Little" : "Mid-Big"}
-        </button>
+        </Button>
 
         {/* Separator */}
         <FlexSeparator />
 
         {/* Grouping button - opens dialog with all options */}
-        <button
+        <Button
           onClick={openGroupingDialog}
-          className={buttonBase}
           title={t("tooltips.groupingMode")}
         >
           {(groupMode === "custom-bits" || groupMode === "custom-bytes") && customLabel
             ? customLabel
             : groupMode}
-        </button>
+        </Button>
 
         {/* Separator */}
         <FlexSeparator />
 
         {/* Input mode selector - icon buttons */}
-        <button
+        <Button
           onClick={() => setInputMode("hex")}
-          className={groupButtonClass(inputMode === "hex")}
+          pressed={inputMode === "hex"}
           title={t("tooltips.hexInput")}
         >
           <Binary className={iconMd} />
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setInputMode("number")}
-          className={groupButtonClass(inputMode === "number")}
+          pressed={inputMode === "number"}
           title={t("tooltips.numberInput")}
         >
           <Hash className={iconMd} />
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setInputMode("string")}
-          className={groupButtonClass(inputMode === "string")}
+          pressed={inputMode === "string"}
           title={t("tooltips.stringInput")}
         >
           <Type className={iconMd} />
-        </button>
+        </Button>
 
         {/* Separator */}
         <FlexSeparator />
 
         {/* Memory buttons */}
-        <button
+        <Button
           onClick={handleMemoryAdd}
           disabled={!rawInput.trim() || history.includes(rawInput.trim())}
-          className={buttonBase}
           title={t("tooltips.addToMemory")}
         >
           M+
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={openHistoryDialog}
-          className={`${buttonBase} ${history.length > 0 ? "text-[color:var(--accent-primary)]" : ""}`}
+          tone={history.length > 0 ? "primary" : "neutral"}
           title={history.length > 0 ? `Memory (${history.length})` : "Memory empty"}
         >
           M{history.length > 0 && <span className="ml-1 text-xs opacity-70">{history.length}</span>}
-        </button>
+        </Button>
 
         {/* Separator */}
         <FlexSeparator />
 
         {/* Clipboard buttons */}
-        <button
+        <IconButton
           onClick={handleCopy}
-          className={iconButtonBase}
+          variant="surface"
           title={t("tooltips.copyHex")}
         >
           <Copy className={iconMd} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           onClick={handlePaste}
-          className={iconButtonBase}
+          variant="surface"
           title={t("tooltips.paste")}
         >
           <ClipboardPaste className={iconMd} />
-        </button>
+        </IconButton>
 
         {/* Separator */}
         <FlexSeparator />
 
         {/* Scale calculator button */}
-        <button
+        <IconButton
           onClick={() => {
             setTargetValueInput("");
             setShowScaleDialog(true);
           }}
-          className={iconButtonBase}
+          variant="surface"
           title={t("tooltips.calculateScale")}
           disabled={groups.length === 0}
         >
           <Divide className={iconMd} />
-        </button>
+        </IconButton>
       </div>
 
       {/* Second row: Input only */}
@@ -558,78 +557,84 @@ export default function FrameCalculator() {
                         <span>{t("labels.hex")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{hexFormatted}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.hex.replace('0x', ''))}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyHexValue")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
                         <span>{t("labels.unsigned")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.unsigned.toString()}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.unsigned)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyUnsigned")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
                         <span>Signed (2's)</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedTwos.toString()}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.signedTwos)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignedTwos")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
                         <span>Signed (1's)</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedOnes.toString()}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.signedOnes)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignedOnes")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
                         <span>Sign-Magnitude</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedMag.toString()}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.signedMag)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignMag")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
                         <span>{t("labels.text")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono break-all">{g.text}</span>
-                          <button
+                          <IconButton
                             onClick={() => handleCopyValue(g.text)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyText")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                          </button>
+                          </IconButton>
                         </div>
                       </div>
                     </div>
@@ -639,13 +644,14 @@ export default function FrameCalculator() {
                   <div className="flex-shrink-0 pt-2 border-t border-[color:var(--border-default)] overflow-hidden">
                     <div className="flex justify-between items-center group mb-2">
                       <span className="text-sm">{t("labels.binary")}</span>
-                      <button
+                      <IconButton
                         onClick={() => handleCopyValue(g.binary)}
-                        className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
                         title={t("tooltips.copyBinary")}
                       >
                         <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
-                      </button>
+                      </IconButton>
                     </div>
                     <ScalingByteBits
                       hexValue={g.displayHex}
@@ -681,13 +687,15 @@ export default function FrameCalculator() {
               </label>
               <div className="grid grid-cols-4 gap-2">
                 {(["1B", "2B", "4B", "8B"] as GroupMode[]).map((mode) => (
-                  <button
+                  <Button
                     key={mode}
                     onClick={() => handlePresetSelect(mode)}
-                    className={selectionButtonClass(groupMode === mode)}
+                    variant="outline"
+                    tone="primary"
+                    pressed={groupMode === mode}
                   >
                     {mode}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -705,18 +713,24 @@ export default function FrameCalculator() {
                 Unit
               </label>
               <div className="flex gap-2">
-                <button
+                <Button
                   onClick={() => setDialogUnit("bits")}
-                  className={`flex-1 ${selectionButtonClass(dialogUnit === "bits")}`}
+                  variant="outline"
+                  tone="primary"
+                  pressed={dialogUnit === "bits"}
+                  className="flex-1"
                 >
                   Bits
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setDialogUnit("bytes")}
-                  className={`flex-1 ${selectionButtonClass(dialogUnit === "bytes")}`}
+                  variant="outline"
+                  tone="primary"
+                  pressed={dialogUnit === "bytes"}
+                  className="flex-1"
                 >
                   Bytes
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -740,13 +754,12 @@ export default function FrameCalculator() {
 
           <div className="flex justify-end gap-3 mt-6">
             <SecondaryButton onClick={handleCustomCancel}>{t("common:actions.close")}</SecondaryButton>
-            <button
+            <PrimaryButton
               onClick={handleCustomOk}
               disabled={!dialogInput.trim()}
-              className={`px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors ${disabledState}`}
             >
               Apply Custom
-            </button>
+            </PrimaryButton>
           </div>
         </div>
       </Dialog>
@@ -780,27 +793,29 @@ export default function FrameCalculator() {
                     {item}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button
+                    <IconButton
                       onClick={() => handleHistoryCopyToClipboard(item)}
-                      className={iconButtonBase}
+                      variant="surface"
                       title={t("tooltips.copyToClipboard")}
                     >
                       <Copy className={iconSm} />
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleHistorySetActive(item)}
-                      className={`${iconButtonBase} text-[color:var(--accent-primary)]`}
+                      variant="surface"
+                      tone="primary"
                       title={t("tooltips.setActive")}
                     >
                       <ArrowRight className={iconSm} />
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleHistoryDelete(index)}
-                      className={`${iconButtonBase} text-[color:var(--status-danger-text)]`}
+                      variant="surface"
+                      tone="danger"
                       title={t("tooltips.deleteFromMemory")}
                     >
                       <Trash2 className={iconSm} />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               );
@@ -808,14 +823,16 @@ export default function FrameCalculator() {
           </div>
 
           <div className="flex justify-between mt-4">
-            <button
+            <Button
               onClick={handleHistoryCopyAll}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--status-info-bg)] text-[color:var(--accent-primary)] hover:brightness-95 transition-colors"
+              variant="tonal"
+              tone="primary"
+              size="lg"
               title={t("tooltips.copyAllHistory")}
             >
               <CopyPlus className={iconMd} />
               Copy All
-            </button>
+            </Button>
             <SecondaryButton onClick={handleHistoryDialogClose}>{t("common:actions.close")}</SecondaryButton>
           </div>
         </div>
@@ -832,16 +849,18 @@ export default function FrameCalculator() {
               { value: "mid-little", label: "Mid-Little" },
               { value: "mid-big", label: "Mid-Big" },
             ] as const).map((option) => (
-              <button
+              <Button
                 key={option.value}
                 onClick={() => {
                   setEndianness(option.value);
                   setShowEndiannessDialog(false);
                 }}
-                className={selectionButtonClass(endianness === option.value)}
+                variant="outline"
+                tone="primary"
+                pressed={endianness === option.value}
               >
                 {option.label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex justify-end mt-4">
@@ -856,16 +875,18 @@ export default function FrameCalculator() {
           <h2 className={`${h2} mb-4`}>{t("dialogs.rotationInterval.title")}</h2>
           <div className="grid grid-cols-3 gap-2">
             {[1, 2, 3, 5, 10, 15].map((interval) => (
-              <button
+              <Button
                 key={interval}
                 onClick={() => {
                   setRotateInterval(interval);
                   setShowRotateDialog(false);
                 }}
-                className={selectionButtonClass(rotateInterval === interval)}
+                variant="outline"
+                tone="primary"
+                pressed={rotateInterval === interval}
               >
                 {interval}s
-              </button>
+              </Button>
             ))}
           </div>
           <div className="flex justify-end mt-4">
@@ -937,13 +958,13 @@ export default function FrameCalculator() {
                     <span className="text-2xl font-mono font-semibold text-[color:var(--accent-primary)]">
                       {scale.toPrecision(6)}
                     </span>
-                    <button
+                    <IconButton
                       onClick={() => handleCopyValue(scale.toPrecision(6))}
-                      className="p-1.5 rounded hover:brightness-95 transition-colors"
+                      size="sm"
                       title={t("tooltips.copyScaleFactor")}
                     >
                       <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
-                    </button>
+                    </IconButton>
                   </div>
                   <div className={`${caption} mt-2 font-mono`}>
                     {targetValue} ÷ {rawValue.toString()} = {scale.toPrecision(6)}

@@ -7,11 +7,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg } from '../../../../styles/spacing';
-import { hoverLight } from '../../../../styles';
 import Dialog from '../../../../components/Dialog';
 import FramingOptionsPanel, { type FramingPanelConfig, type FramingMode } from '../../../../components/FramingOptionsPanel';
 import { DialogFooter } from '../../../../components/forms/DialogFooter';
 import type { FramingConfig } from '../../../../stores/discoveryStore';
+import { IconButton } from '../../../../components/Button';
 
 interface FramingModeDialogProps {
   isOpen: boolean;
@@ -91,9 +91,9 @@ export default function FramingModeDialog({ isOpen, onClose, config, onApply }: 
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("serial.framingModeTitle")}</h2>
-          <button onClick={onClose} className={`p-1 ${hoverLight} rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}>
+          <IconButton onClick={onClose} size="sm">
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         <FramingOptionsPanel

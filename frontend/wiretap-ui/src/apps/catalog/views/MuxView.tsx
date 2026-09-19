@@ -4,12 +4,13 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, bgSecondary, sectionHeaderText, hoverLight } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
+import { Button, IconButton } from "../../../components/Button";
 
 export type MuxViewProps = {
   selectedNode: TomlNode;
@@ -73,29 +74,30 @@ export default function MuxView({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("muxView.title")}</h3>
         <div className={flexRowGap2}>
-          <button
+          <Button
             onClick={() => onAddCase(selectedNode.path)}
-            className="px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+            variant="solid"
+            tone="purple"
+            size="sm"
           >
             {t("muxView.addCase")}
-          </button>
+          </Button>
 
-          <button
+          <IconButton
             onClick={() => onEditMux(selectedNode.path, selectedNode.metadata?.properties || {})}
-            className={iconButtonHover}
             title={t("muxView.editMux")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
 
           {/* Pattern A delete */}
-          <button
+          <IconButton
             onClick={() => setConfirmOpen(true)}
-            className={iconButtonHoverDanger}
+            tone="danger"
             title={t("muxView.deleteMux")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-          </button>
+          </IconButton>
         </div>
       </div>
 

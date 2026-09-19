@@ -17,6 +17,7 @@ import {
 import { formatHexId } from "../utils/formatHex";
 import MaskBitRow from "../components/MaskBitRow";
 import type { BridgeFilterKind, BridgeFilterIde } from "../../../api/framelinkRules";
+import { Button } from "../../../components/Button";
 
 interface BridgeFilterHelpProps {
   kind: BridgeFilterKind;
@@ -129,14 +130,15 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
         {summary && <p className={`text-xs ${textPrimary} mt-2`}>{summary}</p>}
 
         <div className="mt-3 flex justify-end">
-          <button
-            type="button"
+          <Button
             onClick={() => onApplyMask(calcId, calcMask)}
             disabled={!calcInputValid}
-            className="px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            variant="solid"
+            tone="primary"
+            size="sm"
           >
             {t("bridgeDialog.fields.useTheseValues")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

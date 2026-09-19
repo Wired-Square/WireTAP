@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { iconMd, iconXs, iconLg } from "../../../styles/spacing";
-import { iconButtonHover } from "../../../styles/buttonStyles";
 import Dialog from "../../../components/Dialog";
 import type { IOProfile, ConnectionFieldValue } from "../../../hooks/useSettings";
 import { isProfileKind } from "../../../hooks/useSettings";
@@ -37,6 +36,7 @@ import {
 } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
+import { IconButton } from "../../../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -311,13 +311,12 @@ export default function IOProfileDialog({
           <h2 className={h2}>
             {editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
           </h2>
-          <button
+          <IconButton
             onClick={onCancel}
-            className={iconButtonHover}
             title={t("ioProfileDialog.back")}
           >
             <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="p-6 space-y-4">

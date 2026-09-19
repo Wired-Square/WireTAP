@@ -40,6 +40,7 @@ import {
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { toolbarElementHeight } from "../../../styles/inputStyles";
+import { Button, IconButton } from "../../../components/Button";
 
 /** Format timestamp as HH:MM:SS.mmm */
 function formatTime(timestamp: number): string {
@@ -204,8 +205,9 @@ export default function SessionLogView() {
       >
         {/* Event Type Filter Dropdown */}
         <div className="relative group">
-          <button
-            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} ${hoverBg}`}
+          <Button
+            variant="outline"
+            size="sm"
           >
             <Filter className="w-3 h-3" />
             <span>{t("log.filter.events")}</span>
@@ -215,7 +217,7 @@ export default function SessionLogView() {
               </span>
             )}
             <ChevronDown className="w-3 h-3" />
-          </button>
+          </Button>
           {/* Dropdown */}
           <div
             className={`absolute left-0 top-full mt-1 z-50 p-2 rounded-lg border ${borderDefault} ${bgSurface} shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-[200px]`}
@@ -240,12 +242,14 @@ export default function SessionLogView() {
                 </div>
               </div>
             ))}
-            <button
+            <Button
               onClick={() => setFilter({ eventTypes: null })}
-              className={`w-full mt-2 px-2 py-1 text-[10px] rounded border ${borderDefault} ${textSecondary} ${hoverBg}`}
+              variant="outline"
+              size="sm"
+              className="w-full mt-2"
             >
               {t("log.filter.showAll")}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -281,15 +285,14 @@ export default function SessionLogView() {
         <div className="flex-1" />
 
         {/* Profile Column Toggle */}
-        <button
+        <IconButton
           onClick={() => setShowProfileColumn(!showProfileColumn)}
-          className={`p-1 rounded ${hoverBg} ${
-            showProfileColumn ? "text-blue-400" : textMuted
-          }`}
+          size="sm"
+          pressed={showProfileColumn}
           title={showProfileColumn ? t("log.hideProfileColumn") : t("log.showProfileColumn")}
         >
           <User className="w-4 h-4" />
-        </button>
+        </IconButton>
 
         {/* Entry Count */}
         <span className={`text-xs ${textMuted}`}>
@@ -303,7 +306,7 @@ export default function SessionLogView() {
         </span>
 
         {/* Auto-scroll Toggle */}
-        <button
+        <IconButton
           onClick={() => {
             setAutoScroll(true);
             scrollRef.current?.scrollTo({
@@ -311,31 +314,32 @@ export default function SessionLogView() {
               behavior: "smooth",
             });
           }}
-          className={`p-1 rounded ${hoverBg} ${
-            autoScroll ? "text-blue-400" : textMuted
-          }`}
+          size="sm"
+          pressed={autoScroll}
           title={t("log.scrollToBottom")}
         >
           <ArrowDownToLine className="w-4 h-4" />
-        </button>
+        </IconButton>
 
         {/* Copy Button */}
-        <button
+        <Button
           onClick={handleCopy}
-          className={`p-1 rounded ${hoverBg} ${copied ? "text-green-400" : textMuted}`}
+          tone={copied ? "success" : "neutral"}
+          size="sm"
           title={t("log.copyLog")}
         >
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-        </button>
+        </Button>
 
         {/* Clear Button */}
-        <button
+        <IconButton
           onClick={clearEntries}
-          className={`p-1 rounded ${hoverBg} ${textMuted} hover:text-red-400`}
+          tone="danger"
+          size="sm"
           title={t("log.clearLog")}
         >
           <Trash2 className="w-4 h-4" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Log Table */}

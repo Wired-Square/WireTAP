@@ -4,9 +4,10 @@ import { useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Search, ChevronUp, ChevronDown } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { disabledState, focusRing, iconButtonHoverSmall } from "../../../styles";
+import { focusRing } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 /** DOM id for the sidebar search input, so the Find menu (⌘F) can focus it. */
 export const CATALOG_SEARCH_INPUT_ID = "catalog-tree-search";
@@ -159,23 +160,23 @@ export default function FindBar() {
         </span>
       )}
 
-      <button
+      <IconButton
         onClick={findPrevious}
         disabled={matchCount === 0}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.previous")}
       >
         <ChevronUp className={iconSm} />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         onClick={findNext}
         disabled={matchCount === 0}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.next")}
       >
         <ChevronDown className={iconSm} />
-      </button>
+      </IconButton>
     </div>
   );
 }

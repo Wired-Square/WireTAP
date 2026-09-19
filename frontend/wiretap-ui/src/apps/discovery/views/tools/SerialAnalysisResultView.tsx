@@ -10,8 +10,8 @@ import ChecksumCandidateList from "../../components/ChecksumCandidateList";
 import { configFromCandidate, serialChecksumFromConfig } from "../serial/checksumConfig";
 import { Hash, Shield, Info, CheckCircle2, AlertCircle, Check, Layers, Radio, MapPin, X } from "lucide-react";
 import { iconMd, iconXs, iconLg, icon2xl, flexRowGap2 } from "../../../../styles/spacing";
-import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { caption, captionMuted, textMedium, sectionHeaderText } from "../../../../styles";
+import { Button, IconButton } from "../../../../components/Button";
 
 type Props = {
   /** Which results to display. When omitted, shows whichever results exist. */
@@ -191,14 +191,14 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
             </p>
           </div>
           {onClose && (
-            <button
-              type="button"
+            <IconButton
               onClick={onClose}
-              className={iconButtonDangerCompact}
+              tone="danger"
+              size="sm"
               title={t("serialAnalysis.close")}
             >
               <X className={iconXs} />
-            </button>
+            </IconButton>
           )}
         </div>
 
@@ -298,16 +298,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           )}
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-2">
-                          <button
+                          <Button
                             onClick={() => handleToggleFraming(candidate, idx)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                              isApplied
-                                ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
-                                : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
-                            }`}
+                            size="sm"
+                            pressed={isApplied}
                           >
                             {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
-                          </button>
+                          </Button>
                           {isApplied ? (
                             <CheckCircle2 className={`${iconLg} text-blue-500`} />
                           ) : candidate.confidence >= 70 ? (
@@ -364,14 +361,14 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
           </p>
         </div>
         {onClose && (
-          <button
-            type="button"
+          <IconButton
             onClick={onClose}
-            className={iconButtonDangerCompact}
+            tone="danger"
+            size="sm"
             title={t("serialAnalysis.close")}
           >
             <X className={iconXs} />
-          </button>
+          </IconButton>
         )}
       </div>
 
@@ -457,16 +454,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                         )}
                       </div>
                       <div className="flex-shrink-0 flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={() => handleToggleId(candidate, idx)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                            isApplied
-                              ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
-                              : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
-                          }`}
+                          size="sm"
+                          pressed={isApplied}
                         >
-                          {isApplied ? "Applied" : "Apply"}
-                        </button>
+                          {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
+                        </Button>
                         {isApplied ? (
                           <CheckCircle2 className={`${iconLg} text-blue-500`} />
                         ) : idx === 0 ? (
@@ -575,16 +569,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                         )}
                       </div>
                       <div className="flex-shrink-0 flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={() => handleToggleSourceAddress(candidate, idx)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                            isApplied
-                              ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
-                              : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
-                          }`}
+                          size="sm"
+                          pressed={isApplied}
                         >
-                          {isApplied ? "Applied" : "Apply"}
-                        </button>
+                          {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
+                        </Button>
                         {isApplied ? (
                           <CheckCircle2 className={`${iconLg} text-blue-500`} />
                         ) : idx === 0 ? (

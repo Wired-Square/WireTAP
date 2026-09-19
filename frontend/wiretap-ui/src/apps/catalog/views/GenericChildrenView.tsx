@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { caption, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type GenericChildrenViewProps = {
   selectedNode: TomlNode;
@@ -25,13 +26,13 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
         </div>
 
         {onRequestDelete && (
-          <button
+          <IconButton
             onClick={() => onRequestDelete(selectedNode.path, selectedNode.key)}
-            className={iconButtonHoverDanger}
+            tone="danger"
             title={t("genericChildren.deleteTooltip")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
-          </button>
+          </IconButton>
         )}
       </div>
 

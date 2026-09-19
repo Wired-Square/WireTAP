@@ -10,10 +10,10 @@ import { IOSessionControls, type IOSessionControlsProps } from "./SessionControl
 import CatalogButton from "./CatalogButton";
 import FrameIdFormatToggle from "./FrameIdFormatToggle";
 import FlexSeparator from "./FlexSeparator";
-import { buttonBase } from "../styles/buttonStyles";
 import { iconLg, iconSm, paddingAppBarX } from "../styles/spacing";
 import { bgSurface, borderDivider } from "../styles/colourTokens";
 import type { CatalogMetadata } from "../api/catalog";
+import { Button } from "./Button";
 
 /**
  * IO Session section props - passed to IOSessionControls.
@@ -193,10 +193,9 @@ export default function AppTopBar({
         {framePicker && (
           <>
             <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
-            <button
+            <Button
               onClick={framePicker.onOpen}
               disabled={framePicker.disabled}
-              className={buttonBase}
               title={
                 framePicker.disabled && framePicker.disabledTitle
                   ? framePicker.disabledTitle
@@ -207,7 +206,7 @@ export default function AppTopBar({
               <span className="text-[color:var(--text-muted)]">
                 {framePicker.selectedCount}/{framePicker.frameCount}
               </span>
-            </button>
+            </Button>
           </>
         )}
 

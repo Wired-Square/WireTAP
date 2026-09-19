@@ -4,10 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Settings, Trash2 } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
-import { caption, labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, hoverLight, emptyStateText } from "../../../styles";
+import { caption, labelSmall, labelSmallMuted, monoBody, bgSecondary, hoverLight, emptyStateText } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
+import { Button, IconButton } from "../../../components/Button";
 
 export type SerialFrameViewProps = {
   selectedNode: TomlNode;
@@ -96,22 +97,21 @@ export default function SerialFrameView({
         {(onEditFrame || onDeleteFrame) && (
           <div className="flex gap-2">
             {onEditFrame && (
-              <button
+              <IconButton
                 onClick={() => onEditFrame(selectedNode)}
-                className={iconButtonHover}
                 title={t("serialFrame.editFrame")}
               >
                 <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-              </button>
+              </IconButton>
             )}
             {onDeleteFrame && (
-              <button
+              <IconButton
                 onClick={() => onDeleteFrame(selectedNode.key)}
-                className={iconButtonHoverDanger}
+                tone="danger"
                 title={t("serialFrame.deleteFrame")}
               >
                 <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-              </button>
+              </IconButton>
             )}
           </div>
         )}
@@ -234,21 +234,25 @@ export default function SerialFrameView({
               </span>
 
               {onAddMux && !selectedNode.metadata?.hasMux && (
-                <button
+                <Button
                   onClick={() => onAddMux(idKey)}
-                  className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                  variant="solid"
+                  tone="purple"
+                  size="sm"
                 >
                   {t("serialFrame.addMux")}
-                </button>
+                </Button>
               )}
 
               {onAddSignal && (
-                <button
+                <Button
                   onClick={() => onAddSignal(idKey)}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
+                  variant="solid"
+                  tone="success"
+                  size="sm"
                 >
                   {t("serialFrame.addSignal")}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -346,23 +350,22 @@ export default function SerialFrameView({
                           {(onEditSignal || onRequestDeleteSignal) && (
                             <div className="flex items-center gap-2 ml-4">
                               {onEditSignal && (
-                                <button
+                                <IconButton
                                   onClick={() => onEditSignal(idKey, idx, signal, ["frame", "serial", idKey])}
-                                  className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
                                   title={t("serialFrame.editSignal")}
                                 >
                                   <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-                                </button>
+                                </IconButton>
                               )}
 
                               {onRequestDeleteSignal && (
-                                <button
+                                <IconButton
                                   onClick={() => onRequestDeleteSignal(idKey, idx, ["frame", "serial", idKey], signal.name)}
-                                  className={iconButtonHoverDanger}
+                                  tone="danger"
                                   title={t("serialFrame.deleteSignal")}
                                 >
                                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                                </button>
+                                </IconButton>
                               )}
                             </div>
                           )}

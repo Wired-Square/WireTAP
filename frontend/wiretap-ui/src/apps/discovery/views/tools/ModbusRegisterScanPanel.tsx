@@ -22,6 +22,7 @@ import {
   maxChunkFor,
 } from "../../../../components/modbus/modbusScanDefaults";
 import type { ModbusScanConfig, ModbusRegisterType } from "../../../../api/io";
+import { Button } from "../../../../components/Button";
 
 type Props = {
   onStartScan: (config: ModbusScanConfig) => void;
@@ -157,14 +158,13 @@ export default function ModbusRegisterScanPanel({ onStartScan }: Props) {
       </FieldRow>
       {repeat > 1 && <p className={textMuted}>{t("modbusRegister.passesHint")}</p>}
 
-      <button
-        type="button"
+      <Button
         onClick={() => setShowAdvanced((v) => !v)}
-        className={`flex items-center gap-1 ${textMuted} hover:text-[color:var(--text-primary)]`}
+        variant="link"
       >
         {showAdvanced ? <ChevronDown className={iconSm} /> : <ChevronRight className={iconSm} />}
         {t("modbusRegister.advanced")}
-      </button>
+      </Button>
 
       {showAdvanced && (
         <div className={`space-y-3 pl-2 border-l ${borderDefault}`}>

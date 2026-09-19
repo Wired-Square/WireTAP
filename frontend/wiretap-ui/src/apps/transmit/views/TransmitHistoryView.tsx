@@ -11,7 +11,7 @@ import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { textDataSecondary, textDataGreen } from "../../../styles/colourTokens";
 import { textDanger } from "../../../styles";
-import { badgeColorClass, buttonBase } from "../../../styles/buttonStyles";
+import { badgeColorClass } from "../../../styles/badgeStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -28,6 +28,7 @@ import { FrameDataTable, type FrameRow, FRAME_PAGE_SIZE_OPTIONS } from "../../di
 import DataViewPaginationToolbar from "../../../components/DataViewPaginationToolbar";
 import TimelineScrubber from "../../../components/TimelineScrubber";
 import { resolvePageSize, type PageSize } from "../../../utils/pageSize";
+import { Button } from "../../../components/Button";
 
 interface TransmitHistoryViewProps {
   outputBusToSource?: Map<number, BusSourceInfo>;
@@ -223,23 +224,21 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
             }
             rightContent={
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={handleExport}
                   disabled={isExporting}
-                  className={buttonBase}
                   title={t("history.exportCsvTooltip")}
                 >
                   <Download size={14} />
                   <span className="text-sm ml-1">{isExporting ? "Exporting…" : "Export"}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={clear}
-                  className={buttonBase}
                   title={t("history.clearHistoryTooltip")}
                 >
                   <Trash2 size={14} />
                   <span className="text-sm ml-1">{t("history.clearLabel")}</span>
-                </button>
+                </Button>
               </div>
             }
           />

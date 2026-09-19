@@ -9,7 +9,7 @@ import type { PlaybackSpeed } from "../../../components/TimeController";
 import type { CaptureMetadata } from "../../../api/capture";
 import type { BusSourceInfo } from "../../../utils/busFormat";
 import AppTopBar from "../../../components/AppTopBar";
-import { buttonBase, iconButtonBase, pollButtonClass, toggleButtonClass } from "../../../styles/buttonStyles";
+import { Button, IconButton } from "../../../components/Button";
 
 
 type Props = {
@@ -182,11 +182,11 @@ export default function DecoderTopBar({
   // Resolve the single poll-control button for the current Modbus state.
   const pollButton = !modbus ? null
     : modbus.isPolling && isStreaming && modbus.onPause
-      ? { onClick: modbus.onPause, Icon: Square, label: t("modbus.pause"), title: t("modbus.pausePolling"), cls: pollButtonClass(true) }
+      ? { onClick: modbus.onPause, Icon: Square, label: t("modbus.pause"), title: t("modbus.pausePolling"), tone: "danger" as const }
     : isStreaming && !modbus.isPolling && modbus.onResume
-      ? { onClick: modbus.onResume, Icon: Play, label: t("modbus.poll"), title: t("modbus.resumePolling"), cls: pollButtonClass(false) }
+      ? { onClick: modbus.onResume, Icon: Play, label: t("modbus.poll"), title: t("modbus.resumePolling"), tone: "success" as const }
     : !isStreaming && modbus.pollGroupCount > 0 && modbus.onStart
-      ? { onClick: modbus.onStart, Icon: Play, label: t("modbus.poll"), title: t("modbus.startPolling"), cls: pollButtonClass(false) }
+      ? { onClick: modbus.onStart, Icon: Play, label: t("modbus.poll"), title: t("modbus.startPolling"), tone: "success" as const }
     : null;
   // Filter button state
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
@@ -246,10 +246,10 @@ export default function DecoderTopBar({
       {modbus && (
         <>
           {pollButton && (
-            <button onClick={pollButton.onClick} className={pollButton.cls} title={pollButton.title}>
+            <Button onClick={pollButton.onClick} variant="tonal" tone={pollButton.tone} size="sm" title={pollButton.title}>
               <pollButton.Icon size={10} fill="currentColor" />
               {pollButton.label}
-            </button>
+            </Button>
           )}
           {modbus.pollGroupCount > 0 && (
             <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)]">
@@ -262,31 +262,34 @@ export default function DecoderTopBar({
 
       {/* Raw bytes toggle */}
       {onToggleRawBytes && (
-        <button
+        <IconButton
           onClick={onToggleRawBytes}
-          className={toggleButtonClass(showRawBytes, "purple")}
+          variant="surface"
+          tone="purple"
+          pressed={showRawBytes}
           title={showRawBytes ? t("topBar.hideRawBytes") : t("topBar.showRawBytes")}
         >
           <Glasses className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Clear decoded values */}
       {onClear && (
-        <button
+        <Button
           onClick={onClear}
-          className={buttonBase}
           title={t("topBar.clearDecoded")}
         >
           <Trash2 className={iconSm} />
-        </button>
+        </Button>
       )}
 
       {/* View mode toggle (single vs per-source) */}
       {onToggleViewMode && (
-        <button
+        <IconButton
           onClick={onToggleViewMode}
-          className={toggleButtonClass(viewMode === 'per-source', 'blue')}
+          variant="surface"
+          tone="primary"
+          pressed={viewMode === 'per-source'}
           title={viewMode === 'single' ? 'Show per source address' : 'Show single (most recent)'}
         >
           {viewMode === 'per-source' ? (
@@ -294,25 +297,29 @@ export default function DecoderTopBar({
           ) : (
             <User className={iconSm} />
           )}
-        </button>
+        </IconButton>
       )}
 
       {/* Frame filters button - colored when any filter is active */}
       {onOpenFilterDialog && (
-        <button
+        <IconButton
           onClick={onOpenFilterDialog}
-          className={toggleButtonClass(hasFilters, 'yellow')}
+          variant="surface"
+          tone="warning"
+          pressed={hasFilters}
           title={hasFilters ? `Filters: ${filterParts.join(', ')}` : 'Set frame filters'}
         >
           <Filter className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Hide unseen frames toggle */}
       {onToggleHideUnseen && (
-        <button
+        <IconButton
           onClick={onToggleHideUnseen}
-          className={toggleButtonClass(hideUnseen, 'blue')}
+          variant="surface"
+          tone="primary"
+          pressed={hideUnseen}
           title={hideUnseen ? 'Showing only seen frames' : 'Showing all frames'}
         >
           {hideUnseen ? (
@@ -320,22 +327,20 @@ export default function DecoderTopBar({
           ) : (
             <Eye className={iconSm} />
           )}
-        </button>
+        </IconButton>
       )}
 
       {/* ASCII toggle */}
       {onToggleAsciiGutter && (
-        <button
+        <IconButton
           onClick={onToggleAsciiGutter}
-          className={`${iconButtonBase} ${
-            showAsciiGutter
-              ? "!bg-yellow-600 !text-white hover:!bg-yellow-500"
-              : ""
-          }`}
+          variant="surface"
+          tone="warning"
+          pressed={showAsciiGutter}
           title={showAsciiGutter ? t("topBar.hideAsciiColumn") : t("topBar.showAsciiColumn")}
         >
           <Type className={iconMd} />
-        </button>
+        </IconButton>
       )}
     </AppTopBar>
   );

@@ -19,21 +19,14 @@ import {
   focusBorder,
   placeholderMuted,
 } from "../../../styles/colourTokens";
-import {
-  badgeColorClass,
-  buttonBase,
-  dangerButtonBase,
-  playButtonCompact,
-  stopButtonCompact,
-  paginationButtonDark,
-  iconButtonHoverCompact,
-} from "../../../styles/buttonStyles";
+import { badgeColorClass } from "../../../styles/badgeStyles";
 import { toolbarSelect } from "../../../styles/inputStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { formatBusLabel } from "../../../utils/busFormat";
 import { resolveQueueItemSession } from "../../../stores/transmitRowSession";
+import { Button, IconButton } from "../../../components/Button";
 
 interface TransmitQueueViewProps {
   outputBusToSource: Map<number, BusSourceInfo>;
@@ -208,24 +201,24 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
         <div className="flex-1" />
 
         {(hasActiveRepeats || hasActiveGroupRepeats) && (
-          <button
+          <Button
             onClick={handleStopAll}
-            className={dangerButtonBase}
+            variant="solid"
+            tone="danger"
             title={t("queue.stopAllTooltip")}
           >
             <StopCircle size={14} />
-            <span className="text-sm ml-1">{t("queue.stopAllLabel")}</span>
-          </button>
+            {t("queue.stopAllLabel")}
+          </Button>
         )}
 
-        <button
+        <Button
           onClick={handleClearQueue}
-          className={buttonBase}
           title={t("queue.clearTooltip")}
         >
           <Trash2 size={14} />
           <span className="text-sm ml-1">{t("queue.clearLabel")}</span>
-        </button>
+        </Button>
       </div>
 
       {/* Queue Items */}
@@ -278,18 +271,22 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       // Grouped item: show group play/stop on first item only
                       isFirstEnabledInGroup ? (
                         isGroupRepeating ? (
-                          <button
+                          <Button
                             onClick={() => handleToggleGroupRepeat(item.groupName!)}
-                            className={stopButtonCompact}
+                            variant="solid"
+                            tone="danger"
+                            size="sm"
                             title={`Stop group '${item.groupName}'`}
                           >
                             <Square size={12} fill="currentColor" />
-                          </button>
+                          </Button>
                         ) : (
-                          <button
+                          <Button
                             onClick={() => handleToggleGroupRepeat(item.groupName!)}
                             disabled={!canStartGroup}
-                            className={playButtonCompact}
+                            variant="solid"
+                            tone="success"
+                            size="sm"
                             title={
                               !hasIOSession
                                 ? "Group repeat requires an IO session (start Discovery or Decoder first)"
@@ -297,7 +294,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             }
                           >
                             <Play size={12} fill="currentColor" />
-                          </button>
+                          </Button>
                         )
                       ) : (
                         // Not first in group: show indicator only
@@ -308,18 +305,22 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                     ) : (
                       // Individual item: normal play/stop
                       item.isRepeating ? (
-                        <button
+                        <Button
                           onClick={() => handleToggleRepeat(item.id, true)}
-                          className={stopButtonCompact}
+                          variant="solid"
+                          tone="danger"
+                          size="sm"
                           title={t("queue.actions.stopRepeatTooltip")}
                         >
                           <Square size={12} fill="currentColor" />
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           onClick={() => handleToggleRepeat(item.id, false)}
                           disabled={!canStartIndividual}
-                          className={playButtonCompact}
+                          variant="solid"
+                          tone="success"
+                          size="sm"
                           title={
                             !hasIOSession
                               ? "Requires an IO session (connect via the CAN tab)"
@@ -327,7 +328,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           }
                         >
                           <Play size={12} fill="currentColor" />
-                        </button>
+                        </Button>
                       )
                     )}
                   </td>
@@ -452,7 +453,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         title={item.enabled ? t("queue.actions.disableItem") : t("queue.actions.enableItem")}
                       />
                       {isOrphaned && activeSession && (
-                        <button
+                        <IconButton
                           onClick={() =>
                             updateQueueItemSession(
                               item.id,
@@ -460,20 +461,21 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                               activeSession.profileName
                             )
                           }
-                          className={iconButtonHoverCompact}
+                          size="sm"
                           title={`Assign to ${activeSession.profileName}`}
                         >
                           <Link size={14} />
-                        </button>
+                        </IconButton>
                       )}
-                      <button
+                      <IconButton
                         onClick={() => handleRemove(item.id)}
                         disabled={item.isRepeating}
-                        className={`${paginationButtonDark} hover:text-red-400`}
+                        tone="danger"
+                        size="sm"
                         title={t("queue.actions.removeFromQueue")}
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </IconButton>
                     </div>
                   </td>
                 </tr>

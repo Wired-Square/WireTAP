@@ -27,7 +27,6 @@ import {
   emptyStateHeading,
   emptyStateDescription,
 } from "../../styles/typography";
-import { buttonBase } from "../../styles/buttonStyles";
 import { iconSm } from "../../styles/spacing";
 import { useTestPatternStore } from "./stores/testPatternStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
@@ -49,6 +48,7 @@ import { MsgType, HEADER_SIZE } from "../../services/wsProtocol";
 import AppLayout from "../../components/AppLayout";
 import TestPatternTopBar from "./views/TestPatternTopBar";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
+import { Button } from "../../components/Button";
 
 const sharedTextDecoder = new TextDecoder();
 
@@ -295,8 +295,7 @@ export default function TestPattern() {
           <div className={`flex flex-col h-full ${bgSurface} ${textPrimary} p-3 gap-3 overflow-y-auto`}>
             {/* Action buttons */}
             <div className="flex items-center gap-2">
-              <button
-                className={`${buttonBase} gap-1.5`}
+              <Button
                 onClick={isRunning ? handleStop : handleStart}
               >
                 {isRunning ? (
@@ -310,16 +309,15 @@ export default function TestPattern() {
                     <span>{t("actions.start")}</span>
                   </>
                 )}
-              </button>
+              </Button>
               {testState && !isRunning && (
-                <button
-                  className={`${buttonBase} gap-1.5`}
+                <Button
                   onClick={() => { clearTestState(); setError(null); }}
                   title={t("actions.clearResults")}
                 >
                   <Trash2 className={`${iconSm} text-[color:var(--text-muted)]`} />
                   <span>{t("actions.clear")}</span>
-                </button>
+                </Button>
               )}
               {error && (
                 <span className={`text-xs ${textDanger} truncate`}>{error}</span>

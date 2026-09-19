@@ -13,8 +13,8 @@ import {
   type GsUsbDeviceInfo,
 } from "../../api/gs_usb";
 import { Select } from "../../components/forms";
-import { iconButtonBase } from "../../styles/buttonStyles";
 import { textDanger, spaceYSmall, helpText } from "../../styles";
+import { IconButton } from "../Button";
 
 interface Props {
   /** Currently selected device ID (interface name on Linux, bus:address on Windows) */
@@ -79,17 +79,16 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
             );
           })}
         </Select>
-        <button
-          type="button"
+        <IconButton
           onClick={refreshDevices}
           disabled={isRefreshing}
-          className={`${iconButtonBase} disabled:opacity-50`}
+          variant="surface"
           title={t("gsUsbDevicePicker.refreshDeviceList")}
         >
           <RefreshCw
             className={`${iconLg} ${isRefreshing ? "animate-spin" : ""}`}
           />
-        </button>
+        </IconButton>
       </div>
 
       {error && <p className={`text-sm ${textDanger}`}>{error}</p>}

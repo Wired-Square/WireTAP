@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, indigoButton } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import type { FrameHeader } from "../utils/bitGrid";
 import { nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 interface FrameDefDialogProps {
   isOpen: boolean;
@@ -193,18 +194,16 @@ export default function FrameDefDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-end gap-2`}>
-        <button
+        <SecondaryButton
           onClick={onClose}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
           {t("frameDefDialog.cancel")}
-        </button>
-        <button
+        </SecondaryButton>
+        <PrimaryButton
           onClick={handleSubmit}
-          className={indigoButton}
         >
           {t("frameDefDialog.submit")}
-        </button>
+        </PrimaryButton>
       </div>
     </Dialog>
   );

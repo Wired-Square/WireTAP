@@ -8,9 +8,9 @@ import { X } from 'lucide-react';
 import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
 import Dialog from '../../../../components/Dialog';
 import { Input, Select, SecondaryButton, PrimaryButton } from '../../../../components/forms';
-import { h2, labelSmall, helpText, borderDefault, hoverLight } from '../../../../styles';
-import { selectionButtonClass } from '../../../../styles/buttonStyles';
+import { h2, labelSmall, helpText, borderDefault } from '../../../../styles';
 import type { RawBytesViewConfig, RawBytesDisplayMode } from '../../../../stores/discoveryStore';
+import { Button, IconButton } from '../../../../components/Button';
 
 interface RawBytesViewDialogProps {
   isOpen: boolean;
@@ -57,9 +57,9 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={h2}>{t("serial.rawBytesTitle")}</h2>
-          <button onClick={onClose} className={`p-1 ${hoverLight} rounded`}>
+          <IconButton onClick={onClose} size="sm">
             <X className={`${iconLg} text-slate-400`} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="space-y-3">
@@ -67,25 +67,29 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
           <div className="space-y-2">
             <span className={labelSmall}>{t("serial.displayMode")}</span>
 
-            <button
+            <Button
               onClick={() => setDisplayMode('individual')}
-              className={selectionButtonClass(displayMode === 'individual')}
+              variant="outline"
+              tone="primary"
+              pressed={displayMode === 'individual'}
             >
               <div className="font-medium">{t("serial.individualBytes")}</div>
               <div className={`text-xs mt-0.5 ${displayMode === 'individual' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
                 {t("serial.individualDescription")}
               </div>
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={() => setDisplayMode('chunked')}
-              className={selectionButtonClass(displayMode === 'chunked')}
+              variant="outline"
+              tone="primary"
+              pressed={displayMode === 'chunked'}
             >
               <div className="font-medium">{t("serial.chunkedBytes")}</div>
               <div className={`text-xs mt-0.5 ${displayMode === 'chunked' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
                 {t("serial.chunkedDescription")}
               </div>
-            </button>
+            </Button>
           </div>
 
           {/* Chunk Gap Threshold - only shown when chunked mode selected */}
@@ -121,7 +125,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                     <option value={50}>50×</option>
                     <option value={100}>100×</option>
                   </Select>
-                  <PrimaryButton onClick={applyBaudRateGap} className="text-xs px-3 py-1.5">
+                  <PrimaryButton onClick={applyBaudRateGap} size="sm">
                     {t("serial.applyBaud")}
                   </PrimaryButton>
                 </div>

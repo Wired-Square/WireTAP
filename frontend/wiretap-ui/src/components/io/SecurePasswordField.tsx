@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Shield, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { Input } from "../../components/forms";
-import { labelDefault, helpText, alertWarning, hoverLight, roundedDefault } from "../../styles";
+import { labelDefault, helpText, alertWarning } from "../../styles";
+import { Button, IconButton } from "../Button";
 
 type Props = {
   value: string;
@@ -56,13 +57,14 @@ export default function SecurePasswordField({
             </span>
           </div>
           {onMigrate && (
-            <button
-              type="button"
+            <Button
               onClick={onMigrate}
-              className={`px-2 py-1 text-xs bg-amber-600 text-white ${roundedDefault} hover:bg-amber-700 transition-colors flex-shrink-0`}
+              variant="solid"
+              tone="warning"
+              size="sm"
             >
               Migrate
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -80,10 +82,10 @@ export default function SecurePasswordField({
               : ""
           }`}
         />
-        <button
-          type="button"
+        <IconButton
           onClick={() => setShowPassword(!showPassword)}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 ${hoverLight} ${roundedDefault} text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}
+          size="sm"
+          className="absolute right-2 top-1/2 -translate-y-1/2"
           title={showPassword ? "Hide password" : "Show password"}
         >
           {showPassword ? (
@@ -91,7 +93,7 @@ export default function SecurePasswordField({
           ) : (
             <Eye className={iconMd} />
           )}
-        </button>
+        </IconButton>
       </div>
 
       {hasStoredPassword && (

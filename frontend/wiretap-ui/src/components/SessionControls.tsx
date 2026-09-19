@@ -14,11 +14,11 @@ import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
-import { buttonBase } from "../styles/buttonStyles";
 import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
 import { useSessionStore } from "../stores/sessionStore";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
+import { Button } from "./Button";
 
 // ============================================================================
 // Activity dot - status dot that emits a sonar ripple whose cadence scales with
@@ -184,10 +184,9 @@ export function SessionButton({
   const statusColour = getStatusColour();
 
   return (
-    <button
+    <Button
       ref={buttonRef}
       onClick={onClick}
-      className={buttonBase}
       title={title}
     >
       {/* Capture / default-reader type icon (no icon for multi-bus or plain sources) */}
@@ -203,7 +202,7 @@ export function SessionButton({
       {sessionId && !sessionIdInDisplayName && (
         <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
       )}
-    </button>
+    </Button>
   );
 }
 

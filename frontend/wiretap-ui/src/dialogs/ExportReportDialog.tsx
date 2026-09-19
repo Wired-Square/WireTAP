@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import Dialog from "../components/Dialog";
-import { Select, FormField } from "../components/forms";
+import { Select, FormField, SecondaryButton } from "../components/forms";
 import {
   type ExportFormat,
   FORMAT_DESCRIPTIONS,
@@ -11,7 +11,7 @@ import {
   getFullFilename,
 } from "../utils/reportExport";
 import { caption } from "../styles/typography";
-import { secondaryButton } from "../styles";
+import { Button } from "../components/Button";
 
 export type ExportReportDialogProps = {
   open: boolean;
@@ -72,18 +72,19 @@ export default function ExportReportDialog({
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <SecondaryButton
             onClick={onCancel}
-            className={`${secondaryButton} text-sm`}
           >
             Cancel
-          </button>
-          <button
+          </SecondaryButton>
+          <Button
             onClick={handleExport}
-            className="px-4 py-2 rounded-lg text-sm bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+            variant="solid"
+            tone="purple"
+            size="lg"
           >
             Save As...
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Select from './Select';
 import Input from './Input';
+import { Button } from '../Button';
 
 const STANDARD_RATES = [
   '9600',
@@ -62,8 +63,7 @@ export default function BaudRateSelect({
           onChange={(e) => onChange(e.target.value)}
           placeholder={t('baudRate.placeholder')}
         />
-        <button
-          type="button"
+        <Button
           onClick={() => {
             setCustomMode(false);
             // If the current value isn't a standard rate, reset to default
@@ -71,11 +71,11 @@ export default function BaudRateSelect({
               onChange(defaultRate);
             }
           }}
-          className="shrink-0 px-3 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
+          variant="ghost"
           title={t('baudRate.switchBack')}
         >
           {t('baudRate.presets')}
-        </button>
+        </Button>
       </div>
     );
   }

@@ -25,9 +25,9 @@ import { createPortal } from "react-dom";
 import { EllipsisVertical } from "lucide-react";
 
 import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
-import { iconButtonHover } from "../styles/buttonStyles";
 import { iconSm } from "../styles/spacing";
 import { textDanger } from "../styles/colourTokens";
+import { IconButton, type ButtonVariant } from "./Button";
 
 /**
  * A union rather than one optional-everything shape, so a divider is written
@@ -64,6 +64,8 @@ type Props = {
   items: OverflowMenuItems;
   /** Tooltip and accessible name for the trigger. */
   title: string;
+  /** Trigger look; ghost unless the row calls for a surface button */
+  variant?: ButtonVariant;
   className?: string;
   /**
    * What the trigger draws, defaulting to the kebab.
@@ -83,6 +85,7 @@ const MARGIN = 4;
 export default function OverflowMenu({
   items: rawItems,
   title,
+  variant,
   className,
   trigger = <EllipsisVertical className={iconSm} />,
 }: Props) {
@@ -143,17 +146,18 @@ export default function OverflowMenu({
 
   return (
     <>
-      <button
+      <IconButton
         ref={buttonRef}
         onClick={toggle}
         title={title}
         aria-label={title}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`${iconButtonHover} ${className ?? ""}`}
+        variant={variant}
+        className={className}
       >
         {trigger}
-      </button>
+      </IconButton>
 
       {open &&
         createPortal(

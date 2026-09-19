@@ -4,8 +4,8 @@ import { LayoutGrid, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
-import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import type { DashboardLayout } from "../../../utils/dashboardLayouts";
+import { IconButton } from "../../../components/Button";
 
 type DashboardLayoutsViewProps = {
   dashboardLayouts: DashboardLayout[];
@@ -59,20 +59,19 @@ export default function DashboardLayoutsView({
                 </div>
               </div>
               <div className={flexRowGap2}>
-                <button
+                <IconButton
                   onClick={() => onEditDashboardLayout(layout)}
-                  className={iconButtonHover}
                   title={t("dashboardLayouts.actions.edit")}
                 >
                   <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => onDeleteDashboardLayout(layout)}
-                  className={iconButtonHoverDanger}
+                  tone="danger"
                   title={t("dashboardLayouts.actions.delete")}
                 >
                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                </button>
+                </IconButton>
               </div>
             </div>
           ))}

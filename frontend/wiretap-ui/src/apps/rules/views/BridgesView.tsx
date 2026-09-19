@@ -5,12 +5,13 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { BridgeDescriptor } from "../../../api/framelinkRules";
 import BridgeDialog from "../dialogs/BridgeDialog";
 import { formatHexId } from "../utils/formatHex";
+import { Button, IconButton } from "../../../components/Button";
 
 export default function BridgesView() {
   const { t } = useTranslation("rules");
@@ -56,12 +57,14 @@ export default function BridgesView() {
   return (
     <div className="space-y-2">
       <div className="flex justify-end mb-1">
-        <button
+        <Button
           onClick={() => setDialogOpen(true)}
-          className={indigoButtonCompact}
+          variant="solid"
+          tone="primary"
+          size="sm"
         >
           <Plus className={iconMd} /> {t("bridges.add")}
-        </button>
+        </Button>
       </div>
 
       {bridges.length === 0 && (
@@ -102,9 +105,9 @@ export default function BridgesView() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <IconButton
                 onClick={() => enableBridge(b.bridge_id, !b.enabled)}
-                className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
+                size="sm"
                 title={b.enabled ? t("common.disable") : t("common.enable")}
               >
                 {b.enabled ? (
@@ -112,14 +115,15 @@ export default function BridgesView() {
                 ) : (
                   <ToggleLeft className={iconMd} />
                 )}
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 onClick={() => removeBridge(b.bridge_id)}
-                className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                tone="danger"
+                size="sm"
                 title={t("bridges.remove")}
               >
                 <Trash2 className={iconMd} />
-              </button>
+              </IconButton>
             </div>
           </div>
         );

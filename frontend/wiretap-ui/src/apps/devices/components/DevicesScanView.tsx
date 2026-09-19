@@ -30,6 +30,7 @@ import {
   type DeviceRegistryEntry,
 } from "../../../api/deviceRegistry";
 import RegisteredDeviceRow from "./RegisteredDeviceRow";
+import { Button } from "../../../components/Button";
 
 const STALE_PRUNE_MS = 4000;
 const STALE_PRUNE_INTERVAL_MS = 1000;
@@ -333,9 +334,10 @@ export default function DevicesScanView() {
 
       {/* Manual IP entry */}
       <div className="border-t border-[color:var(--border-default)] pt-3">
-        <button
+        <Button
           onClick={() => setShowManualIp(!showManualIp)}
-          className={`flex items-center gap-1.5 text-sm ${textSecondary} hover:text-[color:var(--text-primary)] transition-colors`}
+          variant="link"
+          className="text-sm"
         >
           {showManualIp ? (
             <ChevronDown className={iconMd} />
@@ -343,7 +345,7 @@ export default function DevicesScanView() {
             <ChevronRight className={iconMd} />
           )}
           {t("scan.manualIp")}
-        </button>
+        </Button>
 
         {showManualIp && (
           <div className="flex items-end gap-2 mt-2">

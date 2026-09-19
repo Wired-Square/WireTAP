@@ -8,11 +8,11 @@ import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDefault, textMuted, textPrimary, textSecondary } from "../../../styles";
-import { badgeColorClass } from "../../../styles/buttonStyles";
+import { bgSurface, borderDefault, textPrimary, textSecondary } from "../../../styles";
 import type { IOProfile } from "../../../types/common";
 import type { TestMode, TestRole } from "../../../api/testPattern";
 import AppTopBar from "../../../components/AppTopBar";
+import { Button } from "../../../components/Button";
 
 const TEST_MODE_KEYS: { value: TestMode; i18nKey: string }[] = [
   { value: "auto", i18nKey: "auto" },
@@ -234,7 +234,7 @@ export default function TestPatternTopBar({
               <ToggleBadge
                 label="FD"
                 on={useFd}
-                colour="green"
+                colour="success"
                 onToggle={() => onFdChange(!useFd)}
                 disabled={isRunning}
                 title={t("topBar.fdMode")}
@@ -242,7 +242,7 @@ export default function TestPatternTopBar({
               <ToggleBadge
                 label="Ext"
                 on={useExtended}
-                colour="amber"
+                colour="warning"
                 onToggle={() => onExtendedChange(!useExtended)}
                 disabled={isRunning}
                 title={t("topBar.extendedIds")}
@@ -267,21 +267,15 @@ function ToggleBadge({
 }: {
   label: string;
   on: boolean;
-  colour: "green" | "amber";
+  colour: "success" | "warning";
   onToggle: () => void;
   disabled?: boolean;
   title?: string;
 }) {
-  const off = `${bgSurface} ${textMuted} border ${borderDefault}`;
   return (
-    <button
-      className={`text-xs px-2 py-0.5 rounded ${on ? badgeColorClass(colour) : off}`}
-      onClick={onToggle}
-      disabled={disabled}
-      title={title}
-    >
+    <Button variant="outline" tone={colour} size="sm" pressed={on} onClick={onToggle} disabled={disabled} title={title}>
       {label}
-    </button>
+    </Button>
   );
 }
 

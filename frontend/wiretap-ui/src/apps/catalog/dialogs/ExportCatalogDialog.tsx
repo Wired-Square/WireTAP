@@ -5,7 +5,6 @@ import { Download, FileText, Database, FileCode, BookOpen } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, sectionHeaderText } from "../../../styles/typography";
 import { selectableOptionBox } from "../../../styles/cardStyles";
-import { secondaryButton, disabledState } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { pickFileToSave, CATALOG_FILTERS, DBC_FILTERS, HTML_FILTERS, MARKDOWN_FILTERS, TEXT_FILTERS, type DialogFilter } from "../../../api/dialogs";
 import { exportDbcWs, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
@@ -13,6 +12,8 @@ import { tomlParse } from "../toml";
 import { generateCatalogReport, type CatalogReportFormat } from "../../../utils/catalogReport";
 import { useSettings } from "../../../hooks/useSettings";
 import type { CatalogDoc } from "../../../types/catalog";
+import { Button } from "../../../components/Button";
+import { SecondaryButton } from "../../../components/forms";
 
 export type CatalogExportFormat = "toml" | "dbc" | "html-screen" | "html-print" | "markdown" | "text";
 
@@ -265,17 +266,18 @@ export default function ExportCatalogDialog({
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <button
+          <SecondaryButton
             onClick={onCancel}
             disabled={isExporting}
-            className={`${secondaryButton} ${disabledState}`}
           >
             Cancel
-          </button>
-          <button
+          </SecondaryButton>
+          <Button
             onClick={handleExport}
             disabled={isExporting}
-            className="flex items-center gap-2 px-6 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition-colors disabled:opacity-50"
+            variant="solid"
+            tone="warning"
+            size="lg"
           >
             {isExporting ? (
               <>
@@ -288,7 +290,7 @@ export default function ExportCatalogDialog({
                 Save As...
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

@@ -33,6 +33,7 @@ const ringPurple = "ring-[color:var(--status-purple-border)]";
 import { iconMd, gapSmall } from "../styles/spacing";
 import type { MergedDevice } from "../apps/devices/utils/mergedDevices";
 import { bleHasCap, preferredAddress } from "../apps/devices/utils/mergedDevices";
+import { Button } from "./Button";
 
 export type ConnectVia = "ble" | "ip";
 
@@ -150,9 +151,6 @@ function MetaBubble({
 // Connect button — colour-coded per transport, lit when its data is present
 // ---------------------------------------------------------------------------
 
-const CONNECT_BUTTON_BASE =
-  "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded border transition-colors w-32 justify-center disabled:cursor-not-allowed";
-
 function ConnectButton({
   via,
   enabled,
@@ -167,24 +165,20 @@ function ConnectButton({
   onClick: () => void;
 }) {
   const { t } = useTranslation("devices");
-  // BLE = blue, IP = purple.
-  const lit =
-    via === "ble"
-      ? `${bgInfo} ${textInfo} border-[color:var(--status-info-border)] ring-1 ${ringInfo} hover:brightness-110`
-      : `${bgPurple} ${textPurple} border-[color:var(--status-purple-border)] ring-1 ${ringPurple} hover:brightness-110`;
-  const dim = `${textSecondary} border-[color:var(--border-default)] opacity-40`;
-
   const Icon = via === "ble" ? Bluetooth : Globe;
   const aria = via === "ble" ? t("card.connectViaBle") : t("card.connectViaIp");
 
+  // BLE = blue, IP = purple; lit as a tonal button when its data is present.
   return (
-    <button
-      type="button"
+    <Button
       onClick={onClick}
       disabled={!enabled || anyBusy}
       aria-label={aria}
       title={aria}
-      className={`${CONNECT_BUTTON_BASE} ${enabled ? lit : dim}`}
+      variant={enabled ? "tonal" : "outline"}
+      tone={via === "ble" ? "primary" : "purple"}
+      size="lg"
+      className="w-32"
     >
       {busy ? (
         <Plug className={`${iconMd} animate-pulse`} />
@@ -192,7 +186,7 @@ function ConnectButton({
         <Icon className={iconMd} />
       )}
       {busy ? t("card.connecting") : t("card.connect")}
-    </button>
+    </Button>
   );
 }
 

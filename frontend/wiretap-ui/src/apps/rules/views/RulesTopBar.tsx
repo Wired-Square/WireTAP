@@ -13,12 +13,8 @@ import FrameLinkDevicePicker, {
   type FramelinkDevice,
 } from "../../../components/FrameLinkDevicePicker";
 import type { FrameLinkLiveness } from "../../../hooks/useFrameLinkDeviceLiveness";
-import {
-  iconButtonBase,
-  actionChip,
-  dangerButtonBase,
-} from "../../../styles/buttonStyles";
 import { iconMd } from "../../../styles/spacing";
+import { Button, IconButton } from "../../../components/Button";
 
 export type RulesActiveState = "connecting" | "connected" | "error" | null;
 
@@ -71,21 +67,20 @@ export default function RulesTopBar({
       actions={
         isConnected ? (
           <>
-            <button
-              type="button"
+            <IconButton
               onClick={onRefresh}
               disabled={isLoading}
-              className={iconButtonBase}
+              variant="surface"
               title={t("topBar.refresh")}
             >
               <RefreshCw className={`${iconMd} ${isLoading ? "animate-spin" : ""}`} />
-            </button>
+            </IconButton>
 
-            <button
-              type="button"
+            <Button
               onClick={onPersist}
               disabled={persistState === "saving"}
-              className={actionChip(persistState === "error" ? "red" : "green")}
+              variant="tonal"
+              size="sm"
               title={t("topBar.persistTooltip")}
             >
               {persistState === "saving" ? (
@@ -104,21 +99,18 @@ export default function RulesTopBar({
                   : persistState === "error"
                     ? t("topBar.saveFailed")
                     : t("topBar.makePermanent")}
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button
               onClick={onClearConfig}
-              className={
-                confirmClear
-                  ? `${dangerButtonBase} gap-1 px-2 py-0.5 text-xs rounded`
-                  : actionChip("red")
-              }
+              variant={confirmClear ? "solid" : "tonal"}
+              tone="danger"
+              size="sm"
               title={t("topBar.clearConfigTooltip")}
             >
               <Trash2 className={iconMd} />
               {confirmClear ? t("topBar.confirmClear") : t("topBar.clearConfig")}
-            </button>
+            </Button>
           </>
         ) : null
       }

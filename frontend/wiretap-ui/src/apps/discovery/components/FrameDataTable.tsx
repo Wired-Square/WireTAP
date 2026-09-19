@@ -27,7 +27,7 @@ import {
 } from '../../../styles';
 import { emptyStateContainer, emptyStateText } from '../../../styles/typography';
 import { dataTableContainer, dataCell, dataHeaderCell } from '../../../styles/tableStyles';
-import { tableIconButtonDark } from '../../../styles/buttonStyles';
+import { IconButton } from '../../../components/Button';
 
 /** Height of the spacer below the rows, in px. */
 const RESERVED_PX = 32;
@@ -376,9 +376,9 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 )}
                 {onBookmark && (
                   <td className={`${dataCellIcon} ${cellHighlight}`}>
-                    <button data-action="bookmark" className={tableIconButtonDark} title="Add bookmark at this frame's time">
+                    <IconButton data-action="bookmark" size="xs" title="Add bookmark at this frame's time">
                       <UseIcon id="fdt-bookmark" className={`w-3 h-3 ${textDataAmber}`} />
-                    </button>
+                    </IconButton>
                   </td>
                 )}
                 {showRef && (

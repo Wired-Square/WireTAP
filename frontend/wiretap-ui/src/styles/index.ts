@@ -1,7 +1,7 @@
 // ui/src/styles/index.ts
 // Barrel export for all centralized styles
 
-// Button styles (toolbar buttons, toggle buttons)
+// What is not yet a component: framing cards, data view tabs, the launcher
 export * from './buttonStyles';
 
 // Input and form field styles

@@ -6,13 +6,12 @@ import {
   flexRowGap2,
   h2,
   sectionHeader,
-  resetButtonSmall,
-  resetButtonIcon,
   textPrimary,
   textTertiary,
 } from "../../../styles";
 import { SettingRadioGroup } from "../components/rows";
 import type { ThemeMode, ThemeColours } from "../stores/settingsStore";
+import { Button, IconButton } from "../../../components/Button";
 
 // Theme-colour rows: one entry per swatch, paired light/dark keys. Keeps the two
 // mode columns from drifting apart.
@@ -122,9 +121,9 @@ export default function DisplayView({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.themeColours.title")}</h3>
-          <button type="button" onClick={onResetThemeColours} className={resetButtonSmall}>
+          <Button onClick={onResetThemeColours} size="sm">
             {t("display.themeColours.resetAll")}
-          </button>
+          </Button>
         </div>
         <p className={`text-sm ${textTertiary}`}>{t("display.themeColours.help")}</p>
 
@@ -226,14 +225,13 @@ export default function DisplayView({
                 value={signalColours[key]}
                 onChange={(val) => onChangeSignalColour(key, val)}
               />
-              <button
-                type="button"
+              <IconButton
                 onClick={() => onResetSignalColour(key)}
-                className={resetButtonIcon}
+                size="sm"
                 title={resetTooltip}
               >
                 ↺
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
@@ -265,14 +263,13 @@ export default function DisplayView({
           ].map((row) => (
             <div key={row.label} className={flexRowGap2}>
               <ColourPicker label={row.label} value={row.value} onChange={row.onChange} />
-              <button
-                type="button"
+              <IconButton
                 onClick={row.onReset}
-                className={resetButtonIcon}
+                size="sm"
                 title={resetTooltip}
               >
                 ↺
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
@@ -281,9 +278,9 @@ export default function DisplayView({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.frameEditor.title")}</h3>
-          <button type="button" onClick={onResetFrameEditorColours} className={resetButtonSmall}>
+          <Button onClick={onResetFrameEditorColours} size="sm">
             {t("display.frameEditor.resetAll")}
-          </button>
+          </Button>
         </div>
         <p className={`text-sm ${textTertiary}`}>{t("display.frameEditor.help")}</p>
         <div className="space-y-2">

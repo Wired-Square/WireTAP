@@ -2,8 +2,8 @@
 
 import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
 import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
-import { iconButtonHover, iconButtonHoverDanger } from "../../../styles";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type SelectionHeaderProps = {
   selectedNode: TomlNode;
@@ -82,14 +82,14 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
         {(onEdit || onDelete) && (
           <div className="flex gap-2">
             {onEdit && (
-              <button onClick={onEdit} className={iconButtonHover} title="Edit frame">
+              <IconButton onClick={onEdit} title="Edit frame">
                 <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-              </button>
+              </IconButton>
             )}
             {onDelete && (
-              <button onClick={onDelete} className={iconButtonHoverDanger} title="Delete frame">
+              <IconButton onClick={onDelete} tone="danger" title="Delete frame">
                 <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-              </button>
+              </IconButton>
             )}
           </div>
         )}

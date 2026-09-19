@@ -8,7 +8,6 @@ import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, flexRowGap2 } from "../../../../styles/spacing";
-import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardBase, cardDefault } from "../../../../styles/cardStyles";
 import { badgeSmallNeutral, badgeSmallSuccess } from "../../../../styles/badgeStyles";
 import {
@@ -43,6 +42,7 @@ import type {
   DiscoveredChecksum,
   FrameChecksumFinding,
 } from "../../../../api/checksums";
+import { IconButton } from "../../../../components/Button";
 
 type Props = {
   embedded?: boolean;
@@ -193,14 +193,14 @@ function Header({ onClose }: { onClose?: () => void }) {
         <span className={`font-medium ${textPrimary}`}>{t("checksumDiscovery.title")}</span>
       </div>
       {onClose && (
-        <button
-          type="button"
+        <IconButton
           onClick={onClose}
-          className={iconButtonDangerCompact}
+          tone="danger"
+          size="sm"
           title={t("checksumDiscovery.close")}
         >
           <X className={iconXs} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

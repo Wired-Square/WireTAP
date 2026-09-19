@@ -41,10 +41,9 @@ const UNDEFINED_VARIABLES_IN_REGISTER = [
   "--bg-accent", "--bg-card", "--bg-green", "--bg-green-subtle", "--bg-hover", "--bg-light",
   "--bg-purple-subtle", "--bg-secondary", "--bg-subtle", "--bg-surface-2",
   "--border", "--border-green", "--border-input",
-  "--hover-bg-green", "--hover-bg-purple", "--hover-bg-red", "--hover-bg-strong",
-  "--status-info-badge-bg", "--status-info-badge-text", "--status-info-bg-strong",
+  "--status-info-badge-bg", "--status-info-badge-text",
   "--status-info-text-bold", "--status-purple-text-bold", "--status-warning",
-  "--text-data-green", "--text-emerald", "--text-green-hover", "--text-rose", "--text-tertiary",
+  "--text-data-green", "--text-emerald", "--text-rose", "--text-tertiary",
 ];
 
 // Set at runtime by the iOS safe-area plugin (`main.tsx`), not by the app's CSS.
@@ -52,7 +51,7 @@ const RUNTIME_DEFINED_VARIABLES = ["--safe-area-inset-bottom"];
 
 describe("utilities.css", () => {
   it("finds the sheet, the source and the variables (guards the extractors themselves)", () => {
-    expect(SHEET.split("\n").filter((l) => /^  [.:@]/.test(l)).length).toBeGreaterThan(900);
+    expect(SHEET.split("\n").filter((l) => /^  [.:@]/.test(l)).length).toBeGreaterThan(800);
     expect(Object.keys(sources).length).toBeGreaterThan(500);
     expect(classStrings.length).toBeGreaterThan(1000);
     expect(DECLARED.size).toBeGreaterThan(80);

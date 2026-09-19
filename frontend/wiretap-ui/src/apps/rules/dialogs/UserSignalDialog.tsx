@@ -5,10 +5,12 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
+import { Button, IconButton } from "../../../components/Button";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 // ============================================================================
 // Constants
@@ -252,12 +254,14 @@ export default function UserSignalDialog({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className={labelDefault}>{t("userSignalDialog.fields.enumValues")}</label>
-                <button
+                <Button
                   onClick={addEnumRow}
-                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                  variant="link"
+                  tone="primary"
+                  className="text-xs"
                 >
                   <Plus className={iconMd} /> {t("userSignalDialog.fields.addValue")}
-                </button>
+                </Button>
               </div>
 
               {enumRows.length > 0 && (
@@ -282,12 +286,13 @@ export default function UserSignalDialog({
                         }
                         placeholder={t("userSignalDialog.fields.labelPlaceholder")}
                       />
-                      <button
+                      <IconButton
                         onClick={() => removeEnumRow(idx)}
-                        className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                        tone="danger"
+                        size="sm"
                       >
                         <Trash2 className={iconMd} />
-                      </button>
+                      </IconButton>
                     </div>
                   ))}
                 </div>
@@ -309,18 +314,16 @@ export default function UserSignalDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-end gap-2`}>
-        <button
+        <SecondaryButton
           onClick={handleClose}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
           {t("userSignalDialog.cancel")}
-        </button>
-        <button
+        </SecondaryButton>
+        <PrimaryButton
           onClick={handleSubmit}
-          className={indigoButton}
         >
           {t("userSignalDialog.submit")}
-        </button>
+        </PrimaryButton>
       </div>
     </Dialog>
   );

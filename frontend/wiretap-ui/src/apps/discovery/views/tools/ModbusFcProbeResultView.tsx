@@ -22,6 +22,7 @@ import {
 } from "../../../../styles";
 import { iconSm } from "../../../../styles/spacing";
 import type { FcVerdict } from "../../../../api/io";
+import { IconButton } from "../../../../components/Button";
 
 type Props = {
   results: ModbusFcProbeResults;
@@ -71,9 +72,9 @@ export default function ModbusFcProbeResultView({ results, onClose }: Props) {
           </span>
         </div>
         {!isProbing && (
-          <button onClick={onClose} className={`${textMuted} hover:${textPrimary}`} title={t("modbusFc.close")}>
+          <IconButton onClick={onClose} size="sm" title={t("modbusFc.close")}>
             <X className={iconSm} />
-          </button>
+          </IconButton>
         )}
       </div>
 

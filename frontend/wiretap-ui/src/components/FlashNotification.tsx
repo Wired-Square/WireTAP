@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { iconMd } from "../styles/spacing";
+import { IconButton } from "./Button";
 
 export interface FlashNotificationProps {
   message: string;
@@ -39,10 +40,11 @@ export default function FlashNotification({
           <p className="text-sm font-medium">{message}</p>
         </div>
         {onDismiss && (
-          <button
+          <IconButton
             onClick={onDismiss}
-            className="text-white hover:opacity-80 transition-opacity"
-            aria-label="Dismiss"
+            size="sm"
+            className="text-white hover:text-white"
+            label="Dismiss"
           >
             <svg
               className={iconMd}
@@ -57,7 +59,7 @@ export default function FlashNotification({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </IconButton>
         )}
       </div>
     </div>

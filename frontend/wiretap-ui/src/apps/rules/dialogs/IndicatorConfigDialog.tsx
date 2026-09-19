@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
+import { textPrimary, textTertiary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import ColourPicker from "../components/ColourPicker";
 import { cssToBrgb } from "../utils/brgbColour";
@@ -22,6 +22,8 @@ import {
 } from "../../../api/framelinkRules";
 import SignalCombobox from "../components/SignalCombobox";
 import { useRulesStore } from "../stores/rulesStore";
+import { Button } from "../../../components/Button";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 const COLOUR_WRITE_DEBOUNCE_MS = 150;
 const DEFAULT_CAN_ID_HEX = "100";
@@ -223,17 +225,15 @@ export default function IndicatorConfigDialog({
           <label className={labelDefault}>{t("indicatorConfigDialog.fields.state")}</label>
           <div className="flex gap-2">
             {STATE_KEYS.map((opt) => (
-              <button
+              <Button
                 key={opt.value}
                 onClick={() => writeState(opt.value)}
-                className={`px-3 py-1.5 text-xs rounded-md ${
-                  ledState === opt.value
-                    ? "bg-indigo-500/30 text-indigo-300 font-medium"
-                    : `${textSecondary} hover:bg-white/5`
-                }`}
+                variant="ghost"
+                size="sm"
+                pressed={ledState === opt.value}
               >
                 {t(`indicatorConfigDialog.states.${opt.key}`)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -273,17 +273,15 @@ export default function IndicatorConfigDialog({
           <label className={labelDefault}>{t("indicatorConfigDialog.fields.indicatorSource")}</label>
           <div className="flex gap-2">
             {(["activity", "palette", "threshold"] as const).map((s) => (
-              <button
+              <Button
                 key={s}
                 onClick={() => setSource(s)}
-                className={`px-3 py-1.5 text-xs rounded-md ${
-                  source === s
-                    ? "bg-indigo-500/30 text-indigo-300 font-medium"
-                    : `${textSecondary} hover:bg-white/5`
-                }`}
+                variant="ghost"
+                size="sm"
+                pressed={source === s}
               >
                 {t(`indicatorConfigDialog.sources.${s}`)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -407,23 +405,24 @@ export default function IndicatorConfigDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-between`}>
-        <button
+        <Button
           onClick={handleClear}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-red-500/20 hover:text-red-400`}
+          variant="ghost"
+          tone="danger"
+          size="lg"
         >
           {t("indicatorConfigDialog.clear")}
-        </button>
+        </Button>
         <div className="flex gap-2">
-          <button onClick={closeWithValues} className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}>
+          <SecondaryButton onClick={closeWithValues}>
             {t("indicatorConfigDialog.close")}
-          </button>
-          <button
+          </SecondaryButton>
+          <PrimaryButton
             onClick={handleSubmit}
             disabled={submitting}
-            className={`${indigoButton} disabled:opacity-50`}
           >
             {submitting ? t("indicatorConfigDialog.configuring") : t("indicatorConfigDialog.apply")}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </Dialog>

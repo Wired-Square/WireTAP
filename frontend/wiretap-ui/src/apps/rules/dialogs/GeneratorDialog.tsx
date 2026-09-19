@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
+import { textPrimary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
@@ -13,6 +13,8 @@ import SignalCombobox from "../components/SignalCombobox";
 import { useRulesStore } from "../stores/rulesStore";
 import { DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
+import { Button, IconButton } from "../../../components/Button";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 interface MappingRow {
   source_signal_id: number;
@@ -226,12 +228,14 @@ export default function GeneratorDialog({
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className={labelDefault}>{t("generatorDialog.fields.mappings")}</label>
-            <button
+            <Button
               onClick={addMapping}
-              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+              variant="link"
+              tone="primary"
+              className="text-xs"
             >
               <Plus className={iconMd} /> {t("generatorDialog.fields.addMapping")}
-            </button>
+            </Button>
           </div>
           <div className="space-y-2">
             {mappings.map((m, idx) => {
@@ -274,13 +278,14 @@ export default function GeneratorDialog({
                       <option value="invert">{t("generatorDialog.transforms.invert")}</option>
                       <option value="mask">{t("generatorDialog.transforms.mask")}</option>
                     </select>
-                    <button
+                    <IconButton
                       onClick={() => removeMapping(idx)}
-                      className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                      tone="danger"
+                      size="sm"
                       title={t("generatorDialog.fields.removeMapping")}
                     >
                       <Trash2 className={iconSm} />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               </div>
@@ -290,18 +295,16 @@ export default function GeneratorDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-end gap-2`}>
-        <button
+        <SecondaryButton
           onClick={onClose}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
           {t("generatorDialog.cancel")}
-        </button>
-        <button
+        </SecondaryButton>
+        <PrimaryButton
           onClick={handleSubmit}
-          className={indigoButton}
         >
           {t("generatorDialog.submit")}
-        </button>
+        </PrimaryButton>
       </div>
     </Dialog>
   );

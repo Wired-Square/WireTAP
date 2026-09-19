@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
-import { bgSurface, primaryButtonBase, secondaryButton } from "../../../styles";
+import { bgSurface } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import {
   MetadataSection,
@@ -12,6 +12,7 @@ import {
   SerialConfigSection,
   ModbusConfigSection,
 } from "./config-sections";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 export type UnifiedConfigDialogProps = {
   open: boolean;
@@ -274,19 +275,17 @@ export default function UnifiedConfigDialog({
 
         {/* Footer */}
         <div className="flex justify-end gap-3 mt-6">
-          <button
+          <SecondaryButton
             onClick={onCancel}
-            className={secondaryButton}
           >
             Cancel
-          </button>
-          <button
+          </SecondaryButton>
+          <PrimaryButton
             onClick={() => onSave({ can: canEnabled, serial: serialEnabled, modbus: modbusEnabled })}
             disabled={!isValid}
-            className={primaryButtonBase}
           >
             Save Changes
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </div>

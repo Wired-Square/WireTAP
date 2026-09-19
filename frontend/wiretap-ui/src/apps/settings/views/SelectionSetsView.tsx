@@ -4,8 +4,8 @@ import { Star, Edit2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
-import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { selectionSetSize, type SelectionSet } from "../../../utils/selectionSets";
+import { IconButton } from "../../../components/Button";
 
 type SelectionSetsViewProps = {
   selectionSets: SelectionSet[];
@@ -60,20 +60,19 @@ export default function SelectionSetsView({
                   </div>
                 </div>
                 <div className={flexRowGap2}>
-                  <button
+                  <IconButton
                     onClick={() => onEditSelectionSet(set)}
-                    className={iconButtonHover}
                     title={t("selectionSets.actions.edit")}
                   >
                     <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
-                  </button>
-                  <button
+                  </IconButton>
+                  <IconButton
                     onClick={() => onDeleteSelectionSet(set)}
-                    className={iconButtonHoverDanger}
+                    tone="danger"
                     title={t("selectionSets.actions.delete")}
                   >
                     <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                  </button>
+                  </IconButton>
                 </div>
               </div>
             );

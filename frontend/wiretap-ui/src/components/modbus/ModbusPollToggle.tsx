@@ -5,11 +5,11 @@
 // It gates nothing else — the scan tools name their own device and run with no
 // source selected. The Decoder's equivalent is a transport control with a third
 // "start from stopped" state, so it keeps its own button and shares only the
-// styling — see `pollButtonClass`.
+// styling: a small tonal Button, danger while polling, success while stopped.
 
 import { Play, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { pollButtonClass } from "../../styles/buttonStyles";
+import { Button } from "../Button";
 
 export type ModbusPollToggleProps = {
   /** Profile name of the device being polled, for the tooltip. */
@@ -30,14 +30,15 @@ export default function ModbusPollToggle({
   const Icon = isPolling ? Square : Play;
 
   return (
-    <button
-      type="button"
+    <Button
       onClick={isPolling ? onPause : onResume}
-      className={pollButtonClass(isPolling)}
+      variant="tonal"
+      tone={isPolling ? "danger" : "success"}
+      size="sm"
       title={t(isPolling ? "modbusPoll.pauseTitle" : "modbusPoll.resumeTitle", { device: deviceName })}
     >
       <Icon size={10} fill="currentColor" />
       {t(isPolling ? "modbusPoll.pause" : "modbusPoll.resume")}
-    </button>
+    </Button>
   );
 }

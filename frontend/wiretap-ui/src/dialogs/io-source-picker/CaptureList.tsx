@@ -14,6 +14,7 @@ import { useSessionStore } from "../../stores/sessionStore";
 import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
 import SendCaptureToBackendDialog from "../SendCaptureToBackendDialog";
+import { Button, IconButton } from "../../components/Button";
 
 type Props = {
   captures: CaptureMetadata[];
@@ -118,12 +119,14 @@ export default function CaptureList({
           <span className={captionMuted}>({captures.length})</span>
         </div>
         {captures.length > 1 && (
-          <button
+          <Button
             onClick={onClearAllCaptures}
-            className="text-xs text-[color:var(--status-danger-text)] hover:brightness-110"
+            variant="link"
+            tone="danger"
+            className="text-xs"
           >
             {t("ioSourcePicker.captures.clearAll")}
-          </button>
+          </Button>
         )}
       </div>
       <div className="p-3 space-y-2">
@@ -197,48 +200,47 @@ export default function CaptureList({
               {isThisCaptureSelected && (
                 <Check className={`${iconMd} text-[color:var(--status-info-text)] flex-shrink-0`} />
               )}
-              <button
+              <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
                   setUploadCapture(capture);
                 }}
-                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                size="sm"
                 title={t("ioSourcePicker.captures.sendToBackend")}
               >
                 <UploadCloud className={iconSm} />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
                   startRename(capture);
                 }}
-                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                size="sm"
                 title={t("ioSourcePicker.captures.rename")}
               >
                 <Pencil className={iconSm} />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 onClick={(e) => togglePersistent(capture, e)}
-                className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
-                  capture.persistent
-                    ? "text-[color:var(--status-warning-text)]"
-                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-                }`}
+                tone="warning"
+                size="sm"
+                pressed={capture.persistent}
                 title={capture.persistent ? t("ioSourcePicker.captures.unpinTooltip") : t("ioSourcePicker.captures.pinTooltip")}
               >
                 {capture.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
-              </button>
+              </IconButton>
               {!capture.persistent && (
-                <button
+                <IconButton
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteCapture(capture.id);
                   }}
-                  className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
+                  tone="danger"
+                  size="sm"
                   title={t("ioSourcePicker.captures.delete")}
                 >
                   <Trash2 className={iconSm} />
-                </button>
+                </IconButton>
               )}
             </div>
             {/* Show bus mapping UI when this buffer is selected and has buses */}

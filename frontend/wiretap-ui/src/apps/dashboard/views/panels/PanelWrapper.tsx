@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download, EllipsisVertical, Image, FileCode } from "lucide-react";
 import { iconSm } from "../../../../styles/spacing";
-import { iconButtonHover } from "../../../../styles/buttonStyles";
 import { menuClasses, menuItem, menuDivider } from "../../../../styles/menuStyles";
 import { useDashboardStore, type DashboardPanel } from "../../../../stores/dashboardStore";
 import { getWidget } from "../../widgets/registry";
+import { IconButton } from "../../../../components/Button";
 
 /** Menu-item toggle styling for active toggles in the dropdown. */
 function menuToggle(isActive: boolean, colour: "blue" | "purple"): string {
@@ -153,14 +153,14 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
 
           {/* Overflow menu button — always visible */}
           <div className="shrink-0 ml-1" onClickCapture={handleClickCapture}>
-            <button
+            <IconButton
               ref={buttonRef}
               onClick={handleButtonClick}
-              className={`p-0.5 rounded ${iconButtonHover}`}
+              size="xs"
               title={t("panel.actions")}
             >
               <EllipsisVertical className={iconSm} />
-            </button>
+            </IconButton>
           </div>
         </div>
       </div>

@@ -11,8 +11,6 @@ import {
   h3,
   borderDefault,
   paddingCard,
-  hoverLight,
-  roundedDefault,
 } from "../styles";
 import { useSettings, type IOProfile } from "../hooks/useSettings";
 import { buildCatalogPath } from "../utils/catalogUtils";
@@ -87,6 +85,7 @@ import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { newSavedProfileId, storeProfileSecrets } from "../settings/ioProfileForm";
 import { withAppError } from "../utils/appError";
+import { IconButton } from "../components/Button";
 
 
 /** Options passed when starting a load or connect operation */
@@ -2075,13 +2074,13 @@ export default function IoSourcePickerDialog({
         {/* Header */}
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
           <h2 className={h3}>{t("ioSourcePicker.title")}</h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         <LoadStatus

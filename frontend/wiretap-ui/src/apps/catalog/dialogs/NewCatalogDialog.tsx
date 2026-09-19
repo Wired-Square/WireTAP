@@ -7,8 +7,8 @@ import { iconLg } from "../../../styles/spacing";
 import Dialog from "../../../components/Dialog";
 import { Input, Select, FormField, SecondaryButton, SuccessButton } from "../../../components/forms";
 import { h2, alertDanger, caption } from "../../../styles";
-import { selectionButtonClass } from "../../../styles/buttonStyles";
 import type { MetaFields, ValidationError, ProtocolType, SerialEncoding } from "../types";
+import { Button } from "../../../components/Button";
 
 export type NewCatalogDialogProps = {
   open: boolean;
@@ -105,11 +105,12 @@ export default function NewCatalogDialog({
               {protocols.map(({ type, label, icon: Icon }) => {
                 const isSelected = selectedProtocol === type;
                 return (
-                  <button
+                  <Button
                     key={type}
-                    type="button"
                     onClick={() => setSelectedProtocol(type)}
-                    className={selectionButtonClass(isSelected)}
+                    variant="outline"
+                    tone="primary"
+                    pressed={isSelected}
                   >
                     <Icon
                       className={`${iconLg} ${
@@ -123,7 +124,7 @@ export default function NewCatalogDialog({
                     >
                       {label}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

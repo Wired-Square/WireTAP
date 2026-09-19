@@ -13,6 +13,8 @@ import { textPrimary, textSecondary } from "../../../styles";
 import { badgeWarning } from "../../../styles/badgeStyles";
 import { iconMd, gapSmall } from "../../../styles/spacing";
 import type { DeviceRegistryEntry } from "../../../api/deviceRegistry";
+import { IconButton } from "../../../components/Button";
+import { SecondaryButton } from "../../../components/forms";
 
 interface RegisteredDeviceRowProps {
   entry: DeviceRegistryEntry;
@@ -48,27 +50,26 @@ export default function RegisteredDeviceRow({
       </div>
 
       <div className={`flex items-center ${gapSmall} ml-4`}>
-        <button
-          type="button"
+        <SecondaryButton
           onClick={() => onConnect(entry)}
           disabled={busy}
           aria-label={t("registered.connect")}
           title={t("registered.connect")}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded border border-[color:var(--border-default)] w-32 justify-center transition-colors hover:bg-[var(--bg-surface)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-32"
         >
           <Globe className={iconMd} />
           {t("registered.connect")}
-        </button>
-        <button
-          type="button"
+        </SecondaryButton>
+        <IconButton
           onClick={() => onRemove(entry)}
           disabled={busy}
           aria-label={t("registered.remove")}
           title={t("registered.remove")}
-          className={`inline-flex items-center justify-center p-2 rounded border border-[color:var(--border-default)] ${textSecondary} transition-colors hover:text-[color:var(--status-danger-text)] disabled:cursor-not-allowed disabled:opacity-50`}
+          variant="outline"
+          tone="danger"
         >
           <Trash2 className={iconMd} />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

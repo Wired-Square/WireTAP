@@ -6,7 +6,7 @@ import { Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 import { labelSmall, captionMuted, sectionHeaderText } from "../styles/typography";
-import { borderDivider, bgSecondary, hoverLight } from "../styles";
+import { borderDivider, bgSecondary } from "../styles";
 import Dialog from "../components/Dialog";
 import {
   getAllSelectionSets,
@@ -16,6 +16,7 @@ import {
   type SelectionSet,
 } from "../utils/selectionSets";
 import { useSessionStore } from "../stores/sessionStore";
+import { Button, IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -145,14 +146,13 @@ export default function SelectionSetPickerDialog({
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             {t("selectionSetPicker.title")}
           </h2>
-          <button
-            type="button"
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] ${hoverLight}`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Content */}
@@ -230,30 +230,29 @@ export default function SelectionSetPickerDialog({
                 )}
 
                 <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
+                  <Button
                     onClick={handleDelete}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)]"
+                    variant="ghost"
+                    tone="danger"
                   >
                     <Trash2 className={iconMd} />
                     {t("common:actions.delete")}
-                  </button>
+                  </Button>
                   <div className={flexRowGap2}>
-                    <button
-                      type="button"
+                    <Button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight} disabled:opacity-50`}
+                      variant="outline"
                     >
                       {isSaving ? t("selectionSetPicker.saving") : t("common:actions.save")}
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={handleLoad}
-                      className="px-4 py-1.5 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+                      variant="solid"
+                      tone="primary"
                     >
                       {t("selectionSetPicker.load")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -268,13 +267,12 @@ export default function SelectionSetPickerDialog({
         {/* Footer with Clear button */}
         {onClear && (
           <div className="flex items-center justify-end px-4 py-3 border-t border-[color:var(--border-default)]">
-            <button
-              type="button"
+            <Button
               onClick={handleClear}
-              className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight}`}
+              variant="outline"
             >
               {t("selectionSetPicker.clear")}
-            </button>
+            </Button>
           </div>
         )}
       </div>

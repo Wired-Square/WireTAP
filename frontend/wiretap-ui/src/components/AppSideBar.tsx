@@ -16,6 +16,7 @@ import {
   gapSmall,
   spaceYSmall,
 } from "../styles";
+import { IconButton } from "./Button";
 
 /**
  * A sidebar navigation item.
@@ -85,9 +86,9 @@ export default function AppSideBar({
       {/* Collapse toggle button */}
       {onToggleCollapsed && (
         <div className={`flex ${collapsed ? "justify-center" : "justify-end"} p-2 border-b ${borderDefault}`}>
-          <button
+          <IconButton
             onClick={onToggleCollapsed}
-            className={`p-1.5 ${roundedDefault} ${hoverLight} ${textSecondary}`}
+            size="sm"
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
@@ -95,7 +96,7 @@ export default function AppSideBar({
             ) : (
               <PanelLeftClose className={iconMd} />
             )}
-          </button>
+          </IconButton>
         </div>
       )}
 

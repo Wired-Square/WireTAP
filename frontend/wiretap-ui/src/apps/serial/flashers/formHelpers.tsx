@@ -10,6 +10,7 @@ import {
   borderDivider,
   textPrimary,
 } from "../../../styles/colourTokens";
+import { Button } from "../../../components/Button";
 
 interface FieldProps {
   label: string;
@@ -103,20 +104,16 @@ export function ActionButton({
   disabled,
   children,
 }: ActionButtonProps) {
-  const styles =
-    variant === "primary"
-      ? "bg-sky-500/20 text-sky-300 hover:bg-sky-500/30"
-      : variant === "danger"
-        ? "bg-red-500/30 text-red-200 hover:bg-red-500/40"
-        : "bg-red-500/20 text-red-300 hover:bg-red-500/30";
   return (
-    <button
+    <Button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded ${styles} disabled:opacity-40 disabled:cursor-not-allowed`}
+      variant={variant === "danger" ? "solid" : "tonal"}
+      tone={variant === "primary" ? "primary" : "danger"}
+      size="sm"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

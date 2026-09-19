@@ -30,8 +30,10 @@ import {
 import { getCaptureFramesTail } from '../../../../api/capture';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { alertWarning } from '../../../../styles/cardStyles';
-import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault, hoverBg } from '../../../../styles';
-import { byteHighlight } from '../../../../styles/buttonStyles';
+import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
+import { byteHighlight } from '../../../../styles/badgeStyles';
+import { Button, IconButton } from '../../../../components/Button';
+import { SecondaryButton, DangerButton } from '../../../../components/forms';
 
 /**
  * Only used when detection finds nothing and the caller supplied no config — a
@@ -223,9 +225,9 @@ export default function ChecksumExtractionDialog({
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("serial.checksumDialogTitle")}</h2>
-          <button onClick={onClose} className={`p-1 ${hoverBg} rounded`} aria-label={t("common:actions.close")}>
+          <IconButton onClick={onClose} size="sm" aria-label={t("common:actions.close")}>
             <X className={`${iconLg} ${textSecondary}`} />
-          </button>
+          </IconButton>
         </div>
 
         {/*
@@ -384,45 +386,43 @@ export default function ChecksumExtractionDialog({
             {t("serial.matchRate", { matches: matchRate.matches, total: matchRate.total, percent: matchPercentage.toFixed(0) })}
           </div>
           {detection?.bestCandidate && (
-            <button
-              type="button"
+            <SecondaryButton
               onClick={() => applyCandidate(detection.bestCandidate!)}
-              className={`px-3 py-2 text-sm ${bgSurface} ${textSecondary} hover:brightness-95 rounded whitespace-nowrap`}
             >
               {t("serial.checksumResetToDetected")}
-            </button>
+            </SecondaryButton>
           )}
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
           {onClear ? (
-            <button
+            <DangerButton
               onClick={() => {
                 onClear();
                 onClose();
               }}
-              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded"
             >
               {t("serial.clear")}
-            </button>
+            </DangerButton>
           ) : (
-            <button
+            <SecondaryButton
               onClick={onClose}
-              className={`px-4 py-2 text-sm ${bgSurface} ${textSecondary} hover:brightness-95 rounded`}
             >
               {t("modbusScan.cancel")}
-            </button>
+            </SecondaryButton>
           )}
-          <button
+          <Button
             onClick={() => {
               onApply(config);
               onClose();
             }}
-            className="px-4 py-2 text-sm bg-amber-600 hover:bg-amber-500 rounded font-medium"
+            variant="solid"
+            tone="warning"
+            size="lg"
           >
             {t("serial.apply")}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

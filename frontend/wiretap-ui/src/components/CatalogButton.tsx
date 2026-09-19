@@ -5,8 +5,8 @@
 
 import { useTranslation } from "react-i18next";
 import type { CatalogMetadata } from "../api/catalog";
-import { buttonBase } from "../styles/buttonStyles";
 import { findCatalogByPath } from "../utils/catalogUtils";
+import { Button } from "./Button";
 
 export interface CatalogButtonProps {
   catalogs: CatalogMetadata[];
@@ -26,23 +26,21 @@ export default function CatalogButton({
 
   if (hasCatalog) {
     return (
-      <button
+      <Button
         onClick={onClick}
-        className={buttonBase}
         title={t("catalogButton.selectCatalog")}
       >
         <span className="max-w-32 truncate">{catalogName}</span>
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={buttonBase}
       title={t("catalogButton.selectCatalog")}
     >
       <span className="text-[color:var(--text-muted)] italic">{t("catalogButton.noCatalog")}</span>
-    </button>
+    </Button>
   );
 }

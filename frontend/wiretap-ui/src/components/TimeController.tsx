@@ -5,15 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Play, Pause, Square, Clock, Zap } from "lucide-react";
 import TimeDisplay from "./TimeDisplay";
 import type { IOCapabilities } from '../api/io';
-import {
-  playButtonBase,
-  playButtonCompact,
-  pauseButtonBase,
-  pauseButtonCompact,
-  stopButtonBase,
-  stopButtonCompact,
-  disabledState,
-} from "../styles";
+import { disabledState } from "../styles";
+import { Button } from "./Button";
 import { iconSm, iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 
 export type PlaybackSpeed = 0.125 | 0.25 | 0.5 | 1 | 2 | 10 | 30 | 60;
@@ -124,48 +117,54 @@ export default function TimeController({
       {/* Playback controls */}
       <div className={`${flexRowGap2} border-r border-[color:var(--border-default)] pr-3`}>
         {isPaused ? (
-          <button
+          <Button
             onClick={onPlay}
             disabled={disabled}
-            className={compact ? playButtonCompact : playButtonBase}
+            variant="solid"
+            tone="success"
+            size={compact ? "sm" : "md"}
             title={t("timeController.play")}
           >
             <Play className={compact ? iconSm : iconMd} />
             {!compact && t("timeController.play")}
-          </button>
+          </Button>
         ) : showPauseButton ? (
-          <button
+          <Button
             onClick={onPause}
             disabled={disabled}
-            className={compact ? pauseButtonCompact : pauseButtonBase}
+            variant="solid"
+            tone="warning"
+            size={compact ? "sm" : "md"}
             title={t("timeController.pausePlayback")}
           >
             <Pause className={compact ? iconSm : iconMd} />
             {!compact && t("timeController.pause")}
-          </button>
+          </Button>
         ) : (
           // For realtime sources that can't pause, show disabled play button
-          <button
+          <Button
             disabled
-            className={`flex items-center gap-2 rounded-lg transition-colors bg-green-600/50 text-white/70 cursor-not-allowed ${
-              compact ? "px-2 py-1" : "px-3 py-1.5"
-            }`}
+            variant="solid"
+            tone="success"
+            size={compact ? "sm" : "md"}
             title={t("timeController.streaming")}
           >
             <Play className={compact ? iconSm : iconMd} />
             {!compact && t("timeController.live")}
-          </button>
+          </Button>
         )}
 
-        <button
+        <Button
           onClick={onStop}
           disabled={disabled || isPaused}
-          className={compact ? stopButtonCompact : stopButtonBase}
+          variant="solid"
+          tone="danger"
+          size={compact ? "sm" : "md"}
           title={t("timeController.pause")}
         >
           <Square className={compact ? iconSm : iconMd} />
           {!compact && t("timeController.pause")}
-        </button>
+        </Button>
       </div>
 
       {/* Current time display */}

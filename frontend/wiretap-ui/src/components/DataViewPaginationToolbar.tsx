@@ -17,8 +17,8 @@ import {
   textDataSecondary,
   gapDefault,
 } from "../styles";
-import { paginationButtonDark } from "../styles/buttonStyles";
 import { pageSizeFromOptionValue, pageSizeToOptionValue, type PageSize } from "../utils/pageSize";
+import { IconButton } from "./Button";
 
 export interface PageSizeOption {
   value: PageSize;
@@ -109,38 +109,38 @@ export default function DataViewPaginationToolbar({
           <span className={`text-xs ${textDataSecondary} px-1 tabular-nums`}>
             {currentPage + 1} / {totalPages}
           </span>
-          <button
+          <IconButton
             onClick={() => onPageChange(0)}
             disabled={disabled || currentPage === 0}
-            className={paginationButtonDark}
+            size="sm"
             title={t("pagination.firstPage")}
           >
             <ChevronsLeft className={iconSm} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={disabled || currentPage === 0}
-            className={paginationButtonDark}
+            size="sm"
             title={t("pagination.previousPage")}
           >
             <ChevronLeft className={iconSm} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
             disabled={disabled || currentPage >= totalPages - 1}
-            className={paginationButtonDark}
+            size="sm"
             title={t("pagination.nextPage")}
           >
             <ChevronRight className={iconSm} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={() => onPageChange(totalPages - 1)}
             disabled={disabled || currentPage >= totalPages - 1}
-            className={paginationButtonDark}
+            size="sm"
             title={t("pagination.lastPage")}
           >
             <ChevronsRight className={iconSm} />
-          </button>
+          </IconButton>
         </div>
       )}
 

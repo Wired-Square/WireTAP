@@ -17,11 +17,8 @@ import {
 } from '../styles';
 import { iconXs } from '../styles/spacing';
 import { textDataPrimary, textDataSecondary } from '../styles/colourTokens';
-import {
-  dataViewTabClass,
-  badgeColorClass,
-  tabCountColorClass,
-} from '../styles/buttonStyles';
+import { dataViewTabClass } from '../styles/buttonStyles';
+import { badgeColorClass, tabCountColorClass } from '../styles/badgeStyles';
 
 // Re-export StreamingStatus for backwards compatibility
 export type { StreamingStatus } from './ProtocolBadge';

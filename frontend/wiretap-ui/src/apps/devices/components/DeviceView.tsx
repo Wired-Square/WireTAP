@@ -15,6 +15,7 @@ import DeviceHeader from "./DeviceHeader";
 import WifiTab from "../tabs/WifiTab";
 import FirmwareTab from "../tabs/FirmwareTab";
 import DataIoTab from "../tabs/DataIoTab";
+import { Button } from "../../../components/Button";
 
 interface TabSpec {
   id: DeviceTabId;
@@ -162,14 +163,14 @@ function UnavailableExplainer({
             {otherTabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <button
+                <Button
                   key={tab.id}
                   onClick={() => onSwitch(tab.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-[color:var(--border-default)] ${textPrimary} hover:bg-[var(--bg-surface)] transition-colors cursor-pointer`}
+                  variant="outline"
                 >
                   <Icon className={iconMd} />
                   {tab.label}
-                </button>
+                </Button>
               );
             })}
           </div>

@@ -32,9 +32,9 @@ import {
   bgSurface,
   borderDefault,
   textSecondary,
-  textDataPurple,
 } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
+import { Button } from "../../components/Button";
 
 /** Format import summary as plain text for copying */
 function formatImportSummary(
@@ -415,13 +415,15 @@ export default function CsvColumnMapperDialog({
             {/* Timestamp options */}
             {hasTimestamp && (
               <div className={`flex items-center gap-3 flex-wrap ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
-                <button
-                  type="button"
+                <Button
                   onClick={() => setShowImportedTs((v) => !v)}
-                  className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${showImportedTs ? textDataPurple : textMuted} hover:brightness-90 transition-colors`}
+                  variant="outline"
+                  tone="purple"
+                  size="sm"
+                  pressed={showImportedTs}
                 >
                   {showImportedTs ? t("csvColumnMapper.raw") : t("csvColumnMapper.preview")}
-                </button>
+                </Button>
                 <label className={`text-xs ${textSecondary} whitespace-nowrap`}>
                   {t("csvColumnMapper.timestampUnit")}
                 </label>
@@ -503,8 +505,7 @@ export default function CsvColumnMapperDialog({
                     ? t("csvColumnMapper.completeWithGaps")
                     : t("csvColumnMapper.complete")}
                 </h4>
-                <button
-                  type="button"
+                <Button
                   onClick={() => {
                     navigator.clipboard.writeText(
                       formatImportSummary(t, importSummary, fileCount, hasSequence)
@@ -512,7 +513,8 @@ export default function CsvColumnMapperDialog({
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textMuted} hover:brightness-90 transition-colors`}
+                  variant="outline"
+                  size="sm"
                   title={t("csvColumnMapper.copyTooltip")}
                 >
                   {copied ? (
@@ -521,7 +523,7 @@ export default function CsvColumnMapperDialog({
                     <Copy className={iconSm} />
                   )}
                   {copied ? t("csvColumnMapper.copied") : t("csvColumnMapper.copy")}
-                </button>
+                </Button>
               </div>
               <div className={`text-xs ${textSecondary} space-y-1`}>
                 <p>

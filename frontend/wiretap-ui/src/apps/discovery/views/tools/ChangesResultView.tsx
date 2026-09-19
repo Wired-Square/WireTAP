@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download, X } from "lucide-react";
 import { iconSm, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
-import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
 import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, bgSurface, sectionHeaderText, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
@@ -16,6 +15,7 @@ import { pickFileToSave } from "../../../../api/dialogs";
 import { saveCatalog } from "../../../../api/catalog";
 import { useSettings } from "../../../../hooks/useSettings";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
+import { Button, IconButton } from "../../../../components/Button";
 
 // Helper to build a set of byte indices that are part of multi-byte patterns
 function getBytesInMultiBytePatterns(patterns: MultiBytePattern[]): Set<number> {
@@ -238,25 +238,26 @@ function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
         </p>
       </div>
       {hasResults && (
-        <button
-          type="button"
+        <Button
           onClick={onExport}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:brightness-95 transition-colors"
+          variant="tonal"
+          tone="purple"
+          size="sm"
           title={t("changes.exportTooltip")}
         >
           <Download className={iconSm} />
           {t("changes.exportLabel")}
-        </button>
+        </Button>
       )}
       {onClose && (
-        <button
-          type="button"
+        <IconButton
           onClick={onClose}
-          className={iconButtonDangerCompact}
+          tone="danger"
+          size="sm"
           title={t("changes.close")}
         >
           <X className={iconXs} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

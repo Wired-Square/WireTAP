@@ -7,11 +7,11 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Layers, Filter, Settings, Network, FileText } from 'lucide-react';
 import { iconSm, iconXs } from '../../../../styles/spacing';
-import { bgSurface, tabBarChipToggle, tabBarIconToggle, textSecondary } from '../../../../styles';
 import { DiscoveryTabBar, type TabDefinition } from '../../components';
 import type { FramingConfig } from '../../../../stores/discoveryStore';
 import { TOOL_TAB_CONFIG } from '../../../../stores/discoveryToolboxStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
+import { Button, IconButton } from '../../../../components/Button';
 
 export type TabId = string;
 
@@ -111,59 +111,65 @@ export default function TabBar({
   const serialControls = (activeTab === 'raw' || activeTab === 'framed') ? (
     <>
       {/* Column visibility toggles */}
-      <button
+      <IconButton
         onClick={toggleShowBusColumn}
-        aria-pressed={showBusColumn}
-        className={tabBarIconToggle(showBusColumn, "cyan")}
+        variant="surface"
+        tone="cyan"
+        size="sm"
+        pressed={showBusColumn}
         title={showBusColumn ? t("serial.hideBus") : t("serial.showBus")}
       >
         <Network className={iconSm} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={toggleShowAsciiColumn}
-        aria-pressed={showAsciiColumn}
-        className={tabBarIconToggle(showAsciiColumn, "yellow")}
+        variant="surface"
+        tone="warning"
+        size="sm"
+        pressed={showAsciiColumn}
         title={showAsciiColumn ? t("serial.hideAscii") : t("serial.showAscii")}
       >
         <FileText className={iconSm} />
-      </button>
+      </IconButton>
 
       {/* View settings - only on raw bytes tab */}
       {activeTab === 'raw' && (
-        <button
+        <Button
           onClick={onOpenRawBytesViewDialog}
-          className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
+          size="sm"
           title={t("serial.configureRawBytes")}
         >
           <Settings className={iconXs} />
           {t("serial.viewLabel")}
-        </button>
+        </Button>
       )}
 
       {/* Framing button - only shown when raw bytes are available for client-side framing */}
       {emitsRawBytes && (
-        <button
+        <Button
           onClick={onOpenFramingDialog}
-          aria-pressed={!!framingConfig}
-          className={tabBarChipToggle(!!framingConfig, "blue")}
+          tone="primary"
+          size="sm"
+          pressed={!!framingConfig}
           title={t("serial.configureFraming")}
         >
           <Layers className={iconXs} />
           {getFramingLabel()}
-        </button>
+        </Button>
       )}
 
       {/* Filter button - only on framed tab (filtering applies to frames, not bytes) */}
       {activeTab === 'framed' && (
-        <button
+        <Button
           onClick={onOpenFilterDialog}
-          aria-pressed={minFrameLength > 0}
-          className={tabBarChipToggle(minFrameLength > 0, "amber")}
+          tone="warning"
+          size="sm"
+          pressed={minFrameLength > 0}
           title={t("serial.configureFilters")}
         >
           <Filter className={iconXs} />
           {minFrameLength > 0 ? t("serial.minLengthFilter", { min: minFrameLength }) : t("serial.filterAll")}
-        </button>
+        </Button>
       )}
     </>
   ) : null;

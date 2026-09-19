@@ -30,6 +30,7 @@ import { bytesToHex } from "../../../../utils/byteUtils";
 import { parseFrameKey } from "../../../../utils/frameKey";
 import { interpretPair, interpretRegister, type WordOrder } from "../../../../utils/modbusValues";
 import CheckboxField from "../../../../components/forms/CheckboxField";
+import { Button, IconButton } from "../../../../components/Button";
 
 type Props = {
   results: ModbusScanResults;
@@ -175,17 +176,14 @@ export default function ModbusScanResultView({
             </>
           )}
           {isScanning && onCancel && (
-            <button
-              onClick={onCancel}
-              className={`px-2 py-0.5 rounded hover:bg-red-600 hover:text-white transition-colors ${textMuted}`}
-            >
+            <Button onClick={onCancel} variant="ghost" tone="danger" size="sm">
               {t("modbusScan.cancel")}
-            </button>
+            </Button>
           )}
           {!isScanning && (
-            <button onClick={onClose} className={`${textMuted} hover:${textPrimary}`} title={t("modbusScan.close")}>
+            <IconButton onClick={onClose} size="sm" title={t("modbusScan.close")}>
               <X className={iconSm} />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>

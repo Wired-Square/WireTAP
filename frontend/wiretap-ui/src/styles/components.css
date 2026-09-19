@@ -1,0 +1,221 @@
+/* The app's semantic component classes, one family per block. Layered below the
+   utilities so a consumer's class still overrides any rule here. Each class is
+   what src/components/<Primitive>.tsx renders; the design decisions behind the
+   values are in the vault's Tailwind Removal Handover. */
+@layer components {
+  /* ---- Buttons -----------------------------------------------------------
+     .btn [.btn--solid|--outline|--ghost|--tonal|--link] (surface when none)
+          [.btn--toned .btn--primary|--success|--danger|--warning|--purple|--cyan]
+          [.btn--xs|--sm|--lg] (md when none) [.btn--icon]
+     A tone is a fill plus a tint and colours the text; variants and the pressed
+     state read them. A lit toggle takes the accent tint unless it has a hue of
+     its own. */
+  .btn {
+    --btn-h: 32px;
+    --btn-px: 10px;
+    --btn-gap: 6px;
+    --btn-fill: var(--bg-tertiary);
+    --btn-fill-text: var(--text-primary);
+    --btn-tint-bg: var(--status-info-bg);
+    --btn-tint-text: var(--status-info-text);
+    --btn-tint-border: var(--status-info-border);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--btn-gap);
+    flex-shrink: 0;
+    min-height: var(--btn-h);
+    padding: 0 var(--btn-px);
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background-color: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+    transition-property: transform, color, background-color, border-color, filter;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .btn:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--bg-surface), var(--text-primary) 8%);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* A lit toggle that cannot be pressed again is the current state, not a
+     disabled control. */
+  .btn:disabled[aria-pressed="true"] {
+    opacity: 1;
+    cursor: default;
+  }
+
+  .btn--xs {
+    --btn-h: 20px;
+    --btn-px: 4px;
+    --btn-gap: 4px;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+
+  .btn--sm {
+    --btn-h: 26px;
+    --btn-px: 8px;
+    --btn-gap: 4px;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .btn--lg {
+    --btn-h: 40px;
+    --btn-px: 16px;
+    --btn-gap: 8px;
+  }
+
+  .btn--icon {
+    width: var(--btn-h);
+    padding: 0;
+  }
+
+  .btn--primary {
+    --btn-fill: var(--accent-primary);
+    --btn-tint-bg: var(--status-info-bg);
+    --btn-tint-text: var(--status-info-text);
+    --btn-tint-border: var(--status-info-border);
+  }
+
+  .btn--success {
+    --btn-fill: var(--accent-success);
+    --btn-tint-bg: var(--status-success-bg);
+    --btn-tint-text: var(--status-success-text);
+    --btn-tint-border: var(--status-success-border);
+  }
+
+  .btn--danger {
+    --btn-fill: var(--accent-danger);
+    --btn-tint-bg: var(--status-danger-bg);
+    --btn-tint-text: var(--status-danger-text);
+    --btn-tint-border: var(--status-danger-border);
+  }
+
+  .btn--warning {
+    --btn-fill: var(--accent-warning);
+    --btn-tint-bg: var(--status-warning-bg);
+    --btn-tint-text: var(--status-warning-text);
+    --btn-tint-border: var(--status-warning-border);
+  }
+
+  /* Hue tags, not accents: constant fills, themed tints. */
+  .btn--purple {
+    --btn-fill: #9333ea;
+    --btn-tint-bg: var(--status-purple-bg);
+    --btn-tint-text: var(--status-purple-text);
+    --btn-tint-border: var(--status-purple-border);
+  }
+
+  .btn--cyan {
+    --btn-fill: #0891b2;
+    --btn-tint-bg: var(--status-cyan-bg);
+    --btn-tint-text: var(--status-cyan-text);
+    --btn-tint-border: var(--status-cyan-border);
+  }
+
+  /* A tone colours the text on every variant and puts white on its fill; an
+     unlit toggle is neutral whatever its tone, the tone showing once lit. */
+  .btn--toned {
+    --btn-fill-text: #fff;
+    color: var(--btn-tint-text);
+  }
+
+  .btn[aria-pressed="false"] {
+    color: var(--text-secondary);
+  }
+
+  .btn--solid {
+    background-color: var(--btn-fill);
+    color: var(--btn-fill-text);
+  }
+
+  .btn--solid:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--btn-fill), #000 12%);
+  }
+
+  .btn--outline,
+  .btn--ghost {
+    background-color: transparent;
+  }
+
+  .btn--outline {
+    border-color: var(--border-default);
+  }
+
+  .btn--outline:hover:not(:disabled),
+  .btn--ghost:hover:not(:disabled) {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  /* A toned outline or ghost button gains its tint background on hover. */
+  .btn--toned:is(.btn--outline, .btn--ghost):hover:not(:disabled) {
+    background-color: var(--btn-tint-bg);
+    color: var(--btn-tint-text);
+  }
+
+  .btn--tonal,
+  .btn[aria-pressed="true"] {
+    background-color: var(--btn-tint-bg);
+    color: var(--btn-tint-text);
+    border-color: var(--btn-tint-border);
+  }
+
+  .btn--tonal:hover:not(:disabled),
+  .btn[aria-pressed="true"]:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--btn-tint-bg), var(--btn-tint-text) 12%);
+    color: var(--btn-tint-text);
+  }
+
+  .btn--link {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    color: var(--btn-tint-text);
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    white-space: normal;
+  }
+
+  .btn--link:not(.btn--toned) {
+    color: var(--text-secondary);
+  }
+
+  .btn--link:hover:not(:disabled) {
+    background-color: transparent;
+    color: var(--btn-tint-text);
+    text-decoration: underline;
+  }
+
+  .btn--link:active:not(:disabled) {
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn:active:not(:disabled) {
+      transform: none;
+    }
+  }
+}

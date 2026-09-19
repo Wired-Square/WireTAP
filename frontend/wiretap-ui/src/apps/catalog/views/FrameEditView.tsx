@@ -5,7 +5,7 @@ import { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { caption, disabledState, textMedium, focusRing, secondaryButton } from "../../../styles";
+import { caption, textMedium, focusRing } from "../../../styles";
 import type {
   ProtocolType,
   ProtocolConfig,
@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { protocolRegistry } from "../protocols";
 import { CANConfigSection, ModbusConfigSection, SerialConfigSection } from "./protocol-editors";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 // Icon mapping for protocols
 const protocolIcons: Record<ProtocolType, React.ComponentType<{ className?: string }>> = {
@@ -366,19 +367,17 @@ export default function FrameEditView({
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4">
-          <button
+          <SecondaryButton
             onClick={onCancel}
-            className={secondaryButton}
           >
             {t("frameEditView.cancel")}
-          </button>
-          <button
+          </SecondaryButton>
+          <PrimaryButton
             onClick={onSave}
-            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${disabledState}`}
             disabled={disableSave}
           >
             {resolvedAction}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </div>

@@ -2,7 +2,8 @@
 
 import { useTranslation } from "react-i18next";
 import type { CanidFields } from "../types";
-import { textMedium, focusRing, secondaryButton } from "../../../styles";
+import { textMedium, focusRing } from "../../../styles";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 export type CANFrameEditViewProps = {
   title?: string;
@@ -141,19 +142,17 @@ export default function CANFrameEditView({
         </div>
 
         <div className="flex justify-end gap-3 pt-4">
-          <button
+          <SecondaryButton
             onClick={onCancel}
-            className={secondaryButton}
           >
             {t("canFrameEditView.cancel")}
-          </button>
-          <button
+          </SecondaryButton>
+          <PrimaryButton
             onClick={onSave}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             disabled={disableSave || !idFields.id}
           >
             {resolvedAction}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </div>

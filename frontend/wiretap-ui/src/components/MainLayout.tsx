@@ -48,6 +48,7 @@ import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
 import type { LucideIcon } from "lucide-react";
+import { Button } from "./Button";
 const logo = "/logo.svg";
 
 // Get layout key for a specific window (per-window persistence)
@@ -88,12 +89,15 @@ class PanelErrorBoundary extends React.Component<
           <div className="flex flex-col items-center gap-3 p-6 max-w-md text-center">
             <span className={`text-sm font-medium ${textPrimary}`}>Panel Error</span>
             <span className={`text-xs ${textTertiary} break-all`}>{this.state.error.message}</span>
-            <button
+            <Button
               onClick={() => this.setState({ error: null })}
-              className="mt-2 px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white"
+              variant="solid"
+              tone="primary"
+              size="sm"
+              className="mt-2"
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       );

@@ -11,7 +11,9 @@ import Dialog from '../../../../components/Dialog';
 import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
 import { type ExtractionConfig } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
-import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault, hoverBg } from '../../../../styles';
+import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
+import { Button, IconButton } from '../../../../components/Button';
+import { DangerButton, SecondaryButton } from '../../../../components/forms';
 
 interface ByteExtractionDialogProps {
   isOpen: boolean;
@@ -109,19 +111,19 @@ export default function ByteExtractionDialog({
   };
 
   const colorClasses = color === 'cyan'
-    ? { bg: 'bg-cyan-600', bgHover: 'hover:bg-cyan-500', text: 'text-cyan-400', bgLight: 'bg-cyan-900/50' }
+    ? { text: 'text-cyan-400', bgLight: 'bg-cyan-900/50' }
     : color === 'purple'
-    ? { bg: 'bg-purple-600', bgHover: 'hover:bg-purple-500', text: 'text-purple-400', bgLight: 'bg-purple-900/50' }
-    : { bg: 'bg-amber-600', bgHover: 'hover:bg-amber-500', text: 'text-amber-400', bgLight: 'bg-amber-900/50' };
+    ? { text: 'text-purple-400', bgLight: 'bg-purple-900/50' }
+    : { text: 'text-amber-400', bgLight: 'bg-amber-900/50' };
 
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={`text-lg font-semibold ${textPrimary}`}>{title}</h2>
-          <button onClick={onClose} className={`p-1 ${hoverBg} rounded`}>
+          <IconButton onClick={onClose} size="sm">
             <X className={`${iconLg} ${textSecondary}`} />
-          </button>
+          </IconButton>
         </div>
 
         <p className={`text-sm ${textSecondary}`}>
@@ -213,32 +215,32 @@ export default function ByteExtractionDialog({
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
           {onClear ? (
-            <button
+            <DangerButton
               onClick={() => {
                 onClear();
                 onClose();
               }}
-              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded"
             >
               {t("serial.clear")}
-            </button>
+            </DangerButton>
           ) : (
-            <button
+            <SecondaryButton
               onClick={onClose}
-              className={`px-4 py-2 text-sm ${bgSurface} ${textSecondary} hover:brightness-95 rounded`}
             >
               {t("modbusScan.cancel")}
-            </button>
+            </SecondaryButton>
           )}
-          <button
+          <Button
             onClick={() => {
               onApply({ startByte, numBytes, endianness });
               onClose();
             }}
-            className={`px-4 py-2 text-sm ${colorClasses.bg} ${colorClasses.bgHover} rounded font-medium`}
+            variant="solid"
+            tone={color === 'amber' ? 'warning' : color === 'purple' ? 'purple' : 'cyan'}
+            size="lg"
           >
             {t("serial.apply")}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

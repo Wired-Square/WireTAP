@@ -7,6 +7,7 @@ import Dialog from "../../../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2, helpText, alertDanger, labelSmall } from "../../../styles";
 import { parseIntValue, isValidIntValue } from "../../../utils/numberUtils";
+import { Button, IconButton } from "../../../components/Button";
 
 export type EnumValue = {
   rawValue: string;
@@ -154,26 +155,27 @@ export default function EnumEditorDialog({
                 onChange={(e) => handleChange(i, "label", e.target.value)}
                 placeholder="Label"
               />
-              <button
-                type="button"
+              <IconButton
                 onClick={() => handleRemove(i)}
-                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                tone="danger"
                 title="Remove"
               >
                 <Trash2 className={iconMd} />
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
 
-        <button
-          type="button"
+        <Button
           onClick={handleAdd}
-          className="mt-3 flex items-center gap-2 px-3 py-2 text-sm text-[color:var(--accent-primary)] hover:bg-[var(--accent-bg-subtle)] rounded-lg transition-colors"
+          variant="ghost"
+          tone="primary"
+          size="lg"
+          className="mt-3"
         >
           <Plus className={iconMd} />
           Add Value
-        </button>
+        </Button>
 
         {error && (
           <div className={`mt-4 ${alertDanger}`}>{error}</div>

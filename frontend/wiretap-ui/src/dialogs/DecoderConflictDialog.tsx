@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { iconLg } from "../styles/spacing";
 import { textMedium, caption, borderDivider, hoverLight, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
+import { IconButton } from "../components/Button";
 
 export interface DecoderConflictOption {
   /** Catalog filename (from profile.preferred_catalog) */
@@ -40,13 +41,13 @@ export default function DecoderConflictDialog({
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             {t("decoderConflict.title")}
           </h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
         <div className="px-4 py-2">
           <p className={`${caption}`}>{t("decoderConflict.intro")}</p>

@@ -6,7 +6,7 @@
 import { Send, GitMerge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { flexRowGap2 } from "../../../styles/spacing";
-import { badgeColorClass } from "../../../styles/buttonStyles";
+import { badgeColorClass } from "../../../styles/badgeStyles";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
 import { textDataSecondary } from "../../../styles/colourTokens";

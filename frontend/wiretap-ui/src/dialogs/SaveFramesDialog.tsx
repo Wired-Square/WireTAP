@@ -5,7 +5,7 @@ import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { iconXs, flexRowGap2 } from '../styles/spacing';
 import Dialog from '../components/Dialog';
-import { Input, Select, FormField } from '../components/forms';
+import { Input, Select, FormField, SuccessButton } from '../components/forms';
 import { SecondaryButton } from '../components/forms/DialogButtons';
 import { listCatalogs } from '../api/catalog';
 import {
@@ -165,12 +165,11 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
 
         <div className={`flex justify-end ${gapSmall} pt-2`}>
           <SecondaryButton onClick={onCancel}>{t('common:actions.cancel')}</SecondaryButton>
-          <button
+          <SuccessButton
             onClick={onSave}
-            className="px-4 py-2 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
           >
             {t('common:actions.save')}
-          </button>
+          </SuccessButton>
         </div>
       </div>
     </Dialog>

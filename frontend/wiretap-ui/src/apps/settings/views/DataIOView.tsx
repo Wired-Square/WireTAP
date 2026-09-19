@@ -16,8 +16,6 @@ import {
   cardDefault,
   textPrimary,
   textSecondary,
-  hoverSubtle,
-  roundedDefault,
   spaceYLarge,
   spaceYSmall,
   gapSmall,
@@ -28,8 +26,8 @@ import {
   badgeDanger,
   badgeInfo,
   badgeCyan,
-  iconButtonHoverDanger,
 } from "../../../styles";
+import { IconButton } from "../../../components/Button";
 
 type DataIOViewProps = {
   ioProfiles: IOProfile[];
@@ -289,7 +287,7 @@ export default function DataIOView({
     <div className={spaceYLarge}>
       <div className="flex items-center justify-between">
         <h2 className={h2}>{t("dataIO.title")}</h2>
-        <PrimaryButton onClick={onAddProfile} className="flex items-center gap-1">
+        <PrimaryButton onClick={onAddProfile}>
           <Plus className={iconMd} />
           {t("dataIO.addProfile")}
         </PrimaryButton>
@@ -340,9 +338,8 @@ export default function DataIOView({
               </div>
 
               <div className={`flex items-center ${gapSmall}`}>
-                <button
+                <IconButton
                   onClick={() => onToggleDefaultRead(profile.id)}
-                  className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title={
                     defaultReadProfile === profile.id
                       ? t("dataIO.actions.unsetDefault")
@@ -357,28 +354,26 @@ export default function DataIOView({
                     }`}
                     style={defaultReadProfile !== profile.id ? { color: 'var(--text-secondary)', opacity: 0.6 } : undefined}
                   />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => onDuplicateProfile(profile)}
-                  className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title={t("dataIO.actions.duplicate")}
                 >
                   <Copy className={`${iconMd} ${textSecondary}`} />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => onEditProfile(profile)}
-                  className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title={t("dataIO.actions.edit")}
                 >
                   <Edit2 className={`${iconMd} ${textSecondary}`} />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => onDeleteProfile(profile.id)}
-                  className={iconButtonHoverDanger}
+                  tone="danger"
                   title={t("dataIO.actions.delete")}
                 >
                   <Trash2 className={`${iconMd} text-red-600`} />
-                </button>
+                </IconButton>
               </div>
             </div>
           ))}
@@ -409,20 +404,19 @@ export default function DataIOView({
               </div>
 
               <div className={`flex items-center ${gapSmall}`}>
-                <button
+                <IconButton
                   onClick={() => onSaveAdHocProfile(profile)}
-                  className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title={t("dataIO.unsaved.save")}
                 >
                   <Save className={`${iconMd} ${textSecondary}`} />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => onDiscardAdHocProfile(profile.id)}
-                  className={iconButtonHoverDanger}
+                  tone="danger"
                   title={t("dataIO.unsaved.discard")}
                 >
                   <Trash2 className={`${iconMd} text-red-600`} />
-                </button>
+                </IconButton>
               </div>
             </div>
           ))}

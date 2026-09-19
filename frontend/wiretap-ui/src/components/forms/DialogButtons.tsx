@@ -1,105 +1,28 @@
 // ui/src/components/forms/DialogButtons.tsx
-// Standardized dialog button components for consistent styling
+// The dialog-footer presets: named Button compositions so a footer reads as
+// what it does. Any Button prop can still be passed through.
 
-import type { ReactNode, ButtonHTMLAttributes } from "react";
-import { disabledState, hoverLight } from "../../styles";
+import { forwardRef } from "react";
+import { Button, type ButtonProps } from "../Button";
 
-type ButtonProps = {
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-  type?: ButtonHTMLAttributes<HTMLButtonElement>["type"];
+type PresetProps = Omit<ButtonProps, "variant" | "tone">;
+
+const preset = (displayName: string, variant: ButtonProps["variant"], tone: ButtonProps["tone"]) => {
+  const Preset = forwardRef<HTMLButtonElement, PresetProps>(({ size = "lg", ...props }, ref) => (
+    <Button ref={ref} variant={variant} tone={tone} size={size} {...props} />
+  ));
+  Preset.displayName = displayName;
+  return Preset;
 };
 
-/**
- * Primary action button (blue) for dialogs.
- * Used for: Save, Confirm, Create, etc.
- */
-export function PrimaryButton({
-  children,
-  onClick,
-  disabled = false,
-  className = "",
-  type = "button",
-}: ButtonProps) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 ${disabledState} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+/** Save, Confirm, Create … */
+export const PrimaryButton = preset("PrimaryButton", "solid", "primary");
 
-/**
- * Secondary action button (gray outline) for dialogs.
- * Used for: Cancel, Close, Back, etc.
- */
-export function SecondaryButton({
-  children,
-  onClick,
-  disabled = false,
-  className = "",
-  type = "button",
-}: ButtonProps) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 text-sm rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] ${hoverLight} ${disabledState} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+/** Cancel, Close, Back … */
+export const SecondaryButton = preset("SecondaryButton", "outline", "neutral");
 
-/**
- * Danger action button (red) for dialogs.
- * Used for: Delete, Remove, Discard, etc.
- */
-export function DangerButton({
-  children,
-  onClick,
-  disabled = false,
-  className = "",
-  type = "button",
-}: ButtonProps) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 ${disabledState} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+/** Delete, Remove, Discard … */
+export const DangerButton = preset("DangerButton", "solid", "danger");
 
-/**
- * Success action button (green) for dialogs.
- * Used for: Add, Create, etc.
- */
-export function SuccessButton({
-  children,
-  onClick,
-  disabled = false,
-  className = "",
-  type = "button",
-}: ButtonProps) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 text-sm rounded bg-green-600 text-white hover:bg-green-700 ${disabledState} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+/** Add, Create … */
+export const SuccessButton = preset("SuccessButton", "solid", "success");

@@ -9,7 +9,7 @@ import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
-import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
+import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
@@ -34,6 +34,7 @@ import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
 import { signalByteIndices } from "../../../utils/mirrorBytes";
+import { IconButton } from "../../../components/Button";
 
 type Props = {
   frames: FrameDetail[];
@@ -860,13 +861,13 @@ function FrameCard({
                     {formatSignalValue(decoded)}
                   </span>
                   {isHex && (
-                    <button
+                    <IconButton
                       onClick={() => sendHexDataToCalculator(decoded.value.replace(/\s+/g, ''))}
-                      className="p-0.5 rounded hover:brightness-90 hover:bg-[var(--bg-surface)] transition-all"
+                      size="xs"
                       title={t("framesView.sendToCalculator")}
                     >
                       <Calculator className={`${iconXs} text-orange-500`} />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               </div>
@@ -1416,36 +1417,31 @@ export default function DecoderFramesView({
     <>
       {/* Time range toggle - only for WireTAP backend readers */}
       {supportsTimeRange && (
-        <button
-          type="button"
+        <IconButton
           onClick={onToggleTimeRange}
-          className={`p-1.5 rounded transition-colors ${
-            showTimeRange
-              ? 'bg-blue-600 text-white hover:bg-blue-500'
-              : `${bgSurface} ${textSecondary} hover:brightness-95`
-          }`}
+          variant="surface"
+          size="sm"
+          pressed={showTimeRange}
           title={showTimeRange ? t("framesView.hideTimeRange") : t("framesView.showTimeRange")}
         >
           <Clock className={iconSm} />
-        </button>
+        </IconButton>
       )}
       {/* Bookmark picker - only for WireTAP backend readers */}
       {supportsTimeRange && onOpenBookmarkPicker && (
-        <button
-          type="button"
+        <IconButton
           onClick={onOpenBookmarkPicker}
-          className={`p-1.5 rounded transition-colors ${
-            isBookmarkActive
-              ? 'bg-yellow-600 text-white hover:bg-yellow-500'
-              : `${bgSurface} ${textSecondary} hover:brightness-95`
-          }`}
+          variant="surface"
+          tone="warning"
+          size="sm"
+          pressed={isBookmarkActive}
           title={isBookmarkActive ? t("framesView.bookmarkLoaded") : t("framesView.loadBookmark")}
         >
           <Star
             className={iconSm}
             fill={isBookmarkActive ? "currentColor" : "none"}
           />
-        </button>
+        </IconButton>
       )}
     </>
   );
@@ -1754,13 +1750,13 @@ export default function DecoderFramesView({
                     <span className={`${textDataAmber} text-xs`}>
                       {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
                     </span>
-                    <button
+                    <IconButton
                       onClick={() => sendHexDataToCalculator(bytesToHex(frame.bytes))}
-                      className={`p-1 rounded ${hoverBg} transition-colors`}
+                      size="sm"
                       title={t("framesView.sendToCalculator")}
                     >
                       <Calculator className={`${iconSm} ${textDataOrange}`} />
-                    </button>
+                    </IconButton>
                   </RawFrameRow>
                 ))}
               </div>

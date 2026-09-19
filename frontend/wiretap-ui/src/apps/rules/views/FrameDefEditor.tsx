@@ -8,7 +8,7 @@ import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { SignalDefDescriptor } from "../../../api/framelinkRules";
-import { textPrimary, textSecondary, indigoButton, disabledState } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import {
@@ -31,6 +31,8 @@ import BitGrid from "../components/BitGrid";
 import SignalList from "../components/SignalList";
 import SignalProperties from "../components/SignalProperties";
 import { formatHexId } from "../utils/formatHex";
+import { IconButton } from "../../../components/Button";
+import { PrimaryButton } from "../../../components/forms";
 
 // ============================================================================
 // Interface type name lookup
@@ -346,13 +348,13 @@ export default function FrameDefEditor({
       {/* Header bar */}
       <div className={`${cardDefault} ${cardPadding.md} flex items-center justify-between mb-2`}>
         <div className="flex items-center gap-3">
-          <button
+          <IconButton
             onClick={handleCancel}
-            className={`p-1.5 rounded hover:bg-[var(--hover-bg)] transition-colors ${textSecondary}`}
+            size="sm"
             title={t("frameDefEditor.back")}
           >
             <ArrowLeft className={iconMd} />
-          </button>
+          </IconButton>
           <div>
             <div className={`text-sm font-medium ${textPrimary}`}>
               {t("frameDefEditor.title", { id: formatHexId(frameDefId) })}
@@ -362,13 +364,12 @@ export default function FrameDefEditor({
             </div>
           </div>
         </div>
-        <button
+        <PrimaryButton
           onClick={handleSave}
           disabled={saveDisabled}
-          className={`${indigoButton} ${disabledState}`}
         >
           {t("frameDefEditor.save")}
-        </button>
+        </PrimaryButton>
       </div>
 
       {/* Main layout: left (grid + signal list) | right (properties) */}

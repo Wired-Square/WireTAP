@@ -3,7 +3,6 @@
 import { Gauge, Plus, Save, Layout, X, AlertTriangle, Glasses, Sparkles, FlaskConical, Trash2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
-import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import { textSecondary } from "../../../styles/colourTokens";
@@ -17,6 +16,7 @@ import { catalogFilenameFromPath } from "../../../utils/dashboardLayouts";
 import type { DashboardLayout } from "../../../utils/dashboardLayouts";
 import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
+import { Button, IconButton } from "../../../components/Button";
 
 /** Dropdown menu item style */
 const menuItem = "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors";
@@ -216,13 +216,13 @@ export default function DashboardTopBar({
     >
       {/* Add panel button with dropdown */}
       <div ref={addMenuRef} className="relative">
-        <button
+        <IconButton
           onClick={() => setAddMenuOpen(!addMenuOpen)}
-          className={iconButtonBase}
+          variant="surface"
           title={t("topBar.addPanel")}
         >
           <Plus className={iconMd} />
-        </button>
+        </IconButton>
         {addMenuOpen && (
           <div className={menuContainer}>
             {WIDGET_LIST.map((w, i) => {
@@ -244,28 +244,28 @@ export default function DashboardTopBar({
 
       {/* Auto-add catalog signals as pre-configured instruments */}
       {onOpenInstruments && (
-        <button
+        <IconButton
           onClick={onOpenInstruments}
-          className={iconButtonBase}
+          variant="surface"
           title={t("topBar.addInstruments")}
         >
           <Wand2 className={iconMd} />
-        </button>
+        </IconButton>
       )}
 
       {/* Layouts button with dropdown */}
       <div ref={layoutMenuRef} className="relative">
-        <button
+        <IconButton
           onClick={() => {
             setLayoutMenuOpen(!layoutMenuOpen);
             setIsSaving(false);
             setSaveName("");
           }}
-          className={iconButtonBase}
+          variant="surface"
           title={t("topBar.manageLayouts")}
         >
           <Layout className={iconMd} />
-        </button>
+        </IconButton>
         {layoutMenuOpen && (
           <div className={menuContainer} style={{ minWidth: 220 }}>
             {/* Save current layout */}
@@ -291,21 +291,24 @@ export default function DashboardTopBar({
                   className={`${inputBase} flex-1 text-xs py-1`}
                   autoFocus
                 />
-                <button
+                <Button
                   onClick={handleSaveLayout}
                   disabled={!saveName.trim()}
-                  className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  variant="solid"
+                  tone="primary"
+                  size="sm"
                 >
                   {t("topBar.layouts.save")}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleSaveDashboardFile}
                   disabled={!saveName.trim()}
                   title={t("topBar.layouts.saveFileHint")}
-                  className="text-xs px-2 py-1 bg-[var(--bg-primary)] border border-[var(--border-default)] text-[color:var(--text-primary)] rounded hover:bg-[var(--hover-bg)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  variant="outline"
+                  size="sm"
                 >
                   {t("topBar.layouts.saveFile")}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -344,13 +347,15 @@ export default function DashboardTopBar({
                       {t("topBar.panelsCount", { count: layout.panels.length })}
                     </span>
                   </button>
-                  <button
+                  <IconButton
                     onClick={(e) => handleDeleteLayout(e, layout.id)}
-                    className={`${iconButtonHoverDanger} p-1 opacity-0 group-hover:opacity-100 shrink-0 mr-1`}
+                    tone="danger"
+                    size="xs"
+                    className="opacity-0 group-hover:opacity-100 mr-1"
                     title={t("topBar.deleteLayout")}
                   >
                     <X className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 </div>
               );
             })}
@@ -376,13 +381,13 @@ export default function DashboardTopBar({
       {/* Candidate signals dropdown */}
       {(onOpenCandidates || onOpenHypothesisExplorer) && (
         <div ref={candidateMenuRef} className="relative">
-          <button
+          <IconButton
             onClick={() => setCandidateMenuOpen(!candidateMenuOpen)}
-            className={iconButtonBase}
+            variant="surface"
             title={t("topBar.candidates")}
           >
             <Sparkles className={iconMd} />
-          </button>
+          </IconButton>
           {candidateMenuOpen && (
             <div className={menuContainer}>
               {onOpenCandidates && (
@@ -415,23 +420,25 @@ export default function DashboardTopBar({
       )}
 
       {/* Raw view toggle */}
-      <button
+      <IconButton
         onClick={onToggleRawView}
         title={rawViewMode ? t("topBar.switchToGrid") : t("topBar.switchToRaw")}
-        className={toggleButtonClass(rawViewMode, "purple")}
+        variant="surface"
+        tone="purple"
+        pressed={rawViewMode}
       >
         <Glasses className={iconMd} fill={rawViewMode ? "currentColor" : "none"} />
-      </button>
+      </IconButton>
 
       {/* Remove all panels */}
-      <button
+      <IconButton
         onClick={removeAllPanels}
         disabled={!hasPanels}
-        className={`${iconButtonHoverDanger} disabled:opacity-30 disabled:cursor-not-allowed`}
+        tone="danger"
         title={t("topBar.removeAll")}
       >
         <Trash2 className={iconMd} />
-      </button>
+      </IconButton>
     </AppTopBar>
   );
 }

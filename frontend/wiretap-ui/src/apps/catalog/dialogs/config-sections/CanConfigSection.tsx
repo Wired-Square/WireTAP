@@ -4,10 +4,11 @@
 import { useState, useCallback, useMemo } from "react";
 import { Network, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { disabledState, caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
+import { caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
 import type { CanHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { HeaderFieldFormat } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
+import { Button, IconButton } from "../../../../components/Button";
 
 /** Predefined CAN header field types */
 type CanFieldType = "source_address" | "custom";
@@ -227,21 +228,23 @@ export default function CanConfigSection({
         </div>
         <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
           {isConfigured ? (
-            <button
-              type="button"
+            <Button
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded transition-colors"
+              variant="ghost"
+              tone="danger"
+              size="sm"
             >
               Remove
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-[color:var(--text-green)] hover:bg-[var(--hover-bg-green)] rounded transition-colors"
+              variant="ghost"
+              tone="success"
+              size="sm"
             >
               + Add
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -341,14 +344,15 @@ export default function CanConfigSection({
               <label className={textMedium}>
                 Frame ID Mask <span className="text-slate-400 text-xs font-normal">(optional, hex)</span>
               </label>
-              <button
-                type="button"
+              <Button
                 onClick={() => setShowFrameIdMaskPicker(!showFrameIdMaskPicker)}
-                className="flex items-center gap-1 text-xs text-[color:var(--text-green)] hover:text-[color:var(--text-green-hover)]"
+                variant="link"
+                tone="success"
+                className="text-xs"
               >
                 {showFrameIdMaskPicker ? <ChevronDown className={iconXs} /> : <ChevronRight className={iconXs} />}
                 {showFrameIdMaskPicker ? "Hide" : "Show"} bit picker
-              </button>
+              </Button>
             </div>
             <div className={flexRowGap2}>
               <input
@@ -399,14 +403,14 @@ export default function CanConfigSection({
                 </p>
               </div>
               {!isAddingField && (
-                <button
-                  type="button"
+                <Button
                   onClick={() => setIsAddingField(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-green)] text-[color:var(--text-green)] rounded-lg hover:bg-[var(--hover-bg-green)] transition-colors"
+                  variant="tonal"
+                  tone="success"
                 >
                   <Plus className={iconMd} />
                   Add Field
-                </button>
+                </Button>
               )}
             </div>
 
@@ -425,10 +429,9 @@ export default function CanConfigSection({
                     <div key={index} className="space-y-2">
                       <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)]/50 rounded-lg border border-[color:var(--border-default)]">
                         {/* Expand/collapse toggle */}
-                        <button
-                          type="button"
+                        <IconButton
                           onClick={() => toggleFieldPicker(index)}
-                          className="p-1 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
+                          size="sm"
                           title={isFieldExpanded ? "Hide bit picker" : "Show bit picker"}
                         >
                           {isFieldExpanded ? (
@@ -436,7 +439,7 @@ export default function CanConfigSection({
                           ) : (
                             <ChevronRight className={iconMd} />
                           )}
-                        </button>
+                        </IconButton>
 
                         {/* Field name */}
                         <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
@@ -485,14 +488,14 @@ export default function CanConfigSection({
                         </select>
 
                         {/* Remove button */}
-                        <button
-                          type="button"
+                        <IconButton
                           onClick={() => handleRemoveField(index)}
-                          className="p-1 text-red-500 hover:bg-[var(--hover-bg-red)] rounded transition-colors"
+                          tone="danger"
+                          size="sm"
                           title="Remove field"
                         >
                           <Trash2 className={iconMd} />
-                        </button>
+                        </IconButton>
                       </div>
 
                       {/* Expanded bit picker */}
@@ -558,21 +561,20 @@ export default function CanConfigSection({
                     Use the bit picker after adding to select which CAN ID bits this field covers.
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
+                    <Button
                       onClick={resetAddForm}
-                      className="px-3 py-1 text-sm text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded transition-colors"
+                      variant="ghost"
                     >
                       Cancel
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={handleAddField}
                       disabled={newFieldType === "custom" && !newFieldCustomName.trim()}
-                      className={`px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 ${disabledState} transition-colors`}
+                      variant="solid"
+                      tone="success"
                     >
                       Add
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

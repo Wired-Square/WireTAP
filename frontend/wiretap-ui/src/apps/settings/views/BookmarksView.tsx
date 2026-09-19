@@ -4,10 +4,10 @@ import { useTranslation } from "react-i18next";
 import { iconMd, iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import { emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
-import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { PrimaryButton } from "../../../components/forms";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { IOProfile } from "../stores/settingsStore";
+import { IconButton } from "../../../components/Button";
 
 type BookmarksViewProps = {
   bookmarks: TimeRangeFavorite[];
@@ -96,20 +96,19 @@ export default function BookmarksView({
                       </div>
                     </div>
                     <div className={flexRowGap2}>
-                      <button
+                      <IconButton
                         onClick={() => onEditBookmark(bookmark)}
-                        className={iconButtonHover}
                         title={t("bookmarks.actions.edit")}
                       >
                         <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
-                      </button>
-                      <button
+                      </IconButton>
+                      <IconButton
                         onClick={() => onDeleteBookmark(bookmark)}
-                        className={iconButtonHoverDanger}
+                        tone="danger"
                         title={t("bookmarks.actions.delete")}
                       >
                         <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-                      </button>
+                      </IconButton>
                     </div>
                   </div>
                 ))}

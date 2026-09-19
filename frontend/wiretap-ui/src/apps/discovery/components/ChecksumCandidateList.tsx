@@ -13,6 +13,7 @@ import { getAlgorithmInfo } from "../../../utils/analysis/checksums";
 import { flexRowGap2, iconXs } from "../../../styles/spacing";
 import { textMedium } from "../../../styles/typography";
 import { MatchRateIcon, matchRateTextClass, matchRateToneClasses } from "./checksumTone";
+import { Button } from "../../../components/Button";
 
 interface ChecksumCandidateListProps {
   candidates: ChecksumCandidate[];
@@ -120,17 +121,13 @@ export default function ChecksumCandidateList({
               </div>
 
               <div className="flex-shrink-0 flex items-center gap-2">
-                <button
-                  type="button"
+                <Button
                   onClick={() => (isApplied && onUnapply ? onUnapply() : onApply(candidate, index))}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    isApplied
-                      ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
-                      : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
-                  }`}
+                  size="sm"
+                  pressed={isApplied}
                 >
                   {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
-                </button>
+                </Button>
                 <MatchRateIcon matchRate={candidate.matchRate} isApplied={isApplied} />
               </div>
             </div>

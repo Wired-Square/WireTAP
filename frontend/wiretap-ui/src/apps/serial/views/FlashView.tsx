@@ -30,7 +30,6 @@ import {
 import { tlog } from "../../../api/settings";
 import ManufacturerBadge from "../../../components/ManufacturerBadge";
 import {
-  bgPrimary,
   bgSurface,
   borderDivider,
   textMuted,
@@ -51,6 +50,7 @@ import type {
   DfuDeviceInfo,
   FlasherProgressEvent,
 } from "../utils/flasherTypes";
+import { Button } from "../../../components/Button";
 
 interface Props {
   /** Active serial port name (null when the user picked a DFU device). */
@@ -353,20 +353,18 @@ export default function FlashView({
           const active = operation === (m.id as Operation);
           const supported = driver.capabilities[m.id];
           return (
-            <button
+            <Button
               key={m.id}
               onClick={() => setOperation(m.id as Operation)}
               disabled={inProgress || !supported}
-              className={`flex items-center gap-1 text-xs px-3 py-1 rounded ${
-                active
-                  ? "bg-sky-500/20 text-sky-300"
-                  : `${textSecondary} hover:text-[color:var(--text-primary)]`
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
+              variant="ghost"
+              size="sm"
+              pressed={active}
               title={supported ? undefined : `${driver.manufacturer} doesn't support ${m.label.toLowerCase()}`}
             >
               <ModeIcon size={12} />
               {m.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -394,13 +392,16 @@ export default function FlashView({
           </span>
         )}
         {driver.transport === "serial" && (
-          <button
+          <Button
             onClick={() => detection.detect()}
             disabled={!serialPort || detection.busy || inProgress}
-            className="ml-auto flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            variant="tonal"
+            tone="purple"
+            size="sm"
+            className="ml-auto"
           >
             Detect
-          </button>
+          </Button>
         )}
       </div>
 
@@ -414,13 +415,14 @@ export default function FlashView({
           className={`p-3 ${bgSurface} ${borderDivider} border-b flex flex-wrap gap-3 items-end`}
         >
           <Field label="Image">
-            <button
+            <Button
               onClick={pickImage}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${bgPrimary} ${textPrimary} border ${borderDivider} hover:bg-[var(--hover-bg)]`}
+              variant="outline"
+              size="sm"
             >
               <FileUp size={12} />
               {imagePath ?? `Choose .${driver.imageExtensions.join(" / .")}`}
-            </button>
+            </Button>
           </Field>
           <Field label="Flash address">
             <TextInput
@@ -453,13 +455,14 @@ export default function FlashView({
           className={`p-3 ${bgSurface} ${borderDivider} border-b flex flex-wrap gap-3 items-end`}
         >
           <Field label="Output file">
-            <button
+            <Button
               onClick={pickBackupPath}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${bgPrimary} ${textPrimary} border ${borderDivider} hover:bg-[var(--hover-bg)]`}
+              variant="outline"
+              size="sm"
             >
               <Save size={12} />
               {backupPath ?? `Choose .${driver.backupExtension}`}
-            </button>
+            </Button>
           </Field>
           <Field label="Offset">
             <TextInput value={backupOffset} onChange={setBackupOffset} widthClass="w-32" />
@@ -665,12 +668,14 @@ function EmptyState({
         {message}
       </div>
       {canDetect && (
-        <button
+        <Button
           onClick={handleClick}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-violet-500/20 text-violet-300 hover:bg-violet-500/30"
+          variant="tonal"
+          tone="purple"
+          size="sm"
         >
           Detect chip
-        </button>
+        </Button>
       )}
     </div>
   );

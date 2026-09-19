@@ -148,3 +148,55 @@ export const badgeManufacturerEsp8266 = `${badgeBase} bg-amber-600/20 text-amber
 export const badgeManufacturerStm32 = `${badgeBase} bg-sky-600/20 text-sky-600`;
 export const badgeManufacturerStm32Dfu = `${badgeBase} bg-violet-600/20 text-violet-600`;
 export const badgeManufacturerUnknown = `${badgeBase} bg-[var(--bg-surface)] text-[color:var(--text-secondary)]`;
+
+// ============================================================================
+// Colour helpers for protocol badges, tab counts and byte highlights
+// ============================================================================
+
+/**
+ * Get badge color classes for protocol badges.
+ * @param color - Badge color variant
+ */
+export function badgeColorClass(color: 'green' | 'blue' | 'purple' | 'gray' | 'amber' | 'cyan' | 'red'): string {
+  const colorMap = {
+    green: 'bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]',
+    blue: 'bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]',
+    purple: 'bg-[var(--status-purple-bg)] text-[color:var(--status-purple-text)]',
+    gray: 'bg-[var(--bg-surface)] text-[color:var(--text-secondary)]',
+    amber: 'bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]',
+    cyan: 'bg-[var(--status-cyan-bg)] text-[color:var(--status-cyan-text)]',
+    red: 'bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)]',
+  };
+  return colorMap[color];
+}
+
+/**
+ * Get count color class for tab counts
+ */
+export function tabCountColorClass(color: 'green' | 'purple' | 'gray' | 'orange'): string {
+  const colorMap = {
+    green: 'text-green-500',
+    purple: 'text-purple-500',
+    gray: 'text-gray-500',
+    orange: 'text-orange-500',
+  };
+  return colorMap[color];
+}
+
+/**
+ * Highlight for individual bytes inside a frame preview (e.g., the checksum
+ * extraction dialog showing checksum / calc-data / default bytes). Themed via
+ * status CSS variables; `checksum` adds a ring for extra emphasis.
+ * @param state - Which highlight to apply
+ */
+export function byteHighlight(state: 'checksum' | 'calcData' | 'default'): string {
+  const base = "px-1 py-0.5 rounded text-xs";
+  switch (state) {
+    case 'checksum':
+      return `${base} bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] ring-1 ring-[color:var(--status-warning-border)]`;
+    case 'calcData':
+      return `${base} bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]`;
+    case 'default':
+      return `${base} text-[color:var(--text-secondary)]`;
+  }
+}

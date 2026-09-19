@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { DialogFooter } from "../../../components/forms/DialogFooter";
 import { caption, sectionHeaderText, focusRing, bgSurface } from "../../../styles";
+import { Button } from "../../../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -89,13 +90,14 @@ export default function FilterDialog({
           confirmLabel={t("filterDialog.apply")}
           leftContent={
             hasFilters ? (
-              <button
-                type="button"
+              <Button
                 onClick={handleClear}
-                className="px-4 py-2 text-sm rounded-lg text-[color:var(--text-danger)] hover:bg-[var(--hover-danger-bg)]"
+                variant="ghost"
+                tone="danger"
+                size="lg"
               >
                 {t("filterDialog.clearAll")}
-              </button>
+              </Button>
             ) : undefined
           }
         />

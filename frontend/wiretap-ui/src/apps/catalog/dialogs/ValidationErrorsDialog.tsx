@@ -6,6 +6,7 @@ import Dialog from "../../../components/Dialog";
 import { SecondaryButton } from "../../../components/forms";
 import { h2, caption } from "../../../styles";
 import type { ValidationError } from "../types";
+import { IconButton } from "../../../components/Button";
 
 type Props = {
   open: boolean;
@@ -48,12 +49,12 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
               )}
             </div>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
-            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Content */}

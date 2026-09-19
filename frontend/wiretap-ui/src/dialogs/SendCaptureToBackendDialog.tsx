@@ -19,8 +19,8 @@ import {
   type ApiDatabase,
   type CaptureUploadProgress,
 } from "../api/backendApi";
-import { primaryButtonBase, secondaryButton } from "../styles/buttonStyles";
 import { labelDefault, helpText, textPrimary } from "../styles";
+import { SecondaryButton, PrimaryButton } from "../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -193,16 +193,15 @@ export default function SendCaptureToBackendDialog({
             {error && <p className="text-[color:var(--status-danger-text)] text-sm">{error}</p>}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button className={secondaryButton} onClick={handleClose}>
+              <SecondaryButton onClick={handleClose}>
                 {t("actions.cancel")}
-              </button>
-              <button
-                className={primaryButtonBase}
+              </SecondaryButton>
+              <PrimaryButton
                 disabled={!profileId || !database || (newDatabase && !dbNameValid)}
                 onClick={startUpload}
               >
                 {t("sendToBackend.upload")}
-              </button>
+              </PrimaryButton>
             </div>
           </>
         ) : phase === "uploading" ? (
@@ -228,9 +227,9 @@ export default function SendCaptureToBackendDialog({
               {t("sendToBackend.done", { count: imported.toLocaleString(), database })}
             </p>
             <div className="flex justify-end">
-              <button className={primaryButtonBase} onClick={handleClose}>
+              <PrimaryButton onClick={handleClose}>
                 {t("actions.close")}
-              </button>
+              </PrimaryButton>
             </div>
           </div>
         )}

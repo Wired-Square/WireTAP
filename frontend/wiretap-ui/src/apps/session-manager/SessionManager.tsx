@@ -33,6 +33,7 @@ import SessionTopBar from "./views/SessionTopBar";
 import SessionCanvas from "./views/SessionCanvas";
 import SessionDetailPanel from "./views/SessionDetailPanel";
 import SessionLogView from "./views/SessionLogView";
+import { Button } from "../../components/Button";
 
 export default function SessionManager() {
   const { t } = useTranslation("sessionManager");
@@ -373,12 +374,13 @@ export default function SessionManager() {
             </div>
           )}
           <div className="mt-3 flex justify-end">
-            <button
+            <Button
               onClick={() => setAddSourceSessionId(null)}
-              className="px-3 py-1 rounded text-xs text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]"
+              variant="ghost"
+              size="sm"
             >
               {t("addSource.cancel")}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>

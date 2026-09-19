@@ -5,6 +5,7 @@ import { Network, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles/typography";
 import { focusRing, expandableRowContainer } from "../../../../styles";
+import { Button } from "../../../../components/Button";
 
 export type ModbusConfigSectionProps = {
   isConfigured: boolean;
@@ -79,21 +80,23 @@ export default function ModbusConfigSection({
         </div>
         <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
           {isConfigured ? (
-            <button
-              type="button"
+            <Button
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--status-danger-bg)] rounded transition-colors"
+              variant="ghost"
+              tone="danger"
+              size="sm"
             >
               Remove
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg)] rounded transition-colors"
+              variant="ghost"
+              tone="warning"
+              size="sm"
             >
               + Add
-            </button>
+            </Button>
           )}
         </div>
       </div>

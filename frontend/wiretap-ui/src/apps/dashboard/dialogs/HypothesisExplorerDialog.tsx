@@ -5,8 +5,12 @@ import { useTranslation } from "react-i18next";
 import { X, FlaskConical, ChevronRight, ChevronLeft, CheckSquare, Square, ChevronsUp } from "lucide-react";
 import { iconSm, iconLg } from "../../../styles/spacing";
 import {
-  bgSurface, borderDivider, checkboxDefault, hoverLight, inputSimple,
-  selectSimple, primaryButtonBase, textSecondary,
+  bgSurface,
+  borderDivider,
+  checkboxDefault,
+  inputSimple,
+  selectSimple,
+  textSecondary,
 } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
@@ -14,6 +18,8 @@ import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore"
 import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnalysis";
 import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
+import { Button, IconButton } from "../../../components/Button";
+import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -21,11 +27,6 @@ interface Props {
 }
 
 const BIT_LENGTH_OPTIONS = [8, 12, 16, 24, 32];
-
-const toggleCls = (active: boolean) =>
-  active
-    ? "bg-blue-600 text-white border-blue-600"
-    : "bg-transparent text-[color:var(--text-secondary)] border-[var(--border-default)] hover:bg-[var(--hover-bg)]";
 
 const scoreBadgeCls = (score: number) => {
   if (score >= 70) return "bg-emerald-600/20 text-emerald-400 border-emerald-600/30";
@@ -208,12 +209,12 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {t("hypothesis.title")}
             </h2>
           </div>
-          <button
+          <IconButton
             onClick={handleClose}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="p-4 space-y-4">
@@ -225,18 +226,22 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   {t("hypothesis.fields.frameId")}
                 </label>
                 <div className="flex gap-2 mb-2">
-                  <button
+                  <Button
                     onClick={() => setFrameMode('single')}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(frameMode === 'single')}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={frameMode === 'single'}
                   >
                     {t("hypothesis.fields.single")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setFrameMode('all')}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(frameMode === 'all')}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={frameMode === 'all'}
                   >
                     {t("hypothesis.fields.allDiscovered", { count: sortedFrameIds.length })}
-                  </button>
+                  </Button>
                 </div>
                 {frameMode === 'single' && (
                   <select
@@ -266,13 +271,15 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 </label>
                 <div className="flex gap-2 flex-wrap">
                   {BIT_LENGTH_OPTIONS.map((bits) => (
-                    <button
+                    <Button
                       key={bits}
                       onClick={() => toggleBitLength(bits)}
-                      className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(bitLengths.has(bits))}`}
+                      variant="outline"
+                      size="sm"
+                      pressed={bitLengths.has(bits)}
                     >
                       {t("hypothesis.fields.bitLabel", { bits })}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -283,18 +290,22 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   {t("hypothesis.fields.endianness")}
                 </label>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={() => toggleEndianness("little")}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("little"))}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={endianness.has("little")}
                   >
                     {t("hypothesis.fields.littleEndian")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => toggleEndianness("big")}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("big"))}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={endianness.has("big")}
                   >
                     {t("hypothesis.fields.bigEndian")}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -375,12 +386,13 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
               {/* Advanced: Factor / Offset */}
               <div>
-                <button
+                <Button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className={`text-xs ${textSecondary} hover:text-[color:var(--text-primary)] transition-colors`}
+                  variant="link"
+                  className="text-xs"
                 >
                   {showAdvanced ? t("hypothesis.fields.advancedShown") : t("hypothesis.fields.advancedHidden")}
-                </button>
+                </Button>
                 {showAdvanced && (
                   <div className="flex gap-3 mt-2">
                     <div className="flex-1">
@@ -420,14 +432,14 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               )}
 
               {/* Next button */}
-              <button
+              <PrimaryButton
                 onClick={handlePreview}
                 disabled={!canPreview || candidates.length === 0}
-                className={`${primaryButtonBase} w-full flex items-center justify-center gap-1`}
+                className="w-full"
               >
                 {t("hypothesis.actions.next")}
                 <ChevronRight className={iconSm} />
-              </button>
+              </PrimaryButton>
             </>
           )}
 
@@ -435,27 +447,30 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
             <>
               {/* Selection controls */}
               <div className="flex items-center gap-2 flex-wrap">
-                <button
+                <Button
                   onClick={handleSelectAll}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
+                  variant="outline"
+                  size="sm"
                 >
                   <CheckSquare className="w-3 h-3" />
                   {t("hypothesis.actions.selectAll")}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDeselectAll}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
+                  variant="outline"
+                  size="sm"
                 >
                   <Square className="w-3 h-3" />
                   {t("hypothesis.actions.selectNone")}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleSelectTopN(20)}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
+                  variant="outline"
+                  size="sm"
                 >
                   <ChevronsUp className="w-3 h-3" />
                   {t("hypothesis.actions.topN", { count: 20 })}
-                </button>
+                </Button>
                 <span className={`text-[10px] ${textSecondary} ml-auto`}>
                   {t("hypothesis.actions.selectionSummary", { count: selectedCount, panels: estimatedPanels })}
                 </span>
@@ -504,21 +519,20 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
               {/* Action buttons */}
               <div className="flex gap-2">
-                <button
+                <SecondaryButton
                   onClick={() => setStep(1)}
-                  className="flex items-center gap-1 px-4 py-2 text-sm rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <ChevronLeft className={iconSm} />
                   {t("hypothesis.actions.back")}
-                </button>
-                <button
+                </SecondaryButton>
+                <PrimaryButton
                   onClick={handleGenerate}
                   disabled={selectedCount === 0}
-                  className={`${primaryButtonBase} flex-1 flex items-center justify-center gap-1`}
+                  className="flex-1"
                 >
                   <FlaskConical className={iconSm} />
                   {t("hypothesis.actions.generate", { count: selectedCount })}
-                </button>
+                </PrimaryButton>
               </div>
             </>
           )}

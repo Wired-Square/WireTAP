@@ -13,7 +13,7 @@ import {
   textDataSecondary,
   hoverDataRow,
 } from "../../../styles/colourTokens";
-import { actionChip, badgeColorClass, buttonBase } from "../../../styles/buttonStyles";
+import { badgeColorClass } from "../../../styles/badgeStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -21,6 +21,7 @@ import {
   emptyStateDescription,
 } from "../../../styles/typography";
 import { formatHumanUs } from "../../../utils/timeFormat";
+import { Button } from "../../../components/Button";
 
 // ============================================================================
 // Component
@@ -78,22 +79,26 @@ export default function TransmitReplayView() {
                     />
                   </div>
                 </div>
-                <button
+                <Button
                   onClick={() => restartReplay(replayId)}
-                  className={actionChip('blue')}
+                  variant="tonal"
+                  tone="primary"
+                  size="sm"
                   title={t("replay.restartTooltip")}
                 >
                   <RefreshCw size={11} />
                   {t("replay.restart")}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => stopReplay(replayId)}
-                  className={actionChip('red')}
+                  variant="tonal"
+                  tone="danger"
+                  size="sm"
                   title={t("replay.stopTooltip")}
                 >
                   <StopCircle size={11} />
                   {t("replay.stop")}
-                </button>
+                </Button>
               </div>
             );
           })}
@@ -123,26 +128,27 @@ export default function TransmitReplayView() {
             <div className="flex-1" />
 
             {activeReplays.size > 0 && (
-              <button
+              <Button
                 onClick={() => activeReplays.forEach((id) => stopReplay(id))}
-                className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border border-red-500/50 bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+                variant="tonal"
+                tone="danger"
+                size="sm"
                 title={t("replay.stopAllTooltip")}
               >
                 <StopCircle size={13} />
                 {activeReplays.size > 1
                   ? t("replay.stopReplaysLabel", { count: activeReplays.size })
                   : t("replay.stopReplayLabel")}
-              </button>
+              </Button>
             )}
 
-            <button
+            <Button
               onClick={clearReplayLog}
-              className={buttonBase}
               title={t("replay.clearLogTooltip")}
             >
               <Trash2 size={14} />
               <span className="text-sm ml-1">{t("replay.clearLabel")}</span>
-            </button>
+            </Button>
           </div>
 
           {/* Log table */}
@@ -239,14 +245,16 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
       </td>
       <td className="px-4 py-2">
         {onRestart && (
-          <button
+          <Button
             onClick={onRestart}
-            className={actionChip('blue')}
+            variant="tonal"
+            tone="primary"
+            size="sm"
             title={t("replay.restartTooltipPast")}
           >
             <RefreshCw size={11} />
             {t("replay.restart")}
-          </button>
+          </Button>
         )}
       </td>
     </tr>

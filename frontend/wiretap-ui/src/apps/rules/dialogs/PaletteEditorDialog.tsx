@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, borderDefault, indigoButton } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import ColourPicker from "../components/ColourPicker";
@@ -20,6 +20,8 @@ import {
   framelinkDsigWrite,
   type PaletteInfo,
 } from "../../../api/framelinkRules";
+import { Button, IconButton } from "../../../components/Button";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 interface PaletteEditorDialogProps {
   isOpen: boolean;
@@ -174,12 +176,14 @@ export default function PaletteEditorDialog({
                 <span className={`text-[10px] uppercase tracking-wider ${textTertiary}`}>
                   {t("paletteDialog.fields.colourStops", { count: entries.length })}
                 </span>
-                <button
+                <Button
                   onClick={addStop}
-                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                  variant="link"
+                  tone="primary"
+                  className="text-xs"
                 >
                   <Plus className={iconMd} /> {t("paletteDialog.fields.add")}
-                </button>
+                </Button>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -205,13 +209,14 @@ export default function PaletteEditorDialog({
                     <span className={`text-xs font-medium ${textSecondary}`}>
                       {t("paletteDialog.fields.stopHeading", { index: editingStop })}
                     </span>
-                    <button
+                    <IconButton
                       onClick={() => removeStop(editingStop)}
-                      className={`p-0.5 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                      tone="danger"
+                      size="xs"
                       title={t("paletteDialog.fields.removeStop")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                   <ColourPicker
                     value={entries[editingStop]}
@@ -234,19 +239,17 @@ export default function PaletteEditorDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-end gap-2`}>
-        <button
+        <SecondaryButton
           onClick={onClose}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
           {t("paletteDialog.cancel")}
-        </button>
-        <button
+        </SecondaryButton>
+        <PrimaryButton
           onClick={handleUpload}
           disabled={!selectedPalette || uploading || entries.length === 0}
-          className={`${indigoButton} disabled:opacity-50`}
         >
           {uploading ? t("paletteDialog.uploading") : t("paletteDialog.upload")}
-        </button>
+        </PrimaryButton>
       </div>
     </Dialog>
   );

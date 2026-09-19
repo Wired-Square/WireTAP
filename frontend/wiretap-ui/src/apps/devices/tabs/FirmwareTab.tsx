@@ -12,9 +12,7 @@ import {
   alertDanger,
   cardDefault,
   labelSimple,
-  primaryButtonBase,
   selectSimple,
-  stopButtonBase,
   textDanger,
   textPrimary,
   textSecondary,
@@ -29,6 +27,7 @@ import {
   type Transport,
 } from "../../../api/smpUpgrade";
 import { pickFileToOpen } from "../../../api/dialogs";
+import { PrimaryButton, DangerButton } from "../../../components/forms";
 
 const TERMINATOR_TYPES = new Set(["Complete", "Cancelled", "Error"]);
 const EVENT_LOG_MAX = 200;
@@ -225,15 +224,14 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
 
         {/* File picker */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <PrimaryButton
             onClick={handlePickFile}
             disabled={running}
-            className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+            className="min-w-[160px]"
           >
             <FolderOpen className="w-4 h-4" />
             {t("firmware.choose")}
-          </button>
+          </PrimaryButton>
           {fileName ? (
             <span className={`text-sm ${textPrimary} truncate`}>{fileName}</span>
           ) : (
@@ -261,34 +259,31 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-1">
           {running ? (
-            <button
-              type="button"
+            <DangerButton
               onClick={handleCancel}
-              className={`${stopButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+              className="min-w-[160px]"
             >
               <XCircle className="w-4 h-4" />
               {t("firmware.cancel")}
-            </button>
+            </DangerButton>
           ) : (
-            <button
-              type="button"
+            <PrimaryButton
               onClick={handleStart}
               disabled={!filePath}
-              className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+              className="min-w-[160px]"
             >
               <HardDriveUpload className="w-4 h-4" />
               {t("firmware.flash")}
-            </button>
+            </PrimaryButton>
           )}
-          <button
-            type="button"
+          <PrimaryButton
             onClick={handleListImages}
             disabled={running}
-            className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+            className="min-w-[160px]"
           >
             <ListChecks className="w-4 h-4" />
             {t("firmware.listImages")}
-          </button>
+          </PrimaryButton>
         </div>
       </div>
 

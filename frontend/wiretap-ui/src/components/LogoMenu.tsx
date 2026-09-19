@@ -10,6 +10,7 @@ const logo = "/logo.svg";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 import { menuApps, menuGroupOrder, type PanelId } from "../apps/registry";
+import { Button } from "./Button";
 
 export type { PanelId };
 
@@ -79,9 +80,9 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
   return (
     <div ref={menuRef} className="relative flex items-center px-2 gap-2" style={{ height: '35px' }}>
       {/* Logo button with white rounded background */}
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center hover:shadow transition-all"
+        variant="link"
         title={t("logo.tooltip")}
       >
         <img
@@ -89,18 +90,20 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
           alt="WireTAP"
           className="w-full h-full object-contain"
         />
-      </button>
+      </Button>
 
       {/* Update available indicator */}
       {availableUpdate && (
-        <button
+        <Button
           onClick={handleUpdateClick}
-          className="flex items-center gap-1 transition-colors bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md text-xs font-medium"
+          variant="solid"
+          tone="primary"
+          size="sm"
           title={t("logo.updateAvailable", { version: availableUpdate.version })}
         >
           <ArrowUpCircle className={iconMd} />
           <span>{t("logo.updateLabel")}</span>
-        </button>
+        </Button>
       )}
 
       {/* Dropdown menu */}

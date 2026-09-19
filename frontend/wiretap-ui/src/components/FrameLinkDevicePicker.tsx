@@ -9,7 +9,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buttonBase } from "../styles/buttonStyles";
 import {
   textPrimary,
   textSecondary,
@@ -20,6 +19,7 @@ import {
   textSuccess,
 } from "../styles/colourTokens";
 import type { FrameLinkLiveness } from "../hooks/useFrameLinkDeviceLiveness";
+import { Button } from "./Button";
 
 export interface FramelinkDevice {
   /** Capability device_id (e.g. "WiredFlexLink-9D04"), or `${host}:${port}` fallback. */
@@ -187,9 +187,7 @@ export default function FrameLinkDevicePicker({
 
   return (
     <div ref={containerRef} className="relative shrink-0">
-      <button
-        type="button"
-        className={buttonBase}
+      <Button
         onClick={() => setIsOpen((v) => !v)}
         title={
           activeDevice
@@ -199,7 +197,7 @@ export default function FrameLinkDevicePicker({
       >
         <StatusDot state={buttonState} />
         <span className="max-w-40 truncate">{buttonLabel}</span>
-      </button>
+      </Button>
 
       {isOpen && (
         <div

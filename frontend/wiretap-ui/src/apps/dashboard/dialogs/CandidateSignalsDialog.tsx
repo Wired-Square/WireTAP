@@ -4,12 +4,14 @@ import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Sparkles, ChevronRight } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, checkboxDefault, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
+import { bgSurface, borderDivider, checkboxDefault, inputSimple, selectSimple } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult, ByteRole } from "../../../utils/analysis/payloadAnalysis";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
+import { Button, IconButton } from "../../../components/Button";
+import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 
 interface Props {
   isOpen: boolean;
@@ -146,11 +148,6 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     onClose();
   }, [onClose]);
 
-  const toggleCls = (active: boolean) =>
-    active
-      ? "bg-blue-600 text-white border-blue-600"
-      : "bg-transparent text-[color:var(--text-secondary)] border-[var(--border-default)] hover:bg-[var(--hover-bg)]";
-
   return (
     <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-md">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
@@ -162,12 +159,12 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {t("candidates.title")}
             </h2>
           </div>
-          <button
+          <IconButton
             onClick={handleClose}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="p-4 space-y-4">
@@ -204,13 +201,15 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 </label>
                 <div className="flex gap-2">
                   {[8, 16, 32].map((bits) => (
-                    <button
+                    <Button
                       key={bits}
                       onClick={() => toggleBitLength(bits)}
-                      className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(bitLengths.has(bits))}`}
+                      variant="outline"
+                      size="sm"
+                      pressed={bitLengths.has(bits)}
                     >
                       {t("candidates.fields.bitLabel", { bits })}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -221,18 +220,22 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   {t("candidates.fields.endianness")}
                 </label>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={() => toggleEndianness("le")}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("le"))}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={endianness.has("le")}
                   >
                     {t("candidates.fields.littleEndian")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => toggleEndianness("be")}
-                    className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("be"))}`}
+                    variant="outline"
+                    size="sm"
+                    pressed={endianness.has("be")}
                   >
                     {t("candidates.fields.bigEndian")}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -282,14 +285,14 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               )}
 
               {/* Next button */}
-              <button
+              <PrimaryButton
                 onClick={() => setStep(2)}
                 disabled={!selectedFrameId || bitLengths.size === 0 || endianness.size === 0}
-                className={`${primaryButtonBase} w-full flex items-center justify-center gap-1`}
+                className="w-full"
               >
                 {t("candidates.actions.next")}
                 <ChevronRight className={iconSm} />
-              </button>
+              </PrimaryButton>
             </>
           )}
 
@@ -328,20 +331,19 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
               {/* Action buttons */}
               <div className="flex gap-2">
-                <button
+                <SecondaryButton
                   onClick={() => setStep(1)}
-                  className="px-4 py-2 text-sm rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   {t("candidates.actions.back")}
-                </button>
-                <button
+                </SecondaryButton>
+                <PrimaryButton
                   onClick={handleGenerate}
                   disabled={candidates.length === 0}
-                  className={`${primaryButtonBase} flex-1 flex items-center justify-center gap-1`}
+                  className="flex-1"
                 >
                   <Sparkles className={iconSm} />
                   {t("candidates.actions.generate", { count: candidates.length })}
-                </button>
+                </PrimaryButton>
               </div>
             </>
           )}

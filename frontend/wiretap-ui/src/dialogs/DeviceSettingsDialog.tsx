@@ -30,12 +30,11 @@ import {
   caption,
   alertInfo,
   alertWarning,
-  hoverLight,
-  roundedDefault,
   badgeNeutral,
   cardElevated,
 } from "../styles";
 import type { IOProfile, ConnectionFieldValue } from "../settings/appSettings";
+import { IconButton } from "../components/Button";
 
 export default function DeviceSettingsDialog() {
   const request = useDeviceEditorStore((s) => s.request);
@@ -133,14 +132,14 @@ function DeviceSettingsForm({
               )}
             </div>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
             disabled={busy}
             aria-label={t("common:actions.close")}
-            className={`p-1 ${roundedDefault} ${hoverLight} transition-colors disabled:opacity-50`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="max-h-[65vh] overflow-y-auto px-6 pb-2">

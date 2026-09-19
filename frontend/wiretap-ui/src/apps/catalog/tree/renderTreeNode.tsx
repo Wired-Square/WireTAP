@@ -12,6 +12,7 @@ import { textMuted } from "../../../styles/colourTokens";
 import { formatFrameId as formatId } from "../../../utils/frameIds";
 import { parseCanIdToNumber } from "../utils";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type RenderTreeNode = (node: TomlNode, depth?: number) => React.ReactNode;
 
@@ -85,9 +86,9 @@ export function createRenderTreeNode({
           onClick={() => onNodeClick(node)}
         >
           {hasChildren ? (
-            <button
-              type="button"
-              className="p-0.5 -m-0.5 hover:bg-[var(--hover-bg)] rounded"
+            <IconButton
+              size="xs"
+              className="-m-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleExpand(node);
@@ -98,7 +99,7 @@ export function createRenderTreeNode({
               ) : (
                 <ChevronRight className={`${iconMd} flex-shrink-0`} />
               )}
-            </button>
+            </IconButton>
           ) : (
             <div className="w-4" />
           )}

@@ -7,8 +7,9 @@
 import { useTranslation } from "react-i18next";
 import { CircleCheck, CircleX, Loader2, RefreshCw } from "lucide-react";
 import { iconMd, iconLg } from "../../styles/spacing";
-import { caption, iconButtonHoverSmall } from "../../styles";
+import { caption } from "../../styles";
 import { badgeSmallSuccess, badgeSmallNeutral } from "../../styles/badgeStyles";
+import { IconButton } from "../Button";
 
 export type DeviceProbeState = "idle" | "probing" | "success" | "error";
 
@@ -133,14 +134,13 @@ export default function IODeviceStatus({
 
       {/* Refresh button */}
       {onRefresh && (state === "success" || state === "error") && (
-        <button
-          type="button"
+        <IconButton
           onClick={onRefresh}
-          className={iconButtonHoverSmall}
+          size="sm"
           title={t("ioDeviceStatus.testConnection")}
         >
           <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

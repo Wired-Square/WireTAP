@@ -8,8 +8,8 @@ import { RefreshCw } from "lucide-react";
 import { iconLg } from "../../styles/spacing";
 import { listSerialPorts, SerialPortInfo } from "../../api/serial";
 import { Input, Select } from "../../components/forms";
-import { iconButtonBase } from "../../styles/buttonStyles";
 import { helpText, textDanger, spaceYSmall } from "../../styles";
+import { IconButton } from "../Button";
 
 interface Props {
   value: string;
@@ -67,17 +67,16 @@ export default function SerialPortPicker({ value, onChange }: Props) {
             </option>
           ))}
         </Select>
-        <button
-          type="button"
+        <IconButton
           onClick={refreshPorts}
           disabled={isRefreshing}
-          className={`${iconButtonBase} disabled:opacity-50`}
+          variant="surface"
           title={t("serialPortPicker.refreshPortList")}
         >
           <RefreshCw
             className={`${iconLg} ${isRefreshing ? "animate-spin" : ""}`}
           />
-        </button>
+        </IconButton>
       </div>
 
       {error && <p className={`text-sm ${textDanger}`}>{error}</p>}

@@ -9,8 +9,9 @@
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, FastForward, Play, RefreshCw, Rewind, SkipBack, SkipForward, Square } from "lucide-react";
 import { iconSm } from "../styles/spacing";
-import { badgeColorClass, playbackIconButton, playbackStepButton } from "../styles/buttonStyles";
+import { textPrimary } from "../styles/colourTokens";
 import type { PlaybackSpeed } from "./TimeController";
+import { IconButton } from "./Button";
 
 export type PlaybackState = "playing" | "paused";
 export type PlaybackDirection = "forward" | "backward";
@@ -178,74 +179,66 @@ export function PlaybackControls({
     <div className="flex items-center gap-1">
       {/* Skip to start */}
       {showSeekControls && bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={handleSkipToStart}
-          className={playbackIconButton}
+          size="sm"
           title={t("playback.skipToStart")}
         >
           <SkipBack className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Skip back 10 seconds */}
       {showSeekControls && bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={handleSkipBack}
-          className={playbackIconButton}
+          size="sm"
           title={canSeekByFrame ? t("playback.skipBackFrames", { count: framesPerSkip }) : t("playback.skipBackSeconds")}
         >
           <Rewind className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Play backward (only when buffer controls are enabled) */}
       {supportsReverse && onPlayBackward && bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={onPlayBackward}
           disabled={isPlayingBackward}
-          className={`p-1 rounded ${
-            isPlayingBackward
-              ? badgeColorClass('blue')
-              : "text-blue-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
-          }`}
+          tone="primary"
+          size="sm"
+          pressed={isPlayingBackward}
           title={t("playback.playBackward")}
         >
           <Play className={`${iconSm} rotate-180`} fill="currentColor" />
-        </button>
+        </IconButton>
       )}
 
       {/* Pause/Stop button - pauses stream when live streaming, pauses buffer playback otherwise */}
-      <button
-        type="button"
+      <IconButton
         onClick={onPause}
         disabled={isPaused && !isLiveStreaming}
-        className={`p-1 rounded ${
-          (isPaused && !isLiveStreaming) || (isStreamPaused && isLiveStreaming)
-            ? badgeColorClass('red')
-            : "text-red-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
-        }`}
+        tone="danger"
+        size="sm"
+        pressed={(isPaused && !isLiveStreaming) || (isStreamPaused && isLiveStreaming)}
         title={isLiveStreaming ? t("playback.pauseStream") : t("playback.pause")}
       >
         <Square className={iconSm} fill="currentColor" />
-      </button>
+      </IconButton>
 
       {/* Step backward (when paused and not at start, only when buffer controls enabled) */}
       {onStepBackward && bufferControlsEnabled && (() => {
         const atStart = currentFrameIndex != null && currentFrameIndex <= 0;
         const canStep = isPaused && !atStart;
         return (
-          <button
-            type="button"
+          <IconButton
             onClick={onStepBackward}
             disabled={!canStep}
-            className={playbackStepButton(canStep)}
+            size="sm"
+            className={textPrimary}
             title={atStart ? t("playback.atStart") : t("playback.stepBack")}
           >
             <ChevronLeft className={iconSm} strokeWidth={3} />
-          </button>
+          </IconButton>
         );
       })()}
 
@@ -254,69 +247,64 @@ export function PlaybackControls({
         const atEnd = currentFrameIndex != null && totalFrames != null && currentFrameIndex >= totalFrames - 1;
         const canStep = isPaused && !atEnd;
         return (
-          <button
-            type="button"
+          <IconButton
             onClick={onStepForward}
             disabled={!canStep}
-            className={playbackStepButton(canStep)}
+            size="sm"
+            className={textPrimary}
             title={atEnd ? t("playback.atEnd") : t("playback.stepForward")}
           >
             <ChevronRight className={iconSm} strokeWidth={3} />
-          </button>
+          </IconButton>
         );
       })()}
 
       {/* Play forward (only when buffer controls enabled) */}
       {bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={onPlay}
           disabled={isPlayingForward}
-          className={`p-1 rounded ${
-            isPlayingForward
-              ? badgeColorClass('green')
-              : "text-green-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
-          }`}
+          tone="success"
+          size="sm"
+          pressed={isPlayingForward}
           title={isPaused ? t("playback.resumeForward") : t("playback.playForward")}
         >
           <Play className={iconSm} fill="currentColor" />
-        </button>
+        </IconButton>
       )}
 
       {/* Skip forward 10 seconds */}
       {showSeekControls && bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={handleSkipForward}
-          className={playbackIconButton}
+          size="sm"
           title={canSeekByFrame ? t("playback.skipForwardFrames", { count: framesPerSkip }) : t("playback.skipForwardSeconds")}
         >
           <FastForward className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Skip to end */}
       {showSeekControls && bufferControlsEnabled && (
-        <button
-          type="button"
+        <IconButton
           onClick={handleSkipToEnd}
-          className={playbackIconButton}
+          size="sm"
           title={t("playback.skipToEnd")}
         >
           <SkipForward className={iconSm} />
-        </button>
+        </IconButton>
       )}
 
       {/* Resume Stream button - resumes recorded fetch after pause */}
       {isStreamPaused && onResumeStream && (
-        <button
-          type="button"
+        <IconButton
           onClick={onResumeStream}
-          className="p-1 rounded text-cyan-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
+          tone="cyan"
+          size="sm"
           title={t("playback.resumeStreamTooltip")}
         >
           <RefreshCw className={iconSm} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

@@ -4,11 +4,12 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
 import { getAlgorithmInfo, resolveByteIndexSync } from "../checksums";
 import type { TomlNode, ValidationError, ChecksumAlgorithm } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type ChecksumViewProps = {
   selectedNode: TomlNode;
@@ -82,7 +83,7 @@ export default function ChecksumView({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("checksumDetails.title")}</h3>
         <div className={flexRowGap2}>
-          <button
+          <IconButton
             onClick={() => {
               try {
                 const found = locateChecksum();
@@ -93,13 +94,12 @@ export default function ChecksumView({
                 onSetValidation([{ field: "checksum", message: t("checksumDetails.errorEdit") }]);
               }
             }}
-            className={iconButtonHover}
             title={t("checksumDetails.edit")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
 
-          <button
+          <IconButton
             onClick={() => {
               try {
                 const found = locateChecksum();
@@ -110,11 +110,11 @@ export default function ChecksumView({
                 onSetValidation([{ field: "checksum", message: t("checksumDetails.errorDelete") }]);
               }
             }}
-            className={iconButtonHoverDanger}
+            tone="danger"
             title={t("checksumDetails.delete")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-          </button>
+          </IconButton>
         </div>
       </div>
 

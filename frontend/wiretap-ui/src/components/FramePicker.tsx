@@ -12,6 +12,7 @@ import { useFrameIdFormat } from "../hooks/useFrameIdFormat";
 import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
+import { Button, IconButton } from "./Button";
 
 type FrameWarning = {
   type: "length-mismatch";
@@ -181,67 +182,48 @@ function FramePicker({
             <div className="flex flex-wrap items-center gap-1">
               <div className="flex items-center gap-0.5">
                 {onSelectAll && (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={onSelectAll}
                     disabled={!anyFrames}
-                    className={`p-1 rounded ${
-                      !anyFrames
-                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
-                        : `text-[color:var(--text-green)] ${hoverLight}`
-                    }`}
+                    tone="success"
+                    size="sm"
                     title={t("framePicker.selectAll")}
                   >
                     <CheckCheck className={iconSm} />
-                  </button>
+                  </IconButton>
                 )}
                 {onDeselectAll && (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={onDeselectAll}
                     disabled={!anyFrames}
-                    className={`p-1 rounded ${
-                      !anyFrames
-                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
-                        : `text-[color:var(--text-muted)] ${hoverLight}`
-                    }`}
+                    size="sm"
                     title={t("framePicker.deselectAll")}
                   >
                     <SquareSlash className={iconSm} />
-                  </button>
+                  </IconButton>
                 )}
                 {/* Save to active selection set */}
                 {onSaveSelectionSet && (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={onSaveSelectionSet}
                     disabled={saveDisabled}
-                    className={`p-1 rounded ${
-                      saveDisabled
-                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
-                        : hoverLight
-                    }`}
+                    size="sm"
                     style={{ color: getSaveIconColor() }}
                     title={getSaveIconTitle()}
                   >
                     <Save className={iconSm} />
-                  </button>
+                  </IconButton>
                 )}
                 {/* Save as new selection set */}
                 {onSaveAsNewSelectionSet && (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={onSaveAsNewSelectionSet}
                     disabled={!anyFrames}
-                    className={`p-1 rounded ${
-                      !anyFrames
-                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
-                        : hoverLight
-                    }`}
+                    size="sm"
                     title={t("framePicker.saveSelectionSet")}
                   >
                     <Star className={iconSm} />
-                  </button>
+                  </IconButton>
                 )}
               </div>
               {/* Selection set dropdown */}
@@ -279,20 +261,20 @@ function FramePicker({
                     <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]">
                       Bus {bus}
                     </span>
-                    <button
-                      type="button"
+                    <Button
                       onClick={() => onBulkSelect(bus, true)}
-                      className="px-1.5 py-0.5 rounded bg-green-600 text-white hover:bg-green-700"
+                      variant="solid"
+                      tone="success"
+                      size="sm"
                     >
                       All
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={() => onBulkSelect(bus, false)}
-                      className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95"
+                      size="sm"
                     >
                       None
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 {hasBuslessFrames && (
@@ -300,20 +282,20 @@ function FramePicker({
                     <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-muted)] italic">
                       No bus
                     </span>
-                    <button
-                      type="button"
+                    <Button
                       onClick={() => onBulkSelect(null, true)}
-                      className="px-1.5 py-0.5 rounded bg-green-600 text-white hover:bg-green-700"
+                      variant="solid"
+                      tone="success"
+                      size="sm"
                     >
                       All
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={() => onBulkSelect(null, false)}
-                      className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95"
+                      size="sm"
                     >
                       None
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>

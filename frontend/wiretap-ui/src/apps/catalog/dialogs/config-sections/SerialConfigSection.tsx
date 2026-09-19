@@ -4,11 +4,12 @@
 import { useState, useCallback, useMemo } from "react";
 import { Cable, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { disabledState, caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
+import { caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
 import type { SerialHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { CHECKSUM_ALGORITHMS } from "../../../../utils/analysis/checksums";
+import { Button, IconButton } from "../../../../components/Button";
 
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
@@ -248,21 +249,23 @@ export default function SerialConfigSection({
         </div>
         <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
           {isConfigured ? (
-            <button
-              type="button"
+            <Button
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded transition-colors"
+              variant="ghost"
+              tone="danger"
+              size="sm"
             >
               Remove
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
+            <Button
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-[color:var(--text-purple)] hover:bg-[var(--hover-bg-purple)] rounded transition-colors"
+              variant="ghost"
+              tone="purple"
+              size="sm"
             >
               + Add
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -375,14 +378,14 @@ export default function SerialConfigSection({
                 </p>
               </div>
               {!isAddingField && (
-                <button
-                  type="button"
+                <Button
                   onClick={() => setIsAddingField(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-purple)] text-[color:var(--text-purple)] rounded-lg hover:bg-[var(--hover-bg-purple)] transition-colors"
+                  variant="tonal"
+                  tone="purple"
                 >
                   <Plus className={iconMd} />
                   Add Field
-                </button>
+                </Button>
               )}
             </div>
 
@@ -393,10 +396,9 @@ export default function SerialConfigSection({
                   <div key={index} className="space-y-2">
                     <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)]">
                       {/* Expand/collapse toggle */}
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => toggleFieldPicker(index)}
-                        className="p-1 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
+                        size="sm"
                         title={expandedFieldPickers[index] ? "Hide bit picker" : "Show bit picker"}
                       >
                         {expandedFieldPickers[index] ? (
@@ -404,7 +406,7 @@ export default function SerialConfigSection({
                         ) : (
                           <ChevronRight className={iconMd} />
                         )}
-                      </button>
+                      </IconButton>
 
                       {/* Field name */}
                       <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
@@ -446,14 +448,14 @@ export default function SerialConfigSection({
                       </select>
 
                       {/* Remove button */}
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => handleRemoveField(index)}
-                        className="p-1 text-red-500 hover:bg-[var(--hover-bg-red)] rounded transition-colors"
+                        tone="danger"
+                        size="sm"
                         title="Remove field"
                       >
                         <Trash2 className={iconMd} />
-                      </button>
+                      </IconButton>
                     </div>
 
                     {/* Expanded bit picker */}
@@ -528,21 +530,20 @@ export default function SerialConfigSection({
                     Use the bit picker to select which header bytes this field covers.
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
+                    <Button
                       onClick={resetAddForm}
-                      className="px-3 py-1 text-sm text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded transition-colors"
+                      variant="ghost"
                     >
                       Cancel
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       onClick={handleAddField}
                       disabled={newFieldType === "custom" && !newFieldCustomName.trim()}
-                      className={`px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 ${disabledState} transition-colors`}
+                      variant="solid"
+                      tone="purple"
                     >
                       Add
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -567,23 +568,23 @@ export default function SerialConfigSection({
                 </p>
               </div>
               {!checksum ? (
-                <button
-                  type="button"
+                <Button
                   onClick={handleAddChecksum}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-purple)] text-[color:var(--text-purple)] rounded-lg hover:bg-[var(--hover-bg-purple)] transition-colors"
+                  variant="tonal"
+                  tone="purple"
                 >
                   <Plus className={iconMd} />
                   Add Checksum
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
+                <Button
                   onClick={handleRemoveChecksum}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded-lg transition-colors"
+                  variant="ghost"
+                  tone="danger"
                 >
                   <Trash2 className={iconMd} />
                   Remove
-                </button>
+                </Button>
               )}
             </div>
 

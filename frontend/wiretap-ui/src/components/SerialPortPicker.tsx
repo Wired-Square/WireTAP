@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Bluetooth, CircleDot, HardDrive, RefreshCcw, Usb } from "lucide-react";
-import { buttonBase } from "../styles/buttonStyles";
 import {
   bgPrimary,
   bgSurface,
@@ -27,6 +26,7 @@ import {
 import type { SerialPortInfo } from "../api/serial";
 import type { IOProfile } from "../hooks/useSettings";
 import type { DfuDeviceInfo } from "../apps/serial/utils/flasherTypes";
+import { Button } from "./Button";
 
 export type Parity = "none" | "odd" | "even";
 
@@ -203,9 +203,7 @@ export default function SerialPortPicker({
 
   return (
     <div ref={containerRef} className="relative shrink-0">
-      <button
-        type="button"
-        className={buttonBase}
+      <Button
         onClick={() => setIsOpen((v) => !v)}
         title={activePort ? activePort : t("serialPortPicker.buttonTitle")}
       >
@@ -214,7 +212,7 @@ export default function SerialPortPicker({
           aria-hidden
         />
         <span className="max-w-56 truncate">{buttonLabel}</span>
-      </button>
+      </Button>
 
       {isOpen && (
         <div
@@ -228,15 +226,16 @@ export default function SerialPortPicker({
             <span className={`text-xs font-medium ${textSecondary}`}>
               {t("serialPortPicker.headerTitle", { count: ports.length })}
             </span>
-            <button
+            <Button
               onClick={onRefresh}
               disabled={loading}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--hover-bg)] ${textSecondary}`}
+              variant="ghost"
+              size="sm"
               title={t("serialPortPicker.refreshTooltip")}
             >
               <RefreshCcw size={12} className={loading ? "animate-spin" : ""} />
               {t("serialPortPicker.refresh")}
-            </button>
+            </Button>
           </div>
 
           {/* Port list */}
@@ -421,28 +420,32 @@ export default function SerialPortPicker({
             </Field>
             <div className="ml-auto flex items-center">
               {isConnected ? (
-                <button
+                <Button
                   onClick={() => {
                     onDisconnect();
                     setIsOpen(false);
                   }}
-                  className="text-xs px-3 py-1.5 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                  variant="tonal"
+                  tone="danger"
+                  size="sm"
                 >
                   {t("serialPortPicker.disconnect")}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   onClick={() => {
                     onConnect(matchedRow?.profile?.id);
                     setIsOpen(false);
                   }}
                   disabled={!activePort || connecting}
-                  className="text-xs px-3 py-1.5 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                  variant="tonal"
+                  tone="primary"
+                  size="sm"
                 >
                   {connecting
                     ? t("serialPortPicker.connecting")
                     : t("serialPortPicker.connect")}
-                </button>
+                </Button>
               )}
             </div>
           </div>

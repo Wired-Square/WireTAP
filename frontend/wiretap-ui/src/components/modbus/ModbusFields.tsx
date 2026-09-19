@@ -12,6 +12,7 @@ import { bgSurface, borderDefault, textMuted } from "../../styles";
 import { iconMd } from "../../styles/spacing";
 import CheckboxField, { type CheckboxFieldProps } from "../forms/CheckboxField";
 import type { ModbusRegisterType } from "../../api/io";
+import { Button } from "../../components/Button";
 
 const CONTROL =
   "w-full px-2 py-1 rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)]";
@@ -139,19 +140,10 @@ export function RunButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        disabled
-          ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
-          : "bg-purple-600 hover:bg-purple-700 text-white"
-      }`}
-    >
+    <Button onClick={onClick} disabled={disabled} variant="solid" tone="purple" size="lg" className="w-full">
       <Play className={iconMd} />
       {label}
-    </button>
+    </Button>
   );
 }
 

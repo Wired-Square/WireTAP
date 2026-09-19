@@ -11,10 +11,10 @@ import {
   textMuted,
   textWarning,
   focusRing,
-  folderPickerButton,
   iconLg,
   iconMd,
 } from "../../../../styles";
+import { Button } from "../../../../components/Button";
 
 interface SettingDirectoryRowProps {
   label: ReactNode;
@@ -49,9 +49,9 @@ export default function SettingDirectoryRow({
           className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder={placeholder}
         />
-        <button onClick={onPick} className={folderPickerButton} title={browseTooltip}>
+        <Button onClick={onPick} size="lg" title={browseTooltip}>
           <FolderOpen className={`${iconLg} ${textMuted}`} />
-        </button>
+        </Button>
       </div>
       {error && (
         <div className={`mt-2 flex items-center gap-2 text-sm ${textWarning}`}>

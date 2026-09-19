@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
+import { textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { FrameDefDescriptor, SignalDefDescriptor } from "../../../api/framelinkRules";
@@ -14,6 +14,7 @@ import FrameDefDialog from "../dialogs/FrameDefDialog";
 import FrameDefEditor from "./FrameDefEditor";
 import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
 import { formatHexId } from "../utils/formatHex";
+import { Button, IconButton } from "../../../components/Button";
 
 export default function FrameDefsView() {
   const { t } = useTranslation("rules");
@@ -129,12 +130,14 @@ export default function FrameDefsView() {
   return (
     <div className="space-y-2">
       <div className="flex justify-end mb-1">
-        <button
+        <Button
           onClick={() => setDialogOpen(true)}
-          className={indigoButtonCompact}
+          variant="solid"
+          tone="primary"
+          size="sm"
         >
           <Plus className={iconMd} /> {t("frameDefs.add")}
-        </button>
+        </Button>
       </div>
 
       {frameDefs.length === 0 && (
@@ -194,13 +197,14 @@ export default function FrameDefsView() {
                 />
               </div>
             </div>
-            <button
+            <IconButton
               onClick={(e) => { e.stopPropagation(); removeFrameDef(fd.frame_def_id); }}
-              className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+              tone="danger"
+              size="sm"
               title={t("frameDefs.remove")}
             >
               <Trash2 className={iconMd} />
-            </button>
+            </IconButton>
           </div>
         );
       })}

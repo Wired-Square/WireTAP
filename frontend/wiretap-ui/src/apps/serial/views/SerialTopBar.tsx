@@ -28,6 +28,7 @@ import type { DfuDeviceInfo } from "../utils/flasherTypes";
 import { MIN_TERMINAL_FONT, MAX_TERMINAL_FONT } from "../stores/serialStore";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { iconSm } from "../../../styles/spacing";
+import { Button, IconButton } from "../../../components/Button";
 
 interface Props {
   ports: AnnotatedSerialPort[];
@@ -111,19 +112,23 @@ export default function SerialTopBar({
       actions={showSerialActions ? (
         <div className="flex items-center gap-1">
           {isConnected ? (
-            <button
+            <Button
               onClick={onDisconnect}
-              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded text-red-300 hover:bg-red-500/20 transition-colors"
+              variant="ghost"
+              tone="danger"
+              size="sm"
               title={t("topBar.disconnectTooltip")}
             >
               <Unplug className={iconSm} />
               {t("topBar.disconnect")}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={() => onConnect()}
               disabled={!activePort || connecting}
-              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              variant="tonal"
+              tone="success"
+              size="sm"
               title={
                 activePort
                   ? t("topBar.connectTooltip")
@@ -132,17 +137,15 @@ export default function SerialTopBar({
             >
               <Plug className={iconSm} />
               {connecting ? t("topBar.connecting") : t("topBar.connect")}
-            </button>
+            </Button>
           )}
           {isConnected && (
             <>
-              <button
+              <Button
                 onClick={onToggleLocalEcho}
-                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded transition-colors ${
-                  localEcho
-                    ? "bg-sky-500/20 text-sky-300 hover:bg-sky-500/30"
-                    : "text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)]"
-                }`}
+                variant="ghost"
+                size="sm"
+                pressed={localEcho}
                 title={
                   localEcho
                     ? t("topBar.echoTooltipOn")
@@ -155,35 +158,33 @@ export default function SerialTopBar({
                   <EyeOff className={iconSm} />
                 )}
                 {localEcho ? t("topBar.echoOn") : t("topBar.echoOff")}
-              </button>
+              </Button>
               <div className="flex items-center gap-0.5 rounded bg-[var(--bg-surface)] px-0.5">
-                <button
+                <IconButton
                   onClick={onDecreaseFont}
                   disabled={fontSize <= MIN_TERMINAL_FONT}
-                  className="flex items-center justify-center p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  size="sm"
                   title={t("topBar.fontDecrease")}
                 >
                   <Minus className={iconSm} />
-                </button>
+                </IconButton>
                 <span className="text-xs tabular-nums text-center w-5 text-[color:var(--text-secondary)]">
                   {fontSize}
                 </span>
-                <button
+                <IconButton
                   onClick={onIncreaseFont}
                   disabled={fontSize >= MAX_TERMINAL_FONT}
-                  className="flex items-center justify-center p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  size="sm"
                   title={t("topBar.fontIncrease")}
                 >
                   <Plus className={iconSm} />
-                </button>
+                </IconButton>
               </div>
-              <button
+              <Button
                 onClick={handleCopyAll}
-                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded transition-colors ${
-                  copiedAll
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : "text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)]"
-                }`}
+                variant={copiedAll ? "tonal" : "ghost"}
+                tone={copiedAll ? "success" : "neutral"}
+                size="sm"
                 title={t("topBar.copyAllTooltip")}
               >
                 {copiedAll ? (
@@ -192,15 +193,17 @@ export default function SerialTopBar({
                   <CopyPlus className={iconSm} />
                 )}
                 {copiedAll ? t("topBar.copiedAll") : t("topBar.copyAll")}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={onReset}
-                className="flex items-center gap-1 text-xs px-2 py-1.5 rounded text-amber-300 hover:bg-amber-500/20 transition-colors"
+                variant="ghost"
+                tone="warning"
+                size="sm"
                 title={t("topBar.resetTooltip")}
               >
                 <RotateCcw className={iconSm} />
                 {t("topBar.reset")}
-              </button>
+              </Button>
             </>
           )}
         </div>

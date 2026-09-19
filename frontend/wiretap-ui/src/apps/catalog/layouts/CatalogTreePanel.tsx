@@ -5,11 +5,11 @@ import { Cable, ChevronDown, ChevronRight, FoldVertical, Network, Plus, Server, 
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
-import { iconActionButton, iconButtonHoverSmall } from "../../../styles/buttonStyles";
 import ResizableSidebar from "../../../components/ResizableSidebar";
 import FindBar from "../components/FindBar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
 import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
+import { IconButton } from "../../../components/Button";
 
 const VIEW_MODES: CatalogViewMode[] = ["tree", "frames", "nodes"];
 
@@ -125,20 +125,22 @@ export default function CatalogTreePanel({
   // Collapsed content - just the action buttons as icons
   const collapsedContent = catalogPath ? (
     <>
-      <button
+      <IconButton
         onClick={onAddNode}
-        className={iconActionButton('purple')}
+        variant="solid"
+        tone="purple"
         title={t("tree.addNode")}
       >
         <UserPlus className={iconMd} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={() => handleAddFrame?.()}
-        className={iconActionButton('blue')}
+        variant="solid"
+        tone="primary"
         title={t("tree.addFrame")}
       >
         <Plus className={iconMd} />
-      </button>
+      </IconButton>
     </>
   ) : null;
 
@@ -185,35 +187,37 @@ export default function CatalogTreePanel({
       <div className="flex-shrink-0 p-4 pb-0">
         {/* Action buttons - add on the left, expand/collapse on the right */}
         <div className="flex items-center gap-2 mb-3">
-            <button
+            <IconButton
               onClick={onAddNode}
-              className={iconActionButton('purple')}
+              variant="solid"
+              tone="purple"
               title={t("tree.addNode")}
             >
               <UserPlus className={iconMd} />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               onClick={() => handleAddFrame?.()}
-              className={iconActionButton('blue')}
+              variant="solid"
+              tone="primary"
               title={t("tree.addFrame")}
             >
               <Plus className={iconMd} />
-            </button>
+            </IconButton>
             <div className="ml-auto flex items-center gap-1">
-              <button
+              <IconButton
                 onClick={onExpandAll}
-                className={iconButtonHoverSmall}
+                size="sm"
                 title={t("tree.expandAll")}
               >
                 <UnfoldVertical className={iconSm} />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 onClick={onCollapseAll}
-                className={iconButtonHoverSmall}
+                size="sm"
                 title={t("tree.collapseAll")}
               >
                 <FoldVertical className={iconSm} />
-              </button>
+              </IconButton>
             </div>
           </div>
 

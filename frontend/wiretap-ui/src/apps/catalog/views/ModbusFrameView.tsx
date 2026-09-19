@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary } from "../../../styles";
+import { labelSmall, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type ModbusFrameViewProps = {
   selectedNode: TomlNode;
@@ -41,22 +42,21 @@ export default function ModbusFrameView({
         {(onEditFrame || onDeleteFrame) && (
           <div className="flex gap-2">
             {onEditFrame && (
-              <button
+              <IconButton
                 onClick={() => onEditFrame(selectedNode)}
-                className={iconButtonHover}
                 title={t("modbusFrame.editFrame")}
               >
                 <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-              </button>
+              </IconButton>
             )}
             {onDeleteFrame && (
-              <button
+              <IconButton
                 onClick={() => onDeleteFrame(selectedNode.key)}
-                className={iconButtonHoverDanger}
+                tone="danger"
                 title={t("modbusFrame.deleteFrame")}
               >
                 <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
-              </button>
+              </IconButton>
             )}
           </div>
         )}

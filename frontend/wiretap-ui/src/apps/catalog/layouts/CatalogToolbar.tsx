@@ -4,13 +4,12 @@ import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Setti
 import * as ShareIcon from "../../../components/catalogIcons";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm } from "../../../styles/spacing";
-import { disabledState } from "../../../styles";
-import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
 import type { EditMode } from "../types";
 import type { CatalogMetadata } from "../../../api/catalog";
 import { findCatalogByPath } from "../../../utils/catalogUtils";
 import AppTopBar from "../../../components/AppTopBar";
 import OverflowMenu from "../../../components/OverflowMenu";
+import { Button, IconButton } from "../../../components/Button";
 
 export type CatalogToolbarProps = {
   editMode: EditMode;
@@ -64,18 +63,7 @@ export default function CatalogToolbar({
   const selectedCatalog = findCatalogByPath(catalogs, catalogPath);
   const catalogName = selectedCatalog?.name || catalogPath?.split("/").pop() || t("toolbar.noCatalog");
 
-  // Validation button styling
-  const validationButtonClass =
-    validationState === true
-      ? `p-1.5 rounded transition-colors bg-green-600 text-white hover:bg-green-700 ${disabledState}`
-      : validationState === false
-        ? `p-1.5 rounded transition-colors bg-red-600 text-white hover:bg-red-700 ${disabledState}`
-        : iconButtonBase;
-
-  // Save button styling (red when unsaved)
-  const saveButtonClass = hasUnsavedChanges
-    ? `p-1.5 rounded transition-colors bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-500/30 ${disabledState}`
-    : iconButtonBase;
+  const validationTone = validationState === true ? "success" : validationState === false ? "danger" : "neutral";
 
   return (
     <AppTopBar
@@ -85,49 +73,50 @@ export default function CatalogToolbar({
       actions={
         <>
           {/* Settings Button */}
-          <button
+          <IconButton
             onClick={onEditConfig}
             disabled={!catalogPath}
             title={t("toolbar.configuration")}
-            className={iconButtonBase}
+            variant="surface"
           >
             <Settings className={iconMd} />
-          </button>
+          </IconButton>
         </>
       }
     >
       {/* Catalog Picker Button */}
-      <button
+      <Button
         onClick={onOpenPicker}
-        className={buttonBase}
         title={t("toolbar.selectCatalog")}
       >
         <span className="max-w-40 truncate">{catalogName}</span>
         <ChevronDown className={`${iconSm} flex-shrink-0 text-slate-400`} />
-      </button>
+      </Button>
 
       {/* Save */}
-      <button
+      <IconButton
         onClick={onSave}
         disabled={!catalogPath}
         title={hasUnsavedChanges ? t("toolbar.saveUnsaved") : t("toolbar.save")}
-        className={saveButtonClass}
+        variant={hasUnsavedChanges ? "solid" : "surface"}
+        tone={hasUnsavedChanges ? "danger" : "neutral"}
+        className={hasUnsavedChanges ? "shadow-md shadow-red-500/30" : ""}
       >
         <Save className={`${iconMd} ${hasUnsavedChanges ? "animate-pulse" : ""}`} />
-      </button>
+      </IconButton>
 
       {/* Reload */}
-      <button
+      <IconButton
         onClick={onReload}
         disabled={!catalogPath}
         title={t("toolbar.reload")}
-        className={iconButtonBase}
+        variant="surface"
       >
         <RotateCcw className={iconMd} />
-      </button>
+      </IconButton>
 
       {/* Validate */}
-      <button
+      <IconButton
         onClick={onValidate}
         disabled={!catalogPath}
         title={
@@ -137,36 +126,37 @@ export default function CatalogToolbar({
               ? t("toolbar.validateInvalid")
               : t("toolbar.validate")
         }
-        className={validationButtonClass}
+        variant={validationTone === "neutral" ? "surface" : "solid"}
+        tone={validationTone}
       >
         {validationState === false ? (
           <X className={iconMd} />
         ) : (
           <Check className={iconMd} />
         )}
-      </button>
+      </IconButton>
 
       {/* Export */}
-      <button
+      <IconButton
         onClick={onExport}
         disabled={!catalogPath}
         title={t("toolbar.export")}
-        className={iconButtonBase}
+        variant="surface"
       >
         <Download className={iconMd} />
-      </button>
+      </IconButton>
 
       {/* Publish to Git — the saved file is what gets published, so unsaved
           changes disable it rather than silently publishing stale bytes. */}
       {onPublish && (
-        <button
+        <IconButton
           onClick={onPublish}
           disabled={!catalogPath || hasUnsavedChanges}
           title={hasUnsavedChanges ? t("toolbar.publishUnsaved") : t("toolbar.publish")}
-          className={iconButtonBase}
+          variant="surface"
         >
           <ShareIcon.Push className={iconMd} />
-        </button>
+        </IconButton>
       )}
 
       {/* Review an upstream update — only offered for a tracked catalogue that
@@ -175,18 +165,18 @@ export default function CatalogToolbar({
       {onReviewUpdate &&
         updatableSources.length > 0 &&
         (updatableSources.length === 1 ? (
-          <button
+          <IconButton
             onClick={() => onReviewUpdate(updatableSources[0].id)}
             title={t("toolbar.reviewUpdateFrom", { repo: updatableSources[0].repoLabel })}
-            className={iconButtonBase}
+            variant="surface"
           >
             <ShareIcon.Diff className={iconMd} />
-          </button>
+          </IconButton>
         ) : (
           <OverflowMenu
             title={t("toolbar.reviewUpdateChoose", { count: updatableSources.length })}
             trigger={<ShareIcon.Diff className={iconMd} />}
-            className={iconButtonBase}
+            variant="surface"
             items={updatableSources.map((source) => ({
               label: t("toolbar.reviewUpdateFrom", { repo: source.repoLabel }),
               icon: ShareIcon.Diff,
@@ -196,17 +186,19 @@ export default function CatalogToolbar({
         ))}
 
       {/* Text mode toggle */}
-      <button
+      <IconButton
         onClick={onToggleMode}
         disabled={!catalogPath}
         title={editMode === "ui" ? t("toolbar.switchToText") : t("toolbar.switchToGui")}
-        className={toggleButtonClass(editMode === "text", "purple")}
+        variant="surface"
+        tone="purple"
+        pressed={editMode === "text"}
       >
         <Glasses
           className={`${iconMd} ${hasUnsavedChanges && editMode !== "text" ? "animate-pulse" : ""}`}
           fill={editMode === "text" ? "currentColor" : "none"}
         />
-      </button>
+      </IconButton>
     </AppTopBar>
   );
 }

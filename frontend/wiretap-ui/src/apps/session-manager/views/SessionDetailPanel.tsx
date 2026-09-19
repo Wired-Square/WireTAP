@@ -10,10 +10,10 @@ import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence,
 import type { IOProfile } from "../../../hooks/useSettings";
 import { formatWindowName } from "../../../utils/windowName";
 import { iconSm } from "../../../styles/spacing";
-import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { emptyStateText } from "../../../styles/typography";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
+import { Button, IconButton } from "../../../components/Button";
 
 interface SessionDetailPanelProps {
   sessions: ActiveSessionInfo[];
@@ -102,12 +102,12 @@ export default function SessionDetailPanel({
         <span className="text-sm font-medium text-[color:var(--text-primary)] capitalize">
           {selectedNode.type === "edge" ? t("detail.connectionHeader") : selectedNode.type} {t("detail.headerSuffix")}
         </span>
-        <button
+        <IconButton
           onClick={() => setSelectedNode(null)}
-          className={`p-1 rounded ${iconButtonHover}`}
+          size="sm"
         >
           <X className={iconSm} />
-        </button>
+        </IconButton>
       </div>
 
       {/* Content */}
@@ -244,13 +244,14 @@ function SessionDetails({
                           <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-muted)] font-mono">
                             <span>bus{m.deviceBus} → bus{m.outputBus}</span>
                             {canDisable && (
-                              <button
+                              <IconButton
                                 onClick={() => onDisableBusMapping(session.sessionId, id, m.deviceBus)}
-                                className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                                tone="danger"
+                                size="xs"
                                 title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
                               >
                                 <Trash2 size={10} />
-                              </button>
+                              </IconButton>
                             )}
                           </div>
                         );
@@ -340,57 +341,69 @@ function SessionDetails({
         </label>
         <div className="flex flex-wrap gap-2">
           {isStopped && (
-            <button
+            <Button
               onClick={() => onStart(session.sessionId)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-green-400`}
+              variant="tonal"
+              tone="success"
+              size="sm"
             >
               <Play className={iconSm} />
               {t("detail.actions.start")}
-            </button>
+            </Button>
           )}
           {isRunning && (
-            <button
+            <Button
               onClick={() => onStop(session.sessionId)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-amber-400`}
+              variant="tonal"
+              tone="warning"
+              size="sm"
             >
               <Square className={iconSm} />
               {t("detail.actions.stop")}
-            </button>
+            </Button>
           )}
           {isRunning && canPause && (
-            <button
+            <Button
               onClick={() => onPause(session.sessionId)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-blue-400`}
+              variant="tonal"
+              tone="primary"
+              size="sm"
             >
               <Pause className={iconSm} />
               {t("detail.actions.pause")}
-            </button>
+            </Button>
           )}
           {isPaused && (
-            <button
+            <Button
               onClick={() => onResume(session.sessionId)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-green-400`}
+              variant="tonal"
+              tone="success"
+              size="sm"
             >
               <Play className={iconSm} />
               {t("detail.actions.resume")}
-            </button>
+            </Button>
           )}
           {session.sourceType === "realtime" && (
-            <button
+            <Button
               onClick={() => onAddSource(session.sessionId)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-purple-400`}
+              variant="tonal"
+              tone="purple"
+              size="sm"
             >
               <Plus className={iconSm} />
               {t("detail.actions.addSource")}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => onDestroy(session.sessionId)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
+            variant="tonal"
+            tone="danger"
+            size="sm"
           >
             <Trash2 className={iconSm} />
             {t("detail.actions.destroy")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -413,14 +426,17 @@ function SessionDetails({
             </label>
             <div className="space-y-1">
               {unconnected.map((appName) => (
-                <button
+                <Button
                   key={appName}
                   onClick={() => onConnectApp(session.sessionId, appName)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-cyan-400 capitalize`}
+                  variant="tonal"
+                  tone="cyan"
+                  size="sm"
+                  className="capitalize"
                 >
                   <Plug className={iconSm} />
                   {appName}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -508,13 +524,14 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
                       <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-primary)] font-mono">
                         <span>bus{m.deviceBus} → bus{m.outputBus}</span>
                         {canDisable && (
-                          <button
+                          <IconButton
                             onClick={() => onDisableBusMapping(s.sessionId, profile.id, m.deviceBus)}
-                            className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                            tone="danger"
+                            size="xs"
                             title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
                           >
                             <Trash2 size={10} />
-                          </button>
+                          </IconButton>
                         )}
                       </div>
                     );
@@ -543,14 +560,16 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
           </label>
           {usingSessions.map((s) =>
             s.sourceProfileIds.length > 1 ? (
-              <button
+              <Button
                 key={s.sessionId}
                 onClick={() => onRemoveSource(s.sessionId, profile.id)}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
+                variant="tonal"
+                tone="danger"
+                size="sm"
               >
                 <Trash2 className={iconSm} />
                 {t("detail.actions.removeFrom", { sessionId: s.sessionId })}
-              </button>
+              </Button>
             ) : null
           )}
         </div>
@@ -680,13 +699,13 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
           {t("detail.labels.signalGenerator")}
         </label>
         {busStates.length < 8 && (
-          <button
+          <IconButton
             onClick={handleAddBus}
-            className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-xs ${iconButtonHover}`}
+            size="xs"
             title={t("detail.signalGen.addBus")}
           >
             <Plus className={iconSm} />
-          </button>
+          </IconButton>
         )}
       </div>
       <div className="space-y-2">
@@ -713,25 +732,29 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
             />
             <span className="text-xs text-[color:var(--text-muted)]">{t("detail.signalGen.hz")}</span>
             {busStates.length > 1 && (
-              <button
+              <IconButton
                 onClick={() => handleRemoveBus(bs.bus)}
-                className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                tone="danger"
+                size="xs"
                 title={t("detail.signalGen.removeBus", { bus: bs.bus })}
               >
                 <Trash2 size={12} />
-              </button>
+              </IconButton>
             )}
           </div>
         ))}
       </div>
       {dirty && (
-        <button
+        <Button
           onClick={handleSaveToProfile}
-          className={`mt-2 flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover}`}
+          variant="solid"
+          tone="primary"
+          size="sm"
+          className="mt-2"
         >
           <Save className={iconSm} />
           {t("detail.actions.saveToProfile")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -847,14 +870,16 @@ function UnconnectedAppDetails({
           </label>
           <div className="space-y-1">
             {sessions.map((s) => (
-              <button
+              <Button
                 key={s.sessionId}
                 onClick={() => onConnectApp(s.sessionId, appType)}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-cyan-400`}
+                variant="tonal"
+                tone="cyan"
+                size="sm"
               >
                 <Plug className={iconSm} />
                 <span className="font-mono truncate">{s.sessionId}</span>
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -925,13 +950,15 @@ function EdgeDetails({
         </div>
 
         <div className="pt-2 border-t border-[color:var(--border-default)]">
-          <button
+          <Button
             onClick={() => onEvictSubscriber(sessionId, subscriberId)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
+            variant="tonal"
+            tone="danger"
+            size="sm"
           >
             <Unplug className={iconSm} />
             {t("detail.actions.disconnect")}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -1020,13 +1047,15 @@ function EdgeDetails({
 
       {canDisable && (
         <div className="pt-2 border-t border-[color:var(--border-default)]">
-          <button
+          <Button
             onClick={() => onDisableBusMapping(sessionId, profileId, deviceBus)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
+            variant="tonal"
+            tone="danger"
+            size="sm"
           >
             <Unplug className={iconSm} />
             {t("detail.actions.disconnect")}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -1111,13 +1140,15 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
           {t("detail.labels.actions")}
         </label>
-        <button
+        <Button
           onClick={() => onEvict(sessionId, subscriberId)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
+          variant="tonal"
+          tone="danger"
+          size="sm"
         >
           <UserMinus className={iconSm} />
           {t("detail.actions.remove")}
-        </button>
+        </Button>
       </div>
     </div>
   );

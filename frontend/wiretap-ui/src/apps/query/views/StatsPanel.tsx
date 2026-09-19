@@ -17,7 +17,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useQueryStore, type DatabaseActivity } from "../stores/queryStore";
-import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
 import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import {
@@ -31,6 +30,7 @@ import {
   textDanger,
   bgSurface,
 } from "../../../styles/colourTokens";
+import { Button, IconButton } from "../../../components/Button";
 
 interface Props {
   profileId: string | null;
@@ -147,15 +147,14 @@ export default function StatsPanel({ profileId }: Props) {
             <option value="30">30s</option>
           </select>
           {/* Refresh button */}
-          <button
+          <Button
             onClick={handleRefresh}
             disabled={activity.isLoading}
-            className={buttonBase}
             title={t("stats.refreshTooltip")}
           >
             <RefreshCw className={`${iconSm} ${activity.isLoading ? "animate-spin" : ""}`} />
             <span>{t("stats.refresh")}</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -284,10 +283,11 @@ function QueryRow({ query, onCancel, formatDuration }: QueryRowProps) {
       </td>
       <td className="px-3 py-2 text-right">
         {query.is_cancellable && (
-          <button
+          <IconButton
             onClick={handleCancel}
             disabled={isCancelling}
-            className={`${iconButtonBase} ${textDanger}`}
+            variant="surface"
+            tone="danger"
             title={t("stats.cancelQuery")}
           >
             {isCancelling ? (
@@ -295,7 +295,7 @@ function QueryRow({ query, onCancel, formatDuration }: QueryRowProps) {
             ) : (
               <XCircle className={iconMd} />
             )}
-          </button>
+          </IconButton>
         )}
       </td>
     </tr>
@@ -342,10 +342,12 @@ function SessionRow({ session, onTerminate }: SessionRowProps) {
       <td className={`px-3 py-2 ${stateColour}`}>{session.state ?? "-"}</td>
       <td className={`px-3 py-2 ${monoBody} ${textMuted}`}>{session.client_addr ?? t("stats.values.local")}</td>
       <td className="px-3 py-2 text-right">
-        <button
+        <IconButton
           onClick={handleTerminate}
           disabled={isTerminating}
-          className={`${iconButtonBase} ${textDanger} opacity-50 hover:opacity-100`}
+          variant="surface"
+          tone="danger"
+          className="opacity-50 hover:opacity-100"
           title={t("stats.terminateSession")}
         >
           {isTerminating ? (
@@ -353,7 +355,7 @@ function SessionRow({ session, onTerminate }: SessionRowProps) {
           ) : (
             <XCircle className={iconMd} />
           )}
-        </button>
+        </IconButton>
       </td>
     </tr>
   );

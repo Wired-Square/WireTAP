@@ -41,7 +41,6 @@ import {
   textWarning,
 } from "../../styles";
 import { alertWarning, panelFooter } from "../../styles/cardStyles";
-import { iconButtonHoverCompact, iconButtonHoverSmall } from "../../styles/buttonStyles";
 import { badgeMetadata } from "../../styles/badgeStyles";
 import { useCatalogShareStore } from "../../stores/catalogShareStore";
 import { savedRepoName, revealRepoClone, GIT_PROGRESS_EVENT } from "../../api/catalogShare";
@@ -55,6 +54,7 @@ import type {
 } from "../../api/catalogShare";
 import { writeClipboardText } from "../../api/clipboard";
 import { useIsIOS } from "../../hooks/useIsIOS";
+import { IconButton } from "../../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -200,15 +200,15 @@ function RepoRow({
   return (
     <div className={`${cardCompact} flex items-center gap-2`}>
       {onToggleFavourite && (
-        <button
+        <IconButton
           onClick={onToggleFavourite}
-          className={`${iconButtonHoverCompact} flex-shrink-0`}
+          size="sm"
           title={t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite")}
         >
           <ShareIcon.Favourite
             className={`${iconMd} ${isFavourite ? "fill-yellow-500 text-yellow-500" : `${textSecondary} opacity-60`}`}
           />
-        </button>
+        </IconButton>
       )}
 
       <button onClick={onBrowse} className="flex-1 min-w-0 text-left" title={t("repository.saved.browse")}>
@@ -231,7 +231,6 @@ function RepoRow({
       <OverflowMenu
         title={t("repository.saved.menu")}
         items={items}
-        className="flex-shrink-0"
       />
     </div>
   );
@@ -260,13 +259,13 @@ function PropertyRow({
         {value}
       </span>
       {copy && (
-        <button
+        <IconButton
           onClick={() => void writeClipboardText(value)}
-          className={`${iconButtonHoverSmall} flex-shrink-0`}
+          size="sm"
           title={t("repository.saved.copy")}
         >
           <Copy className={iconSm} />
-        </button>
+        </IconButton>
       )}
     </div>
   );

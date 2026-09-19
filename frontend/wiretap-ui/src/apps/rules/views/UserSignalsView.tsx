@@ -5,12 +5,13 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { formatHexId } from "../utils/formatHex";
 import UserSignalDialog from "../dialogs/UserSignalDialog";
 import type { UserSignalMetadata } from "../dialogs/UserSignalDialog";
+import { Button, IconButton } from "../../../components/Button";
 
 export default function UserSignalsView() {
   const { t } = useTranslation("rules");
@@ -61,12 +62,14 @@ export default function UserSignalsView() {
     <div className="space-y-2">
       {/* Add signal button */}
       <div className="flex items-center mb-2">
-        <button
+        <Button
           onClick={() => setDialogOpen(true)}
-          className={indigoButtonCompact}
+          variant="solid"
+          tone="primary"
+          size="sm"
         >
           <Plus className={iconMd} /> {t("userSignals.add")}
-        </button>
+        </Button>
       </div>
 
       {userSignals.length === 0 && (
@@ -96,13 +99,14 @@ export default function UserSignalsView() {
                 </span>
               )}
             </div>
-            <button
+            <IconButton
               onClick={() => removeUserSignal(signal.signal_id)}
-              className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+              tone="danger"
+              size="sm"
               title={t("userSignals.remove")}
             >
               <Trash2 className={iconMd} />
-            </button>
+            </IconButton>
           </div>
         );
       })}

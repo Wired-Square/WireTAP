@@ -13,8 +13,13 @@ public surface is the barrel file [../frontend/wiretap-ui/src/styles/index.ts](.
 import tokens from there:
 
 ```tsx
-import { buttonBase, textPrimary, paddingDialog, h2 } from "../../../styles";
+import { textPrimary, paddingDialog, h2 } from "../../../styles";
+import { Button, IconButton } from "../../../components/Button";
 ```
+
+Buttons are components, not class strings — see *Buttons* under the token
+reference. The other families (inputs, badges, cards, tabs, tables) are still
+class-string tokens and move to components one family at a time.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -35,21 +40,28 @@ These are non-negotiable in this codebase:
    "centralised", "organisation". Project-wide rule from
    [../CLAUDE.md](../CLAUDE.md).
 3. **Every user-facing string goes through `t(…)`.** No JSX text literals.
-4. **Raw `<button>` and `<input>` + style constants** is the convention, not
-   wrapper components. Centralising the *classes* gives reuse without locking
-   in props.
+4. **A button is `<Button>` or `<IconButton>`.** The primitive carries the
+   look (`variant`, `tone`, `size`, `pressed`) and the wiring (`type="button"`,
+   `aria-pressed`, `aria-label`); a raw `<button>` is for the families that
+   have no primitive yet — list rows, menu items, tabs, cards. For those,
+   raw `<input>` and a class-string token is still the convention.
 5. **Hover states use `hover:brightness-{n}`**, not `hover:bg-{color}-{n}`.
    Brightness filters work uniformly against a CSS-variable background; bg
-   classes don't.
+   classes don't. (The button classes mix with `color-mix()` instead, which
+   the components handle for you.)
 
 ## Theming model
 
 There is no CSS framework. [WireTAP.css](../frontend/wiretap-ui/src/WireTAP.css)
-declares two layers and imports the app's own sheets into them, in cascade
+declares three layers and imports the app's own sheets into them, in cascade
 order:
 
 - [reset.css](../frontend/wiretap-ui/src/styles/reset.css) — the browser
   reset, `@layer reset`.
+- [components.css](../frontend/wiretap-ui/src/styles/components.css) — the
+  semantic classes the primitives render (`.btn` and its modifiers),
+  `@layer components`. Below the utilities on purpose: a `className` on a
+  `<Button>` still wins.
 - [utilities.css](../frontend/wiretap-ui/src/styles/utilities.css) — every
   utility class the code uses, `@layer utilities`. It is **generated**:
   `npm run gen:css` scans the class strings under `src/` and writes the sheet,
@@ -148,31 +160,41 @@ styling goes through the variables.
 | `iconXs` … `icon2xl` | `w-3 h-3` … `w-8 h-8` | Icon sizes |
 | `flexRow` / `flexRowGap1`/`-2`/`-3` | flex helpers | Row layouts |
 
-### Buttons — [buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts)
+### Buttons — [Button.tsx](../frontend/wiretap-ui/src/components/Button.tsx)
 
-| Token | Use |
+`<Button>` and `<IconButton>` render the `.btn` classes in
+[components.css](../frontend/wiretap-ui/src/styles/components.css). Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `variant` | `surface` (default) · `solid` · `outline` · `ghost` · `tonal` · `link` | `IconButton` defaults to `ghost` |
+| `tone` | `neutral` (default) · `primary` · `success` · `danger` · `warning` · `purple` · `cyan` | Colours the text on every variant, the fill on `solid`, the tint on `tonal` |
+| `size` | `xs` 20 px · `sm` 26 px · `md` 32 px (default) · `lg` 40 px | Heights; icon buttons are square |
+| `pressed` | `boolean` | A toggle. Renders `aria-pressed`; lit toggles take the tint, unlit ones are neutral whatever the tone |
+| `label` | string (`IconButton` only) | Accessible name; also the tooltip unless `title` is given |
+
+Where each goes:
+
+| Situation | Use |
 |---|---|
-| `buttonBase` | Default toolbar button (text + icon) |
-| `iconButtonBase` | Icon-only toolbar button |
-| `dangerButtonBase` / `warningButtonBase` / `successIconButton` | Stop / detach / resume in toolbars |
-| `playButtonBase` / `pauseButtonBase` / `stopButtonBase` (+ `Compact` variants) | Playback controls |
-| `primaryButtonBase` | Primary dialog action (Watch, Import, OK) |
-| `successButtonBase` | Affirmative action (Ingest, Confirm) |
-| `secondaryButton` / `dialogOptionButton` / `folderPickerButton` | Secondary / cancel / picker |
-| `toggleButtonClass(active, colour)` | Toggle with purple/yellow/blue active state |
-| `toggleCardClass(active)` / `toggleChipClass(active)` | Larger toggles |
-| `selectionButtonClass(active)` / `groupButtonClass(active)` | Option selectors |
-| `dataViewTabClass(active, hasIndicator)` | Data view tabs |
-| `paginationButtonDark` / `tableIconButtonDark` | Data view chrome |
-| `playbackIconButton` / `playbackStepButton(canStep)` | Themed playback toolbar buttons (skip/rewind, step) |
-| `pollButtonClass(isPolling)` | Modbus poll switch in a top bar (Discovery, Decoder). Colour is the *action*, not the state: red while polling, green while stopped |
-| `iconActionButton(colour)` | Coloured icon-only "create" button (blue/purple) |
-| `actionChip(colour)` | Inline pill action button used next to text (blue/red/green/amber); themed via status CSS vars |
-| `byteHighlight(state)` | Tri-state byte highlight (checksum / calcData / default) for frame previews |
-| `iconButtonHover` / `-Compact` / `-Small` / `-Danger` / `iconButtonDanger` / `iconButtonDangerCompact` | Card / dialog action icons |
-| `launcherButton` / `launcherButtonLabel` / `launcherGrid` | Watermark app launcher |
-| `disabledState` | `disabled:opacity-50 disabled:cursor-not-allowed` |
-| `badgeColorClass(colour)` / `tabCountColorClass(colour)` | Helpers (see backlog — colours hardcoded) |
+| Toolbar action, text or icon+text | `<Button>` |
+| Toolbar icon | `<IconButton variant="surface">` |
+| Card / row / dialog-header icon (edit, close, ↺) | `<IconButton>` (ghost), `size="sm"` in tight rows, `xs` inside table rows |
+| Delete icon | `<IconButton tone="danger">` |
+| Dialog footer | `PrimaryButton` / `SecondaryButton` / `DangerButton` / `SuccessButton` from `components/forms` — `lg` presets over `Button` |
+| Playback / transport | `variant="solid"` with `tone="success"` · `warning` · `danger` |
+| Toolbar toggle | `<IconButton variant="surface" pressed={on}>`, a `tone` when it is hue-coded |
+| Option chip in a form | `<Button variant="outline" size="sm" pressed={selected}>` |
+| Inline action chip beside text | `<Button variant="tonal" size="sm" tone="…">` |
+| Text link ("Add filter", "Learn more") | `<Button variant="link" tone="primary">` |
+
+`buttonClass({ variant, tone, size, icon })` returns the same class
+string for the rare element that must not be a `<button>`.
+
+[buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) keeps
+what other families own: `toggleCardClass(active)` (framing option cards),
+`dataViewTabClass(active, hasIndicator)` (data view tabs), the launcher
+tokens and `disabledState` for non-button controls.
 
 ### Inputs — [inputStyles.ts](../frontend/wiretap-ui/src/styles/inputStyles.ts)
 
@@ -259,30 +281,27 @@ badge's.
 ### Toolbar action button (icon + label)
 
 ```tsx
-import { buttonBase, iconMd } from "../../../styles";
+import { iconMd } from "../../../styles";
+import { Button } from "../../../components/Button";
 import { Play } from "lucide-react";
 
-<button className={buttonBase} onClick={onStart}>
+<Button onClick={onStart}>
   <Play className={iconMd} />
   {t("controls.start")}
-</button>
+</Button>
 ```
 
 ### Dialog with footer
 
 ```tsx
 import Dialog from "../../components/Dialog";
-import { primaryButtonBase, secondaryButton } from "../../styles";
+import { PrimaryButton, SecondaryButton } from "../../components/forms";
 
 <Dialog isOpen={open} onClose={onClose} title={t("dialog.title")}>
   <div className="space-y-4">{/* body */}</div>
   <div className="flex justify-end gap-2 mt-6">
-    <button className={secondaryButton} onClick={onClose}>
-      {t("common:actions.cancel")}
-    </button>
-    <button className={primaryButtonBase} onClick={onConfirm}>
-      {t("common:actions.confirm")}
-    </button>
+    <SecondaryButton onClick={onClose}>{t("common:actions.cancel")}</SecondaryButton>
+    <PrimaryButton onClick={onConfirm}>{t("common:actions.confirm")}</PrimaryButton>
   </div>
 </Dialog>
 ```
@@ -357,7 +376,8 @@ flexible row containing five logical slots, in order:
 - **Custom children** — anything the app needs between the picker and
   the right-side actions (e.g. Discovery's Toolbox button).
 - **Actions** — right-aligned action buttons (Save, Export, Refresh,
-  …). Use `iconButtonBase` for icon-only and `buttonBase` for icon+text.
+  …). `<IconButton variant="surface">` for icon-only, `<Button>` for
+  icon+text.
 
 ### Single line, always
 
@@ -500,7 +520,7 @@ Two pickers, one visual language:
 | `SessionButton` (inside `IOSessionControls`) | Session-bound apps (Discovery, Decoder, Transmit) | [SessionControls.tsx](../frontend/wiretap-ui/src/components/SessionControls.tsx) |
 | `FrameLinkDevicePicker` | Apps bound to a single FrameLink device (Rules) | [FrameLinkDevicePicker.tsx](../frontend/wiretap-ui/src/components/FrameLinkDevicePicker.tsx) |
 
-Both render as a compact `buttonBase`-styled control: `[type icon] [status dot] [label]`.
+Both render as a compact surface `<Button>`: `[type icon] [status dot] [label]`.
 Click opens a popover (never a native `<select>` — popovers can show
 status dots and host-port hints; native selects can't on every platform).
 
@@ -700,8 +720,9 @@ value.toLocaleString(i18n.language);
 | `bg-blue-600/30 text-blue-400` ad-hoc chip | `badgeInfo` / `badgeColorClass(...)` / `badgeDarkPanelInfo` |
 | `focus:ring-blue-500 focus:outline-none` | `focusRing` |
 | `style={{ color: 'var(--text-secondary)' }}` | `className={textSecondary}` |
-| `<button>Save</button>` | `<button>{t("common:actions.save")}</button>` |
-| `bg-purple-600 hover:bg-purple-700 text-white` | `toggleButtonClass(true, "purple")` or extend `buttonStyles.ts` with a semantic variant |
+| `<Button>Save</Button>` | `<Button>{t("common:actions.save")}</Button>` |
+| `<button className="px-3 py-1.5 rounded bg-blue-600 text-white …">` | `<Button variant="solid" tone="primary">` — the tone reads the theme's accent |
+| `<button className={`p-1 rounded ${hoverBg}`}>` | `<IconButton size="sm">` |
 | `hover:bg-zinc-700` | `hover:brightness-95` (or `hoverBg` for tokens) |
 
 ## Adding a new app
@@ -834,12 +855,9 @@ adjacency so related tooling is visible at a glance.
 
 ## Future improvements (non-blocking)
 
-- Optional `<Input />`, `<Select />`, `<Button />` wrappers for places where
-  the same prop combinations are used repeatedly. Trade-off: more abstraction,
-  slightly less direct control.
-- Table primitives — `Table`, `TableRow`, `TableCell` — for data grids that
-  currently roll their own.
-- Move hardcoded `red-600` / `green-600` inside `dangerButtonBase` and
-  `successButtonBase` behind status CSS variables for full theming.
+- The remaining families as primitives, in the order of the Tailwind Removal
+  Handover: inputs and selects, badges, cards and alerts, dialogs, tabs and
+  menus (the segmented controls and list rows still written as raw
+  `<button>`s belong here), data tables.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

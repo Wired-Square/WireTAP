@@ -5,13 +5,14 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
+import { textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { GeneratorDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
 import GeneratorDialog from "../dialogs/GeneratorDialog";
 import { formatHexId } from "../utils/formatHex";
+import { Button, IconButton } from "../../../components/Button";
 
 export default function GeneratorsView() {
   const { t } = useTranslation("rules");
@@ -73,12 +74,14 @@ export default function GeneratorsView() {
   return (
     <div className="space-y-2">
       <div className="flex justify-end mb-1">
-        <button
+        <Button
           onClick={() => setDialogOpen(true)}
-          className={indigoButtonCompact}
+          variant="solid"
+          tone="primary"
+          size="sm"
         >
           <Plus className={iconMd} /> {t("generators.add")}
-        </button>
+        </Button>
       </div>
 
       {generators.length === 0 && (
@@ -133,9 +136,9 @@ export default function GeneratorsView() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <IconButton
                 onClick={() => enableGenerator(g.generator_id, !g.enabled)}
-                className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
+                size="sm"
                 title={g.enabled ? t("common.disable") : t("common.enable")}
               >
                 {g.enabled ? (
@@ -143,14 +146,15 @@ export default function GeneratorsView() {
                 ) : (
                   <ToggleLeft className={iconMd} />
                 )}
-              </button>
-              <button
+              </IconButton>
+              <IconButton
                 onClick={() => removeGenerator(g.generator_id)}
-                className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                tone="danger"
+                size="sm"
                 title={t("generators.remove")}
               >
                 <Trash2 className={iconMd} />
-              </button>
+              </IconButton>
             </div>
           </div>
         );

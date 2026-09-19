@@ -4,11 +4,12 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary } from "../../../styles";
+import { labelSmall, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import type { TomlNode, ValidationError } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type SignalViewProps = {
   selectedNode: TomlNode;
@@ -55,7 +56,7 @@ export default function SignalView({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("signalDetails.title")}</h3>
         <div className={flexRowGap2}>
-          <button
+          <IconButton
             onClick={() => {
               try {
                 const found = locateSignal();
@@ -66,14 +67,13 @@ export default function SignalView({
                 onSetValidation([{ field: "signal", message: t("signalDetails.errorEdit") }]);
               }
             }}
-            className={iconButtonHover}
             title={t("signalDetails.edit")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
 
           {/* Pattern A delete */}
-          <button
+          <IconButton
             onClick={() => {
               try {
                 const found = locateSignal();
@@ -84,11 +84,11 @@ export default function SignalView({
                 onSetValidation([{ field: "signal", message: t("signalDetails.errorDelete") }]);
               }
             }}
-            className={iconButtonHoverDanger}
+            tone="danger"
             title={t("signalDetails.delete")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
-          </button>
+          </IconButton>
         </div>
       </div>
 

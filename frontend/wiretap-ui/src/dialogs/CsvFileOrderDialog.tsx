@@ -26,9 +26,9 @@ import {
   textSecondary,
   bgSurface,
   borderDefault,
-  iconButtonHover,
 } from "../styles";
 import { iconSm, iconMd } from "../styles/spacing";
+import { IconButton } from "../components/Button";
 
 export type CsvFileOrderDialogProps = {
   isOpen: boolean;
@@ -425,24 +425,22 @@ export default function CsvFileOrderDialog({
 
                 {/* Reorder buttons */}
                 <div className="flex gap-0.5 w-14 shrink-0 justify-end">
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={() => moveUp(i)}
                     disabled={i === 0}
-                    className={`${iconButtonHover} p-0.5 rounded disabled:opacity-20`}
+                    size="xs"
                     title="Move up"
                   >
                     <ChevronUp className={iconSm} />
-                  </button>
-                  <button
-                    type="button"
+                  </IconButton>
+                  <IconButton
                     onClick={() => moveDown(i)}
                     disabled={i === entries.length - 1}
-                    className={`${iconButtonHover} p-0.5 rounded disabled:opacity-20`}
+                    size="xs"
                     title="Move down"
                   >
                     <ChevronDown className={iconSm} />
-                  </button>
+                  </IconButton>
                 </div>
               </div>
 

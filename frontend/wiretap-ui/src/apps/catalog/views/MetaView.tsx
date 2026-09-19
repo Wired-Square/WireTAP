@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { FileText, Pencil, Network, Cable, Check } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary, captionMuted, sectionHeaderText } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSecondary, captionMuted, sectionHeaderText } from "../../../styles";
 import type { MetaFields, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type MetaViewProps = {
   metaFields: MetaFields;
@@ -45,13 +46,12 @@ export default function MetaView({
             </p>
           </div>
         </div>
-        <button
+        <IconButton
           onClick={onEditMeta}
-          className={iconButtonHover}
           title={t("metaView.editTooltip")}
         >
           <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-        </button>
+        </IconButton>
       </div>
 
       {/* Property cards */}

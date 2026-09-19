@@ -7,7 +7,6 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Clock, Loader2, CheckCircle2, XCircle, Trash2, ListX } from "lucide-react";
 import { useQueryStore, type QueuedQuery, type QueryStatus } from "../stores/queryStore";
-import { iconButtonBase } from "../../../styles/buttonStyles";
 import { monoBody } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import {
@@ -19,6 +18,7 @@ import {
   textDataGreen,
   textDataAmber,
 } from "../../../styles/colourTokens";
+import { IconButton } from "../../../components/Button";
 
 interface Props {
   onSelectQuery: (id: string) => void;
@@ -168,13 +168,14 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
       </div>
 
       {/* Remove button */}
-      <button
+      <IconButton
         onClick={handleRemove}
-        className={`${iconButtonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
+        variant="surface"
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
         title={isRunning ? t("queue.cancelTooltip") : t("queue.removeTooltip")}
       >
         <Trash2 className={iconMd} />
-      </button>
+      </IconButton>
     </div>
   );
 }

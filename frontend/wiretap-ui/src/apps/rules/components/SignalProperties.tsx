@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { textSecondary, textTertiary, textDanger } from "../../../styles";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { Button } from "../../../components/Button";
 import { type PlacedSignal, VALUE_TYPES, BYTE_ORDER_LE, BYTE_ORDER_BE } from "../utils/bitGrid";
 
 interface SignalPropertiesProps {
@@ -112,12 +113,15 @@ export default function SignalProperties({
       </div>
 
       {/* Delete */}
-      <button
+      <Button
         onClick={onDelete}
-        className={`mt-2 w-full py-2 text-sm rounded border border-[color:var(--status-danger-border)] ${textDanger} hover:bg-[var(--status-danger-bg)] transition-colors`}
+        variant="outline"
+        tone="danger"
+        size="lg"
+        className="mt-2 w-full"
       >
         {t("signalProperties.delete")}
-      </button>
+      </Button>
     </div>
   );
 }

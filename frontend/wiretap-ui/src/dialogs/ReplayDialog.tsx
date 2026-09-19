@@ -16,6 +16,7 @@ import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { getCaptureFramesPaginatedById } from "../api/capture";
 import type { ReplayFrame } from "../api/transmit";
+import { Button } from "../components/Button";
 
 function formatDuration(us: number): string {
   const ms = us / 1000;
@@ -247,12 +248,13 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                   placeholder={t("replay.endPlaceholder")}
                   className={`${inputSimple} flex-1 font-mono text-sm`}
                 />
-                <button
+                <Button
                   onClick={() => { setStartRaw("1"); setEndRaw(String(bufferLength)); }}
-                  className="px-2.5 py-1.5 text-xs rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95 transition-colors whitespace-nowrap"
+                  variant="outline"
+                  size="sm"
                 >
                   {t("replay.all")}
-                </button>
+                </Button>
               </div>
               {rangeError && bufferLength > 0 ? (
                 <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>
@@ -297,28 +299,24 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
             <div className="space-y-1">
               <label className={labelSmall}>{t("replay.targetBus")}</label>
               <div className="flex gap-1 flex-wrap">
-                <button
+                <Button
                   onClick={() => setTargetBus("original")}
-                  className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-                    targetBus === "original"
-                      ? "border-blue-500 bg-blue-600/20 text-blue-400"
-                      : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95"
-                  }`}
+                  variant="outline"
+                  size="sm"
+                  pressed={targetBus === "original"}
                 >
                   {t("replay.perFrame")}
-                </button>
+                </Button>
                 {BUS_OPTIONS.map((b) => (
-                  <button
+                  <Button
                     key={b}
                     onClick={() => setTargetBus(b)}
-                    className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-                      targetBus === b
-                        ? "border-blue-500 bg-blue-600/20 text-blue-400"
-                        : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95"
-                    }`}
+                    variant="outline"
+                    size="sm"
+                    pressed={targetBus === b}
                   >
                     {t("replay.busLabel", { bus: b })}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <p className={helpText}>
@@ -333,17 +331,15 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
               <label className={labelSmall}>{t("replay.speed")}</label>
               <div className="flex gap-1 flex-wrap">
                 {SPEED_PRESETS.map((p) => (
-                  <button
+                  <Button
                     key={p.value}
                     onClick={() => handleSpeedPreset(p.value)}
-                    className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-                      speed === p.value
-                        ? "border-blue-500 bg-blue-600/20 text-blue-400"
-                        : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95"
-                    }`}
+                    variant="outline"
+                    size="sm"
+                    pressed={speed === p.value}
                   >
                     {p.label}
-                  </button>
+                  </Button>
                 ))}
                 <input
                   type="number"

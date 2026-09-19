@@ -4,10 +4,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
-import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
 import { labelSmall, caption, captionMuted, sectionHeaderText, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
-import { borderDivider, hoverLight, bgSurface, textMuted } from "../../../../styles";
+import { borderDivider, bgSurface, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { DetectedPattern, IntervalGroup, StartIdCandidate, MultiplexedFrame, BurstFrame, MultiBusFrame } from "../../../../utils/analysis/messageOrderAnalysis";
 import { useSettings } from "../../../../hooks/useSettings";
@@ -18,6 +17,7 @@ import { pickFileToSave } from "../../../../api/dialogs";
 import { saveCatalog } from "../../../../api/catalog";
 import { generateFrameOrderReport } from "../../../../utils/frameOrderReport";
 import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
+import { Button, IconButton } from "../../../../components/Button";
 
 type Props = {
   embedded?: boolean;
@@ -158,25 +158,25 @@ function Header({ onExport, hasResults, onClose }: HeaderProps) {
         </p>
       </div>
       {hasResults && (
-        <button
-          type="button"
+        <Button
           onClick={onExport}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs text-[color:var(--text-secondary)] ${hoverLight} transition-colors`}
+          variant="ghost"
+          size="sm"
           title={t("messageOrder.exportButtonTooltip")}
         >
           <Download className={iconSm} />
           <span>{t("messageOrder.exportLabel")}</span>
-        </button>
+        </Button>
       )}
       {onClose && (
-        <button
-          type="button"
+        <IconButton
           onClick={onClose}
-          className={iconButtonDangerCompact}
+          tone="danger"
+          size="sm"
           title={t("messageOrder.close")}
         >
           <X className={iconXs} />
-        </button>
+        </IconButton>
       )}
     </div>
   );
@@ -343,13 +343,14 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
                   {candidate.occurrences}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <button
-                    type="button"
+                  <Button
                     onClick={() => onSelect(candidate.id)}
-                    className="text-xs text-[color:var(--text-purple)] hover:underline"
+                    variant="link"
+                    tone="purple"
+                    className="text-xs"
                   >
                     {t("messageOrder.useButton")}
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}

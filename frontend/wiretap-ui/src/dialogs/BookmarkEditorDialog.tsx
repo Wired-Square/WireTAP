@@ -9,7 +9,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton, DangerButton } from "../components/forms";
-import { h2, labelSmall, captionMuted, borderDefault, bgSecondary, hoverLight, sectionHeaderText, emptyStateText } from "../styles";
+import { h2, labelSmall, captionMuted, borderDefault, bgSecondary, sectionHeaderText, emptyStateText } from "../styles";
 import {
   getAllFavorites,
   updateFavorite,
@@ -17,6 +17,7 @@ import {
   type TimeRangeFavorite,
 } from "../utils/favorites";
 import TimeBoundsInput, { type TimeBounds } from "../components/TimeBoundsInput";
+import { IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -265,24 +266,23 @@ export default function BookmarkEditorDialog({
           <div className={flexRowGap2}>
             <h2 className={h2}>{t("bookmarkEditor.title")}</h2>
             {canCreate && (
-              <button
-                type="button"
+              <IconButton
                 onClick={handleStartCreate}
-                className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] ${hoverLight}`}
+                tone="primary"
+                size="sm"
                 title={t("bookmarkEditor.newTooltip")}
               >
                 <Plus className={iconMd} />
-              </button>
+              </IconButton>
             )}
           </div>
-          <button
-            type="button"
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] ${hoverLight}`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Content */}
@@ -324,18 +324,18 @@ export default function BookmarkEditorDialog({
                           </div>
                         </button>
                         {onLoad && (
-                          <button
-                            type="button"
+                          <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
                               onLoad(bookmark);
                               onClose();
                             }}
                             title={t("bookmarkEditor.loadTooltip")}
-                            className="p-2 mr-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg)]"
+                            tone="primary"
+                            className="mr-1"
                           >
                             <Play className={iconMd} />
-                          </button>
+                          </IconButton>
                         )}
                       </div>
                     ))}

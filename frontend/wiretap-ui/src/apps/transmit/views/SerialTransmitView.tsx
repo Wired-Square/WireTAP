@@ -18,10 +18,10 @@ import {
   textDataTertiary,
   focusBorder,
 } from "../../../styles/colourTokens";
-import { buttonBase, toggleChipClass } from "../../../styles/buttonStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex, hexToBytes } from "../../../utils/byteUtils";
+import { Button } from "../../../components/Button";
 
 export default function SerialTransmitView() {
   const { t } = useTranslation("transmit");
@@ -181,26 +181,33 @@ export default function SerialTransmitView() {
           <div className="space-y-2">
             <label className={`${textDataSecondary} text-xs`}>{t("serialView.framingMode")}</label>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
+              <Button
                 onClick={() => handleFramingModeChange("raw")}
-                className={toggleChipClass(serialEditor.framingMode === "raw")}
+                variant="outline"
+                tone="primary"
+                size="sm"
+                pressed={serialEditor.framingMode === "raw"}
               >
                 {t("serialView.framingRaw")}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleFramingModeChange("slip")}
-                className={toggleChipClass(serialEditor.framingMode === "slip")}
+                variant="outline"
+                tone="primary"
+                size="sm"
+                pressed={serialEditor.framingMode === "slip"}
               >
                 {t("serialView.framingSlip")}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleFramingModeChange("delimiter")}
-                className={toggleChipClass(
-                  serialEditor.framingMode === "delimiter"
-                )}
+                variant="outline"
+                tone="primary"
+                size="sm"
+                pressed={serialEditor.framingMode === "delimiter"}
               >
                 {t("serialView.framingDelimiter")}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -252,36 +259,35 @@ export default function SerialTransmitView() {
 
       {/* Actions */}
       <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
-        <button
+        <Button
           onClick={handleSend}
           disabled={!preview || isSending}
-          className={`${buttonBase} ${preview && !isSending ? "bg-blue-600 hover:bg-blue-500" : ""}`}
+          variant="solid"
+          tone="primary"
           title={t("serialView.sendTooltip")}
         >
           <Send size={16} />
           <span>{isSending ? t("serialView.sending") : t("serialView.send")}</span>
-        </button>
+        </Button>
 
-        <button
+        <Button
           onClick={handleAddToQueue}
           disabled={!preview}
-          className={buttonBase}
           title={t("serialView.addToQueueTooltip")}
         >
           <Plus size={16} />
           <span>{t("serialView.addToQueue")}</span>
-        </button>
+        </Button>
 
         <div className="flex-1" />
 
-        <button
+        <Button
           onClick={handleReset}
-          className={buttonBase}
           title={t("serialView.resetTooltip")}
         >
           <RotateCcw size={14} />
           <span>{t("serialView.reset")}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

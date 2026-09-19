@@ -690,10 +690,11 @@ const VARIANT_BIT = Object.fromEntries(Object.keys(VARIANTS).map((v, i) => [v, 1
 // tests, split on whitespace. A chunk's token that abuts a `${}` is a fragment, not a class.
 // ---------------------------------------------------------------------------------------
 
-export const appCss = () => fs.readFileSync(path.join(SRC_DIR, "WireTAP.css"), "utf8");
+const APP_SHEETS = ["WireTAP.css", "styles/components.css"];
+export const appCss = () => APP_SHEETS.map((f) => fs.readFileSync(path.join(SRC_DIR, f), "utf8")).join("\n");
 export const readSheet = () => (fs.existsSync(SHEET_PATH) ? fs.readFileSync(SHEET_PATH, "utf8") : "");
 
-/** Class names WireTAP.css declares itself (`font-led`, `animate-fade-in`): never utilities. */
+/** Class names the app's own sheets declare (`font-led`, `btn--icon`): never utilities. */
 export function appClasses() {
   return new Set([...appCss().matchAll(/\.([a-zA-Z_][\w-]*)/g)].map((m) => m[1]));
 }

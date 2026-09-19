@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import IndicatorSprite, { IndicatorSpriteDefs } from "../components/IndicatorSprite";
@@ -17,6 +17,7 @@ import { brgbToCss } from "../utils/brgbColour";
 import type { DiscoveredLed } from "../../../api/framelinkRules";
 import PaletteEditorDialog from "../dialogs/PaletteEditorDialog";
 import IndicatorConfigDialog, { type LedUpdateValues } from "../dialogs/IndicatorConfigDialog";
+import { Button, IconButton } from "../../../components/Button";
 
 const STATE_KEYS = ["off", "on", "blink"] as const;
 
@@ -56,19 +57,21 @@ export default function IndicatorsView() {
     <div className="space-y-2">
       <IndicatorSpriteDefs />
       <div className="flex justify-end gap-2 mb-1">
-        <button
+        <Button
           onClick={() => setPaletteOpen(true)}
-          className={indigoButtonCompact}
+          variant="solid"
+          tone="primary"
+          size="sm"
         >
           <Palette className={iconMd} /> {t("indicators.paletteEditor")}
-        </button>
-        <button
+        </Button>
+        <IconButton
           onClick={refreshIndicators}
-          className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
+          size="sm"
           title={t("indicators.refresh")}
         >
           <RefreshCw className={iconMd} />
-        </button>
+        </IconButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

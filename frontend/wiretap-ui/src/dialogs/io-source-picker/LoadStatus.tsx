@@ -10,9 +10,9 @@ import {
   bgDanger,
   borderDanger,
   textDanger,
-  gapTight,
   gapSmall,
 } from "../../styles";
+import { Button } from "../../components/Button";
 
 type Props = {
   isLoading: boolean;
@@ -39,13 +39,15 @@ export default function LoadStatus({
               {t("ioSourcePicker.loadingFrames", { count: loadFrameCount.toLocaleString() })}
             </span>
           </div>
-          <button
+          <Button
             onClick={onStopLoad}
-            className={`px-2 py-1 flex items-center ${gapTight} text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors`}
+            variant="solid"
+            tone="danger"
+            size="sm"
           >
             <Square className={iconXs} />
             <span>{t("ioSourcePicker.stop")}</span>
-          </button>
+          </Button>
         </div>
       )}
 

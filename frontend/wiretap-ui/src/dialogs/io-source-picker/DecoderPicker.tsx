@@ -14,6 +14,7 @@ import { iconMd, iconXs } from "../../styles/spacing";
 import CatalogPickerDialog from "../catalog-picker";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { findCatalogByPath } from "../../utils/catalogUtils";
+import { IconButton } from "../../components/Button";
 
 interface Props {
   catalogPath: string | null;
@@ -51,13 +52,13 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
                 </div>
               )}
             </div>
-            <button
+            <IconButton
               onClick={(e) => { e.stopPropagation(); onSelect(null); }}
               title={t("ioSourcePicker.decoder.clear")}
-              className="p-1 rounded hover:bg-[var(--hover-bg)] transition-colors text-[color:var(--text-muted)]"
+              size="sm"
             >
               <X className={iconXs} />
-            </button>
+            </IconButton>
           </div>
         ) : (
           // No decoder — unselected source-style row.

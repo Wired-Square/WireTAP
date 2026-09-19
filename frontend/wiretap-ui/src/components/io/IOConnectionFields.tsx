@@ -49,6 +49,7 @@ import type {
   VirtualInterfaceConfig,
 } from "../../settings/appSettings";
 import { isProfileKind } from "../../settings/appSettings";
+import { Button } from "../Button";
 
 export type MqttFormatKind = "json" | "savvycan" | "decode";
 export type MqttFormatField = "topic" | "enabled";
@@ -889,10 +890,10 @@ export default function IOConnectionFields({
 
         {/* Advanced serial line settings */}
         <div className={`border-t ${borderDefault} pt-4 mt-4`}>
-          <button
-            type="button"
+          <Button
             onClick={() => setSlcanAdvancedOpen(!slcanAdvancedOpen)}
-            className="flex items-center gap-2 text-sm font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors"
+            variant="link"
+            className="text-sm"
           >
             {slcanAdvancedOpen ? (
               <ChevronDown className={iconMd} />
@@ -900,7 +901,7 @@ export default function IOConnectionFields({
               <ChevronRight className={iconMd} />
             )}
             {t("ioProfileDialog.slcan.advancedSerial")}
-          </button>
+          </Button>
 
           {slcanAdvancedOpen && (
             <div className="mt-3 space-y-3 pl-6">

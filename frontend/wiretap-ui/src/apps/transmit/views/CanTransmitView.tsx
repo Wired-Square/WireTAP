@@ -13,9 +13,9 @@ import {
   textDataSecondary,
 } from "../../../styles/colourTokens";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
-import { playButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { byteToHex } from "../../../utils/byteUtils";
 import CanFrameEditor from "../components/CanFrameEditor";
+import { Button } from "../../../components/Button";
 
 export default function CanTransmitView() {
   const { t } = useTranslation("transmit");
@@ -131,36 +131,35 @@ export default function CanTransmitView() {
 
       {/* Actions */}
       <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
-        <button
+        <Button
           onClick={handleSend}
           disabled={!framePreview}
-          className={playButtonBase}
+          variant="solid"
+          tone="success"
           title={t("canView.sendOnceTooltip")}
         >
           <Send size={16} />
           <span>{t("canView.sendOnce")}</span>
-        </button>
+        </Button>
 
-        <button
+        <Button
           onClick={handleAddToQueue}
           disabled={!framePreview}
-          className={buttonBase}
           title={t("canView.addToQueueTooltip")}
         >
           <Plus size={16} />
           <span>{t("canView.addToQueue")}</span>
-        </button>
+        </Button>
 
         <div className="flex-1" />
 
-        <button
+        <Button
           onClick={handleReset}
-          className={buttonBase}
           title={t("canView.resetTooltip")}
         >
           <RotateCcw size={14} />
           <span>{t("canView.reset")}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

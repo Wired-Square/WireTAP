@@ -4,8 +4,8 @@ import { Network, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { iconLg, iconMd } from "../../../styles/spacing";
-import { iconButtonHover } from "../../../styles/buttonStyles";
 import FlexSeparator from "../../../components/FlexSeparator";
+import { Button, IconButton } from "../../../components/Button";
 
 interface SessionTopBarProps {
   sessionCount: number;
@@ -32,9 +32,10 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
       {/* Right: Controls */}
       <div className="flex items-center gap-2">
         {/* Auto-refresh toggle */}
-        <button
+        <Button
           onClick={() => setAutoRefresh(!autoRefresh)}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${iconButtonHover}`}
+          variant="ghost"
+          size="sm"
           title={autoRefresh ? t("topBar.autoRefreshOn") : t("topBar.autoRefreshOff")}
         >
           {autoRefresh ? (
@@ -42,14 +43,13 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
           ) : (
             <ToggleLeft className={`${iconMd} text-[color:var(--text-muted)]`} />
           )}
-          <span className="text-[color:var(--text-secondary)]">{t("topBar.auto")}</span>
-        </button>
+          {t("topBar.auto")}
+        </Button>
 
         {/* Manual refresh */}
-        <button
+        <IconButton
           onClick={onRefresh}
           disabled={isRefreshing}
-          className={`p-1.5 rounded ${iconButtonHover} disabled:opacity-50`}
           title={t("topBar.refresh")}
         >
           <RefreshCw
@@ -57,7 +57,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
               isRefreshing ? "animate-spin" : ""
             }`}
           />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

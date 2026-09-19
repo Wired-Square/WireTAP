@@ -23,7 +23,8 @@ import {
   dataViewContainer,
   textDataSecondary,
 } from "../../styles/colourTokens";
-import { dataViewTabClass, tabCountColorClass } from "../../styles/buttonStyles";
+import { dataViewTabClass } from "../../styles/buttonStyles";
+import { tabCountColorClass } from "../../styles/badgeStyles";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../styles/typography";
 import ProtocolBadge from "../../components/ProtocolBadge";
 import AppLayout from "../../components/AppLayout";
@@ -34,6 +35,7 @@ import TransmitQueueView from "./views/TransmitQueueView";
 import TransmitHistoryView from "./views/TransmitHistoryView";
 import TransmitReplayView from "./views/TransmitReplayView";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
+import { Button } from "../../components/Button";
 
 // ============================================================================
 // Helper: Check if a profile can transmit
@@ -313,12 +315,14 @@ function TransmitInner() {
           >
           <AlertCircle size={16} className="text-red-400 shrink-0" />
           <span className="text-red-300 text-sm flex-1">{transmitError}</span>
-          <button
+          <Button
             onClick={clearError}
-            className="text-red-400 hover:text-red-300 text-xs"
+            variant="link"
+            tone="danger"
+            className="text-xs"
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
 

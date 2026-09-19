@@ -17,6 +17,7 @@ import {
   roundedDefault,
   gapSmall,
 } from "../styles";
+import { IconButton } from "../components/Button";
 
 export interface ErrorDialogProps {
   isOpen: boolean;
@@ -49,13 +50,13 @@ export default function ErrorDialog({
               <h2 className={h2}>{headingTitle}</h2>
             </div>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Message */}

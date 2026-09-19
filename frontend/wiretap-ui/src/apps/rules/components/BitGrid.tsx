@@ -7,6 +7,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
 import { textPrimary, textSecondary, textTertiary, focusRingThin } from "../../../styles";
 import { type PlacedSignal, buildBitOwnerMap } from "../utils/bitGrid";
+import { Button } from "../../../components/Button";
 
 // Column indices 0..7 display bits 7..0 (MSB first)
 const COLUMN_HEADERS = [7, 6, 5, 4, 3, 2, 1, 0] as const;
@@ -106,12 +107,14 @@ export default function BitGrid({
             placeholder="Go to"
             className={`w-16 h-5 text-[10px] font-mono px-1 rounded border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${focusRingThin}`}
           />
-          <button
+          <Button
             onClick={handleJump}
-            className={`h-5 px-1.5 text-[10px] rounded border border-[color:var(--border-default)] bg-[var(--bg-surface)] ${textSecondary} hover:brightness-90`}
+            variant="outline"
+            size="sm"
+            className="h-5"
           >
             Go
-          </button>
+          </Button>
         </div>
       </div>
 

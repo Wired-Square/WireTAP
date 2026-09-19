@@ -11,7 +11,8 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex, byteToHex } from "../utils/byteUtils";
-import { toggleCardClass, toggleChipClass, bgDataInput, borderDataView, textDataPrimary, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
+import { toggleCardClass, bgDataInput, borderDataView, textDataPrimary, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
+import { Button } from "./Button";
 
 // Re-export for backwards compatibility (used by other components)
 export { hexToBytes, bytesToHex };
@@ -353,38 +354,46 @@ export default function FramingOptionsPanel({
           {t("framingOptions.encoding")}
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
+          <Button
             disabled={disabled}
             onClick={() => handleModeChange("raw")}
-            className={`${toggleChipClass(currentMode === "raw")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={currentMode === "raw"}
           >
             {t("framingOptions.modeNone")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={disabled}
             onClick={() => handleModeChange("slip")}
-            className={`${toggleChipClass(currentMode === "slip")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={currentMode === "slip"}
           >
             {t("framingOptions.modeSlip")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={disabled}
             onClick={() => handleModeChange("delimiter")}
-            className={`${toggleChipClass(currentMode === "delimiter")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={currentMode === "delimiter"}
           >
             {t("framingOptions.modeDelimiter")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={disabled}
             onClick={() => handleModeChange("modbus_rtu")}
-            className={`${toggleChipClass(currentMode === "modbus_rtu")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            variant="outline"
+            tone="primary"
+            size="sm"
+            pressed={currentMode === "modbus_rtu"}
           >
             {t("framingOptions.modeModbusRtu")}
-          </button>
+          </Button>
         </div>
       </div>
 

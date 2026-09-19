@@ -17,6 +17,7 @@ import {
 import { parseFrameKey } from "../utils/frameKey";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
+import { Button } from "../components/Button";
 
 interface Props {
   isOpen: boolean;
@@ -189,12 +190,13 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
               className={`${inputSimple} flex-1 font-mono text-sm`}
               maxLength={8}
             />
-            <button
+            <Button
               onClick={() => { setMinIdRaw(""); setMaxIdRaw(""); }}
-              className="px-2.5 py-1.5 text-xs rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95 transition-colors whitespace-nowrap"
+              variant="outline"
+              size="sm"
             >
               {t("bulkAddToTransmit.all")}
-            </button>
+            </Button>
           </div>
           {rangeError ? (
             <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>

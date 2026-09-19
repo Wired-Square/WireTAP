@@ -9,6 +9,7 @@ import { iconMd, flexRowGap2 } from "../../styles/spacing";
 import { getCanSetupCommand } from "../../api/gs_usb";
 import { alertWarning, helpText } from "../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../constants";
+import { IconButton } from "../Button";
 
 interface Props {
   /** CAN interface name (e.g., "can0") */
@@ -70,10 +71,10 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
             <code className="flex-1 p-2 bg-[var(--bg-warning)] rounded text-xs font-mono break-all">
               {setupCommand}
             </code>
-            <button
-              type="button"
+            <IconButton
               onClick={handleCopy}
-              className="p-1.5 hover:bg-[var(--hover-bg-warning)] rounded transition-colors flex-shrink-0"
+              tone="warning"
+              size="sm"
               title={copied ? "Copied!" : "Copy to clipboard"}
             >
               {copied ? (
@@ -81,7 +82,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
               ) : (
                 <Copy className={iconMd} />
               )}
-            </button>
+            </IconButton>
           </div>
           <p className={`${helpText} mt-2 text-xs`}>
             Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.

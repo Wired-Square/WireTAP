@@ -4,8 +4,9 @@ import { useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
+import { borderDivider, focusRing } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { IconButton } from "../../../components/Button";
 
 export type TextFindBarProps = {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -147,31 +148,31 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
           : ""}
       </span>
 
-      <button
+      <IconButton
         onClick={textFindPrevious}
         disabled={matchCount === 0}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.previous")}
       >
         <ChevronUp className={iconMd} />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         onClick={textFindNext}
         disabled={matchCount === 0}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.next")}
       >
         <ChevronDown className={iconMd} />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         onClick={closeTextFind}
-        className={iconButtonHoverSmall}
+        size="sm"
         title={t("findBar.close")}
       >
         <X className={iconMd} />
-      </button>
+      </IconButton>
     </div>
   );
 }

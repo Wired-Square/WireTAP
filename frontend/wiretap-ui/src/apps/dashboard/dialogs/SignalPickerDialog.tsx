@@ -4,11 +4,12 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Check, Search } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple, primaryButtonBase } from "../../../styles";
+import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 /** Key used to identify a signal selection. */
 function signalKey(frameId: number, signalName: string): string {
@@ -182,6 +183,8 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
   const isSignalSelected = (frameId: number, signalName: string) =>
     selectedKeys.has(signalKey(frameId, signalName));
 
+  const AddInstrumentsButton = instrumentsMode ? PrimaryButton : SecondaryButton;
+
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
@@ -319,31 +322,26 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
 
         {/* Footer — OK / Cancel */}
         <div className={`p-4 border-t border-[var(--border-default)] flex justify-end gap-2`}>
-          <button
+          <SecondaryButton
             onClick={onClose}
-            className={`px-4 py-2 rounded text-sm font-medium text-[color:var(--text-secondary)] ${hoverLight} transition-colors`}
           >
             {t("signalPicker.cancel")}
-          </button>
+          </SecondaryButton>
           {!isReplaceMode && (
-            <button
+            <AddInstrumentsButton
               onClick={handleAddInstruments}
               disabled={newSelectionCount === 0}
               title={t("signalPicker.addInstrumentsHint")}
-              className={instrumentsMode
-                ? `${primaryButtonBase} px-4 disabled:opacity-40 disabled:cursor-not-allowed`
-                : `px-4 py-2 rounded text-sm font-medium text-[color:var(--text-primary)] bg-[var(--bg-primary)] border border-[var(--border-default)] ${hoverLight} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
             >
               {t("signalPicker.addInstruments")}
-            </button>
+            </AddInstrumentsButton>
           )}
           {!instrumentsMode && (
-            <button
+            <PrimaryButton
               onClick={handleOk}
-              className={`${primaryButtonBase} px-4`}
             >
               {t("signalPicker.ok")}
-            </button>
+            </PrimaryButton>
           )}
         </div>
       </div>

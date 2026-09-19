@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown, Loader } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
-import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
+import { borderDivider, focusRing } from "../../../styles";
+import { IconButton } from "../../../components/Button";
 
 export type FindSearchMode = 'id' | 'data' | 'both';
 
@@ -104,31 +105,31 @@ export default function DiscoveryFindBar({
           : counterText}
       </span>
 
-      <button
+      <IconButton
         onClick={onPrev}
         disabled={matchCount === 0 || isSearching}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.previous")}
       >
         <ChevronUp className={iconMd} />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         onClick={onNext}
         disabled={matchCount === 0 || isSearching}
-        className={`${iconButtonHoverSmall} ${disabledState}`}
+        size="sm"
         title={t("findBar.next")}
       >
         <ChevronDown className={iconMd} />
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         onClick={onClose}
-        className={iconButtonHoverSmall}
+        size="sm"
         title={t("findBar.close")}
       >
         <X className={iconMd} />
-      </button>
+      </IconButton>
     </div>
   );
 }

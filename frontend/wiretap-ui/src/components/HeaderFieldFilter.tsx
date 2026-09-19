@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { X } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import { labelSmall } from "../styles/typography";
+import { Button, IconButton } from "./Button";
 
 export type HeaderFieldOption = {
   /** Raw numeric value */
@@ -72,35 +73,31 @@ export default function HeaderFieldFilter({
           const isActive = hasSelection ? isSelected : true;
 
           return (
-            <button
+            <Button
               key={option.value}
               onClick={() => onToggle(option.value)}
-              className={`
-                px-2 py-0.5 text-xs font-mono rounded transition-colors
-                ${isActive
-                  ? "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] border border-[color:var(--status-purple-border)]"
-                  : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-transparent"
-                }
-                hover:bg-[var(--status-purple-bg-hover)]
-              `}
+              tone="purple"
+              size="sm"
+              pressed={isActive}
+              className="font-mono"
               title={`${isSelected ? "Hide" : "Show"} ${fieldName} ${option.display}`}
             >
               {option.display}
               {showCounts && (
                 <span className="ml-1 opacity-60">({option.count})</span>
               )}
-            </button>
+            </Button>
           );
         })}
 
         {hasSelection && (
-          <button
+          <IconButton
             onClick={onClear}
-            className="p-0.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
+            size="xs"
             title={`Clear ${fieldName} filter`}
           >
             <X className={iconSm} />
-          </button>
+          </IconButton>
         )}
       </div>
     </div>

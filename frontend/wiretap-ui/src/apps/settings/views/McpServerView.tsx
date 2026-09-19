@@ -15,10 +15,6 @@ import {
   labelDefault,
   helpText,
   inputSimple,
-  buttonBase,
-  primaryButtonBase,
-  secondaryButton,
-  disabledState,
   h2,
   textPrimary,
   textSuccess,
@@ -26,6 +22,8 @@ import {
 } from "../../../styles";
 import { SETTINGS_BOUNDS } from "../../../settings/bounds";
 import { SettingRow, SettingToggleRow } from "../components/rows";
+import { Button } from "../../../components/Button";
+import { PrimaryButton, SecondaryButton } from "../../../components/forms";
 
 interface McpStatus {
   running: boolean;
@@ -224,6 +222,8 @@ export default function McpServerView() {
     },
   ];
 
+  const ApplyButton = pendingRestart ? PrimaryButton : SecondaryButton;
+
   return (
     <div className="space-y-6">
       <h2 className={h2}>MCP Server</h2>
@@ -307,9 +307,7 @@ export default function McpServerView() {
             }}
             className={`${inputSimple} font-mono text-xs`}
           />
-          <button
-            type="button"
-            className={buttonBase}
+          <Button
             title="Generate a new token"
             onClick={() => {
               setServerToken(generateToken());
@@ -317,16 +315,14 @@ export default function McpServerView() {
             }}
           >
             <RefreshCw size={14} /> Generate
-          </button>
-          <button
-            type="button"
-            className={buttonBase}
+          </Button>
+          <Button
             disabled={!serverToken}
             title="Copy token"
             onClick={() => copy("token", serverToken)}
           >
             {copied === "token" ? <Check size={14} /> : <Copy size={14} />}
-          </button>
+          </Button>
         </div>
         <p className={helpText}>
           Clients must send this as a bearer token. Leave blank for no auth — the
@@ -336,14 +332,9 @@ export default function McpServerView() {
 
       {/* Apply */}
       <div>
-        <button
-          type="button"
-          className={`${pendingRestart ? primaryButtonBase : secondaryButton} ${disabledState}`}
-          disabled={busy || !pendingRestart}
-          onClick={() => apply(serverEnabled)}
-        >
+        <ApplyButton disabled={busy || !pendingRestart} onClick={() => apply(serverEnabled)}>
           {busy ? "Applying…" : serverEnabled ? "Apply & restart server" : "Apply"}
-        </button>
+        </ApplyButton>
         <p className={`${helpText} mt-2`}>{applyMessage}</p>
       </div>
 
@@ -355,14 +346,12 @@ export default function McpServerView() {
           <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded p-3 text-[color:var(--text-primary)]">
             {addCommand}
           </pre>
-          <button
-            type="button"
-            className={buttonBase}
+          <Button
             title="Copy command"
             onClick={() => copy("cmd", addCommand)}
           >
             {copied === "cmd" ? <Check size={14} /> : <Copy size={14} />}
-          </button>
+          </Button>
         </div>
         <p className={helpText}>
           Tier 2 tools (discovery analysis, decoded signals, live frame map) need the

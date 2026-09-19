@@ -7,7 +7,8 @@ import { iconLg } from "../styles/spacing";
 import { getAppVersion } from "../api";
 import Dialog from "../components/Dialog";
 import { PrimaryButton } from "../components/forms";
-import { h1, h3, bodyDefault, bodySmall, borderDefault, hoverLight, roundedDefault, spaceYDefault, paddingDialog } from "../styles";
+import { h1, h3, bodyDefault, bodySmall, borderDefault, spaceYDefault, paddingDialog } from "../styles";
+import { IconButton } from "../components/Button";
 
 interface AboutDialogProps {
   isOpen: boolean;
@@ -30,13 +31,13 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
       <div className={`${paddingDialog} max-h-[80vh] flex flex-col`}>
         <div className="flex items-start justify-between mb-4 shrink-0">
           <h2 className={h1}>{t("about.title")}</h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 ${hoverLight} ${roundedDefault} transition-colors`}
+            size="sm"
           >
             <X className={`${iconLg} text-slate-500`} />
-          </button>
+          </IconButton>
         </div>
 
         <div className={`${spaceYDefault} ${bodyDefault} overflow-y-auto min-h-0`}>

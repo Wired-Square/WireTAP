@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2, HelpCircle } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { nextAvailableId } from "../utils/framelinkConstants";
@@ -17,6 +17,8 @@ import type {
   BridgeFilterIde,
   BridgeDefaultAction,
 } from "../../../api/framelinkRules";
+import { Button, IconButton } from "../../../components/Button";
+import { SecondaryButton, PrimaryButton } from "../../../components/forms";
 
 interface FilterRow {
   kind: BridgeFilterKind;
@@ -263,12 +265,14 @@ export default function BridgeDialog({
               <label className={labelDefault} title={filtersTooltip}>
                 {filtersLabel}
               </label>
-              <button
+              <Button
                 onClick={addFilter}
-                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                variant="link"
+                tone="primary"
+                className="text-xs"
               >
                 <Plus className={iconMd} /> {t("bridgeDialog.fields.addFilter")}
-              </button>
+              </Button>
             </div>
 
             {filters.length > 0 && (
@@ -328,27 +332,24 @@ export default function BridgeDialog({
                           </select>
                         </div>
                         <div className="flex-1" />
-                        <button
-                          type="button"
+                        <IconButton
                           onClick={() => toggleHelp(idx)}
-                          aria-pressed={helpOpen}
                           aria-label={t(helpOpen
                             ? "bridgeDialog.fields.helpHide"
                             : "bridgeDialog.fields.helpShow")}
                           title={t("bridgeDialog.tooltips.helpToggle")}
-                          className={`p-1 rounded hover:bg-white/10 ${
-                            helpOpen ? "text-blue-400" : textTertiary
-                          } hover:text-blue-300`}
+                          size="sm"
+                          pressed={helpOpen}
                         >
                           <HelpCircle className={iconMd} />
-                        </button>
-                        <button
-                          type="button"
+                        </IconButton>
+                        <IconButton
                           onClick={() => removeFilter(idx)}
-                          className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                          tone="danger"
+                          size="sm"
                         >
                           <Trash2 className={iconMd} />
-                        </button>
+                        </IconButton>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
@@ -400,18 +401,16 @@ export default function BridgeDialog({
       </div>
 
       <div className={`${panelFooter} flex justify-end gap-2`}>
-        <button
+        <SecondaryButton
           onClick={onClose}
-          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
           {t("bridgeDialog.cancel")}
-        </button>
-        <button
+        </SecondaryButton>
+        <PrimaryButton
           onClick={handleSubmit}
-          className={indigoButton}
         >
           {bidirectional ? t("bridgeDialog.submitTwo") : t("bridgeDialog.submitOne")}
-        </button>
+        </PrimaryButton>
       </div>
     </Dialog>
   );

@@ -27,12 +27,12 @@ import MuxStatisticsView from "./MuxStatisticsView";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { formatHumanUs } from "../../../utils/timeFormat";
 import DataViewPaginationToolbar, { FRAME_PAGE_SIZE_OPTIONS } from "../../../components/DataViewPaginationToolbar";
-import { iconButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import { bgSurface, borderDefault, borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDataCyan, textDanger } from "../../../styles/colourTokens";
 import { useAutoRowCount } from "../../../hooks/useAutoRowCount";
 import { pageCount, resolvePageSize, type PageSize } from "../../../utils/pageSize";
+import { Button, IconButton } from "../../../components/Button";
 
 interface Props {
   selectedQuery: QueuedQuery | null;
@@ -269,9 +269,9 @@ export default function ResultsPanel({
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={onExport} className={iconButtonBase} title={t("results.exportTooltip")}>
+            <IconButton onClick={onExport} variant="surface" title={t("results.exportTooltip")}>
               <FileDown className={iconMd} />
-            </button>
+            </IconButton>
           </div>
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-3">
@@ -286,14 +286,15 @@ export default function ResultsPanel({
             <div className={`${monoBody} text-xs ${textMuted} mt-1`}>
               {formatPayload(fl.first_payload)}
             </div>
-            <button
+            <Button
               onClick={() => onIngestEvent(fl.first_timestamp_us)}
-              className={`${buttonBase} mt-2`}
+              size="sm"
+              className="mt-2"
               title={t("results.ingestAroundFirst")}
             >
               <PlayCircle className={iconSm} />
-              <span className="text-xs">{t("results.ingest")}</span>
-            </button>
+              {t("results.ingest")}
+            </Button>
           </div>
           {/* Last occurrence */}
           <div className={`${bgSurface} ${borderDefault} rounded-lg p-3`}>
@@ -306,14 +307,15 @@ export default function ResultsPanel({
             <div className={`${monoBody} text-xs ${textMuted} mt-1`}>
               {formatPayload(fl.last_payload)}
             </div>
-            <button
+            <Button
               onClick={() => onIngestEvent(fl.last_timestamp_us)}
-              className={`${buttonBase} mt-2`}
+              size="sm"
+              className="mt-2"
               title={t("results.ingestAroundLast")}
             >
               <PlayCircle className={iconSm} />
-              <span className="text-xs">{t("results.ingest")}</span>
-            </button>
+              {t("results.ingest")}
+            </Button>
           </div>
         </div>
       </div>
@@ -339,31 +341,31 @@ export default function ResultsPanel({
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <Button
             onClick={onIngestAll}
-            className={`${buttonBase} text-xs`}
+            size="sm"
             title={t("results.ingestAllTooltip")}
             disabled={resultCount === 0}
           >
             <Download className={iconSm} />
             <span>{t("results.ingestAll")}</span>
-          </button>
-          <button
+          </Button>
+          <IconButton
             onClick={onBookmark}
-            className={iconButtonBase}
+            variant="surface"
             title={t("results.bookmarkTooltip")}
             disabled={resultCount === 0}
           >
             <Bookmark className={`${iconMd} ${textDataAmber}`} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={onExport}
-            className={iconButtonBase}
+            variant="surface"
             title={t("results.exportTooltip")}
             disabled={resultCount === 0}
           >
             <FileDown className={iconMd} />
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -454,14 +456,14 @@ function ResultRow({
         </span>
 
         {/* Ingest button */}
-        <button
+        <Button
           onClick={handleIngestClick}
-          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           title={t("results.ingestAroundEvent")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -516,14 +518,14 @@ function ResultRow({
         </div>
 
         {/* Ingest button */}
-        <button
+        <Button
           onClick={handleIngestClick}
-          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           title={t("results.ingestAroundEvent")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -594,14 +596,14 @@ function ResultRow({
             {formatTimestamp(gap.gap_end_us)}
           </span>
         </span>
-        <button
+        <Button
           onClick={() => onIngest(gap.gap_start_us)}
-          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           title={t("results.ingestAroundGap")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -626,14 +628,14 @@ function ResultRow({
           <span className={textMuted}>{t("results.inventoryTo")}</span>
           <span title={formatTimestampFull(inv.last_us)}>{formatTimestamp(inv.last_us)}</span>
         </span>
-        <button
+        <Button
           onClick={() => onIngest(inv.first_us)}
-          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           title={t("results.ingestAroundFirst")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -668,14 +670,14 @@ function ResultRow({
         <span className={`${monoBody} text-xs flex-1 min-w-0 truncate`}>
           {formatPayloadWithMatches(pat.payload, pat.match_positions)}
         </span>
-        <button
+        <Button
           onClick={() => onIngest(pat.timestamp_us)}
-          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           title={t("results.ingestAroundMatch")}
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">{t("results.ingest")}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -712,14 +714,14 @@ function ResultRow({
       </span>
 
       {/* Ingest button */}
-      <button
+      <Button
         onClick={handleIngestClick}
-        className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
         title="Ingest frames around this event"
       >
         <PlayCircle className={iconSm} />
         <span className="text-xs">Ingest</span>
-      </button>
+      </Button>
     </div>
   );
 }

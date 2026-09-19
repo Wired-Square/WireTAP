@@ -17,7 +17,7 @@ import {
   borderDataView,
   dataViewContainer,
 } from "../../styles";
-import { dataViewTabClass, indigoButton } from "../../styles/buttonStyles";
+import { dataViewTabClass } from "../../styles/buttonStyles";
 import RulesTopBar, { type RulesActiveState, type PersistState } from "./views/RulesTopBar";
 import {
   useFrameLinkDeviceLiveness,
@@ -32,6 +32,7 @@ import IndicatorsView from "./views/IndicatorsView";
 import DeviceOverview from "./views/DeviceOverview";
 import LogView from "./views/LogView";
 import type { IOProfile } from "../../hooks/useSettings";
+import { PrimaryButton } from "../../components/forms";
 
 const TAB_KEYS: { id: RulesTab; i18nKey: string }[] = [
   { id: "frame-defs", i18nKey: "frameDefs" },
@@ -260,13 +261,12 @@ export default function Rules() {
             <p className={`text-sm ${textDanger}`}>
               {t("states.connectFailed", { label: device.label, defaultValue: "Failed to connect to {{label}}" })}
             </p>
-            <button
-              type="button"
+            <PrimaryButton
               onClick={() => connectDevice(device.host, device.port, device.label)}
-              className={`mt-3 ${indigoButton}`}
+              className="mt-3"
             >
               {t("states.retry", "Retry")}
-            </button>
+            </PrimaryButton>
           </div>
         </div>
       )}

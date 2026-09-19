@@ -4,12 +4,13 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2, Layers } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { caption, labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, hoverLight } from "../../../styles";
+import { caption, labelSmall, labelSmallMuted, monoBody, bgSecondary, hoverLight } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
+import { Button, IconButton } from "../../../components/Button";
 
 export type CANFrameViewProps = {
   selectedNode: TomlNode;
@@ -252,29 +253,35 @@ export default function CANFrameView({
               </span>
 
               {!selectedNode.metadata?.hasMux && (
-                <button
+                <Button
                   onClick={() => onAddMux(idKey)}
-                  className="px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                  variant="solid"
+                  tone="purple"
+                  size="sm"
                 >
                   {t("canFrameView.addMux")}
-                </button>
+                </Button>
               )}
 
               {selectedNode.metadata?.hasMux && onAddCase && muxNode && (
-                <button
+                <Button
                   onClick={() => onAddCase(muxNode.path)}
-                  className="px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                  variant="solid"
+                  tone="purple"
+                  size="sm"
                 >
                   {t("canFrameView.addCase")}
-                </button>
+                </Button>
               )}
 
-              <button
+              <Button
                 onClick={() => onAddSignal(idKey)}
-                className="px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
+                variant="solid"
+                tone="success"
+                size="sm"
               >
                 {t("canFrameView.addSignal")}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -347,21 +354,20 @@ export default function CANFrameView({
                     </div>
 
                     <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <button
+                      <IconButton
                         onClick={() => onEditSignal(idKey, idx, signal, ["frame", "can", idKey])}
-                        className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
                         title={t("canFrameView.editSignal")}
                       >
                         <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-                      </button>
+                      </IconButton>
 
-                      <button
+                      <IconButton
                         onClick={() => onRequestDeleteSignal(idKey, idx, signal.name)}
-                        className={iconButtonHoverDanger}
+                        tone="danger"
                         title={t("canFrameView.deleteSignal")}
                       >
                         <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-                      </button>
+                      </IconButton>
                     </div>
                   </div>
                 </div>
@@ -404,22 +410,21 @@ export default function CANFrameView({
 
                   <div className="flex items-center gap-2 ml-4 shrink-0">
                     {onEditMux && (
-                      <button
+                      <IconButton
                         onClick={() => onEditMux(["frame", "can", idKey, "mux"], muxData)}
-                        className={iconButtonHover}
                         title={t("canFrameView.editMux")}
                       >
                         <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-                      </button>
+                      </IconButton>
                     )}
                     {onDeleteMux && (
-                      <button
+                      <IconButton
                         onClick={() => setConfirmDeleteMux(true)}
-                        className={iconButtonHoverDanger}
+                        tone="danger"
                         title={t("canFrameView.deleteMux")}
                       >
                         <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-                      </button>
+                      </IconButton>
                     )}
                   </div>
                 </div>

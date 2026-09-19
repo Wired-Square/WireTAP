@@ -22,7 +22,7 @@ import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import ModbusScanResultView from "./tools/ModbusScanResultView";
 import ModbusFcProbeResultView from "./tools/ModbusFcProbeResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, bgSurface, tabBarIconToggle, textDataSecondary, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
+import { bgDataView, bgSurface, textDataSecondary, textMuted, textPrimary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, groupKeysByProtocol, wholeProtocol } from "../../../utils/frameKey";
 import { isMessageProtocol, protocolFamily } from "../../../utils/profileTraits";
@@ -42,6 +42,7 @@ import type { FrameRow } from "../components/FrameDataTable";
 import BulkAddToTransmitDialog from "../../../dialogs/BulkAddToTransmitDialog";
 import ReplayDialog from "../../../dialogs/ReplayDialog";
 import type { TimeDisplayFormat } from "../../../types/common";
+import { IconButton } from "../../../components/Button";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 
@@ -782,33 +783,38 @@ function DiscoveryFramesView({
   // frames table's; the column toggles and the freeze serve both.
   const tabBarControls = isProtocolTab ? (
     <div className="flex items-center gap-1">
-      <button
+      <IconButton
         onClick={toggleShowRefColumn}
-        aria-pressed={showRefColumn}
-        className={tabBarIconToggle(showRefColumn)}
+        variant="surface"
+        size="sm"
+        pressed={showRefColumn}
         title={showRefColumn ? 'Hide # column' : 'Show # column'}
       >
         <Hash className={iconSm} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={toggleShowBusColumn}
-        aria-pressed={showBusColumn}
-        className={tabBarIconToggle(showBusColumn, "cyan")}
+        variant="surface"
+        tone="cyan"
+        size="sm"
+        pressed={showBusColumn}
         title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
       >
         <Network className={iconSm} />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         onClick={toggleShowAsciiColumn}
-        aria-pressed={showAsciiColumn}
-        className={tabBarIconToggle(showAsciiColumn, "yellow")}
+        variant="surface"
+        tone="warning"
+        size="sm"
+        pressed={showAsciiColumn}
         title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
       >
         <FileText className={iconSm} />
-      </button>
+      </IconButton>
       {activeTab === 'frames' && (
         <>
-          <button
+          <IconButton
             onClick={() => {
               if (findOpen) {
                 setFindOpen(false);
@@ -819,46 +825,52 @@ function DiscoveryFramesView({
                 setFindOpen(true);
               }
             }}
-            aria-pressed={findOpen}
-            className={tabBarIconToggle(findOpen)}
+            variant="surface"
+            size="sm"
+            pressed={findOpen}
             title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
           >
             <Search className={iconSm} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={() => setShowBulkAddDialog(true)}
-            className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
+            variant="surface"
+            size="sm"
             title={t("framesView.actions.addToTransmit")}
           >
             <Send className={iconSm} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             onClick={() => setShowReplayDialog(true)}
-            className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
+            variant="surface"
+            size="sm"
             title={t("framesView.actions.replay")}
           >
             <Play className={iconSm} />
-          </button>
+          </IconButton>
         </>
       )}
       {isStreaming && (
         <>
-          <button
+          <IconButton
             onClick={() => setRenderFrozen(!renderFrozen)}
-            aria-pressed={renderFrozen}
-            className={tabBarIconToggle(renderFrozen, "blue")}
+            variant="surface"
+            tone="primary"
+            size="sm"
+            pressed={renderFrozen}
             title={renderFrozen ? t("framesView.actions.unfreezeDisplay") : t("framesView.actions.freezeDisplay")}
           >
             <Snowflake className={iconSm} />
-          </button>
+          </IconButton>
           {renderFrozen && (
-            <button
+            <IconButton
               onClick={() => { activeView.refreshOnce(); refreshFrozenView(); }}
-              className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
+              variant="surface"
+              size="sm"
               title={t("framesView.actions.refreshLatest")}
             >
               <RefreshCw className={iconSm} />
-            </button>
+            </IconButton>
           )}
         </>
       )}

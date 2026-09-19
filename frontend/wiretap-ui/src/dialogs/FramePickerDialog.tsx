@@ -3,11 +3,12 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconLg } from "../styles/spacing";
-import { borderDivider, hoverLight, bgSurface } from "../styles";
+import { borderDivider, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
 import FramePicker from "../components/FramePicker";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
+import { IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -53,13 +54,13 @@ export default function FramePickerDialog({
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             {t("framePicker.title")}
           </h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto">
           <FramePicker

@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { Cable, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import type { TomlNode } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type SerialConfigViewProps = {
   selectedNode: TomlNode;
@@ -43,13 +44,12 @@ export default function SerialConfigView({
           </div>
         </div>
         {onEditConfig && (
-          <button
+          <IconButton
             onClick={onEditConfig}
-            className={iconButtonHover}
             title={t("serialConfig.editTooltip")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
         )}
       </div>
 

@@ -4,13 +4,14 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, iconButtonHover, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, labelSmallMuted, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import { useState } from "react";
 import type { TomlNode } from "../types";
+import { Button, IconButton } from "../../../components/Button";
 
 export type MuxCaseViewProps = {
   selectedNode: TomlNode;
@@ -128,27 +129,31 @@ export default function MuxCaseView({
         </h3>
 
         <div className={flexRowGap2}>
-          <button
+          <Button
             onClick={() => {
               const idKey = selectedNode.path[2];
               onAddSignal(idKey, selectedNode.path);
             }}
-            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
+            variant="solid"
+            tone="success"
+            size="sm"
             title={t("muxCaseView.addSignalTooltip")}
           >
             {t("muxCaseView.addSignal")}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => onAddNestedMux(selectedNode.path)}
-            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+            variant="solid"
+            tone="purple"
+            size="sm"
             title={t("muxCaseView.addNestedMuxTooltip")}
           >
             {t("muxCaseView.addNestedMux")}
-          </button>
+          </Button>
 
           {onEditCase && (
-            <button
+            <IconButton
               onClick={() => {
                 const muxPath = selectedNode.path.slice(0, -1);
                 const caseNotes = selectedNode.metadata?.properties?.notes;
@@ -157,25 +162,24 @@ export default function MuxCaseView({
                   : undefined;
                 onEditCase(muxPath, caseValue || '', notesStr);
               }}
-              className={iconButtonHover}
               title={t("muxCaseView.editCase")}
             >
               <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-            </button>
+            </IconButton>
           )}
 
-          <button
+          <IconButton
             onClick={() => {
               const muxPath = selectedNode.path.slice(0, -1);
               const caseKey = selectedNode.path[selectedNode.path.length - 1];
               setPendingDelete({ muxPath, caseKey });
               setConfirmOpen(true);
             }}
-            className={iconButtonHoverDanger}
+            tone="danger"
             title={t("muxCaseView.deleteCase")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -248,7 +252,7 @@ export default function MuxCaseView({
                   </div>
 
                   {onRequestDeleteSignal && (
-                    <button
+                    <IconButton
                       onClick={() =>
                         onRequestDeleteSignal(
                           idKey,
@@ -257,11 +261,11 @@ export default function MuxCaseView({
                           signal.name
                         )
                       }
-                      className={iconButtonHoverDanger}
+                      tone="danger"
                       title={t("muxCaseView.deleteSignal")}
                     >
                       <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               ))}

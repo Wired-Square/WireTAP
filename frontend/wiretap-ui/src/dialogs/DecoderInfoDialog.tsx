@@ -6,13 +6,14 @@ import type { TFunction } from "i18next";
 import { iconMd, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../styles/spacing";
 import { cardDefault } from "../styles/cardStyles";
 import { caption, captionMuted, sectionHeaderText, emptyStateText } from "../styles/typography";
-import { borderDivider, hoverLight, bgSurface } from "../styles";
+import { borderDivider, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
 import { useDiscoveryStore } from "../stores/discoveryStore";
 import type { DecoderKnowledge, FrameKnowledge, MuxKnowledge } from "../utils/decoderKnowledge";
 import { createDefaultSignalsForFrame } from "../utils/decoderKnowledge";
 import { formatFrameId } from "../utils/frameIds";
 import { formatMs } from "../utils/reportExport";
+import { IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -38,13 +39,13 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
             <h2 className={sectionHeaderText}>{t("decoderInfo.title")}</h2>
             <p className={caption}>{t("decoderInfo.subtitle")}</p>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Content */}

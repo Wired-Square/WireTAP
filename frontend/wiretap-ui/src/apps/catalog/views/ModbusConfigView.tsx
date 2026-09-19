@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { Network, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import type { TomlNode, ModbusProtocolConfig } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type ModbusConfigViewProps = {
   selectedNode: TomlNode;
@@ -41,13 +42,12 @@ export default function ModbusConfigView({
           </div>
         </div>
         {onEditConfig && (
-          <button
+          <IconButton
             onClick={onEditConfig}
-            className={iconButtonHover}
             title={t("modbusConfig.editTooltip")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
         )}
       </div>
 

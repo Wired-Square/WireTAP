@@ -3,8 +3,9 @@
 import { useTranslation } from "react-i18next";
 import { Network, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
 import type { TomlNode, CanProtocolConfig } from "../types";
+import { IconButton } from "../../../components/Button";
 
 export type CanConfigViewProps = {
   selectedNode: TomlNode;
@@ -42,13 +43,12 @@ export default function CanConfigView({
           </div>
         </div>
         {onEditConfig && (
-          <button
+          <IconButton
             onClick={onEditConfig}
-            className={iconButtonHover}
             title={t("canConfig.editTooltip")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-          </button>
+          </IconButton>
         )}
       </div>
 

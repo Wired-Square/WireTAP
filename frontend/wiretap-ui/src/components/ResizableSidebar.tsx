@@ -4,12 +4,10 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from "react"
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { iconMd } from "../styles/spacing";
 import {
-  hoverLight,
   bgPrimary,
   borderDefault,
-  textSecondary,
-  roundedDefault,
 } from "../styles";
+import { IconButton } from "./Button";
 
 type Props = {
   children: ReactNode;
@@ -110,9 +108,9 @@ export default function ResizableSidebar({
       {collapsible && (
         <div className={`flex items-center gap-2 p-2 border-b ${borderDefault} ${isCollapsed ? "justify-center" : header ? "justify-between" : "justify-end"}`}>
           {!isCollapsed && header}
-          <button
+          <IconButton
             onClick={handleToggleCollapse}
-            className={`p-1.5 ${roundedDefault} ${hoverLight} ${textSecondary} flex-shrink-0`}
+            size="sm"
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
@@ -120,7 +118,7 @@ export default function ResizableSidebar({
             ) : (
               <PanelLeftClose className={iconMd} />
             )}
-          </button>
+          </IconButton>
         </div>
       )}
 

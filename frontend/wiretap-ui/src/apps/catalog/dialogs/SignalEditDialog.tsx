@@ -7,12 +7,12 @@ import Dialog from "../../../components/Dialog";
 import { Input, Select, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2, h3, labelSmall, badgeInfo } from "../../../styles";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { buttonBase } from "../../../styles/buttonStyles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import EnumEditorDialog from "./EnumEditorDialog";
+import { Button } from "../../../components/Button";
 
 export type SignalFields = {
   name: string;
@@ -226,26 +226,25 @@ export default function SignalEditDialog({
               <div>
                 <label className={`${labelSmall} mb-2`}>{t("signalEdit.enumValuesLabel")}</label>
                 <div className={flexRowGap2}>
-                  <button
-                    type="button"
+                  <Button
                     onClick={() => setShowEnumEditor(true)}
-                    className={`${buttonBase} text-sm`}
                   >
                     <List className={iconMd} />
                     {fields.enum && Object.keys(fields.enum).length > 0
                       ? t("signalEdit.editEnumWithCount", { count: Object.keys(fields.enum).length })
                       : t("signalEdit.addEnumValues")}
-                  </button>
+                  </Button>
                   {fields.enum && Object.keys(fields.enum).length > 0 && (
-                    <button
-                      type="button"
+                    <Button
                       onClick={() => setFields({ ...fields, enum: undefined })}
-                      className="flex items-center gap-1 px-3 py-2 text-sm text-[color:var(--danger)] hover:bg-[var(--danger-bg-subtle)] rounded-lg transition-colors"
+                      variant="ghost"
+                      tone="danger"
+                      size="lg"
                       title={t("signalEdit.clearTooltip")}
                     >
                       <X className={iconMd} />
                       {t("signalEdit.clear")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

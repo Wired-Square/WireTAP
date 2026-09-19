@@ -21,10 +21,11 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { FrameIdFormat } from "../../../hooks/useSettings";
 import { formatFrameId, formatFrameIdInput, parseFrameId } from "../../../utils/frameIds";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
-import { primaryButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { labelSmallMuted, monoBody } from "../../../styles/typography";
 import { iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { focusRing, bgSurface, borderDefault, textSecondary, textMuted } from "../../../styles/colourTokens";
+import { Button } from "../../../components/Button";
+import { PrimaryButton } from "../../../components/forms";
 
 // Compact form controls tuned to the Decoder data-view density. Width is applied
 // at each call site so narrow numeric fields can opt out of the full width.
@@ -1012,19 +1013,16 @@ ORDER BY id, extended`;
           <div className="flex flex-wrap gap-2 items-end">
             <div className="flex flex-wrap gap-1">
               {CONTEXT_PRESETS.map((preset) => (
-                <button
+                <Button
                   key={preset.label}
                   onClick={() => handlePresetClick(preset.beforeMs, preset.afterMs)}
                   disabled={disabled}
-                  className={`${buttonBase} text-xs px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    contextWindow.beforeMs === preset.beforeMs &&
-                    contextWindow.afterMs === preset.afterMs
-                      ? "bg-amber-500/20 text-amber-400"
-                      : ""
-                  }`}
+                  size="sm"
+                  tone="warning"
+                  pressed={contextWindow.beforeMs === preset.beforeMs && contextWindow.afterMs === preset.afterMs}
                 >
                   {preset.label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex gap-2 flex-1 min-w-[180px]">
@@ -1115,14 +1113,14 @@ ORDER BY id, extended`;
           <span className={`text-xs ${textMuted}`}>{t("builder.rows")}</span>
         </div>
 
-        <button
+        <PrimaryButton
           onClick={handleAddToQueue}
           disabled={disabled}
-          className={`${primaryButtonBase} w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed`}
+          className="w-full"
         >
           <ListPlus className={iconSm} />
           {t("builder.addToQueue")}
-        </button>
+        </PrimaryButton>
       </div>
     </div>
   );

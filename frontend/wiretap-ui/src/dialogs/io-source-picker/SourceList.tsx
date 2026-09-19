@@ -12,9 +12,9 @@ import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurp
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
-import { iconButtonHover, iconButtonHoverDanger } from "../../styles/buttonStyles";
 import type { ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
+import { IconButton } from "../../components/Button";
 
 /**
  * Map buffer device type to a human-readable storage backend label.
@@ -719,28 +719,27 @@ function SourceButton({
       {!isDisabled && (onEdit || onDiscard) && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {onEdit && (
-            <button
+            <IconButton
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(profile.id);
               }}
-              className={iconButtonHover}
               title={t("ioSourcePicker.sources.editDevice")}
             >
               <Pencil className={`${iconXs} text-[color:var(--text-muted)]`} />
-            </button>
+            </IconButton>
           )}
           {onDiscard && (
-            <button
+            <IconButton
               onClick={(e) => {
                 e.stopPropagation();
                 onDiscard(profile.id);
               }}
-              className={iconButtonHoverDanger}
+              tone="danger"
               title={t("ioSourcePicker.sources.discardDevice")}
             >
               <Trash2 className={`${iconXs} text-[color:var(--text-muted)]`} />
-            </button>
+            </IconButton>
           )}
         </div>
       )}

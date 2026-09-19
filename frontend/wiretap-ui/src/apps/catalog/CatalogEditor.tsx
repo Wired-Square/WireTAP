@@ -40,6 +40,7 @@ import { hasRemoteChanges, needsDecision } from "../../utils/catalogSync";
 import { sourcesFor } from "../../hooks/useCatalogSources";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogWithMigration } from "./io";
+import { IconButton } from "../../components/Button";
 
 function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
@@ -596,14 +597,13 @@ function CatalogEditorInner() {
                   </ul>
                 )}
               </div>
-              <button
-                type="button"
+              <IconButton
                 onClick={dismissBanner}
                 aria-label={t("common.dismiss", "Dismiss")}
-                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                size="sm"
               >
                 <X className={iconSm} />
-              </button>
+              </IconButton>
             </div>
           )}
           {editMode === "text" ? (

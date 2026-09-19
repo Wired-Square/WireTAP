@@ -24,9 +24,10 @@ import { useCatalogList } from "../../hooks/useCatalogList";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { buildCatalogPath, catalogBaseName } from "../../utils/catalogUtils";
 import { iconMd, iconLg, iconSm } from "../../styles/spacing";
-import { caption, textMedium, h3, borderDivider, hoverLight, emptyStateText } from "../../styles";
+import { caption, textMedium, h3, borderDivider, emptyStateText } from "../../styles";
 import { errorBoxCompact, panelFooter } from "../../styles/cardStyles";
-import { dialogActionButton, primaryButtonBase } from "../../styles/buttonStyles";
+import { IconButton } from "../../components/Button";
+import { PrimaryButton, SecondaryButton } from "../../components/forms";
 
 // Its whole subtree — the share store and API — is dead weight in every panel
 // that never opens it.
@@ -96,8 +97,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
     }
   };
 
-  const action = (primary: boolean) =>
-    primary ? `flex-1 text-sm font-medium ${primaryButtonBase}` : `flex-1 ${dialogActionButton}`;
+  const ImportButton = onNewCatalog ? SecondaryButton : PrimaryButton;
 
   return (
     <>
@@ -105,13 +105,13 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
       <Dialog isOpen={!repositoryOpen} onBackdropClick={onClose} maxWidth="max-w-md">
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
           <h2 className={h3}>{title ?? t("catalogPicker.title")}</h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 rounded ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
 
         {showSearch && (
@@ -179,34 +179,34 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
 
         <div className={`${panelFooter} flex gap-2`}>
           {onNewCatalog && (
-            <button
+            <PrimaryButton
               onClick={() => {
                 onNewCatalog();
                 onClose();
               }}
               title={t("catalogPicker.actionTitles.new")}
-              className={action(true)}
+              className="flex-1"
             >
               <ShareIcon.NewCatalog className={iconMd} />
               {t("catalogPicker.actions.new")}
-            </button>
+            </PrimaryButton>
           )}
-          <button
+          <ImportButton
             onClick={handleImport}
             title={t("catalogPicker.actionTitles.import")}
-            className={action(!onNewCatalog)}
+            className="flex-1"
           >
             <ShareIcon.ImportCatalog className={iconMd} />
             {t("catalogPicker.actions.import")}
-          </button>
-          <button
+          </ImportButton>
+          <SecondaryButton
             onClick={() => setRepositoryOpen(true)}
             title={t("catalogPicker.actionTitles.repository")}
-            className={action(false)}
+            className="flex-1"
           >
             <ShareIcon.Repository className={iconMd} />
             {t("catalogPicker.actions.repository")}
-          </button>
+          </SecondaryButton>
         </div>
       </Dialog>
 

@@ -7,8 +7,8 @@ import type { CaptureMetadata } from "../../../api/capture";
 import type { BusSourceInfo } from "../../../utils/busFormat";
 import AppTopBar from "../../../components/AppTopBar";
 import ModbusPollToggle, { type ModbusPollToggleProps } from "../../../components/modbus/ModbusPollToggle";
-import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
+import { Button, IconButton } from "../../../components/Button";
 
 type Props = {
   // IO profile selection
@@ -194,44 +194,45 @@ export default function DiscoveryTopBar({
       }}
       actions={
         <>
-          <button
+          <IconButton
             onClick={onSave}
             disabled={!hasFrames}
-            className={iconButtonBase}
+            variant="surface"
             title={isSerialMode ? t("topBar.saveBytes") : t("topBar.saveFrames")}
           >
             <Save className={iconMd} />
-          </button>
+          </IconButton>
 
-          <button
+          <IconButton
             onClick={onExport}
             disabled={!hasFrames}
-            className={iconButtonBase}
+            variant="surface"
             title={isSerialMode && serialActiveTab === 'raw' ? t("topBar.exportBytes") : t("topBar.exportFrames")}
           >
             <Download className={iconMd} />
-          </button>
+          </IconButton>
 
-          <button
+          <IconButton
             onClick={onInfo}
             disabled={!hasFrames}
-            className={`${iconButtonBase} ${hasFrames ? "text-[color:var(--text-purple)]" : ""}`}
+            variant="surface"
+            tone={hasFrames ? "purple" : "neutral"}
             title={t("topBar.decoderKnowledge")}
           >
             <Info className={iconMd} />
-          </button>
+          </IconButton>
         </>
       }
     >
       {/* Undo Framing button - shows in serial mode when framing is accepted */}
       {isSerialMode && framingAccepted && onUndoFraming && (
-        <button
+        <IconButton
           onClick={onUndoFraming}
-          className={iconButtonBase}
+          variant="surface"
           title={t("topBar.undoFraming")}
         >
           <Undo2 className={iconMd} />
-        </button>
+        </IconButton>
       )}
 
       {/* Modbus poll switch — pause/resume the selected session's poller */}
@@ -245,14 +246,13 @@ export default function DiscoveryTopBar({
       {/* Toolbox button. Never disabled: the Modbus scan tools need neither a
           session nor frames — "No source" is where they are meant to be run —
           so there is always something inside worth opening. */}
-      <button
+      <Button
         onClick={onOpenToolbox}
-        className={buttonBase}
         title={t("topBar.scanningTools")}
       >
         <Wrench className={`${iconSm} flex-shrink-0`} />
         <span>{t("topBar.toolsLabel")}</span>
-      </button>
+      </Button>
     </AppTopBar>
   );
 }

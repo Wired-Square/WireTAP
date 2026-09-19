@@ -5,8 +5,9 @@ import { useTranslation } from "react-i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import type { PlaybackSpeed } from "../components/TimeController";
-import { h2, cardElevated, paddingCard, borderDefault, hoverLight, roundedDefault, textSuccess, textMedium } from "../styles";
+import { h2, cardElevated, paddingCard, borderDefault, hoverLight, textSuccess, textMedium } from "../styles";
 import { SPEED_OPTIONS } from "./io-source-picker/utils";
+import { IconButton } from "../components/Button";
 
 type Props = {
   isOpen: boolean;
@@ -32,13 +33,13 @@ export default function SpeedPickerDialog({
       <div className={`${cardElevated} shadow-xl overflow-hidden`}>
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
           <h2 className={h2}>{t("speedPicker.title")}</h2>
-          <button
+          <IconButton
             onClick={onClose}
             aria-label={t("common:actions.close")}
-            className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
+            size="sm"
           >
             <X className={iconLg} />
-          </button>
+          </IconButton>
         </div>
         <div className="max-h-[50vh] overflow-y-auto">
           <div className="py-1">
