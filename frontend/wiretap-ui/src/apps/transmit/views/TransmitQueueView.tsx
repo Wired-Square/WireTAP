@@ -10,10 +10,14 @@ import { useTransmitStore, GVRET_BUSES } from "../../../stores/transmitStore";
 import { useActiveSession, useSessionStore, type BusSourceInfo } from "../../../stores/sessionStore";
 import {
   bgDataToolbar,
+  bgDataView,
+  bgSuccess,
   borderDataView,
+  textDataAmber,
+  textDataGreen,
   textDataMuted,
   textDataSecondary,
-  hoverDataRow,
+  textWarning,
 } from "../../../styles/colourTokens";
 import { Badge } from "../../../components/Badge";
 import { flexRowGap2 } from "../../../styles/spacing";
@@ -23,6 +27,7 @@ import { formatBusLabel } from "../../../utils/busFormat";
 import { resolveQueueItemSession } from "../../../stores/transmitRowSession";
 import { Button, IconButton } from "../../../components/Button";
 import { Select, Input, Checkbox } from "../../../components/forms";
+import { Table } from "../../../components/Table";
 
 interface TransmitQueueViewProps {
   outputBusToSource: Map<number, BusSourceInfo>;
@@ -218,19 +223,17 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
       </div>
 
       {/* Queue Items */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead
-            className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
-          >
+      <div className={`flex-1 overflow-auto ${bgDataView}`}>
+        <Table sticky hover>
+          <thead>
             <tr>
-              <th className="text-left px-4 py-2 w-12"></th>
-              <th className="text-left px-4 py-2 w-28">{t("queue.columns.bus")}</th>
-              <th className="text-left px-4 py-2 w-16">{t("queue.columns.type")}</th>
-              <th className="text-left px-4 py-2">Frame / Data</th>
-              <th className="text-left px-4 py-2 w-24">{t("queue.columns.interval")}</th>
-              <th className="text-left px-4 py-2 w-28">{t("queue.columns.group")}</th>
-              <th className="text-left px-4 py-2 w-24">{t("queue.columns.actions")}</th>
+              <th className="w-12" />
+              <th className="w-28">{t("queue.columns.bus")}</th>
+              <th className="w-16">{t("queue.columns.type")}</th>
+              <th>Frame / Data</th>
+              <th className="w-24">{t("queue.columns.interval")}</th>
+              <th className="w-28">{t("queue.columns.group")}</th>
+              <th className="w-24">{t("queue.columns.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -257,12 +260,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
               const canStartGroup = isInGroup && isFirstEnabledInGroup && item.enabled && !isGroupRepeating && hasCanTransmit;
 
               return (
-                <tr
-                  key={item.id}
-                  className={`border-b ${borderDataView} ${hoverDataRow} ${isInGroup && isGroupRepeating ? "bg-green-900/20" : ""}`}
-                >
+                <tr key={item.id} className={isInGroup && isGroupRepeating ? bgSuccess : ""}>
                   {/* Play/Stop */}
-                  <td className="px-4 py-2">
+                  <td>
                     {isInGroup ? (
                       // Grouped item: show group play/stop on first item only
                       isFirstEnabledInGroup ? (
@@ -330,11 +330,11 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   </td>
 
                   {/* Bus */}
-                  <td className="px-4 py-2">
+                  <td>
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1.5">
                         {isOrphaned && (
-                          <span className="text-amber-500" title={t("queue.actions.sessionDisconnected")}>
+                          <span className={textWarning} title={t("queue.actions.sessionDisconnected")}>
                             <AlertCircle size={12} />
                           </span>
                         )}
@@ -371,17 +371,17 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   </td>
 
                   {/* Type */}
-                  <td className="px-4 py-2">
+                  <td>
                     <Badge tone={formatted.type === "CAN" ? "primary" : "purple"}>
                       {formatted.type}
                     </Badge>
                   </td>
 
                   {/* Frame / Data */}
-                  <td className="px-4 py-2">
+                  <td>
                     <div className={flexRowGap2}>
                       {formatted.id && (
-                        <code className="font-mono text-green-400">
+                        <code className={`font-mono ${textDataGreen}`}>
                           {formatted.id}
                         </code>
                       )}
@@ -391,7 +391,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       {formatted.flags.map((flag) => (
                         <span
                           key={flag}
-                          className="text-[10px] text-amber-400 uppercase"
+                          className={`text-[10px] uppercase ${textDataAmber}`}
                         >
                           {flag}
                         </span>
@@ -400,7 +400,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   </td>
 
                   {/* Interval */}
-                  <td className="px-4 py-2">
+                  <td>
                     <div className="flex items-center gap-1">
                       <Input
                         type="number"
@@ -418,7 +418,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   </td>
 
                   {/* Group */}
-                  <td className="px-4 py-2">
+                  <td>
                     <Input
                       type="text"
                       value={item.groupName ?? ""}
@@ -432,7 +432,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 py-2">
+                  <td>
                     <div className="flex items-center gap-1.5">
                       <Checkbox
                         checked={item.enabled}
@@ -471,7 +471,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
               );
             })}
           </tbody>
-        </table>
+        </Table>
       </div>
     </div>
   );

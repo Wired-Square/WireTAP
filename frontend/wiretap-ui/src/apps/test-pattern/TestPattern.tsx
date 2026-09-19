@@ -11,16 +11,14 @@ import {
   textPrimary,
   textSecondary,
   textDanger,
-  bgPrimary,
   bgSurface,
-  borderDefault,
   borderDataView,
   monoBody,
   textDataGreen,
   textDataOrange,
   textDataSecondary,
 } from "../../styles";
-import { resultCell, resultHeaderCell } from "../../styles/tableStyles";
+import { Table } from "../../components/Table";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -49,6 +47,7 @@ import AppLayout from "../../components/AppLayout";
 import TestPatternTopBar from "./views/TestPatternTopBar";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
 
 const sharedTextDecoder = new TextDecoder();
 
@@ -535,32 +534,32 @@ function PeerSummary({ peer }: { peer: PeerInfo | null }) {
  */
 function SweepTable({ rows }: { rows: SweepRow[] }) {
   return (
-    <div className={`border ${borderDefault} rounded overflow-x-auto`}>
-      <table className={`w-full text-xs ${monoBody}`}>
+    <Card padding="none" className="overflow-x-auto">
+      <Table mono>
         <thead>
-          <tr className={bgPrimary}>
-            <th className={resultHeaderCell}>Code</th>
-            <th className={`${resultHeaderCell} text-right`}>Expected</th>
-            <th className={`${resultHeaderCell} text-right`}>Received</th>
-            <th className={resultHeaderCell}>Result</th>
+          <tr>
+            <th>Code</th>
+            <th className="text-right">Expected</th>
+            <th className="text-right">Received</th>
+            <th>Result</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.code} className={`border-t ${borderDefault}`}>
-              <td className={resultCell("")}>{r.code}</td>
-              <td className={`${resultCell("")} text-right`}>{r.expected_len} B</td>
-              <td className={`${resultCell(r.passed ? "" : textDanger)} text-right`}>
+            <tr key={r.code}>
+              <td>{r.code}</td>
+              <td className="text-right">{r.expected_len} B</td>
+              <td className={`text-right ${r.passed ? "" : textDanger}`}>
                 {r.received_len === null ? "—" : `${r.received_len} B`}
               </td>
-              <td className={`${resultCell(r.passed ? textDataGreen : textDanger)} font-semibold`}>
+              <td className={`font-semibold ${r.passed ? textDataGreen : textDanger}`}>
                 {r.passed ? "PASS" : r.received_len === null ? "NO ECHO" : "MISMATCH"}
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </Card>
   );
 }
 
@@ -832,42 +831,42 @@ function AutoResults({ state }: { state: IOTestState }) {
 
       {/* Phase results table */}
       {results.length > 0 && (
-        <div className="border border-[color:var(--border-default)] rounded overflow-hidden">
-          <table className={`w-full text-xs ${monoBody}`}>
+        <Card padding="none" className="overflow-hidden">
+          <Table mono>
             <thead>
-              <tr className="bg-[var(--bg-primary)]">
-                <th className="text-left px-3 py-1.5 font-medium">Phase</th>
-                <th className="text-left px-3 py-1.5 font-medium">Result</th>
-                <th className="text-right px-3 py-1.5 font-medium">TX</th>
-                <th className="text-right px-3 py-1.5 font-medium">RX</th>
-                <th className="text-right px-3 py-1.5 font-medium">Drops</th>
-                <th className="text-right px-3 py-1.5 font-medium">Rate</th>
-                <th className="text-right px-3 py-1.5 font-medium">Latency</th>
-                <th className="text-right px-3 py-1.5 font-medium">Time</th>
+              <tr>
+                <th>Phase</th>
+                <th>Result</th>
+                <th className="text-right">TX</th>
+                <th className="text-right">RX</th>
+                <th className="text-right">Drops</th>
+                <th className="text-right">Rate</th>
+                <th className="text-right">Latency</th>
+                <th className="text-right">Time</th>
               </tr>
             </thead>
             <tbody>
               {results.map((r, i) => (
-                <tr key={i} className="border-t border-[color:var(--border-default)]">
-                  <td className="px-3 py-1.5">{r.phase}</td>
-                  <td className={`px-3 py-1.5 font-semibold ${r.passed ? textDataGreen : textDanger}`}>
+                <tr key={i}>
+                  <td>{r.phase}</td>
+                  <td className={`font-semibold ${r.passed ? textDataGreen : textDanger}`}>
                     {r.passed ? "PASS" : "FAIL"}
                   </td>
-                  <td className="text-right px-3 py-1.5">{r.tx_count.toLocaleString()}</td>
-                  <td className="text-right px-3 py-1.5">{r.rx_count.toLocaleString()}</td>
-                  <td className={`text-right px-3 py-1.5 ${r.drops > 0 ? textDanger : ""}`}>
+                  <td className="text-right">{r.tx_count.toLocaleString()}</td>
+                  <td className="text-right">{r.rx_count.toLocaleString()}</td>
+                  <td className={`text-right ${r.drops > 0 ? textDanger : ""}`}>
                     {r.phase === "Throughput" ? "—" : r.drops.toLocaleString()}
                   </td>
-                  <td className="text-right px-3 py-1.5">{r.frames_per_sec.toFixed(0)} fps</td>
-                  <td className="text-right px-3 py-1.5">
+                  <td className="text-right">{r.frames_per_sec.toFixed(0)} fps</td>
+                  <td className="text-right">
                     {r.latency_us ? `${r.latency_us.mean_us.toLocaleString()} μs` : "—"}
                   </td>
-                  <td className="text-right px-3 py-1.5">{r.elapsed_sec.toFixed(1)}s</td>
+                  <td className="text-right">{r.elapsed_sec.toFixed(1)}s</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
       )}
 
       {/* Per-length-code detail, so a sweep failure names the byte count */}

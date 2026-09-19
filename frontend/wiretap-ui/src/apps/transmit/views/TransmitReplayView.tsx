@@ -9,9 +9,14 @@ import { useTransmitStore } from "../../../stores/transmitStore";
 import type { ReplayLogEntry } from "../../../stores/transmitStore";
 import {
   bgDataToolbar,
+  bgDataView,
   borderDataView,
+  textDanger,
+  textDataCyan,
   textDataSecondary,
-  hoverDataRow,
+  textInfo,
+  textSuccess,
+  textWarning,
 } from "../../../styles/colourTokens";
 import { Badge } from "../../../components/Badge";
 import {
@@ -22,6 +27,7 @@ import {
 } from "../../../styles/typography";
 import { formatHumanUs } from "../../../utils/timeFormat";
 import { Button } from "../../../components/Button";
+import { Table } from "../../../components/Table";
 
 // ============================================================================
 // Component
@@ -55,7 +61,7 @@ export default function TransmitReplayView() {
                 key={replayId}
                 className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar}`}
               >
-                <Play size={12} className="text-blue-400 shrink-0" />
+                <Play size={12} className={`shrink-0 ${textInfo}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs ${textDataSecondary}`}>
@@ -152,18 +158,16 @@ export default function TransmitReplayView() {
           </div>
 
           {/* Log table */}
-          <div className="flex-1 overflow-auto">
-            <table className="w-full text-sm">
-              <thead
-                className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
-              >
+          <div className={`flex-1 overflow-auto ${bgDataView}`}>
+            <Table sticky hover>
+              <thead>
                 <tr>
-                  <th className="text-left px-4 py-2 w-10"></th>
-                  <th className="text-left px-4 py-2">{t("replay.columns.time")}</th>
-                  <th className="text-left px-4 py-2">{t("replay.columns.session")}</th>
-                  <th className="text-left px-4 py-2">{t("replay.columns.event")}</th>
-                  <th className="text-left px-4 py-2">{t("replay.columns.details")}</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="w-10" />
+                  <th>{t("replay.columns.time")}</th>
+                  <th>{t("replay.columns.session")}</th>
+                  <th>{t("replay.columns.event")}</th>
+                  <th>{t("replay.columns.details")}</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -179,7 +183,7 @@ export default function TransmitReplayView() {
                   );
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
         </>
       )}
@@ -196,11 +200,11 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
   const { kind, profileName, totalFrames, speed, loopReplay, framesSent, errorMessage, timestamp, pass } = entry;
 
   const icon =
-    kind === "started" ? <Play size={14} className="text-teal-400" /> :
-    kind === "completed" ? <Check size={14} className="text-green-400" /> :
-    kind === "loopRestarted" ? <RefreshCw size={14} className="text-blue-400" /> :
-    kind === "stoppedByUser" ? <X size={14} className="text-amber-400" /> :
-    <X size={14} className="text-red-400" />;
+    kind === "started" ? <Play size={14} className={textDataCyan} /> :
+    kind === "completed" ? <Check size={14} className={textSuccess} /> :
+    kind === "loopRestarted" ? <RefreshCw size={14} className={textInfo} /> :
+    kind === "stoppedByUser" ? <X size={14} className={textWarning} /> :
+    <X size={14} className={textDanger} />;
 
   const kindBadge =
     kind === "started" ? <Badge tone="cyan">{t("replay.kindStarted")}</Badge> :
@@ -227,23 +231,15 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
   }
 
   return (
-    <tr className={`border-b ${borderDataView} ${hoverDataRow}`}>
-      <td className="px-4 py-2">{icon}</td>
-      <td className="px-4 py-2">
-        <span className={`font-mono text-xs ${textDataSecondary}`}>
-          {formatHumanUs(timestamp * 1000)}
-        </span>
+    <tr>
+      <td>{icon}</td>
+      <td className={`font-mono ${textDataSecondary}`}>{formatHumanUs(timestamp * 1000)}</td>
+      <td className={textDataSecondary}>
+        <span className="truncate max-w-[120px] block">{profileName}</span>
       </td>
-      <td className="px-4 py-2">
-        <span className={`${textDataSecondary} text-xs truncate max-w-[120px] block`}>
-          {profileName}
-        </span>
-      </td>
-      <td className="px-4 py-2">{kindBadge}</td>
-      <td className="px-4 py-2">
-        <span className={`font-mono text-xs ${textDataSecondary}`}>{details}</span>
-      </td>
-      <td className="px-4 py-2">
+      <td>{kindBadge}</td>
+      <td className={`font-mono ${textDataSecondary}`}>{details}</td>
+      <td>
         {onRestart && (
           <Button
             onClick={onRestart}

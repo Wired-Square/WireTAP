@@ -17,10 +17,10 @@ import { textPrimary, spaceYDefault, h2 } from "../../../styles";
 import { Button, IconButton } from "../../../components/Button";
 ```
 
-Buttons, form controls, badges, cards, alerts and dialogs are components, not
-class strings — see *Buttons*, *Inputs*, *Badges*, *Cards & alerts* and
-*Dialogs* under the token reference. The other families (tabs, menus, tables)
-are still class-string tokens and move to components one family at a time.
+Buttons, form controls, badges, cards, alerts, dialogs, tabs, menus and
+tables are components, not class strings — see *Buttons*, *Inputs*,
+*Badges*, *Cards & alerts*, *Dialogs*, *Tabs*, *Menus* and *Data tables*
+under the token reference.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -74,6 +74,12 @@ order:
   class name is a test failure, not a missing rule.
 - The rest of `WireTAP.css` — theme variables, fonts and the app's own rules —
   is unlayered, so it wins over both.
+
+The two typefaces are variables on `:root`: `--font-sans` (the system UI
+stack) and `--font-mono` (JetBrains Mono, bundled, over the platform's
+monospace). `font-mono`, the reset's `code` / `pre` rule and the tables'
+`mono` all read `--font-mono`, so the app has one data face and a `ch` in
+a column width means the same on macOS and Windows.
 
 `useTheme` ([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts))
 toggles `.dark` on `<html>` and sets the theme variables on `:root` from the
@@ -364,24 +370,29 @@ menus and popovers share one stack in
 over a dialog closes alone. `ContextMenu` (items at a point) and
 `OverflowMenu` (a kebab with items) are the declarative forms.
 
-### Data tables — [tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts)
+### Data tables — [Table.tsx](../frontend/wiretap-ui/src/components/Table.tsx)
 
-The monospace data tables — Discovery's frame table and its Filtered tab, serial
-framed data, the serial byte dump, Transmit history — are read side by side, so
-their rows have to line up. These are the metrics that keep them in step.
+`<Table>` renders `.table`: the table carries the design and a cell carries
+only its alignment and tone, so `<th>` and `<td>` stay bare — no padding, no
+colour, no font classes. 12 px text; the head is `--text-secondary` at 500,
+start-aligned, over a hairline. Props:
 
-| Token | Use |
-|---|---|
-| `dataTableContainer` | Scroll container (`flex-1 min-h-0 overflow-auto font-mono text-xs`) |
-| `dataCell` | Body cell padding |
-| `dataHeaderCell` | Header cell padding, rule included |
-| `resultHeaderCell` / `resultCell(tone)` | The wider metrics for tool result tables — read as prose, not scanned as a byte dump |
+| Prop | Values | Notes |
+|---|---|---|
+| `size` | `md` (default) · `sm` | `md` is read a row at a time — 24 px rows with a half-strength hairline between them (the Modbus results, the session log, Transmit, Query stats, Frame Order, Test Pattern). `sm` is the dense data table scanned down its columns — 20 px rows, no rules (the frame table, the byte dump, the CSV preview) |
+| `mono` | `boolean` | The body in `--font-mono`; the head stays in the UI face. A mixed table (ids in mono, labels in prose) puts `font-mono` on the cells instead |
+| `sticky` | `boolean` | The head stays put while the scroll container behind it scrolls. The table and its head take the surface they sit on, so the scroller must have one — `bgDataView` for a data view, a `Card` for a result table |
+| `hover` | `boolean` | Rows tint `--hover-bg` under the pointer |
 
-`resultCell` is deliberately not `dataCell`: the Modbus result tables are read a
-row at a time rather than compared column-to-column with a neighbouring view, so
-they get room to breathe. They are shared between the two result views for the
-same reason the metrics above are shared — the pair had already been copied once
-and would have drifted.
+`aria-current` on a `<tr>` marks the current position (the playback frame)
+in the cyan tint with a line above and below; `table__pin` on a cell keeps
+it in view while the table scrolls sideways (the CSV preview's row numbers,
+the mux table's selector column). Column widths are `w-*` on the `<th>` or a
+`<colgroup>`; numeric columns take `text-right`; cell colours are the data
+accents (`textDataGreen`, `textDataYellow`, …) or the text tokens. The scroll
+container is the caller's — `flex-1 min-h-0 overflow-auto ${bgDataView}` for
+a view that fills its panel, `<Card padding="none" className="overflow-hidden">`
+for a result table in a page.
 
 Two things worth knowing before changing the frame table's columns:
 
@@ -971,8 +982,7 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
 | [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Data view tabs, launcher tiles |
-| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog` and `forms/` — the primitives, over `styles/components.css` |
-| [../frontend/wiretap-ui/src/styles/tableStyles.ts](../frontend/wiretap-ui/src/styles/tableStyles.ts) | Monospace data-table container, cell and header metrics |
+| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog`, `Tabs`, `Menu`, `Table` and `forms/` — the primitives, over `styles/components.css` |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
 | [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
 | [../frontend/wiretap-ui/src/locales/en-AU/settings.json](../frontend/wiretap-ui/src/locales/en-AU/settings.json) | Settings panel strings |
@@ -985,8 +995,9 @@ adjacency so related tooling is visible at a glance.
 
 ## Future improvements (non-blocking)
 
-- The remaining families as primitives, in the order of the Tailwind Removal
-  Handover: tabs and menus (the segmented controls and list rows still
-  written as raw `<button>`s belong here), data tables.
+- The app hues in `registry.ts` as one `--app-accent` per app, then the
+  long tail (alias variables, unused exports) — the last two stages of the
+  Tailwind Removal Handover. The list rows still written as raw `<button>`s
+  are in the register as a lists family.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

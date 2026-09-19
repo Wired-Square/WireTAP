@@ -14,12 +14,13 @@ import type { ModbusFcProbeResults } from "../../../../stores/discoveryToolboxSt
 import {
   bgDataView,
   borderDefault,
-  resultCell as td,
-  resultHeaderCell as th,
+  textDataAmber,
+  textDataGreen,
   textMuted,
   textPrimary,
   textSecondary,
 } from "../../../../styles";
+import { Table } from "../../../../components/Table";
 import { iconSm } from "../../../../styles/spacing";
 import type { FcVerdict } from "../../../../api/io";
 import { IconButton } from "../../../../components/Button";
@@ -37,14 +38,14 @@ function verdictLabel(v: FcVerdict, t: (k: string) => string): { text: string; c
         text: v.values.length > 0
           ? `0x${v.values[0].toString(16).padStart(4, "0").toUpperCase()}`
           : t("modbusFc.ok"),
-        className: "text-green-500",
+        className: textDataGreen,
       };
     case "bits":
-      return { text: v.values[0] ? "1" : "0", className: "text-green-500" };
+      return { text: v.values[0] ? "1" : "0", className: textDataGreen };
     case "exception":
-      return { text: t("modbusFc.exception"), className: "text-amber-500" };
+      return { text: t("modbusFc.exception"), className: textDataAmber };
     case "silent":
-      return { text: t("modbusFc.silent"), className: "text-[color:var(--text-muted)]" };
+      return { text: t("modbusFc.silent"), className: textMuted };
   }
 }
 
@@ -84,27 +85,27 @@ export default function ModbusFcProbeResultView({ results, onClose }: Props) {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div className={`flex-1 overflow-auto ${bgDataView}`}>
         {error ? (
           <p className="px-4 py-3 text-xs text-red-500">{error}</p>
         ) : (
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-[var(--bg-surface)]">
-              <tr className={`border-b ${borderDefault}`}>
-                <th className={th}>{t("modbusFc.unit")}</th>
+          <Table mono sticky>
+            <thead>
+              <tr>
+                <th>{t("modbusFc.unit")}</th>
                 {columns.map((c) => (
-                  <th key={c.key} className={th}>{c.label}</th>
+                  <th key={c.key}>{c.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {entries.map((r) => (
-                <tr key={r.unit_id} className="border-b border-[color:var(--border-default)]/30">
-                  <td className={td(textPrimary)}>{r.unit_id}</td>
+                <tr key={r.unit_id}>
+                  <td>{r.unit_id}</td>
                   {columns.map((c) => {
                     const { text, className } = verdictLabel(r[c.key], t);
                     return (
-                      <td key={c.key} className={td(className)}>
+                      <td key={c.key} className={className}>
                         {text}
                       </td>
                     );
@@ -112,7 +113,7 @@ export default function ModbusFcProbeResultView({ results, onClose }: Props) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
 
         {!isProbing && !error && entries.length > 0 && (

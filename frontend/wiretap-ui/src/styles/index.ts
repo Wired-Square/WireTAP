@@ -14,4 +14,3 @@ export * from './typography';
 export * from './spacing';
 
 // Monospace data-table metrics (frame tables, serial byte dump)
-export * from './tableStyles';

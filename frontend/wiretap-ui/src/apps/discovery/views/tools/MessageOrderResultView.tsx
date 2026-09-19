@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
 import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, iconLg, flexRowGap2 } from "../../../../styles/spacing";
 import { labelSmall, caption, captionMuted, sectionHeaderText, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
-import { borderDivider, textMuted } from "../../../../styles";
+import { borderDivider, textDanger, textDataCyan, textDataGreen, textDataOrange, textDataPurple, textMuted, textSecondary } from "../../../../styles";
+import { Table } from "../../../../components/Table";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { DetectedPattern, IntervalGroup, StartIdCandidate, MultiplexedFrame, BurstFrame, MultiBusFrame } from "../../../../utils/analysis/messageOrderAnalysis";
 import { useSettings } from "../../../../hooks/useSettings";
@@ -306,39 +307,36 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
         </span>
       </div>
       <Card padding="none" className="overflow-hidden">
-        <table className="w-full text-xs">
+        <Table>
           <thead>
-            <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMaxGap")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableAvgGap")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMinGap")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCount")}</th>
-              <th className="px-3 py-2"></th>
+            <tr>
+              <th>{t("messageOrder.tableFrameId")}</th>
+              <th className="text-right">{t("messageOrder.tableMaxGap")}</th>
+              <th className="text-right">{t("messageOrder.tableAvgGap")}</th>
+              <th className="text-right">{t("messageOrder.tableMinGap")}</th>
+              <th className="text-right">{t("messageOrder.tableCount")}</th>
+              <th />
             </tr>
           </thead>
           <tbody>
-            {candidates.map((candidate, idx) => (
-              <tr
-                key={candidate.id}
-                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
-              >
-                <td className="px-3 py-2 font-mono text-[color:var(--text-purple)]">
+            {candidates.map((candidate) => (
+              <tr key={candidate.id}>
+                <td className={`font-mono ${textDataPurple}`}>
                   {formatFrameId(candidate.id)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-secondary)]">
+                <td className={`text-right ${textSecondary}`}>
                   {formatMs(candidate.maxGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
+                <td className={`text-right ${textMuted}`}>
                   {formatMs(candidate.avgGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
+                <td className={`text-right ${textMuted}`}>
                   {formatMs(candidate.minGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
+                <td className={`text-right ${textMuted}`}>
                   {candidate.occurrences}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="text-right">
                   <Button
                     onClick={() => onSelect(candidate.id)}
                     variant="link"
@@ -351,7 +349,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </section>
   );
@@ -383,29 +381,26 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
         </span>
       </div>
       <Card padding="none" className="overflow-hidden">
-        <table className="w-full text-xs">
+        <Table>
           <thead>
-            <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableSelector")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCases")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMuxPeriod")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableInterMsg")}</th>
+            <tr>
+              <th>{t("messageOrder.tableFrameId")}</th>
+              <th>{t("messageOrder.tableSelector")}</th>
+              <th>{t("messageOrder.tableCases")}</th>
+              <th className="text-right">{t("messageOrder.tableMuxPeriod")}</th>
+              <th className="text-right">{t("messageOrder.tableInterMsg")}</th>
             </tr>
           </thead>
           <tbody>
-            {multiplexed.map((mux, idx) => (
-              <tr
-                key={mux.frameId}
-                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
-              >
-                <td className="px-3 py-2 font-mono text-[color:var(--text-orange)]">
+            {multiplexed.map((mux) => (
+              <tr key={mux.frameId}>
+                <td className={`font-mono ${textDataOrange}`}>
                   {formatFrameId(mux.frameId)}
                 </td>
-                <td className="px-3 py-2 text-[color:var(--text-secondary)]">
+                <td className={textSecondary}>
                   {mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {mux.selectorByte === -1 ? (
                       // Two-byte mux: show as "b0.b1" format
@@ -428,16 +423,16 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-emerald)] font-medium">
+                <td className={`text-right font-medium ${textDataGreen}`}>
                   {formatMs(mux.muxPeriodMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-tertiary)]">
+                <td className={`text-right ${textMuted}`}>
                   {formatMs(mux.interMessageMs)}
                 </td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </section>
   );
@@ -469,27 +464,24 @@ function BurstSection({ bursts }: BurstSectionProps) {
         </span>
       </div>
       <Card padding="none" className="overflow-hidden">
-        <table className="w-full text-xs">
+        <Table>
           <thead>
-            <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableDlcs")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableBurstSize")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCycle")}</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableIntraBurst")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFlags")}</th>
+            <tr>
+              <th>{t("messageOrder.tableFrameId")}</th>
+              <th>{t("messageOrder.tableDlcs")}</th>
+              <th className="text-right">{t("messageOrder.tableBurstSize")}</th>
+              <th className="text-right">{t("messageOrder.tableCycle")}</th>
+              <th className="text-right">{t("messageOrder.tableIntraBurst")}</th>
+              <th>{t("messageOrder.tableFlags")}</th>
             </tr>
           </thead>
           <tbody>
-            {bursts.map((burst, idx) => (
-              <tr
-                key={burst.frameId}
-                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
-              >
-                <td className="px-3 py-2 font-mono text-[color:var(--text-cyan)]">
+            {bursts.map((burst) => (
+              <tr key={burst.frameId}>
+                <td className={`font-mono ${textDataCyan}`}>
                   {formatFrameId(burst.frameId)}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {burst.dlcVariation.map((dlc) => (
                       <Badge key={dlc} tone="cyan" size="sm" mono>
@@ -498,16 +490,16 @@ function BurstSection({ bursts }: BurstSectionProps) {
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-secondary)]">
+                <td className={`text-right ${textSecondary}`}>
                   {burst.burstCount === 1 ? "—" : `~${burst.burstCount}`}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-emerald)] font-medium">
+                <td className={`text-right font-medium ${textDataGreen}`}>
                   {formatMs(burst.burstPeriodMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-[color:var(--text-tertiary)]">
+                <td className={`text-right ${textMuted}`}>
                   {burst.burstCount > 1 ? formatMs(burst.interMessageMs) : "—"}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {burst.flags.map((flag) => (
                       <Badge key={flag} size="sm">
@@ -519,7 +511,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </section>
   );
@@ -551,24 +543,21 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
         </span>
       </div>
       <Card padding="none" className="overflow-hidden">
-        <table className="w-full text-xs">
+        <Table>
           <thead>
-            <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableBuses")}</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCountPerBus")}</th>
+            <tr>
+              <th>{t("messageOrder.tableFrameId")}</th>
+              <th>{t("messageOrder.tableBuses")}</th>
+              <th>{t("messageOrder.tableCountPerBus")}</th>
             </tr>
           </thead>
           <tbody>
-            {multiBus.map((frame, idx) => (
-              <tr
-                key={frame.frameId}
-                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
-              >
-                <td className="px-3 py-2 font-mono text-[color:var(--text-rose)]">
+            {multiBus.map((frame) => (
+              <tr key={frame.frameId}>
+                <td className={`font-mono ${textDanger}`}>
                   {formatFrameId(frame.frameId)}
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {frame.buses.map((bus) => (
                       <Badge key={bus} tone="danger" size="sm" mono>
@@ -577,7 +566,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {frame.buses.map((bus) => (
                       <Badge key={bus} size="sm">
@@ -589,7 +578,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </section>
   );
@@ -626,7 +615,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
         {groups.map((group, idx) => (
           <Card key={idx} padding="sm">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium text-[color:var(--text-emerald)]">
+              <span className={`text-xs font-medium ${textDataGreen}`}>
                 ~{formatMs(group.intervalMs)}
               </span>
               <span className={captionMuted}>

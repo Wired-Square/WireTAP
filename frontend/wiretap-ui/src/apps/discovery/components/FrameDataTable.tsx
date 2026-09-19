@@ -13,28 +13,21 @@ import { formatHumanUs, TIME_COLUMN_CHARS } from '../../../utils/timeFormat';
 import type { TimeDisplayFormat } from '../../../types/common';
 import {
   bgDataView,
-  borderDataView,
   textDataSecondary,
   textDataTertiary,
-  hoverDataRow,
   textDataYellow,
   textDataOrange,
   textDataGreen,
   textDataPurple,
   textDataAmber,
   textDataCyan,
-  bgCyan,
 } from '../../../styles';
 import { emptyStateContainer, emptyStateText } from '../../../styles/typography';
-import { dataTableContainer, dataCell, dataHeaderCell } from '../../../styles/tableStyles';
 import { IconButton } from '../../../components/Button';
+import { Table } from '../../../components/Table';
 
 /** Height of the spacer below the rows, in px. */
 const RESERVED_PX = 32;
-
-/** Cells holding only an icon button — tighter horizontally, same height. */
-const dataCellIcon = 'px-1 py-0.5';
-const dataHeaderCellIcon = `px-1 py-1.5 border-b ${borderDataView}`;
 
 // ============================================================================
 // Types
@@ -296,7 +289,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   return (
     <div
       ref={ref || internalRef}
-      className={`${dataTableContainer} ${bgDataView}`}
+      className={`flex-1 min-h-0 overflow-auto ${bgDataView}`}
       onScroll={handleScroll}
     >
       <IconSprites />
@@ -313,7 +306,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
         the page's widest run (`hexRunChars`) keeps the ASCII behind it in a straight
         gutter rather than stepping in and out with each frame's length.
       */}
-      <table className="w-full table-fixed">
+      <Table size="sm" mono sticky hover className="table-fixed">
         <colgroup>
           {renderRowStatus && <col className="w-8" />}
           {onBookmark && <col className="w-7" />}
@@ -325,31 +318,21 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
           <col className="w-12" />
           <col />
         </colgroup>
-        <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary}`}>
+        <thead>
           <tr onContextMenu={onHeaderContextMenu ? (e) => { e.preventDefault(); onHeaderContextMenu({ x: e.clientX, y: e.clientY }); } : undefined}>
-            {renderRowStatus && (
-              <th className={`${dataHeaderCellIcon}`}></th>
-            )}
-            {onBookmark && (
-              <th className={`${dataHeaderCellIcon}`}></th>
-            )}
-            {showRef && (
-              <th className={`text-right ${dataHeaderCell} ${textDataSecondary}`}>#</th>
-            )}
-            <th className={`text-left ${dataHeaderCell}`}>Time</th>
+            {renderRowStatus && <th className="px-1" />}
+            {onBookmark && <th className="px-1" />}
+            {showRef && <th className="text-right">#</th>}
+            <th>Time</th>
             {showId && (
-              <th className={`text-right ${dataHeaderCell}`}>
+              <th className="text-right">
                 {frames[0]?.protocol === 'modbus_rtu' ? 'Unit/Fn' : 'ID'}
               </th>
             )}
-            {showBus && (
-              <th className={`text-center ${dataHeaderCell} ${textDataCyan}`}>Bus</th>
-            )}
-            {showSourceAddress && (
-              <th className={`text-right ${dataHeaderCell} ${textDataPurple}`}>Source</th>
-            )}
-            <th className={`text-left ${dataHeaderCell}`}>Len</th>
-            <th className={`text-left ${dataHeaderCell}`}>Data</th>
+            {showBus && <th className={`text-center ${textDataCyan}`}>Bus</th>}
+            {showSourceAddress && <th className={`text-right ${textDataPurple}`}>Source</th>}
+            <th>Len</th>
+            <th>Data</th>
           </tr>
         </thead>
         <tbody onClick={handleBodyClick} onContextMenu={handleBodyContextMenu}>
@@ -359,60 +342,53 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             // Rust supplies the row's capture position; the page offset is only a
             // fallback for callers that don't pass indices.
             const displayIndex = captureIndices?.[idx] ?? (pageStartIndex + idx + 1);
-            const cellHighlight = isCurrentFrame ? bgCyan : '';
 
             return (
               <tr
                 ref={isCurrentFrame ? highlightedRowRef : undefined}
                 key={frameRowKey(captureIndices?.[idx], pageStartIndex + idx)}
                 data-idx={idx}
-                className={`${isCurrentFrame ? '' : hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'ring-1 ring-[color:var(--status-cyan-border)]' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
+                aria-current={isCurrentFrame || undefined}
+                className={`${frame.incomplete ? 'opacity-60' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
                 title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
               >
-                {renderRowStatus && (
-                  <td className={`${dataCellIcon} ${cellHighlight}`}>
-                    {renderRowStatus(frame, idx)}
-                  </td>
-                )}
+                {renderRowStatus && <td className="px-1">{renderRowStatus(frame, idx)}</td>}
                 {onBookmark && (
-                  <td className={`${dataCellIcon} ${cellHighlight}`}>
+                  <td className="px-1">
                     <IconButton data-action="bookmark" size="xs" title="Add bookmark at this frame's time">
                       <UseIcon id="fdt-bookmark" className={`w-3 h-3 ${textDataAmber}`} />
                     </IconButton>
                   </td>
                 )}
                 {showRef && (
-                  <td className={`${dataCell} text-right tabular-nums ${textDataTertiary} ${cellHighlight}`}>
+                  <td className={`text-right ${textDataTertiary}`}>
                     {displayIndex.toLocaleString()}
                   </td>
                 )}
-                <td
-                  className={`${dataCell} ${cellHighlight}`}
-                  title={formatHumanUs(frame.timestamp_us, useLocalTimezone)}
-                >
+                <td title={formatHumanUs(frame.timestamp_us, useLocalTimezone)}>
                   <span className={textDataTertiary}>{formatTime(frame.timestamp_us, prevFrame?.timestamp_us ?? null)}</span>
                 </td>
                 {showId && (
-                  <td className={`${dataCell} text-right ${frame.incomplete ? textDataOrange : textDataYellow} ${cellHighlight}`}>
+                  <td className={`text-right ${frame.incomplete ? textDataOrange : textDataYellow}`}>
                     {formatId(frame.protocol, frame.frame_id, frame.is_extended)}
                     {frame.incomplete && <span className={`ml-1 ${textDataOrange}`}>?</span>}
                   </td>
                 )}
                 {showBus && (
-                  <td className={`${dataCell} text-center ${textDataCyan} ${cellHighlight}`}>
+                  <td className={`text-center ${textDataCyan}`}>
                     {frame.bus ?? 0}
                   </td>
                 )}
                 {showSourceAddress && (
-                  <td className={`${dataCell} text-right ${textDataPurple} ${cellHighlight}`}>
+                  <td className={`text-right ${textDataPurple}`}>
                     {frame.source_address !== undefined
                       ? `0x${frame.source_address.toString(16).toUpperCase().padStart(srcPadding, '0')}`
                       : '-'
                     }
                   </td>
                 )}
-                <td className={`${dataCell} ${textDataSecondary} ${cellHighlight}`}>{frame.dlc}</td>
-                <td className={`${dataCell} ${cellHighlight}`}>
+                <td className={textDataSecondary}>{frame.dlc}</td>
+                <td>
                   {showAscii ? (
                     <>
                       {/* Two non-breaking units with one space between them, so the only
@@ -435,7 +411,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             );
           })}
         </tbody>
-      </table>
+      </Table>
       {frames.length === 0 ? (
         <div className={emptyStateContainer}>
           <p className={emptyStateText}>{emptyMessage}</p>

@@ -18,12 +18,11 @@ import {
   borderDefault,
   emptyStateContainer,
   emptyStateText,
-  resultCell as td,
-  resultHeaderCell as th,
   textMuted,
   textPrimary,
   textSecondary,
 } from "../../../../styles";
+import { Table } from "../../../../components/Table";
 import { iconSm } from "../../../../styles/spacing";
 import { getCaptureLatestFrames } from "../../../../api/capture";
 import { bytesToHex } from "../../../../utils/byteUtils";
@@ -211,7 +210,7 @@ export default function ModbusScanResultView({
       )}
 
       {/* Results table */}
-      <div className="flex-1 overflow-auto">
+      <div className={`flex-1 overflow-auto ${bgDataView}`}>
         {rows.length === 0 ? (
           <div className={emptyStateContainer}>
             <p className={emptyStateText}>
@@ -223,50 +222,47 @@ export default function ModbusScanResultView({
             </p>
           </div>
         ) : scanType === "unit-id" ? (
-          <table className="w-full text-xs">
-            <thead className={`sticky top-0 ${bgDataView}`}>
-              <tr className={`border-b ${borderDefault}`}>
-                <th className={th}>{t("modbusScan.tableUnitId")}</th>
-                <th className={th}>{t("modbusScan.tableVendor")}</th>
-                <th className={th}>{t("modbusScan.tableProduct")}</th>
-                <th className={th}>{t("modbusScan.tableRevision")}</th>
-                <th className={th}>{t("modbusScan.tableData")}</th>
+          <Table sticky hover>
+            <thead>
+              <tr>
+                <th>{t("modbusScan.tableUnitId")}</th>
+                <th>{t("modbusScan.tableVendor")}</th>
+                <th>{t("modbusScan.tableProduct")}</th>
+                <th>{t("modbusScan.tableRevision")}</th>
+                <th>{t("modbusScan.tableData")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const info = deviceInfo.get(row.bus);
                 return (
-                  <tr
-                    key={`${row.address}-${row.bus}`}
-                    className="border-b border-[color:var(--border-default)]/30 hover:bg-[var(--bg-surface)]"
-                  >
-                    <td className={td(textSecondary)}>{row.bus}</td>
-                    <td className={`px-3 py-1 ${textPrimary}`}>{info?.vendor ?? t("modbusScan.noValue")}</td>
-                    <td className={`px-3 py-1 ${textSecondary}`}>{info?.product_code ?? t("modbusScan.noValue")}</td>
-                    <td className={`px-3 py-1 ${textMuted}`}>{info?.revision ?? t("modbusScan.noValue")}</td>
-                    <td className={td(textMuted)}>
+                  <tr key={`${row.address}-${row.bus}`}>
+                    <td className={`font-mono ${textSecondary}`}>{row.bus}</td>
+                    <td>{info?.vendor ?? t("modbusScan.noValue")}</td>
+                    <td className={textSecondary}>{info?.product_code ?? t("modbusScan.noValue")}</td>
+                    <td className={textMuted}>{info?.revision ?? t("modbusScan.noValue")}</td>
+                    <td className={`font-mono ${textMuted}`}>
                       {row.bytes.length > 0 ? bytesToHex(row.bytes) : t("modbusScan.noValue")}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
+          </Table>
         ) : (
-          <table className="w-full text-xs">
-            <thead className={`sticky top-0 ${bgDataView}`}>
-              <tr className={`border-b ${borderDefault}`}>
-                <th className={th}>{t("modbusScan.tableRegister")}</th>
-                <th className={th}>{t("modbusScan.tableHex")}</th>
-                <th className={th}>{t("modbusScan.tableU16")}</th>
-                <th className={th}>{t("modbusScan.tableS16")}</th>
-                <th className={th}>{t("modbusScan.tableAscii")}</th>
+          <Table mono sticky hover>
+            <thead>
+              <tr>
+                <th>{t("modbusScan.tableRegister")}</th>
+                <th>{t("modbusScan.tableHex")}</th>
+                <th>{t("modbusScan.tableU16")}</th>
+                <th>{t("modbusScan.tableS16")}</th>
+                <th>{t("modbusScan.tableAscii")}</th>
                 {showWide && (
                   <>
-                    <th className={th}>{t("modbusScan.tableU32")}</th>
-                    <th className={th}>{t("modbusScan.tableS32")}</th>
-                    <th className={th}>{t("modbusScan.tableF32")}</th>
+                    <th>{t("modbusScan.tableU32")}</th>
+                    <th>{t("modbusScan.tableS32")}</th>
+                    <th>{t("modbusScan.tableF32")}</th>
                   </>
                 )}
               </tr>
@@ -279,20 +275,17 @@ export default function ModbusScanResultView({
                 const next = byAddress.get(row.address + 1);
                 const wide = next ? interpretPair(row.bytes, next.bytes, wordOrder) : null;
                 return (
-                  <tr
-                    key={`${row.bus}-${row.address}`}
-                    className="border-b border-[color:var(--border-default)]/30 hover:bg-[var(--bg-surface)]"
-                  >
-                    <td className={td(textPrimary)}>{row.address}</td>
-                    <td className={td(textMuted)}>{v.hex}</td>
-                    <td className={td(textSecondary)}>{v.u16}</td>
-                    <td className={td(textSecondary)}>{v.s16}</td>
-                    <td className={td(textMuted)}>{v.ascii}</td>
+                  <tr key={`${row.bus}-${row.address}`}>
+                    <td>{row.address}</td>
+                    <td className={textMuted}>{v.hex}</td>
+                    <td className={textSecondary}>{v.u16}</td>
+                    <td className={textSecondary}>{v.s16}</td>
+                    <td className={textMuted}>{v.ascii}</td>
                     {showWide && (
                       <>
-                        <td className={td(textSecondary)}>{wide?.u32 ?? ""}</td>
-                        <td className={td(textSecondary)}>{wide?.s32 ?? ""}</td>
-                        <td className={td(textMuted)}>
+                        <td className={textSecondary}>{wide?.u32 ?? ""}</td>
+                        <td className={textSecondary}>{wide?.s32 ?? ""}</td>
+                        <td className={textMuted}>
                           {wide ? formatFloat(wide.f32) : ""}
                         </td>
                       </>
@@ -301,7 +294,7 @@ export default function ModbusScanResultView({
                 );
               })}
             </tbody>
-          </table>
+          </Table>
         )}
       </div>
     </div>

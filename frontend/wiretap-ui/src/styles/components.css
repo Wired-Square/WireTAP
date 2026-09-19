@@ -1012,6 +1012,94 @@
     text-transform: uppercase;
   }
 
+  /* ---- Tables ------------------------------------------------------------
+     .table [.table--sm] (md when none) [.table--mono] [.table--sticky] [.table--hover]
+       > thead > tr > th · > tbody > tr [aria-current="true"] > td · .table__pin
+     The table carries the design and a cell only its alignment and tone, so
+     th and td stay bare. md is read a row at a time and rules its rows; sm is
+     the dense data table scanned down its columns, with none. The body of a
+     mono table is in the data face, its head in the UI face. The head rule
+     and a pinned cell's surface are drawn so they survive being stuck; the
+     surface itself is whatever the table sits on. */
+  .table {
+    --table-py: 4px;
+    --table-px: 12px;
+
+    width: 100%;
+    background-color: inherit;
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .table--sm {
+    --table-py: 2px;
+    --table-px: 8px;
+  }
+
+  .table--mono {
+    font-family: var(--font-mono);
+  }
+
+  .table--mono > thead {
+    font-family: var(--font-sans);
+  }
+
+  .table > thead,
+  .table > tbody,
+  .table tr {
+    background-color: inherit;
+  }
+
+  .table th,
+  .table td {
+    padding: var(--table-py) var(--table-px);
+    vertical-align: middle;
+  }
+
+  .table th {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    color: var(--text-secondary);
+    text-align: start;
+    font-weight: 500;
+    box-shadow: inset 0 -1px var(--border-default);
+  }
+
+  .table > tbody > tr + tr {
+    border-top: 1px solid color-mix(in srgb, var(--border-default) 50%, transparent);
+  }
+
+  .table--sm > tbody > tr + tr {
+    border-top: 0;
+  }
+
+  .table--sticky > thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .table--hover > tbody > tr:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .table > tbody > tr[aria-current="true"] > td {
+    background-color: var(--status-cyan-bg);
+    box-shadow: inset 0 1px var(--status-cyan-border), inset 0 -1px var(--status-cyan-border);
+  }
+
+  .table__pin {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: inherit;
+  }
+
+  .table > thead .table__pin {
+    z-index: 2;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .btn:active:not(:disabled) {
       transform: none;

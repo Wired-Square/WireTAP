@@ -17,11 +17,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useQueryStore, type DatabaseActivity } from "../stores/queryStore";
-import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import {
   borderDivider,
-  hoverBg,
   textPrimary,
   textSecondary,
   textMuted,
@@ -32,6 +31,8 @@ import {
 } from "../../../styles/colourTokens";
 import { Button, IconButton } from "../../../components/Button";
 import { Select } from "../../../components/forms";
+import { Card } from "../../../components/Card";
+import { Table } from "../../../components/Table";
 
 interface Props {
   profileId: string | null;
@@ -181,18 +182,18 @@ export default function StatsPanel({ profileId }: Props) {
               {t("stats.noRunning")}
             </div>
           ) : (
-            <div className={`border border-[var(--border-default)] rounded overflow-hidden`}>
-              <table className="w-full text-xs">
-                <thead className={`${bgSurface} ${textSecondary}`}>
+            <Card padding="none" className="overflow-hidden">
+              <Table hover>
+                <thead>
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.pid")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.user")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.duration")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.query")}</th>
-                    <th className="px-3 py-2 text-right font-medium">{t("stats.headers.actions")}</th>
+                    <th>{t("stats.headers.pid")}</th>
+                    <th>{t("stats.headers.user")}</th>
+                    <th>{t("stats.headers.duration")}</th>
+                    <th>{t("stats.headers.query")}</th>
+                    <th className="text-right">{t("stats.headers.actions")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border-default)]">
+                <tbody>
                   {activity.queries.map((query) => (
                     <QueryRow
                       key={query.pid}
@@ -202,8 +203,8 @@ export default function StatsPanel({ profileId }: Props) {
                     />
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </Card>
           )}
         </section>
 
@@ -218,19 +219,19 @@ export default function StatsPanel({ profileId }: Props) {
               {t("stats.noSessions")}
             </div>
           ) : (
-            <div className={`border border-[var(--border-default)] rounded overflow-hidden`}>
-              <table className="w-full text-xs">
-                <thead className={`${bgSurface} ${textSecondary}`}>
+            <Card padding="none" className="overflow-hidden">
+              <Table hover>
+                <thead>
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.pid")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.user")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.application")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.state")}</th>
-                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.client")}</th>
-                    <th className="px-3 py-2 text-right font-medium">{t("stats.headers.actions")}</th>
+                    <th>{t("stats.headers.pid")}</th>
+                    <th>{t("stats.headers.user")}</th>
+                    <th>{t("stats.headers.application")}</th>
+                    <th>{t("stats.headers.state")}</th>
+                    <th>{t("stats.headers.client")}</th>
+                    <th className="text-right">{t("stats.headers.actions")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border-default)]">
+                <tbody>
                   {activity.sessions.map((session) => (
                     <SessionRow
                       key={session.pid}
@@ -239,8 +240,8 @@ export default function StatsPanel({ profileId }: Props) {
                     />
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </Card>
           )}
         </section>
       </div>
@@ -271,19 +272,19 @@ function QueryRow({ query, onCancel, formatDuration }: QueryRowProps) {
   const isLongRunning = (query.duration_secs ?? 0) > 30;
 
   return (
-    <tr className={hoverBg}>
-      <td className={`px-3 py-2 ${monoBody} ${textPrimary}`}>{query.pid}</td>
-      <td className={`px-3 py-2 ${textSecondary}`}>{query.username ?? "-"}</td>
-      <td className={`px-3 py-2 ${isLongRunning ? textDataAmber : textDataGreen}`}>
+    <tr>
+      <td className="font-mono">{query.pid}</td>
+      <td className={textSecondary}>{query.username ?? "-"}</td>
+      <td className={isLongRunning ? textDataAmber : textDataGreen}>
         <span className="flex items-center gap-1">
           <Clock className={iconSm} />
           {formatDuration(query.duration_secs)}
         </span>
       </td>
-      <td className={`px-3 py-2 ${monoBody} ${textMuted} max-w-xs truncate`} title={query.query ?? ""}>
+      <td className={`font-mono ${textMuted} max-w-xs truncate`} title={query.query ?? ""}>
         {query.query ?? "-"}
       </td>
-      <td className="px-3 py-2 text-right">
+      <td className="text-right">
         {query.is_cancellable && (
           <IconButton
             onClick={handleCancel}
@@ -332,18 +333,18 @@ function SessionRow({ session, onTerminate }: SessionRowProps) {
         : textSecondary;
 
   return (
-    <tr className={hoverBg}>
-      <td className={`px-3 py-2 ${monoBody} ${textPrimary}`}>{session.pid}</td>
-      <td className={`px-3 py-2 ${textSecondary}`}>{session.username ?? "-"}</td>
-      <td className={`px-3 py-2 ${textMuted}`}>
+    <tr>
+      <td className="font-mono">{session.pid}</td>
+      <td className={textSecondary}>{session.username ?? "-"}</td>
+      <td className={textMuted}>
         <span className="flex items-center gap-1">
           <Terminal className={iconSm} />
           {session.application_name || "-"}
         </span>
       </td>
-      <td className={`px-3 py-2 ${stateColour}`}>{session.state ?? "-"}</td>
-      <td className={`px-3 py-2 ${monoBody} ${textMuted}`}>{session.client_addr ?? t("stats.values.local")}</td>
-      <td className="px-3 py-2 text-right">
+      <td className={stateColour}>{session.state ?? "-"}</td>
+      <td className={`font-mono ${textMuted}`}>{session.client_addr ?? t("stats.values.local")}</td>
+      <td className="text-right">
         <IconButton
           onClick={handleTerminate}
           disabled={isTerminating}

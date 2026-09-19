@@ -70,7 +70,7 @@ const FONT_WEIGHTS = { thin: "100", extralight: "200", light: "300", normal: "40
 const FONT_FAMILIES = {
   sans: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
   serif: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  mono: "var(--font-mono)",
 };
 const TRACKING = { tighter: "-0.05em", tight: "-0.025em", normal: "0em", wide: "0.025em", wider: "0.05em", widest: "0.1em" };
 const LEADING = { tight: "1.25", snug: "1.375", normal: "1.5", relaxed: "1.625", loose: "2" };

@@ -13,8 +13,6 @@ import type {
   TimestampUnit,
 } from "../../api/capture";
 import {
-  bgSurface,
-  borderDefault,
   textMuted,
   textDataGreen,
   textDataCyan,
@@ -23,6 +21,8 @@ import {
   textDataAmber,
 } from "../../styles";
 import { Select } from "../../components/forms";
+import { Card } from "../../components/Card";
+import { Table } from "../../components/Table";
 
 const ROLE_KEYS: CsvColumnRole[] = [
   "ignore",
@@ -170,20 +170,12 @@ export default function PreviewTable({
 
   return (
     <div className="relative">
-      <div
-        ref={scrollRef}
-        onScroll={updateScrollState}
-        className={`overflow-auto max-h-80 border ${borderDefault} rounded`}
-      >
-        <table className="text-xs border-collapse">
+      <Card ref={scrollRef} padding="none" onScroll={updateScrollState} className="overflow-auto max-h-80">
+        <Table size="sm" mono sticky hover className="whitespace-nowrap">
           {/* Role selector row */}
-          <thead className={`sticky top-0 z-10 ${bgSurface}`}>
+          <thead>
             <tr>
-              <th
-                className={`px-2 py-1.5 text-left border-b ${borderDefault} ${textMuted} font-normal whitespace-nowrap sticky left-0 ${bgSurface} z-20`}
-              >
-                #
-              </th>
+              <th className="table__pin">#</th>
               {Array.from({ length: numColumns }, (_, colIdx) => {
                 const mapping = mappings.find(
                   (m) => m.column_index === colIdx
@@ -191,10 +183,7 @@ export default function PreviewTable({
                 const role = mapping?.role ?? "ignore";
                 const isIgnored = role === "ignore";
                 return (
-                  <th
-                    key={colIdx}
-                    className={`px-1 py-1.5 border-b ${borderDefault} ${isIgnored ? "opacity-40" : ""}`}
-                  >
+                  <th key={colIdx} className={`px-1 ${isIgnored ? "opacity-40" : ""}`}>
                     <Select
                       value={role}
                       onChange={(e) =>
@@ -218,12 +207,8 @@ export default function PreviewTable({
             </tr>
             {/* Header row (if present) */}
             {hasHeader && headers && (
-              <tr className={bgSurface}>
-                <td
-                  className={`px-2 py-1 border-b ${borderDefault} ${textMuted} font-mono sticky left-0 ${bgSurface} z-20`}
-                >
-                  H
-                </td>
+              <tr className="font-mono">
+                <td className={`table__pin ${textMuted}`}>H</td>
                 {headers.map((header, colIdx) => {
                   const mapping = mappings.find(
                     (m) => m.column_index === colIdx
@@ -234,7 +219,7 @@ export default function PreviewTable({
                   return (
                     <td
                       key={colIdx}
-                      className={`px-2 py-1 border-b ${borderDefault} ${colour} font-mono whitespace-nowrap ${isIgnored ? "opacity-40" : ""}`}
+                      className={`${colour} ${isIgnored ? "opacity-40" : ""}`}
                       title={header}
                     >
                       {showImportedTs && colIdx === tsColIndex
@@ -249,12 +234,8 @@ export default function PreviewTable({
           {/* Data rows */}
           <tbody>
             {visibleRows.map((row, rowIdx) => (
-              <tr key={rowIdx} className="hover:brightness-95">
-                <td
-                  className={`px-2 py-0.5 border-b ${borderDefault} ${textMuted} font-mono sticky left-0 ${bgSurface} z-20`}
-                >
-                  {rowIdx + 1}
-                </td>
+              <tr key={rowIdx}>
+                <td className={`table__pin ${textMuted}`}>{rowIdx + 1}</td>
                 {Array.from({ length: numColumns }, (_, colIdx) => {
                   const mapping = mappings.find(
                     (m) => m.column_index === colIdx
@@ -266,7 +247,7 @@ export default function PreviewTable({
                   return (
                     <td
                       key={colIdx}
-                      className={`px-2 py-0.5 border-b ${borderDefault} ${colour} font-mono whitespace-nowrap ${isIgnored ? "opacity-40" : ""}`}
+                      className={`${colour} ${isIgnored ? "opacity-40" : ""}`}
                       title={cellValue}
                     >
                       {cellValue}
@@ -276,8 +257,8 @@ export default function PreviewTable({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+        </Table>
+      </Card>
       {/* Scroll edge shadows */}
       {canScrollLeft && (
         <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/15 to-transparent rounded-l" />

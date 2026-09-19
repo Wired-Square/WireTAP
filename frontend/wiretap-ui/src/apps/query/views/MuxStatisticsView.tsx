@@ -12,8 +12,8 @@ import type {
   Word16Stats,
 } from "../../../api/dbquery";
 import type { QueryStats } from "../stores/queryStore";
-import { monoBody } from "../../../styles/typography";
-import { borderDivider, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple } from "../../../styles/colourTokens";
+import { bgPrimary, borderDivider, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple } from "../../../styles/colourTokens";
+import { Table } from "../../../components/Table";
 
 interface Props {
   results: MuxStatisticsResult;
@@ -92,18 +92,14 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
       {/* Scrollable table area */}
       <div className="flex-1 overflow-auto p-4">
         {/* Byte Statistics Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+        <div className={`overflow-x-auto ${bgPrimary}`}>
+          <Table mono className="whitespace-nowrap">
             <thead>
               <tr>
-                <th className={`${monoBody} text-xs ${textMuted} text-left px-2 py-1 sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                  {t("muxStats.headers.mux")}
-                </th>
-                <th className={`${monoBody} text-xs ${textMuted} text-right px-2 py-1`}>
-                  {t("muxStats.headers.frames")}
-                </th>
+                <th className="table__pin">{t("muxStats.headers.mux")}</th>
+                <th className="text-right">{t("muxStats.headers.frames")}</th>
                 {byteIndices.map((idx) => (
-                  <th key={idx} className={`${monoBody} text-xs ${textMuted} text-center px-2 py-1 whitespace-nowrap`}>
+                  <th key={idx} className="text-center">
                     {t("muxStats.byteHeader", { idx })}
                   </th>
                 ))}
@@ -111,23 +107,19 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
             </thead>
             <tbody>
               {results.cases.map((c) => (
-                <tr key={c.mux_value} className="border-t border-[var(--border-default)]">
-                  <td className={`${monoBody} text-xs ${textDataAmber} px-2 py-1.5 font-semibold sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                    {c.mux_value}
-                  </td>
-                  <td className={`${monoBody} text-xs ${textSecondary} text-right px-2 py-1.5`}>
-                    {c.frame_count.toLocaleString()}
-                  </td>
+                <tr key={c.mux_value}>
+                  <td className={`table__pin font-semibold ${textDataAmber}`}>{c.mux_value}</td>
+                  <td className={`text-right ${textSecondary}`}>{c.frame_count.toLocaleString()}</td>
                   {byteIndices.map((idx) => {
                     const bs = getByteStats(c, idx);
                     if (!bs) {
-                      return <td key={idx} className={`${monoBody} text-xs ${textMuted} text-center px-2 py-1.5`}>—</td>;
+                      return <td key={idx} className={`text-center ${textMuted}`}>—</td>;
                     }
                     const isStatic = bs.distinct_count === 1;
                     return (
                       <td
                         key={idx}
-                        className={`${monoBody} text-xs text-center px-2 py-1.5 whitespace-nowrap`}
+                        className="text-center"
                         title={t("muxStats.tooltipByte", { avg: bs.avg.toFixed(1), distinct: bs.distinct_count, samples: bs.sample_count })}
                       >
                         <span className={distinctColour(bs.distinct_count)}>
@@ -135,7 +127,7 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                             ? hex8(bs.min)
                             : `${hex8(bs.min)}-${hex8(bs.max)}`}
                         </span>
-                        <span className={`block text-xs ${textMuted}`}>
+                        <span className={`block ${textMuted}`}>
                           ({bs.distinct_count})
                         </span>
                       </td>
@@ -144,30 +136,28 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
 
         {/* 16-bit Word Statistics */}
         {has16Bit && wordPairs.length > 0 && (
           <div className="mt-6">
             <h3 className={`text-xs font-semibold ${textSecondary} mb-2`}>{t("muxStats.wordsTitle")}</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+            <div className={`overflow-x-auto ${bgPrimary}`}>
+              <Table mono className="whitespace-nowrap">
                 <thead>
                   <tr>
-                    <th className={`${monoBody} text-xs ${textMuted} text-left px-2 py-1 sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                      {t("muxStats.headers.mux")}
-                    </th>
+                    <th className="table__pin">{t("muxStats.headers.mux")}</th>
                     {wordPairs.map((startByte) => (
-                      <th key={startByte} colSpan={2} className={`${monoBody} text-xs ${textMuted} text-center px-2 py-1 whitespace-nowrap`}>
+                      <th key={startByte} colSpan={2} className="text-center">
                         {t("muxStats.wordHeader", { start: startByte, next: startByte + 1 })}
                       </th>
                     ))}
                   </tr>
                   <tr>
-                    <th className={`sticky left-0 bg-[var(--bg-primary)] z-10`} />
+                    <th className="table__pin" />
                     {wordPairs.map((startByte) => (
-                      <th key={startByte} colSpan={2} className={`${monoBody} text-xs ${textMuted} text-center px-1 py-0.5`}>
+                      <th key={startByte} colSpan={2} className="text-center py-0.5">
                         <span className={`inline-block w-1/2 ${textDataPurple}`}>LE</span>
                         <span className={`inline-block w-1/2 ${textDataGreen}`}>BE</span>
                       </th>
@@ -176,15 +166,13 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                 </thead>
                 <tbody>
                   {results.cases.map((c) => (
-                    <tr key={c.mux_value} className="border-t border-[var(--border-default)]">
-                      <td className={`${monoBody} text-xs ${textDataAmber} px-2 py-1.5 font-semibold sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                        {c.mux_value}
-                      </td>
+                    <tr key={c.mux_value}>
+                      <td className={`table__pin font-semibold ${textDataAmber}`}>{c.mux_value}</td>
                       {wordPairs.map((startByte) => {
                         const le = getWordStats(c, startByte, "le");
                         const be = getWordStats(c, startByte, "be");
                         return (
-                          <td key={startByte} colSpan={2} className={`${monoBody} text-xs text-center px-2 py-1.5 whitespace-nowrap`}>
+                          <td key={startByte} colSpan={2} className="text-center">
                             {le ? (
                               <div
                                 className={distinctColour(le.distinct_count)}
@@ -217,7 +205,7 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           </div>
         )}

@@ -32,7 +32,6 @@
   .left-2\.5 { left: 0.625rem }
   .left-full { left: 100% }
   .z-10 { z-index: 10 }
-  .z-20 { z-index: 20 }
   .z-50 { z-index: 50 }
   .col-span-2 { grid-column: span 2 / span 2 }
   .-m-0\.5 { margin: -0.125rem }
@@ -86,7 +85,6 @@
   .inline-block { display: inline-block }
   .inline-flex { display: inline-flex }
   .inline-table { display: inline-table }
-  .table { display: table }
   .aspect-square { aspect-ratio: 1 }
   .\!h-3 { height: 0.75rem !important }
   .h-0 { height: 0 }
@@ -209,7 +207,6 @@
   .flex-shrink-0 { flex-shrink: 0 }
   .shrink-0 { flex-shrink: 0 }
   .table-fixed { table-layout: fixed }
-  .border-collapse { border-collapse: collapse }
   .-translate-x-1\/2 { --tw-translate-x: -50%; translate: var(--tw-translate-x) var(--tw-translate-y) }
   .translate-x-0 { --tw-translate-x: 0; translate: var(--tw-translate-x) var(--tw-translate-y) }
   .translate-x-1\/2 { --tw-translate-x: 50%; translate: var(--tw-translate-x) var(--tw-translate-y) }
@@ -315,7 +312,6 @@
   .\!border-purple-300 { border-color: oklch(82.7% 0.119 306.383) !important }
   .border-\[color\:var\(--accent-primary\)\] { border-color: var(--accent-primary) }
   .border-\[color\:var\(--border-default\)\] { border-color: var(--border-default) }
-  .border-\[color\:var\(--border-default\)\]\/30 { border-color: color-mix(in oklab, var(--border-default) 30%, transparent) }
   .border-\[color\:var\(--border-green\)\] { border-color: var(--border-green) }
   .border-\[color\:var\(--border-info\)\] { border-color: var(--border-info) }
   .border-\[color\:var\(--border-purple\)\] { border-color: var(--border-purple) }
@@ -381,7 +377,6 @@
   .bg-\[var\(--bg-purple\)\] { background-color: var(--bg-purple) }
   .bg-\[var\(--bg-purple-subtle\)\] { background-color: var(--bg-purple-subtle) }
   .bg-\[var\(--bg-red\)\] { background-color: var(--bg-red) }
-  .bg-\[var\(--bg-subtle\)\] { background-color: var(--bg-subtle) }
   .bg-\[var\(--bg-surface\)\] { background-color: var(--bg-surface) }
   .bg-\[var\(--bg-surface-2\,\#222\)\] { background-color: var(--bg-surface-2,#222) }
   .bg-\[var\(--bg-tertiary\)\] { background-color: var(--bg-tertiary) }
@@ -442,7 +437,6 @@
   .bg-green-400 { background-color: oklch(79.2% 0.209 151.711) }
   .bg-green-500 { background-color: oklch(72.3% 0.219 149.579) }
   .bg-green-500\/10 { background-color: color-mix(in oklab, oklch(72.3% 0.219 149.579) 10%, transparent) }
-  .bg-green-900\/20 { background-color: color-mix(in oklab, oklch(39.3% 0.095 152.535) 20%, transparent) }
   .bg-green-900\/30 { background-color: color-mix(in oklab, oklch(39.3% 0.095 152.535) 30%, transparent) }
   .bg-indigo-500\/10 { background-color: color-mix(in oklab, oklch(58.5% 0.233 277.117) 10%, transparent) }
   .bg-orange-500\/10 { background-color: color-mix(in oklab, oklch(70.5% 0.213 47.604) 10%, transparent) }
@@ -528,7 +522,7 @@
   .text-left { text-align: left }
   .text-right { text-align: right }
   .align-middle { vertical-align: middle }
-  .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace }
+  .font-mono { font-family: var(--font-mono) }
   .font-sans { font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" }
   .text-2xl { font-size: 1.5rem; line-height: calc(2 / 1.5) }
   .text-3xl { font-size: 1.875rem; line-height: calc(2.25 / 1.875) }
@@ -585,7 +579,6 @@
   .text-\[color\:var\(--text-blue-bold\)\] { color: var(--text-blue-bold) }
   .text-\[color\:var\(--text-cyan\)\] { color: var(--text-cyan) }
   .text-\[color\:var\(--text-danger\)\] { color: var(--text-danger) }
-  .text-\[color\:var\(--text-emerald\)\] { color: var(--text-emerald) }
   .text-\[color\:var\(--text-green\)\] { color: var(--text-green) }
   .text-\[color\:var\(--text-info\)\] { color: var(--text-info) }
   .text-\[color\:var\(--text-muted\)\] { color: var(--text-muted) }
@@ -594,10 +587,8 @@
   .text-\[color\:var\(--text-purple\)\] { color: var(--text-purple) }
   .text-\[color\:var\(--text-purple-strong\)\] { color: var(--text-purple-strong) }
   .text-\[color\:var\(--text-red\)\] { color: var(--text-red) }
-  .text-\[color\:var\(--text-rose\)\] { color: var(--text-rose) }
   .text-\[color\:var\(--text-secondary\)\] { color: var(--text-secondary) }
   .text-\[color\:var\(--text-success\)\] { color: var(--text-success) }
-  .text-\[color\:var\(--text-tertiary\)\] { color: var(--text-tertiary) }
   .text-\[color\:var\(--text-yellow\)\] { color: var(--text-yellow) }
   .text-amber-300 { color: oklch(87.9% 0.169 91.605) }
   .text-amber-400 { color: oklch(82.8% 0.189 84.429) }
@@ -655,12 +646,10 @@
   .shadow { --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1)); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .shadow-lg { --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1)); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .shadow-md { --tw-shadow: 0 4px 6px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 2px 4px -2px var(--tw-shadow-color, rgb(0 0 0 / 0.1)); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
-  .shadow-sm { --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1)); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .ring-1 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .ring-2 { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) }
   .shadow-red-500\/30 { --tw-shadow-color: color-mix(in oklab, oklch(63.7% 0.237 25.331) 30%, transparent) }
   .ring-\[color\:var\(--border-default\)\] { --tw-ring-color: var(--border-default) }
-  .ring-\[color\:var\(--status-cyan-border\)\] { --tw-ring-color: var(--status-cyan-border) }
   .ring-\[color\:var\(--status-info-border\)\] { --tw-ring-color: var(--status-info-border) }
   .ring-\[color\:var\(--status-warning-border\)\] { --tw-ring-color: var(--status-warning-border) }
   .ring-blue-500\/50 { --tw-ring-color: color-mix(in oklab, oklch(62.3% 0.214 259.815) 50%, transparent) }

@@ -25,13 +25,11 @@ import {
   type SessionLogEventType,
 } from "../stores/sessionLogStore";
 import {
-  textPrimary,
   textSecondary,
   textMuted,
   bgSurface,
   bgDataView,
   borderDefault,
-  hoverBg,
   emptyStateContainer,
   emptyStateText,
   emptyStateHeading,
@@ -41,6 +39,7 @@ import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { Input, Select } from "../../../components/forms";
+import { Table } from "../../../components/Table";
 
 /** Format timestamp as HH:MM:SS.mmm */
 function formatTime(timestamp: number): string {
@@ -357,62 +356,45 @@ export default function SessionLogView() {
             </div>
           </div>
         ) : (
-          <table className="w-full text-xs">
-            <thead className={`sticky top-0 ${bgSurface}`}>
-              <tr className={`border-b ${borderDefault}`}>
-                <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[100px]`}>
-                  {t("log.headers.time")}
-                </th>
-                <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[90px]`}>
-                  {t("log.headers.event")}
-                </th>
-                <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[120px]`}>
-                  {t("log.headers.session")}
-                </th>
-                {showProfileColumn && (
-                  <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[140px]`}>
-                    {t("log.headers.profile")}
-                  </th>
-                )}
-                <th className={`px-2 py-1.5 text-left font-medium ${textMuted}`}>
-                  {t("log.headers.details")}
-                </th>
+          <Table sticky hover>
+            <thead>
+              <tr>
+                <th className="w-[100px]">{t("log.headers.time")}</th>
+                <th className="w-[90px]">{t("log.headers.event")}</th>
+                <th className="w-[120px]">{t("log.headers.session")}</th>
+                {showProfileColumn && <th className="w-[140px]">{t("log.headers.profile")}</th>}
+                <th>{t("log.headers.details")}</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
-                <tr
-                  key={entry.id}
-                  className={`border-b border-[color:var(--border-default)]/30 ${hoverBg}`}
-                >
-                  <td className={`px-2 py-1 font-mono ${textMuted}`}>
+                <tr key={entry.id}>
+                  <td className={`font-mono ${textMuted}`}>
                     {formatTime(entry.timestamp)}
                   </td>
-                  <td className="px-2 py-1">
+                  <td>
                     <Badge size="sm" {...EVENT_TYPE_BADGE[entry.eventType]}>
                       {EVENT_TYPE_LABELS[entry.eventType]}
                     </Badge>
                   </td>
                   <td
-                    className={`px-2 py-1 font-mono ${textSecondary} cursor-default`}
+                    className={`font-mono ${textSecondary}`}
                     title={entry.profileName ? t("log.profileTitle", { name: entry.profileName }) : undefined}
                   >
                     {truncateSessionId(entry.sessionId)}
                   </td>
                   {showProfileColumn && (
-                    <td className={`px-2 py-1 ${textSecondary}`}>
+                    <td className={textSecondary}>
                       <span className="max-w-[130px] truncate block">
                         {entry.profileName ?? "-"}
                       </span>
                     </td>
                   )}
-                  <td className={`px-2 py-1 ${textPrimary}`}>
-                    {entry.details}
-                  </td>
+                  <td>{entry.details}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </div>
     </div>

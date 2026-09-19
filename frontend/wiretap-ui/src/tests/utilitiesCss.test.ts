@@ -37,10 +37,10 @@ const UNDEFINED = undefinedVariables();
 const UNDEFINED_VARIABLES_IN_REGISTER = [
   "--accent", "--accent-green", "--accent-info", "--accent-yellow",
   "--bg-card", "--bg-green-subtle", "--bg-hover", "--bg-light",
-  "--bg-purple-subtle", "--bg-secondary", "--bg-subtle", "--bg-surface-2",
+  "--bg-purple-subtle", "--bg-secondary", "--bg-surface-2",
   "--border", "--border-green",
   "--status-warning",
-  "--text-data-green", "--text-emerald", "--text-rose", "--text-tertiary",
+  "--text-data-green",
 ];
 
 // Set at runtime by the iOS safe-area plugin (`main.tsx`), not by the app's CSS.
