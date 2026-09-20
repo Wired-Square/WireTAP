@@ -57,10 +57,11 @@ jobs:
       - name: Configure private dependency access
         uses: webfactory/ssh-agent@v0.10.0
         with:
-          ssh-private-key: ${{ secrets.FRAMELINK_DEPLOY_KEY }}
+          ssh-private-key: |
+            ${{ secrets.FRAMELINK_DEPLOY_KEY }}
+            ${{ secrets.LIB_WIREDAI_RS_DEPLOYMENT_KEY }}
 
       - name: Force Cargo to use git CLI
-        if: matrix.platform == 'windows-latest'
         run: echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
         shell: bash
 

@@ -14,13 +14,22 @@ Implementation: [crates/wiretap-app/src/analysis.rs](../crates/wiretap-app/src/a
 
 ## Protocol
 
-The server speaks **MCP `2026-07-28`** (via `rmcp` 3.x) over Streamable HTTP at
-`http://127.0.0.1:<mcp_server_port>/mcp`, default port 8787. It is **dual-era**:
-`supported_protocol_versions()` in
-[crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs) advertises
-`2026-07-28`, `2025-11-25` and `2025-06-18`, so a client that still opens with the
-legacy `initialize` handshake keeps working alongside one that sends stateless
-per-request `_meta`. `server/discover` is answered from `get_info()`.
+The server speaks **MCP `2026-07-28`** over Streamable HTTP at
+`http://127.0.0.1:<mcp_server_port>/mcp`, default port 8787. The hosting layer —
+identity, the supported-version list, the `tools/list` cache hints, the bearer
+gate, `Host`/`Origin` policy and connection tracking — is the shared
+[`wiredai-mcp`](https://github.com/Wired-Square/lib-wiredai-rs) crate (over `rmcp`
+3.4); this repo owns only the tools
+([crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs)) and
+the settings-to-lifecycle mapping
+([crates/wiretap-app/src/mcp/mod.rs](../crates/wiretap-app/src/mcp/mod.rs)). It is
+**dual-era**: the lib advertises `2026-07-28`, `2025-11-25` and `2025-06-18`, so a
+client that still opens with the legacy `initialize` handshake keeps working
+alongside one that sends stateless per-request `_meta`. `server/discover` is
+answered from the same identity. Note that since rmcp 3.4 `initialize` only ever
+negotiates a version that *has* a handshake — a client that calls `initialize`
+asking for `2026-07-28` is told `2025-11-25`; a true `2026-07-28` client never
+calls it.
 
 Consequences worth knowing when reading results:
 
@@ -32,8 +41,8 @@ Consequences worth knowing when reading results:
 - **`tools/list` carries `ttlMs` (5 min) and `cacheScope: private`.** The set only
   changes when a permission gate does, which forces a server restart.
 - **There are no protocol sessions** under `2026-07-28`, so the Session Manager's
-  MCP connect/disconnect entries come from a 90-second activity window
-  ([crates/wiretap-app/src/mcp/mod.rs](../crates/wiretap-app/src/mcp/mod.rs)), not a handshake. A
+  MCP connect/disconnect entries come from the lib's 90-second activity window,
+  not a handshake. A
   legacy client's explicit `DELETE` still disconnects it immediately; everything
   else — every stateless client, and any legacy client that just exits — is
   expired by the window. Expect a disconnect entry to lag the client leaving.

@@ -4,7 +4,6 @@
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
 use crate::capture_store::{FrameSelection, ProtocolFrames};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -13,13 +12,12 @@ use tokio_modbus::prelude::*;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{
-    CacheScope, CallToolResult, ContentBlock, DiscoverResult, Implementation, ListToolsResult,
-    PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, ToolAnnotations,
-};
-use rmcp::service::RequestContext;
-use rmcp::{ErrorData as McpError, RoleServer, ServerHandler, tool, tool_handler, tool_router};
+use rmcp::model::{CacheScope, CallToolResult};
+use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::json;
+use wiredai_mcp::result::{internal_error as err, ok_json};
+use wiredai_mcp::router::{compose, mark_read_only};
+use wiredai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
@@ -33,81 +31,53 @@ const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct WireTapTools {
-    app: tauri::AppHandle,
-    tool_router: Arc<ToolRouter<WireTapTools>>,
+    pub(super) app: tauri::AppHandle,
 }
 
-/// How long a client may treat `tools/list` as fresh. The set only changes when
-/// the permission gates change, which forces an explicit server restart.
-const TOOL_LIST_TTL_MS: u64 = 300_000;
-
-/// Protocol revisions this server implements. Narrower than rmcp's default
-/// (which advertises every version it knows, back to 2024-11-05) — this is the
-/// list `server/discover` publishes and the bound on `initialize` negotiation.
-const SUPPORTED_VERSIONS: &[ProtocolVersion] = &[
-    ProtocolVersion::V_2026_07_28,
-    ProtocolVersion::V_2025_11_25,
-    ProtocolVersion::V_2025_06_18,
-];
+/// The tool set only changes with the permission gates, which force a server
+/// restart; `Private` because it varies per gate and the endpoint is bearer-gated.
+pub(super) const TOOL_LIST_CACHE: ToolListCache = ToolListCache {
+    ttl_ms: 300_000,
+    scope: CacheScope::Private,
+};
 
 impl WireTapTools {
     /// Build the tool router for a set of permission gates. Built once when the
-    /// server starts and shared per request: under the stateless 2026-07-28
-    /// transport `StreamableHttpService` runs its service factory on *every*
-    /// request, so assembling seven routers there would be per-call work.
+    /// server starts and shared per request. Read-only-ness is a property of
+    /// *being in* `read_router`; the write routers annotate per tool, because
+    /// destructive/idempotent genuinely differ between them.
     pub fn router(cfg: McpRunningConfig) -> ToolRouter<WireTapTools> {
         let mut router = Self::read_router();
-        // Read-only-ness is a property of *being in* `read_router`, so it is
-        // stamped on here rather than repeated on all 27 tools — where one
-        // omission would silently ship a read tool with no hint. The write
-        // routers annotate per tool, because destructive/idempotent genuinely
-        // differ between them.
-        for route in router.map.values_mut() {
-            route.attr.annotations = Some(ToolAnnotations::new().read_only(true));
-        }
-        for extra in [
-            cfg.control.then(Self::control_router),
-            cfg.session_control.then(Self::session_control_router),
-            cfg.catalog_write.then(Self::catalog_write_router),
-            cfg.catalog_modify.then(Self::catalog_modify_router),
-            cfg.dashboard_write.then(Self::dashboard_write_router),
-            cfg.ui_control.then(Self::ui_control_router),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            router += extra;
-        }
-        router
+        mark_read_only(&mut router);
+        compose(
+            router,
+            [
+                cfg.control.then(Self::control_router),
+                cfg.session_control.then(Self::session_control_router),
+                cfg.catalog_write.then(Self::catalog_write_router),
+                cfg.catalog_modify.then(Self::catalog_modify_router),
+                cfg.dashboard_write.then(Self::dashboard_write_router),
+                cfg.ui_control.then(Self::ui_control_router),
+            ],
+        )
     }
 
-    pub fn new(app: tauri::AppHandle, tool_router: Arc<ToolRouter<WireTapTools>>) -> Self {
-        Self { app, tool_router }
+    pub(super) fn identity() -> ServerIdentity {
+        ServerIdentity::new("wiretap", env!("CARGO_PKG_VERSION"))
+            .with_title("WireTAP")
+            .with_instructions(
+                "WireTAP runtime introspection and control for CAN-bus reverse \
+                 engineering and development. Read tools expose live sessions, captures, \
+                 frame data, payload analysis and decoded signals. Permission-gated \
+                 control tools open/stop sessions, transmit one-shot or repeating frames \
+                 (a repeat is mirrored into the Transmit queue as an Agent-badged, \
+                 human-controllable row), replay captures, and read/write Modbus. \
+                 attach_source surfaces a session in a source-aware tab (discovery, \
+                 decoder, transmit, query, or dashboard) so the human sees what the agent is \
+                 working on. Tier 2 tools (discovery analysis, decoded signals, live \
+                 frame map) require the WireTAP window to be open.",
+            )
     }
-}
-
-fn err(message: impl Into<String>) -> McpError {
-    McpError::internal_error(message.into(), None)
-}
-
-/// Every tool answers through here. `CallToolResult::structured` emits the value
-/// as `structuredContent` *and* as a serialised text block — the latter is the
-/// backwards-compatibility path the spec asks for, and is what pre-2026-07-28
-/// clients read.
-///
-/// Non-object values are sent as the text block alone. SEP-2106 widened
-/// `structuredContent` to any JSON value for `2026-07-28`, but it was
-/// object-only before that and clients still enforce the old rule — a top-level
-/// array (`list_sessions`, `list_catalogs`, …) is rejected outright as a
-/// malformed result. Nothing is lost by omitting it: the text block carries
-/// every result either way.
-fn ok_json<T: serde::Serialize>(value: T) -> Result<CallToolResult, McpError> {
-    let value = serde_json::to_value(value)
-        .map_err(|e| err(format!("Failed to serialise tool result: {e}")))?;
-    if value.is_object() {
-        return Ok(CallToolResult::structured(value));
-    }
-    Ok(CallToolResult::success(vec![ContentBlock::text(value.to_string())]))
 }
 
 /// Convert an optional RFC3339 time bound to capture-timeline microseconds.
@@ -1431,64 +1401,5 @@ impl WireTapTools {
         Parameters(p): Parameters<OpenAppParams>,
     ) -> Result<CallToolResult, McpError> {
         bridge_call("ui.openPanel", json!({ "panelId": p.panel_id, "args": p.args })).await
-    }
-}
-
-#[tool_handler(router = self.tool_router)]
-impl ServerHandler for WireTapTools {
-    fn get_info(&self) -> ServerInfo {
-        // ServerInfo is #[non_exhaustive]; build from Default and set fields.
-        let mut info = ServerInfo::default();
-        info.capabilities = ServerCapabilities::builder().enable_tools().build();
-        // Must be set explicitly: the `Implementation::default()` behind
-        // `ServerInfo::default()` reads the *rmcp* crate's build env, so leaving
-        // it alone makes the server introduce itself to clients as "rmcp".
-        info.server_info = Implementation::new("wiretap", env!("CARGO_PKG_VERSION"))
-            .with_title("WireTAP");
-        info.instructions = Some(
-            "WireTAP runtime introspection and control for CAN-bus reverse \
-             engineering and development. Read tools expose live sessions, captures, \
-             frame data, payload analysis and decoded signals. Permission-gated \
-             control tools open/stop sessions, transmit one-shot or repeating frames \
-             (a repeat is mirrored into the Transmit queue as an Agent-badged, \
-             human-controllable row), replay captures, and read/write Modbus. \
-             attach_source surfaces a session in a source-aware tab (discovery, \
-             decoder, transmit, query, or dashboard) so the human sees what the agent is \
-             working on. Tier 2 tools (discovery analysis, decoded signals, live \
-             frame map) require the WireTAP window to be open."
-                .to_string(),
-        );
-        info
-    }
-
-    fn supported_protocol_versions(&self) -> std::borrow::Cow<'static, [ProtocolVersion]> {
-        std::borrow::Cow::Borrowed(SUPPORTED_VERSIONS)
-    }
-
-    /// Overridden only to add the freshness hint — `from_server_info` derives
-    /// everything else wanted from `get_info()` (including a private cache
-    /// scope) but leaves `ttlMs` at zero. Nothing it reports can change without
-    /// a server restart, so it is safe to let a client hold onto it.
-    async fn discover(
-        &self,
-        _context: RequestContext<RoleServer>,
-    ) -> Result<DiscoverResult, McpError> {
-        Ok(DiscoverResult::from_server_info(SUPPORTED_VERSIONS.to_vec(), self.get_info())
-            .with_ttl_ms(TOOL_LIST_TTL_MS))
-    }
-
-    /// Hand-written so the result can carry the SEP-2549 cache hints — the
-    /// `#[tool_handler]` macro only generates `list_tools` when the impl doesn't
-    /// already define one. `Private` because the tool set varies with the
-    /// permission gates and the endpoint is bearer-gated, so no shared
-    /// intermediary may cache it.
-    async fn list_tools(
-        &self,
-        _request: Option<PaginatedRequestParams>,
-        _context: RequestContext<RoleServer>,
-    ) -> Result<ListToolsResult, McpError> {
-        Ok(ListToolsResult::with_all_items(self.tool_router.list_all())
-            .with_ttl_ms(TOOL_LIST_TTL_MS)
-            .with_cache_scope(CacheScope::Private))
     }
 }
