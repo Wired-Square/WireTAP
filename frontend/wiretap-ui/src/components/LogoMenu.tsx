@@ -10,6 +10,7 @@ import { openSettingsPanel } from "../api";
 import { menuApps, menuGroupOrder, type PanelId } from "../apps/registry";
 import { Button } from "./Button";
 import { Menu, MenuItem, MenuSeparator, usePopover } from "./Menu";
+import { AppIcon, appHueClass } from "./AppIcon";
 
 export type { PanelId };
 
@@ -75,19 +76,16 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
         {menuGroups.map((g, groupIndex) => (
           <div key={g.group}>
             {groupIndex > 0 && <MenuSeparator />}
-            {g.items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <MenuItem
-                  key={item.id}
-                  onClick={() => handleItemClick(item.id)}
-                  icon={<Icon className={item.colour} />}
-                  className={`font-medium ${item.bgColour}`}
-                >
-                  {t(`panels.${item.i18nKey}`)}
-                </MenuItem>
-              );
-            })}
+            {g.items.map((item) => (
+              <MenuItem
+                key={item.id}
+                onClick={() => handleItemClick(item.id)}
+                icon={<AppIcon app={item.id} />}
+                className={appHueClass(item.id, "font-medium")}
+              >
+                {t(`panels.${item.i18nKey}`)}
+              </MenuItem>
+            ))}
           </div>
         ))}
       </Menu>

@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/DiscoveryTopBar.tsx
 
-import { Search, ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
+import { ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../../../types/common";
 import type { CaptureMetadata } from "../../../api/capture";
@@ -150,8 +150,7 @@ export default function DiscoveryTopBar({
 
   return (
     <AppTopBar
-      icon={Search}
-      iconColour="text-[color:var(--text-purple)]"
+      app="discovery"
       frameIdFormat
       ioSession={{
         ioProfile,

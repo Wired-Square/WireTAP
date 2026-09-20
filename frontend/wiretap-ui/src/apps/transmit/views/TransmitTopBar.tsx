@@ -3,7 +3,7 @@
 // Top toolbar for the Transmit app with IO picker button and session controls.
 // Uses shared AppTopBar component for consistent layout.
 
-import { Send, GitMerge } from "lucide-react";
+import { GitMerge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { Badge } from "../../../components/Badge";
@@ -94,8 +94,7 @@ export default function TransmitTopBar({
 
   return (
     <AppTopBar
-      icon={Send}
-      iconColour="text-red-500"
+      app="transmit"
       frameIdFormat
       ioSession={{
         ioProfile,

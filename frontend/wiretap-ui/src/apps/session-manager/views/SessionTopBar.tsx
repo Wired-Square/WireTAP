@@ -1,11 +1,12 @@
 // src/apps/session-manager/views/SessionTopBar.tsx
 
-import { Network, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { iconLg, iconMd } from "../../../styles/spacing";
 import FlexSeparator from "../../../components/FlexSeparator";
 import { Button, IconButton } from "../../../components/Button";
+import { AppIcon } from "../../../components/AppIcon";
 import { Badge } from "../../../components/Badge";
 
 interface SessionTopBarProps {
@@ -23,7 +24,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
     <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
       {/* Left: Icon, title, count, and separator */}
       <div className="flex items-center gap-3">
-        <Network className={`${iconLg} text-cyan-400 shrink-0`} />
+        <AppIcon app="session-manager" className={iconLg} />
         <FlexSeparator />
         <Badge tone="cyan">{t("topBar.activeCount", { count: sessionCount })}</Badge>
       </div>

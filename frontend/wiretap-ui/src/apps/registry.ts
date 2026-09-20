@@ -2,9 +2,9 @@
 //
 // Adding a new app: add ONE entry to `src/apps/apps.json` (structural data —
 // id, label, group, accelerator, singleton) and ONE entry to `visualConfig`
-// below (icon, colour, lazy import). Both the TypeScript surfaces (Dockview
-// registry, LogoMenu, Watermark, AppTab) and the Rust native menu fan out
-// from these two places.
+// below (icon, hue, lazy import). Both the TypeScript surfaces (Dockview
+// registry, LogoMenu, Watermark, AppTab, AppTopBar) and the Rust native menu
+// fan out from these two places.
 //
 // Hidden Dockview-only panels (analysis tools opened programmatically from
 // inside Discovery / Decoder) are declared inline in `hiddenApps` below —
@@ -37,6 +37,22 @@ export type AppGroup =
   | "utilities"
   | "settings";
 
+/** The `.app-hue--<hue>` palette in styles/components.css; drawn by components/AppIcon.tsx. */
+export type AppHue =
+  | "purple"
+  | "green"
+  | "red"
+  | "pink"
+  | "sky"
+  | "yellow"
+  | "indigo"
+  | "blue"
+  | "teal"
+  | "emerald"
+  | "cyan"
+  | "orange"
+  | "amber";
+
 // Visual config for every panel (menu + hidden). Keys define the canonical
 // PanelId union — TypeScript will catch any apps.json id without a matching
 // entry here at the runtime check below.
@@ -44,108 +60,82 @@ const visualConfig = {
   // Menu apps — order/group come from apps.json.
   discovery: {
     icon: Search,
-    colour: "text-purple-400",
-    bgColour: "hover:bg-purple-500/10",
-    watermarkBg: "bg-purple-500/10 hover:bg-purple-500/20",
+    hue: "purple",
     load: () => import("./discovery/Discovery"),
   },
   decoder: {
     icon: Activity,
-    colour: "text-green-400",
-    bgColour: "hover:bg-green-500/10",
-    watermarkBg: "bg-green-500/10 hover:bg-green-500/20",
+    hue: "green",
     load: () => import("./decoder/Decoder"),
   },
   transmit: {
     icon: Send,
-    colour: "text-red-400",
-    bgColour: "hover:bg-red-500/10",
-    watermarkBg: "bg-red-500/10 hover:bg-red-500/20",
+    hue: "red",
     load: () => import("./transmit/Transmit"),
   },
   dashboard: {
     icon: Gauge,
-    colour: "text-pink-400",
-    bgColour: "hover:bg-pink-500/10",
-    watermarkBg: "bg-pink-500/10 hover:bg-pink-500/20",
+    hue: "pink",
     load: () => import("./dashboard/Dashboard"),
   },
   serial: {
     icon: Terminal,
-    colour: "text-sky-400",
-    bgColour: "hover:bg-sky-500/10",
-    watermarkBg: "bg-sky-500/10 hover:bg-sky-500/20",
+    hue: "sky",
     load: () => import("./serial/Serial"),
   },
   query: {
     icon: DatabaseZap,
-    colour: "text-yellow-400",
-    bgColour: "hover:bg-yellow-500/10",
-    watermarkBg: "bg-yellow-500/10 hover:bg-yellow-500/20",
+    hue: "yellow",
     load: () => import("./query/Query"),
   },
   rules: {
     icon: Workflow,
-    colour: "text-indigo-400",
-    bgColour: "hover:bg-indigo-500/10",
-    watermarkBg: "bg-indigo-500/10 hover:bg-indigo-500/20",
+    hue: "indigo",
     load: () => import("./rules/Rules"),
   },
   "catalog-editor": {
     icon: FileText,
-    colour: "text-blue-400",
-    bgColour: "hover:bg-blue-500/10",
-    watermarkBg: "bg-blue-500/10 hover:bg-blue-500/20",
+    hue: "blue",
     load: () => import("./catalog/CatalogEditor"),
   },
   "frame-calculator": {
     icon: Calculator,
-    colour: "text-teal-400",
-    bgColour: "hover:bg-teal-500/10",
-    watermarkBg: "bg-teal-500/10 hover:bg-teal-500/20",
+    hue: "teal",
     load: () => import("./calculator/FrameCalculator"),
   },
   "test-pattern": {
     icon: FlaskConical,
-    colour: "text-emerald-400",
-    bgColour: "hover:bg-emerald-500/10",
-    watermarkBg: "bg-emerald-500/10 hover:bg-emerald-500/20",
+    hue: "emerald",
     load: () => import("./test-pattern/TestPattern"),
   },
   "session-manager": {
     icon: Network,
-    colour: "text-cyan-400",
-    bgColour: "hover:bg-cyan-500/10",
-    watermarkBg: "bg-cyan-500/10 hover:bg-cyan-500/20",
+    hue: "cyan",
     load: () => import("./session-manager/SessionManager"),
   },
   settings: {
     icon: SettingsIcon,
-    colour: "text-orange-400",
-    bgColour: "hover:bg-orange-500/10",
-    watermarkBg: "bg-orange-500/10 hover:bg-orange-500/20",
+    hue: "orange",
     load: () => import("./settings/Settings"),
   },
   // Hidden Dockview-only panels (no apps.json entry, no menu presence).
   "payload-analysis": {
     icon: GitCompare,
-    colour: "text-pink-400",
+    hue: "pink",
     load: () => import("./analysis/PayloadAnalysis"),
   },
   "frame-order-analysis": {
     icon: ListOrdered,
-    colour: "text-amber-400",
+    hue: "amber",
     load: () => import("./analysis/FrameOrderAnalysis"),
   },
 } as const satisfies Record<
   string,
   {
     icon: LucideIcon;
-    colour: string;
+    hue: AppHue;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     load: () => Promise<{ default: ComponentType<any> }>;
-    bgColour?: string;
-    watermarkBg?: string;
   }
 >;
 
@@ -184,9 +174,7 @@ export const sessionAwarePanelIds: ReadonlySet<string> = new Set(
 export type MenuApp = SharedAppEntry & {
   i18nKey: string;
   icon: LucideIcon;
-  colour: string;
-  bgColour: string;
-  watermarkBg: string;
+  hue: AppHue;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   load: () => Promise<{ default: ComponentType<any> }>;
 };
@@ -195,7 +183,7 @@ export type HiddenApp = {
   id: PanelId;
   i18nKey: string;
   icon: LucideIcon;
-  colour: string;
+  hue: AppHue;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   load: () => Promise<{ default: ComponentType<any> }>;
 };

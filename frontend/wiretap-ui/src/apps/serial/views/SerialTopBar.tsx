@@ -7,7 +7,6 @@
 
 import { useState } from "react";
 import {
-  Terminal as TerminalIcon,
   RotateCcw,
   EyeOff,
   Eye,
@@ -107,8 +106,7 @@ export default function SerialTopBar({
 
   return (
     <AppTopBar
-      icon={TerminalIcon}
-      iconColour="text-sky-400"
+      app="serial"
       actions={showSerialActions ? (
         <div className="flex items-center gap-1">
           {isConnected ? (

@@ -1,6 +1,6 @@
 // ui/src/apps/decoder/views/DecoderTopBar.tsx
 
-import { Activity, Glasses, Trash2, Users, User, Filter, Eye, EyeOff, Type, Play, Square, Server } from "lucide-react";
+import { Glasses, Trash2, Users, User, Filter, Eye, EyeOff, Type, Play, Square, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import type { CatalogMetadata } from "../../../api/catalog";
@@ -197,8 +197,7 @@ export default function DecoderTopBar({
 
   return (
     <AppTopBar
-      icon={Activity}
-      iconColour="text-[color:var(--text-green)]"
+      app="decoder"
       frameIdFormat
       ioSession={{
         ioProfile,

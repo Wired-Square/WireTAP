@@ -4,7 +4,7 @@
 // pattern (single AppTopBar row, custom identity picker, action buttons on
 // the right).
 
-import { Workflow, RefreshCw, Save, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
+import { RefreshCw, Save, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
 // Title intentionally omitted to match the icon-only top-nav of Discovery /
@@ -62,8 +62,7 @@ export default function RulesTopBar({
 
   return (
     <AppTopBar
-      icon={Workflow}
-      iconColour="text-indigo-400"
+      app="rules"
       actions={
         isConnected ? (
           <>

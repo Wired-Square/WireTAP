@@ -2,8 +2,11 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { Search, Activity, Send, FileText, Calculator, DatabaseZap, Settings, BarChart3, Server } from "lucide-react";
+import { AppWindow } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
+import { textSecondary } from "../../../styles/colourTokens";
+import { appById, type PanelId } from "../../../apps/registry";
+import { AppIcon } from "../../../components/AppIcon";
 
 export interface AppNodeData {
   appId: string;
@@ -14,19 +17,6 @@ export interface AppNodeData {
   registeredSecondsAgo?: number;
 }
 
-// Map app names to icons and colours
-const appConfig: Record<string, { icon: typeof Search; colour: string }> = {
-  discovery: { icon: Search, colour: "text-purple-400" },
-  decoder: { icon: Activity, colour: "text-green-400" },
-  transmit: { icon: Send, colour: "text-red-400" },
-  "catalog-editor": { icon: FileText, colour: "text-blue-400" },
-  "frame-calculator": { icon: Calculator, colour: "text-teal-400" },
-  query: { icon: DatabaseZap, colour: "text-amber-400" },
-  dashboard: { icon: BarChart3, colour: "text-pink-400" },
-  modbus: { icon: Server, colour: "text-amber-400" },
-  settings: { icon: Settings, colour: "text-orange-400" },
-};
-
 interface AppNodeProps {
   data: AppNodeData;
   selected: boolean;
@@ -35,11 +25,8 @@ interface AppNodeProps {
 function AppNode({ data, selected }: AppNodeProps) {
   const { appId, appName, isActive } = data;
 
-  const config = appConfig[appName.toLowerCase()] || {
-    icon: Search,
-    colour: "text-gray-400",
-  };
-  const Icon = config.icon;
+  // A subscriber that is not a panel — an MCP client — has no hue.
+  const app = appName in appById ? (appName as PanelId) : null;
 
   const borderColour = selected
     ? "border-cyan-400"
@@ -65,7 +52,7 @@ function AppNode({ data, selected }: AppNodeProps) {
 
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
-        <Icon className={`${iconSm} ${config.colour}`} />
+        {app ? <AppIcon app={app} className={iconSm} /> : <AppWindow className={`${iconSm} ${textSecondary}`} />}
         <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
           {displayName}
         </span>

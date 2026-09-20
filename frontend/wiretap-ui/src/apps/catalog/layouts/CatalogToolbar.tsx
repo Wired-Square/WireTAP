@@ -1,6 +1,6 @@
 // ui/src/apps/catalog/layout/CatalogToolbar.tsx
 
-import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
+import { Check, ChevronDown, Download, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
 import * as ShareIcon from "../../../components/catalogIcons";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconSm } from "../../../styles/spacing";
@@ -67,8 +67,7 @@ export default function CatalogToolbar({
 
   return (
     <AppTopBar
-      icon={FileText}
-      iconColour="text-[color:var(--accent-primary)]"
+      app="catalog-editor"
       frameIdFormat
       actions={
         <>

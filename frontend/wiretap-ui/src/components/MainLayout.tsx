@@ -20,10 +20,10 @@ import { getStartupNotices, type StartupNotice } from "../api/appStatus";
 import FlashNotification from "./FlashNotification";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
-import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
 import "dockview-react/dist/styles/dockview.css";
 import LogoMenu from "./LogoMenu";
 import AppTab from "./AppTab";
+import { AppIcon, appHueClass } from "./AppIcon";
 import {
   registerOpenPanelFn,
   unregisterOpenPanelFn,
@@ -47,7 +47,6 @@ import { formatWindowName } from "../utils/windowName";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "./Button";
 const logo = "/logo.svg";
 
@@ -194,22 +193,16 @@ function Watermark(_props: IWatermarkPanelProps) {
                     className="self-stretch w-px bg-[color:var(--border-default)] opacity-50"
                   />
                 )}
-                <div className={launcherGrid}>
+                <div className="flex flex-wrap justify-center gap-2 px-4">
                   {g.items.map((app) => (
-                    <WatermarkAppButton
+                    <button
                       key={app.id}
-                      icon={app.icon}
-                      label={t(`panels.${app.i18nKey}`)}
-                      color={app.colour}
-                      bgColor={app.watermarkBg}
-                      onClick={() => {
-                        if (app.singleton) {
-                          openSettingsPanel();
-                        } else {
-                          openPanel(app.id);
-                        }
-                      }}
-                    />
+                      className={appHueClass(app.id, "launcher-tile")}
+                      onClick={() => (app.singleton ? openSettingsPanel() : openPanel(app.id))}
+                    >
+                      <AppIcon app={app.id} className={icon2xl} />
+                      <span className="launcher-tile__label">{t(`panels.${app.i18nKey}`)}</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -217,27 +210,6 @@ function Watermark(_props: IWatermarkPanelProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-// Button component for watermark app launcher
-interface WatermarkAppButtonProps {
-  icon: LucideIcon;
-  label: string;
-  color: string;
-  bgColor: string;
-  onClick: () => void;
-}
-
-function WatermarkAppButton({ icon: Icon, label, color, bgColor, onClick }: WatermarkAppButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`${launcherButton} ${bgColor}`}
-    >
-      <Icon className={`${icon2xl} ${color}`} />
-      <span className={launcherButtonLabel}>{label}</span>
-    </button>
   );
 }
 

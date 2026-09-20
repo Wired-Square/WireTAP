@@ -3,7 +3,6 @@
 // Top bar for the Query app. Shows amber icon and session controls like other apps.
 // Uses AppTopBar's catalog section for consistent catalog display.
 
-import { DatabaseZap } from "lucide-react";
 import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
 import AppTopBar from "../../../components/AppTopBar";
@@ -64,8 +63,7 @@ export default function QueryTopBar({
 }: Props) {
   return (
     <AppTopBar
-      icon={DatabaseZap}
-      iconColour="text-[color:var(--text-amber)]"
+      app="query"
       frameIdFormat
       ioSession={{
         ioProfile,

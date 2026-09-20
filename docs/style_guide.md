@@ -194,9 +194,6 @@ Where each goes:
 `buttonClass({ variant, tone, size, icon })` returns the same class
 string for the rare element that must not be a `<button>`.
 
-[buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) keeps
-what the app-hues family owns: the launcher tokens.
-
 ### Inputs — [components/forms](../frontend/wiretap-ui/src/components/forms/)
 
 `<Input>`, `<Select>` and `<Textarea>` render the `.input` classes in
@@ -407,6 +404,20 @@ Two things worth knowing before changing the frame table's columns:
   timestamp is nearly twice what a delta needs, and the slack shows up as a gap
   before whatever column follows.
 
+### App hues — [AppIcon.tsx](../frontend/wiretap-ui/src/components/AppIcon.tsx)
+
+Every app has one hue, named in its registry entry (`hue: "purple"`) and
+defined once in `components.css` as `.app-hue--<hue>` — the hue's 600 in the
+light theme and its 400 in the dark, the pairs the data accents use. Wherever
+the app is named, its glyph is `<AppIcon app="discovery" className={iconLg} />`:
+the Dockview tab, the top bar (through `AppTopBar`'s `app` prop), the logo
+menu, the launcher and the session canvas all draw it that way, so an app
+never wears two colours. `appHueClass(app)` puts the hue on a container
+instead — `--app-accent`, `--app-tint` (10 %) and `--app-tint-hover` (20 %)
+for whatever inside reads them: a logo-menu row hovers in its app's tint, and
+the launcher's `.launcher-tile` sits on it. A subscriber that is not a
+panel (an MCP client) gets a neutral glyph, not a hue.
+
 ### The protocol badge says what it knows
 
 `ProtocolBadge` labels a data view with the protocol on screen. It has **no
@@ -506,10 +517,9 @@ flexible row containing five logical slots, in order:
                                                        FlexSeparator (only if actions)
 ```
 
-- **Icon + title** — `icon` is a `lucide-react` component, coloured via
-  `iconColour` (use a CSS-variable text token, e.g.
-  `text-[color:var(--text-purple)]`). `title` is optional — omit it if
-  the identity picker conveys context on its own.
+- **Icon + title** — `app` names the panel; its icon and hue come from
+  the registry (see *App hues*). `title` is optional — omit it if the
+  identity picker conveys context on its own.
 - **Identity picker** — see *Identity pickers* below. Session-bound apps
   pass an `ioSession` prop (renders `IOSessionControls`); apps bound to
   a single device kind pass their picker as `children` (e.g. Rules with
@@ -881,9 +891,8 @@ those individually.
   (`id`, `label`, `group`, `accelerator`, `singleton`) shared by TypeScript
   and Rust. The `groupOrder` array controls divider placement in both menus.
 - **[../frontend/wiretap-ui/src/apps/registry.ts](../frontend/wiretap-ui/src/apps/registry.ts)** — TypeScript-only
-  visual data (icon, colour classes, lazy import) keyed by panel id, plus
-  hidden-only panels (analysis tools opened programmatically, never from the
-  launcher).
+  visual data (icon, hue, lazy import) keyed by panel id, plus hidden-only
+  panels (analysis tools opened programmatically, never from the launcher).
 
 ### 1. Add the structural entry
 
@@ -909,10 +918,8 @@ keyed by the same `id`:
 
 ```ts
 "my-app": {
-  icon: Beaker,                                            // lucide-react
-  colour: "text-purple-400",                               // text colour
-  bgColour: "hover:bg-purple-500/10",                      // LogoMenu hover
-  watermarkBg: "bg-purple-500/10 hover:bg-purple-500/20",  // Watermark tile
+  icon: Beaker,                          // lucide-react
+  hue: "purple",                         // an AppHue — the .app-hue--<hue> palette
   load: () => import("./my-app/MyApp"),
 },
 ```
@@ -940,7 +947,7 @@ do **not** go in `apps.json`.
 
 ### 5. Panel style
 
-- The app's top bar uses [AppTopBar.tsx](../frontend/wiretap-ui/src/components/AppTopBar.tsx).
+- The app's top bar is `<AppTopBar app="my-app">` ([AppTopBar.tsx](../frontend/wiretap-ui/src/components/AppTopBar.tsx)); a hand-rolled bar draws `<AppIcon app="my-app" className={iconLg} />`.
 - The panel root wraps in `h-full overflow-hidden` (Dockview requirement).
 - Use tokens from [../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/) — no inline colour values.
 
@@ -954,7 +961,7 @@ A single `apps.json` + `registry.ts` entry feeds:
 | Panel tab title (i18n) | `apps[i].i18nKey` resolved via `t(\`panels.${key}\`)` |
 | Watermark dashboard | [MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
 | Logo menu (with dividers) | [LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
-| Tab icon + colour | [AppTab.tsx](../frontend/wiretap-ui/src/components/AppTab.tsx) reads `appById[panelId]` |
+| Tab icon in the app's hue | [AppTab.tsx](../frontend/wiretap-ui/src/components/AppTab.tsx) draws `<AppIcon>` |
 | Native Tauri **Apps** menu | [lib.rs](../crates/wiretap-app/src/lib.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
 | `cmdOrCtrl+<accel>` shortcut | Built from the JSON `accelerator` field |
 
@@ -981,8 +988,7 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts) | Surfaces, text, borders, status, data accents, hover, interactive |
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
-| [../frontend/wiretap-ui/src/styles/buttonStyles.ts](../frontend/wiretap-ui/src/styles/buttonStyles.ts) | Data view tabs, launcher tiles |
-| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog`, `Tabs`, `Menu`, `Table` and `forms/` — the primitives, over `styles/components.css` |
+| [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog`, `Tabs`, `Menu`, `Table`, `AppIcon` and `forms/` — the primitives, over `styles/components.css` |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
 | [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
 | [../frontend/wiretap-ui/src/locales/en-AU/settings.json](../frontend/wiretap-ui/src/locales/en-AU/settings.json) | Settings panel strings |
@@ -995,9 +1001,8 @@ adjacency so related tooling is visible at a glance.
 
 ## Future improvements (non-blocking)
 
-- The app hues in `registry.ts` as one `--app-accent` per app, then the
-  long tail (alias variables, unused exports) — the last two stages of the
-  Tailwind Removal Handover. The list rows still written as raw `<button>`s
-  are in the register as a lists family.
+- The long tail (alias variables, unused exports, the escaped `var(--x)`
+  selectors) — the closing stage of the Tailwind Removal Handover. The list
+  rows still written as raw `<button>`s are in the register as a lists family.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

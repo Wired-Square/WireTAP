@@ -4,7 +4,7 @@
 // controls, frame picker) via props, with slots for custom content and actions.
 
 import { type ReactNode } from "react";
-import { ChevronRight, ListFilter, type LucideIcon } from "lucide-react";
+import { ChevronRight, ListFilter } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IOSessionControls, type IOSessionControlsProps } from "./SessionControls";
 import CatalogButton from "./CatalogButton";
@@ -14,6 +14,8 @@ import { iconLg, iconSm, paddingAppBarX } from "../styles/spacing";
 import { bgSurface, borderDivider } from "../styles/colourTokens";
 import type { CatalogMetadata } from "../api/catalog";
 import { Button } from "./Button";
+import { AppIcon } from "./AppIcon";
+import type { PanelId } from "../apps/registry";
 
 /**
  * IO Session section props - passed to IOSessionControls.
@@ -51,10 +53,8 @@ export interface CatalogSectionProps {
 
 export interface AppTopBarProps {
   // === Identity (required) ===
-  /** Lucide icon component */
-  icon: LucideIcon;
-  /** Icon colour class (e.g., "text-purple-600 dark:text-purple-400") */
-  iconColour: string;
+  /** The app, whose icon and hue come from the registry */
+  app: PanelId;
   /** Optional title text (for Settings-style with label) */
   title?: string;
 
@@ -101,8 +101,7 @@ export interface AppTopBarProps {
  * @example
  * ```tsx
  * <AppTopBar
- *   icon={Search}
- *   iconColour="text-purple-600 dark:text-purple-400"
+ *   app="discovery"
  *   ioSession={{
  *     ioProfile,
  *     ioProfiles,
@@ -121,8 +120,7 @@ export interface AppTopBarProps {
  * ```
  */
 export default function AppTopBar({
-  icon: Icon,
-  iconColour,
+  app,
   title,
   ioSession,
   framePicker,
@@ -137,8 +135,7 @@ export default function AppTopBar({
   return (
     <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} ${paddingAppBarX} py-2`}>
       <div className="flex flex-wrap items-center gap-2">
-        {/* Icon */}
-        <Icon className={`${iconLg} ${iconColour} shrink-0`} />
+        <AppIcon app={app} className={iconLg} />
 
         {/* Title (if provided) */}
         {title && (

@@ -4,7 +4,6 @@
 // AppTopBar, with role/mode/params and start/stop inline.
 
 import { useState, useCallback } from "react";
-import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm } from "../../../styles/spacing";
@@ -121,8 +120,7 @@ export default function TestPatternTopBar({
 
   return (
     <AppTopBar
-      icon={FlaskConical}
-      iconColour="text-emerald-500"
+      app="test-pattern"
       ioSession={{
         ioProfile,
         ioProfiles,

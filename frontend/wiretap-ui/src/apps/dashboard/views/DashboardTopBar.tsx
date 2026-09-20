@@ -1,6 +1,6 @@
 // ui/src/apps/dashboard/views/DashboardTopBar.tsx
 
-import { Gauge, Plus, Save, Layout, X, AlertTriangle, Glasses, Sparkles, FlaskConical, Trash2, Wand2 } from "lucide-react";
+import { Plus, Save, Layout, X, AlertTriangle, Glasses, Sparkles, FlaskConical, Trash2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
 import { iconMd } from "../../../styles/spacing";
@@ -150,8 +150,7 @@ export default function DashboardTopBar({
 
   return (
     <AppTopBar
-      icon={Gauge}
-      iconColour="text-pink-400"
+      app="dashboard"
       frameIdFormat
       ioSession={{
         ioProfile,

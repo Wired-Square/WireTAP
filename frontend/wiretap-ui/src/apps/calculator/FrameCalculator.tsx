@@ -1,7 +1,7 @@
 // ui/src/apps/calculator/FrameCalculator.tsx
 
 import { useMemo, useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
-import { RotateCcw, Copy, ClipboardPaste, Calculator, History, Trash2, ArrowRight, Hash, Type, Binary, CopyPlus, Divide } from "lucide-react";
+import { RotateCcw, Copy, ClipboardPaste, History, Trash2, ArrowRight, Hash, Type, Binary, CopyPlus, Divide } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCalculatorStore } from "../../stores/calculatorStore";
 import AppLayout from "../../components/AppLayout";
@@ -18,6 +18,7 @@ import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacin
 import { sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { AppIcon } from "../../components/AppIcon";
 export type Endianness = "little" | "big" | "mid-little" | "mid-big";
 export type GroupMode = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
 export type CustomUnit = "bits" | "bytes";
@@ -370,7 +371,7 @@ export default function FrameCalculator() {
     <div className={`${bgSurface} ${borderDivider} px-4 py-2 space-y-2`}>
       {/* First row: All buttons */}
       <div className="flex flex-wrap items-center gap-2">
-        <Calculator className={`${iconLg} text-[color:var(--accent-primary)] shrink-0`} />
+        <AppIcon app="frame-calculator" className={iconLg} />
 
         <FlexSeparator />
 

@@ -1,12 +1,12 @@
 // ui/src/components/AppTab.tsx
-// Custom Dockview tab component with coloured icons.
-// Icon + colour come from the central app registry — see src/apps/registry.ts.
+// Custom Dockview tab component with the app's icon in its hue.
 
 import { useState, useEffect } from "react";
 import { type IDockviewPanelHeaderProps } from "dockview-react";
 import { X } from "lucide-react";
 import { iconMd, iconXs } from "../styles/spacing";
 import { appById, type PanelId } from "../apps/registry";
+import { AppIcon } from "./AppIcon";
 
 export default function AppTab(props: IDockviewPanelHeaderProps) {
   const { api } = props;
@@ -24,15 +24,13 @@ export default function AppTab(props: IDockviewPanelHeaderProps) {
     return () => disposables.forEach((d) => d.dispose());
   }, [api]);
 
-  const Icon = config?.icon;
-
   return (
     <div
       className={`dv-default-tab ${isActive ? "dv-active-tab" : ""}`}
       data-testid="dockview-tab"
     >
       <div className="dv-default-tab-content">
-        {Icon && <Icon className={`${iconMd} flex-shrink-0 ${config.colour}`} />}
+        {config && <AppIcon app={panelId} className={iconMd} />}
         <span className="truncate">{title}</span>
       </div>
       <div className="dv-default-tab-action">
