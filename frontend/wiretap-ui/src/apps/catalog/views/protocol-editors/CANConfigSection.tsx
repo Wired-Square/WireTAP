@@ -23,7 +23,7 @@ export default function CANConfigSection({
       {/* ID - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          {t("protocolEditors.canIdLabel")} <span className="text-red-500">{t("protocolEditors.canIdRequired")}</span>
+          {t("protocolEditors.canIdLabel")} <span className="text-danger">{t("protocolEditors.canIdRequired")}</span>
         </label>
         <Input
           type="text"

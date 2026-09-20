@@ -86,7 +86,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
 
           {/* Chunk Gap Threshold - only shown when chunked mode selected */}
           {displayMode === 'chunked' && (
-            <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
+            <div className="ml-4 pl-4 border-l-2 border-accent-primary space-y-3 py-2">
               {/* Baud rate calculator */}
               <div className="bg-surface rounded-lg p-3 space-y-2">
                 <span className={labelSmall}>{t("serial.calculateFromBaud")}</span>
@@ -101,7 +101,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                       <option key={rate} value={rate}>{t("serial.baudUnit", { rate: rate.toLocaleString() })}</option>
                     ))}
                   </Select>
-                  <span className="text-slate-400 text-sm">×</span>
+                  <span className="text-muted text-sm">×</span>
                   <Select
                     size="lg"
                     value={idleMultiplier}

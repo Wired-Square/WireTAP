@@ -143,7 +143,7 @@ export default function TestPatternTopBar({
       actions={
         <>
           {error && (
-            <span className="text-xs text-red-400 max-w-75 truncate">
+            <span className="text-xs text-danger max-w-75 truncate">
               {error}
             </span>
           )}

@@ -97,7 +97,7 @@ export default function DataIoTab() {
     <div className="flex flex-col gap-4 p-4 h-full">
       {probing && (
         <div className="flex items-center justify-center py-12 gap-3">
-          <Loader2 className={`${iconMd} animate-spin text-sky-400`} />
+          <Loader2 className={`${iconMd} animate-spin text-accent-primary`} />
           <span className={`text-sm ${textSecondary}`}>{t("frameLink.probing")}</span>
         </div>
       )}

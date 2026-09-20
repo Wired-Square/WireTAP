@@ -171,10 +171,10 @@ function SessionDetails({
           {t("detail.labels.state")}
         </label>
         <p className={`text-sm font-medium ${
-          isRunning ? "text-green-400" :
-          isStopped ? "text-amber-400" :
-          isPaused ? "text-blue-400" :
-          "text-red-400"
+          isRunning ? "text-success" :
+          isStopped ? "text-warning" :
+          isPaused ? "text-info" :
+          "text-danger"
         }`}>
           {session.state}
         </p>
@@ -270,7 +270,7 @@ function SessionDetails({
         <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.streaming")}
         </label>
-        <p className={`text-sm ${session.isStreaming ? "text-green-400" : "text-muted"}`}>
+        <p className={`text-sm ${session.isStreaming ? "text-success" : "text-muted"}`}>
           {session.isStreaming ? t("detail.values.yes") : t("detail.values.no")}
         </p>
       </div>
@@ -1085,8 +1085,8 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
           {t("detail.labels.status")}
         </label>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 rounded-full ${listener.is_active ? "bg-green-400" : "bg-gray-500"}`} />
-          <p className={`text-sm ${listener.is_active ? "text-green-400" : "text-muted"}`}>
+          <span className={`inline-block w-2 h-2 rounded-full ${listener.is_active ? "bg-success-text" : "bg-text-muted"}`} />
+          <p className={`text-sm ${listener.is_active ? "text-success" : "text-muted"}`}>
             {listener.is_active ? t("detail.values.active") : t("detail.values.inactive")}
           </p>
         </div>

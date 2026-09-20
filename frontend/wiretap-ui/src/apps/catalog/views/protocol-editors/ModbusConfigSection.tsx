@@ -35,7 +35,7 @@ export default function ModbusConfigSection({
       {/* Frame Key (friendly name) - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          {t("protocolEditors.modbusFrameNameLabel")} <span className="text-red-500">{t("protocolEditors.modbusFrameNameRequired")}</span>
+          {t("protocolEditors.modbusFrameNameLabel")} <span className="text-danger">{t("protocolEditors.modbusFrameNameRequired")}</span>
         </label>
         <Input
           type="text"

@@ -49,7 +49,7 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
         <div
           key={bar}
           className={`w-1 rounded-sm transition-colors ${
-            bar <= strength ? "bg-green-500" : "bg-border-default"
+            bar <= strength ? "bg-success-text" : "bg-border-default"
           }`}
           style={{ height: `${bar * 25}%` }}
         />
@@ -70,9 +70,9 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
         {/* Row 1: name + badges */}
         <div className={`flex items-center ${gapSmall}`}>
           {isNetwork ? (
-            <Globe className={`${iconMd} text-teal-400 shrink-0`} />
+            <Globe className={`${iconMd} text-teal shrink-0`} />
           ) : (
-            <Bluetooth className={`${iconMd} text-sky-400 shrink-0`} />
+            <Bluetooth className={`${iconMd} text-sky shrink-0`} />
           )}
           <h3 className={`font-medium ${textPrimary}`}>{device.name}</h3>
           {caps.length > 0 && (

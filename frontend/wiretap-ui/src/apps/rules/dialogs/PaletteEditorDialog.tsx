@@ -183,7 +183,7 @@ export default function PaletteEditorDialog({
                 {entries.map((brgb, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
                     <button
-                      className={`w-8 h-8 rounded border-2 ${editingStop === i ? "border-indigo-400" : "border-white/20"}`}
+                      className={`w-8 h-8 rounded border-2 ${editingStop === i ? "border-accent-primary" : "border-default"}`}
                       style={{ backgroundColor: brgbToCss(brgb) }}
                       onClick={() =>
                         setEditingStop(editingStop === i ? null : i)

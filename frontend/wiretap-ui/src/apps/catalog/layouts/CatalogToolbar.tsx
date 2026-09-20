@@ -89,7 +89,7 @@ export default function CatalogToolbar({
         title={t("toolbar.selectCatalog")}
       >
         <span className="max-w-40 truncate">{catalogName}</span>
-        <ChevronDown className={`${iconSm} flex-shrink-0 text-slate-400`} />
+        <ChevronDown className={`${iconSm} flex-shrink-0 text-muted`} />
       </Button>
 
       {/* Save */}
@@ -99,7 +99,7 @@ export default function CatalogToolbar({
         title={hasUnsavedChanges ? t("toolbar.saveUnsaved") : t("toolbar.save")}
         variant={hasUnsavedChanges ? "solid" : "surface"}
         tone={hasUnsavedChanges ? "danger" : "neutral"}
-        className={hasUnsavedChanges ? "shadow-md shadow-red-500/30" : ""}
+        className={hasUnsavedChanges ? "shadow-md shadow-accent-danger/30" : ""}
       >
         <Save className={`${iconMd} ${hasUnsavedChanges ? "animate-pulse" : ""}`} />
       </IconButton>

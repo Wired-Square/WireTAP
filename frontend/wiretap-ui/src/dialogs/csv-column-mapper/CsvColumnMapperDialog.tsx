@@ -520,7 +520,7 @@ export default function CsvColumnMapperDialog({
                         ? t("csvColumnMapper.gapLineFile", { filename: gap.filename, line: gap.line })
                         : t("csvColumnMapper.gapLine", { line: gap.line })}
                       {" "}{t("csvColumnMapper.gapTransition", { from: gap.from_seq, to: gap.to_seq })}{" "}
-                      <span className="text-amber-500">
+                      <span className="text-warning">
                         {t("csvColumnMapper.gapDropped", { count: gap.dropped })}
                       </span>
                     </div>

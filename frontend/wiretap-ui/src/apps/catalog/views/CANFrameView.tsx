@@ -136,7 +136,7 @@ export default function CANFrameView({
 
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
-              {t("canFrameView.lengthDlc")} <span className="text-red-500">{t("canFrameView.required")}</span>
+              {t("canFrameView.lengthDlc")} <span className="text-danger">{t("canFrameView.required")}</span>
               {selectedNode.metadata?.lengthInherited && (
                 <span className="ml-1 text-info" title={t("canFrameView.inheritedTooltip")}>
                   {t("canFrameView.inheritedSuffix")}
@@ -144,7 +144,7 @@ export default function CANFrameView({
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.length || <span className="text-orange-500">{t("canFrameView.notSet")}</span>}
+              {selectedNode.metadata?.length || <span className="text-warning">{t("canFrameView.notSet")}</span>}
             </div>
           </div>
 

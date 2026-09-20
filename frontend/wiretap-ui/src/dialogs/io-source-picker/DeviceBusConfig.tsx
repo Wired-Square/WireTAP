@@ -208,7 +208,7 @@ export default function DeviceBusConfig({
                     <span className="text-muted">→</span>
                     {outputBusSelect(mapping, !!isDuplicate)}
                     {isDuplicate && !configLocked && (
-                      <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
+                      <span className="text-warning" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
                     )}
                     {configLocked && (
                       <span className="text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
@@ -239,7 +239,7 @@ export default function DeviceBusConfig({
   return (
     <div className={wrapperClass}>
       <div className="flex items-center gap-2 mb-2">
-        <Bus className={`${iconMd} text-cyan-500`} />
+        <Bus className={`${iconMd} text-cyan`} />
         <span className="text-xs font-medium text-secondary uppercase tracking-wide">
           {profileName
             ? t("ioSourcePicker.busConfig.namedCanBuses", { name: profileName, enabled: enabledCount, total: deviceInfo.bus_count })
@@ -285,7 +285,7 @@ export default function DeviceBusConfig({
                   <span className="text-muted">{t("ioSourcePicker.busConfig.output")}</span>
                   {outputBusSelect(mapping, !!isDuplicate)}
                   {isDuplicate && !configLocked && (
-                    <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
+                    <span className="text-warning" title="Another source uses this bus number">⚠</span>
                   )}
                   {configLocked && (
                     <span className="text-amber" title="Config locked - source in use by multiple sessions">

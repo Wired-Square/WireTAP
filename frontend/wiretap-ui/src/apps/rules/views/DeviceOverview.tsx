@@ -12,6 +12,9 @@ import { textPrimary, textSecondary, borderDefault } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";
 import { Card } from "../../../components/Card";
 
+const ruleEdge = (enabled: boolean, isTemp: boolean) =>
+  !enabled ? "border-default opacity-50" : isTemp ? "border-warning border-dashed" : "border-success";
+
 export default function DeviceOverview() {
   const { t } = useTranslation("rules");
   const { frameDefs, bridges, transformers, generators, device, temporaryRules, setActiveTab, selectItem } =
@@ -62,7 +65,7 @@ export default function DeviceOverview() {
                 key={iface.index}
                 label={iface.name}
                 sublabel={t("overview.card.indexLabel", { index: iface.index })}
-                borderClass="border-blue-500/40"
+                borderClass="border-info"
               />
             ))}
           </Column>
@@ -83,7 +86,7 @@ export default function DeviceOverview() {
                       ? `0x${fd.can_id.toString(16).toUpperCase()}`
                       : fd.interface_type_name
                   }
-                  borderClass={isTemp ? "border-amber-500/40 border-dashed" : "border-green-500/40"}
+                  borderClass={ruleEdge(true, isTemp)}
                   onClick={() => navigateTo("frame-defs", `framedef:${fd.frame_def_id}`)}
                 />
               );
@@ -103,13 +106,7 @@ export default function DeviceOverview() {
                   key={`b-${b.bridge_id}`}
                   label={t("overview.card.bridge", { id: formatHexId(b.bridge_id) })}
                   sublabel={`${b.source_interface_name}→${b.dest_interface_name}`}
-                  borderClass={
-                    !b.enabled
-                      ? "border-neutral-500/30 opacity-50"
-                      : isTemp
-                        ? "border-amber-500/40 border-dashed"
-                        : "border-green-500/40"
-                  }
+                  borderClass={ruleEdge(b.enabled, isTemp)}
                   onClick={() => navigateTo("bridges", `bridge:${b.bridge_id}`)}
                 />
               );
@@ -121,13 +118,7 @@ export default function DeviceOverview() {
                   key={`x-${xf.transformer_id}`}
                   label={t("overview.card.xform", { id: formatHexId(xf.transformer_id) })}
                   sublabel={`${xf.source_frame_def_name}→${xf.dest_frame_def_name}`}
-                  borderClass={
-                    !xf.enabled
-                      ? "border-neutral-500/30 opacity-50"
-                      : isTemp
-                        ? "border-amber-500/40 border-dashed"
-                        : "border-green-500/40"
-                  }
+                  borderClass={ruleEdge(xf.enabled, isTemp)}
                   onClick={() => navigateTo("transformers", `xform:${xf.transformer_id}`)}
                 />
               );
@@ -139,13 +130,7 @@ export default function DeviceOverview() {
                   key={`g-${g.generator_id}`}
                   label={t("overview.card.gen", { id: formatHexId(g.generator_id) })}
                   sublabel={`${g.frame_def_name}→${g.interface_name}`}
-                  borderClass={
-                    !g.enabled
-                      ? "border-neutral-500/30 opacity-50"
-                      : isTemp
-                        ? "border-amber-500/40 border-dashed"
-                        : "border-green-500/40"
-                  }
+                  borderClass={ruleEdge(g.enabled, isTemp)}
                   onClick={() => navigateTo("generators", `gen:${g.generator_id}`)}
                 />
               );
@@ -165,13 +150,13 @@ export default function DeviceOverview() {
                 key={`out-${iface.index}`}
                 label={iface.name}
                 sublabel={t("overview.card.outputLabel")}
-                borderClass="border-purple-500/40"
+                borderClass="border-purple"
               />
             ))}
             <FlowCard
               label={t("overview.card.deviceSignals")}
               sublabel={t("overview.card.signalStore")}
-              borderClass="border-cyan-500/40"
+              borderClass="border-cyan"
             />
           </Column>
         </div>

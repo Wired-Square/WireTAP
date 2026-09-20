@@ -73,7 +73,7 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
 
   if (kind === "range") {
     return (
-      <div className="mt-2 p-3 rounded bg-white/5 border border-default">
+      <div className="mt-2 p-3 rounded bg-hover border border-default">
         <p className={`text-xs ${textSecondary} mb-2`}>{t("bridgeDialog.help.rangeIntro")}</p>
         <p className={`text-xs ${textSecondary}`}>{t("bridgeDialog.help.rangeExample")}</p>
       </div>
@@ -81,7 +81,7 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
   }
 
   return (
-    <div className="mt-2 p-3 rounded bg-white/5 border border-default space-y-3">
+    <div className="mt-2 p-3 rounded bg-hover border border-default space-y-3">
       <p className={`text-xs ${textSecondary}`}>{t("bridgeDialog.help.maskIntro")}</p>
 
       <div>

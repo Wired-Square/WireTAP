@@ -193,7 +193,7 @@ export default function SingleBusConfig({
     return (
       <div className={wrapperClass}>
         <div className="flex items-center gap-2 text-xs">
-          <CheckCircle2 className={`${iconXs} text-green-500 flex-shrink-0`} />
+          <CheckCircle2 className={`${iconXs} text-success flex-shrink-0`} />
           <span className="text-secondary">
             {probeResult.primaryInfo || t("ioSourcePicker.singleBusConfig.online")}
           </span>
@@ -204,11 +204,11 @@ export default function SingleBusConfig({
           )}
         </div>
         <div className="flex items-center gap-2 mt-1 text-xs">
-          <Bus className={`${iconXs} text-slate-400 flex-shrink-0`} />
+          <Bus className={`${iconXs} text-muted flex-shrink-0`} />
           <span className="text-muted">{t("ioSourcePicker.singleBusConfig.bus")}</span>
           {busSelect}
           {isDuplicate && !configLocked && (
-            <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
+            <span className="text-warning" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
           )}
           {configLocked && (
             <span className="text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
@@ -220,7 +220,7 @@ export default function SingleBusConfig({
           {isSerial && onFramingChange && (
             <>
               <span className="text-muted">|</span>
-              <Layers className={`${iconXs} text-slate-400 flex-shrink-0`} />
+              <Layers className={`${iconXs} text-muted flex-shrink-0`} />
               {framingSelect}
             </>
           )}
@@ -263,7 +263,7 @@ export default function SingleBusConfig({
     <div className="border-t border-default px-4 py-3">
       <div className="flex items-center justify-between">
         <div className={flexRowGap2}>
-          <CheckCircle2 className={`${iconMd} text-green-500`} />
+          <CheckCircle2 className={`${iconMd} text-success`} />
           <span className={sectionHeaderText}>
             {probeResult.primaryInfo || t("ioSourcePicker.singleBusConfig.deviceOnline")}
           </span>
@@ -276,11 +276,11 @@ export default function SingleBusConfig({
       </div>
 
       <div className="flex items-center gap-2 mt-2 text-sm">
-        <Bus className={`${iconMd} text-slate-400`} />
+        <Bus className={`${iconMd} text-muted`} />
         <span className="text-secondary">{t("ioSourcePicker.singleBusConfig.outputBus")}</span>
         {busSelect}
         {isDuplicate && !configLocked && (
-          <span className="text-amber-500 text-sm" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>
+          <span className="text-warning text-sm" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>
             {t("ioSourcePicker.singleBusConfig.duplicate")}
           </span>
         )}
@@ -295,7 +295,7 @@ export default function SingleBusConfig({
       {isSerial && onFramingChange && (
         <>
           <div className="flex items-center gap-2 mt-2 text-sm">
-            <Layers className={`${iconMd} text-slate-400`} />
+            <Layers className={`${iconMd} text-muted`} />
             <span className="text-secondary">{t("ioSourcePicker.singleBusConfig.framing")}</span>
             {framingSelect}
           </div>

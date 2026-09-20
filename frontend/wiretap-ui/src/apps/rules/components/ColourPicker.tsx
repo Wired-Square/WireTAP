@@ -90,12 +90,12 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           type="color"
           value={rgbHex}
           onChange={handleColourInput}
-          className="h-9 w-9 cursor-pointer bg-transparent border border-white/20 rounded-lg p-0"
+          className="h-9 w-9 cursor-pointer bg-transparent border border-default rounded-lg p-0"
           title="Pick colour"
         />
         {/* Dimmed preview swatch */}
         <div
-          className="w-9 h-9 rounded-lg border border-white/20 shrink-0"
+          className="w-9 h-9 rounded-lg border border-default shrink-0"
           style={{ backgroundColor: dimmedColour }}
           title={`Dimmed preview (brightness ${localBrightness})`}
         />
@@ -120,7 +120,7 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           max={255}
           value={localBrightness}
           onChange={(e) => handleBrightnessChange(parseInt(e.target.value))}
-          className="flex-1 h-1.5 accent-amber-400"
+          className="flex-1 h-1.5 accent-amber"
         />
         <span className={`text-2xs w-6 text-right font-mono ${textSecondary}`}>
           {localBrightness}

@@ -313,7 +313,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
     <span className={`text-xs ${textSecondary}`}>
       {t("serial.byteCount", { count: byteCount.toLocaleString() })}
       {isStreaming && (
-        <span className={`ml-2 ${textDataGreen} bg-green-900/30 px-1.5 py-0.5 rounded font-medium`}>
+        <span className={`ml-2 ${textDataGreen} bg-success px-1.5 py-0.5 rounded font-medium`}>
           {t("serial.live")}
         </span>
       )}

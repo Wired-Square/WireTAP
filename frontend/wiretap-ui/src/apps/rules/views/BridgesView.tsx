@@ -109,7 +109,7 @@ export default function BridgesView() {
                 title={b.enabled ? t("common.disable") : t("common.enable")}
               >
                 {b.enabled ? (
-                  <ToggleRight className={`${iconMd} text-blue-400`} />
+                  <ToggleRight className={`${iconMd} text-accent-primary`} />
                 ) : (
                   <ToggleLeft className={iconMd} />
                 )}

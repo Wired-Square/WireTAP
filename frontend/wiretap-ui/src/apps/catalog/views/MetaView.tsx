@@ -58,16 +58,16 @@ export default function MetaView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
-            {t("metaView.name")} <span className="text-red-500">{t("metaView.required")}</span>
+            {t("metaView.name")} <span className="text-danger">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
-            {metaFields.name || <span className="text-red-500">{t("metaView.notSet")}</span>}
+            {metaFields.name || <span className="text-danger">{t("metaView.notSet")}</span>}
           </div>
         </div>
 
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
-            {t("metaView.version")} <span className="text-red-500">{t("metaView.required")}</span>
+            {t("metaView.version")} <span className="text-danger">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
             {metaFields.version}

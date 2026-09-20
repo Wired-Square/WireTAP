@@ -69,7 +69,7 @@ export default function ModbusFrameView({
             {t("modbusFrame.registerNumber")}
           </div>
           <div className={monoBody}>
-            {registerNumber ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
+            {registerNumber ?? <span className="text-warning">{t("modbusFrame.notSet")}</span>}
           </div>
         </div>
 
@@ -83,7 +83,7 @@ export default function ModbusFrameView({
             )}
           </div>
           <div className={monoBody}>
-            {deviceAddress ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
+            {deviceAddress ?? <span className="text-warning">{t("modbusFrame.notSet")}</span>}
           </div>
         </div>
 
@@ -110,7 +110,7 @@ export default function ModbusFrameView({
             {t("modbusFrame.slave")}
           </div>
           <div className={monoBody}>
-            {slave ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
+            {slave ?? <span className="text-warning">{t("modbusFrame.notSet")}</span>}
           </div>
         </div>
 

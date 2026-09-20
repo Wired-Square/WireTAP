@@ -81,13 +81,13 @@ export default function ModbusFcProbeResultView({ results, onClose }: Props) {
 
       {isProbing && (
         <div className="h-1 bg-surface">
-          <div className="h-full w-1/3 bg-purple-500 animate-pulse" />
+          <div className="h-full w-1/3 bg-text-purple animate-pulse" />
         </div>
       )}
 
       <div className={`flex-1 overflow-auto ${bgDataView}`}>
         {error ? (
-          <p className="px-4 py-3 text-xs text-red-500">{error}</p>
+          <p className="px-4 py-3 text-xs text-danger">{error}</p>
         ) : (
           <Table mono sticky>
             <thead>

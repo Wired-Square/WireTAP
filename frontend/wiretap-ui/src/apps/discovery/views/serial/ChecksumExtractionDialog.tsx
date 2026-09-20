@@ -383,9 +383,9 @@ export default function ChecksumExtractionDialog({
         {/* Match Rate */}
         <div className="flex items-center gap-2">
           <div className={`flex-1 text-sm p-2 rounded ${
-            matchPercentage >= 90 ? 'bg-green-900/30 text-green-400' :
-            matchPercentage >= 50 ? 'bg-yellow-900/30 text-yellow-400' :
-            'bg-red-900/30 text-red-400'
+            matchPercentage >= 90 ? 'bg-success text-success' :
+            matchPercentage >= 50 ? 'bg-warning text-warning' :
+            'bg-danger text-danger'
           }`}>
             {t("serial.matchRate", { matches: matchRate.matches, total: matchRate.total, percent: matchPercentage.toFixed(0) })}
           </div>

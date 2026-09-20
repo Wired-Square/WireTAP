@@ -49,35 +49,35 @@ function SessionNode({ data, selected }: SessionNodeProps) {
 
   // Determine colours based on state
   const borderColour = selected
-    ? "border-cyan-400"
+    ? "border-text-cyan"
     : isRunning
-    ? "border-green-500"
+    ? "border-success-text"
     : isStopped
-    ? "border-amber-500"
+    ? "border-warning-text"
     : isPaused
-    ? "border-blue-500"
+    ? "border-info-text"
     : isError
-    ? "border-red-500"
+    ? "border-danger-text"
     : "border-default";
 
   const bgColour = isRunning
-    ? "bg-green-500/10"
+    ? "bg-success"
     : isStopped
-    ? "bg-amber-500/10"
+    ? "bg-warning"
     : isPaused
-    ? "bg-blue-500/10"
+    ? "bg-info"
     : isError
-    ? "bg-red-500/10"
+    ? "bg-danger"
     : "bg-surface";
 
   const stateIcon = isRunning ? (
-    <Radio className={`${iconXs} text-green-500 animate-pulse`} />
+    <Radio className={`${iconXs} text-success animate-pulse`} />
   ) : isStopped ? (
-    <Square className={`${iconXs} text-amber-500`} />
+    <Square className={`${iconXs} text-warning`} />
   ) : isPaused ? (
-    <Pause className={`${iconXs} text-blue-500`} />
+    <Pause className={`${iconXs} text-info`} />
   ) : isError ? (
-    <AlertCircle className={`${iconXs} text-red-500`} />
+    <AlertCircle className={`${iconXs} text-danger`} />
   ) : null;
 
   const stateLabel = isRunning
@@ -105,8 +105,8 @@ function SessionNode({ data, selected }: SessionNodeProps) {
           position={Position.Right}
           className={
             i < outputCount
-              ? "!w-3 !h-3 !bg-green-500 !border-2 !border-green-300"
-              : "!w-3 !h-3 !bg-green-800 !border-2 !border-dashed !border-green-600 !opacity-40"
+              ? "!w-3 !h-3 !bg-text-green !border-2 !border-success"
+              : "!w-3 !h-3 !bg-success !border-2 !border-dashed !border-text-green !opacity-40"
           }
           style={{ top: `${((i + 1) / (totalOutputHandles + 1)) * 100}%` }}
         />
@@ -124,8 +124,8 @@ function SessionNode({ data, selected }: SessionNodeProps) {
                 position={Position.Left}
                 className={
                   enabled
-                    ? "!w-3 !h-3 !bg-cyan-500 !border-2 !border-cyan-300 !relative !transform-none !top-0 !left-0"
-                    : "!w-3 !h-3 !bg-gray-600 !border-2 !border-gray-500 !border-dashed !opacity-50 !relative !transform-none !top-0 !left-0"
+                    ? "!w-3 !h-3 !bg-text-cyan !border-2 !border-cyan !relative !transform-none !top-0 !left-0"
+                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !left-0"
                 }
               />
               <span
@@ -143,7 +143,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
               id={`in-bus${nextInputBus}`}
               type="target"
               position={Position.Left}
-              className="!w-3 !h-3 !bg-cyan-800 !border-2 !border-dashed !border-cyan-600 !opacity-40 !relative !transform-none !top-0 !left-0"
+              className="!w-3 !h-3 !bg-cyan !border-2 !border-dashed !border-text-cyan !opacity-40 !relative !transform-none !top-0 !left-0"
             />
             <span className={`text-2xs font-mono ${textMuted} opacity-40`}>
               {nextInputBus}
@@ -155,7 +155,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
-            <Database className={`${iconSm} text-cyan-400`} />
+            <Database className={`${iconSm} text-cyan`} />
             <span className="font-medium text-sm text-primary truncate">
               {label}
             </span>

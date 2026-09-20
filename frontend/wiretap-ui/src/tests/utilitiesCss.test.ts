@@ -66,6 +66,13 @@ describe("utilities.css", () => {
     ).toEqual([]);
   });
 
+  it("compiles no palette colour — the theme's are the only ones", () => {
+    expect(() => compile("text-red-500")).toThrow(/unresolvable/);
+    expect(() => compile("bg-slate-900/50")).toThrow(/unresolvable/);
+    expect(() => compile("bg-[#0b0f14]")).toThrow(/unresolvable/);
+    expect(compile("text-danger")).toMatchObject({ decls: [["color", "var(--status-danger-text)"]] });
+  });
+
   it("has no Tailwind or PostCSS left in the package", () => {
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
     expect(deps.filter((d) => /tailwind|postcss|autoprefixer/.test(d))).toEqual([]);

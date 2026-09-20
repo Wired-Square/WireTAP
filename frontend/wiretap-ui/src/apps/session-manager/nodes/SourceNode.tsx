@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Handle, Position } from "@xyflow/react";
 import { Wifi, Database, Radio, Pin } from "lucide-react";
 import { iconSm, iconXs } from "../../../styles/spacing";
-import { textDataPurple, textDataDisabled } from "../../../styles/colourTokens";
+import { textDataPurple, textDataDisabled, sourceKindColours } from "../../../styles/colourTokens";
 
 export interface SourceNodeData {
   profileId: string;
@@ -42,18 +42,18 @@ function SourceNode({ data, selected }: SourceNodeProps) {
   ].sort((a, b) => a.bus - b.bus);
 
   const borderColour = selected
-    ? "border-cyan-400"
+    ? "border-text-cyan"
     : isActive
-    ? "border-purple-500"
+    ? "border-text-purple"
     : "border-default";
 
   const bgColour = isActive
-    ? "bg-purple-500/10"
+    ? "bg-purple"
     : "bg-surface";
 
-  const isCapture = sourceType === "sqlite";
+  const kind = sourceType === "sqlite" ? "capture" : isRealtime ? "realtime" : "recorded";
   const Icon = isRealtime ? Wifi : Database;
-  const iconColour = isCapture ? "text-cyan-400" : isRealtime ? "text-purple-400" : "text-green-400";
+  const iconColour = sourceKindColours[kind].text;
 
   return (
     <div
@@ -66,7 +66,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
           {captureName || profileName}
         </span>
         {isPersistent && (
-          <Pin className={`${iconXs} text-amber-400 flex-shrink-0`} />
+          <Pin className={`${iconXs} text-amber flex-shrink-0`} />
         )}
       </div>
 
@@ -74,7 +74,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
       <div className="text-xs text-muted flex items-center gap-1">
         <span>{sourceType}</span>
         {isActive && (
-          <Radio className="w-3 h-3 text-purple-500 animate-pulse" />
+          <Radio className="w-3 h-3 text-purple animate-pulse" />
         )}
       </div>
       {captureCount != null && (
@@ -105,8 +105,8 @@ function SourceNode({ data, selected }: SourceNodeProps) {
                 position={Position.Right}
                 className={
                   enabled
-                    ? "!w-3 !h-3 !bg-purple-500 !border-2 !border-purple-300 !relative !transform-none !top-0 !right-0"
-                    : "!w-3 !h-3 !bg-gray-600 !border-2 !border-gray-500 !border-dashed !opacity-50 !relative !transform-none !top-0 !right-0"
+                    ? "!w-3 !h-3 !bg-text-purple !border-2 !border-purple !relative !transform-none !top-0 !right-0"
+                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !right-0"
                 }
               />
             </div>
@@ -116,7 +116,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-3 !h-3 !bg-purple-500 !border-2 !border-purple-300"
+          className="!w-3 !h-3 !bg-text-purple !border-2 !border-purple"
         />
       )}
     </div>

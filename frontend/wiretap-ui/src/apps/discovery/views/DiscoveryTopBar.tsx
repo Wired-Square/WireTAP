@@ -240,7 +240,7 @@ export default function DiscoveryTopBar({
       )}
 
       {/* Right arrow icon */}
-      <ChevronRight className={`${iconSm} text-slate-400 shrink-0`} />
+      <ChevronRight className={`${iconSm} text-muted shrink-0`} />
 
       {/* Toolbox button. Never disabled: the Modbus scan tools need neither a
           session nor frames — "No source" is where they are meant to be run —

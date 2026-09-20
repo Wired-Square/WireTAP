@@ -302,13 +302,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
                           </Button>
                           {isApplied ? (
-                            <CheckCircle2 className={`${iconLg} text-blue-500`} />
+                            <CheckCircle2 className={`${iconLg} text-info`} />
                           ) : candidate.confidence >= 70 ? (
-                            <CheckCircle2 className={`${iconLg} text-green-500`} />
+                            <CheckCircle2 className={`${iconLg} text-success`} />
                           ) : candidate.confidence >= 50 ? (
-                            <AlertCircle className={`${iconLg} text-yellow-500`} />
+                            <AlertCircle className={`${iconLg} text-warning`} />
                           ) : (
-                            <AlertCircle className={`${iconLg} text-slate-400`} />
+                            <AlertCircle className={`${iconLg} text-muted`} />
                           )}
                         </div>
                       </div>
@@ -456,11 +456,11 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
                         </Button>
                         {isApplied ? (
-                          <CheckCircle2 className={`${iconLg} text-blue-500`} />
+                          <CheckCircle2 className={`${iconLg} text-info`} />
                         ) : idx === 0 ? (
-                          <CheckCircle2 className={`${iconLg} text-green-500`} />
+                          <CheckCircle2 className={`${iconLg} text-success`} />
                         ) : (
-                          <AlertCircle className={`${iconLg} text-slate-400`} />
+                          <AlertCircle className={`${iconLg} text-muted`} />
                         )}
                       </div>
                     </div>
@@ -482,7 +482,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             </Badge>
                           ))}
                           {candidate.uniqueValues.length > 16 && (
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-muted">
                               {t("serialAnalysis.moreItems", { count: candidate.uniqueValues.length - 16 })}
                             </span>
                           )}
@@ -566,11 +566,11 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
                         </Button>
                         {isApplied ? (
-                          <CheckCircle2 className={`${iconLg} text-blue-500`} />
+                          <CheckCircle2 className={`${iconLg} text-info`} />
                         ) : idx === 0 ? (
-                          <CheckCircle2 className={`${iconLg} text-purple-500`} />
+                          <CheckCircle2 className={`${iconLg} text-purple`} />
                         ) : (
-                          <AlertCircle className={`${iconLg} text-slate-400`} />
+                          <AlertCircle className={`${iconLg} text-muted`} />
                         )}
                       </div>
                     </div>
@@ -592,7 +592,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             </Badge>
                           ))}
                           {candidate.uniqueValues.length > 16 && (
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-muted">
                               {t("serialAnalysis.moreItems", { count: candidate.uniqueValues.length - 16 })}
                             </span>
                           )}

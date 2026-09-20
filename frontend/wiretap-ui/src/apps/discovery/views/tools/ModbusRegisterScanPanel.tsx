@@ -221,7 +221,7 @@ export default function ModbusRegisterScanPanel({ onStartScan }: Props) {
         })}
       </ScanNote>
       {overRegisterCap && (
-        <p className="text-amber-500">
+        <p className="text-warning">
           {t("modbusRegister.tooManyRegisters", {
             count: registerCount,
             max: MODBUS_SCAN_DEFAULTS.maxRegisters,

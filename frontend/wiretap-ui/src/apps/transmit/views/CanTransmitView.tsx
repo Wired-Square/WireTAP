@@ -113,17 +113,17 @@ export default function CanTransmitView() {
         <div className={`px-4 py-3 ${bgSurface} border-b ${borderDefault}`}>
           <div className="flex items-center gap-4">
             <span className={`${textSecondary} text-xs`}>{t("canView.preview")}</span>
-            <code className="font-mono text-sm text-green-400">
+            <code className="font-mono text-sm text-green">
               {framePreview.id}
             </code>
-            <code className="font-mono text-sm text-blue-400">
+            <code className="font-mono text-sm text-blue">
               [{framePreview.dlc}]
             </code>
             <code className={`font-mono text-sm ${textSecondary}`}>
               {framePreview.data}
             </code>
             {framePreview.flags && (
-              <span className="text-xs text-amber-400">{framePreview.flags}</span>
+              <span className="text-xs text-amber">{framePreview.flags}</span>
             )}
           </div>
         </div>

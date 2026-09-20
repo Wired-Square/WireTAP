@@ -17,6 +17,7 @@ import {
   textMuted,
   textDataGreen,
   textDataAmber,
+  textDanger,
 } from "../../../styles/colourTokens";
 import { IconButton } from "../../../components/Button";
 
@@ -98,7 +99,7 @@ function StatusIcon({ status }: { status: QueryStatus }) {
     case "completed":
       return <CheckCircle2 className={`${iconSm} ${textDataGreen}`} />;
     case "error":
-      return <XCircle className={`${iconSm} text-red-400`} />;
+      return <XCircle className={`${iconSm} ${textDanger}`} />;
   }
 }
 
@@ -136,7 +137,7 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
     <div
       onClick={handleClick}
       className={`group flex items-center gap-3 px-4 py-3 cursor-pointer ${hoverBg} transition-colors ${
-        isSelected ? "ring-2 ring-inset ring-blue-500/50 bg-blue-500/5" : ""
+        isSelected ? "ring-2 ring-inset ring-accent-primary/50 bg-accent-primary/5" : ""
       }`}
     >
       {/* Status icon */}
@@ -152,7 +153,7 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
             <span className={textDataGreen}>{t("queue.results", { count: resultCount })}</span>
           )}
           {query.status === "error" && (
-            <span className="text-red-400 truncate">{query.errorMessage}</span>
+            <span className={`${textDanger} truncate`}>{query.errorMessage}</span>
           )}
           {query.status === "running" && <span className={textDataAmber}>{t("queue.running")}</span>}
           {query.status === "pending" && <span>{t("queue.queuedAt", { time: formatTime(query.submittedAt) })}</span>}

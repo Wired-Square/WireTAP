@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square, Settings2 } from "lucide-react";
 import { iconSm, roundedDefault } from "../styles/spacing";
+import { sourceKindColours } from "../styles/colourTokens";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
@@ -174,11 +175,11 @@ export function SessionButton({
   // Determine status dot colour based on ioState
   const getStatusColour = (): string | null => {
     if (!ioState || !ioProfile) return null;
-    if (ioState === "running") return "bg-green-500";
-    if (ioState === "paused") return "bg-yellow-500";
+    if (ioState === "running") return "bg-success-text";
+    if (ioState === "paused") return "bg-warning-text";
     if (ioState === "stopped") return "bg-text-muted";
-    if (ioState === "starting") return "bg-blue-500 animate-pulse";
-    if (ioState.startsWith("Error")) return "bg-red-500";
+    if (ioState === "starting") return "bg-info-text animate-pulse";
+    if (ioState.startsWith("Error")) return "bg-danger-text";
     return null;
   };
   const statusColour = getStatusColour();
@@ -191,9 +192,9 @@ export function SessionButton({
     >
       {/* Capture / default-reader type icon (no icon for multi-bus or plain sources) */}
       {isCaptureProfile ? (
-        <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
+        <FileText className={`${iconSm} ${sourceKindColours.capture.text} flex-shrink-0`} />
       ) : isDefaultReader ? (
-        <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
+        <Star className={`${iconSm} text-amber flex-shrink-0`} fill="currentColor" />
       ) : null}
       {statusColour && (
         <ActivityDot sessionId={sessionId} colourClass={statusColour} active={ioState === "running"} />

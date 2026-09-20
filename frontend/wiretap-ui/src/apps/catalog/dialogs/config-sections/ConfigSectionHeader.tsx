@@ -48,7 +48,7 @@ export function ConfigSectionHeader({
       className="w-full flex items-center justify-between px-4 py-3 hover:bg-hover transition-colors"
     >
       <div className="flex items-center gap-3">
-        <Chevron className={`${iconMd} text-slate-500`} />
+        <Chevron className={`${iconMd} text-muted`} />
         <div className={`p-1.5 rounded ${WELL[tone]}`}>{icon}</div>
         <span className="font-medium text-primary">{label}</span>
         {isConfigured && (

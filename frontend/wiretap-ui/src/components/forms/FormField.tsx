@@ -22,7 +22,7 @@ export default function FormField({ label, required, variant = 'default', classN
       <label className="text-sm text-secondary space-y-1">
         <span>
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-danger ml-1">*</span>}
         </span>
         {children}
       </label>
@@ -34,7 +34,7 @@ export default function FormField({ label, required, variant = 'default', classN
     <div className={className}>
       <label className={`block ${textMedium} mb-2`}>
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-danger ml-1">*</span>}
       </label>
       {children}
     </div>

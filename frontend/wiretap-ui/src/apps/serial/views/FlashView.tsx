@@ -374,7 +374,7 @@ export default function FlashView({
       <div
         className={`flex items-center gap-3 px-3 py-2 ${borderDivider} border-b text-xs ${textSecondary}`}
       >
-        <Cpu size={14} className="text-violet-300" />
+        <Cpu size={14} className="text-purple" />
         <ManufacturerBadge manufacturer={badge} />
         {description ? (
           <>
@@ -498,7 +498,7 @@ export default function FlashView({
             String((chip.raw as { rdp_level?: string }).rdp_level ?? "")
               .toLowerCase()
               .includes("lock") ? (
-            <div className="flex items-center gap-1 text-xs text-amber-300">
+            <div className="flex items-center gap-1 text-xs text-warning">
               <ShieldAlert size={12} />
               Read protection is on — backup will fail until RDP is cleared.
             </div>
@@ -585,7 +585,7 @@ export default function FlashView({
           {flash.bytesTotal > 0 && (
             <div className="h-2 rounded bg-primary overflow-hidden">
               <div
-                className="h-full bg-sky-400 transition-all"
+                className="h-full bg-text-sky transition-all"
                 style={{ width: `${progressPct}%` }}
               />
             </div>

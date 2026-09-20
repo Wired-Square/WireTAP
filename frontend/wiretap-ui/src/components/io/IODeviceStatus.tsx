@@ -70,13 +70,13 @@ export default function IODeviceStatus({
       {/* Status indicator */}
       <div className="flex-shrink-0">
         {state === "probing" && (
-          <Loader2 className={`${iconLg} text-blue-500 animate-spin`} />
+          <Loader2 className={`${iconLg} text-accent-primary animate-spin`} />
         )}
         {state === "success" && (
-          <CircleCheck className={`${iconLg} text-green-500`} />
+          <CircleCheck className={`${iconLg} text-success`} />
         )}
         {state === "error" && (
-          <CircleX className={`${iconLg} text-red-500`} />
+          <CircleX className={`${iconLg} text-danger`} />
         )}
         {state === "idle" && (
           <div className="w-5 h-5 rounded-full border-2 border-default" />

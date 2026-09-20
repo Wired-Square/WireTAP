@@ -192,7 +192,7 @@ export default function ModbusScanResultView({
       {isScanning && progress && progress.total > 0 && (
         <div className="h-1 bg-surface">
           <div
-            className="h-full bg-purple-500 transition-all duration-200"
+            className="h-full bg-text-purple transition-all duration-200"
             style={{ width: `${Math.min(100, (progress.current / progress.total) * 100)}%` }}
           />
         </div>
@@ -202,7 +202,7 @@ export default function ModbusScanResultView({
       {notes.length > 0 && (
         <div className={`px-4 py-1.5 border-b ${borderDefault} space-y-0.5`}>
           {notes.map((note, i) => (
-            <p key={i} className="text-xs text-amber-500">
+            <p key={i} className="text-xs text-warning">
               {note}
             </p>
           ))}

@@ -138,7 +138,7 @@ export default function TransformersView() {
                 title={xf.enabled ? t("common.disable") : t("common.enable")}
               >
                 {xf.enabled ? (
-                  <ToggleRight className={`${iconMd} text-blue-400`} />
+                  <ToggleRight className={`${iconMd} text-accent-primary`} />
                 ) : (
                   <ToggleLeft className={iconMd} />
                 )}

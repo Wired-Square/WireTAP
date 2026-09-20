@@ -40,7 +40,7 @@ export default function SecurePasswordField({
   return (
     <div>
       <label className={`${labelDefault} mb-2`}>
-        {label} {optional && <span className="text-slate-500">(optional)</span>}
+        {label} {optional && <span className="text-muted">(optional)</span>}
         {isSecurelyStored && (
           <span className="ml-2 inline-flex items-center gap-1 text-xs text-accent-success">
             <Shield className={iconXs} />

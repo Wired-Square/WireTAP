@@ -36,10 +36,10 @@ const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
 // Loading fallback component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center h-screen bg-slate-900">
+    <div className="flex items-center justify-center h-screen bg-primary">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-slate-400">Loading...</span>
+        <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-muted">Loading...</span>
       </div>
     </div>
   );

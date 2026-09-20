@@ -10,7 +10,7 @@ import TabStrip from "../../components/TabStrip";
 import type { SourceTab } from "./types";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
-import { borderDivider, bgSurface } from "../../styles";
+import { borderDivider, bgSurface, sourceKindColours } from "../../styles";
 import type { ReactNode } from "react";
 import { IconButton } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -188,6 +188,7 @@ export default function SourceList({
     const isCapture = session.sourceType === "capture";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
+    const subtitle = `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`;
 
     if (isMultiSource) {
       // Multi-source session: show sources with bus mappings
@@ -205,17 +206,7 @@ export default function SourceList({
         })
         .join(" + ") || "";
 
-      return {
-        displayName,
-        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
-        sourceDetails,
-        icon: GitMerge,
-        iconColour: "text-purple",
-        bgSelected: "bg-purple border border-purple",
-        bgHover: `${bgSurface} border border-default hover:border-text-purple`,
-        indicatorColour: "border-text-purple",
-        dotColour: "bg-text-purple",
-      };
+      return { displayName, subtitle, sourceDetails, icon: GitMerge, kind: "realtime" as const };
     } else if (isCapture) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
       const storageBackend = getCaptureStorageLabel(session.sourceType);
@@ -223,17 +214,7 @@ export default function SourceList({
         ?? (session.sourceProfileIds ?? [])[0];
       const captureName = captureId ? captureNames?.get(captureId) : undefined;
       const profileName = captureName || storageBackend;
-      return {
-        displayName,
-        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
-        sourceDetails: `${profileName} (${storageBackend})`,
-        icon: Database,
-        iconColour: "text-cyan",
-        bgSelected: "bg-info border border-info",
-        bgHover: `${bgSurface} border border-default hover:border-text-cyan`,
-        indicatorColour: "border-text-cyan",
-        dotColour: "bg-text-cyan",
-      };
+      return { displayName, subtitle, sourceDetails: `${profileName} (${storageBackend})`, icon: Database, kind: "capture" as const };
     } else {
       // Single-source session (e.g., a WireTAP backend)
       // Look up profile via sourceProfileIds (session IDs like t_XXXXX differ from profile IDs)
@@ -243,17 +224,7 @@ export default function SourceList({
         : getProfileForSession(session.sessionId);
       const profileName = profile?.name || session.sourceType;
       const deviceKind = profile?.kind || session.sourceType;
-      return {
-        displayName,
-        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
-        sourceDetails: `${profileName} (${deviceKind})`,
-        icon: Database,
-        iconColour: "text-green",
-        bgSelected: "bg-success border border-success",
-        bgHover: `${bgSurface} border border-default hover:border-text-green`,
-        indicatorColour: "border-text-green",
-        dotColour: "bg-text-green",
-      };
+      return { displayName, subtitle, sourceDetails: `${profileName} (${deviceKind})`, icon: Database, kind: "recorded" as const };
     }
   };
 
@@ -470,28 +441,29 @@ export default function SourceList({
           const isSelected = checkedSourceId === session.sessionId;
           const info = getSessionDisplayInfo(session);
           const IconComponent = info.icon;
+          const look = sourceKindColours[info.kind];
 
           return (
             <button
               key={session.sessionId}
               onClick={() => onSelectMultiSourceSession?.(session.sessionId)}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                isSelected ? info.bgSelected : info.bgHover
+                isSelected ? `${look.tint} border` : `${bgSurface} border border-default ${look.hoverEdge}`
               }`}
             >
               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                isSelected ? info.indicatorColour : "border-default"
+                isSelected ? look.edge : "border-default"
               }`}>
                 {isSelected && (
-                  <div className={`w-2 h-2 rounded-full ${info.dotColour}`} />
+                  <div className={`w-2 h-2 rounded-full ${look.dot}`} />
                 )}
               </div>
-              <IconComponent className={`${iconMd} flex-shrink-0 ${info.iconColour}`} />
+              <IconComponent className={`${iconMd} flex-shrink-0 ${look.text}`} />
               <div className="flex-1 min-w-0">
                 <div className={`${textMedium} truncate flex items-center gap-2`}>
                   <span>{info.displayName}</span>
                   {session.state !== "stopped" && session.sourceType !== "capture" && (
-                    <Radio className={`${iconXs} text-green-500 animate-pulse`} />
+                    <Radio className={`${iconXs} text-success animate-pulse`} />
                   )}
                 </div>
                 <div className={`${caption} flex items-center gap-2`}>
@@ -661,7 +633,7 @@ function SourceButton({
       </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
-          {isDefault && <Bookmark className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />}
+          {isDefault && <Bookmark className={`${iconSm} text-amber flex-shrink-0`} fill="currentColor" />}
           <span className={`${textMedium} truncate ${isDisabled ? "!text-muted" : ""}`}>
             {profile.name}
           </span>

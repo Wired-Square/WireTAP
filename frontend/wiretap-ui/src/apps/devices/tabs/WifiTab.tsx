@@ -220,16 +220,16 @@ export default function WifiTab() {
 
     return (
       <div className="flex flex-col items-center gap-6 p-8 h-full">
-        <Loader2 className="w-12 h-12 text-sky-500 animate-spin" />
+        <Loader2 className="w-12 h-12 text-accent-primary animate-spin" />
         <div className="flex flex-col gap-2 w-full max-w-sm">
           {steps.map((step, i) => {
             const isActive = !step.done && provisionState === "writing";
             return (
               <div key={i} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
                 {step.done ? (
-                  <Check className={`${iconMd} text-green-500 shrink-0`} />
+                  <Check className={`${iconMd} text-success shrink-0`} />
                 ) : isActive ? (
-                  <Loader2 className={`${iconMd} text-sky-500 animate-spin shrink-0`} />
+                  <Loader2 className={`${iconMd} text-accent-primary animate-spin shrink-0`} />
                 ) : (
                   <div className="w-4 h-4 rounded-full border border-default shrink-0" />
                 )}
@@ -257,7 +257,7 @@ export default function WifiTab() {
       <div className="flex flex-col items-center gap-6 p-8 h-full">
         {isSuccess ? (
           <>
-            <CheckCircle className="w-16 h-16 text-green-500" />
+            <CheckCircle className="w-16 h-16 text-success" />
             <div className={`text-lg font-medium ${textPrimary}`}>
               {t("complete.wifiConnected")}
             </div>
@@ -294,7 +294,7 @@ export default function WifiTab() {
           </>
         ) : (
           <>
-            <XCircle className="w-16 h-16 text-red-500" />
+            <XCircle className="w-16 h-16 text-danger" />
             <div className={`text-lg font-medium ${textPrimary}`}>
               {t("complete.failedTitle")}
             </div>

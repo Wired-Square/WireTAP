@@ -1,8 +1,10 @@
 // Flash notification component for non-blocking toast messages
 
 import { useEffect } from 'react';
+import { X } from "lucide-react";
 import { iconMd } from "../styles/spacing";
 import { IconButton } from "./Button";
+import { Alert } from "./Alert";
 
 export interface FlashNotificationProps {
   message: string;
@@ -24,44 +26,22 @@ export default function FlashNotification({
     }
   }, [duration, onDismiss]);
 
-  const bgColor = {
-    info: 'bg-blue-500',
-    success: 'bg-green-500',
-    warning: 'bg-yellow-500',
-    error: 'bg-red-500',
-  }[type];
-
+  // The tints are translucent in the dark theme, so the toast sits on a surface.
   return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in">
-      <div
-        className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-62.5 max-w-100`}
+    <div className="fixed top-4 right-4 z-50 animate-fade-in rounded-lg bg-surface shadow-lg">
+      <Alert
+        tone={type === "error" ? "danger" : type}
+        className="min-w-62.5 max-w-100"
+        action={
+          onDismiss && (
+            <IconButton onClick={onDismiss} size="sm" label="Dismiss">
+              <X className={iconMd} />
+            </IconButton>
+          )
+        }
       >
-        <div className="flex-1">
-          <p className="text-sm font-medium">{message}</p>
-        </div>
-        {onDismiss && (
-          <IconButton
-            onClick={onDismiss}
-            size="sm"
-            className="text-white hover:text-white"
-            label="Dismiss"
-          >
-            <svg
-              className={iconMd}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </IconButton>
-        )}
-      </div>
+        <p className="font-medium">{message}</p>
+      </Alert>
     </div>
   );
 }

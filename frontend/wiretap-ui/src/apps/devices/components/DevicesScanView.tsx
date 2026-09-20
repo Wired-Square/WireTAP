@@ -296,7 +296,7 @@ export default function DevicesScanView() {
 
       {isScanning && mergedDevices.length === 0 && (
         <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 

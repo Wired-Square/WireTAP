@@ -277,7 +277,7 @@ export default function DashboardTopBar({
                 icon={
                   isMismatch ? (
                     <span title={t("topBar.differentCatalog")}>
-                      <AlertTriangle className="text-amber-400" />
+                      <AlertTriangle className="text-warning" />
                     </span>
                   ) : undefined
                 }

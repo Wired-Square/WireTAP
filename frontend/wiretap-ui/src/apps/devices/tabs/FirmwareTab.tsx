@@ -13,6 +13,7 @@ import {
   textDanger,
   textPrimary,
   textSecondary,
+  textSuccess,
 } from "../../../styles";
 import {
   listImages,
@@ -349,7 +350,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
                   key={i}
                   className={
                     isError ? textDanger
-                    : isDone ? "text-green-500"
+                    : isDone ? textSuccess
                     : textSecondary
                   }
                 >

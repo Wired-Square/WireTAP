@@ -65,7 +65,7 @@ export default function ModbusConfigSection({
           {/* Register Base */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Register Base <span className="text-red-500">*</span>
+              Register Base <span className="text-danger">*</span>
             </label>
             <Select
               value={registerBase}

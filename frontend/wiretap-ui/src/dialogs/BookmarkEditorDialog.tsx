@@ -428,7 +428,7 @@ export default function BookmarkEditorDialog({
             </div>
           ) : (
             /* Empty state */
-            <div className="flex items-center justify-center h-full text-sm text-slate-400">
+            <div className="flex items-center justify-center h-full text-sm text-muted">
               {canCreate ? t("bookmarkEditor.selectPromptCanCreate") : t("bookmarkEditor.selectPromptReadOnly")}
             </div>
           )}

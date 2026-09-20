@@ -201,14 +201,14 @@ const ByteRow = forwardRef<HTMLDivElement, ByteRowProps>(function ByteRow(
 
         if (isPending) {
           bgClass = pendingRange!.hasOverlap
-            ? "bg-red-500/40"
-            : "bg-yellow-400/40";
+            ? "bg-danger"
+            : "bg-warning";
         } else if (isSelected && signalColour) {
           cellStyle = { backgroundColor: signalColour, color: "#000" };
         } else if (signalColour) {
           cellStyle = { backgroundColor: signalColour, opacity: 0.7, color: "#000" };
         } else {
-          bgClass = "bg-white/5";
+          bgClass = "bg-tertiary/40";
         }
 
         return (
@@ -251,7 +251,7 @@ function BitCell({
 }: BitCellProps) {
   return (
     <button
-      className={`w-6 h-5 text-2xs font-mono flex items-center justify-center rounded-sm cursor-pointer ${bgClass ?? ""} ${isAnchor ? "ring-2 ring-yellow-400" : ""}`}
+      className={`w-6 h-5 text-2xs font-mono flex items-center justify-center rounded-sm cursor-pointer ${bgClass ?? ""} ${isAnchor ? "ring-2 ring-text-yellow" : ""}`}
       style={cellStyle}
       onClick={() => onBitClick(bitIndex)}
       onMouseEnter={() => onBitHover(bitIndex)}

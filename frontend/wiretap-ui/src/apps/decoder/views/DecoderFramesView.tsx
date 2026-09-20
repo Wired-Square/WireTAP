@@ -853,7 +853,7 @@ function FrameCard({
                       size="xs"
                       title={t("framesView.sendToCalculator")}
                     >
-                      <Calculator className={`${iconXs} text-orange-500`} />
+                      <Calculator className={`${iconXs} text-orange`} />
                     </IconButton>
                   )}
                 </div>
@@ -887,12 +887,12 @@ function FrameCard({
                 return (
                   <div key={`mux-${muxValue}`}>
                     {/* Mux value header */}
-                    <div className="px-3 py-1.5 text-xs bg-purple-600/10 border-t border-default flex items-center gap-2">
-                      <span className="text-purple-500">🔀</span>
-                      <span className="font-medium text-purple-600">
+                    <div className="px-3 py-1.5 text-xs bg-purple border-t border-default flex items-center gap-2">
+                      <span className="text-purple">🔀</span>
+                      <span className="font-medium text-purple">
                         Mux {muxValue}
                       </span>
-                      <span className="text-purple-500 font-mono">
+                      <span className="text-purple font-mono">
                         (0x{muxValueHex})
                       </span>
                     </div>
@@ -1562,7 +1562,7 @@ export default function DecoderFramesView({
           <>
             {/* Header field filters */}
             {headerFieldNames.length > 0 && onToggleHeaderFieldFilter && onClearHeaderFieldFilter && (
-              <div className="flex flex-wrap items-center gap-4 pb-2 border-b border-slate-700">
+              <div className="flex flex-wrap items-center gap-4 pb-2 border-b border-default">
                 {headerFieldNames.map((fieldName) => {
                   const options = headerFieldOptionsMap.get(fieldName) ?? [];
                   const selected = headerFieldFilters?.get(fieldName) ?? new Set<number>();

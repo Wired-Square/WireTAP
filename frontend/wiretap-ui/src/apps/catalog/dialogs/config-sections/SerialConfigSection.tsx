@@ -239,7 +239,7 @@ export default function SerialConfigSection({
             {/* Encoding */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Encoding <span className="text-red-500">*</span>
+                Encoding <span className="text-danger">*</span>
               </label>
               <Select
                 value={encoding}
@@ -260,7 +260,7 @@ export default function SerialConfigSection({
             {/* Byte Order */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Byte Order <span className="text-red-500">*</span>
+                Byte Order <span className="text-danger">*</span>
               </label>
               <Select
                 value={byteOrder}

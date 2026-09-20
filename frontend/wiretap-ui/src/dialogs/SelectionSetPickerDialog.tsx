@@ -166,7 +166,7 @@ export default function SelectionSetPickerDialog({
                     onClick={() => handleSelectSet(set)}
                     className={`w-full text-left px-3 py-2 hover:bg-hover ${
                       selectedId === set.id
-                        ? "bg-info border-l-2 border-blue-500"
+                        ? "bg-info border-l-2 border-accent-primary"
                         : ""
                     }`}
                   >

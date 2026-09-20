@@ -125,15 +125,16 @@ const visualConfig = {
     hue: "orange",
     load: () => import("./settings/Settings"),
   },
-  // Hidden Dockview-only panels (no apps.json entry, no menu presence).
+  // Hidden Dockview-only panels (no apps.json entry, no menu presence). They
+  // hold Discovery's result views, so they wear Discovery's hue.
   "payload-analysis": {
     icon: GitCompare,
-    hue: "pink",
+    hue: "purple",
     load: () => import("./analysis/PayloadAnalysis"),
   },
   "frame-order-analysis": {
     icon: ListOrdered,
-    hue: "amber",
+    hue: "purple",
     load: () => import("./analysis/FrameOrderAnalysis"),
   },
 } as const satisfies Record<string, AppVisual>;

@@ -282,7 +282,7 @@ export default function FramingOptionsPanel({
         {modeCard("slip", t("framingOptions.slipTitle"), t("framingOptions.slipDescription"))}
         {modeCard("delimiter", t("framingOptions.delimiterTitle"), t("framingOptions.delimiterDescription"))}
         {currentMode === "delimiter" && (
-          <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
+          <div className="ml-4 pl-4 border-l-2 border-accent-primary space-y-3 py-2">
             <label className="block text-sm">
               <span className={textSecondary}>{t("framingOptions.delimiterHexLabel")}</span>
               <Input
@@ -311,7 +311,7 @@ export default function FramingOptionsPanel({
 
         {modeCard("modbus_rtu", t("framingOptions.modbusRtuTitle"), t("framingOptions.modbusRtuDescription"))}
         {currentMode === "modbus_rtu" && (
-          <div className="ml-4 pl-4 border-l-2 border-blue-600 py-2">{modbusFields}</div>
+          <div className="ml-4 pl-4 border-l-2 border-accent-primary py-2">{modbusFields}</div>
         )}
 
         {/* Emit raw bytes toggle */}

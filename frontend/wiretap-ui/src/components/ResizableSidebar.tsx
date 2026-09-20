@@ -143,8 +143,8 @@ export default function ResizableSidebar({
               absolute top-0 bottom-0 w-1.5 z-10
               cursor-col-resize
               transition-colors duration-150
-              hover:bg-blue-500/60
-              ${isResizing ? "bg-blue-500/60" : "bg-transparent"}
+              hover:bg-accent-primary/60
+              ${isResizing ? "bg-accent-primary/60" : "bg-transparent"}
               ${position === "left" ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"}
             `}
           />

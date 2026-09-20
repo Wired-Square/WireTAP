@@ -110,10 +110,10 @@ export default function ByteExtractionDialog({
   };
 
   const colorClasses = color === 'cyan'
-    ? { text: 'text-cyan-400', bgLight: 'bg-cyan-900/50' }
+    ? { text: 'text-cyan', bgLight: 'bg-cyan' }
     : color === 'purple'
-    ? { text: 'text-purple-400', bgLight: 'bg-purple-900/50' }
-    : { text: 'text-amber-400', bgLight: 'bg-amber-900/50' };
+    ? { text: 'text-purple', bgLight: 'bg-purple' }
+    : { text: 'text-amber', bgLight: 'bg-warning' };
 
   return (
     <Dialog isOpen={isOpen} size="xl" onClose={onClose} title={title}>

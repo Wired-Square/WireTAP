@@ -39,7 +39,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
           title={autoRefresh ? t("topBar.autoRefreshOn") : t("topBar.autoRefreshOff")}
         >
           {autoRefresh ? (
-            <ToggleRight className={`${iconMd} text-green-400`} />
+            <ToggleRight className={`${iconMd} text-success`} />
           ) : (
             <ToggleLeft className={`${iconMd} text-muted`} />
           )}

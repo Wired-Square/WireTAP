@@ -152,7 +152,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
       isOpen={isOpen}
       onClose={handleClose}
       title={t("candidates.title")}
-      icon={<Sparkles className="text-amber-400" />}
+      icon={<Sparkles className="text-amber" />}
     >
       <DialogBody className="space-y-4">
         {step === 1 && (

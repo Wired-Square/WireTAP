@@ -249,7 +249,7 @@ export default function ChecksumEditDialog({
 
                   let bgClass = "bg-tertiary text-muted";
                   if (isChecksumByte) {
-                    bgClass = "bg-purple-500 text-white";
+                    bgClass = "bg-purple text-purple";
                   } else if (isCalcByte) {
                     bgClass = "bg-info text-info";
                   }
@@ -275,7 +275,7 @@ export default function ChecksumEditDialog({
           })()}
           <div className="flex items-center gap-4 mt-2 text-xs text-muted">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-purple-500"></div>
+              <div className="w-3 h-3 rounded bg-purple"></div>
               <span>Checksum</span>
             </div>
             <div className="flex items-center gap-1">

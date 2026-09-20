@@ -191,7 +191,7 @@ function RepoRow({
           title={t(isFavourite ? "repository.saved.unfavourite" : "repository.saved.favourite")}
         >
           <ShareIcon.Favourite
-            className={`${iconMd} ${isFavourite ? "fill-yellow-500 text-yellow-500" : `${textSecondary} opacity-60`}`}
+            className={`${iconMd} ${isFavourite ? "fill-yellow text-yellow" : `${textSecondary} opacity-60`}`}
           />
         </IconButton>
       )}

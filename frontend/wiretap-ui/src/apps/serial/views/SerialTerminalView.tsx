@@ -30,6 +30,10 @@ import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMe
 import { tlog } from "../../../api/settings";
 import { readClipboardText, writeClipboardText } from "../../../api/clipboard";
 
+// A terminal is dark in both themes; the container paints the same so the
+// padding around xterm's canvas does not show as a frame.
+const TERMINAL_BACKGROUND = "#0b0f14";
+
 export interface SerialTerminalHandle {
   /** Write incoming bytes (from backend) to the terminal display. */
   writeBytes: (bytes: Uint8Array) => void;
@@ -121,7 +125,7 @@ const SerialTerminalView = forwardRef<SerialTerminalHandle, Props>(
         letterSpacing: 0.5,
         scrollback: 5000,
         theme: {
-          background: "#0b0f14",
+          background: TERMINAL_BACKGROUND,
           foreground: "#dde3ec",
           cursor: "#7dd3fc",
           // Visible highlight on the near-black background — without this the
@@ -291,7 +295,8 @@ const SerialTerminalView = forwardRef<SerialTerminalHandle, Props>(
         <div
           ref={containerRef}
           onContextMenu={handleContextMenu}
-          className="flex-1 min-h-0 bg-[#0b0f14] p-2"
+          className="flex-1 min-h-0 p-2"
+          style={{ background: TERMINAL_BACKGROUND }}
         />
         {menu && (
           <ContextMenu

@@ -235,8 +235,8 @@ export default function ToolboxDialog({
                   isDisabled
                     ? "bg-surface text-muted cursor-not-allowed"
                     : isActive
-                      ? "bg-purple-100 text-purple ring-2 ring-purple-500"
-                      : "bg-surface text-secondary ring-1 ring-default hover:ring-2 hover:ring-purple-400"
+                      ? "bg-purple text-purple ring-2 ring-text-purple"
+                      : "bg-surface text-secondary ring-1 ring-default hover:ring-2 hover:ring-text-purple"
                 }`}
                 title={disabledReason ?? (isActive ? t("toolbox.showAllTools") : label)}
               >

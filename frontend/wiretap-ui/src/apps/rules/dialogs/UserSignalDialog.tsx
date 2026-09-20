@@ -306,7 +306,7 @@ export default function UserSignalDialog({
 
         {/* Validation error */}
         {validationError && (
-          <p className="text-xs text-red-400">{validationError}</p>
+          <p className="text-xs text-danger">{validationError}</p>
         )}
       </DialogBody>
       <DialogFooter>

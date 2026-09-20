@@ -315,7 +315,7 @@ export default function DataIOView({
                   <Star
                     className={`${iconMd} ${
                       defaultReadProfile === profile.id
-                        ? "fill-yellow-500 text-yellow-500"
+                        ? "fill-yellow text-yellow"
                         : ""
                     }`}
                     style={defaultReadProfile !== profile.id ? { color: 'var(--text-secondary)', opacity: 0.6 } : undefined}
@@ -338,7 +338,7 @@ export default function DataIOView({
                   tone="danger"
                   title={t("dataIO.actions.delete")}
                 >
-                  <Trash2 className={`${iconMd} text-red-600`} />
+                  <Trash2 className={iconMd} />
                 </IconButton>
               </div>
             </Card>
@@ -382,7 +382,7 @@ export default function DataIOView({
                   tone="danger"
                   title={t("dataIO.unsaved.discard")}
                 >
-                  <Trash2 className={`${iconMd} text-red-600`} />
+                  <Trash2 className={iconMd} />
                 </IconButton>
               </div>
             </Card>

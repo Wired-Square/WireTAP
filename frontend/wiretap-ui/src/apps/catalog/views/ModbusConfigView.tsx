@@ -62,7 +62,7 @@ export default function ModbusConfigView({
             {registerBase !== undefined ? (
               registerBase === 0 ? t("modbusConfig.registerBase0") : t("modbusConfig.registerBase1")
             ) : (
-              <span className="text-orange-500">{t("modbusConfig.notSet")}</span>
+              <span className="text-warning">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>

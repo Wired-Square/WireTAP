@@ -138,13 +138,13 @@ interface ColoredHexBytesProps {
 function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplete }: ColoredHexBytesProps) {
   // Build array of byte colors
   const byteColors = useMemo(() => {
-    const colors: string[] = new Array(bytes.length).fill(incomplete ? 'text-orange-400' : 'text-green-400');
+    const colors: string[] = new Array(bytes.length).fill(incomplete ? 'text-orange' : 'text-green');
 
     // Color ID bytes (cyan)
     if (idConfig) {
       const start = resolveByteIndexSync(idConfig.startByte, bytes.length);
       for (let i = start; i < start + idConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-cyan-400';
+        colors[i] = 'text-cyan';
       }
     }
 
@@ -152,7 +152,7 @@ function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplet
     if (srcConfig) {
       const start = resolveByteIndexSync(srcConfig.startByte, bytes.length);
       for (let i = start; i < start + srcConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-purple-400';
+        colors[i] = 'text-purple';
       }
     }
 
@@ -160,7 +160,7 @@ function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplet
     if (checksumConfig) {
       const start = resolveByteIndexSync(checksumConfig.startByte, bytes.length);
       for (let i = start; i < start + checksumConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-amber-400';
+        colors[i] = 'text-amber';
       }
     }
 

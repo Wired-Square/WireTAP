@@ -200,7 +200,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
     return (
       <section>
         <div className="flex items-center gap-2 mb-2">
-          <Play className={`${iconMd} text-slate-400`} />
+          <Play className={`${iconMd} text-muted`} />
           <h3 className="text-xs font-medium text-secondary">{t("messageOrder.patterns")}</h3>
         </div>
         <p className={captionMuted}>
@@ -213,7 +213,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Play className={`${iconMd} text-purple-500`} />
+        <Play className={`${iconMd} text-purple`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.patternsCount", { count: patterns.length })}
         </h3>
@@ -298,7 +298,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Clock className={`${iconMd} text-blue-500`} />
+        <Clock className={`${iconMd} text-blue`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.candidates")}
         </h3>
@@ -372,7 +372,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Shuffle className={`${iconMd} text-orange-500`} />
+        <Shuffle className={`${iconMd} text-orange`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.multiplexedTitle", { count: multiplexed.length })}
         </h3>
@@ -455,7 +455,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Zap className={`${iconMd} text-cyan-500`} />
+        <Zap className={`${iconMd} text-cyan`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.burstTitle", { count: bursts.length })}
         </h3>
@@ -534,7 +534,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <GitBranch className={`${iconMd} text-rose-500`} />
+        <GitBranch className={`${iconMd} text-pink`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.multiBusTitle", { count: multiBus.length })}
         </h3>
@@ -603,7 +603,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Layers className={`${iconMd} text-emerald-500`} />
+        <Layers className={`${iconMd} text-emerald`} />
         <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.intervalGroups")}
         </h3>

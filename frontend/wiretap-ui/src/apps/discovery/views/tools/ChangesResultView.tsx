@@ -175,7 +175,7 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
         {/* Mirror Groups Section */}
         {mirrorGroups.length > 0 && (
           <div className="space-y-2">
-            <div className="text-xs font-medium text-pink-600 flex items-center gap-1.5">
+            <div className="text-xs font-medium text-pink flex items-center gap-1.5">
               <GitMerge className={iconSm} />
               {t("changes.mirrorFrames")}
             </div>
@@ -480,9 +480,9 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
       >
         <div className={flexRowGap2}>
           {isExpanded ? (
-            <ChevronDown className={`${iconXs} text-slate-400`} />
+            <ChevronDown className={`${iconXs} text-muted`} />
           ) : (
-            <ChevronRight className={`${iconXs} text-slate-400`} />
+            <ChevronRight className={`${iconXs} text-muted`} />
           )}
           <span className="text-2xs font-medium text-orange">
             {t("changes.case", { value: formatMuxValue(caseAnalysis.muxValue, isTwoByte) })}

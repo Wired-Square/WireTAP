@@ -44,7 +44,7 @@ export default function SerialConfigSection({
       {/* Frame ID - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          {t("protocolEditors.serialFrameIdLabel")} <span className="text-red-500">{t("protocolEditors.serialFrameIdRequired")}</span>
+          {t("protocolEditors.serialFrameIdLabel")} <span className="text-danger">{t("protocolEditors.serialFrameIdRequired")}</span>
         </label>
         <Input
           type="text"

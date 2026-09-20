@@ -47,7 +47,7 @@ export default function CANFrameEditView({
         {/* ID - Required */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            {t("canFrameEditView.id")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
+            {t("canFrameEditView.id")} <span className="text-danger">{t("canFrameEditView.required")}</span>
           </label>
           <Input
             type="text"
@@ -62,7 +62,7 @@ export default function CANFrameEditView({
         {/* Length (DLC) - Required */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            {t("canFrameEditView.lengthDlc")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
+            {t("canFrameEditView.lengthDlc")} <span className="text-danger">{t("canFrameEditView.required")}</span>
           </label>
           <Input
             type="number"

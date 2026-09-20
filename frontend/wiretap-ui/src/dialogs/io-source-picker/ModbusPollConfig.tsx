@@ -126,7 +126,7 @@ export default function ModbusPollConfig({ config, onChange, disabled }: Props) 
               disabled={disabled}
             />
           </FieldRow>
-          <p className={invalid ? "text-amber-500" : textMuted}>
+          <p className={invalid ? "text-warning" : textMuted}>
             {invalid
               ? t("modbusPoll.rangeInvalid")
               : t("modbusPoll.summary", { count, interval: config.intervalMs })}

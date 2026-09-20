@@ -62,7 +62,7 @@ export default function CanConfigView({
             {defaultEndianness ? (
               defaultEndianness === "little" ? t("canConfig.endianLE") : t("canConfig.endianBE")
             ) : (
-              <span className="text-orange-500">{t("canConfig.notSet")}</span>
+              <span className="text-warning">{t("canConfig.notSet")}</span>
             )}
           </div>
         </div>
@@ -75,7 +75,7 @@ export default function CanConfigView({
             {defaultInterval !== undefined ? (
               t("canConfig.intervalMs", { ms: defaultInterval })
             ) : (
-              <span className="text-slate-400">{t("canConfig.notSpecified")}</span>
+              <span className="text-muted">{t("canConfig.notSpecified")}</span>
             )}
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function CanConfigView({
             ) : defaultExtended === false ? (
               t("canConfig.no11bit")
             ) : (
-              <span className="text-slate-400">{t("canConfig.autoDetect")}</span>
+              <span className="text-muted">{t("canConfig.autoDetect")}</span>
             )}
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function CanConfigView({
             ) : defaultFd === false ? (
               t("canConfig.noClassic")
             ) : (
-              <span className="text-slate-400">{t("canConfig.classicCan")}</span>
+              <span className="text-muted">{t("canConfig.classicCan")}</span>
             )}
           </div>
         </div>

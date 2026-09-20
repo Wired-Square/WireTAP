@@ -298,12 +298,12 @@ export default function TestPattern() {
               >
                 {isRunning ? (
                   <>
-                    <Square className={`${iconSm} text-red-400`} />
+                    <Square className={`${iconSm} ${textDanger}`} />
                     <span>{t("actions.stop")}</span>
                   </>
                 ) : (
                   <>
-                    <Play className={`${iconSm} text-emerald-400`} />
+                    <Play className={`${iconSm} text-success`} />
                     <span>{t("actions.start")}</span>
                   </>
                 )}

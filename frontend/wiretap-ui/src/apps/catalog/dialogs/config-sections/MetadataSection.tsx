@@ -26,7 +26,7 @@ export default function MetadataSection({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Name <span className="text-red-500">*</span>
+            Name <span className="text-danger">*</span>
           </label>
           <Input
             type="text"
@@ -38,7 +38,7 @@ export default function MetadataSection({
         </div>
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Version <span className="text-red-500">*</span>
+            Version <span className="text-danger">*</span>
           </label>
           <Input
             type="number"

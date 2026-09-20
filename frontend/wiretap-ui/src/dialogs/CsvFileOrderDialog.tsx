@@ -330,7 +330,7 @@ export default function CsvFileOrderDialog({
               <div key={entry.path} className="relative">
                 {/* Drop insertion line — before this row */}
                 {showLineBefore && (
-                  <div className="absolute top-0 left-2 right-2 h-0.5 bg-white rounded-full z-10 -translate-y-px" />
+                  <div className="absolute top-0 left-2 right-2 h-0.5 bg-accent-primary rounded-full z-10 -translate-y-px" />
                 )}
 
                 <div
@@ -404,7 +404,7 @@ export default function CsvFileOrderDialog({
                   {anomaly && (
                     <span title={anomaly}>
                       <AlertTriangle
-                        className={`${iconSm} text-amber-500`}
+                        className={`${iconSm} text-warning`}
                       />
                     </span>
                   )}
@@ -433,7 +433,7 @@ export default function CsvFileOrderDialog({
 
                 {/* Drop insertion line — after last row */}
                 {showLineAfter && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-white rounded-full z-10 translate-y-px" />
+                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-accent-primary rounded-full z-10 translate-y-px" />
                 )}
               </div>
             );

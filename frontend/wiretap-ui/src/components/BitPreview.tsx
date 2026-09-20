@@ -405,7 +405,7 @@ export default function BitPreview({
             const bgColor = isDragSelected
               ? 'bg-warning-text'
               : isOverlap
-              ? 'bg-red-500'
+              ? 'bg-danger-text'
               : rangeType === 'current'
               ? 'bg-success-text'
               : rangeColorClass
@@ -492,7 +492,7 @@ export default function BitPreview({
       <div className="mt-4 space-y-2 text-xs">
         {hasOverlap && (
           <div className={flexRowGap2}>
-            <div className="w-4 h-4 bg-red-500 rounded" />
+            <div className="w-4 h-4 bg-danger-text rounded" />
             <span className="text-secondary">{t('bitPreview.legendOverlap')}</span>
           </div>
         )}

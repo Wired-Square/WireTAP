@@ -80,7 +80,7 @@ export default function TransmitReplayView() {
                   </div>
                   <div className="h-1 rounded-full bg-surface overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 transition-all duration-200"
+                      className="h-full bg-accent-primary transition-all duration-200"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

@@ -194,7 +194,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
       onClose={handleClose}
       size="lg"
       title={t("hypothesis.title")}
-      icon={<FlaskConical className="text-purple-400" />}
+      icon={<FlaskConical className="text-purple" />}
     >
       <DialogBody className="space-y-4">
         {step === 1 && (
@@ -457,7 +457,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   onClick={() => toggleCandidate(c.signalName)}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left ${
                     selectedCandidates.has(c.signalName)
-                      ? "bg-blue-600/10 border border-blue-600/30"
+                      ? "bg-info border border-info"
                       : "bg-primary border border-transparent hover:bg-hover"
                   }`}
                 >

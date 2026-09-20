@@ -215,7 +215,7 @@ export default function CanConfigSection({
           {/* Default Byte Order */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Default Byte Order <span className="text-red-500">*</span>
+              Default Byte Order <span className="text-danger">*</span>
             </label>
             <Select
               value={defaultEndianness}
@@ -233,7 +233,7 @@ export default function CanConfigSection({
           {/* Default Interval */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Default Interval (ms) <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              Default Interval (ms) <span className="text-muted text-xs font-normal">(optional)</span>
             </label>
             <Input
               type="number"
@@ -256,7 +256,7 @@ export default function CanConfigSection({
             {/* Default Extended ID */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default Extended ID <span className="text-slate-400 text-xs font-normal">(optional)</span>
+                Default Extended ID <span className="text-muted text-xs font-normal">(optional)</span>
               </label>
               <Select
                 value={defaultExtended === undefined ? "auto" : defaultExtended ? "true" : "false"}
@@ -278,7 +278,7 @@ export default function CanConfigSection({
             {/* Default CAN FD */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default CAN FD <span className="text-slate-400 text-xs font-normal">(optional)</span>
+                Default CAN FD <span className="text-muted text-xs font-normal">(optional)</span>
               </label>
               <Select
                 value={defaultFd === undefined ? "auto" : defaultFd ? "true" : "false"}
@@ -302,7 +302,7 @@ export default function CanConfigSection({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className={textMedium}>
-                Frame ID Mask <span className="text-slate-400 text-xs font-normal">(optional, hex)</span>
+                Frame ID Mask <span className="text-muted text-xs font-normal">(optional, hex)</span>
               </label>
               <Button
                 onClick={() => setShowFrameIdMaskPicker(!showFrameIdMaskPicker)}

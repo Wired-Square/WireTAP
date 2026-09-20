@@ -239,7 +239,7 @@ export default function SerialTransmitView() {
           <div className="space-y-1">
             <div className="flex items-center gap-4">
               <span className={`${textSecondary} text-xs`}>{t("serialView.preview")}</span>
-              <span className="text-xs text-blue-400">
+              <span className="text-xs text-blue">
                 {t("serialView.bytesCount", { count: preview.length })}
               </span>
             </div>

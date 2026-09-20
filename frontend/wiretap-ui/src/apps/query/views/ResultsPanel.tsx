@@ -191,7 +191,7 @@ export default function ResultsPanel({
   if (isRunning) {
     return (
       <div className={`h-full ${emptyStateContainer}`}>
-        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="w-8 h-8 border-2 border-text-amber border-t-transparent rounded-full animate-spin mb-4" />
         <div className={emptyStateText}>
           <p className={emptyStateHeading}>{t("results.runningHeading")}</p>
           <p className={emptyStateDescription}>

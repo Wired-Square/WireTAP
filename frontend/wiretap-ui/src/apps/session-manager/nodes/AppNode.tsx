@@ -24,7 +24,7 @@ function AppNode({ data, selected }: AppNodeProps) {
   const { appId, appName, isActive } = data;
 
   const borderColour = selected
-    ? "border-cyan-400"
+    ? "border-text-cyan"
     : data.isConnected
     ? "border-default"
     : "border-dashed border-default";
@@ -42,7 +42,7 @@ function AppNode({ data, selected }: AppNodeProps) {
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-green-500 !border-2 !border-green-300"
+        className="!w-3 !h-3 !bg-text-green !border-2 !border-success"
       />
 
       {/* Header */}
@@ -51,7 +51,7 @@ function AppNode({ data, selected }: AppNodeProps) {
         <span className="font-medium text-sm text-primary truncate">
           {displayName}
         </span>
-        <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-green-400" : "bg-gray-500"}`} />
+        <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-success-text" : "bg-text-muted"}`} />
       </div>
 
     </div>

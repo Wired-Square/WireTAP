@@ -284,12 +284,12 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                                 <div
                                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                     isCurrentReplacement
-                                      ? "border-purple-500"
+                                      ? "border-text-purple"
                                       : "border-default"
                                   }`}
                                 >
                                   {isCurrentReplacement && (
-                                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                                    <div className="w-2 h-2 rounded-full bg-text-purple" />
                                   )}
                                 </div>
                               ) : (
@@ -297,7 +297,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                                 <div
                                   className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                     selected
-                                      ? "bg-blue-500 border-blue-500"
+                                      ? "bg-accent-primary border-accent-primary"
                                       : "border-default"
                                   }`}
                                 >

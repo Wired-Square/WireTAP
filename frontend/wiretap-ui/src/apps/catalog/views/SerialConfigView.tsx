@@ -63,7 +63,7 @@ export default function SerialConfigView({
             {encoding ? (
               <span className="uppercase">{encodingLabels[encoding] || encoding}</span>
             ) : (
-              <span className="text-orange-500">{t("serialConfig.encodingNotSet")}</span>
+              <span className="text-warning">{t("serialConfig.encodingNotSet")}</span>
             )}
           </div>
           <p className={`${caption} mt-2`}>

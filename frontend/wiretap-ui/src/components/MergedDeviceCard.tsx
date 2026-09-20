@@ -48,7 +48,7 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
         <div
           key={bar}
           className={`w-1 rounded-sm transition-colors ${
-            bar <= strength ? "bg-green-500" : "bg-border-default"
+            bar <= strength ? "bg-success-text" : "bg-border-default"
           }`}
           style={{ height: `${bar * 25}%` }}
         />

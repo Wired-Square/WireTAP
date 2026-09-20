@@ -138,7 +138,7 @@ export default function SerialFrameView({
             <Settings className={`${iconXs} opacity-0 group-hover:opacity-100 transition-opacity`} />
           </div>
           <div className={`${monoBody} uppercase`}>
-            {encoding ?? <span className="text-orange-500">{t("serialFrame.encodingNotSet")}</span>}
+            {encoding ?? <span className="text-warning">{t("serialFrame.encodingNotSet")}</span>}
           </div>
         </button>
 
@@ -147,7 +147,7 @@ export default function SerialFrameView({
             {t("serialFrame.length")}
           </div>
           <div className={monoBody}>
-            {length ?? <span className="text-slate-400">{t("serialFrame.lengthNotSet")}</span>}
+            {length ?? <span className="text-muted">{t("serialFrame.lengthNotSet")}</span>}
           </div>
         </div>
 
