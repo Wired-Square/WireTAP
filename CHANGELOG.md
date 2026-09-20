@@ -6,6 +6,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds and the bookmark dialogs use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter.
+
 - **WireTAP now requires macOS 13.** The installer refuses an older system, where the app already rendered its colours wrong.
 
 - **Keyboard focus stays where it should.** Tab and Shift+Tab now cycle inside an open dialog instead of escaping to the window behind it, and Tab closes an open menu and returns you to the button that opened it. In the Dashboard's layout menu that drops a half-typed name — press Enter to save it first. Toasts are announced by screen readers.

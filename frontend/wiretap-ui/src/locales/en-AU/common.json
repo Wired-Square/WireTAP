@@ -180,8 +180,7 @@
     "timeZone": "Time Zone",
     "startTime": "Start Time",
     "endTime": "End Time",
-    "startPlaceholder": "Select start time...",
-    "endPlaceholder": "Select end time...",
+    "clear": "Clear",
     "maxFrames": "Max Frames",
     "noLimitPlaceholder": "No limit"
   },
