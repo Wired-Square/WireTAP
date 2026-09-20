@@ -195,14 +195,17 @@ function Watermark(_props: IWatermarkPanelProps) {
                 )}
                 <div className="flex flex-wrap justify-center gap-2 px-4">
                   {g.items.map((app) => (
-                    <button
+                    <Button
                       key={app.id}
+                      variant="tonal"
                       className={appHueClass(app.id, "launcher-tile")}
                       onClick={() => (app.singleton ? openSettingsPanel() : openPanel(app.id))}
                     >
                       <AppIcon app={app.id} className={icon2xl} />
-                      <span className="launcher-tile__label">{t(`panels.${app.i18nKey}`)}</span>
-                    </button>
+                      <span className={`text-xs font-normal ${textSecondary} font-ubuntu truncate max-w-full px-1`}>
+                        {t(`panels.${app.i18nKey}`)}
+                      </span>
+                    </Button>
                   ))}
                 </div>
               </div>

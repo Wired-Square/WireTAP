@@ -2,10 +2,8 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { AppWindow } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
-import { textSecondary } from "../../../styles/colourTokens";
-import { appById, type PanelId } from "../../../apps/registry";
+import { isPanelId } from "../../../apps/registry";
 import { AppIcon } from "../../../components/AppIcon";
 
 export interface AppNodeData {
@@ -24,9 +22,6 @@ interface AppNodeProps {
 
 function AppNode({ data, selected }: AppNodeProps) {
   const { appId, appName, isActive } = data;
-
-  // A subscriber that is not a panel — an MCP client — has no hue.
-  const app = appName in appById ? (appName as PanelId) : null;
 
   const borderColour = selected
     ? "border-cyan-400"
@@ -52,7 +47,7 @@ function AppNode({ data, selected }: AppNodeProps) {
 
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
-        {app ? <AppIcon app={app} className={iconSm} /> : <AppWindow className={`${iconSm} ${textSecondary}`} />}
+        <AppIcon app={isPanelId(appName) ? appName : null} className={iconSm} />
         <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
           {displayName}
         </span>

@@ -294,6 +294,11 @@ html, body {
   --text-yellow: #ca8a04;
   --text-red: #dc2626;
   --text-blue: #2563eb;
+  --text-pink: #db2777;
+  --text-sky: #0284c7;
+  --text-indigo: #4f46e5;
+  --text-teal: #0d9488;
+  --text-emerald: #059669;
 
   /* Tertiary/muted backgrounds */
   --bg-tertiary: #e2e8f0;
@@ -419,6 +424,11 @@ html, body {
   --text-yellow: #facc15;
   --text-red: #f87171;
   --text-blue: #60a5fa;
+  --text-pink: #f472b6;
+  --text-sky: #38bdf8;
+  --text-indigo: #818cf8;
+  --text-teal: #2dd4bf;
+  --text-emerald: #34d399;
 
   /* Tertiary/muted backgrounds */
   --bg-tertiary: #475569;

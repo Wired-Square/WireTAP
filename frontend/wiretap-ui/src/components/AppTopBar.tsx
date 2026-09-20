@@ -55,8 +55,6 @@ export interface AppTopBarProps {
   // === Identity (required) ===
   /** The app, whose icon and hue come from the registry */
   app: PanelId;
-  /** Optional title text (for Settings-style with label) */
-  title?: string;
 
   // === IO Session Section (optional) ===
   /** If provided, renders IOSessionControls with these props */
@@ -88,7 +86,7 @@ export interface AppTopBarProps {
  * Unified top bar component for apps.
  *
  * Renders sections in this order:
- * 1. Icon (+ title if provided)
+ * 1. Icon
  * 2. FlexSeparator
  * 3. FrameIdFormatToggle (if `frameIdFormat` enabled)
  * 4. IOSessionControls (if `ioSession` provided)
@@ -121,7 +119,6 @@ export interface AppTopBarProps {
  */
 export default function AppTopBar({
   app,
-  title,
   ioSession,
   framePicker,
   catalog,
@@ -137,14 +134,6 @@ export default function AppTopBar({
       <div className="flex flex-wrap items-center gap-2">
         <AppIcon app={app} className={iconLg} />
 
-        {/* Title (if provided) */}
-        {title && (
-          <span className="font-semibold text-[color:var(--text-primary)]">
-            {title}
-          </span>
-        )}
-
-        {/* Separator after icon/title */}
         <FlexSeparator />
 
         {/* Frame ID format toggle — sits between the app icon and the session controls */}

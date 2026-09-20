@@ -5,13 +5,12 @@ import { useState, useEffect } from "react";
 import { type IDockviewPanelHeaderProps } from "dockview-react";
 import { X } from "lucide-react";
 import { iconMd, iconXs } from "../styles/spacing";
-import { appById, type PanelId } from "../apps/registry";
+import { isPanelId } from "../apps/registry";
 import { AppIcon } from "./AppIcon";
 
 export default function AppTab(props: IDockviewPanelHeaderProps) {
   const { api } = props;
-  const panelId = api.id as PanelId;
-  const config = appById[panelId];
+  const panelId = api.id;
   const [title, setTitle] = useState(api.title);
   const [isActive, setIsActive] = useState(api.isActive);
 
@@ -30,7 +29,7 @@ export default function AppTab(props: IDockviewPanelHeaderProps) {
       data-testid="dockview-tab"
     >
       <div className="dv-default-tab-content">
-        {config && <AppIcon app={panelId} className={iconMd} />}
+        {isPanelId(panelId) && <AppIcon app={panelId} className={iconMd} />}
         <span className="truncate">{title}</span>
       </div>
       <div className="dv-default-tab-action">

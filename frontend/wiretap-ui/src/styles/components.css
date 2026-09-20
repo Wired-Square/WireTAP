@@ -1106,126 +1106,90 @@
   }
 
   /* ---- App hues ----------------------------------------------------------
-     .app-hue.app-hue--<hue> · .launcher-tile > .launcher-tile__label
+     .app-hue [.app-hue--<hue>] (.app-hue__icon) · .btn--tonal.launcher-tile
      One accent per app, on whatever names it — its tab, its top bar, its row
      in the launcher menu, its tile, its node on the session canvas — read
-     through --app-accent and the two tints mixed from it. A hue is its 600 in
-     the light theme and its 400 in the dark, as the data accents are; an
-     element with no hue takes the secondary text colour. */
+     through --app-accent and the tint mixed from it. A hue is one of the
+     theme's data accents; an element with no hue takes the secondary text
+     colour. */
   .app-hue {
-    --app-accent: var(--app-hue-light, var(--text-secondary));
+    --app-accent: var(--text-secondary);
     --app-tint: color-mix(in srgb, var(--app-accent) 10%, transparent);
-    --app-tint-hover: color-mix(in srgb, var(--app-accent) 20%, transparent);
-  }
-
-  .dark .app-hue {
-    --app-accent: var(--app-hue-dark, var(--text-secondary));
   }
 
   .app-hue--purple {
-    --app-hue-light: #9333ea;
-    --app-hue-dark: #c084fc;
+    --app-accent: var(--text-purple);
   }
 
   .app-hue--green {
-    --app-hue-light: #16a34a;
-    --app-hue-dark: #4ade80;
+    --app-accent: var(--text-green);
   }
 
   .app-hue--red {
-    --app-hue-light: #dc2626;
-    --app-hue-dark: #f87171;
+    --app-accent: var(--text-red);
   }
 
   .app-hue--pink {
-    --app-hue-light: #db2777;
-    --app-hue-dark: #f472b6;
+    --app-accent: var(--text-pink);
   }
 
   .app-hue--sky {
-    --app-hue-light: #0284c7;
-    --app-hue-dark: #38bdf8;
+    --app-accent: var(--text-sky);
   }
 
   .app-hue--yellow {
-    --app-hue-light: #ca8a04;
-    --app-hue-dark: #facc15;
+    --app-accent: var(--text-yellow);
   }
 
   .app-hue--indigo {
-    --app-hue-light: #4f46e5;
-    --app-hue-dark: #818cf8;
+    --app-accent: var(--text-indigo);
   }
 
   .app-hue--blue {
-    --app-hue-light: #2563eb;
-    --app-hue-dark: #60a5fa;
+    --app-accent: var(--text-blue);
   }
 
   .app-hue--teal {
-    --app-hue-light: #0d9488;
-    --app-hue-dark: #2dd4bf;
+    --app-accent: var(--text-teal);
   }
 
   .app-hue--emerald {
-    --app-hue-light: #059669;
-    --app-hue-dark: #34d399;
+    --app-accent: var(--text-emerald);
   }
 
   .app-hue--cyan {
-    --app-hue-light: #0891b2;
-    --app-hue-dark: #22d3ee;
+    --app-accent: var(--text-cyan);
   }
 
   .app-hue--orange {
-    --app-hue-light: #ea580c;
-    --app-hue-dark: #fb923c;
+    --app-accent: var(--text-orange);
   }
 
   .app-hue--amber {
-    --app-hue-light: #d97706;
-    --app-hue-dark: #fbbf24;
+    --app-accent: var(--text-amber);
   }
 
-  /* The launcher's tile: the app's glyph over its label on its tint. */
+  .app-hue__icon {
+    flex-shrink: 0;
+    color: var(--app-accent);
+  }
+
+  /* The launcher's tile: a tonal button in the app's tint, the glyph over the label. */
   .launcher-tile {
-    display: flex;
+    --btn-tint-bg: var(--app-tint);
+    --btn-tint-text: var(--app-accent);
+    --btn-tint-border: transparent;
+
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
     gap: 6px;
     width: 80px;
-    aspect-ratio: 1;
+    height: 80px;
+    padding: 0;
     border-radius: 12px;
-    background-color: var(--app-tint);
-    transition-property: transform, background-color;
-    transition-duration: 130ms;
-    transition-timing-function: ease-out;
-  }
-
-  .launcher-tile:hover {
-    background-color: var(--app-tint-hover);
-  }
-
-  .launcher-tile:active {
-    transform: scale(0.97);
-  }
-
-  .launcher-tile__label {
-    max-width: 100%;
-    padding: 0 4px;
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-family: 'Ubuntu', var(--font-sans);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .btn:active:not(:disabled),
-    .launcher-tile:active {
+    .btn:active:not(:disabled) {
       transform: none;
     }
 

@@ -406,17 +406,18 @@ Two things worth knowing before changing the frame table's columns:
 
 ### App hues — [AppIcon.tsx](../frontend/wiretap-ui/src/components/AppIcon.tsx)
 
-Every app has one hue, named in its registry entry (`hue: "purple"`) and
-defined once in `components.css` as `.app-hue--<hue>` — the hue's 600 in the
-light theme and its 400 in the dark, the pairs the data accents use. Wherever
-the app is named, its glyph is `<AppIcon app="discovery" className={iconLg} />`:
-the Dockview tab, the top bar (through `AppTopBar`'s `app` prop), the logo
-menu, the launcher and the session canvas all draw it that way, so an app
-never wears two colours. `appHueClass(app)` puts the hue on a container
-instead — `--app-accent`, `--app-tint` (10 %) and `--app-tint-hover` (20 %)
-for whatever inside reads them: a logo-menu row hovers in its app's tint, and
-the launcher's `.launcher-tile` sits on it. A subscriber that is not a
-panel (an MCP client) gets a neutral glyph, not a hue.
+Every app has one hue, named in its registry entry (`hue: "purple"`): one of
+the theme's data accents (`--text-<hue>`, the 600 in the light theme and the
+400 in the dark), which `.app-hue--<hue>` in `components.css` reads into
+`--app-accent`. Wherever the app is named, its glyph is
+`<AppIcon app="discovery" className={iconLg} />`: the Dockview tab, the top
+bar (through `AppTopBar`'s `app` prop), the logo menu, the launcher and the
+session canvas all draw it that way, so an app never wears two colours.
+`appHueClass(app)` puts the hue on a container instead — `--app-accent` and
+`--app-tint` (10 %) for whatever inside reads them: a logo-menu row hovers in
+its app's tint, and the launcher's tile is a tonal `Button` on it.
+`app={null}` is a subscriber that is not a panel (an MCP client): a neutral
+glyph, no hue. `isPanelId()` in the registry narrows a runtime id.
 
 ### The protocol badge says what it knows
 
@@ -512,14 +513,14 @@ Every panel renders its top bar through
 flexible row containing five logical slots, in order:
 
 ```
-[icon] [title?] | [identity picker] [secondary pickers] [ID format] [custom children] | [actions]
-       FlexSeparator (between icon/title and the rest)
-                                                       FlexSeparator (only if actions)
+[icon] | [identity picker] [secondary pickers] [ID format] [custom children] | [actions]
+       FlexSeparator (between icon and the rest)
+                                              FlexSeparator (only if actions)
 ```
 
-- **Icon + title** — `app` names the panel; its icon and hue come from
-  the registry (see *App hues*). `title` is optional — omit it if the
-  identity picker conveys context on its own.
+- **Icon** — `app` names the panel; its icon and hue come from the
+  registry (see *App hues*). There is no title: the identity picker
+  conveys the context.
 - **Identity picker** — see *Identity pickers* below. Session-bound apps
   pass an `ioSession` prop (renders `IOSessionControls`); apps bound to
   a single device kind pass their picker as `children` (e.g. Rules with

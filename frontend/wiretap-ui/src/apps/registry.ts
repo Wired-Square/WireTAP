@@ -37,7 +37,7 @@ export type AppGroup =
   | "utilities"
   | "settings";
 
-/** The `.app-hue--<hue>` palette in styles/components.css; drawn by components/AppIcon.tsx. */
+/** A data accent of the theme (`--text-<hue>`), read by `.app-hue--<hue>`; drawn by components/AppIcon.tsx. */
 export type AppHue =
   | "purple"
   | "green"
@@ -52,6 +52,13 @@ export type AppHue =
   | "cyan"
   | "orange"
   | "amber";
+
+type AppVisual = {
+  icon: LucideIcon;
+  hue: AppHue;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  load: () => Promise<{ default: ComponentType<any> }>;
+};
 
 // Visual config for every panel (menu + hidden). Keys define the canonical
 // PanelId union — TypeScript will catch any apps.json id without a matching
@@ -129,17 +136,11 @@ const visualConfig = {
     hue: "amber",
     load: () => import("./analysis/FrameOrderAnalysis"),
   },
-} as const satisfies Record<
-  string,
-  {
-    icon: LucideIcon;
-    hue: AppHue;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    load: () => Promise<{ default: ComponentType<any> }>;
-  }
->;
+} as const satisfies Record<string, AppVisual>;
 
 export type PanelId = keyof typeof visualConfig;
+
+export const isPanelId = (id: string): id is PanelId => id in visualConfig;
 
 type SharedAppEntry = {
   id: PanelId;
@@ -171,22 +172,9 @@ export const sessionAwarePanelIds: ReadonlySet<string> = new Set(
   sharedApps.filter((a) => a.sessionAware).map((a) => a.id),
 );
 
-export type MenuApp = SharedAppEntry & {
-  i18nKey: string;
-  icon: LucideIcon;
-  hue: AppHue;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  load: () => Promise<{ default: ComponentType<any> }>;
-};
+export type MenuApp = SharedAppEntry & { i18nKey: string } & AppVisual;
 
-export type HiddenApp = {
-  id: PanelId;
-  i18nKey: string;
-  icon: LucideIcon;
-  hue: AppHue;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  load: () => Promise<{ default: ComponentType<any> }>;
-};
+export type HiddenApp = { id: PanelId; i18nKey: string } & AppVisual;
 
 export type AppEntry = MenuApp | HiddenApp;
 

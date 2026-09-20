@@ -549,7 +549,6 @@
   .text-\[color\:var\(--accent-secondary\)\] { color: var(--accent-secondary) }
   .text-\[color\:var\(--accent-success\)\] { color: var(--accent-success) }
   .text-\[color\:var\(--accent-text\)\] { color: var(--accent-text) }
-  .text-\[color\:var\(--app-accent\)\] { color: var(--app-accent) }
   .text-\[color\:var\(--danger\)\] { color: var(--danger) }
   .text-\[color\:var\(--data-text-primary\)\] { color: var(--data-text-primary) }
   .text-\[color\:var\(--info-text\)\] { color: var(--info-text) }
