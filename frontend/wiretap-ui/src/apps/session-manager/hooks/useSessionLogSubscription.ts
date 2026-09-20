@@ -406,7 +406,7 @@ async function setupPerSessionListeners(
       })
     )) return;
 
-    // Session reconfigured (bookmark jump)
+    // Session reconfigured (time-range jump)
     if (pushOrAbort(
       await listen<void>(`session-reconfigured:${sessionId}`, async () => {
         const { profileId, profileName } = await getProfileInfo();

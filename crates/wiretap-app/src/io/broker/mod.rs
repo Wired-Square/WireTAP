@@ -645,7 +645,7 @@ impl IOSource for IOBroker {
         // Determine if any source produces actual frames (vs just raw bytes)
         let has_framing = self.emits_frames();
 
-        // Orphan any existing capture owned by this session (e.g., from a previous bookmark jump)
+        // Orphan any existing capture owned by this session (e.g., from a previous time-range jump)
         // This makes the old capture selectable in "Orphaned Captures" while creating a fresh one
         let _orphaned = capture_store::orphan_captures_for_session(&self.session_id);
 

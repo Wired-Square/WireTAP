@@ -6,7 +6,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
-- **Events.** What you used to bookmark, you now mark as an event: a time (or a span) and a note, owned by the stored capture — a local capture keeps its own, a WireTAP Backend database keeps them on the gateway so every machine reading that archive sees them. Mark one with ⌘D in any session app, from a frame's right-click menu or its flag button in Discovery, from the Query results toolbar (the whole result range), or from the new **Events** app (⌘5), which lists the joined session's events under a timeline you can click to jump. Events show as amber marks on the Discovery and Decoder scrubbers; jumping to one seeks a capture or re-windows a backend source ±30 s around it. Marking an event on a live device works from the first frame. The backend gateway needs the matching release for events on a WireTAP Backend profile.
+- **Events.** What you used to bookmark, you now mark as an event: a time (or a span) and a note, owned by the stored capture — a local capture keeps its own, a WireTAP Backend database keeps them on the gateway so every machine reading that archive sees them. Mark one with ⌘D in any session app, from a frame's right-click menu or its flag button in Discovery, from the Query results toolbar (the whole result range), or from the new **Events** app (⌘5), which lists the joined session's events under a timeline you can click to jump. Events show as amber marks on the Discovery and Decoder scrubbers; jumping to one seeks a capture or re-windows a backend source ±30 s around it. Marking an event on a live device works from the first frame. Events on a WireTAP Backend profile need the gateway at WireTAP-Server 0.1.3 or later.
 
 ### Removed
 
