@@ -5,8 +5,6 @@
 import { useCallback } from "react";
 import { useTimeHandlers } from "../../../../hooks/useTimeHandlers";
 import type { IOCapabilities } from "../../../../api/io";
-import type { TimeRangeFavorite } from "../../../../utils/favorites";
-import type { LoadOptions } from "../../../../hooks/useIOSessionManager";
 
 export interface UseDecoderTimeHandlersParams {
   // Session actions
@@ -29,12 +27,6 @@ export interface UseDecoderTimeHandlersParams {
   minTimeUs?: number | null;
   maxTimeUs?: number | null;
   totalFrames?: number | null;
-
-  // Bookmark state
-  setActiveBookmarkId: (id: string | null) => void;
-
-  // Manager method for jumping to bookmarks
-  jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<LoadOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 }
 
 export function useDecoderTimeHandlers({
@@ -49,10 +41,8 @@ export function useDecoderTimeHandlers({
   minTimeUs,
   maxTimeUs,
   totalFrames,
-  setActiveBookmarkId,
-  jumpToBookmark,
 }: UseDecoderTimeHandlersParams) {
-  // Shared handlers: time range, frame change, bookmark load
+  // Shared handlers: time range, frame change
   const shared = useTimeHandlers({
     setTimeRange,
     seekByFrame,
@@ -60,8 +50,6 @@ export function useDecoderTimeHandlers({
     setCurrentFrameIndex,
     startTime,
     endTime,
-    setActiveBookmarkId,
-    jumpToBookmark,
   });
 
   // Decoder-specific: timeline scrubber with boundary frame index calculation

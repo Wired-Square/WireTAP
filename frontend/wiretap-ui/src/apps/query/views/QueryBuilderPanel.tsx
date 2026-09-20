@@ -1,7 +1,7 @@
 // src/apps/query/views/QueryBuilderPanel.tsx
 //
 // Query configuration panel. Users select query type, frame ID, byte index,
-// and context window settings. Supports favourite-based time bounds. The source
+// and context window settings. The source
 // (a SQLite capture or a WireTAP backend profile) is chosen via the shared Data Source
 // picker in the top bar, not here.
 
@@ -17,7 +17,6 @@ import {
 } from "../stores/queryStore";
 import type { ResolvedSignal } from "../../../utils/catalogParser";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
-import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { FrameIdFormat } from "../../../hooks/useSettings";
 import { formatFrameId, formatFrameIdInput, parseFrameId } from "../../../utils/frameIds";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
@@ -49,7 +48,6 @@ interface Props {
   profileId: string | null;
   captureId?: string | null;
   disabled?: boolean;
-  favourites: TimeRangeFavorite[];
   timeBounds: TimeBounds;
   onTimeBoundsChange: (bounds: TimeBounds) => void;
   /** Active frame-id display format (Auto/Hex/Dec toggle in the top bar) */
@@ -60,7 +58,6 @@ export default function QueryBuilderPanel({
   profileId,
   captureId,
   disabled = false,
-  favourites,
   timeBounds,
   onTimeBoundsChange,
   displayIdFormat,
@@ -1055,8 +1052,6 @@ ORDER BY id, extended`;
           <TimeBoundsInput
             value={timeBounds}
             onChange={onTimeBoundsChange}
-            bookmarks={favourites}
-            showBookmarks={true}
             showMaxFrames={false}
             disabled={disabled}
           />

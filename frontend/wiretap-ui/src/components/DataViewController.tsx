@@ -7,6 +7,7 @@ import DataViewTabBar, { type TabDefinition, type ProtocolBadge } from "./DataVi
 import DataViewPaginationToolbar, { type PageSizeOption, FRAME_PAGE_SIZE_OPTIONS } from "./DataViewPaginationToolbar";
 import type { PageSize } from "../utils/pageSize";
 import DataViewTimelineSection from "./DataViewTimelineSection";
+import type { TimelineMarkers } from "./TimelineScrubber";
 
 interface DataViewControllerProps {
   // Tab bar props
@@ -73,6 +74,8 @@ interface DataViewControllerProps {
   timelineOnFrameChange?: (frameIndex: number) => void;
   /** Whether to use local timezone for timeline labels */
   timelineUseLocalTimezone?: boolean;
+  /** Events drawn on the timeline */
+  timelineMarkers?: TimelineMarkers;
 }
 
 /**
@@ -131,6 +134,7 @@ export default function DataViewController({
   timelineCurrentFrameIndex,
   timelineOnFrameChange,
   timelineUseLocalTimezone = false,
+  timelineMarkers,
 }: DataViewControllerProps) {
   return (
     <>
@@ -186,6 +190,7 @@ export default function DataViewController({
         streamStartTimeUs={streamStartTimeUs}
         disabled={timelineDisabled}
         useLocalTimezone={timelineUseLocalTimezone}
+        markers={timelineMarkers}
       />
     </>
   );

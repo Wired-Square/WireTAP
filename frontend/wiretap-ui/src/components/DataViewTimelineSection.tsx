@@ -2,7 +2,7 @@
 //
 // Shared timeline section wrapper for data views (Discovery, Decoder, etc.).
 
-import TimelineScrubber from "./TimelineScrubber";
+import TimelineScrubber, { type TimelineMarkers } from "./TimelineScrubber";
 import { bgSurface, borderDefault } from "../styles";
 
 interface DataViewTimelineSectionProps {
@@ -30,6 +30,8 @@ interface DataViewTimelineSectionProps {
   onFrameChange?: (frameIndex: number) => void;
   /** Whether to use local timezone for time display */
   useLocalTimezone?: boolean;
+  /** Events drawn on the track */
+  markers?: TimelineMarkers;
 }
 
 export default function DataViewTimelineSection({
@@ -45,6 +47,7 @@ export default function DataViewTimelineSection({
   currentFrameIndex,
   onFrameChange,
   useLocalTimezone = false,
+  markers,
 }: DataViewTimelineSectionProps) {
   if (!show) {
     return null;
@@ -65,6 +68,7 @@ export default function DataViewTimelineSection({
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={streamStartTimeUs ?? undefined}
         useLocalTimezone={useLocalTimezone}
+        markers={markers}
       />
     </div>
   );

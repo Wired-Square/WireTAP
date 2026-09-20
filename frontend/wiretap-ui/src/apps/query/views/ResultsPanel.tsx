@@ -5,7 +5,7 @@
 
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { PlayCircle, Download, AlertCircle, Database, Bookmark, FileDown } from "lucide-react";
+import { PlayCircle, Download, AlertCircle, Database, Flag, FileDown } from "lucide-react";
 import {
   QUERY_TYPE_INFO,
   type ByteChangeResult,
@@ -39,7 +39,8 @@ interface Props {
   onIngestEvent: (timestampUs: number) => Promise<void>;
   onIngestAll: () => void;
   onExport: () => void;
-  onBookmark: () => void;
+  /** Absent when the source cannot hold events. */
+  onAddEvent?: () => void;
 }
 
 export default function ResultsPanel({
@@ -47,7 +48,7 @@ export default function ResultsPanel({
   onIngestEvent,
   onIngestAll,
   onExport,
-  onBookmark,
+  onAddEvent,
 }: Props) {
   const { t } = useTranslation("query");
   const timezone = useSettingsStore((s) => s.display.timezone);
@@ -351,12 +352,12 @@ export default function ResultsPanel({
             <span>{t("results.ingestAll")}</span>
           </Button>
           <IconButton
-            onClick={onBookmark}
+            onClick={onAddEvent}
             variant="surface"
-            title={t("results.bookmarkTooltip")}
-            disabled={resultCount === 0}
+            title={t("results.addEventTooltip")}
+            disabled={resultCount === 0 || !onAddEvent}
           >
-            <Bookmark className={`${iconMd} ${textDataAmber}`} />
+            <Flag className={`${iconMd} ${textDataAmber}`} />
           </IconButton>
           <IconButton
             onClick={onExport}

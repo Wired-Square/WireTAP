@@ -6,6 +6,7 @@
     { "id": "decoder",          "label": "Decoder",        "group": "sessions",   "accelerator": "2", "sessionAware": true },
     { "id": "transmit",         "label": "Transmit",       "group": "sessions",   "accelerator": "3", "sessionAware": true },
     { "id": "dashboard",        "label": "Dashboard",      "group": "sessions",   "accelerator": "4", "sessionAware": true },
+    { "id": "events",           "label": "Events",         "group": "sessions",   "accelerator": "5", "sessionAware": true },
     { "id": "test-pattern",     "label": "Test Pattern",   "group": "sessions" },
     { "id": "session-manager",  "label": "Sessions",       "group": "sessions",   "accelerator": "0" },
     { "id": "query",            "label": "Query",          "group": "database",   "accelerator": "6", "sessionAware": true },

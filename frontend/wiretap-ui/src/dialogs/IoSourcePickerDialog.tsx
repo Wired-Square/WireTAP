@@ -42,7 +42,6 @@ import {
   type ModbusRangeSpec,
 } from '../api/io';
 import { loadCatalog } from "../utils/catalogParser";
-import { getAllFavorites, type TimeRangeFavorite } from "../utils/favorites";
 import type { TimeBounds } from "../components/TimeBoundsInput";
 
 // Import extracted components
@@ -331,7 +330,6 @@ export default function IoSourcePickerDialog({
     maxFrames: undefined,
     timezoneMode: "local",
   });
-  const [bookmarks, setBookmarks] = useState<TimeRangeFavorite[]>([]);
   const [selectedSpeed, setSelectedSpeed] = useState(1); // Default to 1x realtime with pacing
 
   // Framing configuration for serial sources
@@ -508,7 +506,7 @@ export default function IoSourcePickerDialog({
 
   const isMultiSourceLive = liveMultiSourceSession !== null;
 
-  // Load bookmarks and captures when dialog opens.
+  // Load captures when dialog opens.
   // Guarded by didInitForOpenRef so we only run the initialisation once per
   // open cycle — re-running it while open would reset `hasUserExpandedRef`
   // and re-collapse the source list after the user clicks "Change".
@@ -520,7 +518,6 @@ export default function IoSourcePickerDialog({
     if (didInitForOpenRef.current) return;
     didInitForOpenRef.current = true;
     {
-      getAllFavorites().then(setBookmarks).catch(console.error);
       // Refresh known capture IDs so isCaptureProfileId() is up-to-date
       useSessionStore.getState().loadCaptureIds();
       // Load all captures from the registry and initialize selected capture
@@ -821,12 +818,6 @@ export default function IoSourcePickerDialog({
       setCheckedReaderId(selectedId);
     }
   }, [isOpen, selectedId, checkedSourceId, activeMultiSourceSessions]);
-
-  // Filter bookmarks for the checked profile
-  const profileBookmarks = useMemo(() => {
-    if (!checkedSourceId || checkedSourceId === CSV_EXTERNAL_ID) return [];
-    return bookmarks.filter((b) => b.profileId === checkedSourceId);
-  }, [bookmarks, checkedSourceId]);
 
   // Multi-bus mode is active when at least one profile is selected in multi-select
   const isMultiBusMode = checkedSourceIds.length > 0;
@@ -1989,7 +1980,6 @@ export default function IoSourcePickerDialog({
               onTimeBoundsChange={handleTimeBoundsChange}
               selectedSpeed={selectedSpeed}
               onSpeedChange={handleSpeedChange}
-              profileBookmarks={profileBookmarks}
             />
 
             {/* Only show FramingOptions/FilterOptions for bytes capture - per-interface framing is now in SingleBusConfig */}

@@ -74,6 +74,36 @@ impl CaptureSource {
             buses,
         }
     }
+
+    /// A stopped reader has no loop to answer a seek, so the position is
+    /// published from here; `start()` still lands on the stored target.
+    fn publish_while_stopped(&self, position: Option<PlaybackPosition>) {
+        if self.reader_state.state() != IOState::Stopped {
+            return;
+        }
+        let Some(position) = position else { return };
+        let session_id = self.reader_state.session_id();
+        crate::io::store_playback_position(session_id, position);
+        signal_playback_position(session_id);
+        signal_frames_ready(session_id);
+    }
+}
+
+fn position_at_timestamp(capture_id: &str, timestamp_us: i64) -> Option<PlaybackPosition> {
+    let rowid = capture_db::find_rowid_for_timestamp(capture_id, timestamp_us as u64).ok()??;
+    let frame_index = capture_db::count_frames_before_rowid(capture_id, rowid).unwrap_or(0);
+    position_at_frame(capture_id, frame_index)
+}
+
+fn position_at_frame(capture_id: &str, frame_index: usize) -> Option<PlaybackPosition> {
+    let total = capture_store::get_capture_count(capture_id);
+    let frame_index = frame_index.min(total.saturating_sub(1));
+    let (_, frame) = capture_db::get_frame_at_index(capture_id, frame_index).ok()??;
+    Some(PlaybackPosition {
+        timestamp_us: frame.timestamp_us as i64,
+        frame_index,
+        frame_count: Some(total),
+    })
 }
 
 #[async_trait]
@@ -153,6 +183,7 @@ impl IOSource for CaptureSource {
             self.reader_state.session_id, timestamp_us
         );
         self.seek_target_us.store(timestamp_us, Ordering::Relaxed);
+        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| position_at_timestamp(id, timestamp_us)));
         Ok(())
     }
 
@@ -162,6 +193,7 @@ impl IOSource for CaptureSource {
             self.reader_state.session_id, frame_index
         );
         self.seek_target_frame.store(frame_index, Ordering::Relaxed);
+        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| position_at_frame(id, frame_index.max(0) as usize)));
         Ok(())
     }
 

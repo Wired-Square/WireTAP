@@ -280,18 +280,6 @@
     "goneUpstream": "That catalogue is no longer in the repository. Use “Stop tracking the Git source” to unlink it, or push your copy back.",
     "notCloned": "Nothing is cloned for that repository yet. Pull it, or browse it from Repository, and try again."
   },
-  "bookmarks": {
-    "title": "Time Range Bookmarks",
-    "newBookmark": "New Bookmark",
-    "empty": {
-      "heading": "No bookmarks saved yet",
-      "description": "Create bookmarks from the Decoder or Discovery apps"
-    },
-    "actions": {
-      "edit": "Edit bookmark",
-      "delete": "Delete bookmark"
-    }
-  },
   "selectionSets": {
     "title": "Selection Sets",
     "empty": {
@@ -379,17 +367,6 @@
       "filename": "Filename",
       "namePlaceholder": "Catalog name",
       "filenamePlaceholder": "filename.toml"
-    },
-    "editBookmark": {
-      "title": "Edit Bookmark",
-      "name": "Name",
-      "namePlaceholder": "Bookmark name"
-    },
-    "createBookmark": {
-      "title": "New Bookmark",
-      "profile": "Profile",
-      "name": "Name",
-      "namePlaceholder": "Bookmark name"
     },
     "editDashboardLayout": {
       "title": "Edit Dashboard Layout",
@@ -642,7 +619,6 @@
     }
   },
   "sidebar": {
-    "bookmarks": "Bookmarks",
     "captures": "Captures",
     "catalogs": "Catalogs",
     "dataIo": "Data IO",
@@ -657,7 +633,6 @@
   "confirmDelete": {
     "deleteIoProfileTitle": "Delete IO Profile",
     "deleteCatalogTitle": "Delete Catalog",
-    "deleteBookmarkTitle": "Delete Bookmark",
     "deleteSelectionSetTitle": "Delete Selection Set",
     "deleteDashboardLayoutTitle": "Delete Dashboard Layout",
     "areYouSure": "Are you sure you want to delete"

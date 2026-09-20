@@ -192,13 +192,11 @@ export const CONTEXT_PRESETS: { label: string; beforeMs: number; afterMs: number
 /** Queue item status */
 export type QueryStatus = "pending" | "running" | "completed" | "error";
 
-/** Time bounds for query (from manual entry or bookmark) */
+/** Time bounds for query */
 export interface QueryTimeBounds {
   startTime: string;
   endTime: string;
   maxFrames?: number;
-  /** Display name (from bookmark, if selected) */
-  favouriteName?: string;
 }
 
 /** A queued query with its configuration and results */
@@ -229,7 +227,7 @@ export interface QueuedQuery {
   stats: QueryStats | null;
   /** Display name for the query (auto-generated) */
   displayName: string;
-  /** Time bounds from favourite (optional) */
+  /** Time bounds (optional) */
   timeBounds?: QueryTimeBounds;
   /** Result limit for this query */
   resultLimit: number;
@@ -261,7 +259,7 @@ function formatFrameId(frameId: number, isExtended: boolean | null): string {
 }
 
 /** Generate a display name for a query */
-function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams, timeBounds?: QueryTimeBounds): string {
+function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams): string {
   const typeLabel = QUERY_TYPE_INFO[queryType].label;
 
   let name: string;
@@ -293,9 +291,6 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
     if (queryParams.isExtended) {
       name += " (ext)";
     }
-  }
-  if (timeBounds?.favouriteName) {
-    name += ` · ${timeBounds.favouriteName}`;
   }
   return name;
 }
@@ -334,7 +329,6 @@ interface QueryState {
   // Queue state
   queue: QueuedQuery[];
   selectedQueryId: string | null;
-  selectedFavouriteId: string | null;
 
   // Catalog state
   catalogPath: string | null;
@@ -367,7 +361,6 @@ interface QueryState {
   removeQueueItem: (id: string) => void;
   clearQueue: () => void;
   setSelectedQueryId: (id: string | null) => void;
-  setSelectedFavouriteId: (id: string | null) => void;
   processNextQuery: () => Promise<void>;
 
   // Catalog actions
@@ -417,7 +410,6 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   // Queue state
   queue: [],
   selectedQueryId: null,
-  selectedFavouriteId: null,
 
   // Catalog state
   catalogPath: null,
@@ -476,7 +468,6 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       lastQueryStats: null,
       queue: [],
       selectedQueryId: null,
-      selectedFavouriteId: null,
       catalogPath: null,
       parsedCatalog: null,
       selectedSignal: null,
@@ -497,7 +488,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
         : undefined;
 
-    const displayName = generateQueryDisplayName(queryType, queryParams, timeBounds);
+    const displayName = generateQueryDisplayName(queryType, queryParams);
 
     // Use provided limit or fall back to settings
     const limit = resultLimit ?? useSettingsStore.getState().buffers.queryResultLimit;
@@ -558,10 +549,6 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
   setSelectedQueryId: (id: string | null) => {
     set({ selectedQueryId: id });
-  },
-
-  setSelectedFavouriteId: (id: string | null) => {
-    set({ selectedFavouriteId: id });
   },
 
   processNextQuery: async () => {

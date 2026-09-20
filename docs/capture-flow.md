@@ -375,6 +375,32 @@ picker exposes this as a pin toggle next to each capture in its list.
 Schema details — columns, indexes, cleanup policies — are in
 [capture-database-schema.md](capture-database-schema.md).
 
+### Events
+
+A capture owns its events — a moment (or a span) and a note, the things a
+user marks while watching. `crates/wiretap-app/src/capture_events.rs` is the
+command surface; `EventOwner` says who holds them:
+
+- **`Capture { capture_id }`** — rows in `capture_events` beside the frames.
+  They copy, delete and sweep with the capture, so a leave-session snapshot
+  carries its events and a deleted capture takes them with it. A realtime
+  session has a capture id from its first frame (WS `CaptureChanged`), so an
+  event can be marked live; its frames carry wall-clock time, and so does the
+  event.
+- **`Backend { profile_id }`** — a WireTAP Backend profile's database holds
+  them on the gateway (`/v1/db/{db}/events`), shared by every machine that
+  reads that archive. A backend session also streams into a local load-window
+  capture; the profile wins, so a detached copy of that window is
+  Capture-owned and starts with no events.
+
+`eventOwnerForSession` in `src/utils/captureEvents.ts` makes that choice for
+the frontend. Every mutation emits `capture-events-changed` with the owner so
+each window's `useCaptureEvents` reloads. Jumping to an event depends on the
+source: a capture seeks — and a stopped `CaptureSource` answers with a
+`PlaybackPosition` straight away, so every app follows — a recorded archive
+re-windows ±30 s around the span (`jumpToTimeRange`), a live source only marks.
+`useSessionEvents` is the one hook an app wires it all through.
+
 ---
 
 ## 8. CaptureSource — replaying a capture as a session
@@ -500,7 +526,9 @@ cannot go infinite even where a size is legitimately unresolved.
 | [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs) | Registry, session-scoped API, streaming/active sets |
 | [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | SQLite persistence |
 | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) | Tauri commands (list/read/import/delete) |
+| [crates/wiretap-app/src/capture_events.rs](../crates/wiretap-app/src/capture_events.rs) | Events — owner dispatch between `capture_db` and the gateway |
 | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |
 | [crates/wiretap-app/src/io/recorded/capture.rs](../crates/wiretap-app/src/io/recorded/capture.rs) | `CaptureSource` timeline device |
 | [src/api/capture.ts](../frontend/wiretap-ui/src/api/capture.ts) | TypeScript wrappers |
+| [src/api/captureEvents.ts](../frontend/wiretap-ui/src/api/captureEvents.ts) | Events wrappers; `src/apps/events/` is the app |
 | [docs/capture-database-schema.md](capture-database-schema.md) | On-disk schema reference |

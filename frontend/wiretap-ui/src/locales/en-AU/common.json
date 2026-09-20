@@ -120,13 +120,13 @@
     "type": "Type:",
     "capture": "Capture:",
     "frames": "Frames:",
-    "loadBookmark": "Load saved time bookmark",
     "renameCapture": "Rename capture",
     "captureName": "Capture name",
     "resumeIo": "Resume IO stream",
     "pinCapture": "Pin capture (survives restart)",
     "unpinCapture": "Unpin capture (will be cleared on restart)",
-    "interfaceSettings": "Interface settings — {{name}}"
+    "interfaceSettings": "Interface settings — {{name}}",
+    "showEvents": "Show events"
   },
   "timezone": {
     "changeTooltip": "Click to change timezone"
@@ -176,8 +176,6 @@
     "instruction": "Click and drag to select"
   },
   "timeBounds": {
-    "bookmarks": "Bookmarks",
-    "selectBookmark": "Select a bookmark...",
     "timeZone": "Time Zone",
     "startTime": "Start Time",
     "endTime": "End Time",

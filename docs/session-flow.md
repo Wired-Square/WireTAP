@@ -434,7 +434,6 @@ opens the picker (with no current source, clicking the chip opens it directly).
                                               │   • Orphaned captures    │
                                               │   • Active sessions      │
                                               │   • Profile usage map    │
-                                              │   • Bookmarks            │
                                               └────────┬─────────────────┘
                                                        │
                                      ┌─────────────────┼─────────────────┐
@@ -1000,7 +999,7 @@ moved off — and a `destroyed` naming it gets the store cleanup but never reach
 moves an app to a different session must call it before the backend call**,
 because the registration is what triggers the old session's teardown.
 `reinitialize` stamps for itself, which covers watch, load, connect-only and
-jump-to-bookmark in one place; `useIOSessionManager` stamps the two that bypass
+jump-to-event in one place; `useIOSessionManager` stamps the two that bypass
 it (`startMultiBusSession` and `joinExistingSession`). `selectProfile` needs no
 stamp — it sets the profile and lets the effect re-register the listener before
 `openSession` runs.
@@ -1222,7 +1221,7 @@ Per-session (channel 1..254):
 | `CaptureChanged`    | 0x07 | Capture created/orphaned; frontend re-fetches |
 | `SessionLifecycle`  | 0x08 | State + capabilities inline; covers device-replaced, resuming, switched-to-capture |
 | `SessionInfo`       | 0x09 | Speed, subscriber count |
-| `Reconfigured`      | 0x0A | Session was reconfigured (time range, bookmark) |
+| `Reconfigured`      | 0x0A | Session was reconfigured (time range, event jump) |
 | `DecodedSignals`    | 0x14 | JSON batch of decoded signals, pushed alongside `FrameData` when a catalogue is attached (see [§ Decoded-signal stream](#decoded-signal-stream)) |
 | `FrameCounts`       | 0x16 | Live total + distinct-(bus,frame_id) unique counts, pushed on the frame cadence (see [§ Frame counts](#frame-counts)) |
 | `ByteCounts`        | 0x19 | Live raw-byte total + the session's byte-capture id, pushed on the byte cadence (see [§ Raw serial bytes](#raw-serial-bytes--counted-not-streamed)) |

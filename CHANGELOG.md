@@ -4,11 +4,19 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Events.** What you used to bookmark, you now mark as an event: a time (or a span) and a note, owned by the stored capture — a local capture keeps its own, a WireTAP Backend database keeps them on the gateway so every machine reading that archive sees them. Mark one with ⌘D in any session app, from a frame's right-click menu or its flag button in Discovery, from the Query results toolbar (the whole result range), or from the new **Events** app (⌘5), which lists the joined session's events under a timeline you can click to jump. Events show as amber marks on the Discovery and Decoder scrubbers; jumping to one seeks a capture or re-windows a backend source ±30 s around it. Marking an event on a live device works from the first frame. The backend gateway needs the matching release for events on a WireTAP Backend profile.
+
+### Removed
+
+- **Bookmarks.** The saved time ranges keyed to a WireTAP Backend profile are gone — Settings › Bookmarks, the Bookmarks menu, the star button, the picker's bookmark dropdown. Any you had saved are dropped on first launch; mark an event at the moment you cared about instead.
+
 ### Changed
 
-- **Lists are now drawn from one system.** Every list of choices in the app — the sources, captures and sessions in the source picker, the catalogue pickers, the speed picker, the signal picker, selection sets and bookmarks, the toolbox's tools, the Rules signal list — shares one row: flat at rest, tinted under the pointer, and lit in the theme's accent when chosen, with a source's row lit in its kind's colour. The arrow keys, Home and End walk every one of them. A live device's row no longer glows green before it is chosen (its badge says it is live), capture rows are no longer boxed, and the Settings sidebar is a proper tab list you can walk with the arrow keys. The session log's event filter opens on a click rather than on hover. In the Dashboard's layout menu, Tab now moves from the name field to its Save buttons instead of closing the menu. A dashboard widget's tooltip no longer lingers over another tab when the panel is switched away under the pointer.
+- **Lists are now drawn from one system.** Every list of choices in the app — the sources, captures and sessions in the source picker, the catalogue pickers, the speed picker, the signal picker, selection sets, the toolbox's tools, the Rules signal list — shares one row: flat at rest, tinted under the pointer, and lit in the theme's accent when chosen, with a source's row lit in its kind's colour. The arrow keys, Home and End walk every one of them. A live device's row no longer glows green before it is chosen (its badge says it is live), capture rows are no longer boxed, and the Settings sidebar is a proper tab list you can walk with the arrow keys. The session log's event filter opens on a click rather than on hover. In the Dashboard's layout menu, Tab now moves from the name field to its Save buttons instead of closing the menu. A dashboard widget's tooltip no longer lingers over another tab when the panel is switched away under the pointer.
 
-- **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds and the bookmark dialogs use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter. A toast's dismiss button is now labelled in the app's language.
+- **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter. A toast's dismiss button is now labelled in the app's language.
 
 - **WireTAP now requires macOS 13.** The installer refuses an older system, where the app already rendered its colours wrong.
 

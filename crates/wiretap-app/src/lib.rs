@@ -4,6 +4,7 @@ mod analysis;
 mod app_registry;
 mod ble_provision;
 mod capture_db;
+mod capture_events;
 mod capturequery;
 mod capture_store;
 mod captures;
@@ -192,18 +193,18 @@ struct SessionMenuItems {
 #[cfg(not(target_os = "ios"))]
 struct SessionMenuState(Mutex<Option<SessionMenuItems>>);
 
-// Store reference to the bookmarks submenu for dynamic updates
+// Store reference to the Jump to Event submenu for dynamic updates
 #[cfg(not(target_os = "ios"))]
-struct BookmarksMenuState(Mutex<Option<Submenu<Wry>>>);
+struct EventsMenuState(Mutex<Option<Submenu<Wry>>>);
 
-// Store references to bookmark menu items for dynamic enable/disable
+// Store references to event menu items for dynamic enable/disable
 #[cfg(not(target_os = "ios"))]
-struct BookmarkMenuItems {
-    save: MenuItem<Wry>,
+struct EventMenuItems {
+    add: MenuItem<Wry>,
 }
 
 #[cfg(not(target_os = "ios"))]
-struct BookmarkMenuItemState(Mutex<Option<BookmarkMenuItems>>);
+struct EventMenuItemState(Mutex<Option<EventMenuItems>>);
 
 // iOS stub types for menu state (not used, but needed for compilation)
 #[cfg(target_os = "ios")]
@@ -211,16 +212,16 @@ struct BookmarkMenuItemState(Mutex<Option<BookmarkMenuItems>>);
 struct SessionMenuState(Mutex<()>);
 #[cfg(target_os = "ios")]
 #[allow(dead_code)]
-struct BookmarksMenuState(Mutex<()>);
+struct EventsMenuState(Mutex<()>);
 #[cfg(target_os = "ios")]
 #[allow(dead_code)]
-struct BookmarkMenuItemState(Mutex<()>);
+struct EventMenuItemState(Mutex<()>);
 
-// Bookmark info received from frontend for menu display
+// Event info received from frontend for menu display
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-struct BookmarkInfo {
+struct EventInfo {
     id: String,
-    name: String,
+    label: String,
 }
 
 // Window configuration helper (desktop only - multi-window support)
@@ -350,21 +351,21 @@ fn open_settings_panel(app: AppHandle, state: State<SettingsWindowState>) {
 }
 
 /// Update the Session menu state based on the focused app's session.
-/// When `has_session` is false, disables all session and bookmark menu items.
+/// When `has_session` is false, disables all session and event menu items.
 /// When `has_session` is true, updates items based on session state.
 #[cfg(not(target_os = "ios"))]
 #[tauri::command]
 fn update_menu_state(
     state: State<SessionMenuState>,
-    bookmark_item_state: State<BookmarkMenuItemState>,
-    bookmarks_menu_state: State<BookmarksMenuState>,
+    event_item_state: State<EventMenuItemState>,
+    events_menu_state: State<EventsMenuState>,
     has_session: bool,
     profile_name: Option<String>,
     is_streaming: bool,
     is_paused: bool,
     can_pause: bool,
     joiner_count: u32,
-    has_bookmarks: bool,
+    has_events: bool,
 ) {
     if let Some(items) = state.0.lock().unwrap().as_ref() {
         if has_session {
@@ -392,34 +393,33 @@ fn update_menu_state(
         }
     }
 
-    // Enable/disable bookmark items
-    if let Some(items) = bookmark_item_state.0.lock().unwrap().as_ref() {
-        let _ = items.save.set_enabled(has_bookmarks);
+    // Enable/disable event items
+    if let Some(items) = event_item_state.0.lock().unwrap().as_ref() {
+        let _ = items.add.set_enabled(has_events);
     }
-    if let Some(submenu) = bookmarks_menu_state.0.lock().unwrap().as_ref() {
-        let _ = submenu.set_enabled(has_bookmarks);
+    if let Some(submenu) = events_menu_state.0.lock().unwrap().as_ref() {
+        let _ = submenu.set_enabled(has_events);
     }
 }
 
-/// Update the Bookmarks > Jump to Bookmark submenu with bookmarks for the current profile.
-/// Called by the frontend when panel focus or IO profile changes.
+/// Update the Events > Jump to Event submenu with the focused session's events.
+/// Called by the frontend when panel focus, the session or its events change.
 #[cfg(not(target_os = "ios"))]
 #[tauri::command]
-fn update_bookmarks_menu(
+fn update_events_menu(
     app: AppHandle,
-    state: State<BookmarksMenuState>,
-    bookmarks: Vec<BookmarkInfo>,
+    state: State<EventsMenuState>,
+    events: Vec<EventInfo>,
 ) -> Result<(), String> {
     if let Some(submenu) = state.0.lock().unwrap().as_ref() {
-        // Remove existing bookmark items (IDs start with "bookmark-jump-")
-        // We need to collect the items first to avoid borrow issues
+        // Collect first to avoid borrowing the submenu while removing
         let items_to_remove: Vec<_> = submenu
             .items()
             .unwrap_or_default()
             .into_iter()
             .filter(|item| {
                 if let tauri::menu::MenuItemKind::MenuItem(menu_item) = item {
-                    menu_item.id().0.starts_with("bookmark-jump-")
+                    menu_item.id().0.starts_with("event-jump-")
                 } else {
                     false
                 }
@@ -430,10 +430,9 @@ fn update_bookmarks_menu(
             let _ = submenu.remove(&item);
         }
 
-        // Add new bookmark items
-        for bookmark in bookmarks {
-            let item_id = format!("bookmark-jump-{}", bookmark.id);
-            if let Ok(menu_item) = MenuItemBuilder::with_id(&item_id, &bookmark.name).build(&app) {
+        for event in events {
+            let item_id = format!("event-jump-{}", event.id);
+            if let Ok(menu_item) = MenuItemBuilder::with_id(&item_id, &event.label).build(&app) {
                 let _ = submenu.append(&menu_item);
             }
         }
@@ -545,25 +544,25 @@ async fn create_main_window(_app: AppHandle, _label: String) -> Result<(), Strin
 #[tauri::command]
 fn update_menu_state(
     _state: State<SessionMenuState>,
-    _bookmark_item_state: State<BookmarkMenuItemState>,
-    _bookmarks_menu_state: State<BookmarksMenuState>,
+    _event_item_state: State<EventMenuItemState>,
+    _events_menu_state: State<EventsMenuState>,
     _has_session: bool,
     _profile_name: Option<String>,
     _is_streaming: bool,
     _is_paused: bool,
     _can_pause: bool,
     _joiner_count: u32,
-    _has_bookmarks: bool,
+    _has_events: bool,
 ) {
     // No-op on iOS
 }
 
 #[cfg(target_os = "ios")]
 #[tauri::command]
-fn update_bookmarks_menu(
+fn update_events_menu(
     _app: AppHandle,
-    _state: State<BookmarksMenuState>,
-    _bookmarks: Vec<BookmarkInfo>,
+    _state: State<EventsMenuState>,
+    _events: Vec<EventInfo>,
 ) -> Result<(), String> {
     Ok(()) // No-op on iOS
 }
@@ -735,22 +734,20 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .item(&session_clear_item)
         .build()?;
 
-    // Create Bookmarks menu
-    let bookmark_save_item = MenuItemBuilder::with_id("bookmark-save", "Save Bookmark…")
+    // Create Events menu
+    let event_add_item = MenuItemBuilder::with_id("event-add", "Add Event…")
         .accelerator("cmdOrCtrl+D")
         .build(app)?;
-    let bookmark_manage_item =
-        MenuItemBuilder::with_id("bookmark-manage", "Manage Bookmarks…").build(app)?;
+    let event_show_item = MenuItemBuilder::with_id("event-show", "Show Events").build(app)?;
 
-    // Create "Jump to Bookmark" submenu (dynamically populated by frontend)
-    let jump_to_bookmark_submenu = SubmenuBuilder::new(app, "Jump to Bookmark")
-        .build()?;
+    // Create "Jump to Event" submenu (dynamically populated by frontend)
+    let jump_to_event_submenu = SubmenuBuilder::new(app, "Jump to Event").build()?;
 
-    let bookmarks_menu = SubmenuBuilder::new(app, "Bookmarks")
-        .item(&bookmark_save_item)
-        .item(&jump_to_bookmark_submenu)
+    let events_menu = SubmenuBuilder::new(app, "Events")
+        .item(&event_add_item)
+        .item(&jump_to_event_submenu)
         .separator()
-        .item(&bookmark_manage_item)
+        .item(&event_show_item)
         .build()?;
 
     // Create View submenu
@@ -779,7 +776,7 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             &apps_menu,
             &edit_menu,
             &session_menu,
-            &bookmarks_menu,
+            &events_menu,
             &view_menu,
             &help_menu,
         ])
@@ -800,14 +797,8 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     };
     *app.state::<SessionMenuState>().0.lock().unwrap() = Some(session_menu_items);
 
-    // Store bookmark menu items for dynamic updates
-    let bookmark_items = BookmarkMenuItems {
-        save: bookmark_save_item,
-    };
-    *app.state::<BookmarkMenuItemState>().0.lock().unwrap() = Some(bookmark_items);
-
-    // Store bookmarks submenu reference for dynamic updates
-    *app.state::<BookmarksMenuState>().0.lock().unwrap() = Some(jump_to_bookmark_submenu);
+    *app.state::<EventMenuItemState>().0.lock().unwrap() = Some(EventMenuItems { add: event_add_item });
+    *app.state::<EventsMenuState>().0.lock().unwrap() = Some(jump_to_event_submenu);
 
     // Handle menu events
     app.on_menu_event(|app, event| {
@@ -861,19 +852,16 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             "session-clear" => {
                 emit_to_focused_window(app, "menu-session-clear", ());
             }
-            // Bookmark menu items
-            "bookmark-save" => {
-                emit_to_focused_window(app, "menu-bookmark-save", ());
+            // Events menu items
+            "event-add" => {
+                emit_to_focused_window(app, "menu-event-add", ());
             }
-            "bookmark-manage" => {
-                // Open Settings panel and navigate to Bookmarks tab
-                open_settings_singleton(app, &app.state::<SettingsWindowState>());
-                emit_to_focused_window(app, "menu-bookmark-manage", ());
+            "event-show" => {
+                open_panel_in_focused_window(app, "events");
             }
-            id if id.starts_with("bookmark-jump-") => {
-                // Jump to specific bookmark - extract ID and emit to focused window
-                let bookmark_id = id.strip_prefix("bookmark-jump-").unwrap_or("");
-                emit_to_focused_window(app, "menu-jump-to-bookmark", bookmark_id.to_string());
+            id if id.starts_with("event-jump-") => {
+                let event_id = id.strip_prefix("event-jump-").unwrap_or("");
+                emit_to_focused_window(app, "menu-jump-to-event", event_id.to_string());
             }
             // Help menu items - open URLs in default browser
             "help-issues" => {
@@ -1163,13 +1151,13 @@ pub fn run() {
     #[cfg(not(target_os = "ios"))]
     let builder = builder
         .manage(SessionMenuState(Mutex::new(None)))
-        .manage(BookmarksMenuState(Mutex::new(None)))
-        .manage(BookmarkMenuItemState(Mutex::new(None)));
+        .manage(EventsMenuState(Mutex::new(None)))
+        .manage(EventMenuItemState(Mutex::new(None)));
     #[cfg(target_os = "ios")]
     let builder = builder
         .manage(SessionMenuState(Mutex::new(())))
-        .manage(BookmarksMenuState(Mutex::new(())))
-        .manage(BookmarkMenuItemState(Mutex::new(())));
+        .manage(EventsMenuState(Mutex::new(())))
+        .manage(EventMenuItemState(Mutex::new(())));
 
     let builder = builder.invoke_handler(tauri::generate_handler![
             show_current_window,
@@ -1181,7 +1169,7 @@ pub fn run() {
             settings_panel_closed,
             open_settings_panel,
             update_menu_state,
-            update_bookmarks_menu,
+            update_events_menu,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::save_binary_file,
@@ -1474,6 +1462,10 @@ pub fn run() {
             analysis::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
+            capture_events::capture_events_list,
+            capture_events::capture_events_add,
+            capture_events::capture_events_update,
+            capture_events::capture_events_delete,
             capturequery::capture_query_byte_changes,
             capturequery::capture_query_frame_changes,
             capturequery::capture_query_mirror_validation,

@@ -57,8 +57,8 @@ export interface FrameDataTableProps {
   formatTime: (timestampUs: number, prevTimestampUs: number | null) => ReactNode;
   /** Whether to show source address column */
   showSourceAddress?: boolean;
-  /** Called when bookmark button is clicked (omit to hide bookmark button) */
-  onBookmark?: (frameId: number, timestampUs: number) => void;
+  /** Marks an event at the frame's time (omit to hide the column) */
+  onAddEvent?: (timestampUs: number) => void;
   /** Empty state message */
   emptyMessage?: string;
   /** Number of source bytes for padding (serial extraction) */
@@ -114,8 +114,8 @@ function IconSprites() {
   return (
     <svg className="hidden" aria-hidden="true">
       <defs>
-        <symbol id="fdt-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+        <symbol id="fdt-event" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" />
         </symbol>
       </defs>
     </svg>
@@ -162,7 +162,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   frames,
   formatTime,
   showSourceAddress = false,
-  onBookmark,
+  onAddEvent,
   emptyMessage = 'No frames to display',
   sourceByteCount = 2,
   renderBytes,
@@ -217,8 +217,8 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   // Keep mutable refs for callbacks used in event delegation so handlers are stable
   const framesRef = useRef(frames);
   framesRef.current = frames;
-  const onBookmarkRef = useRef(onBookmark);
-  onBookmarkRef.current = onBookmark;
+  const onAddEventRef = useRef(onAddEvent);
+  onAddEventRef.current = onAddEvent;
   const onRowClickRef = useRef(onRowClick);
   onRowClickRef.current = onRowClick;
   const onContextMenuRef = useRef(onContextMenu);
@@ -261,8 +261,8 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
       if (!frame) return;
 
       const action = btn.dataset.action;
-      if (action === 'bookmark' && onBookmarkRef.current) {
-        onBookmarkRef.current(frame.frame_id, frame.timestamp_us);
+      if (action === 'add-event' && onAddEventRef.current) {
+        onAddEventRef.current(frame.timestamp_us);
       }
       return;
     }
@@ -309,7 +309,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
       <Table size="sm" mono sticky hover className="table-fixed">
         <colgroup>
           {renderRowStatus && <col className="w-8" />}
-          {onBookmark && <col className="w-7" />}
+          {onAddEvent && <col className="w-7" />}
           {showRef && <col className="w-20" />}
           <col style={{ width: `calc(${TIME_COLUMN_CHARS[displayTimeFormat]}ch + 1rem)` }} />
           {showId && <col className="w-24" />}
@@ -321,7 +321,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
         <thead>
           <tr onContextMenu={onHeaderContextMenu ? (e) => { e.preventDefault(); onHeaderContextMenu({ x: e.clientX, y: e.clientY }); } : undefined}>
             {renderRowStatus && <th className="px-1" />}
-            {onBookmark && <th className="px-1" />}
+            {onAddEvent && <th className="px-1" />}
             {showRef && <th className="text-right">#</th>}
             <th>Time</th>
             {showId && (
@@ -353,10 +353,10 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
               >
                 {renderRowStatus && <td className="px-1">{renderRowStatus(frame, idx)}</td>}
-                {onBookmark && (
+                {onAddEvent && (
                   <td className="px-1">
-                    <IconButton data-action="bookmark" size="xs" title="Add bookmark at this frame's time">
-                      <UseIcon id="fdt-bookmark" className={`w-3 h-3 ${textDataAmber}`} />
+                    <IconButton data-action="add-event" size="xs" title="Add event at this frame's time">
+                      <UseIcon id="fdt-event" className={`w-3 h-3 ${textDataAmber}`} />
                     </IconButton>
                   </td>
                 )}

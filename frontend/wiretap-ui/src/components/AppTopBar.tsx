@@ -159,13 +159,11 @@ export default function AppTopBar({
             isStreaming={ioSession.isStreaming ?? false}
             isPaused={ioSession.isPaused}
             isStopped={ioSession.isStopped}
-            supportsTimeRange={ioSession.supportsTimeRange}
             onPlay={ioSession.onPlay}
             onPause={ioSession.onPause}
             onLeave={ioSession.onLeave}
             onStop={ioSession.onStop}
             onDestroy={ioSession.onDestroy}
-            onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             isCaptureMode={ioSession.isCaptureMode}
             capturePersistent={ioSession.capturePersistent}
             onToggleCapturePin={ioSession.onToggleCapturePin}

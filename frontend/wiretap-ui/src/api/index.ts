@@ -114,9 +114,9 @@ export {
 // Menu API
 export {
   updateMenuState,
-  updateBookmarksMenu,
+  updateEventsMenu,
   type MenuState,
-  type BookmarkMenuInfo,
+  type EventMenuInfo,
 } from "./menu";
 
 // Checksum API

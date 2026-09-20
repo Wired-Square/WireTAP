@@ -40,10 +40,6 @@ interface Props {
   supportsSpeed?: boolean;
   onOpenSpeedPicker?: () => void;
 
-  // Bookmark (for time range sources)
-  supportsTimeRange?: boolean;
-  onOpenBookmarkPicker?: () => void;
-
   // Frame counts (for tooltip)
   uniqueFrameCount?: number;
   totalFrameCount?: number;
@@ -74,8 +70,6 @@ export default function TransmitTopBar({
   speed = 1,
   supportsSpeed = false,
   onOpenSpeedPicker,
-  supportsTimeRange = false,
-  onOpenBookmarkPicker,
   capabilities,
   uniqueFrameCount,
   totalFrameCount,
@@ -109,8 +103,6 @@ export default function TransmitTopBar({
         speed,
         supportsSpeed,
         onOpenSpeedPicker,
-        supportsTimeRange,
-        onOpenBookmarkPicker,
         isStreaming,
         isPaused,
         isStopped,

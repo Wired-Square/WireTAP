@@ -7,10 +7,6 @@ import {
   type SettingsCatalogHandlers,
 } from './handlers/useSettingsCatalogHandlers';
 import {
-  useBookmarkHandlers,
-  type BookmarkHandlers,
-} from './handlers/useBookmarkHandlers';
-import {
   useSelectionSetSettingsHandlers,
   type SelectionSetSettingsHandlers,
 } from './handlers/useSelectionSetSettingsHandlers';
@@ -18,8 +14,6 @@ import {
   useDashboardLayoutHandlers,
   type DashboardLayoutHandlers,
 } from './handlers/useDashboardLayoutHandlers';
-import type { IOProfile } from '../stores/settingsStore';
-import type { TimeBounds } from '../../../components/TimeBoundsInput';
 
 export interface UseSettingsHandlersParams {
   // Form state from useSettingsForms
@@ -30,25 +24,6 @@ export interface UseSettingsHandlersParams {
   resetCatalogForm: () => void;
   initDuplicateCatalogForm: (name: string, filename: string) => void;
   initEditCatalogForm: (name: string, filename: string) => void;
-
-  // Bookmark form (editing)
-  bookmarkName: string;
-  bookmarkTimeBounds: TimeBounds;
-  resetBookmarkForm: () => void;
-  initEditBookmarkForm: (
-    name: string,
-    startTime: string,
-    endTime: string,
-    maxFrames?: number
-  ) => void;
-
-  // New bookmark form (creating)
-  newBookmarkProfileId: string;
-  newBookmarkName: string;
-  newBookmarkTimeBounds: TimeBounds;
-  resetNewBookmarkForm: () => void;
-  initNewBookmarkForm: (defaultProfileId: string) => void;
-  timeRangeCapableProfiles: IOProfile[];
 
   // Selection set form (editing)
   selectionSetName: string;
@@ -61,7 +36,7 @@ export interface UseSettingsHandlersParams {
   initEditDashboardLayoutForm: (name: string) => void;
 }
 
-export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers & SelectionSetSettingsHandlers & DashboardLayoutHandlers;
+export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & SelectionSetSettingsHandlers & DashboardLayoutHandlers;
 
 export function useSettingsHandlers(params: UseSettingsHandlersParams): SettingsHandlers {
   // IO Profile handlers (no params needed - uses store directly)
@@ -76,20 +51,6 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
     resetCatalogForm: params.resetCatalogForm,
     initDuplicateCatalogForm: params.initDuplicateCatalogForm,
     initEditCatalogForm: params.initEditCatalogForm,
-  });
-
-  // Bookmark handlers
-  const bookmarkHandlers = useBookmarkHandlers({
-    bookmarkName: params.bookmarkName,
-    bookmarkTimeBounds: params.bookmarkTimeBounds,
-    resetBookmarkForm: params.resetBookmarkForm,
-    initEditBookmarkForm: params.initEditBookmarkForm,
-    newBookmarkProfileId: params.newBookmarkProfileId,
-    newBookmarkName: params.newBookmarkName,
-    newBookmarkTimeBounds: params.newBookmarkTimeBounds,
-    resetNewBookmarkForm: params.resetNewBookmarkForm,
-    initNewBookmarkForm: params.initNewBookmarkForm,
-    timeRangeCapableProfiles: params.timeRangeCapableProfiles,
   });
 
   // Selection set handlers
@@ -110,7 +71,6 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
   return {
     ...ioProfileHandlers,
     ...catalogHandlers,
-    ...bookmarkHandlers,
     ...selectionSetHandlers,
     ...dashboardLayoutHandlers,
   };

@@ -81,6 +81,26 @@ One row per capture. Survives `ALTER TABLE RENAME` from the legacy
 | `persistent` | INTEGER | NO | 0 | Boolean (0/1). `1` if pinned (survives restart). |
 | `buses` | TEXT | NO | `'[]'` | JSON array of distinct bus numbers seen in this capture's data. |
 
+### `capture_events`
+
+A user's annotations on a capture — a moment or a span and a note. Rows
+follow their capture: copied by `copy_capture_data`, deleted by
+`delete_capture_data` and `delete_capture_metadata`, swept with the
+non-persistent captures on a clear-on-start launch. Framing
+(`clear_and_refill`) leaves them alone — the derived frames share the byte
+timeline. A WireTAP Backend profile's events live on the gateway instead
+(`public.events` in its database), not here.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | INTEGER | NO | autoincrement | Primary key; the frontend sees it as a string. Attachments will key on it. |
+| `capture_id` | TEXT | NO | | The capture this event belongs to. |
+| `timestamp_us` | INTEGER | NO | | When it happened, in the capture's own clock. |
+| `duration_us` | INTEGER | NO | 0 | Span length; `0` marks an instant. |
+| `note` | TEXT | NO | `''` | Free text; the first line is the label. |
+| `created_at_us` | INTEGER | NO | | Wall-clock microseconds when the row was written. |
+| `updated_at_us` | INTEGER | NO | | Wall-clock microseconds of the last edit. |
+
 ## Indexes
 
 | Index | Columns | Purpose |
@@ -89,6 +109,7 @@ One row per capture. Survives `ALTER TABLE RENAME` from the legacy
 | `idx_frames_capture_fid` | `(capture_id, frame_id, protocol)` | Filtered pagination by frame identity. `protocol` is in the key so the filtered `COUNT(*)` stays covering — frame identity is `(protocol, frame_id)`, not the bare id. |
 | `idx_frames_capture_rowid` | `(capture_id, rowid)` | The live frame tail (`ORDER BY rowid DESC LIMIT n`). Without it SQLite sorts the whole capture into a temp b-tree on a query the frames view reissues twice a second. |
 | `idx_bytes_capture_ts` | `(capture_id, timestamp_us)` | Timestamp-based seeks for byte captures. |
+| `idx_capture_events_capture_ts` | `(capture_id, timestamp_us)` | A capture's events in time order. |
 
 ## Query Patterns
 
@@ -123,9 +144,10 @@ One row per capture. Survives `ALTER TABLE RENAME` from the legacy
 
 ### Capture management
 
-- **Copy capture:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE capture_id = ? ORDER BY rowid` (no memory spike).
-- **Delete capture:** `DELETE FROM frames WHERE capture_id = ?` (+ same for bytes).
+- **Copy capture:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE capture_id = ? ORDER BY rowid` (no memory spike); bytes and `capture_events` follow in the same transaction.
+- **Delete capture:** `DELETE FROM frames WHERE capture_id = ?` (+ same for bytes and `capture_events`).
 - **Clear all:** `DELETE FROM frames; DELETE FROM bytes;`
+- **Events:** `SELECT … FROM capture_events WHERE capture_id = ? ORDER BY timestamp_us, id`; insert/update/delete by `(capture_id, id)` so a stale id from another capture cannot touch a row.
 
 ## Architecture
 

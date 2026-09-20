@@ -455,7 +455,7 @@ after); the row carries everything else. Props:
 
 | Prop | Values | Notes |
 |---|---|---|
-| `variant` (Listbox) | `inset` (default) · `flush` | Flush is the list in a flush dialog body: no inset, no rounding, rows edge to edge at 8 px / 16 px (the speed picker, decoder conflict, signal picker, selection sets, bookmarks, add source) |
+| `variant` (Listbox) | `inset` (default) · `flush` | Flush is the list in a flush dialog body: no inset, no rounding, rows edge to edge at 8 px / 16 px (the speed picker, decoder conflict, signal picker, selection sets, add source) |
 | `selected` | `boolean` | The chosen row — `aria-selected`, and the tint |
 | `tone` | `purple` · `success` · `warning` · `cyan` | Colours the lit state (fill, edge, mark) and the hover edge at rest — a source in its kind's hue (`sourceKindColours[kind].tone`), a live device green, a stopped one amber, the multi-bus tick purple. A toned row at rest is flat like the others |
 | `mark` | `radio` · `check` | The row's own radio or check, a span drawn like `.check` and lit with the row (a real `<input>` cannot sit inside a `<button>`) |

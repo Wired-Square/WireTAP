@@ -1,7 +1,6 @@
 // ui/src/components/TimeBoundsInput.tsx
 //
-// Reusable time bounds input component with optional bookmark pre-fill.
-// Used in Query app (with bookmarks) and BookmarkEditorDialog (without bookmarks).
+// Reusable time bounds input: start, end, timezone and an optional frame cap.
 
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,8 +8,7 @@ import { Globe, X } from "lucide-react";
 import { caption } from "../styles/typography";
 import { getLocalTimezoneAbbr, convertDatetimeLocal, utcToLocal } from "../utils/timezone";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
-import type { TimeRangeFavorite } from "../utils/favorites";
-import { Select, Input } from "./forms";
+import { Input } from "./forms";
 import { IconButton } from "./Button";
 import { Tab, Tabs } from "./Tabs";
 
@@ -24,8 +22,6 @@ export interface TimeBounds {
   maxFrames?: number;
   /** The timezone mode used for the times */
   timezoneMode: "local" | "utc";
-  /** Name of the selected bookmark (cleared when fields are manually modified) */
-  bookmarkName?: string;
 }
 
 export interface TimeBoundsInputProps {
@@ -33,10 +29,6 @@ export interface TimeBoundsInputProps {
   value: TimeBounds;
   /** Called when time bounds change */
   onChange: (bounds: TimeBounds) => void;
-  /** Available bookmarks to select from */
-  bookmarks?: TimeRangeFavorite[];
-  /** Whether to show the bookmark dropdown (default: true) */
-  showBookmarks?: boolean;
   /** Whether to show the max-frames cap (default: true). Hidden where a separate
    *  result-limit control owns the cap (e.g. the Query builder). */
   showMaxFrames?: boolean;
@@ -47,8 +39,6 @@ export interface TimeBoundsInputProps {
 export default function TimeBoundsInput({
   value,
   onChange,
-  bookmarks = [],
-  showBookmarks = true,
   showMaxFrames = true,
   disabled = false,
 }: TimeBoundsInputProps) {
@@ -57,33 +47,7 @@ export default function TimeBoundsInput({
   const localTzAbbr = useMemo(() => getLocalTimezoneAbbr(), []);
   const now = useMemo(() => utcToLocal(new Date().toISOString()), []);
 
-  // Editing a field by hand leaves whatever bookmark pre-filled it.
-  const edit = (patch: Partial<TimeBounds>) => onChange({ ...value, ...patch, bookmarkName: undefined });
-
-  // Handle bookmark selection - pre-fill the fields and remember the name
-  const handleBookmarkChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const bookmarkId = e.target.value;
-      if (!bookmarkId) {
-        // Clear bookmark selection
-        onChange({ ...value, bookmarkName: undefined });
-        return;
-      }
-
-      const bookmark = bookmarks.find((b) => b.id === bookmarkId);
-      if (!bookmark) return;
-
-      // Pre-fill fields and set bookmark name
-      onChange({
-        startTime: bookmark.startTime,
-        endTime: bookmark.endTime,
-        maxFrames: bookmark.maxFrames,
-        timezoneMode: value.timezoneMode,
-        bookmarkName: bookmark.name,
-      });
-    },
-    [bookmarks, value, onChange]
-  );
+  const edit = (patch: Partial<TimeBounds>) => onChange({ ...value, ...patch });
 
   // Handle timezone mode change - convert existing times
   const handleTimezoneChange = useCallback(
@@ -115,25 +79,6 @@ export default function TimeBoundsInput({
 
   return (
     <div className="space-y-3">
-      {/* Bookmarks dropdown (optional) */}
-      {showBookmarks && bookmarks.length > 0 && (
-        <div>
-          <label className={`block ${caption} mb-1`}>{t("timeBounds.bookmarks")}</label>
-          <Select
-            value={bookmarks.find((b) => b.name === value.bookmarkName)?.id ?? ""}
-            onChange={handleBookmarkChange}
-            disabled={disabled}
-          >
-            <option value="">{t("timeBounds.selectBookmark")}</option>
-            {bookmarks.map((bm) => (
-              <option key={bm.id} value={bm.id}>
-                {bm.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
-
       {/* Timezone toggle */}
       <div className="flex items-center justify-between">
         <label className={caption}>{t("timeBounds.timeZone")}</label>

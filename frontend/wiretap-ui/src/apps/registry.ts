@@ -17,6 +17,7 @@ import {
   Send,
   DatabaseZap,
   Gauge,
+  Flag,
   Workflow,
   FileText,
   Calculator,
@@ -50,7 +51,8 @@ export type AppHue =
   | "teal"
   | "emerald"
   | "cyan"
-  | "orange";
+  | "orange"
+  | "amber";
 
 type AppVisual = {
   icon: LucideIcon;
@@ -83,6 +85,11 @@ const visualConfig = {
     icon: Gauge,
     hue: "pink",
     load: () => import("./dashboard/Dashboard"),
+  },
+  events: {
+    icon: Flag,
+    hue: "amber",
+    load: () => import("./events/Events"),
   },
   serial: {
     icon: Terminal,

@@ -26,11 +26,11 @@ import {
 // Re-export for backward compatibility
 export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition } from "../api/io";
+import type { EventOwner } from "../api/captureEvents";
+import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
 import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
-import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
-import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
 import { isMultiSourceCapable } from "../utils/profileTraits";
 import { useProfileBusStore, profileBusMappings } from "../stores/profileBusStore";
@@ -62,18 +62,9 @@ function generateCaptureSessionId(): string {
 const CAPTURE_ADOPTION_LIMIT = 3;
 const CAPTURE_ADOPTION_WINDOW_MS = 2000;
 
-/** Reason for session reconfiguration */
-export type SessionReconfigurationReason = "bookmark" | "time_range_change";
-
-/** Information about a session reconfiguration */
+/** The window a session was re-configured to (UTC ISO-8601). */
 export interface SessionReconfigurationInfo {
-  /** Why the session was reconfigured */
-  reason: SessionReconfigurationReason;
-  /** The bookmark that triggered the reconfiguration (if reason === 'bookmark') */
-  bookmark?: TimeRangeFavorite;
-  /** New start time (UTC ISO-8601) */
-  startTime?: string;
-  /** New end time (UTC ISO-8601) */
+  startTime: string;
   endTime?: string;
 }
 
@@ -162,7 +153,7 @@ export interface UseIOSessionManagerOptions {
   onBeforeMultiWatch?: () => void;
   /** Ref to track stream completion (if provided, manager resets it during watch operations) */
   streamCompletedRef?: React.MutableRefObject<boolean>;
-  /** Called after session is reconfigured (bookmark jump, time range change) */
+  /** Called after session is reconfigured (event jump, time range change) */
   onSessionReconfigured?: (info: SessionReconfigurationInfo) => void;
   /** Called when session is destroyed externally (e.g., from Sessions app).
    *  Receives orphaned capture IDs so apps can switch to capture mode. */
@@ -223,6 +214,12 @@ export interface UseIOSessionManagerResult {
   currentTimeUs: number | null;
   /** Convenience: playbackPosition?.frame_index */
   currentFrameIndex: number | null;
+  /** Where "now" is when there is no reported position: wall clock on a live source, else the capture's start. */
+  playheadNowUs: () => number | null;
+
+  // ---- Events ----
+  /** Who holds this session's events — the archive behind a WireTAP profile, else its capture; null before either exists */
+  eventOwner: EventOwner | null;
 
   // ---- Detach/Rejoin State ----
   /** Whether detached from session */
@@ -302,12 +299,9 @@ export interface UseIOSessionManagerResult {
   /** Ref that tracks whether stream has completed (for ignoring stale time updates) */
   streamCompletedRef: React.MutableRefObject<boolean>;
 
-  // ---- Bookmark Methods ----
-  /** Jump to a bookmark, stopping current stream if needed and reinitializing with bookmark time range */
-  jumpToBookmark: (
-    bookmark: TimeRangeFavorite,
-    options?: Omit<LoadOptions, "startTime" | "endTime" | "maxFrames">
-  ) => Promise<void>;
+  // ---- Time range ----
+  /** Re-window a recorded session (an event jump), stopping the current stream if needed. Times are UTC ISO-8601. */
+  jumpToTimeRange: (startUtc: string, endUtc?: string) => Promise<void>;
 }
 
 // Multi-source session-id generation (prefix inference from output type) now
@@ -384,7 +378,7 @@ export function useIOSessionManager(
   const streamCompletedRef = streamCompletedRefProp ?? localStreamCompletedRef;
 
   // Flag to suppress handleReconfigure when the reconfigure was self-initiated
-  // (e.g., our own jumpToBookmark). The backend fires session-reconfigured for ALL
+  // (e.g., our own jumpToTimeRange). The backend fires session-reconfigured for ALL
   // listeners, including the one that initiated the reconfigure.
   const selfReconfigureRef = useRef(0);
 
@@ -477,9 +471,9 @@ export function useIOSessionManager(
   }, [onIngestComplete, onBeforeIngestStart]);
 
   // ---- IO Session ----
-  // Handler for when session is reconfigured externally (e.g., another app jumped to a bookmark)
+  // Handler for when session is reconfigured externally (e.g., another app jumped to an event)
   // This resets frame counts and calls cleanup so the UI clears its state.
-  // Skipped for self-initiated reconfigures (jumpToBookmark already handled cleanup).
+  // Skipped for self-initiated reconfigures (jumpToTimeRange already handled cleanup).
   const handleReconfigure = useCallback(() => {
     if (selfReconfigureRef.current > 0) {
       selfReconfigureRef.current--;
@@ -654,6 +648,15 @@ export function useIOSessionManager(
   const sessionReady = session.isReady;
   const capabilities = session.capabilities;
   const joinerCount = session.joinerCount;
+  const { currentTimeUs, captureId, captureStartTimeUs } = session;
+  const playheadNowUs = useCallback(
+    () => currentTimeUs ?? (isStreaming && isRealtime ? Date.now() * 1000 : captureStartTimeUs),
+    [currentTimeUs, isStreaming, isRealtime, captureStartTimeUs]
+  );
+  const eventOwner = useMemo(
+    () => eventOwnerForSession({ sourceProfileId, ioProfile, profiles: ioProfiles, captureId }),
+    [sourceProfileId, ioProfile, ioProfiles, captureId]
+  );
 
   // ---- Handlers ----
   // Leave session: behaviour depends on current mode.
@@ -1147,49 +1150,32 @@ export function useIOSessionManager(
     // Note: Do NOT set isWatching - session is connected but not streaming to us
   }, [session, appName, setMultiBusProfiles, setIoProfile, setSourceProfileId, setPlaybackSpeedProp]);
 
-  // Jump to a bookmark: stop if streaming, cleanup, reinitialize with bookmark time range
-  const jumpToBookmark = useCallback(
-    async (
-      bookmark: TimeRangeFavorite,
-      opts?: Omit<LoadOptions, "startTime" | "endTime" | "maxFrames">
-    ) => {
-      // Convert bookmark times to UTC
-      const startUtc = localToUtc(bookmark.startTime);
-      const endUtc = localToUtc(bookmark.endTime);
-
-      if (!startUtc) {
-        tlog.debug("[IOSessionManager:jumpToBookmark] No valid start time in bookmark");
-        return;
-      }
-
-      // Determine target profile (bookmark's profile or current)
-      const targetProfileId = bookmark.profileId || sourceProfileId || ioProfile;
+  // Re-window the source: stop if streaming, cleanup, reconfigure or reinitialise with the new range
+  const jumpToTimeRange = useCallback(
+    async (startUtc: string, endUtc?: string) => {
+      const targetProfileId = sourceProfileId || ioProfile;
       if (!targetProfileId) {
-        tlog.debug("[IOSessionManager:jumpToBookmark] No profile available");
+        tlog.debug("[IOSessionManager:jumpToTimeRange] No profile available");
         return;
       }
 
-      // For recorded sources:
-      // - If jumping to a bookmark for the same profile we're already watching, reuse the session ID
-      //   (other apps stay connected, capture is finalised and new one created)
-      // - If switching to a different profile, generate a unique session ID
+      // For recorded sources on the profile we're already watching, reuse the session ID
+      // (other apps stay connected, capture is finalised and new one created); otherwise
+      // generate a unique session ID
       const targetProfile = findProfile(targetProfileId);
       const isRecorded = targetProfile ? !isRealtimeProfile(targetProfile) : false;
       const isSameProfile = sourceProfileId === targetProfileId;
 
       let sessionId: string;
       if (isSameProfile && ioProfile) {
-        // Same profile - reuse current session ID (keeps other listeners connected)
         sessionId = ioProfile;
       } else if (isRecorded) {
-        // Different profile or no existing session - generate unique ID for recorded sources
         sessionId = generateRecordedSessionId();
       } else {
-        // Realtime source - use profile ID
         sessionId = targetProfileId;
       }
 
-      tlog.debug(`[IOSessionManager:jumpToBookmark] Jumping to bookmark "${bookmark.name}" (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
+      tlog.debug(`[IOSessionManager:jumpToTimeRange] ${startUtc} → ${endUtc ?? "open"} (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
 
       // Step 1: Run cleanup callback (same as onBeforeWatch)
       onBeforeWatch?.();
@@ -1197,12 +1183,7 @@ export function useIOSessionManager(
       // Step 2: Notify app of reconfiguration BEFORE the async backend call.
       // This lets the app set streamStartTimeUs (for correct time deltas) before
       // frames start arriving during the await below.
-      onSessionReconfigured?.({
-        reason: "bookmark",
-        bookmark,
-        startTime: startUtc,
-        endTime: endUtc ?? undefined,
-      });
+      onSessionReconfigured?.({ startTime: startUtc, endTime: endUtc });
 
       // Step 3: Clear multi-bus state
       setMultiBusProfiles([]);
@@ -1214,43 +1195,23 @@ export function useIOSessionManager(
         // Other apps joined to this session stay connected
         // Suppress the session-reconfigured event handler since we already ran cleanup
         selfReconfigureRef.current++;
-        tlog.debug("[IOSessionManager:jumpToBookmark] Using reconfigure (same profile, session stays alive)");
-        await reconfigureReaderSession(sessionId, startUtc, endUtc || undefined);
+        tlog.debug("[IOSessionManager:jumpToTimeRange] Using reconfigure (same profile, session stays alive)");
+        await reconfigureReaderSession(sessionId, startUtc, endUtc);
       } else {
         // Different profile or realtime source - full reinitialize
-        tlog.debug("[IOSessionManager:jumpToBookmark] Using reinitialize (different profile or realtime)");
+        tlog.debug("[IOSessionManager:jumpToTimeRange] Using reinitialize (different profile or realtime)");
 
         // Stop current stream if watching
         if (isWatching) {
-          tlog.debug("[IOSessionManager:jumpToBookmark] Stopping current watch...");
+          tlog.debug("[IOSessionManager:jumpToTimeRange] Stopping current watch...");
           await session.stop();
           setIsWatching(false);
         }
 
-        // Reinitialize with bookmark time range
-        const effectiveSpeed = opts?.speed ?? session.speed ?? 1;
         await session.reinitialize(targetProfileId, {
           startTime: startUtc,
-          endTime: endUtc || undefined,
-          speed: effectiveSpeed,
-          limit: bookmark.maxFrames,
-          framingEncoding: opts?.framingEncoding,
-          delimiter: opts?.delimiter,
-          maxFrameLength: opts?.maxFrameLength,
-          modbusValidateCrc: opts?.modbusValidateCrc,
-          modbusDeviceAddress: opts?.modbusDeviceAddress,
-          modbusVendorFunctions: opts?.modbusVendorFunctions,
-          modbusAllowBroadcast: opts?.modbusAllowBroadcast,
-          modbusAnyFunction: opts?.modbusAnyFunction,
-          frameIdStartByte: opts?.frameIdStartByte,
-          frameIdBytes: opts?.frameIdBytes,
-          frameIdBigEndian: opts?.frameIdStartByte !== undefined ? true : undefined,
-          sourceAddressStartByte: opts?.sourceAddressStartByte,
-          sourceAddressBytes: opts?.sourceAddressBytes,
-          sourceAddressBigEndian: opts?.sourceAddressEndianness === "big",
-          minFrameLength: opts?.minFrameLength,
-          emitRawBytes: opts?.emitRawBytes,
-          busOverride: opts?.busOverride,
+          endTime: endUtc,
+          speed: session.speed ?? 1,
           // Pass session ID override when it differs from profile ID (recorded sources use unique session IDs)
           sessionIdOverride: sessionId !== targetProfileId ? sessionId : undefined,
         });
@@ -1259,17 +1220,11 @@ export function useIOSessionManager(
       // Step 5: Update manager state (use session ID so callbacks are registered correctly)
       setIoProfile(sessionId);
       setSourceProfileId(targetProfileId);
-      if (opts?.speed !== undefined) {
-        setPlaybackSpeedProp?.(opts.speed);
-      }
 
       // Step 6: Mark as watching and reset state
       setIsWatching(true);
       resetWatchFrameCount();
       streamCompletedRef.current = false;
-
-      // Step 7: Mark bookmark as used
-      await markFavoriteUsed(bookmark.id);
     },
     [
       sourceProfileId,
@@ -1279,7 +1234,6 @@ export function useIOSessionManager(
       onBeforeWatch,
       setMultiBusProfiles,
       setIoProfile,
-      setPlaybackSpeedProp,
       resetWatchFrameCount,
       streamCompletedRef,
       onSessionReconfigured,
@@ -1391,6 +1345,8 @@ export function useIOSessionManager(
     joinerCount,
     playbackPosition: session.playbackPosition,
     currentTimeUs: session.currentTimeUs,
+    playheadNowUs,
+    eventOwner,
     currentFrameIndex: session.currentFrameIndex,
 
     // Rejoin/Leave/Destroy
@@ -1434,7 +1390,6 @@ export function useIOSessionManager(
     skipReader,
     streamCompletedRef,
 
-    // Bookmark Methods
-    jumpToBookmark,
+    jumpToTimeRange,
   };
 }

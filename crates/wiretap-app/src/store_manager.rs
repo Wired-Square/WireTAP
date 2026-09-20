@@ -200,13 +200,10 @@ pub fn initialise(app: &AppHandle) -> Result<(), String> {
     let app_data_dir = path.parent().ok_or("Invalid store path")?;
     let mut migrated = false;
 
-    // Migrate favorites.dat -> favorites.timeRanges
-    if !manager.data.entries.contains_key("favorites.timeRanges") {
-        if let Some(data) = migrate_old_store(app_data_dir, "favorites.dat", "timeRangeFavorites") {
-            tlog!("[StoreManager] Migrating favorites from old store");
-            manager.data.entries.insert("favorites.timeRanges".to_string(), data);
-            migrated = true;
-        }
+    // Bookmarks became capture-owned events; the old saved time ranges have no home
+    if manager.data.entries.remove("favorites.timeRanges").is_some() {
+        tlog!("[StoreManager] Dropping retired favorites.timeRanges");
+        migrated = true;
     }
 
     // Migrate selection-sets.dat -> selectionSets.all

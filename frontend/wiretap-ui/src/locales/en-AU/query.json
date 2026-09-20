@@ -51,7 +51,7 @@
     "ingestAroundFirst": "Ingest frames around the first sighting",
     "inventoryLen": "≤{{len}} B",
     "inventoryTo": " → ",
-    "bookmarkTooltip": "Bookmark time range",
+    "addEventTooltip": "Add event for this range",
     "firstOccurrence": "First Occurrence",
     "lastOccurrence": "Last Occurrence",
     "delta": "Δ {{ms}}ms",
@@ -183,7 +183,7 @@
     "running": "Running...",
     "queuedAt": "Queued at {{time}}",
     "executionMs": " · {{ms}}ms",
-    "boundedBy": "Bounded: {{name}}",
+    "boundedBy": "Bounded: {{start}} → {{end}}",
     "cancelTooltip": "Cancel and remove query",
     "removeTooltip": "Remove from queue"
   }

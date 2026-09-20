@@ -1465,6 +1465,10 @@
     --app-accent: var(--text-orange);
   }
 
+  .app-hue--amber {
+    --app-accent: var(--text-amber);
+  }
+
   .app-hue__icon {
     flex-shrink: 0;
     color: var(--app-accent);

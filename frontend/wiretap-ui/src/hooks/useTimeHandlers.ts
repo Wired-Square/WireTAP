@@ -1,13 +1,11 @@
 // src/hooks/useTimeHandlers.ts
 //
 // Shared time-related handlers for Decoder and Discovery:
-// time range changes, frame-based seeking, and bookmark loading.
+// time range changes and frame-based seeking.
 
 import { useCallback } from "react";
 import { localToUtc } from "../utils/timeFormat";
-import type { TimeRangeFavorite } from "../utils/favorites";
 import type { IOCapabilities } from "../api/io";
-import type { LoadOptions } from "./useIOSessionManager";
 
 export interface UseTimeHandlersParams {
   // Session actions
@@ -26,15 +24,6 @@ export interface UseTimeHandlersParams {
   startTime: string;
   endTime: string;
 
-  // Bookmark state
-  setActiveBookmarkId: (id: string | null) => void;
-
-  // Manager method for jumping to bookmarks
-  jumpToBookmark: (
-    bookmark: TimeRangeFavorite,
-    options?: Omit<LoadOptions, "startTime" | "endTime" | "maxFrames">
-  ) => Promise<void>;
-
   // Optional callbacks for app-specific side effects before the backend call
   onStartTimeChange?: (time: string) => void;
   onEndTimeChange?: (time: string) => void;
@@ -47,38 +36,34 @@ export function useTimeHandlers({
   setCurrentFrameIndex,
   startTime,
   endTime,
-  setActiveBookmarkId,
-  jumpToBookmark,
   onStartTimeChange,
   onEndTimeChange,
 }: UseTimeHandlersParams) {
-  // Handle start time change — clears bookmark, optionally updates local state,
+  // Handle start time change — optionally updates local state,
   // converts to UTC with null-check, then sets range on session
   const handleStartTimeChange = useCallback(
     async (time: string) => {
       onStartTimeChange?.(time);
-      setActiveBookmarkId(null);
       const startUtc = localToUtc(time);
       const endUtc = localToUtc(endTime);
       if (startUtc && endUtc) {
         await setTimeRange(startUtc, endUtc);
       }
     },
-    [onStartTimeChange, setActiveBookmarkId, setTimeRange, endTime]
+    [onStartTimeChange, setTimeRange, endTime]
   );
 
   // Handle end time change — mirror of handleStartTimeChange
   const handleEndTimeChange = useCallback(
     async (time: string) => {
       onEndTimeChange?.(time);
-      setActiveBookmarkId(null);
       const startUtc = localToUtc(startTime);
       const endUtc = localToUtc(time);
       if (startUtc && endUtc) {
         await setTimeRange(startUtc, endUtc);
       }
     },
-    [onEndTimeChange, setActiveBookmarkId, setTimeRange, startTime]
+    [onEndTimeChange, setTimeRange, startTime]
   );
 
   // Handle frame-based position change (preferred for buffer playback).
@@ -93,20 +78,10 @@ export function useTimeHandlers({
     [setCurrentFrameIndex, capabilities, seekByFrame]
   );
 
-  // Handle loading a bookmark — delegates to manager's jumpToBookmark
-  const handleLoadBookmark = useCallback(
-    async (bookmark: TimeRangeFavorite) => {
-      console.log("[TimeHandlers:handleLoadBookmark] Delegating to manager.jumpToBookmark:", bookmark.name);
-      await jumpToBookmark(bookmark);
-    },
-    [jumpToBookmark]
-  );
-
   return {
     handleStartTimeChange,
     handleEndTimeChange,
     handleFrameChange,
-    handleLoadBookmark,
   };
 }
 

@@ -1,7 +1,7 @@
 // ui/src/apps/decoder/views/DecoderFramesView.tsx
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
-import { Calculator, Star, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, Gauge, Pencil } from "lucide-react";
+import { Calculator, Flag, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, Gauge, Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
@@ -16,6 +16,7 @@ import { protocolLabel, MODBUS_REGISTER_TONES } from "../../../utils/profileTrai
 import MessageBytes from "../../../components/MessageBytes";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
+import type { TimelineMarkers } from "../../../components/TimelineScrubber";
 import HeaderFieldFilter from "../../../components/HeaderFieldFilter";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, FilteredFrame, MirrorValidationEntry, TunnelTransaction } from "../../../stores/decoderStore";
@@ -91,9 +92,13 @@ type Props = {
   // Whether we have capture data available for replay
   hasCaptureData?: boolean;
 
-  // Time range / bookmark
-  activeBookmarkId?: string | null;
-  onOpenBookmarkPicker?: () => void;
+  // Events
+  /** Marks an event at the playhead (omit when the session has nothing to own events) */
+  onAddEvent?: () => void;
+  /** Events drawn on the timeline */
+  timelineMarkers?: TimelineMarkers;
+
+  // Time range
   showTimeRange?: boolean;
   onToggleTimeRange?: () => void;
   startTime?: string;
@@ -948,8 +953,8 @@ export default function DecoderFramesView({
   playbackSpeed = 1,
   onSpeedChange,
   hasCaptureData = false,
-  activeBookmarkId,
-  onOpenBookmarkPicker,
+  onAddEvent,
+  timelineMarkers,
   showTimeRange,
   onToggleTimeRange,
   startTime,
@@ -1079,7 +1084,6 @@ export default function DecoderFramesView({
   const supportsSpeedControl = capabilities?.supports_speed_control ?? false;
   const supportsReverse = capabilities?.supports_reverse ?? false;
   const canPause = capabilities?.can_pause ?? false;
-  const isBookmarkActive = !!activeBookmarkId;
 
   // Tab definitions - Signals tab always, plus Unmatched/Filtered tabs always visible
   // Show ">" prefix when buffer is at maximum capacity
@@ -1282,8 +1286,14 @@ export default function DecoderFramesView({
         icon: <Pencil />,
         onClick: () => { navigateToCatalogFrame(frame.id); },
       },
+      ...(onAddEvent
+        ? [
+            { separator: true, label: '', onClick: () => {} },
+            { label: 'Add event here', icon: <Flag />, onClick: onAddEvent },
+          ]
+        : []),
     ];
-  }, [frameContextMenu, displayFrameIdFormat]);
+  }, [frameContextMenu, displayFrameIdFormat, onAddEvent]);
 
   const signalContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!signalContextMenu) return [];
@@ -1413,20 +1423,9 @@ export default function DecoderFramesView({
           <Clock className={iconSm} />
         </IconButton>
       )}
-      {/* Bookmark picker - only for WireTAP backend readers */}
-      {supportsTimeRange && onOpenBookmarkPicker && (
-        <IconButton
-          onClick={onOpenBookmarkPicker}
-          variant="surface"
-          tone="warning"
-          size="sm"
-          pressed={isBookmarkActive}
-          title={isBookmarkActive ? t("framesView.bookmarkLoaded") : t("framesView.loadBookmark")}
-        >
-          <Star
-            className={iconSm}
-            fill={isBookmarkActive ? "currentColor" : "none"}
-          />
+      {onAddEvent && (
+        <IconButton onClick={onAddEvent} variant="surface" tone="warning" size="sm" title={t("framesView.addEvent")}>
+          <Flag className={iconSm} />
         </IconButton>
       )}
     </>
@@ -1551,6 +1550,7 @@ export default function DecoderFramesView({
               onScrub: onScrub ?? (() => {}),
               displayTimeFormat: "human",
               disabled: !hasCaptureData,
+              markers: timelineMarkers,
             }
           : undefined
       }

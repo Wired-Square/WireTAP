@@ -13,6 +13,7 @@ import DataViewController, {
 } from "./DataViewController";
 import { bgDataView, dataViewContainer } from "../styles";
 import type { PageSize } from "../utils/pageSize";
+import type { TimelineMarkers } from "./TimelineScrubber";
 
 /**
  * Toolbar configuration for AppTabView.
@@ -57,6 +58,8 @@ interface TimelineConfig {
   onFrameChange?: (frameIndex: number) => void;
   /** Whether to use local timezone for timeline labels */
   useLocalTimezone?: boolean;
+  /** Events drawn on the timeline */
+  markers?: TimelineMarkers;
 }
 
 /**
@@ -233,6 +236,7 @@ export default function AppTabView({
         timelineCurrentFrameIndex={timeline?.currentFrameIndex}
         timelineOnFrameChange={timeline?.onFrameChange}
         timelineUseLocalTimezone={timeline?.useLocalTimezone}
+        timelineMarkers={timeline?.markers}
       />
 
       {/* Content Area */}

@@ -44,7 +44,6 @@ import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState 
 import { registerOpenApp, unregisterOpenApp } from "../api/io";
 import { trackFeatureUsage } from "../api/telemetry";
 import { formatWindowName } from "../utils/windowName";
-import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
 import { Button } from "./Button";
@@ -549,7 +548,7 @@ export default function MainLayout() {
     };
   }, [handlePanelClick]);
 
-  // Disable all session + bookmark menu items when a non-session panel is focused.
+  // Disable all session + event menu items when a non-session panel is focused.
   // Session-aware panels (declared in apps.json) manage their own state via useMenuSessionControl.
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
@@ -563,27 +562,10 @@ export default function MainLayout() {
         isPaused: false,
         canPause: false,
         joinerCount: 0,
-        hasBookmarks: false,
+        hasEvents: false,
       });
     }
   }, [focusedPanelId]);
-
-  // Navigate to Bookmarks tab in Settings (not a session-control event)
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-    const setupListeners = async () => {
-      const unlistenBookmarkManage = await currentWindow.listen("menu-bookmark-manage", () => {
-        useSettingsStore.getState().setSection("bookmarks");
-      });
-      return () => {
-        unlistenBookmarkManage();
-      };
-    };
-    const cleanup = setupListeners();
-    return () => {
-      cleanup.then((fn) => fn());
-    };
-  }, []);
 
   // Cleanup save timeout on unmount
   useEffect(() => {

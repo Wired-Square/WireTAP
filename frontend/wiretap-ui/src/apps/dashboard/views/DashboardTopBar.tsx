@@ -29,7 +29,6 @@ interface Props {
   isStreaming: boolean;
   isPaused?: boolean;
   isStopped?: boolean;
-  supportsTimeRange?: boolean;
   onPlay?: () => void;
   onPause?: () => void;
   onLeave?: () => void;
@@ -75,7 +74,6 @@ export default function DashboardTopBar({
   isStreaming,
   isPaused,
   isStopped,
-  supportsTimeRange,
   onPlay,
   onPause,
   onLeave,
@@ -165,7 +163,6 @@ export default function DashboardTopBar({
         isStreaming,
         isPaused,
         isStopped,
-        supportsTimeRange,
         onPlay,
         onPause,
         onLeave,

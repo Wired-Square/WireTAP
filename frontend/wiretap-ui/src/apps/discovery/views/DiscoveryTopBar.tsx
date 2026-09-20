@@ -40,10 +40,6 @@ type Props = {
   onLeave?: () => void;
   onStop?: () => void;
   onDestroy?: () => void;
-  /** Whether the IO source supports time range filtering */
-  supportsTimeRange?: boolean;
-  /** Called to open bookmark picker */
-  onOpenBookmarkPicker?: () => void;
 
   // Speed control
   /** Current playback speed */
@@ -133,8 +129,6 @@ export default function DiscoveryTopBar({
   onRenameCapture,
   onClearCapture,
   hasData = false,
-  supportsTimeRange = false,
-  onOpenBookmarkPicker,
   speed = 1,
   supportsSpeed = false,
   onOpenSpeedPicker,
@@ -170,13 +164,11 @@ export default function DiscoveryTopBar({
         isStreaming,
         isPaused,
         isStopped,
-        supportsTimeRange,
         onPlay,
         onPause,
         onLeave,
         onStop,
         onDestroy,
-        onOpenBookmarkPicker,
         isCaptureMode,
         capturePersistent,
         onToggleCapturePin,

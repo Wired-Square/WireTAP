@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { sectionHeader, caption, captionMuted } from "../../styles/typography";
 import { borderDivider } from "../../styles";
 import type { IOProfile } from "../../hooks/useSettings";
-import type { TimeRangeFavorite } from "../../utils/favorites";
 import TimeBoundsInput, { type TimeBounds } from "../../components/TimeBoundsInput";
 import { SPEED_OPTIONS, CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
 import { Select } from "../../components/forms";
@@ -19,8 +18,6 @@ type Props = {
   // Speed
   selectedSpeed: number;
   onSpeedChange: (speed: number) => void;
-  // Bookmarks
-  profileBookmarks: TimeRangeFavorite[];
 };
 
 export default function LoadOptions({
@@ -31,7 +28,6 @@ export default function LoadOptions({
   onTimeBoundsChange,
   selectedSpeed,
   onSpeedChange,
-  profileBookmarks,
 }: Props) {
   const { t } = useTranslation("dialogs");
   // Don't show options if no source is checked, CSV is selected, or loading
@@ -49,12 +45,7 @@ export default function LoadOptions({
       <div className="p-3 space-y-3">
         {/* Time bounds (for recorded sources only) */}
         {!isCheckedRealtime && (
-          <TimeBoundsInput
-            value={timeBounds}
-            onChange={onTimeBoundsChange}
-            bookmarks={profileBookmarks}
-            showBookmarks={profileBookmarks.length > 0}
-          />
+          <TimeBoundsInput value={timeBounds} onChange={onTimeBoundsChange} />
         )}
 
         {/* Speed (for Connect mode, recorded sources only) */}

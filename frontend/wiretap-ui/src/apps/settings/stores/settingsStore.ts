@@ -12,10 +12,6 @@ import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../../../events/registry';
 import { getOrCreateDefaultDirs } from '../../../utils/defaultPaths';
 import {
-  getAllFavorites,
-  type TimeRangeFavorite,
-} from '../../../utils/favorites';
-import {
   getAllSelectionSets,
   type SelectionSet,
 } from '../../../utils/selectionSets';
@@ -25,7 +21,7 @@ import {
 } from '../../../utils/dashboardLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
 
 // The settings shape, IO-profile union + connection types/guards, default
 // constants and normalisation live in the neutral settings/appSettings module.
@@ -102,9 +98,6 @@ type DialogName =
   | 'deleteCatalog'
   | 'duplicateCatalog'
   | 'editCatalog'
-  | 'editBookmark'
-  | 'deleteBookmark'
-  | 'createBookmark'
   | 'editSelectionSet'
   | 'deleteSelectionSet'
   | 'editDashboardLayout'
@@ -117,8 +110,6 @@ interface DialogPayload {
   catalogToDelete: CatalogFile | null;
   catalogToDuplicate: CatalogFile | null;
   catalogToEdit: CatalogFile | null;
-  bookmarkToEdit: TimeRangeFavorite | null;
-  bookmarkToDelete: TimeRangeFavorite | null;
   selectionSetToEdit: SelectionSet | null;
   selectionSetToDelete: SelectionSet | null;
   dashboardLayoutToEdit: DashboardLayout | null;
@@ -131,9 +122,6 @@ const initialDialogs: Record<DialogName, boolean> = {
   deleteCatalog: false,
   duplicateCatalog: false,
   editCatalog: false,
-  editBookmark: false,
-  deleteBookmark: false,
-  createBookmark: false,
   editSelectionSet: false,
   deleteSelectionSet: false,
   editDashboardLayout: false,
@@ -147,8 +135,6 @@ const initialDialogPayload: DialogPayload = {
   catalogToDelete: null,
   catalogToDuplicate: null,
   catalogToEdit: null,
-  bookmarkToEdit: null,
-  bookmarkToDelete: null,
   selectionSetToEdit: null,
   selectionSetToDelete: null,
   dashboardLayoutToEdit: null,
@@ -183,9 +169,6 @@ interface SettingsState {
     defaultReadProfile: string | null;
     defaultWriteProfiles: string[];
   };
-
-  // Bookmarks
-  bookmarks: TimeRangeFavorite[];
 
   // Selection sets
   selectionSets: SelectionSet[];
@@ -264,7 +247,6 @@ interface SettingsState {
 
   // Actions - Loading
   loadSettings: () => Promise<void>;
-  loadBookmarks: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
   loadDashboardLayouts: () => Promise<void>;
 
@@ -292,11 +274,6 @@ interface SettingsState {
   removeProfile: (id: string) => void;
   setDefaultReadProfile: (id: string | null) => void;
   setDefaultWriteProfiles: (ids: string[]) => void;
-
-  // Actions - Catalogs
-
-  // Actions - Bookmarks
-  setBookmarks: (bookmarks: TimeRangeFavorite[]) => void;
 
   // Actions - Display
   setDisplayFrameIdFormat: (format: 'hex' | 'decimal') => void;
@@ -544,8 +521,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     defaultReadProfile: null,
     defaultWriteProfiles: [],
   },
-
-  bookmarks: [],
 
   selectionSets: [],
 
@@ -798,16 +773,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  loadBookmarks: async () => {
-    try {
-      const allBookmarks = await getAllFavorites();
-      allBookmarks.sort((a, b) => a.name.localeCompare(b.name));
-      set({ bookmarks: allBookmarks });
-    } catch (error) {
-      console.error('Failed to load bookmarks:', error);
-    }
-  },
-
   loadSelectionSets: async () => {
     try {
       const allSets = await getAllSelectionSets();
@@ -997,9 +962,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }));
     scheduleSave(get().saveSettings);
   },
-
-  // Bookmark actions
-  setBookmarks: (bookmarks) => set({ bookmarks }),
 
   // Display actions
   setDisplayFrameIdFormat: (format) => {

@@ -163,7 +163,7 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
         </div>
         {query.timeBounds && (
           <div className={`text-xs ${textMuted} mt-0.5 truncate`}>
-            {t("queue.boundedBy", { name: query.timeBounds.favouriteName })}
+            {t("queue.boundedBy", { start: query.timeBounds.startTime || "…", end: query.timeBounds.endTime || "…" })}
           </div>
         )}
       </div>

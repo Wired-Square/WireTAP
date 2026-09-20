@@ -8,14 +8,11 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useFocusStore } from "../stores/focusStore";
-import {
-  updateMenuState,
-  updateBookmarksMenu,
-  type BookmarkMenuInfo,
-} from "../api/menu";
-import { getFavoritesForProfile } from "../utils/favorites";
-import { isCaptureProfileId } from "./useIOSessionManager";
+import { updateMenuState, updateEventsMenu } from "../api/menu";
 import type { IOCapabilities } from "../api/io";
+import type { CaptureEvent, EventOwner } from "../api/captureEvents";
+import { eventLabel } from "../utils/captureEvents";
+import { NO_EVENTS } from "./useCaptureEvents";
 
 /** Callback map for session-control actions dispatched from the native menu. */
 export interface SessionControlCallbacks {
@@ -27,9 +24,9 @@ export interface SessionControlCallbacks {
   onPicker?: () => void;
   onImportFromFile?: () => void;
   onLeave?: () => void;
-  onJumpToBookmark?: (bookmarkId: string) => Promise<void>;
-  /** Called when "Save Bookmark…" is triggered from the menu. */
-  onBookmarkSave?: () => void;
+  onJumpToEvent?: (eventId: string) => Promise<void> | void;
+  /** Called when "Add Event…" is triggered from the menu. */
+  onEventAdd?: () => void;
 }
 
 /** Session state values reported to the native menu for enable/disable logic. */
@@ -41,10 +38,12 @@ export interface MenuReportState {
   joinerCount: number;
 }
 
-/** Optional bookmark support configuration. */
-export interface BookmarkConfig {
-  /** Profile ID used for bookmark lookups (sourceProfileId || ioProfile). */
-  profileId: string | null;
+/** Optional events support configuration. */
+export interface EventsMenuConfig {
+  /** Who holds the session's events; null disables the Events menu. */
+  owner: EventOwner | null;
+  /** Listed under Jump to Event when the session can seek or re-window. */
+  events: CaptureEvent[];
 }
 
 export interface UseMenuSessionControlOptions {
@@ -54,15 +53,15 @@ export interface UseMenuSessionControlOptions {
   sessionState: MenuReportState;
   /** Callbacks for session-control actions from the menu. */
   callbacks: SessionControlCallbacks;
-  /** If provided, bookmark menu is populated when this panel is focused. */
-  bookmarks?: BookmarkConfig;
+  /** If provided, the Events menu is enabled and populated when this panel is focused. */
+  events?: EventsMenuConfig;
 }
 
 /**
  * Centralised hook that handles:
  * 1. Reporting session state to the native menu when focused
  * 2. Listening for native menu events and dispatching to callbacks
- * 3. Reporting bookmarks to the native menu when focused (optional)
+ * 3. Reporting events to the native menu when focused (optional)
  *
  * Uses a single ref updated every render to avoid stale closures —
  * the event listener is registered once and reads from the ref.
@@ -71,13 +70,14 @@ export function useMenuSessionControl({
   panelId,
   sessionState,
   callbacks,
-  bookmarks,
+  events,
 }: UseMenuSessionControlOptions) {
   const isFocused = useFocusStore((s) => s.focusedPanelId === panelId);
 
   // Single ref holding all mutable state — updated every render, read by event handlers
-  const stateRef = useRef({ sessionState, callbacks, bookmarks, isFocused });
-  stateRef.current = { sessionState, callbacks, bookmarks, isFocused };
+  const stateRef = useRef({ sessionState, callbacks, isFocused });
+  stateRef.current = { sessionState, callbacks, isFocused };
+  const hasEvents = !!events?.owner;
 
   // ── Menu state reporting (when focused) ──
   useEffect(() => {
@@ -89,11 +89,6 @@ export function useMenuSessionControl({
     const effectiveProfileName =
       capabilities?.traits.temporal_mode === "capture" ? "Capture" : profileName;
 
-    const bookmarksEnabled =
-      !!bookmarks &&
-      (capabilities?.traits.temporal_mode === "recorded" ||
-        capabilities?.traits.temporal_mode === "capture");
-
     updateMenuState({
       hasSession: true,
       profileName: effectiveProfileName,
@@ -101,7 +96,7 @@ export function useMenuSessionControl({
       isPaused,
       canPause: capabilities?.can_pause ?? false,
       joinerCount: joinerCount ?? 1,
-      hasBookmarks: bookmarksEnabled,
+      hasEvents,
     });
   }, [
     isFocused,
@@ -110,27 +105,16 @@ export function useMenuSessionControl({
     sessionState.isPaused,
     sessionState.capabilities,
     sessionState.joinerCount,
+    hasEvents,
   ]);
 
-  // ── Bookmark menu reporting (when focused) ──
+  // ── Jump to Event submenu (when focused) ──
+  const menuEvents = events?.events ?? NO_EVENTS;
+  const canJump = !!sessionState.capabilities?.supports_seek || !!sessionState.capabilities?.supports_time_range;
   useEffect(() => {
-    if (!isFocused || !bookmarks) return;
-    const profileId = bookmarks.profileId;
-
-    const update = async () => {
-      if (profileId && !isCaptureProfileId(profileId)) {
-        const favs = await getFavoritesForProfile(profileId);
-        const items: BookmarkMenuInfo[] = favs.map((b) => ({
-          id: b.id,
-          name: b.name,
-        }));
-        await updateBookmarksMenu(items);
-      } else {
-        await updateBookmarksMenu([]);
-      }
-    };
-    update();
-  }, [isFocused, bookmarks?.profileId]);
+    if (!isFocused) return;
+    updateEventsMenu(canJump ? menuEvents.map((e) => ({ id: e.id, label: eventLabel(e) })) : []);
+  }, [isFocused, canJump, menuEvents]);
 
   // ── Native menu event listeners (registered once) ──
   // Each listener checks isFocused so only the active panel responds.
@@ -165,13 +149,13 @@ export function useMenuSessionControl({
       const unImportFile = await currentWindow.listen("menu-session-import-file", () => {
         if (guard()) cb().onImportFromFile?.();
       });
-      const unJump = await currentWindow.listen<string>("menu-jump-to-bookmark", async (event) => {
+      const unJump = await currentWindow.listen<string>("menu-jump-to-event", async (event) => {
         if (guard() && event.payload) {
-          await cb().onJumpToBookmark?.(event.payload);
+          await cb().onJumpToEvent?.(event.payload);
         }
       });
-      const unSave = await currentWindow.listen("menu-bookmark-save", () => {
-        if (guard()) cb().onBookmarkSave?.();
+      const unAdd = await currentWindow.listen("menu-event-add", () => {
+        if (guard()) cb().onEventAdd?.();
       });
 
       return () => {
@@ -184,7 +168,7 @@ export function useMenuSessionControl({
         unPicker();
         unImportFile();
         unJump();
-        unSave();
+        unAdd();
       };
     };
 

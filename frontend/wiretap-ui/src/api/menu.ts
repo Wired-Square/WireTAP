@@ -10,12 +10,12 @@ export interface MenuState {
   isPaused: boolean;
   canPause: boolean;
   joinerCount: number;
-  hasBookmarks: boolean;
+  hasEvents: boolean;
 }
 
-export interface BookmarkMenuInfo {
+export interface EventMenuInfo {
   id: string;
-  name: string;
+  label: string;
 }
 
 /** Update all Session menu items based on the focused app's session state and capabilities. */
@@ -27,11 +27,11 @@ export async function updateMenuState(state: MenuState): Promise<void> {
     isPaused: state.isPaused,
     canPause: state.canPause,
     joinerCount: state.joinerCount,
-    hasBookmarks: state.hasBookmarks,
+    hasEvents: state.hasEvents,
   });
 }
 
-/** Update the Bookmarks > Jump to Bookmark submenu with bookmarks for the current profile. */
-export async function updateBookmarksMenu(bookmarks: BookmarkMenuInfo[]): Promise<void> {
-  return invoke("update_bookmarks_menu", { bookmarks });
+/** Update the Events > Jump to Event submenu with the focused session's events. */
+export async function updateEventsMenu(events: EventMenuInfo[]): Promise<void> {
+  return invoke("update_events_menu", { events });
 }

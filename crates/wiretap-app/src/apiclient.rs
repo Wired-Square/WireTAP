@@ -17,6 +17,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
+use crate::capture_events::CaptureEvent;
 use crate::credentials::{self, get_credential};
 use crate::queryresults::{
     differing_byte_indices, ByteChangeQueryResult, DatabaseActivityResult, DistributionQueryResult,
@@ -217,7 +218,10 @@ pub(crate) async fn parse<T: DeserializeOwned>(resp: reqwest::Response) -> Resul
 /// `/v1/health`, and elsewhere the gateway's 401 comes back as the error text.
 async fn get_url<T: DeserializeOwned>(url: String, api_key: &str) -> Result<T, String> {
     let req = HTTP.get(url);
-    let req = if api_key.is_empty() { req } else { req.bearer_auth(api_key) };
+    send(if api_key.is_empty() { req } else { req.bearer_auth(api_key) }).await
+}
+
+async fn send<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> Result<T, String> {
     let resp = req
         .send()
         .await
@@ -248,17 +252,7 @@ async fn post_query<T: DeserializeOwned>(
         },
     );
     let body = api.with_protocol(body);
-    let result = async {
-        let resp = HTTP
-            .post(api.db_url(path))
-            .bearer_auth(&api.api_key)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("API request failed: {}", describe(&e)))?;
-        parse(resp).await
-    }
-    .await;
+    let result = send(HTTP.post(api.db_url(path)).bearer_auth(&api.api_key).json(&body)).await;
     API_RUNNING.lock().await.remove(query_id);
     result
 }
@@ -543,12 +537,7 @@ pub async fn signal_backend(profile: &IOProfile, pid: i32, terminate: bool) -> R
         api.db_url(&format!("/activity/{pid}/cancel"))
     };
     let req = if terminate { HTTP.delete(url) } else { HTTP.post(url) };
-    let resp = req
-        .bearer_auth(&api.api_key)
-        .send()
-        .await
-        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
-    Ok(parse::<Ok_>(resp).await?.ok)
+    Ok(send::<Ok_>(req.bearer_auth(&api.api_key)).await?.ok)
 }
 
 // ---------------------------------------------------------------------------
@@ -627,14 +616,8 @@ pub async fn fetch_frame_payloads(
     struct Resp {
         payloads: Vec<Vec<u8>>,
     }
-    let resp = HTTP
-        .post(api.db_url("/payloads"))
-        .bearer_auth(&api.api_key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
-    Ok(parse::<Resp>(resp).await?.payloads)
+    let resp: Resp = send(HTTP.post(api.db_url("/payloads")).bearer_auth(&api.api_key).json(&body)).await?;
+    Ok(resp.payloads)
 }
 
 // ---------------------------------------------------------------------------
@@ -656,6 +639,88 @@ struct ImportProgress {
 #[derive(Deserialize)]
 struct ImportResp {
     imported: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Events — the archive's annotations, one per database
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct WireEvent {
+    id: i64,
+    ts_us: i64,
+    duration_us: i64,
+    note: String,
+    created_at_us: i64,
+    updated_at_us: i64,
+}
+
+impl From<WireEvent> for CaptureEvent {
+    fn from(e: WireEvent) -> Self {
+        CaptureEvent {
+            id: e.id.to_string(),
+            timestamp_us: e.ts_us,
+            duration_us: e.duration_us,
+            note: e.note,
+            created_at_us: e.created_at_us,
+            updated_at_us: e.updated_at_us,
+        }
+    }
+}
+
+pub async fn events_list(app: &tauri::AppHandle, profile_id: &str) -> Result<Vec<CaptureEvent>, String> {
+    #[derive(Deserialize)]
+    struct Resp {
+        events: Vec<WireEvent>,
+    }
+    let api = resolve_by_id(app, profile_id).await?;
+    // The gateway's default is the oldest 1000; there is no cursor, so ask for all of them.
+    let resp: Resp = get(&api, "/events?limit=1000000").await?;
+    Ok(resp.events.into_iter().map(Into::into).collect())
+}
+
+pub async fn events_add(
+    app: &tauri::AppHandle,
+    profile_id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    let api = resolve_by_id(app, profile_id).await?;
+    let body = json!({ "ts_us": timestamp_us, "duration_us": duration_us, "note": note });
+    send::<WireEvent>(HTTP.post(api.db_url("/events")).bearer_auth(&api.api_key).json(&body))
+        .await
+        .map(Into::into)
+}
+
+pub async fn events_update(
+    app: &tauri::AppHandle,
+    profile_id: &str,
+    id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    let api = resolve_by_id(app, profile_id).await?;
+    let body = json!({ "ts_us": timestamp_us, "duration_us": duration_us, "note": note });
+    send::<WireEvent>(HTTP.patch(api.db_url(&format!("/events/{id}"))).bearer_auth(&api.api_key).json(&body))
+        .await
+        .map(Into::into)
+}
+
+/// A 204 carries no body, which `parse` would reject — only a failure is read.
+pub async fn events_delete(app: &tauri::AppHandle, profile_id: &str, id: &str) -> Result<(), String> {
+    let api = resolve_by_id(app, profile_id).await?;
+    let resp = HTTP
+        .delete(api.db_url(&format!("/events/{id}")))
+        .bearer_auth(&api.api_key)
+        .send()
+        .await
+        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
+    if resp.status().is_success() {
+        return Ok(());
+    }
+    parse::<Value>(resp).await.map(|_| ())
 }
 
 /// Encode one frame in the backend's flat import record format:
@@ -813,14 +878,8 @@ pub async fn api_create_database(
     name: String,
 ) -> Result<(), String> {
     let api = resolve_by_id(&app, &profile_id).await?;
-    let resp = HTTP
-        .post(format!("{}/v1/databases", api.base_url))
-        .bearer_auth(&api.api_key)
-        .json(&json!({ "name": name }))
-        .send()
-        .await
-        .map_err(|e| format!("API request failed: {}", describe(&e)))?;
-    parse::<Value>(resp).await.map(|_| ())
+    let req = HTTP.post(format!("{}/v1/databases", api.base_url)).bearer_auth(&api.api_key).json(&json!({ "name": name }));
+    send::<Value>(req).await.map(|_| ())
 }
 
 /// Health/connectivity probe for the profile editor ("Test connection").

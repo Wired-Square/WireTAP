@@ -37,12 +37,11 @@ import DiscoveryFramesView from "./views/DiscoveryFramesView";
 import SerialDiscoveryView from "./views/SerialDiscoveryView";
 import SaveFramesDialog from "../../dialogs/SaveFramesDialog";
 import DecoderInfoDialog from "../../dialogs/DecoderInfoDialog";
-import AddBookmarkDialog from "../../dialogs/AddBookmarkDialog";
+import EventDialog from "../../dialogs/EventDialog";
 import AnalysisProgressDialog from "./dialogs/AnalysisProgressDialog";
 import ConfirmDeleteDialog from "../../dialogs/ConfirmDeleteDialog";
 import SpeedPickerDialog from "../../dialogs/SpeedPickerDialog";
 import ExportFramesDialog, { type ExportDataMode } from "../../dialogs/ExportFramesDialog";
-import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
@@ -55,7 +54,8 @@ import { pickFileToSave } from "../../api/dialogs";
 import { saveCatalog } from "../../api/catalog";
 import { formatFilenameDate } from "../../utils/timeFormat";
 import { useDialogManager } from "../../hooks/useDialogManager";
-import { getFavoritesForProfile } from "../../utils/favorites";
+import { useSessionEvents } from "../../hooks/useSessionEvents";
+import { utcToLocal } from "../../utils/timezone";
 
 /** The protocol these frames are, for labelling and export naming. Entries without a
  *  protocol are skipped, and no frames at all answers undefined rather than 'can' —
@@ -233,11 +233,9 @@ function DiscoveryInner() {
 
   // Dialog visibility states managed by hook
   const dialogs = useDialogManager([
-    'bookmark',
     'speedPicker',
     'speedChange',
     'export',
-    'bookmarkPicker',
     'saveSelectionSet',
     'ioSessionPicker',
     'framePicker',
@@ -248,10 +246,7 @@ function DiscoveryInner() {
   const { selectionSets } = useSelectionSets();
 
   // Additional dialog state (data associated with dialogs)
-  const [bookmarkFrameId, setBookmarkFrameId] = useState(0);
-  const [bookmarkFrameTime, setBookmarkFrameTime] = useState("");
   const [pendingSpeed, setPendingSpeed] = useState<PlaybackSpeed | null>(null);
-  const [_activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
 
   // Playback direction state (for capture replay)
   const [playbackDirection, setPlaybackDirection] = useState<"forward" | "backward">("forward");
@@ -376,24 +371,18 @@ function DiscoveryInner() {
     setFrameInfoFromCapture,
   ]);
 
-  // Callback for when session is reconfigured (e.g., bookmark jump)
+  // Callback for when session is reconfigured (e.g., event jump)
   const handleSessionReconfigured = useCallback((info: SessionReconfigurationInfo) => {
-    if (info.reason === "bookmark" && info.bookmark) {
-      setStartTime(info.bookmark.startTime);
-      setEndTime(info.bookmark.endTime);
-      setActiveBookmarkId(info.bookmark.id);
+    setStartTime(utcToLocal(info.startTime));
+    setEndTime(info.endTime ? utcToLocal(info.endTime) : "");
 
-      // Zero the time delta from the bookmark's start time
-      if (info.startTime) {
-        const startTimeUs = new Date(info.startTime).getTime() * 1000;
-        setStreamStartTimeUs(startTimeUs);
-      }
+    // Zero the time delta from the new window's start
+    setStreamStartTimeUs(new Date(info.startTime).getTime() * 1000);
 
-      // Reset playback position so the scrubber doesn't show a stale position
-      updateCurrentTime(null);
-      setCurrentFrameIndex(null);
-    }
-  }, [setStartTime, setEndTime, setActiveBookmarkId, setStreamStartTimeUs, updateCurrentTime, setCurrentFrameIndex]);
+    // Reset playback position so the scrubber doesn't show a stale position
+    updateCurrentTime(null);
+    setCurrentFrameIndex(null);
+  }, [setStartTime, setEndTime, setStreamStartTimeUs, updateCurrentTime, setCurrentFrameIndex]);
 
   // The single teardown entry point for Discovery. Every path that drops a source —
   // starting a new watch, destroying, leaving, switching profile, "Continue without a
@@ -489,8 +478,9 @@ function DiscoveryInner() {
     selectProfile,
     watchSource,
     joinSession,
-    // Bookmark methods
-    jumpToBookmark,
+    jumpToTimeRange,
+    playheadNowUs,
+    eventOwner,
   } = manager;
 
   // Session controls from the underlying session
@@ -911,8 +901,6 @@ function DiscoveryInner() {
     isStreaming,
     isPaused,
     sessionReady,
-    ioProfile,
-    sourceProfileId,
     playbackSpeed,
     isStopped,
     captureModeEnabled: captureMode.enabled,
@@ -949,9 +937,6 @@ function DiscoveryInner() {
     // Local state
     pendingSpeed,
     setPendingSpeed,
-    setActiveBookmarkId,
-    setBookmarkFrameId,
-    setBookmarkFrameTime,
     resetWatchFrameCount,
     setCaptureMetadata,
 
@@ -959,7 +944,6 @@ function DiscoveryInner() {
     stopWatch,
     selectProfile,
     watchSource,
-    jumpToBookmark,
 
     // Session actions
     setIoProfile,
@@ -1003,7 +987,6 @@ function DiscoveryInner() {
     saveCatalog,
 
     // Dialog controls
-    openBookmarkDialog: dialogs.bookmark.open,
     closeSpeedChangeDialog: dialogs.speedChange.close,
     openSaveSelectionSetDialog: dialogs.saveSelectionSet.open,
     closeExportDialog: dialogs.export.close,
@@ -1031,8 +1014,15 @@ function DiscoveryInner() {
     }
   }, [sessionId, capabilities, seekByFrame, selectedFrames, captureMetadata, sessionCaptureId, setCurrentFrameIndex, updateCurrentTime]);
 
+  const sessionEvents = useSessionEvents({
+    owner: eventOwner,
+    capabilities,
+    seek,
+    jumpToTimeRange,
+    useLocalTimezone: settings?.display_timezone === "local",
+  });
+
   // ── Menu session control ──
-  const bookmarkProfileId = sourceProfileId || ioProfile;
   useMenuSessionControl({
     panelId: "discovery",
     sessionState: {
@@ -1059,22 +1049,13 @@ function DiscoveryInner() {
       onClear: () => handlers.handleClearDiscoveredFrames(),
       onPicker: () => dialogs.ioSessionPicker.open(),
       onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
-      onJumpToBookmark: async (bookmarkId) => {
-        const profileId = sourceProfileId || ioProfile;
-        if (profileId) {
-          const bookmarks = await getFavoritesForProfile(profileId);
-          const bookmark = bookmarks.find((b) => b.id === bookmarkId);
-          if (bookmark) await jumpToBookmark(bookmark);
-        }
-      },
-      onBookmarkSave: () => {
-        const timeUs = currentTime !== null ? currentTime * 1_000_000 : 0;
-        setBookmarkFrameId(0);
-        setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
-        dialogs.bookmark.open();
+      onJumpToEvent: sessionEvents.jumpToEventId,
+      onEventAdd: () => {
+        const at = currentTime !== null ? currentTime * 1_000_000 : playheadNowUs();
+        if (eventOwner && at !== null) sessionEvents.openAdd(at);
       },
     },
-    bookmarks: { profileId: bookmarkProfileId },
+    events: sessionEvents.menu,
   });
 
 
@@ -1099,8 +1080,6 @@ function DiscoveryInner() {
           onLeave={handleLeave}
           onStop={isStreaming ? stopWatch : undefined}
           onDestroy={handleDestroy}
-          supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
           speed={playbackSpeed}
           supportsSpeed={capabilities?.supports_speed_control ?? false}
           onOpenSpeedPicker={() => dialogs.speedPicker.open()}
@@ -1175,7 +1154,8 @@ function DiscoveryInner() {
             onCancelScan={handleCancelModbusScan}
             displayFrameIdFormat={displayFrameIdFormat}
             displayTimeFormat={displayTimeFormat}
-            onBookmark={isRecorded ? handlers.handleBookmark : undefined}
+            onAddEvent={eventOwner ? sessionEvents.openAdd : undefined}
+            timelineMarkers={sessionEvents.markers}
             isStreaming={isStreaming}
             timestamp={displayTimeSeconds}
             streamStartTimeUs={streamStartTimeUs}
@@ -1229,12 +1209,11 @@ function DiscoveryInner() {
         onSave={handlers.handleSaveFrames}
       />
 
-      <AddBookmarkDialog
-        isOpen={dialogs.bookmark.isOpen}
-        frameId={bookmarkFrameId}
-        frameTime={bookmarkFrameTime}
-        onClose={() => dialogs.bookmark.close()}
-        onSave={handlers.handleSaveBookmark}
+      <EventDialog
+        isOpen={sessionEvents.draft !== null}
+        initial={sessionEvents.draft}
+        onClose={sessionEvents.closeDraft}
+        onSave={sessionEvents.save}
       />
 
       <AnalysisProgressDialog
@@ -1270,13 +1249,6 @@ function DiscoveryInner() {
         defaultFilename={exportDefaultFilename}
         onCancel={() => dialogs.export.close()}
         onExport={handlers.handleExport}
-      />
-
-      <BookmarkEditorDialog
-        isOpen={dialogs.bookmarkPicker.isOpen}
-        onClose={() => dialogs.bookmarkPicker.close()}
-        onLoad={handlers.handleLoadBookmark}
-        profileId={sourceProfileId || ioProfile}
       />
 
       <IoSourcePickerDialog

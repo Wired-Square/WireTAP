@@ -14,7 +14,8 @@ import { useEffectiveCaptureMetadata } from "../../hooks/useEffectiveCaptureMeta
 import { useFocusStore } from '../../stores/focusStore';
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
-import { getFavoritesForProfile } from "../../utils/favorites";
+import { useSessionEvents } from "../../hooks/useSessionEvents";
+import { utcToLocal } from "../../utils/timezone";
 import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
 import { frameKey } from "../../utils/frameKey";
 import { buildCatalogPath } from "../../utils/catalogUtils";
@@ -33,7 +34,7 @@ import { getCaptureMetadata, type CaptureMetadata } from "../../api/capture";
 import SpeedPickerDialog from "../../dialogs/SpeedPickerDialog";
 import CatalogPickerDialog from "../../dialogs/catalog-picker";
 import FlashNotification from "../../components/FlashNotification";
-import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
+import EventDialog from "../../dialogs/EventDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import FilterDialog from "./dialogs/FilterDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
@@ -63,7 +64,6 @@ function DecoderInner() {
   const allIOProfiles = useAllIOProfiles();
   const [catalogNotification, setCatalogNotification] = useState<string | null>(null);
   const catalogs = useCatalogList();
-  const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [showTimeRange, setShowTimeRange] = useState(false);
 
   // Track if this panel is focused (for scroll position restoration)
@@ -71,7 +71,6 @@ function DecoderInner() {
 
   // Dialog visibility states managed by hook
   const dialogs = useDialogManager([
-    'bookmarkPicker',
     'saveSelectionSet',
     'framePicker',
     'ioSessionPicker',
@@ -460,14 +459,11 @@ function DecoderInner() {
     }
   }, [dialogs.ioSessionPicker]);
 
-  // Callback for when session is reconfigured (e.g., bookmark jump)
+  // Callback for when session is reconfigured (e.g., event jump)
   const handleSessionReconfigured = useCallback((info: SessionReconfigurationInfo) => {
-    if (info.reason === "bookmark" && info.bookmark) {
-      setStartTime(info.bookmark.startTime);
-      setEndTime(info.bookmark.endTime);
-      setActiveBookmarkId(info.bookmark.id);
-    }
-  }, [setStartTime, setEndTime, setActiveBookmarkId]);
+    setStartTime(utcToLocal(info.startTime));
+    setEndTime(info.endTime ? utcToLocal(info.endTime) : "");
+  }, [setStartTime, setEndTime]);
 
   // Handle session suspended (from any app sharing this session)
   // This fetches capture metadata so Decoder can show timeline controls
@@ -532,7 +528,7 @@ function DecoderInner() {
     // Multi-bus state
     multiBusProfiles: ioProfiles,
     outputBusToSource,
-    // Source profile ID (for bookmark lookups - preserved when session ID differs)
+    // Source profile ID (preserved when session ID differs)
     sourceProfileId,
     // Session
     session,
@@ -560,8 +556,9 @@ function DecoderInner() {
     resumeWithNewCapture,
     selectProfile,
     watchSource,
-    // Bookmark methods
-    jumpToBookmark,
+    jumpToTimeRange,
+    playheadNowUs,
+    eventOwner,
     // Watch state
     watchFrameCount,
     watchUniqueFrameCount,
@@ -737,16 +734,12 @@ function DecoderInner() {
     stopWatch,
     selectProfile,
     watchSource,
-    jumpToBookmark,
 
     // Dialog controls
     openSaveSelectionSet: dialogs.saveSelectionSet.open,
 
     // Active tab
     activeTab,
-
-    // Bookmark state
-    setActiveBookmarkId,
 
     // Buffer state
     setCaptureMetadata,
@@ -797,8 +790,21 @@ function DecoderInner() {
     },
   });
 
+  const sessionEvents = useSessionEvents({
+    owner: eventOwner,
+    capabilities,
+    seek,
+    jumpToTimeRange,
+    useLocalTimezone: settings?.display_timezone === "local",
+  });
+  // Decoded rows carry no timestamp, so every add marks the playhead
+  const openAddEventAtPlayhead = useCallback(() => {
+    const at = useDecoderStore.getState().currentTime;
+    const timestampUs = at !== null ? at * 1_000_000 : playheadNowUs();
+    if (eventOwner && timestampUs !== null) sessionEvents.openAdd(timestampUs);
+  }, [eventOwner, playheadNowUs, sessionEvents]);
+
   // ── Menu session control ──
-  const bookmarkProfileId = sourceProfileId || ioProfile;
   useMenuSessionControl({
     panelId: "decoder",
     sessionState: {
@@ -825,15 +831,10 @@ function DecoderInner() {
       onClear: () => handlers.handleClear(),
       onPicker: () => dialogs.ioSessionPicker.open(),
       onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
-      onJumpToBookmark: async (bookmarkId) => {
-        if (bookmarkProfileId) {
-          const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
-          const bookmark = bookmarks.find((b) => b.id === bookmarkId);
-          if (bookmark) await jumpToBookmark(bookmark);
-        }
-      },
+      onJumpToEvent: sessionEvents.jumpToEventId,
+      onEventAdd: openAddEventAtPlayhead,
     },
-    bookmarks: { profileId: bookmarkProfileId },
+    events: sessionEvents.menu,
   });
 
   // Note: Watch state is cleared automatically by useIOSessionManager when streaming stops
@@ -1112,8 +1113,6 @@ function DecoderInner() {
             onLeave={!isDetached ? handleLeave : undefined}
             onStop={isStreaming ? stopWatch : undefined}
             onDestroy={handleDestroy}
-            supportsTimeRange={capabilities?.supports_time_range ?? false}
-            onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}
             uniqueFrameCount={isCaptureMode ? frameList.length : watchUniqueFrameCount}
             totalFrameCount={isCaptureMode ? captureCount : watchFrameCount}
@@ -1176,8 +1175,8 @@ function DecoderInner() {
           playbackSpeed={playbackSpeed}
           onSpeedChange={handlers.handleSpeedChange}
           hasCaptureData={hasCaptureData}
-          activeBookmarkId={activeBookmarkId}
-          onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
+          onAddEvent={eventOwner ? openAddEventAtPlayhead : undefined}
+          timelineMarkers={sessionEvents.markers}
           showTimeRange={showTimeRange}
           onToggleTimeRange={() => setShowTimeRange(!showTimeRange)}
           startTime={startTime}
@@ -1272,11 +1271,11 @@ function DecoderInner() {
         title={t("catalogPicker.title")}
       />
 
-      <BookmarkEditorDialog
-        isOpen={dialogs.bookmarkPicker.isOpen}
-        onClose={() => dialogs.bookmarkPicker.close()}
-        onLoad={handlers.handleLoadBookmark}
-        profileId={bookmarkProfileId}
+      <EventDialog
+        isOpen={sessionEvents.draft !== null}
+        initial={sessionEvents.draft}
+        onClose={sessionEvents.closeDraft}
+        onSave={sessionEvents.save}
       />
 
       <SaveSelectionSetDialog

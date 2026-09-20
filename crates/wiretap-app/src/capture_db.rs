@@ -16,8 +16,9 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::Mutex;
 
+use crate::capture_events::CaptureEvent;
 use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, FrameSelection, TimestampedByte};
-use crate::io::FrameMessage;
+use crate::io::{now_us, FrameMessage};
 
 /// Global database connection, protected by a Mutex.
 /// rusqlite::Connection is !Sync, so we use Mutex (not RwLock).
@@ -128,6 +129,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 3,
         name: "frames_fid_protocol_index",
         step: MigrationStep::Sql(include_str!("../migrations/0003_frames_fid_protocol_index.sql")),
+    },
+    Migration {
+        version: 4,
+        name: "capture_events",
+        step: MigrationStep::Sql(include_str!("../migrations/0004_capture_events.sql")),
     },
 ];
 
@@ -285,30 +291,7 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
         // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
         conn.execute_batch("PRAGMA journal_mode=DELETE;")
             .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
-        // Delete frames/bytes belonging to non-persistent captures
-        conn.execute(
-            "DELETE FROM frames WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0)",
-            [],
-        )
-        .map_err(|e| format!("Failed to clear non-persistent frames: {}", e))?;
-        conn.execute(
-            "DELETE FROM bytes WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0)",
-            [],
-        )
-        .map_err(|e| format!("Failed to clear non-persistent bytes: {}", e))?;
-        conn.execute("DELETE FROM capture_metadata WHERE persistent = 0", [])
-            .map_err(|e| format!("Failed to clear non-persistent capture metadata: {}", e))?;
-        // Also delete orphaned data (frames/bytes with no metadata row at all)
-        conn.execute(
-            "DELETE FROM frames WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata)",
-            [],
-        )
-        .map_err(|e| format!("Failed to clear orphaned frames: {}", e))?;
-        conn.execute(
-            "DELETE FROM bytes WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata)",
-            [],
-        )
-        .map_err(|e| format!("Failed to clear orphaned bytes: {}", e))?;
+        sweep_non_persistent_with_conn(&conn)?;
         conn.execute_batch("VACUUM;")
             .map_err(|e| format!("Failed to vacuum database: {}", e))?;
         tlog!("[capture_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
@@ -330,6 +313,21 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     Ok(())
 }
 
+
+/// Drop every non-persistent capture's rows, then any rows left without a
+/// metadata row at all.
+fn sweep_non_persistent_with_conn(conn: &Connection) -> Result<(), String> {
+    conn.execute_batch(
+        "DELETE FROM frames WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0);
+         DELETE FROM bytes WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0);
+         DELETE FROM capture_events WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0);
+         DELETE FROM capture_metadata WHERE persistent = 0;
+         DELETE FROM frames WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata);
+         DELETE FROM bytes WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata);
+         DELETE FROM capture_events WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata);",
+    )
+    .map_err(|e| format!("Failed to clear non-persistent captures: {}", e))
+}
 
 // ============================================================================
 // Helper: row → FrameMessage
@@ -1036,7 +1034,10 @@ pub fn search_frames(
 pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
     let mut guard = DB.lock().unwrap();
     let conn = guard.as_mut().ok_or("Database not initialised")?;
+    copy_capture_data_with_conn(conn, source_id, dest_id)
+}
 
+fn copy_capture_data_with_conn(conn: &mut Connection, source_id: &str, dest_id: &str) -> Result<usize, String> {
     let tx = conn
         .transaction()
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
@@ -1059,6 +1060,14 @@ pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String
         )
         .map_err(|e| format!("Failed to copy bytes: {}", e))?;
 
+    tx.execute(
+        "INSERT INTO capture_events (capture_id, timestamp_us, duration_us, note, created_at_us, updated_at_us)
+         SELECT ?2, timestamp_us, duration_us, note, created_at_us, updated_at_us
+         FROM capture_events WHERE capture_id = ?1 ORDER BY id",
+        params![source_id, dest_id],
+    )
+    .map_err(|e| format!("Failed to copy events: {}", e))?;
+
     tx.commit()
         .map_err(|e| format!("Failed to commit: {}", e))?;
 
@@ -1069,11 +1078,16 @@ pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String
 pub fn delete_capture_data(capture_id: &str) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
+    delete_capture_data_with_conn(conn, capture_id)
+}
 
+fn delete_capture_data_with_conn(conn: &Connection, capture_id: &str) -> Result<(), String> {
     conn.execute("DELETE FROM frames WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to delete frames: {}", e))?;
     conn.execute("DELETE FROM bytes WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to delete bytes: {}", e))?;
+    conn.execute("DELETE FROM capture_events WHERE capture_id = ?1", params![capture_id])
+        .map_err(|e| format!("Failed to delete events: {}", e))?;
 
     Ok(())
 }
@@ -1763,7 +1777,130 @@ pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
         params![capture_id],
     )
     .map_err(|e| format!("Failed to delete capture metadata: {}", e))?;
+    conn.execute("DELETE FROM capture_events WHERE capture_id = ?1", params![capture_id])
+        .map_err(|e| format!("Failed to delete events: {}", e))?;
 
+    Ok(())
+}
+
+// ============================================================================
+// Capture events
+// ============================================================================
+
+const EVENT_COLUMNS: &str = "id, timestamp_us, duration_us, note, created_at_us, updated_at_us";
+
+fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<CaptureEvent> {
+    Ok(CaptureEvent {
+        id: row.get::<_, i64>(0)?.to_string(),
+        timestamp_us: row.get(1)?,
+        duration_us: row.get(2)?,
+        note: row.get(3)?,
+        created_at_us: row.get(4)?,
+        updated_at_us: row.get(5)?,
+    })
+}
+
+fn parse_event_id(id: &str) -> Result<i64, String> {
+    id.parse().map_err(|_| format!("Invalid event id '{id}'"))
+}
+
+pub fn list_capture_events(capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    list_capture_events_with_conn(conn, capture_id)
+}
+
+fn list_capture_events_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
+    let mut stmt = conn
+        .prepare_cached(&format!(
+            "SELECT {EVENT_COLUMNS} FROM capture_events WHERE capture_id = ?1 ORDER BY timestamp_us, id"
+        ))
+        .map_err(|e| format!("Failed to prepare: {}", e))?;
+    let rows = stmt
+        .query_map(params![capture_id], row_to_event)
+        .map_err(|e| format!("Failed to query events: {}", e))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to read events: {}", e))
+}
+
+pub fn insert_capture_event(
+    capture_id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    insert_capture_event_with_conn(conn, capture_id, timestamp_us, duration_us, note)
+}
+
+fn insert_capture_event_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    conn.query_row(
+        &format!(
+            "INSERT INTO capture_events (capture_id, timestamp_us, duration_us, note, created_at_us, updated_at_us)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?5) RETURNING {EVENT_COLUMNS}"
+        ),
+        params![capture_id, timestamp_us, duration_us, note, now_us() as i64],
+        row_to_event,
+    )
+    .map_err(|e| format!("Failed to insert event: {}", e))
+}
+
+pub fn update_capture_event(
+    capture_id: &str,
+    id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    update_capture_event_with_conn(conn, capture_id, id, timestamp_us, duration_us, note)
+}
+
+fn update_capture_event_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    id: &str,
+    timestamp_us: i64,
+    duration_us: i64,
+    note: &str,
+) -> Result<CaptureEvent, String> {
+    conn.query_row(
+        &format!(
+            "UPDATE capture_events SET timestamp_us = ?3, duration_us = ?4, note = ?5, updated_at_us = ?6
+             WHERE capture_id = ?1 AND id = ?2 RETURNING {EVENT_COLUMNS}"
+        ),
+        params![capture_id, parse_event_id(id)?, timestamp_us, duration_us, note, now_us() as i64],
+        row_to_event,
+    )
+    .optional()
+    .map_err(|e| format!("Failed to update event: {}", e))?
+    .ok_or_else(|| "Event not found".to_string())
+}
+
+pub fn delete_capture_event(capture_id: &str, id: &str) -> Result<(), String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    delete_capture_event_with_conn(conn, capture_id, id)
+}
+
+fn delete_capture_event_with_conn(conn: &Connection, capture_id: &str, id: &str) -> Result<(), String> {
+    let changed = conn
+        .execute(
+            "DELETE FROM capture_events WHERE capture_id = ?1 AND id = ?2",
+            params![capture_id, parse_event_id(id)?],
+        )
+        .map_err(|e| format!("Failed to delete event: {}", e))?;
+    if changed == 0 {
+        return Err("Event not found".to_string());
+    }
     Ok(())
 }
 
@@ -2192,11 +2329,98 @@ mod tests {
                 (1, "baseline_capture_schema".to_string()),
                 (2, "frames_capture_rowid_index".to_string()),
                 (3, "frames_fid_protocol_index".to_string()),
+                (4, "capture_events".to_string()),
             ]
         );
         assert!(has_column(&conn, "frames", "capture_id").unwrap());
         assert!(has_column(&conn, "capture_metadata", "persistent").unwrap());
         assert!(has_column(&conn, "capture_metadata", "buses").unwrap());
+        assert!(has_column(&conn, "capture_events", "duration_us").unwrap());
+    }
+
+    fn event_count(conn: &Connection, capture_id: &str) -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM capture_events WHERE capture_id = ?1",
+            params![capture_id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn events_round_trip_in_timestamp_order() {
+        let conn = multi_protocol_capture();
+        let later = insert_capture_event_with_conn(&conn, "c1", 30, 0, "later").unwrap();
+        let earlier = insert_capture_event_with_conn(&conn, "c1", 10, 5, "earlier").unwrap();
+        insert_capture_event_with_conn(&conn, "c2", 20, 0, "other capture").unwrap();
+
+        let listed = list_capture_events_with_conn(&conn, "c1").unwrap();
+        assert_eq!(
+            listed.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(),
+            vec![earlier.id.as_str(), later.id.as_str()]
+        );
+        assert_eq!(listed[0].duration_us, 5);
+        assert_eq!(listed[0].created_at_us, listed[0].updated_at_us);
+
+        let updated = update_capture_event_with_conn(&conn, "c1", &later.id, 30, 7, "renamed").unwrap();
+        assert_eq!((updated.timestamp_us, updated.duration_us, updated.note.as_str()), (30, 7, "renamed"));
+        assert!(updated.updated_at_us >= updated.created_at_us);
+
+        delete_capture_event_with_conn(&conn, "c1", &earlier.id).unwrap();
+        assert_eq!(list_capture_events_with_conn(&conn, "c1").unwrap().len(), 1);
+        assert!(delete_capture_event_with_conn(&conn, "c1", &earlier.id).is_err());
+        assert!(update_capture_event_with_conn(&conn, "c2", &later.id, 30, 7, "wrong capture").is_err());
+        assert_eq!(event_count(&conn, "c2"), 1);
+    }
+
+    #[test]
+    fn deleting_capture_data_removes_its_events() {
+        let conn = multi_protocol_capture();
+        insert_capture_event_with_conn(&conn, "c1", 10, 0, "gone").unwrap();
+        insert_capture_event_with_conn(&conn, "c2", 10, 0, "kept").unwrap();
+
+        delete_capture_data_with_conn(&conn, "c1").unwrap();
+
+        assert_eq!(event_count(&conn, "c1"), 0);
+        assert_eq!(event_count(&conn, "c2"), 1);
+    }
+
+    #[test]
+    fn copying_a_capture_copies_its_events() {
+        let mut conn = multi_protocol_capture();
+        insert_capture_event_with_conn(&conn, "c1", 10, 3, "first").unwrap();
+        insert_capture_event_with_conn(&conn, "c1", 40, 0, "second").unwrap();
+
+        let copied_rows = copy_capture_data_with_conn(&mut conn, "c1", "c1_copy").unwrap();
+        assert_eq!(copied_rows, 4, "events are not counted as data rows");
+
+        let copied = list_capture_events_with_conn(&conn, "c1_copy").unwrap();
+        assert_eq!(copied.iter().map(|e| e.note.as_str()).collect::<Vec<_>>(), vec!["first", "second"]);
+        assert_eq!(copied[0].duration_us, 3);
+        assert_eq!(event_count(&conn, "c1"), 2);
+    }
+
+    #[test]
+    fn clear_on_start_sweeps_non_persistent_events() {
+        let conn = multi_protocol_capture();
+        conn.execute_batch(
+            "INSERT INTO capture_metadata (capture_id, capture_kind, name, created_at, persistent)
+             VALUES ('pinned', 'frames', 'pinned', 0, 1), ('ephemeral', 'frames', 'ephemeral', 0, 0);",
+        )
+        .unwrap();
+        insert_capture_event_with_conn(&conn, "pinned", 1, 0, "survives").unwrap();
+        insert_capture_event_with_conn(&conn, "ephemeral", 1, 0, "swept").unwrap();
+        insert_capture_event_with_conn(&conn, "no_metadata", 1, 0, "orphan").unwrap();
+
+        sweep_non_persistent_with_conn(&conn).unwrap();
+
+        assert_eq!(event_count(&conn, "pinned"), 1);
+        assert_eq!(event_count(&conn, "ephemeral"), 0);
+        assert_eq!(event_count(&conn, "no_metadata"), 0);
+        let frames: i64 = conn
+            .query_row("SELECT COUNT(*) FROM frames WHERE capture_id = 'c1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(frames, 0, "c1 has no metadata row, so its frames are orphans too");
     }
 
     #[test]

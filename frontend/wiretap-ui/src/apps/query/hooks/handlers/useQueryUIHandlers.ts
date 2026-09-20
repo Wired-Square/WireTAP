@@ -1,6 +1,6 @@
 // src/apps/query/hooks/handlers/useQueryUIHandlers.ts
 //
-// UI-related handlers for Query: dialogs, tabs, queue, bookmarks, export.
+// UI-related handlers for Query: dialogs, tabs, queue, export.
 
 import { useCallback } from "react";
 import { useQueryStore, type QueuedQuery, type ByteChangeResult, type FrameChangeResult, type MirrorValidationResult } from "../../stores/queryStore";
@@ -13,7 +13,6 @@ import type {
   PatternSearchResult,
   InventoryRow,
 } from "../../../../api/dbquery";
-import { addFavorite, getFavoritesForProfile, type TimeRangeFavorite } from "../../../../utils/favorites";
 import type { TimeBounds } from "../../../../components/TimeBoundsInput";
 import { pickFileToSave, CSV_FILTERS } from "../../../../api/dialogs";
 import { saveCatalog } from "../../../../api/catalog";
@@ -25,26 +24,14 @@ export interface UseQueryUIHandlersParams {
   closeCatalogPicker: () => void;
   openErrorDialog: () => void;
   closeErrorDialog: () => void;
-  openAddBookmarkDialog: () => void;
-  closeAddBookmarkDialog: () => void;
-
-  // Profile state (for bookmarks)
-  ioProfile: string | null;
 
   // Tab state
   setActiveTab: (tab: string) => void;
-
-  // Favourites state
-  setFavourites: (favs: TimeRangeFavorite[]) => void;
 }
 
 export function useQueryUIHandlers({
   closeErrorDialog,
-  openAddBookmarkDialog,
-  closeAddBookmarkDialog,
-  ioProfile,
   setActiveTab,
-  setFavourites,
 }: UseQueryUIHandlersParams) {
   // Store actions
   const setError = useQueryStore((s) => s.setError);
@@ -91,33 +78,6 @@ export function useQueryUIHandlers({
     [removeQueueItem]
   );
 
-  // Handle bookmark button click (from results)
-  const handleBookmarkQuery = useCallback(
-    (hasSelectedQuery: boolean) => {
-      if (hasSelectedQuery) {
-        openAddBookmarkDialog();
-      }
-    },
-    [openAddBookmarkDialog]
-  );
-
-  // Handle save bookmark
-  const handleSaveBookmark = useCallback(
-    async (name: string, startTime: string, endTime: string) => {
-      if (!ioProfile) return;
-      try {
-        await addFavorite(name, ioProfile, startTime, endTime);
-        // Reload favourites
-        const favs = await getFavoritesForProfile(ioProfile);
-        setFavourites(favs);
-        closeAddBookmarkDialog();
-      } catch (e) {
-        console.error("Failed to save bookmark:", e);
-      }
-    },
-    [ioProfile, setFavourites, closeAddBookmarkDialog]
-  );
-
   // Handle export — build CSV from query results and save via file dialog
   const handleExportQuery = useCallback(async (queryId: string | undefined) => {
     if (!queryId) return;
@@ -146,8 +106,6 @@ export function useQueryUIHandlers({
     handleTimeBoundsChange,
     handleSelectQuery,
     handleRemoveQuery,
-    handleBookmarkQuery,
-    handleSaveBookmark,
     handleExportQuery,
   };
 }

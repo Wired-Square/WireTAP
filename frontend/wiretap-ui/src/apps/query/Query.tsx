@@ -25,7 +25,7 @@ import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
 import { useCatalogList } from "../../hooks/useCatalogList";
 
-import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
+import { addCaptureEvent, type EventDraft } from "../../api/captureEvents";
 import { loadCatalog } from "../../utils/catalogParser";
 import type { TimeBounds } from "../../components/TimeBoundsInput";
 import AppLayout from "../../components/AppLayout";
@@ -38,7 +38,7 @@ import StatsPanel from "./views/StatsPanel";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import ErrorDialog from "../../dialogs/ErrorDialog";
 import CatalogPickerDialog from "../../dialogs/catalog-picker";
-import AddBookmarkDialog from "../../dialogs/AddBookmarkDialog";
+import EventDialog from "../../dialogs/EventDialog";
 
 function QueryInner() {
   const { t } = useTranslation("query");
@@ -63,9 +63,6 @@ function QueryInner() {
 
   // Catalog state — backend-owned list, pushed live.
   const catalogs = useCatalogList();
-
-  // Favourites state (bookmarks)
-  const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
 
   // Per-panel frame ID display format (Auto/Hex/Dec toggle in the top bar)
   const { effective: displayIdFormat } = useFrameIdFormat();
@@ -93,7 +90,7 @@ function QueryInner() {
     "ioSessionPicker",
     "error",
     "catalogPicker",
-    "addBookmark",
+    "addEvent",
   ] as const);
 
 
@@ -158,6 +155,7 @@ function QueryInner() {
     stopWatch,
     ioProfileName,
     sourceProfileId,
+    eventOwner,
     isCaptureMode,
     isStreaming,
     isPaused,
@@ -226,24 +224,6 @@ function QueryInner() {
   // Determine active source — a capture replay or a WireTAP backend profile
   const hasSource = !!sourceProfileId;
 
-  // Load favourites when source profile changes
-  useEffect(() => {
-    if (!sourceProfileId) {
-      setFavourites([]);
-      return;
-    }
-
-    const loadFavourites = async () => {
-      try {
-        const favs = await getFavoritesForProfile(sourceProfileId);
-        setFavourites(favs);
-      } catch (e) {
-        console.error("Failed to load favourites:", e);
-      }
-    };
-    loadFavourites();
-  }, [sourceProfileId]);
-
   // ── Menu session control ──
   useMenuSessionControl({
     panelId: "query",
@@ -275,13 +255,10 @@ function QueryInner() {
     closeCatalogPicker: dialogs.catalogPicker.close,
     openErrorDialog: dialogs.error.open,
     closeErrorDialog: dialogs.error.close,
-    openAddBookmarkDialog: dialogs.addBookmark.open,
-    closeAddBookmarkDialog: dialogs.addBookmark.close,
     setActiveTab,
-    setFavourites,
   });
 
-  // Get time range from selected query results for bookmarking
+  // Get time range from selected query results for an event or an ingest
   const getSelectedQueryTimeRange = useCallback(() => {
     if (!selectedQuery?.results) return null;
     // Mux statistics results are an object, not a timestamped array
@@ -308,10 +285,23 @@ function QueryInner() {
     }
   }, [handlers, getSelectedQueryTimeRange]);
 
-  // Handle bookmark query wrapper
-  const handleBookmarkQueryWrapper = useCallback(() => {
-    handlers.handleBookmarkQuery(selectedQuery !== null);
-  }, [handlers, selectedQuery]);
+  // The selected query's results become one event spanning first to last
+  const eventDraft = useMemo((): EventDraft | null => {
+    const range = getSelectedQueryTimeRange();
+    if (!range) return null;
+    return { timestampUs: range.minTimestampUs, durationUs: range.maxTimestampUs - range.minTimestampUs, note: "" };
+  }, [getSelectedQueryTimeRange]);
+  const handleSaveEvent = useCallback(
+    async (draft: EventDraft) => {
+      if (!eventOwner) return;
+      try {
+        await addCaptureEvent(eventOwner, draft);
+      } catch (e) {
+        console.error("Failed to save event:", e);
+      }
+    },
+    [eventOwner]
+  );
 
   // Handle export query wrapper
   const handleExportQueryWrapper = useCallback(() => {
@@ -325,16 +315,6 @@ function QueryInner() {
     },
     [handlers]
   );
-
-  // Get bookmark time range for the dialog
-  const bookmarkTimeRange = useMemo(() => {
-    const range = getSelectedQueryTimeRange();
-    if (!range) return { startTime: "", endTime: "" };
-    return {
-      startTime: new Date(range.minTimestampUs / 1000).toISOString().slice(0, 19),
-      endTime: new Date(range.maxTimestampUs / 1000).toISOString().slice(0, 19),
-    };
-  }, [getSelectedQueryTimeRange]);
 
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
@@ -383,7 +363,6 @@ function QueryInner() {
           isStreaming={isStreaming || hasSource}
           isPaused={isPaused}
           isStopped={isStopped}
-          supportsTimeRange={capabilities?.supports_time_range ?? false}
           onPlay={session.start}
           onLeave={handleLeave}
           onStop={isStreaming ? stopWatch : undefined}
@@ -406,7 +385,6 @@ function QueryInner() {
             profileId={profileId}
             captureId={captureId}
             disabled={!hasSource}
-            favourites={favourites}
             timeBounds={timeBounds}
             onTimeBoundsChange={handleTimeBoundsChangeWrapper}
             displayIdFormat={displayIdFormat}
@@ -424,7 +402,7 @@ function QueryInner() {
             onIngestEvent={handlers.handleIngestAroundEvent}
             onIngestAll={handleIngestAllResultsWrapper}
             onExport={handleExportQueryWrapper}
-            onBookmark={handleBookmarkQueryWrapper}
+            onAddEvent={eventOwner && eventDraft ? () => dialogs.addEvent.open() : undefined}
           />
         )}
         {activeTab === "stats" && (
@@ -471,13 +449,11 @@ function QueryInner() {
         }}
       />
 
-      {/* Add Bookmark Dialog */}
-      <AddBookmarkDialog
-        isOpen={dialogs.addBookmark.isOpen}
-        frameId={0}
-        frameTime={bookmarkTimeRange.startTime}
-        onClose={() => dialogs.addBookmark.close()}
-        onSave={handlers.handleSaveBookmark}
+      <EventDialog
+        isOpen={dialogs.addEvent.isOpen}
+        initial={eventDraft}
+        onClose={() => dialogs.addEvent.close()}
+        onSave={handleSaveEvent}
       />
     </AppLayout>
   );

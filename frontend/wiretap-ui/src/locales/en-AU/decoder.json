@@ -6,11 +6,10 @@
     "sendToCalculator": "Send to Frame Calculator",
     "showTimeRange": "Show time range",
     "hideTimeRange": "Hide time range",
-    "bookmarkLoaded": "Bookmark loaded",
-    "loadBookmark": "Load bookmark",
     "start": "Start",
     "end": "End",
-    "playbackSpeed": "Playback speed"
+    "playbackSpeed": "Playback speed",
+    "addEvent": "Add event at current position"
   },
   "topBar": {
     "showRawBytes": "Show raw bytes",

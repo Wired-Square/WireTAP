@@ -52,10 +52,6 @@ type Props = {
   onLeave?: () => void;
   onStop?: () => void;
   onDestroy?: () => void;
-  /** Whether the IO source supports time range filtering */
-  supportsTimeRange?: boolean;
-  /** Called to open bookmark picker */
-  onOpenBookmarkPicker?: () => void;
 
   // Buffer actions
   /** Whether the session is in buffer replay mode */
@@ -149,8 +145,6 @@ export default function DecoderTopBar({
   onLeave,
   onStop,
   onDestroy,
-  supportsTimeRange = false,
-  onOpenBookmarkPicker,
   isCaptureMode = false,
   capturePersistent = false,
   onToggleCapturePin,
@@ -217,13 +211,11 @@ export default function DecoderTopBar({
         isStreaming,
         isPaused,
         isStopped,
-        supportsTimeRange,
         onPlay,
         onPause,
         onLeave,
         onStop,
         onDestroy,
-        onOpenBookmarkPicker,
         isCaptureMode,
         capturePersistent,
         onToggleCapturePin,

@@ -27,7 +27,6 @@ import type { IOCapabilities } from "../../../api/io";
 import type { CaptureMetadata } from "../../../api/capture";
 import type { FrameDetail } from "../../../types/decoder";
 import type { LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
-import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { SelectionSet } from "../../../utils/selectionSets";
 
 export interface UseDecoderHandlersParams {
@@ -80,7 +79,6 @@ export interface UseDecoderHandlersParams {
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
   watchSource: (profileIds: string[], options: ManagerLoadOptions) => Promise<void>;
-  jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerLoadOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Dialog controls
   openSaveSelectionSet: () => void;
@@ -90,9 +88,6 @@ export interface UseDecoderHandlersParams {
 
   // Active tab
   activeTab: string;
-
-  // Bookmark state
-  setActiveBookmarkId: (id: string | null) => void;
 
   // Buffer state
   setCaptureMetadata: (meta: CaptureMetadata | null) => void;
@@ -143,7 +138,7 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
     streamCompletedRef: params.streamCompletedRef,
   });
 
-  // Time handlers (scrub, start/end time change, load bookmark)
+  // Time handlers (scrub, start/end time change)
   const timeHandlers = useDecoderTimeHandlers({
     setTimeRange: params.setTimeRange,
     seek: params.seek,
@@ -156,8 +151,6 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
     minTimeUs: params.minTimeUs,
     maxTimeUs: params.maxTimeUs,
     totalFrames: params.totalFrames,
-    setActiveBookmarkId: params.setActiveBookmarkId,
-    jumpToBookmark: params.jumpToBookmark,
   });
 
   // Selection handlers (save, load, clear selection sets)

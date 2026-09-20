@@ -505,7 +505,6 @@ function DashboardInner() {
           isStreaming={isStreaming}
           isPaused={isPaused}
           isStopped={isStopped}
-          supportsTimeRange={capabilities?.supports_time_range ?? false}
           onPlay={resumeWithNewCapture}
           onLeave={!isDetached ? handleLeave : undefined}
           onStop={isStreaming ? stopWatch : undefined}

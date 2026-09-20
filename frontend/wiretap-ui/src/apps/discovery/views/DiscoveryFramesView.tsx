@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network, Filter, Snowflake, RefreshCw, Target, Send, Gauge, Bookmark, Search, Play } from "lucide-react";
+import { FileText, Hash, Network, Filter, Snowflake, RefreshCw, Target, Send, Gauge, Flag, Search, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
@@ -14,6 +14,7 @@ import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../
 import { pageForOffset, resolvePageSize, type PageSize } from "../../../utils/pageSize";
 import DiscoveryFindBar, { type FindSearchMode } from "../components/DiscoveryFindBar";
 import AppTabView from "../../../components/AppTabView";
+import type { TimelineMarkers } from "../../../components/TimelineScrubber";
 import { PlaybackControls, type PlaybackState } from "../../../components/PlaybackControls";
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import ChangesResultView from "./tools/ChangesResultView";
@@ -62,7 +63,10 @@ type Props = {
   protocols?: string[];
   displayFrameIdFormat: "hex" | "decimal";
   displayTimeFormat: TimeDisplayFormat;
-  onBookmark?: (frameId: number, timestampUs: number) => void;
+  /** Marks an event at a frame's time (omit when the session has nothing to own events) */
+  onAddEvent?: (timestampUs: number) => void;
+  /** Events drawn on the timeline */
+  timelineMarkers?: TimelineMarkers;
   isStreaming?: boolean;
 
   // Time display
@@ -130,7 +134,8 @@ function DiscoveryFramesView({
   protocols = [],
   displayFrameIdFormat,
   displayTimeFormat,
-  onBookmark,
+  onAddEvent,
+  timelineMarkers,
   isStreaming = false,
   timestamp,
   displayTime,
@@ -469,18 +474,11 @@ function DiscoveryFramesView({
         },
       },
     ];
-    if (onBookmark) {
-      items.push(
-        { separator: true, label: '', onClick: () => {} },
-        {
-          label: 'Bookmark',
-          icon: <Bookmark />,
-          onClick: () => onBookmark(frame.frame_id, frame.timestamp_us),
-        },
-      );
+    if (onAddEvent) {
+      items.push(menuSeparator, { label: 'Add event here', icon: <Flag />, onClick: () => onAddEvent(frame.timestamp_us) });
     }
     return items;
-  }, [contextMenu, toggleFrameSelection, deselectAllFrames, displayFrameIdFormat, onBookmark, t]);
+  }, [contextMenu, toggleFrameSelection, deselectAllFrames, displayFrameIdFormat, onAddEvent, t]);
 
   const headerContextMenuItems: ContextMenuItem[] = useMemo(() => [
     { label: '# Column', checked: showRefColumn, onClick: toggleShowRefColumn },
@@ -1034,6 +1032,7 @@ function DiscoveryFramesView({
               currentFrameIndex: currentFrameIndex ?? undefined,
               onFrameChange: handleFrameScrub,
               useLocalTimezone,
+              markers: timelineMarkers,
             }
           : undefined
       }
@@ -1061,7 +1060,7 @@ function DiscoveryFramesView({
             ref={scrollRef}
             frames={visibleFrames}
             formatTime={formatTime}
-            onBookmark={onBookmark}
+            onAddEvent={onAddEvent}
             emptyMessage={
               // Reached only when the same fetch that produced the rows returned none,
               // so this can no longer appear beside rows.

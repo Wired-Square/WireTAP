@@ -13,7 +13,6 @@ import {
   Database,
   BookOpen,
   Monitor,
-  Bookmark,
   Star,
   LayoutGrid,
   Shield,
@@ -29,7 +28,6 @@ import RepositoryDialog from "../../dialogs/catalog-share/RepositoryDialog";
 import DataIOView from "./views/DataIOView";
 import GeneralView from "./views/GeneralView";
 import CapturesView from "./views/CapturesView";
-import BookmarksView from "./views/BookmarksView";
 import SelectionSetsView from "./views/SelectionSetsView";
 import DashboardLayoutsView from "./views/DashboardLayoutsView";
 import PrivacyView from "./views/PrivacyView";
@@ -39,15 +37,12 @@ import IOProfileDialog from "./dialogs/IOProfileDialog";
 import EditCatalogDialog from "./dialogs/EditCatalogDialog";
 import ConfirmDeleteDialog from "../../dialogs/ConfirmDeleteDialog";
 import DuplicateCatalogDialog from "./dialogs/DuplicateCatalogDialog";
-import EditBookmarkDialog from "./dialogs/EditBookmarkDialog";
 import EditSelectionSetDialog from "./dialogs/EditSelectionSetDialog";
 import EditDashboardLayoutDialog from "./dialogs/EditDashboardLayoutDialog";
-import CreateBookmarkDialog from "./dialogs/CreateBookmarkDialog";
 import { useSettingsStore, type SettingsSection } from "./stores/settingsStore";
 import { useAdHocProfileStore } from "../../stores/adHocProfileStore";
 import { useSettingsForms } from "./hooks/useSettingsForms";
 import { useSettingsHandlers } from "./hooks/useSettingsHandlers";
-import { getTimeRangeCapableProfiles } from "../../utils/profileTraits";
 import { isIOS } from "../../utils/platform";
 import { onStoreChanged } from "../../api/store";
 
@@ -60,7 +55,6 @@ export default function Settings() {
   const currentSection = useSettingsStore((s) => s.ui.currentSection);
   const setSection = useSettingsStore((s) => s.setSection);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
-  const loadBookmarks = useSettingsStore((s) => s.loadBookmarks);
   const loadSelectionSets = useSettingsStore((s) => s.loadSelectionSets);
   const loadDashboardLayouts = useSettingsStore((s) => s.loadDashboardLayouts);
 
@@ -184,12 +178,6 @@ export default function Settings() {
   const defaultReadProfile = useSettingsStore(
     (s) => s.ioProfiles.defaultReadProfile,
   );
-  const timeRangeCapableProfiles = getTimeRangeCapableProfiles(ioProfiles);
-
-
-  // Bookmarks
-  const bookmarks = useSettingsStore((s) => s.bookmarks);
-
   // Selection sets
   const selectionSets = useSettingsStore((s) => s.selectionSets);
 
@@ -209,16 +197,6 @@ export default function Settings() {
     resetCatalogForm: forms.resetCatalogForm,
     initDuplicateCatalogForm: forms.initDuplicateCatalogForm,
     initEditCatalogForm: forms.initEditCatalogForm,
-    bookmarkName: forms.bookmarkName,
-    bookmarkTimeBounds: forms.bookmarkTimeBounds,
-    resetBookmarkForm: forms.resetBookmarkForm,
-    initEditBookmarkForm: forms.initEditBookmarkForm,
-    newBookmarkProfileId: forms.newBookmarkProfileId,
-    newBookmarkName: forms.newBookmarkName,
-    newBookmarkTimeBounds: forms.newBookmarkTimeBounds,
-    resetNewBookmarkForm: forms.resetNewBookmarkForm,
-    initNewBookmarkForm: forms.initNewBookmarkForm,
-    timeRangeCapableProfiles,
     selectionSetName: forms.selectionSetName,
     resetSelectionSetForm: forms.resetSelectionSetForm,
     initEditSelectionSetForm: forms.initEditSelectionSetForm,
@@ -240,27 +218,24 @@ export default function Settings() {
   // Load data on mount and detect platform
   useEffect(() => {
     loadSettings();
-    loadBookmarks();
     loadSelectionSets();
     loadDashboardLayouts();
     isIOS().then(setIsIOSPlatform);
-  }, [loadSettings, loadBookmarks, loadSelectionSets, loadDashboardLayouts]);
+  }, [loadSettings, loadSelectionSets, loadDashboardLayouts]);
 
   // Reload collections when they change from other panels
   useEffect(() => {
     const promise = onStoreChanged((event) => {
       if (event.key === "graph.layouts") loadDashboardLayouts();
-      if (event.key === "favorites.timeRanges") loadBookmarks();
       if (event.key === "selectionSets.all") loadSelectionSets();
     });
     return () => {
       promise.then((unlisten) => unlisten());
     };
-  }, [loadDashboardLayouts, loadBookmarks, loadSelectionSets]);
+  }, [loadDashboardLayouts, loadSelectionSets]);
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
-    { id: "bookmarks", label: t("sidebar.bookmarks"), icon: Bookmark },
     { id: "captures", label: t("sidebar.captures"), icon: Database },
     { id: "catalogs", label: t("sidebar.catalogs"), icon: BookOpen },
     { id: "data-io", label: t("sidebar.dataIo"), icon: Cable },
@@ -428,18 +403,6 @@ export default function Settings() {
             />
           )}
 
-          {/* Bookmarks Section */}
-          {currentSection === "bookmarks" && (
-            <BookmarksView
-              bookmarks={bookmarks}
-              ioProfiles={ioProfiles}
-              timeRangeCapableProfiles={timeRangeCapableProfiles}
-              onEditBookmark={handlers.handleEditBookmark}
-              onDeleteBookmark={handlers.handleDeleteBookmark}
-              onNewBookmark={handlers.handleNewBookmark}
-            />
-          )}
-
           {/* Selection Sets Section */}
           {currentSection === "selection-sets" && (
             <SelectionSetsView
@@ -554,41 +517,6 @@ export default function Settings() {
         onChangeFilename={forms.setCatalogFilename}
         onCancel={handlers.handleCancelEdit}
         onSave={handlers.handleConfirmEdit}
-      />
-
-      {/* Edit Bookmark Dialog */}
-      <EditBookmarkDialog
-        isOpen={dialogs.editBookmark}
-        name={forms.bookmarkName}
-        timeBounds={forms.bookmarkTimeBounds}
-        onChangeName={forms.setBookmarkName}
-        onChangeTimeBounds={forms.setBookmarkTimeBounds}
-        onCancel={handlers.handleCancelEditBookmark}
-        onSave={handlers.handleConfirmEditBookmark}
-      />
-
-      {/* Create Bookmark Dialog */}
-      <CreateBookmarkDialog
-        isOpen={dialogs.createBookmark}
-        availableProfiles={timeRangeCapableProfiles}
-        profileId={forms.newBookmarkProfileId}
-        name={forms.newBookmarkName}
-        timeBounds={forms.newBookmarkTimeBounds}
-        onChangeProfileId={forms.setNewBookmarkProfileId}
-        onChangeName={forms.setNewBookmarkName}
-        onChangeTimeBounds={forms.setNewBookmarkTimeBounds}
-        onCancel={handlers.handleCancelCreateBookmark}
-        onCreate={handlers.handleConfirmCreateBookmark}
-      />
-
-      {/* Delete Bookmark Confirmation Dialog */}
-      <ConfirmDeleteDialog
-        open={dialogs.deleteBookmark}
-        title={t("confirmDelete.deleteBookmarkTitle")}
-        message={t("confirmDelete.areYouSure")}
-        highlightText={dialogPayload.bookmarkToDelete?.name}
-        onCancel={handlers.handleCancelDeleteBookmark}
-        onConfirm={handlers.handleConfirmDeleteBookmark}
       />
 
       {/* Edit Selection Set Dialog */}

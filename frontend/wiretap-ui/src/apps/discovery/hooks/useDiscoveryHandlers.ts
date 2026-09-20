@@ -16,10 +16,6 @@ import {
   type DiscoveryExportHandlers,
 } from "./handlers/useDiscoveryExportHandlers";
 import {
-  useDiscoveryBookmarkHandlers,
-  type DiscoveryBookmarkHandlers,
-} from "./handlers/useDiscoveryBookmarkHandlers";
-import {
   useSelectionSetHandlers,
   type SelectionSetHandlers,
 } from "../../../hooks/useSelectionSetHandlers";
@@ -29,7 +25,6 @@ import type { CaptureFrameInfo, CaptureMetadata, TimestampedByte } from "../../.
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
 import { type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
-import type { TimeRangeFavorite } from "../../../utils/favorites";
 
 export interface UseDiscoveryHandlersParams {
   // Session state
@@ -37,8 +32,6 @@ export interface UseDiscoveryHandlersParams {
   isStreaming: boolean;
   isPaused: boolean;
   sessionReady: boolean;
-  ioProfile: string | null;
-  sourceProfileId: string | null;
   playbackSpeed: PlaybackSpeed;
   /** Whether the session is stopped (used for play/resume/step logic) */
   isStopped: boolean;
@@ -77,9 +70,6 @@ export interface UseDiscoveryHandlersParams {
   // Local state
   pendingSpeed: PlaybackSpeed | null;
   setPendingSpeed: (speed: PlaybackSpeed | null) => void;
-  setActiveBookmarkId: (id: string | null) => void;
-  setBookmarkFrameId: (id: number) => void;
-  setBookmarkFrameTime: (time: string) => void;
   resetWatchFrameCount: () => void;
   setCaptureMetadata: (meta: CaptureMetadata | null) => void;
 
@@ -87,7 +77,6 @@ export interface UseDiscoveryHandlersParams {
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
   watchSource: (profileIds: string[], options: ManagerLoadOptions) => Promise<void>;
-  jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerLoadOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Session actions
   setIoProfile: (profileId: string | null) => void;
@@ -131,7 +120,6 @@ export interface UseDiscoveryHandlersParams {
   saveCatalog: (path: string, content: string) => Promise<void>;
 
   // Dialog controls
-  openBookmarkDialog: () => void;
   closeSpeedChangeDialog: () => void;
   openSaveSelectionSetDialog: () => void;
   /** Called after a selection set is saved or updated */
@@ -143,7 +131,6 @@ export type DiscoveryHandlers = DiscoverySessionHandlers &
   DiscoveryPlaybackHandlers &
   TimeHandlers &
   DiscoveryExportHandlers &
-  DiscoveryBookmarkHandlers &
   SelectionSetHandlers & {
     handleClearDiscoveredFrames: () => Promise<void>;
     handleExportClick: () => void;
@@ -191,15 +178,13 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     closeSpeedChangeDialog: params.closeSpeedChangeDialog,
   });
 
-  // Time handlers (shared: time range, frame change, bookmark load)
+  // Time handlers (shared: time range, frame change)
   const timeHandlers = useTimeHandlers({
     setTimeRange: params.setTimeRange,
     seekByFrame: params.seekByFrame,
     setCurrentFrameIndex: params.setCurrentFrameIndex,
     startTime: params.startTime,
     endTime: params.endTime,
-    setActiveBookmarkId: params.setActiveBookmarkId,
-    jumpToBookmark: params.jumpToBookmark,
     onStartTimeChange: params.setStartTime,
     onEndTimeChange: params.setEndTime,
   });
@@ -226,15 +211,6 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     pickFileToSave: params.pickFileToSave,
     saveCatalog: params.saveCatalog,
     closeExportDialog: params.closeExportDialog,
-  });
-
-  // Bookmark handlers (bookmark UI + save; load is in shared timeHandlers)
-  const bookmarkHandlers = useDiscoveryBookmarkHandlers({
-    setBookmarkFrameId: params.setBookmarkFrameId,
-    setBookmarkFrameTime: params.setBookmarkFrameTime,
-    ioProfile: params.ioProfile,
-    sourceProfileId: params.sourceProfileId,
-    openBookmarkDialog: params.openBookmarkDialog,
   });
 
   // Selection handlers
@@ -267,7 +243,6 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     ...playbackHandlers,
     ...timeHandlers,
     ...exportHandlers,
-    ...bookmarkHandlers,
     ...selectionHandlers,
     handleClearDiscoveredFrames,
     handleExportClick,

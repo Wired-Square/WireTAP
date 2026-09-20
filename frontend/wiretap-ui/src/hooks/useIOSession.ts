@@ -99,8 +99,6 @@ interface LocalSessionState {
   streamEndedReason: "complete" | "stopped" | "disconnected" | "error" | null;
   /** Current playback speed */
   speed: number | null;
-  /** Current playback position */
-  playbackPosition: PlaybackPosition | null;
 }
 
 /** Empty capture state used when no session.capture info is available yet. */
@@ -191,7 +189,7 @@ export interface UseIOSessionOptions {
   onStreamComplete?: () => void;
   /** Callback when playback speed changes (from any subscriber on this session) */
   onSpeedChange?: (speed: number) => void;
-  /** Callback when session is reconfigured (e.g., bookmark jump) - apps should clear their state */
+  /** Callback when session is reconfigured (e.g., event jump) - apps should clear their state */
   onReconfigure?: () => void;
   /** Callback when session is suspended (stopped with capture available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;
@@ -569,7 +567,6 @@ export function useIOSession(
             stoppedExplicitly: false,
             streamEndedReason: null,
             speed: null,
-            playbackPosition: null,
           });
         } else {
           // Session doesn't exist yet - will be created by openSession below
@@ -797,7 +794,6 @@ export function useIOSession(
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: null,
-              playbackPosition: null,
             });
             tlog.debug(`[useIOSession:${appName}] local state initialized: ioState=${getStateType(state)}`);
           }
@@ -1115,7 +1111,7 @@ export function useIOSession(
       try {
         // If switching to a different session, leave the old one first
         const oldSessionId = currentSessionIdRef.current;
-        // Every reinitialize caller — watch, load, connect-only, jump-to-bookmark —
+        // Every reinitialize caller — watch, load, connect-only, jump-to-event —
         // funnels through here, so stamping the switch once covers all of them.
         markSessionSwitch(targetSessionId);
         if (oldSessionId && oldSessionId !== targetSessionId) {
@@ -1193,7 +1189,6 @@ export function useIOSession(
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: opts?.speed ?? null,
-              playbackPosition: null,
             };
             // Store in ref BEFORE calling setLocalState - this ensures the ref is available
             // immediately, even before React commits the state update
@@ -1314,6 +1309,10 @@ export function useIOSession(
       ? expectedStateRef.current.state
       : localState
   );
+  // The reader pushes positions to the store; nothing else in local state needs them.
+  const playbackPosition = useSessionStore((st) =>
+    effectiveSessionId ? st.sessions[effectiveSessionId]?.playbackPosition ?? null : null
+  );
 
   return {
     sessionId: effectiveSessionId,
@@ -1335,9 +1334,9 @@ export function useIOSession(
     stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
     streamEndedReason: effectiveState?.streamEndedReason ?? null,
     speed: effectiveState?.speed ?? null,
-    playbackPosition: effectiveState?.playbackPosition ?? null,
-    currentTimeUs: effectiveState?.playbackPosition?.timestamp_us ?? null,
-    currentFrameIndex: effectiveState?.playbackPosition?.frame_index ?? null,
+    playbackPosition,
+    currentTimeUs: playbackPosition?.timestamp_us ?? null,
+    currentFrameIndex: playbackPosition?.frame_index ?? null,
     subscriberId: subscriberIdRef.current,
     start,
     stop,

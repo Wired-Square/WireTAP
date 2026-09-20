@@ -326,7 +326,7 @@ export interface SessionCallbacks {
   onStreamComplete?: () => void;
   onStateChange?: (state: IOStateType) => void;
   onSpeedChange?: (speed: number) => void;
-  /** Called when session is reconfigured (e.g., bookmark jump) - apps should clear state */
+  /** Called when session is reconfigured (e.g., event jump) - apps should clear state */
   onReconfigure?: (payload: SessionReconfiguredPayload) => void;
   /** Called when session is suspended (stopped with capture available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;

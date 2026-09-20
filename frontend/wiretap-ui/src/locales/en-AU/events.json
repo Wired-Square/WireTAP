@@ -1,0 +1,46 @@
+{
+  "title": "Events",
+  "tabs": {
+    "list": "List"
+  },
+  "columns": {
+    "time": "Time",
+    "duration": "Duration",
+    "note": "Note"
+  },
+  "instant": "instant",
+  "untitled": "(no note)",
+  "actions": {
+    "addAtPosition": "Add event at current position",
+    "jump": "Jump to event",
+    "edit": "Edit event",
+    "delete": "Delete event"
+  },
+  "empty": {
+    "noSession": "Join a session to see its events",
+    "noSessionHint": "Events belong to the stored capture — a local capture or a WireTAP Backend database.",
+    "noEvents": "No events yet",
+    "noEventsHint": "Press ⌘D, use Add event at current position, or right-click a frame in Discovery.",
+    "noOwner": "This session has nothing to hold events yet",
+    "noOwnerHint": "Events appear once the session has a capture."
+  },
+  "dialog": {
+    "addTitle": "Add Event",
+    "editTitle": "Edit Event",
+    "time": "Time",
+    "duration": "Duration (seconds)",
+    "durationHint": "0 marks an instant",
+    "note": "Note",
+    "notePlaceholder": "What happened?",
+    "save": "Save Event"
+  },
+  "confirmDelete": {
+    "title": "Delete Event",
+    "message": "Delete this event? This cannot be undone."
+  },
+  "errors": {
+    "load": "Failed to load events: {{error}}",
+    "save": "Failed to save event: {{error}}",
+    "delete": "Failed to delete event: {{error}}"
+  }
+}

@@ -2,12 +2,12 @@
 //
 // Shared session control components for top bars.
 // Renders a fixed-width session chip plus a kebab (⋮) menu holding the session
-// details and all actions (play/pause, speed, bookmark, rename, pin, clear,
+// details and all actions (play/pause, speed, events, rename, pin, clear,
 // disconnect). The chip width never changes as session state changes.
 
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square, Settings2 } from "lucide-react";
+import { Star, FileText, Play, Pause, Gauge, Flag, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square, Settings2 } from "lucide-react";
 import { iconSm, roundedDefault } from "../styles/spacing";
 import { sourceKindColours } from "../styles/colourTokens";
 import type { IOProfile } from "../types/common";
@@ -16,6 +16,7 @@ import type { BusSourceInfo } from "../utils/busFormat";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import { getIOKindLabel } from "../utils/ioKindLabel";
 import { useSessionStore } from "../stores/sessionStore";
+import { openPanel } from "../utils/windowCommunication";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { Button } from "./Button";
 import { Input } from "./forms";
@@ -318,8 +319,6 @@ export interface IOSessionControlsProps {
   isPaused?: boolean;
   /** Whether the session is stopped but can be resumed */
   isStopped?: boolean;
-  /** Whether the IO source supports time range filtering */
-  supportsTimeRange?: boolean;
   /** Play/resume the session */
   onPlay?: () => void;
   /** Pause the session */
@@ -330,9 +329,6 @@ export interface IOSessionControlsProps {
   onStop?: () => void;
   /** Destroy the session — ALL connected apps return to "No source". */
   onDestroy?: () => void;
-  /** Open bookmark picker (for time range sources) */
-  onOpenBookmarkPicker?: () => void;
-
   // Capture action props (shown when capture metadata is available)
   /** Whether the session is in capture replay mode (viewing stored capture data) */
   isCaptureMode?: boolean;
@@ -353,7 +349,7 @@ export interface IOSessionControlsProps {
 /**
  * Combined IO session controls: a fixed-width session chip plus a kebab (⋮)
  * menu. The chip opens the session picker; the kebab holds the session details
- * and every action (play/pause, speed, bookmark, rename, pin, clear, disconnect).
+ * and every action (play/pause, speed, events, rename, pin, clear, disconnect).
  */
 export function IOSessionControls({
   // Reader props
@@ -376,13 +372,11 @@ export function IOSessionControls({
   isStreaming,
   isPaused = false,
   isStopped = false,
-  supportsTimeRange = false,
   onPlay,
   onPause,
   onLeave,
   onStop,
   onDestroy,
-  onOpenBookmarkPicker,
   // Capture action props
   isCaptureMode: isCaptureModeProp,
   capturePersistent = false,
@@ -443,7 +437,7 @@ export function IOSessionControls({
   const showPlay = (isPaused || isStopped) && !!onPlay;
   const showPause = isStreaming && !isPaused && !!onPause;
   const showSpeed = hasSource && !!onOpenSpeedPicker;
-  const showBookmark = supportsTimeRange && !!onOpenBookmarkPicker;
+  const showEvents = hasSource && !!sessionId;
   const showRename = !!captureMetadata?.id && !!onRenameCapture;
   const showPin = !!captureMetadata?.id && !!onToggleCapturePin;
   const showClear = !!onClearCapture && !!ioProfile && !(isCaptureMode && capturePersistent);
@@ -592,9 +586,15 @@ export function IOSessionControls({
               <span className="text-muted">{speedLabel}</span>
             </MenuItem>
           )}
-          {showBookmark && (
-            <MenuItem onClick={onOpenBookmarkPicker} icon={<Bookmark />}>
-              {t("session.loadBookmark")}
+          {showEvents && (
+            <MenuItem
+              onClick={() => {
+                useSessionStore.getState().requestSessionJoin("events", sessionId);
+                openPanel("events");
+              }}
+              icon={<Flag />}
+            >
+              {t("session.showEvents")}
             </MenuItem>
           )}
           {showRename && (

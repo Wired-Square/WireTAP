@@ -29,7 +29,6 @@ interface Props {
   isStreaming: boolean;
   isPaused?: boolean;
   isStopped?: boolean;
-  supportsTimeRange?: boolean;
 
   // Session actions
   onPlay?: () => void;
@@ -37,7 +36,6 @@ interface Props {
   onLeave?: () => void;
   onStop?: () => void;
   onDestroy?: () => void;
-  onOpenBookmarkPicker?: () => void;
 }
 
 export default function QueryTopBar({
@@ -53,13 +51,11 @@ export default function QueryTopBar({
   isStreaming,
   isPaused,
   isStopped,
-  supportsTimeRange,
   onPlay,
   onPause,
   onLeave,
   onStop,
   onDestroy,
-  onOpenBookmarkPicker,
 }: Props) {
   return (
     <AppTopBar
@@ -75,13 +71,11 @@ export default function QueryTopBar({
         isStreaming,
         isPaused,
         isStopped,
-        supportsTimeRange,
         onPlay,
         onPause,
         onLeave,
         onStop,
         onDestroy,
-        onOpenBookmarkPicker,
       }}
       catalog={{
         catalogs,

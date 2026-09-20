@@ -6,6 +6,27 @@ import { caption } from "../styles/typography";
 
 type TimeDisplayFormat = "delta-last" | "delta-start" | "timestamp" | "human";
 
+export interface TimelineMarker {
+  id: string;
+  timeUs: number;
+  /** 0 draws a tick; more draws a span from `timeUs`. */
+  durationUs: number;
+  label: string;
+}
+
+export interface TimelineMarkers {
+  items: TimelineMarker[];
+  activeId?: string | null;
+  onSelect?: (id: string) => void;
+}
+
+/** Where a time sits on the track, 0–100, or null when the range is empty. */
+export function markerPercent(timeUs: number, minTimeUs: number, maxTimeUs: number): number | null {
+  const range = maxTimeUs - minTimeUs;
+  if (range <= 0) return null;
+  return Math.max(0, Math.min(100, ((timeUs - minTimeUs) / range) * 100));
+}
+
 type Props = {
   /** Minimum timestamp in microseconds (for timestamp mode) */
   minTimeUs?: number;
@@ -33,6 +54,8 @@ type Props = {
   streamStartTimeUs?: number | null;
   /** Whether to use local timezone for time display */
   useLocalTimezone?: boolean;
+  /** Events drawn on the track, placed by time in either mode */
+  markers?: TimelineMarkers;
 };
 
 export default function TimelineScrubber({
@@ -48,6 +71,7 @@ export default function TimelineScrubber({
   displayTimeFormat = "human",
   streamStartTimeUs,
   useLocalTimezone = false,
+  markers,
 }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,13 +88,8 @@ export default function TimelineScrubber({
       if (totalFrames <= 1) return 0;
       const percent = (effectiveCurrentFrameIndex / (totalFrames - 1)) * 100;
       return Math.max(0, Math.min(100, percent));
-    } else {
-      // Timestamp-based mode
-      const range = maxTimeUs - minTimeUs;
-      if (range <= 0) return 0;
-      const percent = ((currentTimeUs - minTimeUs) / range) * 100;
-      return Math.max(0, Math.min(100, percent));
     }
+    return markerPercent(currentTimeUs, minTimeUs, maxTimeUs) ?? 0;
   }, [isFrameMode, totalFrames, effectiveCurrentFrameIndex, currentTimeUs, minTimeUs, maxTimeUs]);
 
   // Convert pixel position to frame index (frame mode)
@@ -249,6 +268,31 @@ export default function TimelineScrubber({
           className="absolute left-0 h-1.5 bg-accent-primary rounded-full"
           style={{ width: `${positionPercent}%` }}
         />
+
+        {markers?.items.map((marker) => {
+          const left = markerPercent(marker.timeUs, minTimeUs, maxTimeUs);
+          if (left === null) return null;
+          const right = markerPercent(marker.timeUs + marker.durationUs, minTimeUs, maxTimeUs) ?? left;
+          const isSpan = right - left > 0;
+          const isActive = marker.id === markers.activeId;
+          return (
+            <button
+              key={marker.id}
+              type="button"
+              title={marker.label}
+              aria-label={marker.label}
+              aria-pressed={isActive}
+              className={`absolute bg-text-amber ${
+                isSpan ? "h-2.5 rounded-sm" : "h-4 w-0.5 -translate-x-1/2 rounded-sm"
+              } ${isActive ? "opacity-100" : "opacity-70 hover:opacity-100"}`}
+              style={isSpan ? { left: `${left}%`, width: `${right - left}%`, minWidth: 2 } : { left: `${left}%` }}
+              onClick={(e) => {
+                e.stopPropagation();
+                markers.onSelect?.(marker.id);
+              }}
+            />
+          );
+        })}
 
         {/* Handle */}
         <div

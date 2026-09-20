@@ -403,7 +403,7 @@ export function isRealtimeProfile(profile: IOProfile): boolean {
 
 /**
  * Check if a profile answers time-range queries and carries a default playback
- * speed — what bookmarks and the Query app need.
+ * speed — what events and the Query app need.
  *
  * Deliberately a kind check rather than `temporalMode === "recorded"`: those
  * coincide only because the WireTAP backend is currently the sole recorded
