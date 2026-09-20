@@ -37,6 +37,7 @@ import {
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { Button, IconButton } from "../../../components/Button";
+import { Popover, usePopover } from "../../../components/Menu";
 import { Badge } from "../../../components/Badge";
 import { Input, Select } from "../../../components/forms";
 import { Table } from "../../../components/Table";
@@ -63,6 +64,7 @@ export default function SessionLogView() {
   const entries = useFilteredEntries();
   const uniqueSessionIds = useUniqueSessionIds();
   const filter = useSessionLogStore((s) => s.filter);
+  const eventFilter = usePopover("dialog");
   const autoScroll = useSessionLogStore((s) => s.autoScroll);
   const showProfileColumn = useSessionLogStore((s) => s.showProfileColumn);
   const setFilter = useSessionLogStore((s) => s.setFilter);
@@ -202,54 +204,46 @@ export default function SessionLogView() {
       <div
         className={`flex items-center gap-3 px-3 py-2 border-b ${borderDefault} ${bgSurface}`}
       >
-        {/* Event Type Filter Dropdown */}
-        <div className="relative group">
+        {/* Event type filter */}
+        <Button {...eventFilter.trigger} variant="outline" size="sm">
+          <Filter className="w-3 h-3" />
+          <span>{t("log.filter.events")}</span>
+          {filter.eventTypes && (
+            <Badge tone="primary" size="sm">{filter.eventTypes.size}</Badge>
+          )}
+          <ChevronDown className="w-3 h-3" />
+        </Button>
+        <Popover {...eventFilter.popover} className="p-2 min-w-50">
+          {eventTypeGroups.map((group) => (
+            <div key={group.label} className="mb-2 last:mb-0">
+              <div className={`text-2xs uppercase font-medium ${textMuted} mb-1`}>
+                {group.label}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {group.types.map((eventType) => (
+                  <Button
+                    key={eventType}
+                    variant="outline"
+                    tone={EVENT_TYPE_BADGE[eventType].tone}
+                    size="xs"
+                    pressed={isEventTypeActive(eventType)}
+                    onClick={() => toggleEventType(eventType)}
+                  >
+                    {EVENT_TYPE_LABELS[eventType]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ))}
           <Button
+            onClick={() => setFilter({ eventTypes: null })}
             variant="outline"
             size="sm"
+            className="w-full mt-2"
           >
-            <Filter className="w-3 h-3" />
-            <span>{t("log.filter.events")}</span>
-            {filter.eventTypes && (
-              <Badge tone="primary" size="sm">{filter.eventTypes.size}</Badge>
-            )}
-            <ChevronDown className="w-3 h-3" />
+            {t("log.filter.showAll")}
           </Button>
-          {/* Dropdown */}
-          <div
-            className="popover absolute left-0 top-full mt-1 p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-50"
-          >
-            {eventTypeGroups.map((group) => (
-              <div key={group.label} className="mb-2 last:mb-0">
-                <div className={`text-2xs uppercase font-medium ${textMuted} mb-1`}>
-                  {group.label}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {group.types.map((eventType) => (
-                    <Button
-                      key={eventType}
-                      variant="outline"
-                      tone={EVENT_TYPE_BADGE[eventType].tone}
-                      size="xs"
-                      pressed={isEventTypeActive(eventType)}
-                      onClick={() => toggleEventType(eventType)}
-                    >
-                      {EVENT_TYPE_LABELS[eventType]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <Button
-              onClick={() => setFilter({ eventTypes: null })}
-              variant="outline"
-              size="sm"
-              className="w-full mt-2"
-            >
-              {t("log.filter.showAll")}
-            </Button>
-          </div>
-        </div>
+        </Popover>
 
         {/* Session Filter */}
         <Select

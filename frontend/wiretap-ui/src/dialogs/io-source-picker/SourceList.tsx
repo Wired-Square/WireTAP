@@ -10,9 +10,10 @@ import TabStrip from "../../components/TabStrip";
 import type { SourceTab } from "./types";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
-import { borderDivider, bgSurface, sourceKindColours } from "../../styles";
+import { borderDivider, sourceKindColours } from "../../styles";
 import type { ReactNode } from "react";
 import { IconButton } from "../../components/Button";
+import { Listbox, Option, type OptionTone } from "../../components/Listbox";
 import { Badge } from "../../components/Badge";
 import { Alert } from "../../components/Alert";
 /**
@@ -158,21 +159,15 @@ export default function SourceList({
         <div className={`px-4 py-2 bg-surface ${sectionHeader}`}>
           {t("ioSourcePicker.sources.source")}
         </div>
-        <div className="px-3 py-2">
-          <button
-            onClick={() => onSelectSource(null)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 bg-info border border-info"
-          >
-            <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center border-info-text">
-              <div className="w-2 h-2 rounded-full bg-info-text" />
-            </div>
+        <Listbox>
+          <Option selected mark="radio" onClick={() => onSelectSource(null)}>
             <div className="flex-1 min-w-0">
               <span className={`${textMedium} truncate`}>{displayName}</span>
               <div className={`${caption} text-muted`}>{subtitle}</div>
             </div>
             <span className="text-xs text-info">{t("ioSourcePicker.sources.change")}</span>
-          </button>
-        </div>
+          </Option>
+        </Listbox>
       </div>
     );
   };
@@ -322,31 +317,19 @@ export default function SourceList({
             <FolderOpen className={iconXs} />
             <span>{t("ioSourcePicker.sources.external")}</span>
           </div>
-          <div className="px-3 pb-2 space-y-1">
-            <button
-              onClick={() => onSelectSource(isCsvSelected ? null : CSV_EXTERNAL_ID)}
+          <Listbox className="pt-0">
+            <Option
+              selected={isCsvSelected}
+              mark="radio"
               disabled={isLoading}
-              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors disabled:opacity-50 ${
-                isCsvSelected
-                  ? "bg-info border border-info"
-                  : "hover:bg-hover border border-transparent"
-              }`}
+              onClick={() => onSelectSource(isCsvSelected ? null : CSV_EXTERNAL_ID)}
             >
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  isCsvSelected
-                    ? "border-info-text"
-                    : "border-default"
-                }`}
-              >
-                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-info-text" />}
-              </div>
               <div className="flex-1 min-w-0">
                 <span className={textMedium}>{t("ioSourcePicker.sources.csv")}</span>
                 <div className={caption}>{t("ioSourcePicker.sources.csvImport")}</div>
               </div>
-            </button>
-          </div>
+            </Option>
+          </Listbox>
         </div>
       )}
     </>
@@ -370,7 +353,7 @@ export default function SourceList({
       {validationError && (
         <Alert tone="danger" size="sm" className="mx-3 mb-2">{validationError}</Alert>
       )}
-      <div className="px-3 pb-2 space-y-1">
+      <Listbox className="pt-0">
         {realtimeProfiles.map((profile) => {
           const canMultiSelect = allowMultiSelect && isMultiSourceCapable(profile);
           const isProfileChecked = canMultiSelect
@@ -418,25 +401,21 @@ export default function SourceList({
         })}
 
         {onNewDevice && (
-          <button
-            onClick={onNewDevice}
-            disabled={isLoading}
-            className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors border border-dashed border-default hover:bg-hover hover:border-info-text disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
+          <Option dashed disabled={isLoading} onClick={onNewDevice}>
             <Plus className={`${iconMd} text-muted`} />
             <span className={`${textMedium} text-muted`}>
               {t("ioSourcePicker.sources.newDevice")}
             </span>
-          </button>
+          </Option>
         )}
-      </div>
+      </Listbox>
     </div>
   );
 
   // ── Sessions tab body: joinable active sessions ──
   const sessionsBody = (
     <div className="border-b border-default">
-      <div className="px-3 pt-2 pb-2 space-y-1">
+      <Listbox>
         {joinableSessions.map((session) => {
           const isSelected = checkedSourceId === session.sessionId;
           const info = getSessionDisplayInfo(session);
@@ -444,20 +423,13 @@ export default function SourceList({
           const look = sourceKindColours[info.kind];
 
           return (
-            <button
+            <Option
               key={session.sessionId}
+              selected={isSelected}
+              tone={look.tone}
+              mark="radio"
               onClick={() => onSelectMultiSourceSession?.(session.sessionId)}
-              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                isSelected ? `${look.tint} border` : `${bgSurface} border border-default ${look.hoverEdge}`
-              }`}
             >
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                isSelected ? look.edge : "border-default"
-              }`}>
-                {isSelected && (
-                  <div className={`w-2 h-2 rounded-full ${look.dot}`} />
-                )}
-              </div>
               <IconComponent className={`${iconMd} flex-shrink-0 ${look.text}`} />
               <div className="flex-1 min-w-0">
                 <div className={`${textMedium} truncate flex items-center gap-2`}>
@@ -492,10 +464,10 @@ export default function SourceList({
                   </div>
                 )}
               </div>
-            </button>
+            </Option>
           );
         })}
-      </div>
+      </Listbox>
     </div>
   );
 
@@ -565,72 +537,18 @@ function SourceButton({
   const isStopped = sessionState === "stopped";
   const isRunning = isLive && sessionState === "running";
 
-  // Live profile gets green styling when checked, amber when stopped
-  const liveAndChecked = isLive && isChecked;
-
-  // Checkbox or radio styling
-  const indicatorBaseClass = useCheckbox
-    ? "w-4 h-4 rounded border-2 flex items-center justify-center"
-    : "w-4 h-4 rounded-full border-2 flex items-center justify-center";
-
-  const getIndicatorColor = () => {
-    if (isDisabled) {
-      return "border-default";
-    }
-    if (useCheckbox && isChecked) {
-      return "border-text-purple bg-text-purple";
-    }
-    if (liveAndChecked) {
-      return isStopped
-        ? "border-text-amber"
-        : "border-text-green";
-    }
-    if (isChecked) {
-      return "border-info-text";
-    }
-    return "border-default";
-  };
+  // A multi-bus tick is purple; a live device lights green when checked, amber when stopped.
+  const tone: OptionTone | undefined = useCheckbox ? "purple" : isLive ? (isStopped ? "warning" : "success") : undefined;
 
   return (
-    <div
-      className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-        isDisabled
-          ? "opacity-60 cursor-not-allowed border border-default bg-surface"
-          : isLoading
-          ? "opacity-50 cursor-not-allowed"
-          : useCheckbox && isChecked
-          ? "bg-purple border border-purple cursor-pointer"
-          : liveAndChecked
-          ? isStopped
-            ? "bg-warning border border-warning cursor-pointer"
-            : "bg-success border border-success cursor-pointer"
-          : isChecked
-          ? "bg-info border border-info cursor-pointer"
-          : isLive
-          ? isStopped
-            ? "bg-warning/50 border border-warning hover:bg-warning cursor-pointer"
-            : "bg-success/50 border border-success hover:bg-success cursor-pointer"
-          : "hover:bg-hover border border-transparent cursor-pointer"
-      }`}
-      onClick={isDisabled || isLoading ? undefined : () => onSelect(isChecked && !useCheckbox ? null : profile.id)}
-      role={isDisabled ? undefined : "button"}
-      tabIndex={isDisabled ? undefined : 0}
+    <Option
+      as="div"
+      selected={isChecked && !isDisabled}
+      tone={tone}
+      mark={useCheckbox ? "check" : "radio"}
+      disabled={isDisabled || isLoading}
+      onClick={() => onSelect(isChecked && !useCheckbox ? null : profile.id)}
     >
-      <div className={`${indicatorBaseClass} ${getIndicatorColor()}`}>
-        {!isDisabled && useCheckbox && isChecked ? (
-          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : !isDisabled && isChecked && !useCheckbox ? (
-          <div className={`w-2 h-2 rounded-full ${
-            liveAndChecked
-              ? isStopped
-                ? "bg-text-amber"
-                : "bg-text-green"
-              : "bg-info-text"
-          }`} />
-        ) : null}
-      </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
           {isDefault && <Bookmark className={`${iconSm} text-amber flex-shrink-0`} fill="currentColor" />}
@@ -711,6 +629,6 @@ function SourceButton({
           )}
         </div>
       )}
-    </div>
+    </Option>
   );
 }

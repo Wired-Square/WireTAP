@@ -27,6 +27,7 @@ import { iconMd, iconSm } from "../../styles/spacing";
 import { caption, textMedium, emptyStateText } from "../../styles";
 import { PrimaryButton, SecondaryButton } from "../../components/forms";
 import { Alert } from "../../components/Alert";
+import { Listbox, Option } from "../../components/Listbox";
 
 // Its whole subtree — the share store and API — is dead weight in every panel
 // that never opens it.
@@ -127,21 +128,11 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                 {needle ? t("catalogPicker.noMatches") : t("catalogPicker.empty")}
               </div>
             ) : (
-              // Rows read like the Data Source dialog's: tinted and bordered when
-              // selected, not a bare background swap.
-              <div className="px-3 py-2 space-y-1">
+              <Listbox>
                 {shown.map((catalog) => {
                   const isSelected = catalog.path === selectedPath;
                   return (
-                    <button
-                      key={catalog.path}
-                      onClick={() => pick(catalog.path)}
-                      className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                        isSelected
-                          ? "bg-info border border-info"
-                          : "hover:bg-hover border border-transparent"
-                      }`}
-                    >
+                    <Option key={catalog.path} selected={isSelected} onClick={() => pick(catalog.path)}>
                       {/* Leading, not trailing: the trailing slot holds the tick, which
                           renders only when selected, so a status icon beside it would
                           shift on every click. A left column also scans vertically past
@@ -157,10 +148,10 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                       {isSelected && (
                         <Check className={`${iconMd} text-green flex-shrink-0`} />
                       )}
-                    </button>
+                    </Option>
                   );
                 })}
-              </div>
+              </Listbox>
             )}
           </div>
 

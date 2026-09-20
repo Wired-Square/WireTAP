@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
 import { iconMd } from "../styles/spacing";
 import Dialog, { DialogBody } from "../components/Dialog";
 import type { PlaybackSpeed } from "../components/TimeController";
-import { hoverLight, textSuccess, textMedium } from "../styles";
+import { textSuccess, textMedium } from "../styles";
+import { Listbox, Option } from "../components/Listbox";
 import { SPEED_OPTIONS } from "./io-source-picker/utils";
 
 type Props = {
@@ -30,27 +31,21 @@ export default function SpeedPickerDialog({
   return (
     <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("speedPicker.title")}>
       <DialogBody padding="none" className="max-h-[50vh]">
-        <div className="py-1">
+        <Listbox variant="flush">
           {SPEED_OPTIONS.map((opt) => {
             const isSelected = opt.value === speed;
             return (
-              <button
-                key={opt.value}
-                onClick={() => handleSelect(opt.value)}
-                className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors ${
-                  isSelected ? "bg-hover" : ""
-                }`}
-              >
+              <Option key={opt.value} selected={isSelected} onClick={() => handleSelect(opt.value)}>
                 <span className={`flex-1 ${textMedium}`}>
                   {opt.label}
                 </span>
                 {isSelected && (
                   <Check className={`${iconMd} ${textSuccess} flex-shrink-0`} />
                 )}
-              </button>
+              </Option>
             );
           })}
-        </div>
+        </Listbox>
       </DialogBody>
     </Dialog>
   );

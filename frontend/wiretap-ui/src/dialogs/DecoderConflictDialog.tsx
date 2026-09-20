@@ -1,6 +1,7 @@
 
 import { useTranslation } from "react-i18next";
-import { textMedium, caption, hoverLight } from "../styles";
+import { textMedium, caption } from "../styles";
+import { Listbox, Option } from "../components/Listbox";
 import Dialog, { DialogBody } from "../components/Dialog";
 
 export interface DecoderConflictOption {
@@ -33,15 +34,14 @@ export default function DecoderConflictDialog({
         <div className="px-4 py-2">
           <p className={`${caption}`}>{t("decoderConflict.intro")}</p>
         </div>
-        <div className="py-1">
+        <Listbox variant="flush">
           {options.map((opt) => (
-            <button
+            <Option
               key={opt.filename}
               onClick={() => {
                 onSelect(opt.filename);
                 onClose();
               }}
-              className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors`}
             >
               <div className="flex-1 min-w-0">
                 <span className={`${textMedium} truncate`}>
@@ -51,20 +51,19 @@ export default function DecoderConflictDialog({
                   {t("decoderConflict.usedBy", { profiles: opt.profileNames.join(", ") })}
                 </div>
               </div>
-            </button>
+            </Option>
           ))}
-          <button
+          <Option
             onClick={() => {
               onSkip();
               onClose();
             }}
-            className={`w-full px-4 py-2.5 text-left ${hoverLight} transition-colors`}
           >
             <span className={`${textMedium} text-muted`}>
               {t("decoderConflict.none")}
             </span>
-          </button>
-        </div>
+          </Option>
+        </Listbox>
       </DialogBody>
     </Dialog>
   );

@@ -19,10 +19,10 @@ import { textPrimary, spaceYDefault, h2 } from "../../../styles";
 import { Button, IconButton } from "../../../components/Button";
 ```
 
-Buttons, form controls, badges, cards, alerts, dialogs, tabs, menus and
-tables are components, not class strings — see *Buttons*, *Inputs*,
-*Badges*, *Cards & alerts*, *Dialogs*, *Tabs*, *Menus* and *Data tables*
-under the token reference.
+Buttons, form controls, badges, cards, alerts, dialogs, tabs, menus, lists
+and tables are components, not class strings — see *Buttons*, *Inputs*,
+*Badges*, *Cards & alerts*, *Dialogs*, *Tabs*, *Menus*, *Lists* and *Data
+tables* under the token reference.
 
 Localisation lives in [../frontend/wiretap-ui/src/locales/](../frontend/wiretap-ui/src/locales/). The active language
 is driven by the `language` field in `settings.json` (see
@@ -376,6 +376,7 @@ lifting to `--text-primary`, the current tab underlined 2 px in
 | Prop | Values | Notes |
 |---|---|---|
 | `variant` | `underline` (default) · `segmented` | Segmented is the pill form for a mode switch (Local / UTC, Both / ID / Data, Edit / Diff): a `--bg-tertiary` trough at `--radius-control`, the current tab lifted on `--bg-primary`, 26 px tall to sit beside `sm` controls |
+| `orientation` | `horizontal` (default) · `vertical` | Vertical is the nav down the side of a view (`AppSideBar` in Settings): a column of 44 px rows at `--radius-panel`, 14 px text, 20 px glyphs, no hairline, the current row lit in the info tint; ↑ ↓ move along it |
 | `inline` | `boolean` | No hairline of its own — the strip sits in a bar that draws one (`DataViewTabBar`) |
 | `inset` | `boolean` | Its own 8 px inset and `--bg-surface` fill — the strip is the first row of a flush dialog body (`TabStrip`) |
 | `sticky` | `boolean` | Pinned at the top of the scroller below it |
@@ -415,9 +416,14 @@ must close by hand. Rows are `<MenuItem>` (12 px text, 28 px, `icon` in a 14 px 
 a second line, `tone="danger" | "warning"` for a destructive or a leaving
 action, `checked` for a toggle — lit in the info tint like a pressed button;
 an item closes the menu after its click unless `keepOpen`),
-`<MenuSeparator>` and `<MenuHeading>` (a 10 px uppercase caption). A picker's
-option list is a `<Popover role="listbox">` of `<MenuItem role="option"
-aria-selected>` rows. Escape reaches only the layer opened last — dialogs,
+`<MenuSeparator>` and `<MenuHeading>` (a 10 px uppercase caption). `<MenuRow>`
+holds a field and its buttons (`field` for the menu's inset), or an item and
+its delete button, as one row: Tab moves between the row's controls and
+closes the menu only from its last (or first, with Shift) — the Dashboard's
+layout menu. A *floating* picker's option list is a `<Popover role="listbox">`
+of `<MenuItem role="option" aria-selected>` rows (`FrameLinkDevicePicker`,
+`SerialPortPicker`, `SignalCombobox`); a list *in the page* is the lists
+family below. Escape reaches only the layer opened last — dialogs,
 menus and popovers share one stack in
 [behaviour/dismiss.ts](../frontend/wiretap-ui/src/components/behaviour/dismiss.ts)
 (`useDismiss` in `dismiss.ts` is its React face) — so a menu over a dialog
@@ -434,6 +440,33 @@ dialog's ✕, the toast's dismiss — come through
 [strings.ts](../frontend/wiretap-ui/src/components/strings.ts), which
 `i18n.ts` points at the `common` resources once, so no primitive imports the
 translation layer.
+
+### Lists — [Listbox.tsx](../frontend/wiretap-ui/src/components/Listbox.tsx)
+
+`<Listbox>` is the list a picker or a dialog body shows in the page (a
+`listbox`; ↑ ↓ Home End move along it, wrapping, and yield to a text field
+inside a row) and `<Option>` one row in it, rendering `.listbox` and
+`.option`. One look: a full-width row, 8 px / 12 px inset at `--radius-panel`,
+flat at rest, `--bg-hover` under the pointer and on `focus-visible`, and the
+chosen row lit in the info tint and border — the same lit look as a pressed
+button, a selected card and a checked menu item. The row's text is the
+caller's (`textMedium` over `caption`, a glyph before, a badge or a tick
+after); the row carries everything else. Props:
+
+| Prop | Values | Notes |
+|---|---|---|
+| `variant` (Listbox) | `inset` (default) · `flush` | Flush is the list in a flush dialog body: no inset, no rounding, rows edge to edge at 8 px / 16 px (the speed picker, decoder conflict, signal picker, selection sets, bookmarks, add source) |
+| `selected` | `boolean` | The chosen row — `aria-selected`, and the tint |
+| `tone` | `purple` · `success` · `warning` · `cyan` | Colours the lit state (fill, edge, mark) and the hover edge at rest — a source in its kind's hue (`sourceKindColours[kind].tone`), a live device green, a stopped one amber, the multi-bus tick purple. A toned row at rest is flat like the others |
+| `mark` | `radio` · `check` | The row's own radio or check, a span drawn like `.check` and lit with the row (a real `<input>` cannot sit inside a `<button>`) |
+| `size` | `md` (default) · `sm` | `sm` is 6 px rows for a nested or dense list (the signal picker's signals, the Rules signal list) |
+| `dashed` | `boolean` | The add-row at the end of a list (New device) |
+| `as` | `button` (default) · `div` | A `div` for a row that nests a button of its own (edit, discard, rename, load): focusable, Enter and Space click it, `disabled` becomes `aria-disabled` |
+
+Options are tabbable like menu items; a `disabled` option is skipped by the
+arrow keys. `optionClass()` is the class string for a row that must be some
+other element. Not a list: a disclosure header that expands a section under
+it is a plain `<button>`, and a card that answers a click is `cardClass()`.
 
 ### Data tables — [Table.tsx](../frontend/wiretap-ui/src/components/Table.tsx)
 
@@ -1109,11 +1142,11 @@ adjacency so related tooling is visible at a glance.
 
 ## What is not a primitive yet
 
-The option rows inside pickers and dialogs (a `w-full text-left` `<button>`
-with its own hover and selected look), the Settings sidebar, the fake
-checkbox and radio drawn inside a row, the toggle switch in the FrameLink
-signal control, and the Catalog Editor's field tiles are still hand-rolled;
-each is in the register (*Bugs and Feature gaps* in the vault) under
-*Frontend styling*, and a new one should copy an existing row rather than
-invent a third look. Additional locales (`en-US`, `de`, `ja`, …) are a
-folder plus a line in `src/locales/index.ts`.
+The disclosure headers that expand a section under them (a `<button>` with
+a chevron — the signal picker's frames, an IO profile's interfaces, the
+checksum results), the toggle switch in the FrameLink signal control, and
+the Catalog Editor's field tiles are still hand-rolled; each is in the
+register (*Bugs and Feature gaps* in the vault) under *Frontend styling*,
+and a new one should copy an existing one rather than invent a third look.
+Additional locales (`en-US`, `de`, `ja`, …) are a folder plus a line in
+`src/locales/index.ts`.

@@ -16,7 +16,7 @@ import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
 import { Button, IconButton } from "../../../components/Button";
 import { Input } from "../../../components/forms";
-import { Menu, MenuHeading, MenuItem, MenuSeparator, usePopover } from "../../../components/Menu";
+import { Menu, MenuHeading, MenuItem, MenuRow, MenuSeparator, usePopover } from "../../../components/Menu";
 
 interface Props {
   // IO session
@@ -224,7 +224,7 @@ export default function DashboardTopBar({
             {t("topBar.layouts.saveCurrent")}
           </MenuItem>
         ) : (
-          <div className="flex items-center gap-1 px-3 py-1.5">
+          <MenuRow field>
             <Input
               type="text"
               value={saveName}
@@ -256,7 +256,7 @@ export default function DashboardTopBar({
             >
               {t("topBar.layouts.saveFile")}
             </Button>
-          </div>
+          </MenuRow>
         )}
 
         {savedLayouts.length > 0 && <MenuSeparator />}
@@ -270,10 +270,9 @@ export default function DashboardTopBar({
         {savedLayouts.map((layout) => {
           const isMismatch = catalogFilename && layout.catalogFilename && layout.catalogFilename !== catalogFilename;
           return (
-            <div key={layout.id} className="flex items-center gap-1 group">
+            <MenuRow key={layout.id} className="group">
               <MenuItem
                 onClick={() => onLoadLayout(layout)}
-                className="flex-1"
                 icon={
                   isMismatch ? (
                     <span title={t("topBar.differentCatalog")}>
@@ -296,7 +295,7 @@ export default function DashboardTopBar({
               >
                 <X className="w-3 h-3" />
               </IconButton>
-            </div>
+            </MenuRow>
           );
         })}
 

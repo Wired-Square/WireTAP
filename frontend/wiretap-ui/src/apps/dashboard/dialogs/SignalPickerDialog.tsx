@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown, Check, Search } from "lucide-react";
+import { ChevronRight, ChevronDown, Search } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 import { textSecondary, hoverLight } from "../../../styles";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
@@ -10,6 +10,7 @@ import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
 import { SecondaryButton, PrimaryButton, Input } from "../../../components/forms";
+import { Listbox, Option } from "../../../components/Listbox";
 
 /** Key used to identify a signal selection. */
 function signalKey(frameId: number, signalName: string): string {
@@ -268,42 +269,21 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
 
                     {/* Signal list */}
                     {isExpanded && (
-                      <div className="pl-8">
+                      <Listbox variant="flush" className="pl-4 py-0">
                         {numericSignals.map((signal) => {
                           const selected = isSignalSelected(frameId, signal.name!);
                           const isCurrentReplacement = isReplaceMode && replacementTarget &&
                             replacementTarget.frameId === frameId && replacementTarget.signalName === signal.name;
                           return (
-                            <button
+                            <Option
                               key={signal.name}
+                              size="sm"
+                              selected={isReplaceMode ? !!isCurrentReplacement : selected}
+                              tone={isReplaceMode ? "purple" : undefined}
+                              mark={isReplaceMode ? "radio" : "check"}
+                              className="gap-2"
                               onClick={() => handleSignalClick(frameId, signal.name!, signal.unit)}
-                              className={`w-full flex items-center gap-2 px-4 py-1.5 text-left ${hoverLight} transition-colors`}
                             >
-                              {isReplaceMode ? (
-                                // In replace mode, show a radio-style indicator
-                                <div
-                                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                    isCurrentReplacement
-                                      ? "border-text-purple"
-                                      : "border-default"
-                                  }`}
-                                >
-                                  {isCurrentReplacement && (
-                                    <div className="w-2 h-2 rounded-full bg-text-purple" />
-                                  )}
-                                </div>
-                              ) : (
-                                // Normal mode: checkbox
-                                <div
-                                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                    selected
-                                      ? "bg-accent-primary border-accent-primary"
-                                      : "border-default"
-                                  }`}
-                                >
-                                  {selected && <Check className="w-3 h-3 text-white" />}
-                                </div>
-                              )}
                               <span className="text-sm text-primary">
                                 {signal.name}
                               </span>
@@ -312,10 +292,10 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                                   ({signal.unit})
                                 </span>
                               )}
-                            </button>
+                            </Option>
                           );
                         })}
-                      </div>
+                      </Listbox>
                     )}
                   </div>
                 );

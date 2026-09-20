@@ -1,89 +1,37 @@
-// ui/src/components/AppSideBar.tsx
-//
-// Reusable collapsible sidebar component for apps like Settings.
-// Renders a list of navigation items with icons and labels.
+// A collapsible side nav for an app with sections, like Settings: a vertical
+// tab strip of icon-and-label rows, and a toggle that folds it to the icons.
 
 import { type LucideIcon, PanelLeftClose, PanelLeft } from "lucide-react";
-import { iconLg, iconMd } from "../styles/spacing";
-import {
-  bgPrimary,
-  borderDefault,
-  bgInfo,
-  textInfo,
-  hoverLight,
-  textSecondary,
-  roundedDefault,
-  gapSmall,
-  spaceYSmall,
-} from "../styles";
+import { iconMd } from "../styles/spacing";
+import { bgPrimary, borderDefault } from "../styles";
 import { IconButton } from "./Button";
+import { Tab, Tabs } from "./Tabs";
 
-/**
- * A sidebar navigation item.
- */
 export interface SideBarItem {
-  /** Unique identifier for the item */
   id: string;
-  /** Display label */
   label: string;
-  /** Lucide icon component */
   icon: LucideIcon;
 }
 
 export interface AppSideBarProps {
-  /** Navigation items to display */
   items: SideBarItem[];
-  /** Currently active item ID */
   activeItem: string;
-  /** Called when an item is selected */
   onSelect: (id: string) => void;
-  /** Width class when expanded (default: "w-64") */
-  width?: string;
-  /** Whether the sidebar is collapsed */
   collapsed?: boolean;
-  /** Called when collapse state changes */
   onToggleCollapsed?: () => void;
 }
 
-/**
- * Reusable collapsible sidebar component for apps.
- *
- * @example
- * ```tsx
- * const items: SideBarItem[] = [
- *   { id: 'general', label: 'General', icon: Cog },
- *   { id: 'display', label: 'Display', icon: Monitor },
- * ];
- *
- * <AppSideBar
- *   items={items}
- *   activeItem={currentSection}
- *   onSelect={setSection}
- *   collapsed={collapsed}
- *   onToggleCollapsed={() => setCollapsed(!collapsed)}
- * />
- * ```
- */
 export default function AppSideBar({
   items,
   activeItem,
   onSelect,
-  width = "w-64",
   collapsed = false,
   onToggleCollapsed,
 }: AppSideBarProps) {
-  const itemClasses = (id: string) =>
-    `w-full flex items-center ${collapsed ? "justify-center" : ""} ${gapSmall} ${collapsed ? "px-2" : "px-4"} py-3 ${roundedDefault} transition-colors text-left ${
-      activeItem === id
-        ? `${bgInfo} ${textInfo}`
-        : `${hoverLight} ${textSecondary}`
-    }`;
-
   return (
     <aside
-      className={`${collapsed ? "w-14" : width} ${bgPrimary} border-r ${borderDefault} flex flex-col overflow-hidden transition-all duration-200`}
+      className={`${collapsed ? "w-14" : "w-64"} ${bgPrimary} border-r ${borderDefault} flex flex-col overflow-hidden transition-all duration-200`}
     >
-      {/* Collapse toggle button */}
       {onToggleCollapsed && (
         <div className={`flex ${collapsed ? "justify-center" : "justify-end"} p-2 border-b ${borderDefault}`}>
           <IconButton
@@ -101,22 +49,23 @@ export default function AppSideBar({
       )}
 
       <div className="flex-1 overflow-y-auto p-2">
-        <nav className={spaceYSmall}>
+        <Tabs orientation="vertical">
           {items.map((item) => {
             const Icon = item.icon;
             return (
-              <button
+              <Tab
                 key={item.id}
+                selected={activeItem === item.id}
                 onClick={() => onSelect(item.id)}
-                className={itemClasses(item.id)}
+                className={collapsed ? "justify-center px-2" : undefined}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon className={iconLg} />
-                {!collapsed && <span className="font-medium">{item.label}</span>}
-              </button>
+                <Icon />
+                {!collapsed && <span>{item.label}</span>}
+              </Tab>
             );
           })}
-        </nav>
+        </Tabs>
       </div>
     </aside>
   );

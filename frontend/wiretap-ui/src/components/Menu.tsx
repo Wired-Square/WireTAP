@@ -3,8 +3,9 @@
 // body, placed against an anchor or at a point, dismissed by Escape and a
 // click outside; `Menu` is a popover with menu semantics, arrow-key focus,
 // Tab closing it and focus returned to the opener; `MenuItem`, `MenuSeparator`
-// and `MenuHeading` are its rows. An item closes the menu after its click
-// unless told to stay.
+// and `MenuHeading` are its rows, and `MenuRow` holds a field and its buttons,
+// or an item and its delete, as one row Tab walks before it leaves. An item
+// closes the menu after its click unless told to stay.
 // `usePopover` holds the open state between a trigger and its popover.
 
 import {
@@ -24,7 +25,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useDismiss } from "./dismiss";
-import { moveFocusAlong, rememberFocus } from "./behaviour/focus";
+import { moveFocusAlong, rememberFocus, tabStaysWithin } from "./behaviour/focus";
 import { placePopover } from "./behaviour/placement";
 
 export interface PopoverProps extends HTMLAttributes<HTMLDivElement> {
@@ -133,7 +134,7 @@ export function Menu({ open, onClose, size = "md", className = "", onKeyDown, ch
         className={`menu ${size === "lg" ? "menu--lg " : ""}${className}`}
         onKeyDown={(e) => {
           onKeyDown?.(e);
-          if (e.key === "Tab" && !e.defaultPrevented) {
+          if (e.key === "Tab" && !e.defaultPrevented && !tabStaysWithin(e, ".menu__row")) {
             e.preventDefault();
             onClose();
           }
@@ -194,6 +195,15 @@ export const MenuItem = forwardRef<HTMLButtonElement, MenuItemProps>(
   },
 );
 MenuItem.displayName = "MenuItem";
+
+export interface MenuRowProps extends HTMLAttributes<HTMLDivElement> {
+  /** The row holds a field: it takes the menu's inset */
+  field?: boolean;
+}
+
+export function MenuRow({ field = false, className = "", ...rest }: MenuRowProps) {
+  return <div className={`menu__row ${field ? "menu__row--field " : ""}${className}`} {...rest} />;
+}
 
 export function MenuSeparator() {
   return <div role="separator" className="menu__separator" />;

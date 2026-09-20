@@ -2,7 +2,6 @@
    run `npm run gen:css`. Layered so the `!` utilities keep beating unlayered third-party CSS. */
 @layer utilities {
   .pointer-events-none { pointer-events: none }
-  .invisible { visibility: hidden }
   .visible { visibility: visible }
   .\!relative { position: relative !important }
   .absolute { position: absolute }
@@ -17,7 +16,6 @@
   .top-0 { top: 0 }
   .top-1 { top: 0.25rem }
   .top-1\/2 { top: 50% }
-  .top-full { top: 100% }
   .\!right-0 { right: 0 !important }
   .right-0 { right: 0 }
   .right-1 { right: 0.25rem }
@@ -311,7 +309,6 @@
   .border-success-text { border-color: var(--status-success-text) }
   .border-text-amber { border-color: var(--text-amber) }
   .border-text-cyan { border-color: var(--text-cyan) }
-  .border-text-green { border-color: var(--text-green) }
   .border-text-purple { border-color: var(--text-purple) }
   .border-transparent { border-color: transparent }
   .border-warning { border-color: var(--status-warning-border) }
@@ -357,14 +354,11 @@
   .bg-signal-violet-1 { background-color: var(--signal-violet-1) }
   .bg-success { background-color: var(--status-success-bg) }
   .bg-success-text { background-color: var(--status-success-text) }
-  .bg-success\/50 { background-color: color-mix(in oklab, var(--status-success-bg) 50%, transparent) }
   .bg-surface { background-color: var(--bg-surface) }
   .bg-table-row-alt { background-color: var(--table-row-alt) }
   .bg-table-row-highlight { background-color: var(--table-row-highlight) }
   .bg-tertiary { background-color: var(--bg-tertiary) }
   .bg-tertiary\/40 { background-color: color-mix(in oklab, var(--bg-tertiary) 40%, transparent) }
-  .bg-text-amber { background-color: var(--text-amber) }
-  .bg-text-cyan { background-color: var(--text-cyan) }
   .bg-text-green { background-color: var(--text-green) }
   .bg-text-muted { background-color: var(--text-muted) }
   .bg-text-purple { background-color: var(--text-purple) }
@@ -373,7 +367,6 @@
   .bg-transparent { background-color: transparent }
   .bg-warning { background-color: var(--status-warning-bg) }
   .bg-warning-text { background-color: var(--status-warning-text) }
-  .bg-warning\/50 { background-color: color-mix(in oklab, var(--status-warning-bg) 50%, transparent) }
   .bg-white { background-color: #fff }
   .bg-gradient-to-l { background-image: linear-gradient(to left in oklab, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%) }
   .bg-gradient-to-r { background-image: linear-gradient(to right in oklab, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%) }
@@ -397,11 +390,11 @@
   .px-2 { padding-inline: 0.5rem }
   .px-3 { padding-inline: 0.75rem }
   .px-4 { padding-inline: 1rem }
+  .py-0 { padding-block: 0 }
   .py-0\.5 { padding-block: 0.125rem }
   .py-1 { padding-block: 0.25rem }
   .py-1\.5 { padding-block: 0.375rem }
   .py-2 { padding-block: 0.5rem }
-  .py-2\.5 { padding-block: 0.625rem }
   .py-3 { padding-block: 0.75rem }
   .py-4 { padding-block: 1rem }
   .py-8 { padding-block: 2rem }
@@ -515,13 +508,10 @@
   .shadow-accent-danger\/30 { --tw-shadow-color: color-mix(in oklab, var(--accent-danger) 30%, transparent) }
   .ring-accent-primary\/50 { --tw-ring-color: color-mix(in oklab, var(--accent-primary) 50%, transparent) }
   .ring-current { --tw-ring-color: currentcolor }
-  .ring-default { --tw-ring-color: var(--border-default) }
   .ring-info { --tw-ring-color: var(--status-info-border) }
-  .ring-text-purple { --tw-ring-color: var(--text-purple) }
   .ring-text-yellow { --tw-ring-color: var(--text-yellow) }
   .ring-warning { --tw-ring-color: var(--status-warning-border) }
   .outline { outline-style: solid; outline-width: 1px }
-  .brightness-110 { filter: brightness(110%) }
   .invert { filter: invert(100%) }
   .transition-\[width\] { transition-property: width; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms }
   .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms }
@@ -535,30 +525,20 @@
   .select-none { -webkit-user-select: none; user-select: none }
   .select-text { -webkit-user-select: text; user-select: text }
   .ring-inset { --tw-ring-inset: inset }
-  @media (hover: hover) { .group-hover\:visible:is(:where(.group):hover *) { visibility: visible } }
   @media (hover: hover) { .group-hover\:opacity-100:is(:where(.group):hover *) { opacity: 1 } }
   .last\:mb-0:last-child { margin-bottom: 0 }
   .last\:border-b-0:last-child { border-bottom-style: solid; border-bottom-width: 0px }
   @media (hover: hover) { .hover\:scale-110:hover { scale: 110% 110% } }
   @media (hover: hover) { .hover\:border-hover:hover { border-color: var(--border-hover) } }
-  @media (hover: hover) { .hover\:border-info-text:hover { border-color: var(--status-info-text) } }
-  @media (hover: hover) { .hover\:border-text-cyan:hover { border-color: var(--text-cyan) } }
-  @media (hover: hover) { .hover\:border-text-green:hover { border-color: var(--text-green) } }
-  @media (hover: hover) { .hover\:border-text-purple:hover { border-color: var(--text-purple) } }
   @media (hover: hover) { .hover\:bg-accent-primary\/60:hover { background-color: color-mix(in oklab, var(--accent-primary) 60%, transparent) } }
-  @media (hover: hover) { .hover\:bg-danger:hover { background-color: var(--status-danger-bg) } }
   @media (hover: hover) { .hover\:bg-hover:hover { background-color: var(--bg-hover) } }
-  @media (hover: hover) { .hover\:bg-info:hover { background-color: var(--status-info-bg) } }
-  @media (hover: hover) { .hover\:bg-success:hover { background-color: var(--status-success-bg) } }
   @media (hover: hover) { .hover\:bg-surface:hover { background-color: var(--bg-surface) } }
-  @media (hover: hover) { .hover\:bg-warning:hover { background-color: var(--status-warning-bg) } }
   @media (hover: hover) { .hover\:no-underline:hover { text-decoration-line: none } }
   @media (hover: hover) { .hover\:underline:hover { text-decoration-line: underline } }
   @media (hover: hover) { .hover\:decoration-dotted:hover { text-decoration-style: dotted } }
   @media (hover: hover) { .hover\:opacity-100:hover { opacity: 1 } }
   @media (hover: hover) { .hover\:ring-2:hover { --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) } }
   @media (hover: hover) { .hover\:ring-accent-primary:hover { --tw-ring-color: var(--accent-primary) } }
-  @media (hover: hover) { .hover\:ring-text-purple:hover { --tw-ring-color: var(--text-purple) } }
   @media (hover: hover) { .hover\:brightness-95:hover { filter: brightness(95%) } }
   @media (hover: hover) { .hover\:brightness-125:hover { filter: brightness(125%) } }
   .focus\:outline-none:focus { outline-style: none }

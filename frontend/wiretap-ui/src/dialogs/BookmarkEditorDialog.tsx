@@ -18,6 +18,7 @@ import {
 } from "../utils/favorites";
 import TimeBoundsInput, { type TimeBounds } from "../components/TimeBoundsInput";
 import { IconButton } from "../components/Button";
+import { Listbox, Option } from "../components/Listbox";
 
 type Props = {
   isOpen: boolean;
@@ -283,7 +284,7 @@ export default function BookmarkEditorDialog({
           ) : bookmarks.length === 0 ? (
             <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.empty")}</div>
           ) : (
-            <div className="divide-y divide-default">
+            <Listbox variant="flush">
               {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
                 <div key={pid}>
                   {!profileId && (
@@ -292,26 +293,20 @@ export default function BookmarkEditorDialog({
                     </div>
                   )}
                   {profileBookmarks.map((bookmark) => (
-                    <div
+                    <Option
                       key={bookmark.id}
-                      className={`flex items-center w-full hover:bg-hover ${
-                        selectedId === bookmark.id
-                          ? "bg-info border-l-2 border-info-text"
-                          : ""
-                      }`}
+                      as="div"
+                      selected={selectedId === bookmark.id}
+                      onClick={() => handleSelectBookmark(bookmark)}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSelectBookmark(bookmark)}
-                        className="flex-1 text-left px-3 py-2"
-                      >
+                      <div className="flex-1 min-w-0">
                         <div className={sectionHeaderText}>
                           {bookmark.name}
                         </div>
                         <div className={`${captionMuted} mt-0.5`}>
                           {formatTimeRange(bookmark)}
                         </div>
-                      </button>
+                      </div>
                       {onLoad && (
                         <IconButton
                           onClick={(e) => {
@@ -321,16 +316,15 @@ export default function BookmarkEditorDialog({
                           }}
                           title={t("bookmarkEditor.loadTooltip")}
                           tone="primary"
-                          className="mr-1"
                         >
                           <Play className={iconMd} />
                         </IconButton>
                       )}
-                    </div>
+                    </Option>
                   ))}
                 </div>
               ))}
-            </div>
+            </Listbox>
           )}
         </div>
 

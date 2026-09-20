@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import {
   textPrimary,
   textSecondary,
@@ -10,6 +10,8 @@ import {
 import { formatHexId } from "../utils/formatHex";
 import type { SelectableSignal } from "../../../api/framelinkRules";
 import { Input } from "../../../components/forms";
+import { MenuItem, Popover } from "../../../components/Menu";
+import { moveFocusAlong } from "../../../components/behaviour/focus";
 
 // ============================================================================
 // Types
@@ -36,7 +38,8 @@ const TIER_LABELS: Record<SelectableSignal["tier"], string> = {
 
 const TIER_ORDER: SelectableSignal["tier"][] = ["frame_def", "device", "user"];
 
-const DROPDOWN_Z_INDEX = 9999;
+const LIST_KEYS = { ArrowDown: 1, ArrowUp: -1, Home: "first", End: "last" } as const;
+const OPTIONS = '[role="option"]';
 
 // ============================================================================
 // Helpers
@@ -113,8 +116,7 @@ export default function SignalCombobox({
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Resolve selected signal for display
   const selectedSignal = useMemo(
@@ -138,35 +140,16 @@ export default function SignalCombobox({
     return groupSignals(filtered);
   }, [signals, filter, minBitLength]);
 
-  // Position the dropdown using fixed positioning to escape overflow
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-
-  const updatePosition = useCallback(() => {
-    if (!inputRef.current) return;
-    const rect = inputRef.current.getBoundingClientRect();
-    setDropdownStyle({
-      position: "fixed",
-      top: rect.bottom + 2,
-      left: rect.left,
-      width: rect.width,
-      zIndex: DROPDOWN_Z_INDEX,
-    });
-  }, []);
-
-  // Open dropdown
   const open = useCallback(() => {
     setIsOpen(true);
     setFilter("");
-    updatePosition();
-  }, [updatePosition]);
+  }, []);
 
-  // Close dropdown
   const close = useCallback(() => {
     setIsOpen(false);
     setFilter("");
   }, []);
 
-  // Select a signal
   const selectSignal = useCallback(
     (signalId: number) => {
       onChange(signalId);
@@ -175,26 +158,6 @@ export default function SignalCombobox({
     [onChange, close],
   );
 
-  // Close on click outside
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handleMouseDown(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        close();
-      }
-    }
-
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isOpen, close]);
-
-  // Handle keyboard
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Escape") {
@@ -202,7 +165,11 @@ export default function SignalCombobox({
         inputRef.current?.blur();
         return;
       }
-
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        listRef.current?.querySelector<HTMLElement>(OPTIONS)?.focus();
+        return;
+      }
       if (e.key === "Enter" && filter) {
         // Manual hex entry: parse typed text as a hex number
         const parsed = parseHexInput(filter);
@@ -218,7 +185,7 @@ export default function SignalCombobox({
   const renderedTiers = new Set<SelectableSignal["tier"]>();
 
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <Input
         ref={inputRef}
         type="text"
@@ -229,67 +196,73 @@ export default function SignalCombobox({
         onClick={() => { if (!isOpen) open(); }}
         onChange={(e) => setFilter(e.target.value)}
         onKeyDown={handleKeyDown}
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       />
 
-      {isOpen && (
-        <div
-          ref={dropdownRef}
-          className="popover max-h-64 overflow-y-auto"
-          style={dropdownStyle}
-        >
-          {filteredGroups.length === 0 && (
-            <div className={`px-2 py-2 text-xs ${textSecondary}`}>
-              {filter ? "No matching signals" : "No signals available"}
+      <Popover
+        ref={listRef}
+        open={isOpen}
+        onClose={close}
+        anchorRef={inputRef}
+        matchWidth
+        role="listbox"
+        className="max-h-64 overflow-y-auto"
+        onKeyDown={(e) => {
+          if (e.key === "Tab") close();
+          moveFocusAlong(e, LIST_KEYS, OPTIONS);
+        }}
+      >
+        {filteredGroups.length === 0 && (
+          <div className={`px-2 py-2 text-xs ${textSecondary}`}>
+            {filter ? "No matching signals" : "No signals available"}
+          </div>
+        )}
+
+        {filteredGroups.map(({ tier, group, signals: groupSignals }) => {
+          // Render tier header once per tier
+          const showTierHeader = !renderedTiers.has(tier);
+          if (showTierHeader) renderedTiers.add(tier);
+
+          const tierLabel = TIER_LABELS[tier];
+
+          return (
+            <div key={`${tier}:${group}`}>
+              {showTierHeader && (
+                <div
+                  className={`sticky top-0 px-2 py-1 text-2xs font-semibold uppercase tracking-wider ${bgSurface} ${textSecondary} border-b ${borderDefault}`}
+                >
+                  {tierLabel}
+                </div>
+              )}
+
+              {groupSignals.map((signal) => (
+                <MenuItem
+                  key={signal.signal_id}
+                  role="option"
+                  aria-selected={signal.signal_id === value}
+                  className="grid grid-cols-[1fr_auto_3rem_auto] gap-x-2 px-2 text-xs"
+                  onClick={() => selectSignal(signal.signal_id)}
+                >
+                  <span className={`truncate ${textPrimary}`}>
+                    {signal.name}
+                  </span>
+                  <span className={`text-right px-2 ${textSecondary}`}>
+                    {group}
+                  </span>
+                  <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
+                    {signal.bit_length}b
+                  </span>
+                  <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
+                    {formatHexId(signal.signal_id)}
+                  </span>
+                </MenuItem>
+              ))}
             </div>
-          )}
-
-          {filteredGroups.map(({ tier, group, signals: groupSignals }) => {
-            // Render tier header once per tier
-            const showTierHeader = !renderedTiers.has(tier);
-            if (showTierHeader) renderedTiers.add(tier);
-
-            const tierLabel = TIER_LABELS[tier];
-
-            return (
-              <div key={`${tier}:${group}`}>
-                {showTierHeader && (
-                  <div
-                    className={`sticky top-0 px-2 py-1 text-2xs font-semibold uppercase tracking-wider ${bgSurface} ${textSecondary} border-b ${borderDefault}`}
-                  >
-                    {tierLabel}
-                  </div>
-                )}
-
-                {groupSignals.map((signal) => (
-                  <button
-                    key={signal.signal_id}
-                    type="button"
-                    className="menu__item grid grid-cols-[1fr_auto_3rem_auto] gap-x-2 px-2 text-xs"
-                    onMouseDown={(e) => {
-                      // Prevent input blur before we can handle the click
-                      e.preventDefault();
-                      selectSignal(signal.signal_id);
-                    }}
-                  >
-                    <span className={`truncate ${textPrimary}`}>
-                      {signal.name}
-                    </span>
-                    <span className={`text-right px-2 ${textSecondary}`}>
-                      {group}
-                    </span>
-                    <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
-                      {signal.bit_length}b
-                    </span>
-                    <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
-                      {formatHexId(signal.signal_id)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+          );
+        })}
+      </Popover>
+    </>
   );
 }

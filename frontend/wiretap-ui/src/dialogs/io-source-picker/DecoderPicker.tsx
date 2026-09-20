@@ -15,6 +15,7 @@ import CatalogPickerDialog from "../catalog-picker";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { findCatalogByPath } from "../../utils/catalogUtils";
 import { IconButton } from "../../components/Button";
+import { Listbox, Option } from "../../components/Listbox";
 
 interface Props {
   catalogPath: string | null;
@@ -33,14 +34,9 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
       <div className={`p-4 border-t ${borderDefault}`}>
         <div className={`${sectionHeader} mb-2`}>{t("ioSourcePicker.decoder.label")}</div>
 
+        <Listbox className="p-0">
         {catalogPath ? (
-          // Selected decoder — styled like a selected source row.
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setPickerOpen(true)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:brightness-95 bg-info border border-info"
-          >
+          <Option as="div" selected onClick={() => setPickerOpen(true)}>
             <FileText className={`${iconMd} flex-shrink-0 text-info`} />
             <div className="flex-1 min-w-0">
               <div className={`${textMedium} truncate`}>
@@ -59,19 +55,16 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
             >
               <X className={iconXs} />
             </IconButton>
-          </div>
+          </Option>
         ) : (
-          // No decoder — unselected source-style row.
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:bg-hover border border-transparent"
-          >
+          <Option onClick={() => setPickerOpen(true)}>
             <FileText className={`${iconMd} flex-shrink-0 text-muted`} />
             <span className="text-muted italic">
               {t("ioSourcePicker.decoder.none")}
             </span>
-          </button>
+          </Option>
         )}
+        </Listbox>
       </div>
 
       <CatalogPickerDialog

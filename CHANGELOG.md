@@ -6,11 +6,13 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Lists are now drawn from one system.** Every list of choices in the app — the sources, captures and sessions in the source picker, the catalogue pickers, the speed picker, the signal picker, selection sets and bookmarks, the toolbox's tools, the Rules signal list — shares one row: flat at rest, tinted under the pointer, and lit in the theme's accent when chosen, with a source's row lit in its kind's colour. The arrow keys, Home and End walk every one of them. A live device's row no longer glows green before it is chosen (its badge says it is live), capture rows are no longer boxed, and the Settings sidebar is a proper tab list you can walk with the arrow keys. The session log's event filter opens on a click rather than on hover. In the Dashboard's layout menu, Tab now moves from the name field to its Save buttons instead of closing the menu. A dashboard widget's tooltip no longer lingers over another tab when the panel is switched away under the pointer.
+
 - **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds and the bookmark dialogs use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter. A toast's dismiss button is now labelled in the app's language.
 
 - **WireTAP now requires macOS 13.** The installer refuses an older system, where the app already rendered its colours wrong.
 
-- **Keyboard focus stays where it should.** Tab and Shift+Tab now cycle inside an open dialog instead of escaping to the window behind it, and Tab closes an open menu and returns you to the button that opened it. In the Dashboard's layout menu that drops a half-typed name — press Enter to save it first. Toasts are announced by screen readers.
+- **Keyboard focus stays where it should.** Tab and Shift+Tab now cycle inside an open dialog instead of escaping to the window behind it, and Tab closes an open menu and returns you to the button that opened it. Toasts are announced by screen readers.
 
 - **The MCP server's plumbing is now shared with the other Wired Square MCP servers.** Which tools exist, what they return and how the bearer token, origin check and Session Manager connect/disconnect entries behave are unchanged; a client that opens with the legacy `initialize` handshake while asking for `2026-07-28` is now answered with `2025-11-25`, which every such client already speaks. Nothing to do.
 

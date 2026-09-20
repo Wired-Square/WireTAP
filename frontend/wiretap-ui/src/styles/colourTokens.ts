@@ -96,9 +96,9 @@ export const textDataCyan = "text-cyan";
 
 export type SourceKind = "realtime" | "capture" | "recorded";
 
-/** `text` for a glyph, `dot` for a fill, `edge` for a ring, `tint` for a selected row */
-export const sourceKindColours: Record<SourceKind, { text: string; dot: string; edge: string; hoverEdge: string; tint: string }> = {
-  realtime: { text: "text-purple", dot: "bg-text-purple", edge: "border-text-purple", hoverEdge: "hover:border-text-purple", tint: "bg-purple border-purple" },
-  capture: { text: "text-cyan", dot: "bg-text-cyan", edge: "border-text-cyan", hoverEdge: "hover:border-text-cyan", tint: "bg-cyan border-cyan" },
-  recorded: { text: "text-green", dot: "bg-text-green", edge: "border-text-green", hoverEdge: "hover:border-text-green", tint: "bg-success border-success" },
+/** `text` for a glyph, `tone` for the row that selects it */
+export const sourceKindColours: Record<SourceKind, { text: string; tone: "purple" | "cyan" | "success" }> = {
+  realtime: { text: "text-purple", tone: "purple" },
+  capture: { text: "text-cyan", tone: "cyan" },
+  recorded: { text: "text-green", tone: "success" },
 };

@@ -11,6 +11,8 @@ export type TabsVariant = "underline" | "segmented";
 
 export interface TabsProps extends HTMLAttributes<HTMLDivElement> {
   variant?: TabsVariant;
+  /** A column — the nav down the side of a view; ↑ ↓ move along it */
+  orientation?: "horizontal" | "vertical";
   /** No hairline of its own: the strip sits in a bar that draws one */
   inline?: boolean;
   /** Its own inset and fill: the strip is the first row of a flush body */
@@ -19,12 +21,24 @@ export interface TabsProps extends HTMLAttributes<HTMLDivElement> {
   sticky?: boolean;
 }
 
-const KEYS = { ArrowRight: 1, ArrowLeft: -1, Home: "first", End: "last" } as const;
+const ROW_KEYS = { ArrowRight: 1, ArrowLeft: -1, Home: "first", End: "last" } as const;
+const COLUMN_KEYS = { ArrowDown: 1, ArrowUp: -1, Home: "first", End: "last" } as const;
 
-export function Tabs({ variant = "underline", inline = false, inset = false, sticky = false, className = "", onKeyDown, ...rest }: TabsProps) {
+export function Tabs({
+  variant = "underline",
+  orientation = "horizontal",
+  inline = false,
+  inset = false,
+  sticky = false,
+  className = "",
+  onKeyDown,
+  ...rest
+}: TabsProps) {
+  const vertical = orientation === "vertical";
   const classes = [
     "tabs",
     variant !== "underline" && `tabs--${variant}`,
+    vertical && "tabs--vertical",
     inline && "tabs--inline",
     inset && "tabs--inset",
     sticky && "tabs--sticky",
@@ -33,10 +47,11 @@ export function Tabs({ variant = "underline", inline = false, inset = false, sti
   return (
     <div
       role="tablist"
+      aria-orientation={vertical ? "vertical" : undefined}
       className={classes.filter(Boolean).join(" ")}
       onKeyDown={(e) => {
         onKeyDown?.(e);
-        moveFocusAlong(e, KEYS, '[role="tab"]:not(:disabled)')?.click();
+        moveFocusAlong(e, vertical ? COLUMN_KEYS : ROW_KEYS, '[role="tab"]:not(:disabled)')?.click();
       }}
       {...rest}
     />

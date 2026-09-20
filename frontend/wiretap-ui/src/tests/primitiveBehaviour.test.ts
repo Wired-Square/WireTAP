@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pushDismissLayer } from "../components/behaviour/dismiss";
-import { moveFocusAlong, rememberFocus, trapTab } from "../components/behaviour/focus";
+import { moveFocusAlong, rememberFocus, tabStaysWithin, trapTab } from "../components/behaviour/focus";
 import { placePopover } from "../components/behaviour/placement";
 
 const key = (target: EventTarget, init: KeyboardEventInit) => {
@@ -119,6 +119,24 @@ describe("focus", () => {
     const e = key(input, { key: "ArrowRight" });
     expect(e.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(input);
+  });
+
+  it("tabStaysWithin holds Tab inside a row until its end, and not outside one", () => {
+    const menu = document.createElement("div");
+    menu.innerHTML = '<button>item</button><div class="row"><input><button>save</button><button disabled>never</button></div>';
+    document.body.append(menu);
+    const [item, save] = menu.querySelectorAll("button");
+    const field = menu.querySelector("input")!;
+    const tab = (target: Element, shiftKey = false) => {
+      const e = new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true });
+      Object.defineProperty(e, "target", { value: target });
+      return tabStaysWithin(e, ".row");
+    };
+    expect(tab(item)).toBe(false);
+    expect(tab(field)).toBe(true);
+    expect(tab(field, true)).toBe(false);
+    expect(tab(save)).toBe(false);
+    expect(tab(save, true)).toBe(true);
   });
 
   it("trapTab wraps at the frame's edges and from the frame itself, and leaves the middle alone", () => {

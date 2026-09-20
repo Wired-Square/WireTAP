@@ -34,6 +34,7 @@ import SessionCanvas from "./views/SessionCanvas";
 import SessionDetailPanel from "./views/SessionDetailPanel";
 import SessionLogView from "./views/SessionLogView";
 import { Button } from "../../components/Button";
+import { Listbox, Option } from "../../components/Listbox";
 
 export default function SessionManager() {
   const { t } = useTranslation("sessionManager");
@@ -344,26 +345,22 @@ export default function SessionManager() {
 
       {/* Add Source dialog */}
       <Dialog isOpen={addSourceSessionId !== null} onClose={() => setAddSourceSessionId(null)} size="sm" title={t("addSource.title")}>
-        <DialogBody>
+        <DialogBody padding="none">
           {availableProfiles.length === 0 ? (
-            <p className="text-sm text-muted">
+            <p className="p-4 text-sm text-muted">
               {t("addSource.noProfiles")}
             </p>
           ) : (
-            <div className="space-y-1">
+            <Listbox variant="flush">
               {availableProfiles.map((profile) => (
-                <button
-                  key={profile.id}
-                  onClick={() => handleAddSourceConfirm(profile.id)}
-                  className="w-full text-left px-3 py-2 rounded text-sm text-primary hover:bg-hover transition-colors"
-                >
-                  <span className="font-medium">{profile.name}</span>
-                  <span className="text-muted ml-2 text-xs">
+                <Option key={profile.id} onClick={() => handleAddSourceConfirm(profile.id)}>
+                  <span className="text-sm font-medium">{profile.name}</span>
+                  <span className="text-muted text-xs">
                     {profile.kind}
                   </span>
-                </button>
+                </Option>
               ))}
-            </div>
+            </Listbox>
           )}
         </DialogBody>
         <DialogFooter>

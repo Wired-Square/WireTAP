@@ -2,6 +2,7 @@
 
 import { textPrimary, textSecondary } from "../../../styles";
 import { Badge } from "../../../components/Badge";
+import { Listbox, Option } from "../../../components/Listbox";
 import { type PlacedSignal, BYTE_ORDER_LE } from "../utils/bitGrid";
 
 interface SignalListProps {
@@ -20,18 +21,16 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <Listbox className="p-0 gap-0.5">
       {signals.map((signal, index) => {
         const isSelected = selectedIndex === index;
         return (
-          <button
+          <Option
             key={signal.signalId}
+            selected={isSelected}
+            size="sm"
+            className="gap-2 px-2"
             onClick={() => onSelect(index)}
-            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
-              isSelected
-                ? "bg-hover brightness-110"
-                : "hover:bg-hover"
-            }`}
           >
             {/* Colour dot */}
             <span
@@ -53,9 +52,9 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
             <Badge variant="outline" size="sm" mono>
               {signal.byteOrder === BYTE_ORDER_LE ? "LE" : "BE"}
             </Badge>
-          </button>
+          </Option>
         );
       })}
-    </div>
+    </Listbox>
   );
 }

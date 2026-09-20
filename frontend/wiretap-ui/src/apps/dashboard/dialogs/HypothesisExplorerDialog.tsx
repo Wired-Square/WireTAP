@@ -14,6 +14,7 @@ import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button } from "../../../components/Button";
 import { Badge, type BadgeTone } from "../../../components/Badge";
 import { PrimaryButton, SecondaryButton, Select, Checkbox, Input } from "../../../components/forms";
+import { Listbox, Option } from "../../../components/Listbox";
 
 interface Props {
   isOpen: boolean;
@@ -450,22 +451,16 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
             </div>
 
             {/* Candidate list */}
-            <div className="max-h-64 overflow-y-auto space-y-0.5 text-xs">
+            <Listbox className="max-h-64 overflow-y-auto p-0 gap-0.5 text-xs">
               {candidates.map((c) => (
-                <button
+                <Option
                   key={c.signalName}
+                  size="sm"
+                  selected={selectedCandidates.has(c.signalName)}
+                  mark="check"
+                  className="gap-2 px-2"
                   onClick={() => toggleCandidate(c.signalName)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left ${
-                    selectedCandidates.has(c.signalName)
-                      ? "bg-info border border-info"
-                      : "bg-primary border border-transparent hover:bg-hover"
-                  }`}
                 >
-                  <Checkbox
-                    checked={selectedCandidates.has(c.signalName)}
-                    readOnly
-                    className="pointer-events-none"
-                  />
                   <span className="text-primary font-mono truncate flex-1">
                     {c.signalName}
                   </span>
@@ -477,14 +472,14 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={c.reason}>
                     {c.score}
                   </Badge>
-                </button>
+                </Option>
               ))}
               {candidates.length === 0 && (
                 <p className="text-xs text-muted text-center py-4">
                   {t("hypothesis.preview.noMatches")}
                 </p>
               )}
-            </div>
+            </Listbox>
 
             {/* Action buttons */}
             <div className="flex gap-2">

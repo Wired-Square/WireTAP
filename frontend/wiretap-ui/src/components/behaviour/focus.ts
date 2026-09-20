@@ -1,6 +1,6 @@
 // Keyboard focus inside a primitive: the arrow keys along a set of siblings,
-// Tab held inside a frame, and focus returned to where it was when a layer
-// closes.
+// Tab held inside a frame or walked along a row, and focus returned to where
+// it was when a layer closes.
 
 /** The event surface these read — a native KeyboardEvent or a framework's synthetic one. */
 export interface KeyEvent {
@@ -38,6 +38,15 @@ export function moveFocusAlong(e: KeyEvent, keys: Record<string, Step>, selector
 }
 
 const TABBABLE = ':is(a[href], button, input, select, textarea, [tabindex]):not(:disabled, [tabindex="-1"])';
+
+/** Whether Tab from the target lands on another control inside its nearest `group` — false at the group's end, or outside one. */
+export function tabStaysWithin(e: KeyEvent, group: string): boolean {
+  const row = (e.target as HTMLElement).closest(group);
+  if (!row) return false;
+  const controls = [...row.querySelectorAll<HTMLElement>(TABBABLE)];
+  const at = controls.indexOf(e.target as HTMLElement);
+  return e.shiftKey ? at > 0 : at >= 0 && at < controls.length - 1;
+}
 
 /** Tab from the frame's last tabbable, or from the frame itself, wraps to the first; Shift+Tab the reverse. */
 export function trapTab(e: KeyEvent): void {

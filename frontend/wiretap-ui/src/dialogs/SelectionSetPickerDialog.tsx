@@ -18,6 +18,7 @@ import {
 import { useSessionStore } from "../stores/sessionStore";
 import { Button } from "../components/Button";
 import { Input } from "../components/forms";
+import { Listbox, Option } from "../components/Listbox";
 
 type Props = {
   isOpen: boolean;
@@ -158,27 +159,20 @@ export default function SelectionSetPickerDialog({
                 {t("selectionSetPicker.empty")}
               </div>
             ) : (
-              <div className="divide-y divide-default">
+              <Listbox variant="flush">
                 {selectionSets.map((set) => (
-                  <button
-                    key={set.id}
-                    type="button"
-                    onClick={() => handleSelectSet(set)}
-                    className={`w-full text-left px-3 py-2 hover:bg-hover ${
-                      selectedId === set.id
-                        ? "bg-info border-l-2 border-accent-primary"
-                        : ""
-                    }`}
-                  >
-                    <div className={sectionHeaderText}>
-                      {set.name}
+                  <Option key={set.id} selected={selectedId === set.id} onClick={() => handleSelectSet(set)}>
+                    <div className="min-w-0">
+                      <div className={sectionHeaderText}>
+                        {set.name}
+                      </div>
+                      <div className={`${captionMuted} mt-0.5`}>
+                        {t("selectionSetPicker.selectedSummary", selectionSetSize(set))}
+                      </div>
                     </div>
-                    <div className={`${captionMuted} mt-0.5`}>
-                      {t("selectionSetPicker.selectedSummary", selectionSetSize(set))}
-                    </div>
-                  </button>
+                  </Option>
                 ))}
-              </div>
+              </Listbox>
             )}
           </div>
 

@@ -24,6 +24,7 @@ import {
   type ToolDataCounts,
 } from "./toolboxGating";
 import { Button } from "../components/Button";
+import { Listbox, Option } from "../components/Listbox";
 
 type ToolConfig = {
   id: ToolboxView;
@@ -216,7 +217,7 @@ export default function ToolboxDialog({
     <Dialog isOpen onClose={onClose} size="lg" title={t("toolbox.titleAnalysisAndScanning")}>
       <DialogBody className={spaceYSmall}>
         {/* Tool selection */}
-        <div className={spaceYSmall}>
+        <Listbox className="p-0 gap-2">
           {visibleTools.map((tool) => {
             const Icon = tool.icon;
             const isActive = effectiveTool === tool.id;
@@ -226,31 +227,26 @@ export default function ToolboxDialog({
             const description = t(`toolbox.tools.${tool.i18nKey}.description`);
 
             return (
-              <button
+              <Option
                 key={tool.id}
-                type="button"
-                onClick={() => handleToolClick(tool.id)}
+                selected={isActive}
+                tone="purple"
                 disabled={isDisabled}
-                className={`flex items-start gap-3 w-full p-3 rounded-lg text-left transition-all ${
-                  isDisabled
-                    ? "bg-surface text-muted cursor-not-allowed"
-                    : isActive
-                      ? "bg-purple text-purple ring-2 ring-text-purple"
-                      : "bg-surface text-secondary ring-1 ring-default hover:ring-2 hover:ring-text-purple"
-                }`}
+                className="items-start"
                 title={disabledReason ?? (isActive ? t("toolbox.showAllTools") : label)}
+                onClick={() => handleToolClick(tool.id)}
               >
-                <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-purple" : ""}`} />
+                <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-purple" : "text-secondary"}`} />
                 <div>
                   <div className="font-medium text-sm">{label}</div>
                   <div className={`text-xs mt-0.5 ${isActive ? "text-purple opacity-70" : "text-muted"}`}>
                     {description}
                   </div>
                 </div>
-              </button>
+              </Option>
             );
           })}
-        </div>
+        </Listbox>
 
         {/* Tool-specific options panel */}
         {effectiveTool && (

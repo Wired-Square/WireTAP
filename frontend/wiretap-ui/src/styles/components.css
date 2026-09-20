@@ -831,12 +831,14 @@
   }
 
   /* ---- Tabs --------------------------------------------------------------
-     .tabs [.tabs--inline] [.tabs--inset] [.tabs--sticky] [.tabs--segmented] > .tabs__tab [aria-selected="true"]
+     .tabs [.tabs--inline] [.tabs--inset] [.tabs--sticky] [.tabs--segmented|--vertical]
+       > .tabs__tab [aria-selected="true"]
        (.tabs__count [--success|--warning|--purple], .tabs__dot [--danger|--warning|--info])
      A strip of choices with one current. The underline form draws a hairline
      under the strip that the current tab's underline cuts; inline drops the
      hairline for a strip inside a bar that draws its own. Segmented is the
-     pill form for a mode switch: a tinted trough, the current tab lifted. */
+     pill form for a mode switch: a tinted trough, the current tab lifted.
+     Vertical is the nav down the side of a view, the current tab lit. */
   .tabs {
     display: flex;
     align-items: stretch;
@@ -966,10 +968,46 @@
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
   }
 
+  /* The column form: a nav down the side of a view, no hairline, the current
+     tab lit in the info tint rather than underlined. */
+  .tabs--vertical {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    border-bottom: 0;
+  }
+
+  .tabs--vertical .tabs__tab {
+    --tab-h: 44px;
+
+    gap: 8px;
+    margin: 0;
+    padding: 0 16px;
+    border: 0;
+    border-radius: var(--radius-panel);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .tabs--vertical .tabs__tab > svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tabs--vertical .tabs__tab:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+  }
+
+  .tabs--vertical .tabs__tab[aria-selected="true"] {
+    background-color: var(--status-info-bg);
+    color: var(--status-info-text);
+  }
+
   /* ---- Menus -------------------------------------------------------------
      .popover — the floating surface; .menu [.menu--lg] > .menu__item
        [.menu__item--danger|--warning] [aria-checked|aria-selected="true"]
-       (.menu__icon, .menu__hint) · .menu__separator · .menu__heading · .menu__trigger
+       (.menu__icon, .menu__hint) · .menu__row [--field] · .menu__separator · .menu__heading
+       · .menu__trigger
      One surface for everything that floats over the page: a command menu, a
      picker's option list, a rename box. An item is a full-width row; its tone
      colours the text and the hover tint, and a checked or selected item lights
@@ -1097,6 +1135,186 @@
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+  }
+
+  /* A row that holds a field and its buttons, or an item and its delete, as
+     one item: Tab moves between them and leaves the menu only from its end. */
+  .menu__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .menu__row > .menu__item {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .menu__row--field {
+    padding: 4px var(--menu-px);
+  }
+
+  /* ---- Lists -------------------------------------------------------------
+     .listbox [.listbox--flush] > .option [.option--sm] [.option--dashed]
+       [.option--purple|--success|--warning|--cyan] [aria-selected="true"]
+       (.option__mark [.option__mark--check])
+     The list a picker or a dialog body shows in the page: full-width rows,
+     flat at rest, tinted under the pointer, and the chosen one lit in the
+     info tint and border like a pressed button. A tone colours that lit
+     state — the fill, the edge and the mark — and the hover edge at rest.
+     Flush is the list in a flush dialog body: no inset, no rounding. The
+     mark is the row's own radio or check, drawn like .check. */
+  .listbox {
+    --option-px: 12px;
+    --option-py: 8px;
+    --option-radius: var(--radius-panel);
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .listbox--flush {
+    --option-px: 16px;
+    --option-radius: 0;
+
+    gap: 0;
+    padding: 4px 0;
+  }
+
+  .option {
+    --option-tint: var(--bg-hover);
+    --option-bg: transparent;
+    --option-border: transparent;
+    --option-hover-border: transparent;
+    --option-lit-bg: var(--status-info-bg);
+    --option-lit-border: var(--status-info-border);
+    --option-lit-text: var(--status-info-text);
+    --option-mark: var(--accent-primary);
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: var(--option-py) var(--option-px);
+    border: 1px solid var(--option-border);
+    border-radius: var(--option-radius);
+    background-color: var(--option-bg);
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition-property: color, background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .option:hover:not(:disabled, [aria-disabled="true"]),
+  .option:focus-visible {
+    background-color: var(--option-tint);
+    border-color: var(--option-hover-border);
+  }
+
+  .option:disabled,
+  .option[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .option[aria-selected="true"] {
+    --option-bg: var(--option-lit-bg);
+    --option-border: var(--option-lit-border);
+    --option-hover-border: var(--option-lit-border);
+    --option-tint: color-mix(in srgb, var(--option-lit-bg), var(--option-lit-text) 12%);
+  }
+
+  .option--sm {
+    --option-py: 6px;
+  }
+
+  .option--dashed {
+    --option-border: var(--border-default);
+    --option-hover-border: var(--status-info-text);
+
+    border-style: dashed;
+  }
+
+  /* A toned row hovers in its edge and marks in its text colour. */
+  .option--success,
+  .option--warning,
+  .option--purple,
+  .option--cyan {
+    --option-hover-border: var(--option-lit-border);
+    --option-mark: var(--option-lit-text);
+  }
+
+  .option--success {
+    --option-lit-bg: var(--status-success-bg);
+    --option-lit-border: var(--status-success-border);
+    --option-lit-text: var(--status-success-text);
+  }
+
+  .option--warning {
+    --option-lit-bg: var(--status-warning-bg);
+    --option-lit-border: var(--status-warning-border);
+    --option-lit-text: var(--status-warning-text);
+  }
+
+  .option--purple {
+    --option-lit-bg: var(--status-purple-bg);
+    --option-lit-border: var(--status-purple-border);
+    --option-lit-text: var(--text-purple);
+  }
+
+  .option--cyan {
+    --option-lit-bg: var(--status-cyan-bg);
+    --option-lit-border: var(--status-cyan-border);
+    --option-lit-text: var(--text-cyan);
+  }
+
+  .option__mark {
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-default);
+    border-radius: 50%;
+    background-color: var(--bg-primary);
+    transition-property: background-color, border-color;
+    transition-duration: 130ms;
+    transition-timing-function: ease-out;
+  }
+
+  .option__mark::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #fff;
+    transform: scale(0);
+    transition: transform 100ms ease-out;
+  }
+
+  .option__mark--check {
+    border-radius: 4px;
+  }
+
+  .option__mark--check::before {
+    width: 10px;
+    height: 10px;
+    border-radius: 0;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  }
+
+  .option[aria-selected="true"] > .option__mark {
+    border-color: var(--option-mark);
+    background-color: var(--option-mark);
+  }
+
+  .option[aria-selected="true"] > .option__mark::before {
+    transform: scale(1);
   }
 
   /* ---- Tables ------------------------------------------------------------

@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff, UploadCloud } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
-import { borderDivider, bgSurface } from "../../styles";
+import { borderDivider } from "../../styles";
 import type { CaptureMetadata } from "../../api/capture";
 import { useSessionStore } from "../../stores/sessionStore";
 import DeviceBusConfig from "./DeviceBusConfig";
@@ -15,6 +15,7 @@ import type { BusMapping } from "../../api/io";
 import SendCaptureToBackendDialog from "../SendCaptureToBackendDialog";
 import { Button, IconButton } from "../../components/Button";
 import { Badge } from "../../components/Badge";
+import { Listbox, Option } from "../../components/Listbox";
 
 type Props = {
   captures: CaptureMetadata[];
@@ -129,7 +130,7 @@ export default function CaptureList({
           </Button>
         )}
       </div>
-      <div className="p-3 space-y-2">
+      <Listbox>
         {captures.map((capture) => {
           const isThisCaptureSelected = selectedCaptureId === capture.id && !checkedSourceId && checkedSourceIds.length === 0;
           const isRenaming = renamingId === capture.id;
@@ -137,16 +138,10 @@ export default function CaptureList({
           const isInSession = sessionId !== undefined;
           return (
             <React.Fragment key={capture.id}>
-            <div
+            <Option
+              as="div"
+              selected={isThisCaptureSelected}
               onClick={() => !isRenaming && onSelectCapture(capture.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => !isRenaming && e.key === "Enter" && onSelectCapture(capture.id)}
-              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer ${
-                isThisCaptureSelected
-                  ? "bg-info border border-info"
-                  : `${bgSurface} border border-default hover:border-info-text`
-              }`}
             >
               {isInSession ? (
                 <Database className={`${iconMd} flex-shrink-0 text-cyan`} />
@@ -238,7 +233,7 @@ export default function CaptureList({
                   <Trash2 className={iconSm} />
                 </IconButton>
               )}
-            </div>
+            </Option>
             {/* Show bus mapping UI when this buffer is selected and has buses */}
             {isThisCaptureSelected && busConfig && busConfig.length > 0 && onBusConfigChange ? (
               <DeviceBusConfig
@@ -254,7 +249,7 @@ export default function CaptureList({
           </React.Fragment>
           );
         })}
-      </div>
+      </Listbox>
       {uploadCapture && (
         <SendCaptureToBackendDialog
           isOpen={true}

@@ -3,7 +3,7 @@
 // Shared hover tooltip for graph panels (gauge, list).
 // Wraps children and shows a portalled tooltip with signal details on hover.
 
-import { useState, useRef, useCallback, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { getSignalLabel, getConfidenceColour, type SignalRef } from "../../../../stores/dashboardStore";
 import { formatValue } from "../../utils/dashboardFormat";
@@ -31,6 +31,18 @@ export default function PanelTooltip({
 }: PanelTooltipProps) {
   const [tip, setTip] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
   const tipRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  // The panel can be switched away under a still pointer, and no mouseleave
+  // fires; the next thing the pointer is over that is not this widget hides it.
+  useEffect(() => {
+    if (!tip.visible) return;
+    const onPointerOver = (e: PointerEvent) => {
+      if (!hostRef.current?.contains(e.target as Node)) setTip((prev) => ({ ...prev, visible: false }));
+    };
+    document.addEventListener("pointerover", onPointerOver);
+    return () => document.removeEventListener("pointerover", onPointerOver);
+  }, [tip.visible]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     setTip({ x: e.clientX, y: e.clientY, visible: true });
@@ -52,7 +64,7 @@ export default function PanelTooltip({
   }
 
   return (
-    <div className={className} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
+    <div ref={hostRef} className={className} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
       {children}
 
       {tip.visible && signals.length > 0 && createPortal(
