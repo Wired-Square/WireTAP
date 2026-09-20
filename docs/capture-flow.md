@@ -394,7 +394,9 @@ command surface; `EventOwner` says who holds them:
   Capture-owned and starts with no events.
 
 `eventOwnerForSession` in `src/utils/captureEvents.ts` makes that choice for
-the frontend. Every mutation emits `capture-events-changed` with the owner so
+the frontend, from the session's `profileId` in `sessionStore` — Rust's
+`source_profile_ids`, so a window that only joined the session resolves the
+same owner as the one that started it. Every mutation emits `capture-events-changed` with the owner so
 each window's `useCaptureEvents` reloads. Jumping to an event depends on the
 source: a capture seeks — and a stopped `CaptureSource` answers with a
 `PlaybackPosition` straight away, so every app follows — a recorded archive

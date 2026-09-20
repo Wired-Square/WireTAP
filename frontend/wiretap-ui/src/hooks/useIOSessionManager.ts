@@ -402,6 +402,9 @@ export function useIOSessionManager(
     effectiveSessionId ? s.sessions[effectiveSessionId]?.byteCount ?? 0 : 0);
   const bytesCaptureId = useSessionStore((s) =>
     effectiveSessionId ? s.sessions[effectiveSessionId]?.bytesCaptureId ?? null : null);
+  // Rust-authoritative, so it is known for a session this app only joined.
+  const sessionProfileId = useSessionStore((s) =>
+    effectiveSessionId ? s.sessions[effectiveSessionId]?.profileId || null : null);
 
   // Resolve a profile id, falling back to the ad-hoc registry.
   //
@@ -654,8 +657,8 @@ export function useIOSessionManager(
     [currentTimeUs, isStreaming, isRealtime, captureStartTimeUs]
   );
   const eventOwner = useMemo(
-    () => eventOwnerForSession({ sourceProfileId, ioProfile, profiles: ioProfiles, captureId }),
-    [sourceProfileId, ioProfile, ioProfiles, captureId]
+    () => eventOwnerForSession({ sourceProfileId: sessionProfileId, ioProfile, profiles: ioProfiles, captureId }),
+    [sessionProfileId, ioProfile, ioProfiles, captureId]
   );
 
   // ---- Handlers ----
