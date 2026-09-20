@@ -68,7 +68,7 @@ export default function ModbusConfigSection({
           placeholder={keyIsRegister ? `${parseInt(frameKey)} (from name)` : t("protocolEditors.modbusRegisterNumberPlaceholder")}
         />
         {needsRegisterNumber ? (
-          <p className="mt-1 text-xs text-[color:var(--text-amber)]">
+          <p className="mt-1 text-xs text-amber">
             ⚠ {MODBUS_REGISTER_REQUIRED_MESSAGE}
           </p>
         ) : (

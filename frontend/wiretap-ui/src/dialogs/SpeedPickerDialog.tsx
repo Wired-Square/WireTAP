@@ -38,7 +38,7 @@ export default function SpeedPickerDialog({
                 key={opt.value}
                 onClick={() => handleSelect(opt.value)}
                 className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors ${
-                  isSelected ? "bg-[var(--hover-bg)]" : ""
+                  isSelected ? "bg-hover" : ""
                 }`}
               >
                 <span className={`flex-1 ${textMedium}`}>

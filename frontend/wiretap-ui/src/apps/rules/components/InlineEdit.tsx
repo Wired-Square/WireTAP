@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { useState, useRef, useEffect } from "react";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { Input } from "../../../components/forms";
 
 interface InlineEditProps {
@@ -60,7 +60,7 @@ export function InlineEdit({ value, placeholder, variant = "primary", onCommit }
 
   return (
     <span
-      className={`${displayValue === placeholder ? textTertiary : textClass} cursor-pointer hover:underline hover:decoration-dotted`}
+      className={`${displayValue === placeholder ? textSecondary : textClass} cursor-pointer hover:underline hover:decoration-dotted`}
       onClick={() => setEditing(true)}
     >
       {displayValue}

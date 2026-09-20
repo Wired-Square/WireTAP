@@ -8,7 +8,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useRulesStore, type RulesTab } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
+import { textPrimary, textSecondary, borderDefault } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";
 import { Card } from "../../../components/Card";
 
@@ -47,13 +47,13 @@ export default function DeviceOverview() {
         <ResourceCount label={t("overview.summary.bridges")} count={bridges.length} />
         <ResourceCount label={t("overview.summary.transformers")} count={transformers.length} />
         <ResourceCount label={t("overview.summary.generators")} count={generators.length} />
-        <span className={`ml-auto text-xs ${textTertiary}`}>
+        <span className={`ml-auto text-xs ${textSecondary}`}>
           {t("overview.summary.temporaryCount", { count: temporaryRules.size })}
         </span>
       </Card>
 
       {/* Flow diagram */}
-      <div className="relative min-h-[300px]">
+      <div className="relative min-h-75">
         <div className="flex items-start gap-6 overflow-x-auto p-4">
           {/* Interfaces column */}
           <Column title={t("overview.columns.interfaces")}>
@@ -182,7 +182,7 @@ export default function DeviceOverview() {
 
 function Column({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 min-w-[140px]">
+    <div className="flex flex-col gap-2 min-w-35">
       <span className={`text-xs font-medium ${textSecondary} text-center`}>{title}</span>
       {children}
     </div>
@@ -203,18 +203,18 @@ function FlowCard({
   const clickable = !!onClick;
   return (
     <div
-      className={`px-3 py-2 rounded-lg border-2 ${borderClass} bg-[var(--bg-surface)] text-center ${clickable ? "cursor-pointer hover:brightness-125 transition-all" : ""}`}
+      className={`px-3 py-2 rounded-lg border-2 ${borderClass} bg-surface text-center ${clickable ? "cursor-pointer hover:brightness-125 transition-all" : ""}`}
       onClick={onClick}
     >
       <div className={`text-xs font-medium ${textPrimary}`}>{label}</div>
-      <div className={`text-[10px] ${textTertiary}`}>{sublabel}</div>
+      <div className={`text-2xs ${textSecondary}`}>{sublabel}</div>
     </div>
   );
 }
 
 function Arrow() {
   return (
-    <div className={`flex items-center self-center ${textTertiary}`}>
+    <div className={`flex items-center self-center ${textSecondary}`}>
       <svg width="24" height="12" viewBox="0 0 24 12">
         <line x1="0" y1="6" x2="18" y2="6" stroke="currentColor" strokeWidth="1.5" />
         <polygon points="18,2 24,6 18,10" fill="currentColor" />
@@ -226,7 +226,7 @@ function Arrow() {
 function EmptyCard({ label }: { label: string }) {
   return (
     <div className={`px-3 py-2 rounded-lg border border-dashed ${borderDefault} text-center`}>
-      <span className={`text-[10px] ${textTertiary}`}>{label}</span>
+      <span className={`text-2xs ${textSecondary}`}>{label}</span>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { TomlNode } from "../types";
-import { monoBody, bgSecondary, sectionHeaderText, emptyStateText } from "../../../styles";
+import { monoBody, bgSurface, sectionHeaderText, emptyStateText } from "../../../styles";
 
 export type ArrayViewProps = {
   selectedNode: TomlNode;
@@ -17,7 +17,7 @@ export default function ArrayView({ selectedNode }: ArrayViewProps) {
       <div className={sectionHeaderText}>
         {t("arrayView.label", { count: items.length })}
       </div>
-      <div className={`p-4 ${bgSecondary} rounded-lg`}>
+      <div className={`p-4 ${bgSurface} rounded-lg`}>
         {items.length === 0 ? (
           <div className={emptyStateText}>{t("arrayView.noItems")}</div>
         ) : (

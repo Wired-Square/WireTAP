@@ -107,7 +107,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
             <div className="px-4 pt-3">
               <div className="relative">
                 <Search
-                  className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`}
+                  className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-muted`}
                 />
                 <Input
                   size="lg"
@@ -138,8 +138,8 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                       onClick={() => pick(catalog.path)}
                       className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
                         isSelected
-                          ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-                          : "hover:bg-[var(--hover-bg)] border border-transparent"
+                          ? "bg-info border border-info"
+                          : "hover:bg-hover border border-transparent"
                       }`}
                     >
                       {/* Leading, not trailing: the trailing slot holds the tick, which
@@ -155,7 +155,7 @@ function CatalogPicker({ onClose, selectedPath, onSelect, title, onNewCatalog }:
                         <div className={`${caption} truncate`}>{catalog.filename}</div>
                       </div>
                       {isSelected && (
-                        <Check className={`${iconMd} text-[color:var(--text-success)] flex-shrink-0`} />
+                        <Check className={`${iconMd} text-green flex-shrink-0`} />
                       )}
                     </button>
                   );

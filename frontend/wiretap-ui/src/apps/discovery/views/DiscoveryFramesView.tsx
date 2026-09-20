@@ -22,7 +22,7 @@ import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import ModbusScanResultView from "./tools/ModbusScanResultView";
 import ModbusFcProbeResultView from "./tools/ModbusFcProbeResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, textDataSecondary, textMuted } from "../../../styles";
+import { bgDataView, textSecondary, textMuted } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, groupKeysByProtocol, wholeProtocol } from "../../../utils/frameKey";
 import { isMessageProtocol, protocolFamily } from "../../../utils/profileTraits";
@@ -946,7 +946,7 @@ function DiscoveryFramesView({
       const maxChars = totalStr.length * 2 + 4;
       return (
         <span
-          className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}
+          className={`px-1.5 text-xs font-mono tabular-nums text-center ${textSecondary}`}
           style={{ minWidth: `${maxChars}ch` }}
         >
           {currentStr} of {totalStr}
@@ -958,7 +958,7 @@ function DiscoveryFramesView({
       const count = filteredCount;
       if (count > 0) {
         return (
-          <span className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}>
+          <span className={`px-1.5 text-xs font-mono tabular-nums text-center ${textSecondary}`}>
             {count.toLocaleString()}
           </span>
         );

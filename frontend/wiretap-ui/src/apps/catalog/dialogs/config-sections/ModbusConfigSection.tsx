@@ -61,7 +61,7 @@ export default function ModbusConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
+        <div className="p-4 space-y-4 border-t border-default">
           {/* Register Base */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
@@ -98,7 +98,7 @@ export default function ModbusConfigSection({
                 }}
                 size="lg"
               />
-              <span className="text-sm text-[color:var(--text-muted)] whitespace-nowrap">ms</span>
+              <span className="text-sm text-muted whitespace-nowrap">ms</span>
             </div>
             <p className={`mt-1 ${caption}`}>
               Default polling interval for frames without an explicit interval
@@ -146,7 +146,7 @@ export default function ModbusConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
+        <div className={`px-4 py-2 ${caption} border-t border-default`}>
           Base: {registerBase}-based
           {defaultInterval !== undefined && ` • ${defaultInterval}ms`}
           {` • Byte: ${defaultByteOrder === "big" ? "BE" : "LE"}`}

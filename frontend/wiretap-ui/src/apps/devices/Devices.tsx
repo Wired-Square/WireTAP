@@ -78,7 +78,7 @@ export default function Devices() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-primary)]">
+    <div className="flex flex-col h-full bg-primary">
       {screen === "scan" ? <DevicesScanView /> : <DeviceView />}
     </div>
   );

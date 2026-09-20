@@ -6,7 +6,7 @@ import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../styles/spacing";
 import { labelSmall, captionMuted, sectionHeaderText } from "../styles/typography";
-import { bgSecondary } from "../styles";
+import { bgSurface } from "../styles";
 import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import {
   getAllSelectionSets,
@@ -145,28 +145,28 @@ export default function SelectionSetPickerDialog({
       size="xl"
       onClose={onClose}
       title={t("selectionSetPicker.title")}
-      className="h-[500px]"
+      className="h-125"
     >
       <DialogBody padding="none">
         <div className="flex flex-1 min-h-0">
           {/* Left: Selection Set List */}
-          <div className="w-1/2 border-r border-[color:var(--border-default)] overflow-y-auto">
+          <div className="w-1/2 border-r border-default overflow-y-auto">
             {isLoading ? (
-              <div className="p-4 text-sm text-[color:var(--text-muted)]">{t("selectionSetPicker.loading")}</div>
+              <div className="p-4 text-sm text-muted">{t("selectionSetPicker.loading")}</div>
             ) : selectionSets.length === 0 ? (
-              <div className="p-4 text-sm text-[color:var(--text-muted)]">
+              <div className="p-4 text-sm text-muted">
                 {t("selectionSetPicker.empty")}
               </div>
             ) : (
-              <div className="divide-y divide-[color:var(--border-default)]">
+              <div className="divide-y divide-default">
                 {selectionSets.map((set) => (
                   <button
                     key={set.id}
                     type="button"
                     onClick={() => handleSelectSet(set)}
-                    className={`w-full text-left px-3 py-2 hover:bg-[var(--hover-bg)] ${
+                    className={`w-full text-left px-3 py-2 hover:bg-hover ${
                       selectedId === set.id
-                        ? "bg-[var(--status-info-bg)] border-l-2 border-blue-500"
+                        ? "bg-info border-l-2 border-blue-500"
                         : ""
                     }`}
                   >
@@ -200,14 +200,14 @@ export default function SelectionSetPickerDialog({
 
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("selectionSetPicker.frames")}</label>
-                  <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
+                  <div className={`px-3 py-2 text-sm rounded border border-default ${bgSurface} text-secondary`}>
                     {t("selectionSetPicker.selectedSummary", selectionSetSize(selectedSet))}
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("selectionSetPicker.created")}</label>
-                  <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
+                  <div className={`px-3 py-2 text-sm rounded border border-default ${bgSurface} text-secondary`}>
                     {formatDate(selectedSet.createdAt)}
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export default function SelectionSetPickerDialog({
                 {selectedSet.lastUsedAt && (
                   <div className="space-y-1">
                     <label className={labelSmall}>{t("selectionSetPicker.lastUsed")}</label>
-                    <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
+                    <div className={`px-3 py-2 text-sm rounded border border-default ${bgSurface} text-secondary`}>
                       {formatDate(selectedSet.lastUsedAt)}
                     </div>
                   </div>
@@ -249,7 +249,7 @@ export default function SelectionSetPickerDialog({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-sm text-[color:var(--text-muted)]">
+              <div className="flex items-center justify-center h-full text-sm text-muted">
                 {t("selectionSetPicker.selectPrompt")}
               </div>
             )}

@@ -71,8 +71,8 @@ export default function SingleBusConfig({
 
   // Compact wrapper for inline display
   const wrapperClass = compact
-    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-[color:var(--text-cyan)]"
-    : "border-t border-[color:var(--border-default)] px-4 py-3";
+    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-text-cyan"
+    : "border-t border-default px-4 py-3";
 
   // Loading state
   if (isLoading) {
@@ -91,7 +91,7 @@ export default function SingleBusConfig({
     const errorMsg = error || probeResult?.error || t("ioSourcePicker.singleBusConfig.deviceNotResponding");
     return (
       <div className={wrapperClass}>
-        <div className="flex items-center gap-2 text-xs text-[color:var(--status-danger-text)]">
+        <div className="flex items-center gap-2 text-xs text-danger">
           <AlertCircle className={`${iconXs} flex-shrink-0`} />
           <span className="truncate">{errorMsg}</span>
         </div>
@@ -194,24 +194,24 @@ export default function SingleBusConfig({
       <div className={wrapperClass}>
         <div className="flex items-center gap-2 text-xs">
           <CheckCircle2 className={`${iconXs} text-green-500 flex-shrink-0`} />
-          <span className="text-[color:var(--text-secondary)]">
+          <span className="text-secondary">
             {probeResult.primaryInfo || t("ioSourcePicker.singleBusConfig.online")}
           </span>
           {probeResult.secondaryInfo && (
-            <span className="text-[color:var(--text-muted)]">
+            <span className="text-muted">
               ({probeResult.secondaryInfo})
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-1 text-xs">
           <Bus className={`${iconXs} text-slate-400 flex-shrink-0`} />
-          <span className="text-[color:var(--text-muted)]">{t("ioSourcePicker.singleBusConfig.bus")}</span>
+          <span className="text-muted">{t("ioSourcePicker.singleBusConfig.bus")}</span>
           {busSelect}
           {isDuplicate && !configLocked && (
             <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
           )}
           {configLocked && (
-            <span className="text-[color:var(--text-amber)]" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
+            <span className="text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
               <Lock className={iconXs} />
             </span>
           )}
@@ -219,7 +219,7 @@ export default function SingleBusConfig({
           {/* Framing selector for serial devices */}
           {isSerial && onFramingChange && (
             <>
-              <span className="text-[color:var(--text-muted)]">|</span>
+              <span className="text-muted">|</span>
               <Layers className={`${iconXs} text-slate-400 flex-shrink-0`} />
               {framingSelect}
             </>
@@ -228,15 +228,15 @@ export default function SingleBusConfig({
 
         {/* Framing sub-options */}
         {isSerial && onFramingChange && (showDelimiterOptions || showModbusOptions || showRawBytesOption) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-[color:var(--text-secondary)]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-secondary">
             {/* Delimiter options */}
             {showDelimiterOptions && (
               <>
-                <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
+                <label className={`flex items-center gap-1 ${configLocked ? "text-muted" : ""}`}>
                   <span>{t("ioSourcePicker.singleBusConfig.delimiter")}</span>
                   {delimiterInput}
                 </label>
-                <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
+                <label className={`flex items-center gap-1 ${configLocked ? "text-muted" : ""}`}>
                   <span>{t("ioSourcePicker.singleBusConfig.max")}</span>
                   {maxLengthInput}
                 </label>
@@ -248,7 +248,7 @@ export default function SingleBusConfig({
 
             {/* Raw bytes option (for any framing mode except raw) */}
             {showRawBytesOption && (
-              <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)] cursor-not-allowed" : "cursor-pointer"}`}>
+              <label className={`flex items-center gap-1 ${configLocked ? "text-muted cursor-not-allowed" : "cursor-pointer"}`}>
                 {rawBytesCheckbox}
                 <span>{t("ioSourcePicker.singleBusConfig.captureRawBytes")}</span>
               </label>
@@ -260,7 +260,7 @@ export default function SingleBusConfig({
   }
 
   return (
-    <div className="border-t border-[color:var(--border-default)] px-4 py-3">
+    <div className="border-t border-default px-4 py-3">
       <div className="flex items-center justify-between">
         <div className={flexRowGap2}>
           <CheckCircle2 className={`${iconMd} text-green-500`} />
@@ -277,7 +277,7 @@ export default function SingleBusConfig({
 
       <div className="flex items-center gap-2 mt-2 text-sm">
         <Bus className={`${iconMd} text-slate-400`} />
-        <span className="text-[color:var(--text-secondary)]">{t("ioSourcePicker.singleBusConfig.outputBus")}</span>
+        <span className="text-secondary">{t("ioSourcePicker.singleBusConfig.outputBus")}</span>
         {busSelect}
         {isDuplicate && !configLocked && (
           <span className="text-amber-500 text-sm" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>
@@ -285,7 +285,7 @@ export default function SingleBusConfig({
           </span>
         )}
         {configLocked && (
-          <span className="flex items-center gap-1 text-[color:var(--text-amber)]" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
+          <span className="flex items-center gap-1 text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
             <Lock className={iconXs} />
           </span>
         )}
@@ -296,13 +296,13 @@ export default function SingleBusConfig({
         <>
           <div className="flex items-center gap-2 mt-2 text-sm">
             <Layers className={`${iconMd} text-slate-400`} />
-            <span className="text-[color:var(--text-secondary)]">{t("ioSourcePicker.singleBusConfig.framing")}</span>
+            <span className="text-secondary">{t("ioSourcePicker.singleBusConfig.framing")}</span>
             {framingSelect}
           </div>
 
           {/* Framing sub-options */}
           {(showDelimiterOptions || showModbusOptions || showRawBytesOption) && (
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm ${configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}`}>
+            <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm ${configLocked ? "text-muted" : "text-secondary"}`}>
               {/* Delimiter options */}
               {showDelimiterOptions && (
                 <>

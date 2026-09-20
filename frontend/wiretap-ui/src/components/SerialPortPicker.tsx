@@ -101,14 +101,14 @@ function portIcon(portType: string) {
 function dotClass(state: "connected" | "connecting" | "selected" | "idle"): string {
   switch (state) {
     case "connected":
-      return "bg-[var(--status-success-text)]";
+      return "bg-success-text";
     case "connecting":
-      return "bg-[var(--status-info-text)] animate-pulse";
+      return "bg-info-text animate-pulse";
     case "selected":
-      return "bg-[var(--status-info-text)]";
+      return "bg-info-text";
     case "idle":
     default:
-      return "bg-[color:var(--text-muted)]";
+      return "bg-text-muted";
   }
 }
 
@@ -189,7 +189,7 @@ export default function SerialPortPicker({
         <span className="max-w-56 truncate">{buttonLabel}</span>
       </Button>
 
-      <Popover {...picker.popover} role="dialog" className="w-[420px] flex flex-col text-xs">
+      <Popover {...picker.popover} role="dialog" className="w-105 flex flex-col text-xs">
           {/* Header */}
           <div
             className={`flex items-center justify-between px-3 py-2 ${borderDivider} border-b`}
@@ -212,7 +212,7 @@ export default function SerialPortPicker({
           {/* Port list */}
           <div className="max-h-64 overflow-y-auto">
             {error && (
-              <div className="p-3 text-xs text-[color:var(--text-danger)]">
+              <div className="p-3 text-xs text-danger">
                 {error}
               </div>
             )}
@@ -265,7 +265,7 @@ export default function SerialPortPicker({
                 <div
                   className={`flex items-center justify-between px-3 py-1.5 ${borderDivider} border-y ${bgPrimary}`}
                 >
-                  <span className={`text-[10px] uppercase tracking-wide ${textSecondary}`}>
+                  <span className={`text-2xs uppercase tracking-wide ${textSecondary}`}>
                     {t("serialPortPicker.dfuHeader", { count: dfuDevices.length })}
                   </span>
                   {dfuLoading && (
@@ -286,7 +286,7 @@ export default function SerialPortPicker({
                             role="option"
                             aria-selected={selected}
                             onClick={() => onSelectDfu(d.serial)}
-                            icon={<Usb className="text-[color:var(--status-warning-text)]" />}
+                            icon={<Usb className="text-warning" />}
                           >
                             <div className="flex-1 min-w-0">
                               <div className={`${textPrimary} truncate`}>
@@ -433,7 +433,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
+      <span className="text-2xs uppercase tracking-wide text-muted">
         {label}
       </span>
       {children}

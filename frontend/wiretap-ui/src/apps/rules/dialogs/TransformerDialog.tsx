@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
 import SignalCombobox from "../components/SignalCombobox";
@@ -248,17 +248,17 @@ export default function TransformerDialog({
                 <div className="flex items-start gap-3">
                   {/* Source → Dest vertical flow */}
                   <div className="flex-1 space-y-1">
-                    <label className={`text-xs ${textTertiary}`}>{t("transformerDialog.fields.sourceSignal")}</label>
+                    <label className={`text-xs ${textSecondary}`}>{t("transformerDialog.fields.sourceSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.source_signal_id || null}
                       onChange={(id) => updateMapping(idx, "source_signal_id", id)}
                       placeholder={t("transformerDialog.fields.sourcePlaceholder")}
                     />
-                    <div className={`flex justify-center ${textTertiary}`}>
+                    <div className={`flex justify-center ${textSecondary}`}>
                       <ArrowDown className={iconSm} />
                     </div>
-                    <label className={`text-xs ${textTertiary}`}>{t("transformerDialog.fields.destSignal")}</label>
+                    <label className={`text-xs ${textSecondary}`}>{t("transformerDialog.fields.destSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.dest_signal_id || null}

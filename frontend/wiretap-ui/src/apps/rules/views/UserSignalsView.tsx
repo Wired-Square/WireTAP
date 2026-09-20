@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import { formatHexId } from "../utils/formatHex";
 import UserSignalDialog from "../dialogs/UserSignalDialog";
@@ -74,7 +74,7 @@ export default function UserSignalsView() {
       </div>
 
       {userSignals.length === 0 && (
-        <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+        <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
           <p className="text-sm">{t("userSignals.empty")}</p>
         </div>
       )}

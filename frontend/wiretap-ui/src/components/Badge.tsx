@@ -53,7 +53,7 @@ export function SummaryBadge({ label, value, size = "lg", ...rest }: SummaryBadg
   return (
     <Badge size={size} {...rest}>
       <span className="opacity-70">{label}:</span>
-      <span className="font-mono text-[color:var(--text-primary)]">{value}</span>
+      <span className="font-mono text-primary">{value}</span>
     </Badge>
   );
 }

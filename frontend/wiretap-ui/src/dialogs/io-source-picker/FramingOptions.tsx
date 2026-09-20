@@ -128,7 +128,7 @@ export default function FramingOptions({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-surface ${sectionHeader}`}>
         {t("ioSourcePicker.framing")}
       </div>
       <div className="p-3">

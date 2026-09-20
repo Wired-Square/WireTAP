@@ -217,7 +217,7 @@ export default function DashboardTopBar({
       >
         <Layout className={iconMd} />
       </IconButton>
-      <Menu {...layoutMenu.popover} onClose={closeLayoutMenu} className="min-w-[220px]">
+      <Menu {...layoutMenu.popover} onClose={closeLayoutMenu} className="min-w-55">
         {/* Save current layout */}
         {!isSaving ? (
           <MenuItem onClick={() => setIsSaving(true)} keepOpen icon={<Save />}>
@@ -283,7 +283,7 @@ export default function DashboardTopBar({
                 }
               >
                 <span className="truncate flex-1">{layout.name}</span>
-                <span className="text-[10px] text-[color:var(--text-muted)] shrink-0 tabular-nums">
+                <span className="text-2xs text-muted shrink-0 tabular-nums">
                   {t("topBar.panelsCount", { count: layout.panels.length })}
                 </span>
               </MenuItem>

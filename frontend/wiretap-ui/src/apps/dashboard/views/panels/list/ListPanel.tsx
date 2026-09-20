@@ -45,7 +45,7 @@ export default function ListPanel({ panel }: Props) {
       {panel.signals.map((signal, i) => (
         <div
           key={signalValues[i].key}
-          className="flex items-center gap-2 py-1 border-b border-[var(--border-default)] last:border-b-0"
+          className="flex items-center gap-2 py-1 border-b border-default last:border-b-0"
         >
           {/* Confidence dot */}
           <span
@@ -54,18 +54,18 @@ export default function ListPanel({ panel }: Props) {
           />
 
           {/* Signal name */}
-          <span className="text-xs text-[color:var(--text-secondary)] truncate flex-1">
+          <span className="text-xs text-secondary truncate flex-1">
             {getSignalLabel(signal)}
           </span>
 
           {/* Value */}
-          <span className="text-xs font-mono font-medium text-[color:var(--text-primary)] tabular-nums shrink-0">
+          <span className="text-xs font-mono font-medium text-primary tabular-nums shrink-0">
             {formatValue(signalValues[i].value)}
           </span>
 
           {/* Unit */}
           {signal.unit && (
-            <span className="text-[10px] text-[color:var(--text-muted)] shrink-0">
+            <span className="text-2xs text-muted shrink-0">
               {signal.unit}
             </span>
           )}

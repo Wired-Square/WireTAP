@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import IndicatorSprite, { IndicatorSpriteDefs } from "../components/IndicatorSprite";
 import { brgbToCss } from "../utils/brgbColour";
@@ -37,7 +37,7 @@ export default function IndicatorsView() {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+      <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
         <span className="ml-2 text-sm">{t("indicators.loading")}</span>
       </div>
@@ -46,7 +46,7 @@ export default function IndicatorsView() {
 
   if (indicators.length === 0 && !loading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+      <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
         <p className="text-sm">{t("indicators.empty")}</p>
       </div>
     );

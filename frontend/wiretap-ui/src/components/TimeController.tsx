@@ -117,7 +117,7 @@ export default function TimeController({
   return (
     <div className={`flex items-center gap-3 ${compact ? "text-sm" : ""}`}>
       {/* Playback controls */}
-      <div className={`${flexRowGap2} border-r border-[color:var(--border-default)] pr-3`}>
+      <div className={`${flexRowGap2} border-r border-default pr-3`}>
         {isPaused ? (
           <Button
             onClick={onPlay}
@@ -172,7 +172,7 @@ export default function TimeController({
       {/* Current time display */}
       <div className={flexRowGap2}>
         <Clock
-          className={`${compact ? iconMd : iconLg} text-[color:var(--text-muted)] ${
+          className={`${compact ? iconMd : iconLg} text-muted ${
             isPlaying ? "animate-pulse" : ""
           }`}
         />
@@ -187,9 +187,9 @@ export default function TimeController({
 
       {/* Speed control - only show if supported */}
       {showSpeedControl && (
-        <div className={`${flexRowGap2} border-l border-[color:var(--border-default)] pl-3`}>
+        <div className={`${flexRowGap2} border-l border-default pl-3`}>
           <Zap
-            className={`${compact ? iconMd : iconLg} text-[color:var(--text-orange)]`}
+            className={`${compact ? iconMd : iconLg} text-orange`}
           />
           <Select
             value={speed}
@@ -211,8 +211,8 @@ export default function TimeController({
 
       {/* Time range inputs - only show if supported */}
       {showTimeRangeInputs && (
-        <div className={`${flexRowGap2} border-l border-[color:var(--border-default)] pl-3`}>
-          <label className="text-xs text-[color:var(--text-muted)]">
+        <div className={`${flexRowGap2} border-l border-default pl-3`}>
+          <label className="text-xs text-muted">
             {t("timeController.from")}
           </label>
           <Input
@@ -225,7 +225,7 @@ export default function TimeController({
             mono
             className="w-auto"
           />
-          <label className="text-xs text-[color:var(--text-muted)]">
+          <label className="text-xs text-muted">
             {t("timeController.to")}
           </label>
           <Input

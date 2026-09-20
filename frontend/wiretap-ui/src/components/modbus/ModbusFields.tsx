@@ -19,7 +19,7 @@ import { Input, Select } from "../forms";
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex-1 space-y-1 min-w-0">
-      <label className="text-[color:var(--text-muted)] block truncate">{label}</label>
+      <label className="text-muted block truncate">{label}</label>
       {children}
     </div>
   );

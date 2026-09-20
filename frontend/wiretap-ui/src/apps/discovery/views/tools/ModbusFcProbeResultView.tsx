@@ -80,7 +80,7 @@ export default function ModbusFcProbeResultView({ results, onClose }: Props) {
       </div>
 
       {isProbing && (
-        <div className="h-1 bg-[var(--bg-surface)]">
+        <div className="h-1 bg-surface">
           <div className="h-full w-1/3 bg-purple-500 animate-pulse" />
         </div>
       )}

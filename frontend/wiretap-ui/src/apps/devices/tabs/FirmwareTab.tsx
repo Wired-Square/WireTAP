@@ -96,9 +96,9 @@ function UploadProgressBar({
           {kbpsStr} kB/s · ETA {etaText}
         </span>
       </div>
-      <div className="h-2 w-full bg-[var(--bg-tertiary)] rounded overflow-hidden">
+      <div className="h-2 w-full bg-tertiary rounded overflow-hidden">
         <div
-          className="h-full bg-[var(--accent-primary)] transition-[width] duration-150"
+          className="h-full bg-accent-primary transition-[width] duration-150"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -108,7 +108,7 @@ function UploadProgressBar({
 
 function SlotBadge({ label, active = true }: { label: string; active?: boolean }) {
   return (
-    <Badge tone={active ? "success" : "neutral"} className="min-w-[72px] justify-center">
+    <Badge tone={active ? "success" : "neutral"} className="min-w-18 justify-center">
       {label}
     </Badge>
   );
@@ -221,7 +221,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
           <PrimaryButton
             onClick={handlePickFile}
             disabled={running}
-            className="min-w-[160px]"
+            className="min-w-40"
           >
             <FolderOpen className="w-4 h-4" />
             {t("firmware.choose")}
@@ -255,7 +255,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
           {running ? (
             <DangerButton
               onClick={handleCancel}
-              className="min-w-[160px]"
+              className="min-w-40"
             >
               <XCircle className="w-4 h-4" />
               {t("firmware.cancel")}
@@ -264,7 +264,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
             <PrimaryButton
               onClick={handleStart}
               disabled={!filePath}
-              className="min-w-[160px]"
+              className="min-w-40"
             >
               <HardDriveUpload className="w-4 h-4" />
               {t("firmware.flash")}
@@ -273,7 +273,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
           <PrimaryButton
             onClick={handleListImages}
             disabled={running}
-            className="min-w-[160px]"
+            className="min-w-40"
           >
             <ListChecks className="w-4 h-4" />
             {t("firmware.listImages")}

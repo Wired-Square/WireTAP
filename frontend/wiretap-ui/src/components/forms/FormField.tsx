@@ -19,7 +19,7 @@ export interface FormFieldProps {
 export default function FormField({ label, required, variant = 'default', className, children }: FormFieldProps) {
   if (variant === 'simple') {
     return (
-      <label className="text-sm text-[color:var(--text-secondary)] space-y-1">
+      <label className="text-sm text-secondary space-y-1">
         <span>
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}

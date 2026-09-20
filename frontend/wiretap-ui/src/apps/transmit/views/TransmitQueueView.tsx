@@ -9,14 +9,14 @@ import { useTranslation } from "react-i18next";
 import { useTransmitStore, GVRET_BUSES } from "../../../stores/transmitStore";
 import { useActiveSession, useSessionStore, type BusSourceInfo } from "../../../stores/sessionStore";
 import {
-  bgDataToolbar,
+  bgSurface,
   bgDataView,
   bgSuccess,
-  borderDataView,
+  borderDefault,
   textDataAmber,
   textDataGreen,
   textDataMuted,
-  textDataSecondary,
+  textSecondary,
   textWarning,
 } from "../../../styles/colourTokens";
 import { Badge } from "../../../components/Badge";
@@ -193,9 +193,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
+        className={`flex items-center gap-3 px-4 py-2 ${bgSurface} border-b ${borderDefault}`}
       >
-        <span className={`${textDataSecondary} text-sm`}>
+        <span className={`${textSecondary} text-sm`}>
           {queue.length} item{queue.length !== 1 ? "s" : ""} in queue
         </span>
 
@@ -339,7 +339,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           </span>
                         )}
                         <span
-                          className={`${textDataSecondary} text-xs truncate max-w-[100px]`}
+                          className={`${textSecondary} text-xs truncate max-w-25`}
                           title={formatBusLabel(item.profileName, item.canFrame?.bus, outputBusToSource)}
                         >
                           {formatBusLabel(item.profileName, item.canFrame?.bus, outputBusToSource)}
@@ -385,13 +385,13 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           {formatted.id}
                         </code>
                       )}
-                      <code className={`font-mono text-xs ${textDataSecondary}`}>
+                      <code className={`font-mono text-xs ${textSecondary}`}>
                         {formatted.details}
                       </code>
                       {formatted.flags.map((flag) => (
                         <span
                           key={flag}
-                          className={`text-[10px] uppercase ${textDataAmber}`}
+                          className={`text-2xs uppercase ${textDataAmber}`}
                         >
                           {flag}
                         </span>
@@ -413,7 +413,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         size="sm"
                         className="w-16"
                       />
-                      <span className={`${textDataSecondary} text-xs`}>ms</span>
+                      <span className={`${textSecondary} text-xs`}>ms</span>
                     </div>
                   </td>
 

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textSecondary, textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import type { TransformerDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
@@ -62,7 +62,7 @@ export default function TransformersView() {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+      <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
         <span className="ml-2 text-sm">{t("transformers.loading")}</span>
       </div>
@@ -83,7 +83,7 @@ export default function TransformersView() {
       </div>
 
       {transformers.length === 0 && (
-        <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+        <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
           <p className="text-sm">{t("transformers.empty")}</p>
         </div>
       )}
@@ -106,7 +106,7 @@ export default function TransformersView() {
                     onCommit={(newName) => setLabel('transformer', xf.transformer_id, newName || null, null)}
                   />
                 </span>
-                <span className={`text-xs font-mono ${textTertiary}`}>
+                <span className={`text-xs font-mono ${textSecondary}`}>
                   {formatHexId(xf.transformer_id)}
                 </span>
                 <Badge tone={isTemp ? "warning" : "success"}>

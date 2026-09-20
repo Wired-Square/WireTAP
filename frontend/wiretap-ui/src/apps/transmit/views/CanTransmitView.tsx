@@ -8,9 +8,9 @@ import { Send, Plus, RotateCcw } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  bgDataToolbar,
-  borderDataView,
-  textDataSecondary,
+  bgSurface,
+  borderDefault,
+  textSecondary,
 } from "../../../styles/colourTokens";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
@@ -91,7 +91,7 @@ export default function CanTransmitView() {
   if (!canTransmit) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDataSecondary} text-center`}>
+        <div className={`${textSecondary} text-center`}>
           <p className="text-lg font-medium">{t("canView.notSupportedHeading")}</p>
           <p className="text-sm mt-2">
             {t("canView.notSupportedDescription")}
@@ -104,22 +104,22 @@ export default function CanTransmitView() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Frame Editor */}
-      <div className={`p-4 border-b ${borderDataView}`}>
+      <div className={`p-4 border-b ${borderDefault}`}>
         <CanFrameEditor />
       </div>
 
       {/* Frame Preview */}
       {framePreview && (
-        <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
+        <div className={`px-4 py-3 ${bgSurface} border-b ${borderDefault}`}>
           <div className="flex items-center gap-4">
-            <span className={`${textDataSecondary} text-xs`}>{t("canView.preview")}</span>
+            <span className={`${textSecondary} text-xs`}>{t("canView.preview")}</span>
             <code className="font-mono text-sm text-green-400">
               {framePreview.id}
             </code>
             <code className="font-mono text-sm text-blue-400">
               [{framePreview.dlc}]
             </code>
-            <code className={`font-mono text-sm ${textDataSecondary}`}>
+            <code className={`font-mono text-sm ${textSecondary}`}>
               {framePreview.data}
             </code>
             {framePreview.flags && (
@@ -130,7 +130,7 @@ export default function CanTransmitView() {
       )}
 
       {/* Actions */}
-      <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 ${bgSurface}`}>
         <Button
           onClick={handleSend}
           disabled={!framePreview}

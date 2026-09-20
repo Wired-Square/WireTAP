@@ -295,7 +295,7 @@ export default function BridgeDialog({
                   return (
                     <div
                       key={idx}
-                      className="p-3 rounded border border-[color:var(--border-default)] space-y-2"
+                      className="p-3 rounded border border-default space-y-2"
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex-none w-28">

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2, Layers } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { caption, labelSmall, labelSmallMuted, monoBody, bgSecondary, hoverLight } from "../../../styles";
+import { caption, labelSmall, labelSmallMuted, monoBody, bgSurface, hoverLight } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
@@ -124,21 +124,21 @@ export default function CANFrameView({
       {/* Summary cards (non-edit only) */}
       {!editingId && (
         <div className="grid grid-cols-2 gap-4">
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>{t("canFrameView.id")}</div>
             <div className={`${monoBody} flex items-center gap-2`}>
               <span>{formattedId.primary}</span>
               {formattedId.secondary && (
-                <span className="text-[color:var(--text-muted)] text-xs">({formattedId.secondary})</span>
+                <span className="text-muted text-xs">({formattedId.secondary})</span>
               )}
             </div>
           </div>
 
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.lengthDlc")} <span className="text-red-500">{t("canFrameView.required")}</span>
               {selectedNode.metadata?.lengthInherited && (
-                <span className="ml-1 text-[color:var(--status-info-text)]" title={t("canFrameView.inheritedTooltip")}>
+                <span className="ml-1 text-info" title={t("canFrameView.inheritedTooltip")}>
                   {t("canFrameView.inheritedSuffix")}
                 </span>
               )}
@@ -148,26 +148,26 @@ export default function CANFrameView({
             </div>
           </div>
 
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.transmitter")}
               {selectedNode.metadata?.transmitterInherited && (
-                <span className="ml-1 text-[color:var(--status-info-text)]" title={t("canFrameView.inheritedTooltip")}>
+                <span className="ml-1 text-info" title={t("canFrameView.inheritedTooltip")}>
                   {t("canFrameView.inheritedSuffix")}
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.transmitter || <span className="text-[color:var(--text-muted)]">{t("canFrameView.none")}</span>}
+              {selectedNode.metadata?.transmitter || <span className="text-muted">{t("canFrameView.none")}</span>}
             </div>
           </div>
 
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.interval")}
               {selectedNode.metadata?.intervalInherited && (
                 <span
-                  className="ml-1 text-[color:var(--status-info-text)]"
+                  className="ml-1 text-info"
                   title={t("canFrameView.intervalInheritedTooltip")}
                 >
                   {t("canFrameView.inheritedSuffix")}
@@ -178,17 +178,17 @@ export default function CANFrameView({
               {selectedNode.metadata?.interval !== undefined ? (
                 t("canFrameView.intervalMs", { ms: selectedNode.metadata.interval })
               ) : (
-                <span className="text-[color:var(--text-muted)]">{t("canFrameView.none")}</span>
+                <span className="text-muted">{t("canFrameView.none")}</span>
               )}
             </div>
           </div>
 
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.extendedId")}
               {selectedNode.metadata?.extendedInherited && (
                 <span
-                  className="ml-1 text-[color:var(--status-info-text)]"
+                  className="ml-1 text-info"
                   title={t("canFrameView.extendedInheritedTooltip")}
                 >
                   {t("canFrameView.inheritedSuffix")}
@@ -200,12 +200,12 @@ export default function CANFrameView({
             </div>
           </div>
 
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.canFd")}
               {selectedNode.metadata?.fdInherited && (
                 <span
-                  className="ml-1 text-[color:var(--status-info-text)]"
+                  className="ml-1 text-info"
                   title={t("canFrameView.fdInheritedTooltip")}
                 >
                   {t("canFrameView.inheritedSuffix")}
@@ -221,11 +221,11 @@ export default function CANFrameView({
 
       {/* Notes card */}
       {!editingId && selectedNode.metadata?.notes && (
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
             {t("canFrameView.notes")}
           </div>
-          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
+          <div className="text-sm text-secondary whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.notes)
               ? selectedNode.metadata.notes.join("\n")
               : selectedNode.metadata.notes}
@@ -237,10 +237,10 @@ export default function CANFrameView({
       {!editingId && !editingSignal && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] shrink-0">
+            <h3 className="text-sm font-semibold text-primary shrink-0">
               {t("canFrameView.signalsHeader", { count: (selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0) })}
               {selectedNode.metadata?.hasMux && (
-                <span className="ml-2 text-xs font-normal text-[color:var(--text-purple)] inline-flex items-center gap-2">
+                <span className="ml-2 text-xs font-normal text-purple inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
                   {t("canFrameView.muxSignalsHint", { count: selectedNode.metadata.muxSignalCount })}
                 </span>
@@ -287,8 +287,8 @@ export default function CANFrameView({
 
           {/* BitPreview — renders when there are any ranges (base signals or mux selector) */}
           {ranges.length > 0 && (
-            <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
-              <div className="text-xs font-medium text-[color:var(--text-secondary)] mb-3">
+            <div className="mb-4 p-4 bg-surface rounded-lg">
+              <div className="text-xs font-medium text-secondary mb-3">
                 {t("canFrameView.byteLayout")}
               </div>
               <BitPreview
@@ -309,22 +309,22 @@ export default function CANFrameView({
               {sortedSignals.map((signal: any, idx: number) => (
                 <div
                   key={idx}
-                  className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} transition-colors`}
+                  className={`p-3 ${bgSurface} rounded-lg ${hoverLight} transition-colors`}
                 >
                   <div className="flex items-start justify-between min-w-0">
                     <div className="flex-1 min-w-0 flex gap-3">
                       <div
                         className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${
-                          signalColor(signal) || "bg-[var(--bg-surface)]"
+                          signalColor(signal) || "bg-surface"
                         }`}
                       />
                       <div className="min-w-0">
-                        <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                        <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                           <span className="shrink-0">⚡</span>
                           <span className="truncate">{signal.name}</span>
                           {signal._inherited && (
                             <span
-                              className="text-xs text-[color:var(--accent-purple)] flex items-center gap-1"
+                              className="text-xs text-purple flex items-center gap-1"
                               title={t("canFrameView.inheritedFromMirror")}
                             >
                               <Layers className="w-3 h-3" />
@@ -346,7 +346,7 @@ export default function CANFrameView({
                           {signal.offset !== undefined && <div>{t("canFrameView.offset", { offset: signal.offset })}</div>}
                         </div>
                         {signal.notes && (
-                          <div className="text-xs text-[color:var(--text-secondary)] mt-2 italic whitespace-pre-wrap">
+                          <div className="text-xs text-secondary mt-2 italic whitespace-pre-wrap">
                             {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
                           </div>
                         )}
@@ -358,7 +358,7 @@ export default function CANFrameView({
                         onClick={() => onEditSignal(idKey, idx, signal, ["frame", "can", idKey])}
                         title={t("canFrameView.editSignal")}
                       >
-                        <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                        <Pencil className={`${iconMd} text-secondary`} />
                       </IconButton>
 
                       <IconButton
@@ -366,7 +366,7 @@ export default function CANFrameView({
                         tone="danger"
                         title={t("canFrameView.deleteSignal")}
                       >
-                        <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+                        <Trash2 className={`${iconMd} text-danger`} />
                       </IconButton>
                     </div>
                   </div>
@@ -383,10 +383,10 @@ export default function CANFrameView({
                 <div className="flex items-start justify-between min-w-0">
                   <div className="flex-1 min-w-0 flex gap-3">
                     <div
-                      className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${muxLegendColor || "bg-[var(--status-purple-border)]"}`}
+                      className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${muxLegendColor || "bg-purple-border"}`}
                     />
                     <div className="min-w-0">
-                      <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                      <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                         <span className="shrink-0">🔀</span>
                         <span className="truncate">{muxData.name || t("canFrameView.muxName")}</span>
                       </div>
@@ -397,11 +397,11 @@ export default function CANFrameView({
                           length: muxData.bit_length ?? 0,
                         })}
                         {muxData.default !== undefined && (
-                          <span className="ml-2 text-[color:var(--text-blue)]">{t("canFrameView.muxDefault", { value: muxData.default })}</span>
+                          <span className="ml-2 text-blue">{t("canFrameView.muxDefault", { value: muxData.default })}</span>
                         )}
                       </div>
                       {muxData.notes && (
-                        <div className="text-xs text-[color:var(--text-secondary)] mt-2 italic whitespace-pre-wrap">
+                        <div className="text-xs text-secondary mt-2 italic whitespace-pre-wrap">
                           {Array.isArray(muxData.notes) ? muxData.notes.join('\n') : muxData.notes}
                         </div>
                       )}
@@ -414,7 +414,7 @@ export default function CANFrameView({
                         onClick={() => onEditMux(["frame", "can", idKey, "mux"], muxData)}
                         title={t("canFrameView.editMux")}
                       >
-                        <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                        <Pencil className={`${iconMd} text-secondary`} />
                       </IconButton>
                     )}
                     {onDeleteMux && (
@@ -423,7 +423,7 @@ export default function CANFrameView({
                         tone="danger"
                         title={t("canFrameView.deleteMux")}
                       >
-                        <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+                        <Trash2 className={`${iconMd} text-danger`} />
                       </IconButton>
                     )}
                   </div>
@@ -438,12 +438,12 @@ export default function CANFrameView({
                     return (
                       <div
                         key={idx}
-                        className={`p-3 ${bgSecondary} rounded-lg ${onSelectNode ? `${hoverLight} cursor-pointer` : ""} transition-colors`}
+                        className={`p-3 ${bgSurface} rounded-lg ${onSelectNode ? `${hoverLight} cursor-pointer` : ""} transition-colors`}
                         onClick={onSelectNode ? () => onSelectNode(caseNode) : undefined}
                       >
                         <div className="flex items-center justify-between min-w-0">
                           <div className="min-w-0">
-                            <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                            <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                               <span className="shrink-0">📍</span>
                               <span className="truncate">{caseNode.key}</span>
                               <span className={caption}>
@@ -455,7 +455,7 @@ export default function CANFrameView({
                                 {caseSignals.map((sig: any, sIdx: number) => (
                                   <div key={sIdx} className="truncate">
                                     ⚡ {sig.name || t("canFrameView.signalDefault", { idx: sIdx + 1 })}
-                                    <span className="ml-1 text-[color:var(--text-muted)]">
+                                    <span className="ml-1 text-muted">
                                       ({sig.start_bit ?? 0}:{sig.bit_length ?? 0})
                                     </span>
                                   </div>

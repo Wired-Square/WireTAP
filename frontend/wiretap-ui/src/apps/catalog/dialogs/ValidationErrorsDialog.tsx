@@ -24,14 +24,14 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
           <div
             className={`w-12 h-12 rounded-lg flex items-center justify-center ${
               isValidCatalog
-                ? "bg-[var(--status-success-bg)]"
-                : "bg-[var(--status-warning-bg)]"
+                ? "bg-success"
+                : "bg-warning"
             }`}
           >
             {isValidCatalog ? (
-              <CheckCircle className={`${iconXl} text-[color:var(--text-green)]`} />
+              <CheckCircle className={`${iconXl} text-green`} />
             ) : (
-              <AlertTriangle className={`${iconXl} text-[color:var(--text-amber)]`} />
+              <AlertTriangle className={`${iconXl} text-amber`} />
             )}
           </div>
           <div>
@@ -39,7 +39,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
               {isValidCatalog ? "Validation Passed" : "Validation Warnings"}
             </DialogTitle>
             {hasErrors && (
-              <p className="text-sm text-[color:var(--text-muted)]">
+              <p className="text-sm text-muted">
                 {errors.length} {errors.length === 1 ? "issue" : "issues"} found
               </p>
             )}
@@ -48,7 +48,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
       </DialogHeader>
       <DialogBody>
         {isValidCatalog ? (
-          <p className="text-[color:var(--text-secondary)]">
+          <p className="text-secondary">
             The catalog is valid and ready for use.
           </p>
         ) : (

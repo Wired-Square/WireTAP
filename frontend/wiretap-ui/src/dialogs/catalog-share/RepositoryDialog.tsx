@@ -657,7 +657,7 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
               )}
             </div>
 
-            <div className="max-h-[34vh] overflow-y-auto rounded-lg border border-[color:var(--border-default)]">
+            <div className="max-h-[34vh] overflow-y-auto rounded-lg border border-default">
               {entries.length === 0 ? (
                 <p className={`p-4 ${caption}`}>{t("repository.noneFound")}</p>
               ) : (

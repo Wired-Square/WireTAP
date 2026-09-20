@@ -11,7 +11,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex, byteToHex } from "../utils/byteUtils";
-import { textDataSecondary, textPrimary, caption, captionMuted } from "../styles";
+import { textSecondary, textPrimary, caption, captionMuted } from "../styles";
 import { cardClass } from "./Card";
 import { Button } from "./Button";
 import { Checkbox, Input } from "./forms";
@@ -87,7 +87,7 @@ export function ModbusRtuFields({
   const [vendorText, setVendorText] = useState(() => formatFunctionCodes(config.vendorFunctions));
 
   const tick = (label: string, checked: boolean, onToggle: (value: boolean) => void) => (
-    <label className={`flex items-center gap-2 text-xs ${textDataSecondary} cursor-pointer`}>
+    <label className={`flex items-center gap-2 text-xs ${textSecondary} cursor-pointer`}>
       <Checkbox
         checked={checked}
         onChange={(e) => onToggle(e.target.checked)}
@@ -270,7 +270,7 @@ export default function FramingOptionsPanel({
         className={cardClass({ interactive: true, selected }, `w-full text-left ${textPrimary} disabled:opacity-50 disabled:cursor-not-allowed`)}
       >
         <div className="font-medium">{title}</div>
-        <div className={`text-xs ${textDataSecondary} mt-0.5`}>{description}</div>
+        <div className={`text-xs ${textSecondary} mt-0.5`}>{description}</div>
       </button>
     );
   };
@@ -284,7 +284,7 @@ export default function FramingOptionsPanel({
         {currentMode === "delimiter" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
             <label className="block text-sm">
-              <span className={textDataSecondary}>{t("framingOptions.delimiterHexLabel")}</span>
+              <span className={textSecondary}>{t("framingOptions.delimiterHexLabel")}</span>
               <Input
                 type="text"
                 value={delimiterHex}
@@ -296,7 +296,7 @@ export default function FramingOptionsPanel({
               />
             </label>
             <label className="block text-sm">
-              <span className={textDataSecondary}>{t("framingOptions.maxFrameLengthLabel")}</span>
+              <span className={textSecondary}>{t("framingOptions.maxFrameLengthLabel")}</span>
               <Input
                 type="number"
                 value={maxLength}
@@ -316,7 +316,7 @@ export default function FramingOptionsPanel({
 
         {/* Emit raw bytes toggle */}
         {showEmitRawBytes && currentMode !== "raw" && (
-          <label className={`flex items-center gap-2 text-sm mt-3 cursor-pointer ${textDataSecondary}`}>
+          <label className={`flex items-center gap-2 text-sm mt-3 cursor-pointer ${textSecondary}`}>
             <Checkbox
               checked={emitRawBytes}
               onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
@@ -383,7 +383,7 @@ export default function FramingOptionsPanel({
 
       {/* Delimiter options */}
       {currentMode === "delimiter" && (
-        <div className="space-y-2 pl-2 border-l-2 border-[color:var(--accent-primary)]">
+        <div className="space-y-2 pl-2 border-l-2 border-accent-primary">
           <div>
             <label className={`block ${caption} mb-1`}>
               {t("framingOptions.delimiterHexLabelShort")}
@@ -417,14 +417,14 @@ export default function FramingOptionsPanel({
 
       {/* Modbus RTU options */}
       {currentMode === "modbus_rtu" && (
-        <div className="pl-2 border-l-2 border-[color:var(--accent-primary)]">
+        <div className="pl-2 border-l-2 border-accent-primary">
           {modbusFields}
         </div>
       )}
 
       {/* Emit raw bytes toggle (when framing is enabled) */}
       {showEmitRawBytes && currentMode !== "raw" && (
-        <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
           <Checkbox
             checked={emitRawBytes}
             onChange={(e) => handleEmitRawBytesChange(e.target.checked)}

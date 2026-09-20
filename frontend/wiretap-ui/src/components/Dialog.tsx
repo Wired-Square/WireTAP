@@ -32,7 +32,7 @@ export interface DialogProps {
   subtitle?: ReactNode;
   /** Leading glyph in the standard header */
   icon?: ReactNode;
-  /** On the frame — a fixed height (`h-[500px]`) for a list that must not jump */
+  /** On the frame — a fixed height (`h-125`) for a list that must not jump */
   className?: string;
   children: ReactNode;
 }

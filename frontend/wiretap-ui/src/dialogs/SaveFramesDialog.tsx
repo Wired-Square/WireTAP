@@ -144,10 +144,10 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
                 value={meta.filename}
                 onChange={(e) => onChange({ ...meta, filename: e.target.value })}
                 placeholder={t('saveFrames.filenamePlaceholder')}
-                className={filenameError ? 'border-[color:var(--text-amber)]' : ''}
+                className={filenameError ? 'border-text-amber' : ''}
               />
               {filenameError && (
-                <div className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
+                <div className="flex items-center gap-1 text-xs text-amber">
                   <AlertCircle className={iconXs} />
                   {filenameError}
                 </div>

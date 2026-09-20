@@ -20,7 +20,7 @@ import {
   Cpu,
   Bot,
 } from "lucide-react";
-import { bgDataView, borderDataView } from "../../styles/colourTokens";
+import { bgDataView, borderDefault } from "../../styles/colourTokens";
 import LocationsView from "./views/LocationsView";
 import DisplayView from "./views/DisplayView";
 import CatalogsView from "./views/CatalogsView";
@@ -300,7 +300,7 @@ export default function Settings() {
     >
       {/* Sidebar + Content in bubble */}
       <div
-        className={`flex-1 flex min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}
+        className={`flex-1 flex min-h-0 rounded-lg border ${borderDefault} overflow-hidden`}
       >
         <AppSideBar
           items={sidebarItems}

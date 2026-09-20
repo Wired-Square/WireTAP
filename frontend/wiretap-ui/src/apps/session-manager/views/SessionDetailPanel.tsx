@@ -55,7 +55,7 @@ export default function SessionDetailPanel({
 
   if (!selectedNode) {
     return (
-      <div className="w-64 border-l border-[color:var(--border-default)] bg-[var(--bg-surface)] p-4">
+      <div className="w-64 border-l border-default bg-surface p-4">
         <p className={emptyStateText}>
           {t("detail.emptyPrompt")}
         </p>
@@ -68,7 +68,7 @@ export default function SessionDetailPanel({
     if (selectedNode.type === "session") {
       const sessionId = selectedNode.id.replace("session-", "");
       const session = sessions.find((s) => s.sessionId === sessionId);
-      if (!session) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.sessionNotFound")}</p>;
+      if (!session) return <p className="text-sm text-muted">{t("detail.sessionNotFound")}</p>;
 
       return <SessionDetails session={session} profiles={profiles} openApps={openApps} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} onConnectApp={onConnectAppToSession} />;
     }
@@ -76,7 +76,7 @@ export default function SessionDetailPanel({
     if (selectedNode.type === "source") {
       const profileId = selectedNode.id.replace("source-", "");
       const profile = profiles.find((p) => p.id === profileId);
-      if (!profile) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.profileNotFound")}</p>;
+      if (!profile) return <p className="text-sm text-muted">{t("detail.profileNotFound")}</p>;
 
       return <SourceDetails profile={profile} sessions={sessions} onRemoveSource={onRemoveSource} onDisableBusMapping={onDisableBusMapping} />;
     }
@@ -99,10 +99,10 @@ export default function SessionDetailPanel({
   };
 
   return (
-    <div className="w-64 h-full min-h-0 border-l border-[color:var(--border-default)] bg-[var(--bg-surface)] flex flex-col">
+    <div className="w-64 h-full min-h-0 border-l border-default bg-surface flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)]">
-        <span className="text-sm font-medium text-[color:var(--text-primary)] capitalize">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-default">
+        <span className="text-sm font-medium text-primary capitalize">
           {selectedNode.type === "edge" ? t("detail.connectionHeader") : selectedNode.type} {t("detail.headerSuffix")}
         </span>
         <IconButton
@@ -157,17 +157,17 @@ function SessionDetails({
     <div className="space-y-4">
       {/* Session ID */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.sessionId")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
+        <p className="text-sm text-primary font-mono break-all">
           {session.sessionId}
         </p>
       </div>
 
       {/* State */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.state")}
         </label>
         <p className={`text-sm font-medium ${
@@ -182,10 +182,10 @@ function SessionDetails({
 
       {/* Device Type */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.deviceType")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {session.sourceType}
         </p>
       </div>
@@ -193,7 +193,7 @@ function SessionDetails({
       {/* Sources */}
       {session.sourceProfileIds.length > 0 && (
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.sources")}
           </label>
           <div className="mt-1 space-y-1.5">
@@ -203,9 +203,9 @@ function SessionDetails({
               const enabledMappings = config?.busMappings.filter((m) => m.enabled) ?? [];
               return (
                 <div key={id}>
-                  <p className="text-sm text-[color:var(--text-primary)]">
+                  <p className="text-sm text-primary">
                     {profile?.name ?? id}
-                    {profile && <span className="text-[color:var(--text-muted)] ml-1">({profile.kind})</span>}
+                    {profile && <span className="text-muted ml-1">({profile.kind})</span>}
                   </p>
                   {enabledMappings.length > 0 && (
                     <div className="ml-2 mt-0.5 space-y-0.5">
@@ -216,7 +216,7 @@ function SessionDetails({
                         ) ?? 0;
                         const canDisable = totalEnabledAcrossSources > 1;
                         return (
-                          <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-muted)] font-mono">
+                          <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-muted font-mono">
                             <span>bus{m.deviceBus} → bus{m.outputBus}</span>
                             {canDisable && (
                               <IconButton
@@ -242,10 +242,10 @@ function SessionDetails({
 
       {/* Apps */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.apps")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {session.subscriberCount}
         </p>
       </div>
@@ -256,10 +256,10 @@ function SessionDetails({
       {/* Buffer Info */}
       {session.captureId && (
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.buffer")}
           </label>
-          <p className="text-sm text-[color:var(--text-primary)]">
+          <p className="text-sm text-primary">
             {t("detail.values.framesCount", { count: session.captureFrameCount ?? 0 })}
           </p>
         </div>
@@ -267,17 +267,17 @@ function SessionDetails({
 
       {/* Streaming */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.streaming")}
         </label>
-        <p className={`text-sm ${session.isStreaming ? "text-green-400" : "text-[color:var(--text-muted)]"}`}>
+        <p className={`text-sm ${session.isStreaming ? "text-green-400" : "text-muted"}`}>
           {session.isStreaming ? t("detail.values.yes") : t("detail.values.no")}
         </p>
       </div>
 
       {/* Capabilities */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.capabilities")}
         </label>
         <div className="flex flex-wrap gap-1 mt-1">
@@ -302,8 +302,8 @@ function SessionDetails({
       </div>
 
       {/* Actions */}
-      <div className="pt-2 border-t border-[color:var(--border-default)]">
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
+      <div className="pt-2 border-t border-default">
+        <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
           {t("detail.labels.actions")}
         </label>
         <div className="flex flex-wrap gap-2">
@@ -387,8 +387,8 @@ function SessionDetails({
         ];
         if (unconnected.length === 0) return null;
         return (
-          <div className="pt-2 border-t border-[color:var(--border-default)]">
-            <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
+          <div className="pt-2 border-t border-default">
+            <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
               {t("detail.labels.connectApp")}
             </label>
             <div className="space-y-1">
@@ -427,38 +427,38 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.profileName")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {profile.name}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.profileId")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
+        <p className="text-sm text-primary font-mono break-all">
           {profile.id}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.deviceType")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {profile.kind}
         </p>
       </div>
 
       {/* Preferred Decoder */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.preferredDecoder")}
         </label>
-        <p className={`text-sm ${profile.preferred_catalog ? "text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}>
+        <p className={`text-sm ${profile.preferred_catalog ? "text-primary" : "text-muted"}`}>
           {profile.preferred_catalog ?? t("detail.values.none")}
         </p>
       </div>
@@ -469,7 +469,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
         return config?.busMappings.some((m) => m.enabled);
       }) && (
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.busMappings")}
           </label>
           {usingSessions.map((s) => {
@@ -479,7 +479,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
             return (
               <div key={s.sessionId} className="mt-1">
                 {usingSessions.length > 1 && (
-                  <p className="text-xs text-[color:var(--text-muted)] font-mono">{s.sessionId}</p>
+                  <p className="text-xs text-muted font-mono">{s.sessionId}</p>
                 )}
                 <div className="ml-2 space-y-0.5">
                   {enabledMappings.map((m) => {
@@ -488,7 +488,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
                     ) ?? 0;
                     const canDisable = totalEnabled > 1;
                     return (
-                      <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-primary)] font-mono">
+                      <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-primary font-mono">
                         <span>bus{m.deviceBus} → bus{m.outputBus}</span>
                         {canDisable && (
                           <IconButton
@@ -521,8 +521,8 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
       {/* Actions — remove from session (only if session has more than 1 source) */}
       {usingSessions.some((s) => s.sourceProfileIds.length > 1) && (
-        <div className="pt-2 border-t border-[color:var(--border-default)]">
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
+        <div className="pt-2 border-t border-default">
+          <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
             {t("detail.labels.actions")}
           </label>
           {usingSessions.map((s) =>
@@ -660,9 +660,9 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
   if (busStates.length === 0) return null;
 
   return (
-    <div className="pt-2 border-t border-[color:var(--border-default)]">
+    <div className="pt-2 border-t border-default">
       <div className="flex items-center justify-between mb-2">
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.signalGenerator")}
         </label>
         {busStates.length < 8 && (
@@ -684,7 +684,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
                 onChange={(e) => handleToggle(bs.bus, e.target.checked)}
                 size="sm"
               />
-              <span className="text-xs text-[color:var(--text-primary)] w-10">{t("detail.signalGen.busLabel", { bus: bs.bus })}</span>
+              <span className="text-xs text-primary w-10">{t("detail.signalGen.busLabel", { bus: bs.bus })}</span>
             </label>
             <Input
               type="number"
@@ -697,7 +697,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
               size="xs"
               className="w-16"
             />
-            <span className="text-xs text-[color:var(--text-muted)]">{t("detail.signalGen.hz")}</span>
+            <span className="text-xs text-muted">{t("detail.signalGen.hz")}</span>
             {busStates.length > 1 && (
               <IconButton
                 onClick={() => handleRemoveBus(bs.bus)}
@@ -757,7 +757,7 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
 
   return (
     <div>
-      <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+      <label className="text-xs text-muted uppercase tracking-wide">
         {t("detail.labels.decoder")}
       </label>
       <Select
@@ -782,10 +782,10 @@ function WindowField({ windowLabel }: { windowLabel?: string }) {
   if (!windowLabel) return null;
   return (
     <div>
-      <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+      <label className="text-xs text-muted uppercase tracking-wide">
         {t("detail.labels.window")}
       </label>
-      <p className="text-sm text-[color:var(--text-primary)]">
+      <p className="text-sm text-primary">
         {formatWindowName(windowLabel)}
       </p>
     </div>
@@ -810,10 +810,10 @@ function UnconnectedAppDetails({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.app")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono">
+        <p className="text-sm text-primary font-mono">
           {displayId}
         </p>
       </div>
@@ -821,18 +821,18 @@ function UnconnectedAppDetails({
       <WindowField windowLabel={instance?.windowLabel} />
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.status")}
         </label>
-        <p className="text-sm text-[color:var(--text-muted)]">
+        <p className="text-sm text-muted">
           {t("detail.values.notConnected")}
         </p>
       </div>
 
       {/* Connect to session */}
       {onConnectApp && sessions.length > 0 && (
-        <div className="pt-2 border-t border-[color:var(--border-default)]">
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
+        <div className="pt-2 border-t border-default">
+          <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
             {t("detail.labels.connectToSession")}
           </label>
           <div className="space-y-1">
@@ -877,7 +877,7 @@ function EdgeDetails({
   if (edgeId.includes("::")) {
     // Session → Listener edge
     const match = edgeId.match(/^edge-(.+?)::(.+)$/);
-    if (!match) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.edgeNotFound")}</p>;
+    if (!match) return <p className="text-sm text-muted">{t("detail.edgeNotFound")}</p>;
     const [, sessionId, subscriberId] = match;
     const session = sessions.find((s) => s.sessionId === sessionId);
     const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
@@ -885,38 +885,38 @@ function EdgeDetails({
     return (
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.type")}
           </label>
-          <p className="text-sm text-[color:var(--text-primary)]">
+          <p className="text-sm text-primary">
             {t("detail.values.sessionToApp")}
           </p>
         </div>
 
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.session")}
           </label>
-          <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
+          <p className="text-sm text-primary font-mono break-all">
             {sessionId}
           </p>
         </div>
 
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.app")}
           </label>
-          <p className="text-sm text-[color:var(--text-primary)] font-mono">
+          <p className="text-sm text-primary font-mono">
             {subscriberId}
           </p>
           {listener && (
-            <p className="text-xs text-[color:var(--text-muted)] capitalize">
+            <p className="text-xs text-muted capitalize">
               {listener.app_name || subscriberId}
             </p>
           )}
         </div>
 
-        <div className="pt-2 border-t border-[color:var(--border-default)]">
+        <div className="pt-2 border-t border-default">
           <Button
             onClick={() => onEvictSubscriber(sessionId, subscriberId)}
             variant="tonal"
@@ -938,10 +938,10 @@ function EdgeDetails({
     return (
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.type")}
           </label>
-          <p className="text-sm text-[color:var(--text-primary)]">
+          <p className="text-sm text-primary">
             {t("detail.values.deviceToSession")}
           </p>
         </div>
@@ -977,43 +977,43 @@ function EdgeDetails({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.type")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {t("detail.values.deviceToSession")}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.device")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {profile?.name ?? profileId}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.busMapping")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono">
+        <p className="text-sm text-primary font-mono">
           bus{deviceBus} → bus{outputBus}
         </p>
       </div>
 
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.session")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
+        <p className="text-sm text-primary font-mono break-all">
           {sessionId}
         </p>
       </div>
 
       {canDisable && (
-        <div className="pt-2 border-t border-[color:var(--border-default)]">
+        <div className="pt-2 border-t border-default">
           <Button
             onClick={() => onDisableBusMapping(sessionId, profileId, deviceBus)}
             variant="tonal"
@@ -1042,7 +1042,7 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
   const instance = openApps?.find((a) => a.instanceId === subscriberId);
 
   if (!listener) {
-    return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.appNotFound")}</p>;
+    return <p className="text-sm text-muted">{t("detail.appNotFound")}</p>;
   }
 
   const formatUptime = (seconds: number): string => {
@@ -1058,10 +1058,10 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
     <div className="space-y-4">
       {/* App ID */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.appId")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono">
+        <p className="text-sm text-primary font-mono">
           {instance?.displayId ?? listener.subscriber_id}
         </p>
       </div>
@@ -1071,22 +1071,22 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
 
       {/* Session */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.session")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
+        <p className="text-sm text-primary font-mono break-all">
           {sessionId}
         </p>
       </div>
 
       {/* Active status */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.status")}
         </label>
         <div className="flex items-center gap-2">
           <span className={`inline-block w-2 h-2 rounded-full ${listener.is_active ? "bg-green-400" : "bg-gray-500"}`} />
-          <p className={`text-sm ${listener.is_active ? "text-green-400" : "text-[color:var(--text-muted)]"}`}>
+          <p className={`text-sm ${listener.is_active ? "text-green-400" : "text-muted"}`}>
             {listener.is_active ? t("detail.values.active") : t("detail.values.inactive")}
           </p>
         </div>
@@ -1094,17 +1094,17 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
 
       {/* Registration time */}
       <div>
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.registered")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)]">
+        <p className="text-sm text-primary">
           {formatUptime(listener.registered_seconds_ago)}
         </p>
       </div>
 
       {/* Actions */}
-      <div className="pt-2 border-t border-[color:var(--border-default)]">
-        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
+      <div className="pt-2 border-t border-default">
+        <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
           {t("detail.labels.actions")}
         </label>
         <Button

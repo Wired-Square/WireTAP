@@ -79,29 +79,29 @@ export default function IODeviceStatus({
           <CircleX className={`${iconLg} text-red-500`} />
         )}
         {state === "idle" && (
-          <div className="w-5 h-5 rounded-full border-2 border-[color:var(--border-default)]" />
+          <div className="w-5 h-5 rounded-full border-2 border-default" />
         )}
       </div>
 
       {/* Status text */}
       <div className="flex-1 min-w-0">
         {state === "probing" && (
-          <span className="text-sm text-[color:var(--text-muted)]">
+          <span className="text-sm text-muted">
             {resolvedProbingText}
           </span>
         )}
         {state === "success" && result && (
           <div>
-            <span className="text-sm font-medium text-[color:var(--text-green)]">
+            <span className="text-sm font-medium text-green">
               {resolvedSuccessText}
             </span>
             {result.primaryInfo && (
-              <span className="text-sm text-[color:var(--text-muted)] ml-2">
+              <span className="text-sm text-muted ml-2">
                 {resolvedPrimaryLabel}: {result.primaryInfo}
               </span>
             )}
             {result.secondaryInfo && (
-              <span className="text-sm text-[color:var(--text-muted)] ml-2">
+              <span className="text-sm text-muted ml-2">
                 {resolvedSecondaryLabel}: {result.secondaryInfo}
               </span>
             )}
@@ -115,7 +115,7 @@ export default function IODeviceStatus({
         )}
         {state === "error" && result && (
           <div>
-            <span className="text-sm font-medium text-[color:var(--text-red)]">
+            <span className="text-sm font-medium text-red">
               {resolvedErrorText}
             </span>
             {result.error && (
@@ -126,7 +126,7 @@ export default function IODeviceStatus({
           </div>
         )}
         {state === "idle" && (
-          <span className="text-sm text-[color:var(--text-muted)]">
+          <span className="text-sm text-muted">
             {resolvedIdleText}
           </span>
         )}
@@ -139,7 +139,7 @@ export default function IODeviceStatus({
           size="sm"
           title={t("ioDeviceStatus.testConnection")}
         >
-          <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
+          <RefreshCw className={`${iconMd} text-muted`} />
         </IconButton>
       )}
     </Card>

@@ -233,7 +233,7 @@ export default function SerialConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
+        <div className="p-4 space-y-4 border-t border-default">
           {/* Encoding and Byte Order row */}
           <div className="grid grid-cols-2 gap-4">
             {/* Encoding */}
@@ -300,14 +300,14 @@ export default function SerialConfigSection({
           </div>
 
           {/* Header Section */}
-          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
+          <div className="border-t border-default pt-4 mt-4">
             <h3 className={`${textMedium} mb-3`}>
               Header
             </h3>
 
             {/* Header Length */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 Header Length (bytes)
               </label>
               <Input
@@ -330,7 +330,7 @@ export default function SerialConfigSection({
           </div>
 
           {/* Header Fields Section */}
-          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
+          <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -372,7 +372,7 @@ export default function SerialConfigSection({
                       </IconButton>
 
                       {/* Field name */}
-                      <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
+                      <span className="w-28 font-medium text-sm text-primary truncate">
                         {field.name}
                       </span>
 
@@ -439,7 +439,7 @@ export default function SerialConfigSection({
 
             {/* Add new field form */}
             {isAddingField && (
-              <div className="p-3 bg-[var(--bg-purple-subtle)] rounded-lg border border-[color:var(--border-purple)]">
+              <div className="p-3 bg-purple rounded-lg border border-purple">
                 <div className="flex items-center gap-2 mb-3">
                   {/* Field type dropdown */}
                   <Select
@@ -520,7 +520,7 @@ export default function SerialConfigSection({
           </div>
 
           {/* Protocol-Level Checksum Section */}
-          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
+          <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -555,7 +555,7 @@ export default function SerialConfigSection({
               <Card className="space-y-3">
                 {/* Algorithm */}
                 <div>
-                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                  <label className="block text-xs font-medium text-secondary mb-1">
                     Algorithm
                   </label>
                   <Select
@@ -576,7 +576,7 @@ export default function SerialConfigSection({
                 {/* Checksum location */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-medium text-secondary mb-1">
                       Start Byte
                     </label>
                     <Input
@@ -590,7 +590,7 @@ export default function SerialConfigSection({
                     </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-medium text-secondary mb-1">
                       Byte Length
                     </label>
                     <Select
@@ -606,7 +606,7 @@ export default function SerialConfigSection({
                 {/* Calculation range */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-medium text-secondary mb-1">
                       Calc Start Byte
                     </label>
                     <Input
@@ -617,7 +617,7 @@ export default function SerialConfigSection({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-medium text-secondary mb-1">
                       Calc End Byte
                     </label>
                     <Input
@@ -640,7 +640,7 @@ export default function SerialConfigSection({
                       checked={checksum.big_endian ?? false}
                       onChange={(e) => handleUpdateChecksum({ big_endian: e.target.checked })}
                     />
-                    <label htmlFor="checksum-big-endian" className="text-sm text-[color:var(--text-secondary)]">
+                    <label htmlFor="checksum-big-endian" className="text-sm text-secondary">
                       Big endian (MSB first)
                     </label>
                   </div>
@@ -659,7 +659,7 @@ export default function SerialConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
+        <div className={`px-4 py-2 ${caption} border-t border-default`}>
           Encoding: {encoding.toUpperCase()} • {byteOrder === 'big' ? 'BE' : 'LE'}
           {maxFrameLength !== undefined && ` • Max: ${maxFrameLength}B`}
           {headerLength !== undefined && headerLength > 0 && ` • Header: ${headerLength}B`}

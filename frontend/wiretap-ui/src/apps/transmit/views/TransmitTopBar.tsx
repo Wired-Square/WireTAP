@@ -9,7 +9,7 @@ import { flexRowGap2 } from "../../../styles/spacing";
 import { Badge } from "../../../components/Badge";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
-import { textDataSecondary } from "../../../styles/colourTokens";
+import { textSecondary } from "../../../styles/colourTokens";
 
 interface Props {
   // IO profiles
@@ -124,12 +124,12 @@ export default function TransmitTopBar({
         <>
           {/* Loading indicator */}
           {isLoading && (
-            <span className={`text-xs ${textDataSecondary}`}>{t("common:states.loading")}</span>
+            <span className={`text-xs ${textSecondary}`}>{t("common:states.loading")}</span>
           )}
 
           {/* Connection error */}
           {error && (
-            <span className="text-xs text-red-400 max-w-[300px] truncate">
+            <span className="text-xs text-red-400 max-w-75 truncate">
               {error}
             </span>
           )}

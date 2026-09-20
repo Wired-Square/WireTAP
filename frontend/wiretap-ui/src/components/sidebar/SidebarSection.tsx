@@ -33,7 +33,7 @@ export function SidebarSection({
  * Horizontal divider between sidebar sections.
  */
 export function SidebarDivider() {
-  return <div className="border-t border-[color:var(--border-default)]" />;
+  return <div className="border-t border-default" />;
 }
 
 type IconButtonVariant = "default" | "primary" | "danger";
@@ -48,16 +48,16 @@ type SidebarIconButtonProps = {
 
 const variantStyles: Record<IconButtonVariant, { enabled: string; disabled: string }> = {
   default: {
-    enabled: `text-[color:var(--text-primary)] ${hoverLight}`,
-    disabled: "text-[color:var(--text-muted)] cursor-not-allowed",
+    enabled: `text-primary ${hoverLight}`,
+    disabled: "text-muted cursor-not-allowed",
   },
   primary: {
-    enabled: "text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg)]",
-    disabled: "text-[color:var(--text-muted)] cursor-not-allowed",
+    enabled: "text-info hover:bg-info",
+    disabled: "text-muted cursor-not-allowed",
   },
   danger: {
-    enabled: "text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)]",
-    disabled: "text-[color:var(--text-muted)] cursor-not-allowed",
+    enabled: "text-danger hover:bg-danger",
+    disabled: "text-muted cursor-not-allowed",
   },
 };
 

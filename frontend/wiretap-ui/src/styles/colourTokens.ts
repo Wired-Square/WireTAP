@@ -1,199 +1,90 @@
 // ui/src/styles/colourTokens.ts
 //
-// Centralised colour tokens for consistent palette across the app.
-// Core colours use CSS variables (set by useTheme) for user customisation.
+// Named colour utilities. Each class reads a theme variable from WireTAP.css —
+// `text-muted` is `--text-muted`, `bg-info` is `--status-info-bg` — so one
+// variable change re-themes every use; docs/style_guide.md § Theming model
+// has the naming rule.
 
 // =============================================================================
-// CSS Variable-based Colours (User Customisable)
+// Surfaces, text and borders
 // =============================================================================
 
-/** Primary surface (main app background) - uses CSS variable */
-export const bgPrimary = "bg-[var(--bg-primary)]";
+/** Primary surface (main app background) */
+export const bgPrimary = "bg-primary";
 
-/** Surface background (dialogs, panels, elevated cards) - uses CSS variable */
-export const bgSurface = "bg-[var(--bg-surface)]";
+/** Surface background (dialogs, panels, elevated cards) */
+export const bgSurface = "bg-surface";
 
-/** Primary text (headings, main content) - uses CSS variable */
-export const textPrimary = "text-[color:var(--text-primary)]";
+/** Data view background */
+export const bgDataView = "bg-data";
 
-/** Secondary text (descriptions, labels) - uses CSS variable */
-export const textSecondary = "text-[color:var(--text-secondary)]";
+/** Primary text (headings, main content) */
+export const textPrimary = "text-primary";
 
-/** Default border - uses CSS variable */
-export const borderDefault = "border-[color:var(--border-default)]";
+/** Secondary text (descriptions, labels) */
+export const textSecondary = "text-secondary";
 
-/** Data view background - uses CSS variable */
-export const bgDataView = "bg-[var(--data-bg)]";
+/** Muted text (disabled, placeholder) */
+export const textMuted = "text-muted";
 
-/** Data view primary text - uses CSS variable */
-export const textDataPrimary = "text-[color:var(--data-text-primary)]";
+/** Data view primary text */
+export const textDataPrimary = "text-data-primary";
 
-// =============================================================================
-// Secondary Semantic Colours (CSS variable-based for Windows compatibility)
-// =============================================================================
+/** Default border */
+export const borderDefault = "border-default";
 
-/** Secondary surface (cards, panels) - uses CSS variable */
-export const bgSecondary = "bg-[var(--bg-surface)]";
-
-/** Tertiary surface (inputs, nested elements) - uses CSS variable with opacity */
-export const bgTertiary = "bg-[var(--bg-surface)]";
-
-/** Muted background (disabled, inactive) - uses CSS variable */
-export const bgMuted = "bg-[var(--bg-surface)]";
-
-/** Tertiary text (hints, help text) - uses secondary with reduced opacity */
-export const textTertiary = "text-[color:var(--text-secondary)]";
-
-/** Muted text (disabled, placeholder) - uses CSS variable */
-export const textMuted = "text-[color:var(--text-muted)]";
-
-/** Strong border (focus, emphasis) - uses CSS variable */
-export const borderStrong = "border-[color:var(--border-default)]";
-
-/** Subtle border (dividers) - uses CSS variable with opacity */
-export const borderSubtle = "border-[color:var(--border-default)] opacity-50";
-
-/** Bottom border divider (for section separators) - uses CSS variable */
-export const borderDivider = "border-b border-[color:var(--border-default)]";
-
-// =============================================================================
-// Status Colors (backgrounds) - CSS variable based for Windows compatibility
-// =============================================================================
-
-/** Success background */
-export const bgSuccess = "bg-[var(--status-success-bg)]";
-
-/** Danger/error background */
-export const bgDanger = "bg-[var(--status-danger-bg)]";
-
-/** Warning background */
-export const bgWarning = "bg-[var(--status-warning-bg)]";
-
-/** Info background */
-export const bgInfo = "bg-[var(--status-info-bg)]";
-
-// =============================================================================
-// Status Colors (text) - CSS variable based for Windows compatibility
-// =============================================================================
-
-/** Success text */
-export const textSuccess = "text-[color:var(--status-success-text)]";
-
-/** Danger/error text */
-export const textDanger = "text-[color:var(--status-danger-text)]";
-
-/** Warning text */
-export const textWarning = "text-[color:var(--status-warning-text)]";
-
-/** Info text */
-export const textInfo = "text-[color:var(--status-info-text)]";
-
-// =============================================================================
-// Status Colors (borders) - CSS variable based for Windows compatibility
-// =============================================================================
-
-/** Success border */
-export const borderSuccess = "border-[color:var(--status-success-border)]";
-
-/** Danger/error border */
-export const borderDanger = "border-[color:var(--status-danger-border)]";
-
-/** Warning border */
-export const borderWarning = "border-[color:var(--status-warning-border)]";
-
-/** Info border */
-export const borderInfo = "border-[color:var(--status-info-border)]";
-
-/** Purple background */
-export const bgPurple = "bg-[var(--status-purple-bg)]";
-
-/** Purple text */
-export const textPurple = "text-[color:var(--status-purple-text)]";
-
-/** Purple border */
-export const borderPurple = "border-[color:var(--status-purple-border)]";
-
-/** Cyan background */
-export const bgCyan = "bg-[var(--status-cyan-bg)]";
-
-/** Cyan text */
-export const textCyan = "text-[color:var(--status-cyan-text)]";
-
-/** Cyan border */
-export const borderCyan = "border-[color:var(--status-cyan-border)]";
-
-// =============================================================================
-// Interactive Colors - Use CSS variables for accent
-// =============================================================================
-
-/** Primary action background (buttons) - uses CSS variable */
-export const bgInteractive = "bg-[var(--accent-primary)] hover:brightness-110";
-
-/** Primary action text - uses CSS variable */
-export const textInteractive = "text-[color:var(--accent-primary)] hover:brightness-110";
-
-// =============================================================================
-// Data View Colors (CSS variable-based for Windows compatibility)
-// =============================================================================
-
-/** Data view toolbar background - uses CSS variable */
-export const bgDataToolbar = "bg-[var(--bg-surface)]";
-
-/** Data view border - uses CSS variable */
-export const borderDataView = "border-[color:var(--border-default)]";
+/** Bottom border divider (for section separators) */
+export const borderDivider = "border-b border-default";
 
 /** Data view outer container - rounded with border (the standard "bubble" look) */
-export const dataViewContainer = "rounded-lg border border-[color:var(--border-default)] overflow-hidden";
+export const dataViewContainer = "rounded-lg border border-default overflow-hidden";
 
-/** Data view input background - uses CSS variable */
-export const bgDataInput = "bg-[var(--bg-primary)]";
+// =============================================================================
+// Status tints
+// =============================================================================
 
-/** Data view secondary text - uses CSS variable */
-export const textDataSecondary = "text-[color:var(--text-secondary)]";
+export const bgSuccess = "bg-success";
+export const bgDanger = "bg-danger";
+export const bgInfo = "bg-info";
 
-/** Data view tertiary text - uses CSS variable with opacity */
-export const textDataTertiary = "text-[color:var(--text-secondary)] opacity-80";
+export const textSuccess = "text-success";
+export const textDanger = "text-danger";
+export const textWarning = "text-warning";
+export const textInfo = "text-info";
 
-/** Data view muted/decorative text - uses CSS variable with opacity */
-export const textDataMuted = "text-[color:var(--text-secondary)] opacity-60";
+export const borderSuccess = "border-success";
+export const borderDanger = "border-danger";
 
-/** Data view placeholder text - uses CSS variable with opacity */
-export const textDataPlaceholder = "text-[color:var(--text-secondary)] opacity-60 italic";
+// =============================================================================
+// Data view text at reduced emphasis
+// =============================================================================
+
+/** Data view tertiary text */
+export const textDataTertiary = "text-secondary opacity-80";
+
+/** Data view muted/decorative text */
+export const textDataMuted = "text-secondary opacity-60";
 
 /** Disabled/inactive data text — pair with a themed accent for active state */
-export const textDataDisabled = "text-[color:var(--text-muted)] opacity-50";
+export const textDataDisabled = "text-muted opacity-50";
 
 // =============================================================================
-// Hover States - use brightness filter for cross-platform support
+// Hover states
 // =============================================================================
 
-/** Light hover (for light backgrounds) */
+/** Brightness hover, for a surface whose fill is not the hover colour */
 export const hoverLight = "hover:brightness-95";
 
-/** Subtle hover (for secondary surfaces) */
-export const hoverSubtle = "hover:brightness-90";
-
-/** Data view item hover */
-export const hoverDataItem = "hover:brightness-95";
-
-/** Data view row hover */
-export const hoverDataRow = "hover:brightness-95";
+/** Hover background */
+export const hoverBg = "hover:bg-hover";
 
 // =============================================================================
-// Hover States - CSS variable based for Windows compatibility
+// Data accents (for table cells, syntax highlighting)
 // =============================================================================
 
-/** Hover background - uses CSS variable */
-export const hoverBg = "hover:bg-[var(--hover-bg)]";
-
-// =============================================================================
-// Data Accent Colors (for table cells, syntax highlighting)
-// =============================================================================
-// These use CSS variables for Windows WebView compatibility.
-
-export const textDataGreen = "text-[color:var(--text-green)]";
-export const textDataYellow = "text-[color:var(--text-yellow)]";
-export const textDataOrange = "text-[color:var(--text-orange)]";
-export const textDataPurple = "text-[color:var(--text-purple)]";
-export const textDataAmber = "text-[color:var(--text-amber)]";
-export const textDataCyan = "text-[color:var(--text-cyan)]";
+export const textDataGreen = "text-green";
+export const textDataYellow = "text-yellow";
+export const textDataOrange = "text-orange";
+export const textDataPurple = "text-purple";
+export const textDataAmber = "text-amber";
+export const textDataCyan = "text-cyan";

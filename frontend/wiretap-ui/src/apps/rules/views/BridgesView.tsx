@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import type { BridgeDescriptor } from "../../../api/framelinkRules";
 import BridgeDialog from "../dialogs/BridgeDialog";
@@ -48,7 +48,7 @@ export default function BridgesView() {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+      <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
         <span className="ml-2 text-sm">{t("bridges.loading")}</span>
       </div>
@@ -69,7 +69,7 @@ export default function BridgesView() {
       </div>
 
       {bridges.length === 0 && (
-        <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+        <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
           <p className="text-sm">{t("bridges.empty")}</p>
         </div>
       )}

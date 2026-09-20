@@ -24,7 +24,7 @@ export default function PayloadAnalysis() {
 
   // Render the existing ChangesResultView - not embedded since this is its own panel
   return (
-    <div className="h-full bg-[var(--bg-surface)]">
+    <div className="h-full bg-surface">
       <ChangesResultView />
     </div>
   );

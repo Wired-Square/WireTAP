@@ -12,11 +12,10 @@ import {
   textSecondary,
   textDanger,
   bgSurface,
-  borderDataView,
+  borderDefault,
   monoBody,
   textDataGreen,
   textDataOrange,
-  textDataSecondary,
 } from "../../styles";
 import { Table } from "../../components/Table";
 import {
@@ -281,10 +280,10 @@ export default function TestPattern() {
       />
 
       {/* Main content */}
-      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
+      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDefault} overflow-hidden`}>
         {!isConnected ? (
           <div className={emptyStateContainer}>
-            <FlaskConical size={48} className={textDataSecondary} />
+            <FlaskConical size={48} className={textSecondary} />
             <div className={emptyStateText}>
               <p className={emptyStateHeading}>{t("states.noSession")}</p>
               <p className={emptyStateDescription}>{t("states.noSessionHelp")}</p>
@@ -314,7 +313,7 @@ export default function TestPattern() {
                   onClick={() => { clearTestState(); setError(null); }}
                   title={t("actions.clearResults")}
                 >
-                  <Trash2 className={`${iconSm} text-[color:var(--text-muted)]`} />
+                  <Trash2 className={`${iconSm} text-muted`} />
                   <span>{t("actions.clear")}</span>
                 </Button>
               )}
@@ -412,7 +411,7 @@ function Gauge({
 
   return (
     <div className="flex flex-col items-center min-w-0">
-      <svg viewBox="0 0 200 160" className="w-full max-w-[200px]" overflow="visible">
+      <svg viewBox="0 0 200 160" className="w-full max-w-50" overflow="visible">
         {/* Background arc */}
         <path
           d={describeArc(cx, cy, r, GAUGE_START, GAUGE_END)}
@@ -576,7 +575,7 @@ function SweepResults({ state }: { state: IOTestState }) {
       <PeerSummary peer={state.peer} />
       {rows.length > 0 && <SweepTable rows={rows} />}
       {verdict(state.status).settled && (
-        <div className={`text-sm ${textSecondary} border-t border-[color:var(--border-default)] pt-2 mt-1`}>
+        <div className={`text-sm ${textSecondary} border-t border-default pt-2 mt-1`}>
           {failures.length === 0 && rows.length > 0 ? (
             <p>
               Every length code round-tripped at exactly the length it names
@@ -803,7 +802,7 @@ function TestResults({ state }: { state: IOTestState }) {
 
       {/* Plain English summary */}
       {verdict(state.status).settled && (
-        <div className={`text-sm ${textSecondary} border-t border-[color:var(--border-default)] pt-2 mt-1`}>
+        <div className={`text-sm ${textSecondary} border-t border-default pt-2 mt-1`}>
           <TestSummary state={state} passed={passed} />
         </div>
       )}
@@ -897,7 +896,7 @@ function AutoResults({ state }: { state: IOTestState }) {
 
       {/* Plain English summary */}
       {settled && results.length > 0 && (
-        <div className={`text-sm ${textSecondary} border-t border-[color:var(--border-default)] pt-2 mt-1`}>
+        <div className={`text-sm ${textSecondary} border-t border-default pt-2 mt-1`}>
           <AutoSummary results={results} elapsed={state.elapsed_sec} />
         </div>
       )}

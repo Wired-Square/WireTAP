@@ -331,7 +331,7 @@ export default function DevicesScanView() {
       </div>
 
       {/* Manual IP entry */}
-      <div className="border-t border-[color:var(--border-default)] pt-3">
+      <div className="border-t border-default pt-3">
         <Button
           onClick={() => setShowManualIp(!showManualIp)}
           variant="link"

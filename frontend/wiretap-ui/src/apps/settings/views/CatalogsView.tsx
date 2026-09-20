@@ -173,7 +173,7 @@ export default function CatalogsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        <h2 className="text-xl font-semibold text-primary">
           {t("catalogs.title")}
         </h2>
         <div className={flexRowGap2}>
@@ -248,7 +248,7 @@ export default function CatalogsView({
             <Card key={catalog.path} padding="lg">
               <div className={`${flexRowGap2} justify-between`}>
                 <div className={`${flexRowGap3} flex-wrap min-w-0`}>
-                  <h3 className="font-medium text-[color:var(--text-primary)]">
+                  <h3 className="font-medium text-primary">
                     {catalog.name}
                   </h3>
                   <Badge size="lg">{catalog.filename}</Badge>

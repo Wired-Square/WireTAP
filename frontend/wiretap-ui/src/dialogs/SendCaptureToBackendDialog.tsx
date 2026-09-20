@@ -131,13 +131,13 @@ export default function SendCaptureToBackendDialog({
       isOpen={isOpen}
       onClose={handleClose}
       title={t("sendToBackend.title")}
-      icon={<UploadCloud className="text-[color:var(--accent-primary)]" />}
+      icon={<UploadCloud className="text-accent-primary" />}
     >
       <DialogBody className="space-y-4">
         <p className={helpText}>{t("sendToBackend.description", { name: captureName })}</p>
 
         {wiretapProfiles.length === 0 ? (
-          <p className="text-[color:var(--status-warning-text)] text-sm">
+          <p className="text-warning text-sm">
             {t("sendToBackend.noProfiles")}
           </p>
         ) : phase === "configure" || phase === "error" ? (
@@ -183,19 +183,19 @@ export default function SendCaptureToBackendDialog({
                 <span className={helpText}>{t("sendToBackend.newDatabase")}</span>
               </label>
               {newDatabase && database && !dbNameValid && (
-                <p className="text-[color:var(--status-danger-text)] text-xs">
+                <p className="text-danger text-xs">
                   {t("sendToBackend.invalidName")}
                 </p>
               )}
             </div>
 
-            {error && <p className="text-[color:var(--status-danger-text)] text-sm">{error}</p>}
+            {error && <p className="text-danger text-sm">{error}</p>}
           </>
         ) : phase === "uploading" ? (
           <div className="space-y-3">
-            <div className="h-2 rounded-full bg-[var(--bg-surface-2,#222)] overflow-hidden">
+            <div className="h-2 rounded-full bg-tertiary overflow-hidden">
               <div
-                className="h-full bg-[color:var(--accent)] transition-all"
+                className="h-full bg-accent-primary transition-all"
                 style={{ width: `${pct}%` }}
               />
             </div>

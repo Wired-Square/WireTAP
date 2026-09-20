@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textSecondary, textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import type { FrameDefDescriptor, SignalDefDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
@@ -121,7 +121,7 @@ export default function FrameDefsView() {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+      <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
         <span className="ml-2 text-sm">{t("frameDefs.loading")}</span>
       </div>
@@ -142,7 +142,7 @@ export default function FrameDefsView() {
       </div>
 
       {frameDefs.length === 0 && (
-        <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
+        <div className={`flex items-center justify-center py-12 ${textSecondary}`}>
           <p className="text-sm">{t("frameDefs.empty")}</p>
         </div>
       )}
@@ -168,7 +168,7 @@ export default function FrameDefsView() {
                     onCommit={(newName) => setLabel("frame_def", fd.frame_def_id, newName || null, null)}
                   />
                 </span>
-                <span className={`text-xs font-mono ${textTertiary}`}>
+                <span className={`text-xs font-mono ${textSecondary}`}>
                   #{formatHexId(fd.frame_def_id)}
                 </span>
                 <Badge tone={isTemp ? "warning" : "success"}>

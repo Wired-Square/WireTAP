@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, textMedium, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, textMedium, bgSurface, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import type { TomlNode } from "../types";
 import { tomlParse } from "../toml";
 import { formatFrameId } from "../utils";
@@ -158,7 +158,7 @@ export default function NodeView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
+        <h3 className="text-lg font-semibold text-primary">
           {isModbus ? t("nodeView.slave") : t("nodeView.transmittingNode")}
         </h3>
 
@@ -194,7 +194,7 @@ export default function NodeView({
               }}
               title={t("nodeView.edit")}
             >
-              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+              <Pencil className={`${iconMd} text-secondary`} />
             </IconButton>
           )}
 
@@ -204,28 +204,28 @@ export default function NodeView({
               tone="danger"
               title={t("nodeView.deleteTooltip")}
             >
-              <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+              <Trash2 className={`${iconMd} text-red`} />
             </IconButton>
           )}
         </div>
       </div>
 
-      <div className={`p-4 ${bgSecondary} rounded-lg`}>
+      <div className={`p-4 ${bgSurface} rounded-lg`}>
         <div className={labelSmallMuted}>{t("metaView.name")}</div>
         <div className={monoBody}>{nodeName}</div>
       </div>
 
       {isModbus && (
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("nodeView.deviceAddress")}</div>
           <div className={monoBody}>{deviceAddress}</div>
         </div>
       )}
 
       {selectedNode.metadata?.properties?.notes && (
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("nodeView.notes")}</div>
-          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
+          <div className="text-sm text-secondary whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -242,12 +242,12 @@ export default function NodeView({
           {selectedNode.children.map((child, idx) => (
             <div
               key={idx}
-              className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
+              className={`p-3 ${bgSurface} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
               onClick={() => onSelectNode(child)}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-[color:var(--text-primary)] mb-1 flex items-center gap-2">
+                  <div className="font-medium text-primary mb-1 flex items-center gap-2">
                     {child.type === "can-frame" && <span>🔖</span>}
                     {child.type === "modbus-frame" && <span>📟</span>}
                     {child.type === "mux" && <span>🔀</span>}
@@ -281,7 +281,7 @@ export default function NodeView({
         </div>
 
         {framesForNode.length === 0 ? (
-          <div className="text-sm text-[color:var(--text-muted)]">
+          <div className="text-sm text-muted">
             {isModbus ? t("nodeView.noRegisters") : t("nodeView.noTransmittedFrames")}
           </div>
         ) : (
@@ -291,7 +291,7 @@ export default function NodeView({
                 const formatted = formatFrameId(frame.id, displayFrameIdFormat);
                 return (
               <div className="flex items-center justify-between mb-2">
-                <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
+                <div className="font-medium text-primary flex items-center gap-2">
                   <span>🔖</span>
                   <span className={flexRowGap2}>
                     {formatted.primary}
@@ -312,7 +312,7 @@ export default function NodeView({
                     onClick={() => onSelectPath(["frame", frameProtocol, frame.id])}
                     title={t("nodeView.editFrame")}
                   >
-                    <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                    <Pencil className={`${iconMd} text-secondary`} />
                   </IconButton>
                   {(isModbus ? onRequestDeleteRegister : onRequestDeleteFrame) && (
                     <IconButton
@@ -324,7 +324,7 @@ export default function NodeView({
                       tone="danger"
                       title={t("nodeView.deleteFrame")}
                     >
-                      <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                      <Trash2 className={`${iconMd} text-red`} />
                     </IconButton>
                   )}
                 </div>
@@ -362,7 +362,7 @@ export default function NodeView({
                           onClick={() => onSelectPath(signal.path)}
                           title={t("nodeView.editSignal")}
                         >
-                          <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                          <Pencil className={`${iconMd} text-secondary`} />
                         </IconButton>
                         {onRequestDeleteSignal && (
                           <IconButton
@@ -377,7 +377,7 @@ export default function NodeView({
                             tone="danger"
                             title={t("nodeView.deleteSignal")}
                           >
-                            <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                            <Trash2 className={`${iconMd} text-red`} />
                           </IconButton>
                         )}
                       </div>

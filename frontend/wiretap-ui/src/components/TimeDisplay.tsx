@@ -124,8 +124,8 @@ export default function TimeDisplay({
       <div className="flex flex-col">
         {showTime && (
           <span
-            className={`font-mono min-w-[80px] leading-tight ${
-              compact ? 'text-sm text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'
+            className={`font-mono min-w-20 leading-tight ${
+              compact ? 'text-sm text-secondary' : 'text-primary'
             }`}
           >
             {formattedTime}
@@ -134,7 +134,7 @@ export default function TimeDisplay({
         {showDate && formattedDate && (
           <span
             className={`font-mono leading-tight ${
-              compact ? 'text-[10px] text-[color:var(--text-secondary)]' : caption
+              compact ? 'text-2xs text-secondary' : caption
             }`}
           >
             {formattedDate}

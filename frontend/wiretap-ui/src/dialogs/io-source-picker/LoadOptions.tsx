@@ -43,7 +43,7 @@ export default function LoadOptions({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-surface ${sectionHeader}`}>
         {t("ioSourcePicker.options")}
       </div>
       <div className="p-3 space-y-3">

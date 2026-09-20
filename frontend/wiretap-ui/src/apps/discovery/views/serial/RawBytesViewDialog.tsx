@@ -66,7 +66,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
               pressed={displayMode === 'individual'}
             >
               <div className="font-medium">{t("serial.individualBytes")}</div>
-              <div className={`text-xs mt-0.5 ${displayMode === 'individual' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
+              <div className={`text-xs mt-0.5 ${displayMode === 'individual' ? 'text-accent-primary/70' : 'text-muted'}`}>
                 {t("serial.individualDescription")}
               </div>
             </Button>
@@ -78,7 +78,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
               pressed={displayMode === 'chunked'}
             >
               <div className="font-medium">{t("serial.chunkedBytes")}</div>
-              <div className={`text-xs mt-0.5 ${displayMode === 'chunked' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
+              <div className={`text-xs mt-0.5 ${displayMode === 'chunked' ? 'text-accent-primary/70' : 'text-muted'}`}>
                 {t("serial.chunkedDescription")}
               </div>
             </Button>
@@ -88,7 +88,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
           {displayMode === 'chunked' && (
             <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
               {/* Baud rate calculator */}
-              <div className="bg-[var(--bg-surface)] rounded-lg p-3 space-y-2">
+              <div className="bg-surface rounded-lg p-3 space-y-2">
                 <span className={labelSmall}>{t("serial.calculateFromBaud")}</span>
                 <div className={flexRowGap2}>
                   <Select

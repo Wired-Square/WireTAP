@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   textPrimary,
   textSecondary,
-  textTertiary,
   bgSurface,
   borderDefault,
 } from "../../../styles";
@@ -239,7 +238,7 @@ export default function SignalCombobox({
           style={dropdownStyle}
         >
           {filteredGroups.length === 0 && (
-            <div className={`px-2 py-2 text-xs ${textTertiary}`}>
+            <div className={`px-2 py-2 text-xs ${textSecondary}`}>
               {filter ? "No matching signals" : "No signals available"}
             </div>
           )}
@@ -255,7 +254,7 @@ export default function SignalCombobox({
               <div key={`${tier}:${group}`}>
                 {showTierHeader && (
                   <div
-                    className={`sticky top-0 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${bgSurface} ${textTertiary} border-b ${borderDefault}`}
+                    className={`sticky top-0 px-2 py-1 text-2xs font-semibold uppercase tracking-wider ${bgSurface} ${textSecondary} border-b ${borderDefault}`}
                   >
                     {tierLabel}
                   </div>
@@ -278,10 +277,10 @@ export default function SignalCombobox({
                     <span className={`text-right px-2 ${textSecondary}`}>
                       {group}
                     </span>
-                    <span className={`text-right font-mono tabular-nums ${textTertiary}`}>
+                    <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
                       {signal.bit_length}b
                     </span>
-                    <span className={`text-right font-mono tabular-nums ${textTertiary}`}>
+                    <span className={`text-right font-mono tabular-nums ${textSecondary}`}>
                       {formatHexId(signal.signal_id)}
                     </span>
                   </button>

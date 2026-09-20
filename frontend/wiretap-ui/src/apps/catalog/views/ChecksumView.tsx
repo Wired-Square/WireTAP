@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSurface } from "../../../styles";
 import { tomlParse } from "../toml";
 import { getFrameByteLengthFromPath } from "../utils";
 import { getAlgorithmInfo, resolveByteIndexSync } from "../checksums";
@@ -82,7 +82,7 @@ export default function ChecksumView({
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("checksumDetails.title")}</h3>
+        <h3 className="text-lg font-semibold text-primary">{t("checksumDetails.title")}</h3>
         <div className={flexRowGap2}>
           <IconButton
             onClick={() => {
@@ -97,7 +97,7 @@ export default function ChecksumView({
             }}
             title={t("checksumDetails.edit")}
           >
-            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+            <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
 
           <IconButton
@@ -114,7 +114,7 @@ export default function ChecksumView({
             tone="danger"
             title={t("checksumDetails.delete")}
           >
-            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+            <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
         </div>
       </div>
@@ -124,18 +124,18 @@ export default function ChecksumView({
         <Card tone="info" padding="lg">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">🔐</span>
-            <span className="font-semibold text-[color:var(--status-info-text)]">{algorithmInfo.name}</span>
+            <span className="font-semibold text-info">{algorithmInfo.name}</span>
             <Badge tone="primary" variant="outline">
               {t("checksumDetails.outputBytes", { count: algorithmInfo.outputBytes })}
             </Badge>
           </div>
-          <p className="text-sm text-[color:var(--status-info-text)]">{algorithmInfo.description}</p>
+          <p className="text-sm text-info">{algorithmInfo.description}</p>
         </Card>
       )}
 
       {/* Byte Range Visualization */}
-      <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-        <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">{t("checksumDetails.byteLayout")}</h4>
+      <div className="p-4 bg-surface rounded-lg">
+        <h4 className="text-sm font-semibold text-primary mb-3">{t("checksumDetails.byteLayout")}</h4>
         {(() => {
           // Resolve negative indices for display
           const resolvedStartByte = props.start_byte !== undefined
@@ -161,11 +161,11 @@ export default function ChecksumView({
                   i >= resolvedCalcStart &&
                   i < resolvedCalcEnd;
 
-                let bgClass = "bg-[var(--bg-tertiary)] text-[color:var(--text-muted)]";
+                let bgClass = "bg-tertiary text-muted";
                 if (isChecksumByte) {
                   bgClass = "bg-purple-500 text-white";
                 } else if (isCalcByte) {
-                  bgClass = "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]";
+                  bgClass = "bg-info text-info";
                 }
 
                 return (
@@ -181,13 +181,13 @@ export default function ChecksumView({
             </div>
           );
         })()}
-        <div className="flex items-center gap-4 mt-3 text-xs text-[color:var(--text-muted)]">
+        <div className="flex items-center gap-4 mt-3 text-xs text-muted">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-purple-500"></div>
             <span>{t("checksumDetails.checksumLocation")}</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-[var(--status-info-bg)]"></div>
+            <div className="w-3 h-3 rounded bg-info"></div>
             <span>{t("checksumDetails.calculationLegend")}</span>
           </div>
         </div>
@@ -196,18 +196,18 @@ export default function ChecksumView({
       {/* Properties Grid */}
       <div className="grid grid-cols-2 gap-4">
         {/* Core Properties */}
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.name")}</div>
           <div className={monoBody}>"{props.name}"</div>
         </div>
 
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.algorithm")}</div>
           <div className={monoBody}>{props.algorithm}</div>
         </div>
 
         {/* Checksum Location */}
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.checksumPosition")}</div>
           <div className={monoBody}>
             {props.start_byte !== undefined && props.start_byte < 0 ? (
@@ -221,13 +221,13 @@ export default function ChecksumView({
           </div>
         </div>
 
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.endianness")}</div>
           <div className={monoBody}>{props.endianness || "big"}</div>
         </div>
 
         {/* Calculation Range */}
-        <div className={`p-3 ${bgSecondary} rounded-lg col-span-2`}>
+        <div className={`p-3 ${bgSurface} rounded-lg col-span-2`}>
           <div className={labelSmallMuted}>{t("checksumDetails.calculationRange")}</div>
           {(() => {
             const hasNegativeStart = props.calc_start_byte !== undefined && props.calc_start_byte < 0;
@@ -243,9 +243,9 @@ export default function ChecksumView({
               return (
                 <div className={monoBody}>
                   bytes {props.calc_start_byte}
-                  {hasNegativeStart && <span className="text-[color:var(--text-muted)]"> (→ {resolvedStart})</span>}
+                  {hasNegativeStart && <span className="text-muted"> (→ {resolvedStart})</span>}
                   {" "}to {props.calc_end_byte}
-                  {hasNegativeEnd && <span className="text-[color:var(--text-muted)]"> (→ {resolvedEnd})</span>}
+                  {hasNegativeEnd && <span className="text-muted"> (→ {resolvedEnd})</span>}
                   {" "}= bytes {resolvedStart} to {resolvedEnd - 1}
                 </div>
               );
@@ -261,9 +261,9 @@ export default function ChecksumView({
 
         {/* Notes */}
         {props.notes && (
-          <div className={`p-3 ${bgSecondary} rounded-lg col-span-2`}>
+          <div className={`p-3 ${bgSurface} rounded-lg col-span-2`}>
             <div className={labelSmallMuted}>{t("checksumDetails.notes")}</div>
-            <div className="text-sm text-[color:var(--text-primary)]">{props.notes}</div>
+            <div className="text-sm text-primary">{props.notes}</div>
           </div>
         )}
       </div>

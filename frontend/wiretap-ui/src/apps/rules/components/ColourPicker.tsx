@@ -4,7 +4,7 @@
 // and hex input. Writes to the device only on committed changes.
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { textSecondary, textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import { brgbComponents, cssToBrgb } from "../utils/brgbColour";
 import { Input } from "../../../components/forms";
 
@@ -113,7 +113,7 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
 
       {/* Brightness slider */}
       <div className="flex items-center gap-2">
-        <span className={`text-[10px] w-12 ${textTertiary}`}>Brightness</span>
+        <span className={`text-2xs w-12 ${textSecondary}`}>Brightness</span>
         <input
           type="range"
           min={0}
@@ -122,7 +122,7 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           onChange={(e) => handleBrightnessChange(parseInt(e.target.value))}
           className="flex-1 h-1.5 accent-amber-400"
         />
-        <span className={`text-[10px] w-6 text-right font-mono ${textSecondary}`}>
+        <span className={`text-2xs w-6 text-right font-mono ${textSecondary}`}>
           {localBrightness}
         </span>
       </div>

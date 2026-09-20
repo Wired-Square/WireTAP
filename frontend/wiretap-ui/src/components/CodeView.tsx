@@ -35,12 +35,12 @@ const CodeView = forwardRef<HTMLTextAreaElement, CodeViewProps>(
         {/* Line numbers gutter */}
         <div
           ref={lineNumbersRef}
-          className="flex-shrink-0 py-4 pr-3 pl-4 font-mono text-sm text-right text-[color:var(--text-muted)] bg-[var(--bg-surface)] border-r border-[color:var(--border-default)] select-none overflow-hidden"
+          className="flex-shrink-0 py-4 pr-3 pl-4 font-mono text-sm text-right text-muted bg-surface border-r border-default select-none overflow-hidden"
           style={{ minWidth: `${Math.max(3, String(lineCount).length + 1)}ch` }}
           aria-hidden="true"
         >
           {lineNumbers.map((num) => (
-            <div key={num} className="leading-[1.5rem]">
+            <div key={num} className="leading-6">
               {num}
             </div>
           ))}
@@ -53,7 +53,7 @@ const CodeView = forwardRef<HTMLTextAreaElement, CodeViewProps>(
           onChange={(e) => onChange(e.target.value)}
           onScroll={handleScroll}
           disabled={isDisabled}
-          className="flex-1 p-4 font-mono text-sm leading-[1.5rem] bg-[var(--bg-primary)] text-[color:var(--text-primary)] resize-none focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 p-4 font-mono text-sm leading-6 bg-primary text-primary resize-none focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           placeholder={placeholder || ""}
           spellCheck={false}
         />

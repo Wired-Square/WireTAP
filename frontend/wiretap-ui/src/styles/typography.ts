@@ -1,36 +1,32 @@
 // ui/src/styles/typography.ts
 //
-// Centralized typography styles for consistent text presentation.
-// Uses CSS variables for cross-platform dark mode support (Windows WebView).
+// Centralised typography styles for consistent text presentation.
 
 // =============================================================================
-// Headings - use CSS variables for text colour
+// Headings
 // =============================================================================
 
 /** Page title (h1) */
-export const h1 = "text-2xl font-bold text-[color:var(--text-primary)]";
+export const h1 = "text-2xl font-bold text-primary";
 
 /** Section title (h2) */
-export const h2 = "text-xl font-semibold text-[color:var(--text-primary)]";
+export const h2 = "text-xl font-semibold text-primary";
 
 /** Subsection title (h3) */
-export const h3 = "text-lg font-semibold text-[color:var(--text-primary)]";
+export const h3 = "text-lg font-semibold text-primary";
 
 /** Card/dialog title (h4) */
-export const h4 = "text-base font-medium text-[color:var(--text-primary)]";
+export const h4 = "text-base font-medium text-primary";
 
 // =============================================================================
-// Body Text - use CSS variables for text colour
+// Body Text
 // =============================================================================
 
 /** Default body text */
-export const bodyDefault = "text-sm text-[color:var(--text-secondary)]";
-
-/** Large body text */
-export const bodyLarge = "text-base text-[color:var(--text-secondary)]";
+export const bodyDefault = "text-sm text-secondary";
 
 /** Small body text */
-export const bodySmall = "text-xs text-[color:var(--text-secondary)]";
+export const bodySmall = "text-xs text-secondary";
 
 // =============================================================================
 // Utility Text
@@ -40,10 +36,10 @@ export const bodySmall = "text-xs text-[color:var(--text-secondary)]";
 export const mono = "font-mono text-sm";
 
 /** Caption text */
-export const caption = "text-xs text-[color:var(--text-secondary)]";
+export const caption = "text-xs text-secondary";
 
 /** Emphasized text */
-export const emphasis = "font-medium text-[color:var(--text-primary)]";
+export const emphasis = "font-medium text-primary";
 
 // =============================================================================
 // Truncation Helpers
@@ -52,21 +48,15 @@ export const emphasis = "font-medium text-[color:var(--text-primary)]";
 /** Single line truncation */
 export const truncate = "truncate";
 
-/** Multi-line clamp (2 lines) */
-export const lineClamp2 = "line-clamp-2";
-
-/** Multi-line clamp (3 lines) */
-export const lineClamp3 = "line-clamp-3";
-
 // =============================================================================
-// Extended Utility Text - use CSS variables for text colour
+// Extended Utility Text
 // =============================================================================
 
 /** Monospace body text with full colours */
-export const monoBody = "font-mono text-sm text-[color:var(--text-primary)]";
+export const monoBody = "font-mono text-sm text-primary";
 
 /** Small label base - muted colour, no margin */
-export const labelSmall = "text-xs font-medium text-[color:var(--text-secondary)]";
+export const labelSmall = "text-xs font-medium text-secondary";
 
 /** Small label with muted colour and bottom margin (for form field labels) */
 export const labelSmallMuted = `${labelSmall} mb-1`;
@@ -75,29 +65,29 @@ export const labelSmallMuted = `${labelSmall} mb-1`;
 export const sectionHeader = `${labelSmall} uppercase tracking-wide`;
 
 /** Medium weight text - for list item titles, inline labels */
-export const textMedium = "text-sm font-medium text-[color:var(--text-primary)]";
+export const textMedium = "text-sm font-medium text-primary";
 
 /** Muted caption - inverted muted colours for secondary info */
-export const captionMuted = "text-xs text-[color:var(--text-secondary)] opacity-70";
+export const captionMuted = "text-xs text-secondary opacity-70";
 
 /** Section header text - for panel/section headings */
-export const sectionHeaderText = "text-sm font-medium text-[color:var(--text-secondary)]";
+export const sectionHeaderText = "text-sm font-medium text-secondary";
 
 // =============================================================================
 // Form labels and help text
 // =============================================================================
 
 /** Block label above a form control */
-export const labelDefault = "block text-sm font-medium text-[color:var(--text-primary)] mb-2";
+export const labelDefault = "block text-sm font-medium text-primary mb-2";
 
 /** Inline label beside a control in a compact form */
-export const labelSimple = "text-sm text-[color:var(--text-secondary)]";
+export const labelSimple = "text-sm text-secondary";
 
 /** Description under a control */
-export const helpText = "text-xs text-[color:var(--text-secondary)]";
+export const helpText = "text-xs text-secondary";
 
 /** Label above a field in the Discovery tool option panels */
-export const toolPanelLabel = "text-[color:var(--text-muted)]";
+export const toolPanelLabel = "text-muted";
 
 // =============================================================================
 // Empty State Text (for "Not connected", "No data", etc.)
@@ -108,7 +98,7 @@ export const toolPanelLabel = "text-[color:var(--text-muted)]";
 export const emptyStateContainer = "flex-1 flex flex-col items-center justify-center gap-4 p-8";
 
 /** Empty state text wrapper - applies muted colour, centering, and resets font */
-export const emptyStateText = "text-sm font-sans text-[color:var(--text-muted)] text-center";
+export const emptyStateText = "text-sm font-sans text-muted text-center";
 
 /** Empty state heading - medium weight */
 export const emptyStateHeading = "text-sm font-medium";

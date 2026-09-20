@@ -127,8 +127,8 @@ export default function DeviceBusConfig({
 
   // Compact wrapper for inline display
   const wrapperClass = compact
-    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-[color:var(--text-cyan)]"
-    : "border-t border-[color:var(--border-default)] px-4 py-3";
+    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-text-cyan"
+    : "border-t border-default px-4 py-3";
 
   // Loading state
   if (isLoading) {
@@ -146,7 +146,7 @@ export default function DeviceBusConfig({
   if (error) {
     return (
       <div className={wrapperClass}>
-        <div className="flex items-center gap-2 text-xs text-[color:var(--status-danger-text)]">
+        <div className="flex items-center gap-2 text-xs text-danger">
           <AlertCircle className={`${iconXs} flex-shrink-0`} />
           <span className="truncate">{error}</span>
         </div>
@@ -195,7 +195,7 @@ export default function DeviceBusConfig({
                     disabled={configLocked}
                     size="sm"
                   />
-                  <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}>
+                  <span className={configLocked ? "text-muted" : "text-secondary"}>
                     {BUS_NAMES[mapping.deviceBus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.deviceBus })}
                   </span>
                 </label>
@@ -205,13 +205,13 @@ export default function DeviceBusConfig({
                 {/* Output bus selector (only show if enabled and showOutputBus is true) */}
                 {mapping.enabled && showOutputBus && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[color:var(--text-muted)]">→</span>
+                    <span className="text-muted">→</span>
                     {outputBusSelect(mapping, !!isDuplicate)}
                     {isDuplicate && !configLocked && (
                       <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
                     )}
                     {configLocked && (
-                      <span className="text-[color:var(--text-amber)]" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
+                      <span className="text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
                         <Lock className={iconXs} />
                       </span>
                     )}
@@ -222,12 +222,12 @@ export default function DeviceBusConfig({
           })}
         </div>
         {enabledCount === 0 && !configLocked && (
-          <p className="text-[10px] text-[color:var(--text-amber)] mt-1">
+          <p className="text-2xs text-amber mt-1">
             {t("ioSourcePicker.busConfig.noBusesEnabled")}
           </p>
         )}
         {hasDuplicates && (
-          <p className="text-[10px] text-[color:var(--text-amber)] mt-1">
+          <p className="text-2xs text-amber mt-1">
             {t("ioSourcePicker.busConfig.duplicateWarning")}
           </p>
         )}
@@ -240,7 +240,7 @@ export default function DeviceBusConfig({
     <div className={wrapperClass}>
       <div className="flex items-center gap-2 mb-2">
         <Bus className={`${iconMd} text-cyan-500`} />
-        <span className="text-xs font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+        <span className="text-xs font-medium text-secondary uppercase tracking-wide">
           {profileName
             ? t("ioSourcePicker.busConfig.namedCanBuses", { name: profileName, enabled: enabledCount, total: deviceInfo.bus_count })
             : t("ioSourcePicker.busConfig.canBuses", { enabled: enabledCount, total: deviceInfo.bus_count })}
@@ -256,8 +256,8 @@ export default function DeviceBusConfig({
               key={mapping.deviceBus}
               className={`flex items-center gap-3 px-2 py-1.5 rounded transition-colors ${
                 mapping.enabled
-                  ? "bg-[var(--bg-surface)]"
-                  : "bg-[var(--hover-bg)]/50 opacity-60"
+                  ? "bg-surface"
+                  : "bg-hover/50 opacity-60"
               }`}
             >
               {/* Enable/disable checkbox */}
@@ -267,14 +267,14 @@ export default function DeviceBusConfig({
                   onChange={() => updateBus(mapping.deviceBus, { enabled: !mapping.enabled })}
                   disabled={configLocked}
                 />
-                <span className={configLocked ? "text-sm font-medium text-[color:var(--text-muted)]" : sectionHeaderText}>
+                <span className={configLocked ? "text-sm font-medium text-muted" : sectionHeaderText}>
                   {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
                 </span>
               </label>
 
               {protocol && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-[color:var(--text-muted)]">{t("ioSourcePicker.busConfig.protocol")}</span>
+                  <span className="text-muted">{t("ioSourcePicker.busConfig.protocol")}</span>
                   {protocol}
                 </div>
               )}
@@ -282,13 +282,13 @@ export default function DeviceBusConfig({
               {/* Output bus selector (only show if enabled and showOutputBus is true) */}
               {mapping.enabled && showOutputBus && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-[color:var(--text-muted)]">{t("ioSourcePicker.busConfig.output")}</span>
+                  <span className="text-muted">{t("ioSourcePicker.busConfig.output")}</span>
                   {outputBusSelect(mapping, !!isDuplicate)}
                   {isDuplicate && !configLocked && (
                     <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
                   )}
                   {configLocked && (
-                    <span className="text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+                    <span className="text-amber" title="Config locked - source in use by multiple sessions">
                       <Lock className={iconXs} />
                     </span>
                   )}
@@ -300,17 +300,17 @@ export default function DeviceBusConfig({
       </div>
 
       {configLocked && (
-        <p className="text-xs text-[color:var(--text-amber)] mt-2">
+        <p className="text-xs text-amber mt-2">
           {t("ioSourcePicker.busConfig.configLocked")}
         </p>
       )}
       {enabledCount === 0 && !configLocked && (
-        <p className="text-xs text-[color:var(--text-amber)] mt-2">
+        <p className="text-xs text-amber mt-2">
           {t("ioSourcePicker.busConfig.noBusesEnabled")}
         </p>
       )}
       {hasDuplicates && !configLocked && (
-        <p className="text-xs text-[color:var(--text-amber)] mt-2">
+        <p className="text-xs text-amber mt-2">
           {t("ioSourcePicker.busConfig.duplicateOutputs")}
         </p>
       )}

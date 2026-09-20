@@ -121,14 +121,14 @@
   .btn--purple {
     --btn-fill: #9333ea;
     --btn-tint-bg: var(--status-purple-bg);
-    --btn-tint-text: var(--status-purple-text);
+    --btn-tint-text: var(--text-purple);
     --btn-tint-border: var(--status-purple-border);
   }
 
   .btn--cyan {
     --btn-fill: #0891b2;
     --btn-tint-bg: var(--status-cyan-bg);
-    --btn-tint-text: var(--status-cyan-text);
+    --btn-tint-text: var(--text-cyan);
     --btn-tint-border: var(--status-cyan-border);
   }
 
@@ -163,7 +163,7 @@
 
   .btn--outline:hover:not(:disabled),
   .btn--ghost:hover:not(:disabled) {
-    background-color: var(--hover-bg);
+    background-color: var(--bg-hover);
     color: var(--text-primary);
   }
 
@@ -476,13 +476,13 @@
 
   .badge--purple {
     --badge-bg: var(--status-purple-bg);
-    --badge-text: var(--status-purple-text);
+    --badge-text: var(--text-purple);
     --badge-border: var(--status-purple-border);
   }
 
   .badge--cyan {
     --badge-bg: var(--status-cyan-bg);
-    --badge-text: var(--status-cyan-text);
+    --badge-text: var(--text-cyan);
     --badge-border: var(--status-cyan-border);
   }
 
@@ -846,7 +846,7 @@
   }
 
   .tabs__count--purple {
-    color: var(--status-purple-text);
+    color: var(--text-purple);
   }
 
   .tabs__dot {
@@ -854,7 +854,7 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background-color: var(--status-purple-text);
+    background-color: var(--text-purple);
   }
 
   .tabs__dot--danger {
@@ -933,7 +933,7 @@
   }
 
   .menu__item {
-    --menu-tint: var(--hover-bg);
+    --menu-tint: var(--bg-hover);
 
     display: flex;
     align-items: center;
@@ -1086,7 +1086,7 @@
   }
 
   .table--hover > tbody > tr:hover {
-    background-color: var(--hover-bg);
+    background-color: var(--bg-hover);
   }
 
   .table > tbody > tr[aria-current="true"] > td {

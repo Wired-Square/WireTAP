@@ -110,7 +110,7 @@ export default function ActionButtons({
   return (
     <DialogFooter className="block">
       {isLoading ? (
-        <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--text-muted)]">
+        <div className="flex items-center justify-center gap-2 text-sm text-muted">
           <Loader2 className={`${iconMd} animate-spin`} />
           <span>{t("ioSourcePicker.actions.loadingFrom", { profile: loadProfileId })}</span>
         </div>
@@ -137,7 +137,7 @@ export default function ActionButtons({
             )}
           </div>
         ) : (
-          <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
+          <div className="text-center text-sm text-muted py-1">
             {t("ioSourcePicker.actions.selectRealtime")}
           </div>
         )
@@ -298,7 +298,7 @@ export default function ActionButtons({
           <span>{t("ioSourcePicker.actions.continueWithoutSource")}</span>
         </PrimaryButton>
       ) : (
-        <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
+        <div className="text-center text-sm text-muted py-1">
           {mode === "connect" ? t("ioSourcePicker.actions.selectDatabase") : t("ioSourcePicker.actions.selectSource")}
         </div>
       )}

@@ -45,11 +45,11 @@ function SourceNode({ data, selected }: SourceNodeProps) {
     ? "border-cyan-400"
     : isActive
     ? "border-purple-500"
-    : "border-[color:var(--border-default)]";
+    : "border-default";
 
   const bgColour = isActive
     ? "bg-purple-500/10"
-    : "bg-[var(--bg-surface)]";
+    : "bg-surface";
 
   const isCapture = sourceType === "sqlite";
   const Icon = isRealtime ? Wifi : Database;
@@ -57,12 +57,12 @@ function SourceNode({ data, selected }: SourceNodeProps) {
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-[140px] shadow-lg`}
+      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-35 shadow-lg`}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
         <Icon className={`${iconSm} ${iconColour}`} />
-        <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
+        <span className="font-medium text-sm text-primary truncate">
           {captureName || profileName}
         </span>
         {isPersistent && (
@@ -71,14 +71,14 @@ function SourceNode({ data, selected }: SourceNodeProps) {
       </div>
 
       {/* Device type + buffer info */}
-      <div className="text-xs text-[color:var(--text-muted)] flex items-center gap-1">
+      <div className="text-xs text-muted flex items-center gap-1">
         <span>{sourceType}</span>
         {isActive && (
           <Radio className="w-3 h-3 text-purple-500 animate-pulse" />
         )}
       </div>
       {captureCount != null && (
-        <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
+        <div className="text-2xs text-muted mt-0.5">
           {captureCount.toLocaleString()} {captureKind ?? "frames"}
         </div>
       )}
@@ -93,7 +93,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
               title={enabled ? undefined : t("node.source.unwiredBus", { bus })}
             >
               <span
-                className={`text-[10px] font-mono ${
+                className={`text-2xs font-mono ${
                   enabled ? textDataPurple : textDataDisabled
                 }`}
               >

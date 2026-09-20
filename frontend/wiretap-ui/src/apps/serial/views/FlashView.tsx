@@ -536,7 +536,7 @@ export default function FlashView({
               </ActionButton>
             ) : eraseConfirm ? (
               <>
-                <span className="text-xs text-[color:var(--text-danger)]">
+                <span className="text-xs text-danger">
                   Confirm wipe?
                 </span>
                 <ActionButton
@@ -583,7 +583,7 @@ export default function FlashView({
             )}
           </div>
           {flash.bytesTotal > 0 && (
-            <div className="h-2 rounded bg-[var(--bg-primary)] overflow-hidden">
+            <div className="h-2 rounded bg-primary overflow-hidden">
               <div
                 className="h-full bg-sky-400 transition-all"
                 style={{ width: `${progressPct}%` }}
@@ -591,7 +591,7 @@ export default function FlashView({
             </div>
           )}
           {flash.error && (
-            <div className="text-xs text-[color:var(--text-danger)] mt-1">
+            <div className="text-xs text-danger mt-1">
               {flash.error}
             </div>
           )}

@@ -10,9 +10,9 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import {
-  bgDataToolbar,
-  borderDataView,
-  textDataSecondary,
+  bgSurface,
+  borderDefault,
+  textSecondary,
   gapDefault,
 } from "../styles";
 import { pageSizeFromOptionValue, pageSizeToOptionValue, type PageSize } from "../utils/pageSize";
@@ -93,7 +93,7 @@ export default function DataViewPaginationToolbar({
     : pageSizeOptions;
 
   return (
-    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar} flex items-center ${gapDefault}`}>
+    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDefault} ${bgSurface} flex items-center ${gapDefault}`}>
       {/* LEFT ZONE: content slots */}
       {leftContent}
       {centerContent}
@@ -105,7 +105,7 @@ export default function DataViewPaginationToolbar({
 
       {showPagination && (
         <div className="flex items-center gap-0.5">
-          <span className={`text-xs ${textDataSecondary} px-1 tabular-nums`}>
+          <span className={`text-xs ${textSecondary} px-1 tabular-nums`}>
             {currentPage + 1} / {totalPages}
           </span>
           <IconButton

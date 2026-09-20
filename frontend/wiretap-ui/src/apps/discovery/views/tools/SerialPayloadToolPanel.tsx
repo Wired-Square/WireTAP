@@ -16,15 +16,15 @@ export default function SerialPayloadToolPanel({ framesCount }: Props) {
         <p className="font-medium">Analyze Frame Structure</p>
         <p className="mt-1">Analyze {framesCount.toLocaleString()} frames to identify payload structure.</p>
       </Alert>
-      <p className="text-[color:var(--text-muted)]">
+      <p className="text-muted">
         Will identify:
       </p>
-      <ul className="text-[color:var(--text-muted)] list-disc list-inside space-y-0.5">
+      <ul className="text-muted list-disc list-inside space-y-0.5">
         <li>Candidate ID byte positions (frame type identifiers)</li>
         <li>Candidate source address positions</li>
         <li>Candidate checksum positions and algorithms</li>
       </ul>
-      <p className="text-[color:var(--text-muted)] mt-2 italic">
+      <p className="text-muted mt-2 italic">
         Works best with structured protocol frames.
       </p>
     </div>

@@ -10,9 +10,9 @@ import { useActiveSession } from "../../../stores/sessionStore";
 import { ioTransmitSerial } from "../../../api/transmit";
 import { applyFraming } from "../utils/slipFraming";
 import {
-  bgDataToolbar,
-  borderDataView,
-  textDataSecondary,
+  bgSurface,
+  borderDefault,
+  textSecondary,
   textDataTertiary,
 } from "../../../styles/colourTokens";
 import { flexRowGap2 } from "../../../styles/spacing";
@@ -160,10 +160,10 @@ export default function SerialTransmitView() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Hex Input */}
-      <div className={`p-4 border-b ${borderDataView}`}>
+      <div className={`p-4 border-b ${borderDefault}`}>
         <div className="space-y-4">
           <div>
-            <label className={`${textDataSecondary} text-xs mb-1 block`}>
+            <label className={`${textSecondary} text-xs mb-1 block`}>
               {t("serialView.hexBytes")}
             </label>
             <Textarea
@@ -179,7 +179,7 @@ export default function SerialTransmitView() {
 
           {/* Framing Mode */}
           <div className="space-y-2">
-            <label className={`${textDataSecondary} text-xs`}>{t("serialView.framingMode")}</label>
+            <label className={`${textSecondary} text-xs`}>{t("serialView.framingMode")}</label>
             <div className="flex items-center gap-2 flex-wrap">
               <Button
                 onClick={() => handleFramingModeChange("raw")}
@@ -214,7 +214,7 @@ export default function SerialTransmitView() {
           {/* Delimiter input (when delimiter mode selected) */}
           {serialEditor.framingMode === "delimiter" && (
             <div>
-              <label className={`${textDataSecondary} text-xs mb-1 block`}>
+              <label className={`${textSecondary} text-xs mb-1 block`}>
                 {t("serialView.delimiterLabel")}
               </label>
               <Input
@@ -225,7 +225,7 @@ export default function SerialTransmitView() {
                 mono
                 className="w-32 uppercase"
               />
-              <p className={`${textDataSecondary} text-xs mt-1`}>
+              <p className={`${textSecondary} text-xs mt-1`}>
                 {t("serialView.delimiterDefault")}
               </p>
             </div>
@@ -235,21 +235,21 @@ export default function SerialTransmitView() {
 
       {/* Preview */}
       {preview && (
-        <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
+        <div className={`px-4 py-3 ${bgSurface} border-b ${borderDefault}`}>
           <div className="space-y-1">
             <div className="flex items-center gap-4">
-              <span className={`${textDataSecondary} text-xs`}>{t("serialView.preview")}</span>
+              <span className={`${textSecondary} text-xs`}>{t("serialView.preview")}</span>
               <span className="text-xs text-blue-400">
                 {t("serialView.bytesCount", { count: preview.length })}
               </span>
             </div>
             <div className="flex items-start gap-4">
-              <code className={`font-mono text-sm flex-1 break-all ${textDataSecondary}`}>
+              <code className={`font-mono text-sm flex-1 break-all ${textSecondary}`}>
                 {preview.hex}
               </code>
             </div>
             <div className={flexRowGap2}>
-              <span className={`${textDataSecondary} text-xs`}>{t("serialView.ascii")}</span>
+              <span className={`${textSecondary} text-xs`}>{t("serialView.ascii")}</span>
               <code className={`font-mono text-xs ${textDataTertiary}`}>
                 {preview.ascii}
               </code>
@@ -259,7 +259,7 @@ export default function SerialTransmitView() {
       )}
 
       {/* Actions */}
-      <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 ${bgSurface}`}>
         <Button
           onClick={handleSend}
           disabled={!preview || isSending}

@@ -2,9 +2,10 @@
 // Generates src/styles/utilities.css: the app's own utility sheet, keeping Tailwind's
 // class names so no component changes. Every string literal under src/ is scanned for
 // class names, each is compiled through the family table below, and the rules are
-// sorted the way Tailwind 4 sorts them. Values are resolved — no theme variables —
-// except the ring/shadow, translate and gradient variables, which compose across
-// classes on one element (see the Tailwind Removal Feasibility note, Phase 1).
+// sorted the way Tailwind 4 sorts them. Values are resolved — none of Tailwind's theme
+// variables — except the ring/shadow, translate and gradient variables, which compose
+// across classes on one element (see the Tailwind Removal Feasibility note, Phase 1), and
+// the app's own theme colours, which are utilities by name (THEME below).
 //
 //   npm run gen:css        rewrite the sheet
 //
@@ -58,10 +59,32 @@ const PALETTE = {
 };
 const NAMED_COLOURS = { white: "#fff", black: "#000", transparent: "transparent", current: "currentcolor", inherit: "inherit" };
 
+// Theme colours: every variable WireTAP.css declares, by name. The class value is the
+// variable minus `--` and `status-`, and minus the family's own role where the name carries
+// one, so `--text-muted` is `text-muted` and `bg-text-muted`, `--status-info-text` is
+// `text-info` and `bg-info-text`, `--bg-surface` is `bg-surface` and `border-bg-surface`.
+const THEME_VARIABLES = [...new Set(
+  [...fs.readFileSync(path.join(SRC_DIR, "WireTAP.css"), "utf8").matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1]),
+)].filter((v) => !/^--(font|radius)-/.test(v));
+
+function themeColours(role) {
+  const table = {};
+  for (const variable of THEME_VARIABLES) {
+    const parts = variable.slice(2).replace(/^status-/, "").split("-");
+    const i = parts.indexOf(role);
+    if (i >= 0) parts.splice(i, 1);
+    const name = parts.join("-");
+    if (table[name]) throw new Error(`gen-utilities: ${variable} and ${table[name]} would both be ${role}-${name}`);
+    table[name] = variable;
+  }
+  return table;
+}
+const THEME = { text: themeColours("text"), bg: themeColours("bg"), border: themeColours("border") };
+
 const SPACING_REM = 0.25;
 const CONTAINERS = { "3xs": "16rem", "2xs": "18rem", xs: "20rem", sm: "24rem", md: "28rem", lg: "32rem", xl: "36rem", "2xl": "42rem", "3xl": "48rem", "4xl": "56rem", "5xl": "64rem", "6xl": "72rem", "7xl": "80rem" };
 const TEXT_SIZES = {
-  xs: ["0.75rem", "calc(1 / 0.75)"], sm: ["0.875rem", "calc(1.25 / 0.875)"], base: ["1rem", "calc(1.5 / 1)"],
+  "2xs": ["0.625rem", "calc(0.875 / 0.625)"], xs: ["0.75rem", "calc(1 / 0.75)"], sm: ["0.875rem", "calc(1.25 / 0.875)"], base: ["1rem", "calc(1.5 / 1)"],
   lg: ["1.125rem", "calc(1.75 / 1.125)"], xl: ["1.25rem", "calc(1.75 / 1.25)"], "2xl": ["1.5rem", "calc(2 / 1.5)"],
   "3xl": ["1.875rem", "calc(2.25 / 1.875)"], "4xl": ["2.25rem", "calc(2.5 / 2.25)"], "5xl": ["3rem", "1"],
   "6xl": ["3.75rem", "1"], "7xl": ["4.5rem", "1"], "8xl": ["6rem", "1"], "9xl": ["8rem", "1"],
@@ -164,8 +187,8 @@ function spacingValue(v, { negative = false, fractions = false, extra = {} } = {
   return null;
 }
 
-/** Tailwind colour syntax: palette-shade, named, arbitrary, each with an optional /alpha. */
-function colour(v) {
+/** Palette-shade, named, a theme colour of the family's role, or arbitrary, each with an optional /alpha. */
+function colour(v, role = null) {
   const slash = v.lastIndexOf("/");
   let base = v;
   let alpha = null;
@@ -176,10 +199,11 @@ function colour(v) {
   }
   let resolved;
   if (base in NAMED_COLOURS) resolved = NAMED_COLOURS[base];
+  else if (role && base in THEME[role]) resolved = `var(${THEME[role][base]})`;
   else if (isArbitrary(base)) {
     const { hint, value } = arbitrary(base);
     if (hint && hint !== "color") return null;
-    if (!hint && !/^(var\(|#|rgb|hsl|okl|color|current)/.test(value)) return null;
+    if (!hint && !/^(#|rgb|hsl|okl|color|current)/.test(value)) return null;
     resolved = value;
   } else {
     const m = /^([a-z]+)-(\d+)$/.exec(base);
@@ -435,7 +459,7 @@ function border(side, v) {
   const prefix = BORDER_SIDES[side];
   const width = v === "" ? "1px" : isInteger(v) ? `${v}px` : isArbitrary(v) && arbitrary(v).hint !== "color" && isLengthLike(arbitrary(v).value) ? arbitrary(v).value : null;
   if (width !== null) return decl(`${prefix}-style`, "solid", `${prefix}-width`, width);
-  const c = colour(v);
+  const c = colour(v, "border");
   return c ? decl(`${prefix}-color`, c) : null;
 }
 
@@ -496,7 +520,7 @@ function divide(v) {
       tw: [`--tw-sort:divide-${axis}-width`, `--tw-divide-${axis}-reverse`, `border-${end}-style`, `border-${start}-style`, `border-${start}-width`, `border-${end}-width`],
     });
   }
-  const c = colour(v);
+  const c = colour(v, "border");
   return c ? rule(decl("border-color", c), { children: true, tw: ["--tw-sort:divide-color", "border-color"] }) : null;
 }
 
@@ -506,7 +530,7 @@ function text(v) {
     const { hint, value } = arbitrary(v);
     if (hint === "length" || (hint === null && isLengthLike(value))) return decl("font-size", value);
   }
-  const c = colour(v);
+  const c = colour(v, "text");
   return c ? decl("color", c) : null;
 }
 
@@ -524,12 +548,12 @@ function background(v) {
       tw: ["--tw-gradient-position", "background-image"],
     });
   }
-  const c = colour(v);
+  const c = colour(v, "bg");
   return c ? decl("background-color", c) : null;
 }
 
 function gradientStop(stop, v) {
-  const c = colour(v);
+  const c = colour(v, "bg");
   return c ? rule(decl(`--tw-gradient-${stop}`, c), { tw: ["--tw-gradient-stops", `--tw-gradient-${stop}`] }) : null;
 }
 
@@ -563,6 +587,8 @@ const plainSpacing = (v) => spacingValue(v);
 const arbitraryOnly = (v) => (isArbitrary(v) ? arbitrary(v).value : null);
 const span = (v) => (isInteger(v) ? `span ${v} / span ${v}` : v === "full" ? "1 / -1" : null);
 const filterFamily = (variable, fn) => (v) => (isNumber(v) ? filterRule(variable, `${fn}(${v}%)`) : null);
+const textColour = (v) => colour(v, "text");
+const borderColour = (v) => colour(v, "border");
 
 const FUNCTIONAL = {
   inset: one("inset", insetValue),
@@ -610,8 +636,8 @@ const FUNCTIONAL = {
   bg: background,
   from: (v) => gradientStop("from", v),
   to: (v) => gradientStop("to", v),
-  fill: one("fill", colour),
-  stroke: one("stroke", colour),
+  fill: one("fill", textColour),
+  stroke: one("stroke", textColour),
   p: one("padding", plainSpacing),
   px: one("padding-inline", plainSpacing),
   py: one("padding-block", plainSpacing),
@@ -631,17 +657,17 @@ const FUNCTIONAL = {
     const t = v in TRACKING ? TRACKING[v] : arbitraryOnly(v);
     return t === null ? null : viaVariable("--tw-tracking", "letter-spacing", n ? `calc(${t} * -1)` : t);
   },
-  decoration: one("text-decoration-color", colour),
+  decoration: one("text-decoration-color", textColour),
   placeholder: (v) => {
-    const c = colour(v);
+    const c = colour(v, "text");
     return c === null ? null : rule(decl("color", c), { pseudo: "::placeholder", tw: ["--tw-sort:placeholder-color", "color"] });
   },
-  accent: one("accent-color", colour),
+  accent: one("accent-color", textColour),
   opacity: one("opacity", (v) => (isNumber(v) ? formatNumber(parseFloat(v) / 100) : arbitraryOnly(v))),
   shadow,
-  ring: (v) => ringWidth(v) ?? one("--tw-ring-color", colour)(v),
+  ring: (v) => ringWidth(v) ?? one("--tw-ring-color", borderColour)(v),
   "ring-offset": (v) => (isInteger(v) ? decl("--tw-ring-offset-width", `${v}px`, "--tw-ring-offset-shadow", "var(--tw-ring-inset,) 0 0 0 var(--tw-ring-offset-width) #fff") : null),
-  outline: (v) => (isInteger(v) ? decl("outline-style", "solid", "outline-width", `${v}px`) : one("outline-color", colour)(v)),
+  outline: (v) => (isInteger(v) ? decl("outline-style", "solid", "outline-width", `${v}px`) : one("outline-color", borderColour)(v)),
   blur: (v) => {
     const radius = v in BLURS ? BLURS[v] : arbitraryOnly(v);
     return radius === null ? null : filterRule("--tw-blur", `blur(${radius})`);
@@ -780,6 +806,7 @@ export function compile(token) {
     const root = FUNCTIONAL_ROOTS.find((r) => base === r || base.startsWith(r + "-"));
     if (!root) return null;
     const value = base === root ? "" : base.slice(root.length + 1);
+    if (value.includes("var(")) throw new CandidateError(`theme colours are named, not spelled: ${token}`);
     compiled = FUNCTIONAL[root](value, negative);
     if (compiled == null) {
       if (value === "") return null;

@@ -18,10 +18,10 @@ import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
 import {
-  bgDataToolbar,
-  borderDataView,
+  bgSurface,
+  borderDefault,
   dataViewContainer,
-  textDataSecondary,
+  textSecondary,
 } from "../../styles/colourTokens";
 import { Tab, TabCount, TabDot, Tabs } from "../../components/Tabs";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../styles/typography";
@@ -331,7 +331,7 @@ function TransmitInner() {
 
       {!isLoading && transmitProfiles.length === 0 && (
         <div className={emptyStateContainer}>
-          <Send size={48} className={textDataSecondary} />
+          <Send size={48} className={textSecondary} />
           <div className={emptyStateText}>
             <p className={emptyStateHeading}>{t("main.noProfilesHeading")}</p>
             <p className={emptyStateDescription}>{t("main.noProfilesDescription")}</p>
@@ -345,7 +345,7 @@ function TransmitInner() {
         <>
           {/* Tab Bar */}
           <div
-            className={`flex-shrink-0 flex items-center border-b ${borderDataView} ${bgDataToolbar}`}
+            className={`flex-shrink-0 flex items-center border-b ${borderDefault} ${bgSurface}`}
           >
             {/* Protocol badge with status light */}
             <div className="ml-1">

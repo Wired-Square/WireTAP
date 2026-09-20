@@ -21,7 +21,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
   const setAutoRefresh = useSessionManagerStore((s) => s.setAutoRefresh);
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-default bg-surface">
       {/* Left: Icon, title, count, and separator */}
       <div className="flex items-center gap-3">
         <AppIcon app="session-manager" className={iconLg} />
@@ -41,7 +41,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
           {autoRefresh ? (
             <ToggleRight className={`${iconMd} text-green-400`} />
           ) : (
-            <ToggleLeft className={`${iconMd} text-[color:var(--text-muted)]`} />
+            <ToggleLeft className={`${iconMd} text-muted`} />
           )}
           {t("topBar.auto")}
         </Button>
@@ -53,7 +53,7 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
           title={t("topBar.refresh")}
         >
           <RefreshCw
-            className={`${iconMd} text-[color:var(--text-secondary)] ${
+            className={`${iconMd} text-secondary ${
               isRefreshing ? "animate-spin" : ""
             }`}
           />

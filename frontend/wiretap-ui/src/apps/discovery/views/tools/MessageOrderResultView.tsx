@@ -80,16 +80,16 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
       {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />}
 
       {/* Stats Summary */}
-      <div className={`px-4 py-2 ${borderDivider} bg-[var(--bg-surface)]`}>
+      <div className={`px-4 py-2 ${borderDivider} bg-surface`}>
         <div className="flex flex-wrap gap-4 text-xs">
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.totalFramesAnalyzed.toLocaleString()}</span> {t("messageOrder.framesUnit")}
+          <span className="text-muted">
+            <span className="font-medium text-primary">{results.totalFramesAnalyzed.toLocaleString()}</span> {t("messageOrder.framesUnit")}
           </span>
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> {t("messageOrder.uniqueIdsUnit")}
+          <span className="text-muted">
+            <span className="font-medium text-primary">{results.uniqueFrameIds}</span> {t("messageOrder.uniqueIdsUnit")}
           </span>
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{formatMs(results.timeSpanMs)}</span> {t("messageOrder.spanUnit")}
+          <span className="text-muted">
+            <span className="font-medium text-primary">{formatMs(results.timeSpanMs)}</span> {t("messageOrder.spanUnit")}
           </span>
         </div>
       </div>
@@ -152,7 +152,7 @@ function Header({ onExport, hasResults, onClose }: HeaderProps) {
   const { t } = useTranslation("discovery");
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
-      <ListOrdered className={`${iconLg} text-[color:var(--text-purple)]`} />
+      <ListOrdered className={`${iconLg} text-purple`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
           {t("messageOrder.title")}
@@ -201,7 +201,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
       <section>
         <div className="flex items-center gap-2 mb-2">
           <Play className={`${iconMd} text-slate-400`} />
-          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">{t("messageOrder.patterns")}</h3>
+          <h3 className="text-xs font-medium text-secondary">{t("messageOrder.patterns")}</h3>
         </div>
         <p className={captionMuted}>
           {t("messageOrder.noPatterns")}
@@ -214,7 +214,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Play className={`${iconMd} text-purple-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.patternsCount", { count: patterns.length })}
         </h3>
       </div>
@@ -245,18 +245,18 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
             {t("messageOrder.patternRank", { rank })}
           </span>
           <span className={captionMuted}>
-            {t("messageOrder.patternStartsWith")} <span className="font-mono text-[color:var(--text-purple)]">{formatFrameId(pattern.startId)}</span>
+            {t("messageOrder.patternStartsWith")} <span className="font-mono text-purple">{formatFrameId(pattern.startId)}</span>
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-[color:var(--text-muted)]">
+          <span className="text-muted">
             {t("messageOrder.occurrences", { count: pattern.occurrences })}
           </span>
           <span
             className={`font-medium ${
               isHighConfidence
-                ? "text-[color:var(--text-green)]"
-                : "text-[color:var(--text-amber)]"
+                ? "text-green"
+                : "text-amber"
             }`}
           >
             {t("messageOrder.consistent", { percent: confidencePercent })}
@@ -299,7 +299,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Clock className={`${iconMd} text-blue-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.candidates")}
         </h3>
         <span className={captionMuted}>
@@ -373,7 +373,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Shuffle className={`${iconMd} text-orange-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.multiplexedTitle", { count: multiplexed.length })}
         </h3>
         <span className={captionMuted}>
@@ -456,7 +456,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Zap className={`${iconMd} text-cyan-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.burstTitle", { count: bursts.length })}
         </h3>
         <span className={captionMuted}>
@@ -535,7 +535,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <GitBranch className={`${iconMd} text-rose-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.multiBusTitle", { count: multiBus.length })}
         </h3>
         <span className={captionMuted}>
@@ -604,7 +604,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Layers className={`${iconMd} text-emerald-500`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <h3 className="text-xs font-medium text-secondary">
           {t("messageOrder.intervalGroups")}
         </h3>
         <span className={captionMuted}>

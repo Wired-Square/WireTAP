@@ -133,7 +133,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
       <DialogBody className="space-y-4">
         {/* Title */}
         <div>
-          <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+          <label className="block text-xs font-medium text-secondary mb-1">
             {t("panelConfig.fields.title")}
           </label>
           <Input
@@ -150,7 +150,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {(panel.type === "gauge" || panel.type === "rotary" || panel.type === "level-bar") && (
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("panelConfig.fields.minValue")}
               </label>
               <Input
@@ -163,7 +163,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("panelConfig.fields.maxValue")}
               </label>
               <Input
@@ -181,7 +181,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {/* Primary signal selector (gauge with multiple signals) */}
         {panel.type === "gauge" && panel.signals.length > 1 && (
           <div>
-            <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+            <label className="block text-xs font-medium text-secondary mb-1">
               {t("panelConfig.fields.primaryDisplay")}
             </label>
             <Select
@@ -202,7 +202,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {(panel.type === "flow" || panel.type === "heatmap" || panel.type === "bitfield") && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("panelConfig.fields.frameId")}
               </label>
               <Select
@@ -218,14 +218,14 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                 ))}
               </Select>
               {sortedFrameIds.length === 0 && (
-                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                <p className="text-2xs text-muted mt-1">
                   {t("panelConfig.fields.noFrames")}
                 </p>
               )}
             </div>
             {(panel.type === "flow" || panel.type === "bitfield") && (
               <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                <label className="block text-xs font-medium text-secondary mb-1">
                   {t("panelConfig.fields.byteCount")}
                 </label>
                 <Input
@@ -246,7 +246,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {/* Histogram bin count */}
         {panel.type === "histogram" && (
           <div>
-            <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+            <label className="block text-xs font-medium text-secondary mb-1">
               {t("panelConfig.fields.binCount")}
             </label>
             <Input
@@ -267,7 +267,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           <div className="space-y-2">
             {panel.type === "custom-svg" && (
               <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                <label className="block text-xs font-medium text-secondary mb-1">
                   {t("panelConfig.fields.svgMode")}
                 </label>
                 <Select
@@ -282,7 +282,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             )}
             {(panel.type === "raw-canvas" || svgMode === "script") && (
               <div>
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                <label className="block text-xs font-medium text-secondary mb-1">
                   {panel.type === "raw-canvas"
                     ? t("panelConfig.fields.canvasCode")
                     : t("panelConfig.fields.svgCode")}
@@ -297,7 +297,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                     ? "(ctx, { signals, width, height, time, dt }) => {\n  ctx.fillStyle = '#3b82f6';\n  ctx.fillRect(0, 0, signals[0] ?? 0, height);\n}"
                     : "(signals, { width, height, time, dt }) =>\n  `<circle cx=50 cy=50 r=${signals[0] ?? 0} fill=\"#3b82f6\" />`"}
                 />
-                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                <p className="text-2xs text-muted mt-1">
                   {t("panelConfig.fields.customCodeHint")}
                 </p>
               </div>
@@ -308,7 +308,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {/* Signals — drag reorder, colour, display name, replace */}
         {panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && panel.signals.length > 0 && (
           <div>
-            <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">
+            <label className="block text-xs font-medium text-secondary mb-2">
               {t("panelConfig.fields.signals")}
             </label>
             <div className="space-y-1">
@@ -323,7 +323,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   onDragLeave={() => setDragOverIndex(null)}
                   onDrop={(e) => handleDrop(e, index)}
                   className={`flex items-center gap-2 rounded px-1 py-1 transition-colors ${
-                    dragOverIndex === index ? "bg-[var(--hover-bg)]" : ""
+                    dragOverIndex === index ? "bg-hover" : ""
                   } ${dragIndex === index ? "opacity-50" : ""}`}
                 >
                   {/* Drag handle */}
@@ -343,7 +343,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                     className="cursor-grab active:cursor-grabbing shrink-0"
                     title={t("panelConfig.actions.dragReorder")}
                   >
-                    <GripVertical className={`${iconSm} text-[color:var(--text-muted)]`} />
+                    <GripVertical className={`${iconSm} text-muted`} />
                   </div>
 
                   {panel.type !== "list" && (
@@ -353,7 +353,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       onChange={(e) =>
                         updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
                       }
-                      className="h-7 w-10 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded shrink-0"
+                      className="h-7 w-10 cursor-pointer bg-transparent border border-default rounded shrink-0"
                     />
                   )}
                   {/* Y-axis toggle (line-chart with 2+ signals) */}

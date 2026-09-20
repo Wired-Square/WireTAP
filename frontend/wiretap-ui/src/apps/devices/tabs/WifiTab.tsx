@@ -231,7 +231,7 @@ export default function WifiTab() {
                 ) : isActive ? (
                   <Loader2 className={`${iconMd} text-sky-500 animate-spin shrink-0`} />
                 ) : (
-                  <div className="w-4 h-4 rounded-full border border-[color:var(--border-default)] shrink-0" />
+                  <div className="w-4 h-4 rounded-full border border-default shrink-0" />
                 )}
                 <span className={step.done ? "" : isActive ? "font-medium" : textSecondary}>
                   {step.label}
@@ -404,7 +404,7 @@ export default function WifiTab() {
         <DangerButton
           onClick={handleDeleteAllCredentials}
           disabled={deletingCredentials || !transports.bleProv}
-          className="min-w-[20rem]"
+          className="min-w-80"
         >
           <span className="flex items-center justify-center gap-1">
             <Trash2 className={iconMd} />

@@ -167,7 +167,7 @@ export default function ExportCatalogDialog({
       isOpen={open}
       onClose={onCancel}
       title="Export Catalog"
-      icon={<Download className="text-[color:var(--text-orange)]" />}
+      icon={<Download className="text-orange" />}
     >
       <DialogBody className="space-y-4">
         <div>
@@ -195,14 +195,14 @@ export default function ExportCatalogDialog({
           </Select>
         </div>
 
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+        <div className="p-4 bg-surface rounded-lg">
           <div className="flex items-start gap-3">
-            <FormatIcon className={`${iconLg} text-[color:var(--text-muted)] mt-0.5`} />
+            <FormatIcon className={`${iconLg} text-muted mt-0.5`} />
             <div>
-              <div className="font-medium text-[color:var(--text-primary)]">
+              <div className="font-medium text-primary">
                 {formatInfo.name}
               </div>
-              <div className="text-sm text-[color:var(--text-muted)] mt-1">
+              <div className="text-sm text-muted mt-1">
                 {formatInfo.description}
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function ExportCatalogDialog({
                   className="mt-0.5"
                 />
                 <div>
-                  <div className="font-medium text-[color:var(--text-primary)] text-sm">
+                  <div className="font-medium text-primary text-sm">
                     Extended (SG_MUL_VAL_)
                   </div>
                   <div className={`${caption} mt-0.5`}>
@@ -241,7 +241,7 @@ export default function ExportCatalogDialog({
                   className="mt-0.5"
                 />
                 <div>
-                  <div className="font-medium text-[color:var(--text-primary)] text-sm">
+                  <div className="font-medium text-primary text-sm">
                     Flattened (Legacy)
                   </div>
                   <div className={`${caption} mt-0.5`}>
@@ -254,7 +254,7 @@ export default function ExportCatalogDialog({
         )}
 
         {error && (
-          <div className="p-3 bg-[var(--bg-red)] border border-[color:var(--border-red)] rounded-lg text-sm text-[color:var(--text-red)]">
+          <div className="p-3 bg-danger border border-danger rounded-lg text-sm text-red">
             {error}
           </div>
         )}

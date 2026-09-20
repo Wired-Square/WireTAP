@@ -28,7 +28,7 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
       <DialogBody className={`${spaceYDefault} ${bodyDefault}`}>
         <div className="flex flex-col items-center text-center">
           <img src="/logo.svg" alt="WireTAP" className="w-14 h-14 rounded-2xl mb-2 bg-white p-1.5" />
-          <p className="text-2xl font-bold font-ubuntu text-[color:var(--text-primary)]">WireTAP</p>
+          <p className="text-2xl font-bold font-ubuntu text-primary">WireTAP</p>
           <p className={`${bodySmall} font-ubuntu mt-1`}>{t("about.by")}</p>
           <p className={`${bodySmall} mt-1`}>{t("about.version", { version })}</p>
           <p className="text-xs italic opacity-50 mt-1">{t("about.tagline")}</p>

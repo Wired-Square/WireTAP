@@ -126,13 +126,13 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
   const mainContent = (
     <>
       {/* Summary Section */}
-      <div className={`px-4 py-3 ${borderDivider} bg-[var(--bg-surface)]`}>
+      <div className={`px-4 py-3 ${borderDivider} bg-surface`}>
         <div className="flex flex-wrap gap-4 text-xs mb-2">
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.frameCount.toLocaleString()}</span> {t("changes.framesUnit")}
+          <span className="text-muted">
+            <span className="font-medium text-primary">{results.frameCount.toLocaleString()}</span> {t("changes.framesUnit")}
           </span>
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> {t("changes.uniqueAnalyzed")}
+          <span className="text-muted">
+            <span className="font-medium text-primary">{results.uniqueFrameIds}</span> {t("changes.uniqueAnalyzed")}
           </span>
         </div>
 
@@ -227,7 +227,7 @@ function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
   const { t } = useTranslation("discovery");
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
-      <GitCompare className={`${iconLg} text-[color:var(--text-purple)]`} />
+      <GitCompare className={`${iconLg} text-purple`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
           {t("changes.title")}
@@ -279,35 +279,35 @@ function MirrorGroupCard({ group }: MirrorGroupCardProps) {
           <div className="flex items-center gap-1">
             {group.frameIds.map((id, idx) => (
               <span key={id}>
-                <span className="font-mono font-semibold text-sm text-[color:var(--status-purple-text)]">
+                <span className="font-mono font-semibold text-sm text-purple">
                   {formatFrameId(id)}
                 </span>
                 {idx < group.frameIds.length - 1 && (
-                  <span className="text-[color:var(--status-purple-text)] mx-1">↔</span>
+                  <span className="text-purple mx-1">↔</span>
                 )}
               </span>
             ))}
           </div>
-          <span className="text-xs text-[color:var(--status-purple-text)]">
+          <span className="text-xs text-purple">
             {t("changes.matchPercent", { percent: group.matchPercentage })}
           </span>
         </div>
-        <span className="text-[10px] text-[color:var(--status-purple-text)]">
+        <span className="text-2xs text-purple">
           {t("changes.matchingPairs", { count: group.sampleCount })}
         </span>
       </div>
 
       {/* Sample payload */}
       {group.samplePayload && (
-        <div className="mt-2 text-[10px] text-[color:var(--status-purple-text)]">
-          <span className="text-[color:var(--status-purple-text)]">{t("changes.samplePrefix")} </span>
+        <div className="mt-2 text-2xs text-purple">
+          <span className="text-purple">{t("changes.samplePrefix")} </span>
           <span className="font-mono">
             {group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
           </span>
         </div>
       )}
 
-      <div className="mt-1.5 text-[10px] text-[color:var(--status-purple-text)]">
+      <div className="mt-1.5 text-2xs text-purple">
         {t("changes.mirrorDescription")}
       </div>
     </Card>
@@ -331,7 +331,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono font-semibold text-sm text-[color:var(--text-primary)]">
+          <span className="font-mono font-semibold text-sm text-primary">
             {formatFrameId(result.frameId)}
           </span>
           <span className={captionMuted}>
@@ -363,33 +363,33 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-2xs">
           {counts.staticCount > 0 && (
-            <span className="flex items-center gap-1 text-[color:var(--text-muted)]">
+            <span className="flex items-center gap-1 text-muted">
               <Minus className={iconXs} />
               {t("changes.static", { count: counts.staticCount })}
             </span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
-            <span className="flex items-center gap-1 text-[color:var(--text-green)]">
+            <span className="flex items-center gap-1 text-green">
               <RefreshCw className={iconXs} />
               {t("changes.counter", { count: counts.counterCount + counts.counter16Count + counts.counter32Count })}
             </span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
-            <span className="flex items-center gap-1 text-[color:var(--text-purple)]">
+            <span className="flex items-center gap-1 text-purple">
               <Thermometer className={iconXs} />
               {t("changes.sensor", { count: counts.sensorCount + counts.sensor16Count })}
             </span>
           )}
           {counts.valueCount > 0 && (
-            <span className="flex items-center gap-1 text-[color:var(--status-info-text)]">
+            <span className="flex items-center gap-1 text-info">
               <Activity className={iconXs} />
               {t("changes.value", { count: counts.valueCount })}
             </span>
           )}
           {counts.textCount > 0 && (
-            <span className="flex items-center gap-1 text-[color:var(--text-amber)]">
+            <span className="flex items-center gap-1 text-amber">
               <Type className={iconXs} />
               {t("changes.text", { count: counts.textCount })}
             </span>
@@ -399,7 +399,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
 
       {/* Mux info line */}
       {result.isMuxFrame && result.muxInfo && (
-        <div className="mb-3 text-[10px] text-[color:var(--text-orange)]">
+        <div className="mb-3 text-2xs text-orange">
           <span className="font-medium">{t("changes.muxLabelPrefix")}</span>{" "}
           {result.muxInfo.isTwoByte ? "byte[0:1]" : `byte[${result.muxInfo.selectorByte}]`}
           , {t("changes.muxCases")} {result.muxInfo.selectorValues.map(v => formatMuxValue(v, result.muxInfo!.isTwoByte)).join(", ")}
@@ -423,7 +423,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
         <>
           {/* Byte visualization (non-mux frames) - with multi-byte patterns inline */}
           <div className="mb-3">
-            <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
+            <div className="text-2xs text-muted mb-1">
               {t("changes.byteRange", { from: result.analyzedFromByte, to: result.analyzedToByteExclusive - 1 })}
             </div>
             <ByteVisualization
@@ -434,13 +434,13 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
 
           {/* Notes */}
           {result.notes.length > 0 && (
-            <div className="border-t border-[color:var(--border-default)] pt-2">
-              <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
+            <div className="border-t border-default pt-2">
+              <div className="text-2xs font-medium text-muted mb-1">
                 {t("changes.notes")}
               </div>
               <ul className="space-y-0.5">
                 {result.notes.map((note, idx) => (
-                  <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
+                  <li key={idx} className="text-2xs text-secondary">
                     • {note}
                   </li>
                 ))}
@@ -476,7 +476,7 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-[var(--hover-bg)] transition-colors"
+        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-hover transition-colors"
       >
         <div className={flexRowGap2}>
           {isExpanded ? (
@@ -484,38 +484,38 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
           ) : (
             <ChevronRight className={`${iconXs} text-slate-400`} />
           )}
-          <span className="text-[10px] font-medium text-[color:var(--text-orange)]">
+          <span className="text-2xs font-medium text-orange">
             {t("changes.case", { value: formatMuxValue(caseAnalysis.muxValue, isTwoByte) })}
           </span>
-          <span className="text-[10px] text-[color:var(--text-muted)]">
+          <span className="text-2xs text-muted">
             {t("changes.casesSamples", { count: caseAnalysis.sampleCount })}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-2xs">
           {counts.staticCount > 0 && (
-            <span className="text-[color:var(--text-muted)]">{t("changes.static", { count: counts.staticCount })}</span>
+            <span className="text-muted">{t("changes.static", { count: counts.staticCount })}</span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
-            <span className="text-[color:var(--text-green)]">{t("changes.counter", { count: counts.counterCount + counts.counter16Count + counts.counter32Count })}</span>
+            <span className="text-green">{t("changes.counter", { count: counts.counterCount + counts.counter16Count + counts.counter32Count })}</span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
-            <span className="text-[color:var(--text-purple)]">{t("changes.sensor", { count: counts.sensorCount + counts.sensor16Count })}</span>
+            <span className="text-purple">{t("changes.sensor", { count: counts.sensorCount + counts.sensor16Count })}</span>
           )}
           {counts.valueCount > 0 && (
-            <span className="text-[color:var(--status-info-text)]">{t("changes.value", { count: counts.valueCount })}</span>
+            <span className="text-info">{t("changes.value", { count: counts.valueCount })}</span>
           )}
           {counts.textCount > 0 && (
-            <span className="text-[color:var(--text-amber)]">{t("changes.text", { count: counts.textCount })}</span>
+            <span className="text-amber">{t("changes.text", { count: counts.textCount })}</span>
           )}
         </div>
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-2 pb-2 pt-1 border-t border-[color:var(--border-default)]">
+        <div className="px-2 pb-2 pt-1 border-t border-default">
           {/* Byte visualization */}
           <div className="mb-2">
-            <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
+            <div className="text-2xs text-muted mb-1">
               {t("changes.byteRange", { from: analyzedFromByte, to: analyzedToByteExclusive - 1 })}
             </div>
             <ByteVisualization
@@ -526,10 +526,10 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
 
           {/* Notes */}
           {caseAnalysis.notes.length > 0 && (
-            <div className="border-t border-[color:var(--border-default)] pt-1.5 mt-1.5">
+            <div className="border-t border-default pt-1.5 mt-1.5">
               <ul className="space-y-0.5">
                 {caseAnalysis.notes.map((note, idx) => (
-                  <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
+                  <li key={idx} className="text-2xs text-secondary">
                     • {note}
                   </li>
                 ))}
@@ -596,7 +596,7 @@ function ByteChip({ byte }: ByteChipProps) {
         <span className="ml-0.5">
           {byte.counterDirection === 'up' ? '↑' : '↓'}
           {byte.isLoopingCounter && byte.loopingModulo ? (
-            <span className="opacity-70 text-[8px]">%{byte.loopingModulo}</span>
+            <span className="opacity-70 text-2xs">%{byte.loopingModulo}</span>
           ) : (
             byte.rolloverDetected && '↻'
           )}
@@ -660,7 +660,7 @@ function MultiByteChip({ pattern }: MultiByteChipProps) {
     <Badge tone={tone} size="sm" mono title={title}>
       {pattern.startByte}–{pattern.startByte + pattern.length - 1}
       <span className="ml-0.5">{icon}</span>
-      {endianChar && <span className="ml-0.5 opacity-60 text-[8px]">{endianChar}</span>}
+      {endianChar && <span className="ml-0.5 opacity-60 text-2xs">{endianChar}</span>}
       {displayText && <span className="ml-1 opacity-80">{displayText}</span>}
     </Badge>
   );

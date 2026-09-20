@@ -157,7 +157,7 @@ export default function SerialTopBar({
                 )}
                 {localEcho ? t("topBar.echoOn") : t("topBar.echoOff")}
               </Button>
-              <div className="flex items-center gap-0.5 rounded bg-[var(--bg-surface)] px-0.5">
+              <div className="flex items-center gap-0.5 rounded bg-surface px-0.5">
                 <IconButton
                   onClick={onDecreaseFont}
                   disabled={fontSize <= MIN_TERMINAL_FONT}
@@ -166,7 +166,7 @@ export default function SerialTopBar({
                 >
                   <Minus className={iconSm} />
                 </IconButton>
-                <span className="text-xs tabular-nums text-center w-5 text-[color:var(--text-secondary)]">
+                <span className="text-xs tabular-nums text-center w-5 text-secondary">
                   {fontSize}
                 </span>
                 <IconButton

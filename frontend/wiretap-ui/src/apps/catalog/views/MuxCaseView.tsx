@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, labelSmallMuted, bgSurface, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import { tomlParse } from "../toml";
@@ -124,7 +124,7 @@ export default function MuxCaseView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
+        <h3 className="text-lg font-semibold text-primary">
           {t("muxCaseView.titlePrefix", { value: caseValue })}
         </h3>
 
@@ -164,7 +164,7 @@ export default function MuxCaseView({
               }}
               title={t("muxCaseView.editCase")}
             >
-              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+              <Pencil className={`${iconMd} text-secondary`} />
             </IconButton>
           )}
 
@@ -178,15 +178,15 @@ export default function MuxCaseView({
             tone="danger"
             title={t("muxCaseView.deleteCase")}
           >
-            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+            <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
         </div>
       </div>
 
       {selectedNode.metadata?.properties?.notes && (
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("muxCaseView.notes")}</div>
-          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
+          <div className="text-sm text-secondary whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -195,8 +195,8 @@ export default function MuxCaseView({
       )}
 
       <div className="space-y-4">
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-          <div className="text-xs font-medium text-[color:var(--text-muted)] mb-2">
+        <div className="p-4 bg-surface rounded-lg">
+          <div className="text-xs font-medium text-muted mb-2">
             {t("muxCaseView.bitLayoutTitle")}
           </div>
           <BitPreview
@@ -218,7 +218,7 @@ export default function MuxCaseView({
               {caseSignals.map((signal: any, idx: number) => (
                 <div
                   key={`${signal.name || "signal"}-${idx}`}
-                  className={`p-3 ${bgSecondary} rounded-lg flex items-center justify-between`}
+                  className={`p-3 ${bgSurface} rounded-lg flex items-center justify-between`}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -228,11 +228,11 @@ export default function MuxCaseView({
                           start_bit: signal.start_bit || 0,
                           bit_length: signal.bit_length || 8,
                           type: "signal",
-                        }) || "bg-[var(--bg-surface)]"
+                        }) || "bg-surface"
                       }`}
                     />
                     <div>
-                      <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
+                      <div className="font-medium text-primary flex items-center gap-2">
                         <span>⚡</span>
                         {signal.name || t("muxCaseView.signalDefault", { idx: idx + 1 })}
                       </div>
@@ -244,7 +244,7 @@ export default function MuxCaseView({
                         })}
                       </div>
                       {signal.notes && (
-                        <div className="text-xs text-[color:var(--text-muted)] mt-2 italic whitespace-pre-wrap">
+                        <div className="text-xs text-muted mt-2 italic whitespace-pre-wrap">
                           {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
                         </div>
                       )}
@@ -264,7 +264,7 @@ export default function MuxCaseView({
                       tone="danger"
                       title={t("muxCaseView.deleteSignal")}
                     >
-                      <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+                      <Trash2 className={`${iconMd} text-danger`} />
                     </IconButton>
                   )}
                 </div>
@@ -282,10 +282,10 @@ export default function MuxCaseView({
               {nonSignalChildren.map((child, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
+                  className={`p-3 ${bgSurface} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
                   onClick={() => onSelectNode(child)}
                 >
-                  <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
+                  <div className="font-medium text-primary flex items-center gap-2">
                     {child.type === "signal" && <span>⚡</span>}
                     {child.type === "mux" && <span>🔀</span>}
                     {child.key}

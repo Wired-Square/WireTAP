@@ -143,7 +143,7 @@ export default function TestPatternTopBar({
       actions={
         <>
           {error && (
-            <span className="text-xs text-red-400 max-w-[300px] truncate">
+            <span className="text-xs text-red-400 max-w-75 truncate">
               {error}
             </span>
           )}
@@ -153,7 +153,7 @@ export default function TestPatternTopBar({
       {/* Test controls — shown after IO session, before actions */}
       {isConnected && (
         <>
-          <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
+          <ChevronRight className={`${iconSm} text-muted shrink-0`} />
 
           {/* Role (hidden for Auto — always initiator) */}
           {mode !== "auto" && (

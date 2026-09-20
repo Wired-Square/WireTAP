@@ -217,11 +217,11 @@ export default function SessionLogView() {
           </Button>
           {/* Dropdown */}
           <div
-            className="popover absolute left-0 top-full mt-1 p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-[200px]"
+            className="popover absolute left-0 top-full mt-1 p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity min-w-50"
           >
             {eventTypeGroups.map((group) => (
               <div key={group.label} className="mb-2 last:mb-0">
-                <div className={`text-[10px] uppercase font-medium ${textMuted} mb-1`}>
+                <div className={`text-2xs uppercase font-medium ${textMuted} mb-1`}>
                   {group.label}
                 </div>
                 <div className="flex flex-wrap gap-1">
@@ -269,7 +269,7 @@ export default function SessionLogView() {
         </Select>
 
         {/* Search Input */}
-        <div className="relative flex-1 max-w-[200px]">
+        <div className="relative flex-1 max-w-50">
           <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 ${textMuted}`} />
           <Input
             type="text"
@@ -359,10 +359,10 @@ export default function SessionLogView() {
           <Table sticky hover>
             <thead>
               <tr>
-                <th className="w-[100px]">{t("log.headers.time")}</th>
-                <th className="w-[90px]">{t("log.headers.event")}</th>
-                <th className="w-[120px]">{t("log.headers.session")}</th>
-                {showProfileColumn && <th className="w-[140px]">{t("log.headers.profile")}</th>}
+                <th className="w-25">{t("log.headers.time")}</th>
+                <th className="w-22.5">{t("log.headers.event")}</th>
+                <th className="w-30">{t("log.headers.session")}</th>
+                {showProfileColumn && <th className="w-35">{t("log.headers.profile")}</th>}
                 <th>{t("log.headers.details")}</th>
               </tr>
             </thead>
@@ -385,7 +385,7 @@ export default function SessionLogView() {
                   </td>
                   {showProfileColumn && (
                     <td className={textSecondary}>
-                      <span className="max-w-[130px] truncate block">
+                      <span className="max-w-32.5 truncate block">
                         {entry.profileName ?? "-"}
                       </span>
                     </td>

@@ -432,13 +432,13 @@ export function measurementPlugin(
         line1 = document.createElement("div");
         line1.style.cssText = CURSOR_LINE_CSS;
         line1.style.display = "none";
-        line1.style.borderColor = "var(--accent-info, #3b82f6)";
+        line1.style.borderColor = "var(--accent-primary)";
         over.appendChild(line1);
 
         line2 = document.createElement("div");
         line2.style.cssText = CURSOR_LINE_CSS;
         line2.style.display = "none";
-        line2.style.borderColor = "var(--accent-warning, #f59e0b)";
+        line2.style.borderColor = "var(--accent-warning)";
         over.appendChild(line2);
 
         // Create measurement overlay portalled to body (deduped like the tooltip).

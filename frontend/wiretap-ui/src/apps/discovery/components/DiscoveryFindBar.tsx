@@ -71,7 +71,7 @@ export default function DiscoveryFindBar({
       : "";
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-surface)] ${borderDivider}`}>
+    <div className={`flex items-center gap-2 px-3 py-1.5 bg-surface ${borderDivider}`}>
       <Input
         ref={inputRef}
         type="text"
@@ -92,7 +92,7 @@ export default function DiscoveryFindBar({
       </Tabs>
 
       {/* Match counter / spinner */}
-      <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center flex items-center justify-center gap-1">
+      <span className="text-sm text-muted min-w-15 text-center flex items-center justify-center gap-1">
         {isSearching
           ? <Loader className={`${iconXs} animate-spin`} />
           : counterText}

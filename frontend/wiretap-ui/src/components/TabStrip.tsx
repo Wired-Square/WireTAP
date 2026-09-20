@@ -35,7 +35,7 @@ export default function TabStrip<Id extends string>({
   sticky = false,
 }: Props<Id>) {
   return (
-    <Tabs className={`px-2 bg-[var(--bg-surface)] ${sticky ? "sticky top-0 z-10" : ""}`}>
+    <Tabs className={`px-2 bg-surface ${sticky ? "sticky top-0 z-10" : ""}`}>
       {tabs.map((tab) => (
         <Tab
           key={tab.id}

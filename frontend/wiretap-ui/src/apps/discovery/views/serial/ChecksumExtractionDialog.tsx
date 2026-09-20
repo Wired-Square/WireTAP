@@ -55,11 +55,11 @@ function byteHighlight(state: 'checksum' | 'calcData' | 'default'): string {
   const base = "px-1 py-0.5 rounded text-xs";
   switch (state) {
     case 'checksum':
-      return `${base} bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] ring-1 ring-[color:var(--status-warning-border)]`;
+      return `${base} bg-warning text-warning ring-1 ring-warning`;
     case 'calcData':
-      return `${base} bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]`;
+      return `${base} bg-info text-info`;
     case 'default':
-      return `${base} text-[color:var(--text-secondary)]`;
+      return `${base} text-secondary`;
   }
 }
 

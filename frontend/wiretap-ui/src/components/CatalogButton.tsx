@@ -40,7 +40,7 @@ export default function CatalogButton({
       onClick={onClick}
       title={t("catalogButton.selectCatalog")}
     >
-      <span className="text-[color:var(--text-muted)] italic">{t("catalogButton.noCatalog")}</span>
+      <span className="text-muted italic">{t("catalogButton.noCatalog")}</span>
     </Button>
   );
 }

@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Network, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSurface } from "../../../styles";
 import type { TomlNode, CanProtocolConfig } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Alert } from "../../../components/Alert";
@@ -30,14 +30,14 @@ export default function CanConfigView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[var(--status-success-bg)] rounded-lg">
-            <Network className={`${iconLg} text-[color:var(--status-success)]`} />
+          <div className="p-2 bg-success rounded-lg">
+            <Network className={`${iconLg} text-success`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-[color:var(--text-primary)]">
+            <div className="text-lg font-bold text-primary">
               {t("canConfig.title")}
             </div>
-            <p className="text-sm text-[color:var(--text-muted)]">
+            <p className="text-sm text-muted">
               {t("canConfig.subtitle")}
             </p>
           </div>
@@ -47,14 +47,14 @@ export default function CanConfigView({
             onClick={onEditConfig}
             title={t("canConfig.editTooltip")}
           >
-            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+            <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
         )}
       </div>
 
       {/* Property cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("canConfig.defaultByteOrder")}
           </div>
@@ -67,7 +67,7 @@ export default function CanConfigView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("canConfig.defaultInterval")}
           </div>
@@ -80,7 +80,7 @@ export default function CanConfigView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("canConfig.defaultExtendedId")}
           </div>
@@ -95,7 +95,7 @@ export default function CanConfigView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("canConfig.defaultCanFd")}
           </div>

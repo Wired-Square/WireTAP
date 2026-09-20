@@ -174,7 +174,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     return (
       <Dialog isOpen={isOpen} onClose={onClose}>
         <DialogBody>
-          <p className="text-sm text-[color:var(--text-muted)]">{t("signalPicker.panelNotFound")}</p>
+          <p className="text-sm text-muted">{t("signalPicker.panelNotFound")}</p>
         </DialogBody>
       </Dialog>
     );
@@ -204,9 +204,9 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     >
       <DialogBody padding="none">
         {/* Search */}
-        <div className="px-4 py-2 border-b border-[var(--border-default)]">
+        <div className="px-4 py-2 border-b border-default">
           <div className="relative">
-            <Search className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`} />
+            <Search className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-muted`} />
             <Input
               type="text"
               value={search}
@@ -222,7 +222,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         {/* Signal list */}
         <div className="max-h-[50vh] overflow-y-auto">
           {sortedFrames.length === 0 ? (
-            <div className="p-4 text-sm text-[color:var(--text-muted)]">
+            <div className="p-4 text-sm text-muted">
               {needle ? t("signalPicker.noMatching") : t("signalPicker.noCatalog")}
             </div>
           ) : (
@@ -249,18 +249,18 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                       className={`w-full flex items-center gap-2 px-4 py-2 text-left ${hoverLight} transition-colors`}
                     >
                       {isExpanded ? (
-                        <ChevronDown className={`${iconSm} text-[color:var(--text-muted)]`} />
+                        <ChevronDown className={`${iconSm} text-muted`} />
                       ) : (
-                        <ChevronRight className={`${iconSm} text-[color:var(--text-muted)]`} />
+                        <ChevronRight className={`${iconSm} text-muted`} />
                       )}
-                      <span className="text-sm font-mono font-medium text-[color:var(--text-primary)]">
+                      <span className="text-sm font-mono font-medium text-primary">
                         {formatFrameId(frameId)}
                       </span>
                       <span className={`text-xs ${textSecondary}`}>
                         {t("signalPicker.signalsCount", { count: numericSignals.length })}
                       </span>
                       {selectedCount > 0 && !isReplaceMode && (
-                        <span className="text-xs text-[color:var(--text-success)] ml-auto">
+                        <span className="text-xs text-green ml-auto">
                           {t("signalPicker.selectedCount", { count: selectedCount })}
                         </span>
                       )}
@@ -285,7 +285,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                     isCurrentReplacement
                                       ? "border-purple-500"
-                                      : "border-[var(--border-default)]"
+                                      : "border-default"
                                   }`}
                                 >
                                   {isCurrentReplacement && (
@@ -298,13 +298,13 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                                   className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                     selected
                                       ? "bg-blue-500 border-blue-500"
-                                      : "border-[var(--border-default)]"
+                                      : "border-default"
                                   }`}
                                 >
                                   {selected && <Check className="w-3 h-3 text-white" />}
                                 </div>
                               )}
-                              <span className="text-sm text-[color:var(--text-primary)]">
+                              <span className="text-sm text-primary">
                                 {signal.name}
                               </span>
                               {signal.unit && (

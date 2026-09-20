@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { useTranslation } from "react-i18next";
-import { textSecondary, textTertiary, textDanger } from "../../../styles";
+import { textSecondary, textDanger } from "../../../styles";
 import { labelDefault } from "../../../styles/typography";
 import { Button } from "../../../components/Button";
 import { type PlacedSignal, VALUE_TYPES, BYTE_ORDER_LE, BYTE_ORDER_BE } from "../utils/bitGrid";
@@ -23,7 +23,7 @@ export default function SignalProperties({
   const { t } = useTranslation("rules");
   if (signal === null) {
     return (
-      <div className={`flex items-center justify-center h-full text-center px-4 text-sm ${textTertiary}`}>
+      <div className={`flex items-center justify-center h-full text-center px-4 text-sm ${textSecondary}`}>
         {t("signalProperties.emptyHint")}
       </div>
     );

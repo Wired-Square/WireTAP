@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmall, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
+import { labelSmall, labelSmallMuted, monoBody, bgSurface } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import { tomlParse } from "../toml";
 import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
@@ -55,7 +55,7 @@ export default function SignalView({
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("signalDetails.title")}</h3>
+        <h3 className="text-lg font-semibold text-primary">{t("signalDetails.title")}</h3>
         <div className={flexRowGap2}>
           <IconButton
             onClick={() => {
@@ -70,7 +70,7 @@ export default function SignalView({
             }}
             title={t("signalDetails.edit")}
           >
-            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+            <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
 
           {/* Pattern A delete */}
@@ -88,7 +88,7 @@ export default function SignalView({
             tone="danger"
             title={t("signalDetails.delete")}
           >
-            <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
+            <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
         </div>
       </div>
@@ -113,8 +113,8 @@ export default function SignalView({
             const frameLength = getFrameByteLengthFromPath(selectedNode.path, parsed);
 
             return (
-              <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">{t("signalDetails.bitPreview")}</h4>
+              <div className="p-4 bg-surface rounded-lg">
+                <h4 className="text-sm font-semibold text-primary mb-3">{t("signalDetails.bitPreview")}</h4>
                 <BitPreview
                   numBytes={frameLength}
                   ranges={ranges}
@@ -132,8 +132,8 @@ export default function SignalView({
             const numBytes = endByte - startByte + 1;
 
             return (
-              <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">{t("signalDetails.bitPreview")}</h4>
+              <div className="p-4 bg-surface rounded-lg">
+                <h4 className="text-sm font-semibold text-primary mb-3">{t("signalDetails.bitPreview")}</h4>
                 <BitPreview
                   numBytes={numBytes}
                   ranges={[]}
@@ -147,9 +147,9 @@ export default function SignalView({
         })()}
 
       {selectedNode.metadata?.muxCase && (
-        <div className="p-3 bg-[var(--bg-purple)] border-2 border-[color:var(--border-purple)] rounded-lg">
-          <div className="text-xs font-medium text-[color:var(--text-purple)] mb-1">{t("signalDetails.muxCase")}</div>
-          <div className="font-mono text-sm text-[color:var(--text-purple-strong)]">{selectedNode.metadata.muxCase}</div>
+        <div className="p-3 bg-purple border-2 border-purple rounded-lg">
+          <div className="text-xs font-medium text-purple mb-1">{t("signalDetails.muxCase")}</div>
+          <div className="font-mono text-sm text-purple">{selectedNode.metadata.muxCase}</div>
         </div>
       )}
 
@@ -158,7 +158,7 @@ export default function SignalView({
           Object.entries(selectedNode.metadata.properties)
             .filter(([key]) => key !== "endianness" && key !== "byte_order")
             .map(([key, value]) => (
-            <div key={key} className={`p-3 ${bgSecondary} rounded-lg min-w-0`}>
+            <div key={key} className={`p-3 ${bgSurface} rounded-lg min-w-0`}>
               <div className={labelSmallMuted}>{key}</div>
               <div className={`${monoBody} break-all`}>
                 {typeof value === "boolean"
@@ -184,7 +184,7 @@ export default function SignalView({
           if (!effectiveByteOrder) return null;
 
           return (
-            <div className={`p-3 ${bgSecondary} rounded-lg min-w-0`}>
+            <div className={`p-3 ${bgSurface} rounded-lg min-w-0`}>
               <div className={`${flexRowGap2} mb-1`}>
                 <span className={labelSmall}>{t("signalDetails.byteOrderLabel")}</span>
                 {isInherited && (

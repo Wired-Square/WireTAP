@@ -62,7 +62,7 @@ export default function ChecksumCandidateList({
                         : t("serial.littleEndianShort")}
                     </Badge>
                   )}
-                  <span className="text-sm text-[color:var(--text-secondary)]">
+                  <span className="text-sm text-secondary">
                     {t("serialAnalysis.atByte", { position: candidate.position })}
                     {candidate.length > 1
                       ? t("serialAnalysis.ofLength", { count: candidate.length })
@@ -79,20 +79,20 @@ export default function ChecksumCandidateList({
                   )}
                 </div>
 
-                <div className="text-sm text-[color:var(--text-secondary)] mt-1">
+                <div className="text-sm text-secondary mt-1">
                   <span className={matchRateTextClass(candidate.matchRate)}>
                     {t("serialAnalysis.matchPercent", { percent: candidate.matchRate.toFixed(1) })}
                   </span>
-                  <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                  <span className="mx-2 text-muted">|</span>
                   {t("serialAnalysis.matchedFrames", {
                     matched: candidate.matchCount.toLocaleString(),
                     total: candidate.totalCount.toLocaleString(),
                   })}
-                  <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                  <span className="mx-2 text-muted">|</span>
                   {t("serialAnalysis.confidencePercent", { percent: candidate.confidence })}
                 </div>
 
-                <div className="text-xs text-[color:var(--text-muted)] mt-1">
+                <div className="text-xs text-muted mt-1">
                   {t("serialAnalysis.calcRange", {
                     start: candidate.calcStartByte,
                     end: candidate.calcEndByte,
@@ -110,7 +110,7 @@ export default function ChecksumCandidateList({
                 </div>
 
                 {candidate.notes.length > 0 && (
-                  <div className="text-xs text-[color:var(--text-muted)] mt-1">
+                  <div className="text-xs text-muted mt-1">
                     {candidate.notes
                       .slice(0, 3)
                       .map((note) => t(`serial.checksumNote.${note.code}`, note.values))

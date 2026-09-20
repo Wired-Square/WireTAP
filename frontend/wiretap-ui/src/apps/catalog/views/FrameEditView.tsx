@@ -195,8 +195,8 @@ export default function FrameEditView({
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{resolvedTitle}</h2>
-        <p className="text-sm text-[color:var(--text-muted)]">{resolvedSubtitle}</p>
+        <h2 className="text-2xl font-bold text-primary mb-2">{resolvedTitle}</h2>
+        <p className="text-sm text-muted">{resolvedSubtitle}</p>
       </div>
 
       <div className="space-y-6">
@@ -217,18 +217,18 @@ export default function FrameEditView({
                     onClick={() => handleProtocolChange(handler.type)}
                     className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                       isSelected
-                        ? "border-[color:var(--accent-primary)] bg-[var(--accent-bg)]"
-                        : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)]"
+                        ? "border-accent-primary bg-info"
+                        : "border-default hover:border-hover"
                     }`}
                   >
                     <Icon
                       className={`${iconLg} ${
-                        isSelected ? "text-[color:var(--accent-primary)]" : "text-[color:var(--text-muted)]"
+                        isSelected ? "text-accent-primary" : "text-muted"
                       }`}
                     />
                     <span
                       className={`font-medium ${
-                        isSelected ? "text-[color:var(--accent-text)]" : "text-[color:var(--text-secondary)]"
+                        isSelected ? "text-info" : "text-secondary"
                       }`}
                     >
                       {handler.displayName}
@@ -241,8 +241,8 @@ export default function FrameEditView({
         )}
 
         {/* Protocol-Specific Configuration */}
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-          <h3 className="text-sm font-semibold text-[color:var(--text-secondary)] mb-4 flex items-center gap-2">
+        <div className="p-4 bg-surface rounded-lg">
+          <h3 className="text-sm font-semibold text-secondary mb-4 flex items-center gap-2">
             {currentHandler && (
               <>
                 {(() => {
@@ -257,8 +257,8 @@ export default function FrameEditView({
         </div>
 
         {/* Common Frame Fields */}
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-          <h3 className="text-sm font-semibold text-[color:var(--text-secondary)] mb-4">
+        <div className="p-4 bg-surface rounded-lg">
+          <h3 className="text-sm font-semibold text-secondary mb-4">
             {t("frameEditView.commonProperties")}
           </h3>
 

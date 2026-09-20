@@ -34,7 +34,7 @@ export default function FlashNotification({
   return (
     <div className="fixed top-4 right-4 z-50 animate-fade-in">
       <div
-        className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[250px] max-w-[400px]`}
+        className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-62.5 max-w-100`}
       >
         <div className="flex-1">
           <p className="text-sm font-medium">{message}</p>

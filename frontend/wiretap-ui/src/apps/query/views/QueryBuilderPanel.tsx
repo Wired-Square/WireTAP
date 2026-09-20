@@ -1018,7 +1018,7 @@ ORDER BY id, extended`;
                 </Button>
               ))}
             </div>
-            <div className="flex gap-2 flex-1 min-w-[180px]">
+            <div className="flex gap-2 flex-1 min-w-45">
               <div className="flex-1">
                 <label className={`text-xs ${textMuted}`}>{t("builder.before")}</label>
                 <div className={flexRowGap2}>

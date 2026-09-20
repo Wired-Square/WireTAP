@@ -157,9 +157,9 @@ function FramePicker({
         className="flex items-center gap-1 w-full text-left"
       >
         {isExpanded ? (
-          <ChevronDown className={`${iconSm} text-[color:var(--text-muted)]`} />
+          <ChevronDown className={`${iconSm} text-muted`} />
         ) : (
-          <ChevronRight className={`${iconSm} text-[color:var(--text-muted)]`} />
+          <ChevronRight className={`${iconSm} text-muted`} />
         )}
         <span className={labelSmall}>
           Frames
@@ -169,7 +169,7 @@ function FramePicker({
         </span>
         <div className="flex items-center gap-1 ml-auto">
           {hasWarnings && (
-            <span title={warningTooltip} className="text-[color:var(--text-orange)]">
+            <span title={warningTooltip} className="text-orange">
               <AlertTriangle className={iconSm} />
             </span>
           )}
@@ -242,7 +242,7 @@ function FramePicker({
                     }
                   }}
                   size="xs"
-                  className="max-w-[140px] w-auto"
+                  className="max-w-35 w-auto"
                   title={t("framePicker.selectionSet")}
                 >
                   <option value="">-- None --</option>
@@ -260,8 +260,8 @@ function FramePicker({
             <div className="space-y-1">
               <div className="flex flex-wrap gap-1">
                 {buses.map((bus) => (
-                  <div key={bus} className="flex items-center gap-0.5 text-[10px]">
-                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]">
+                  <div key={bus} className="flex items-center gap-0.5 text-2xs">
+                    <span className="px-1.5 py-0.5 rounded bg-surface border border-default text-secondary">
                       Bus {bus}
                     </span>
                     <Button
@@ -281,8 +281,8 @@ function FramePicker({
                   </div>
                 ))}
                 {hasBuslessFrames && (
-                  <div className="flex items-center gap-0.5 text-[10px]">
-                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-muted)] italic">
+                  <div className="flex items-center gap-0.5 text-2xs">
+                    <span className="px-1.5 py-0.5 rounded bg-surface border border-default text-muted italic">
                       No bus
                     </span>
                     <Button
@@ -304,8 +304,8 @@ function FramePicker({
               </div>
             </div>
           )}
-          <div className="rounded-lg border border-[color:var(--border-default)] overflow-hidden">
-            <div className={`divide-y divide-[color:var(--border-default)] ${noInnerScroll ? "" : "max-h-80 overflow-auto"}`}>
+          <div className="rounded-lg border border-default overflow-hidden">
+            <div className={`divide-y divide-default ${noInnerScroll ? "" : "max-h-80 overflow-auto"}`}>
               {sortedFrames.map((f) => (
                 <label
                   key={f.id}
@@ -322,11 +322,11 @@ function FramePicker({
                       size="sm"
                     />
                     <span className="font-mono">{formatId(f)}</span>
-                    <span className="text-[10px] text-[color:var(--text-muted)]">
+                    <span className="text-2xs text-muted">
                       [{f.len}]
                     </span>
                     {typeof f.bus === "number" && (
-                      <span className="text-[10px] text-[color:var(--text-muted)]">
+                      <span className="text-2xs text-muted">
                         bus {f.bus}
                       </span>
                     )}
@@ -337,7 +337,7 @@ function FramePicker({
                     )}
                   </span>
                   {f.detail && (
-                    <span className="pl-5 text-[10px] text-[color:var(--text-muted)] font-mono leading-snug">
+                    <span className="pl-5 text-2xs text-muted font-mono leading-snug">
                       {f.detail}
                     </span>
                   )}

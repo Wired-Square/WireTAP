@@ -39,15 +39,15 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
             role="button"
             tabIndex={0}
             onClick={() => setPickerOpen(true)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:brightness-95 bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:brightness-95 bg-info border border-info"
           >
-            <FileText className={`${iconMd} flex-shrink-0 text-[color:var(--status-info-text)]`} />
+            <FileText className={`${iconMd} flex-shrink-0 text-info`} />
             <div className="flex-1 min-w-0">
               <div className={`${textMedium} truncate`}>
                 {selected?.name ?? catalogPath}
               </div>
               {selected?.filename && (
-                <div className={`${caption} text-[color:var(--text-muted)] truncate`}>
+                <div className={`${caption} text-muted truncate`}>
                   {selected.filename}
                 </div>
               )}
@@ -64,10 +64,10 @@ export default function DecoderPicker({ catalogPath, onSelect }: Props) {
           // No decoder — unselected source-style row.
           <button
             onClick={() => setPickerOpen(true)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:bg-[var(--hover-bg)] border border-transparent"
+            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer hover:bg-hover border border-transparent"
           >
-            <FileText className={`${iconMd} flex-shrink-0 text-[color:var(--text-muted)]`} />
-            <span className="text-[color:var(--text-muted)] italic">
+            <FileText className={`${iconMd} flex-shrink-0 text-muted`} />
+            <span className="text-muted italic">
               {t("ioSourcePicker.decoder.none")}
             </span>
           </button>

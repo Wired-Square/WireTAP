@@ -63,7 +63,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
         Run this command in your terminal to configure the CAN interface:
       </p>
       <div className={flexRowGap2}>
-        <code className="flex-1 p-2 bg-[var(--bg-warning)] rounded text-xs font-mono break-all">
+        <code className="flex-1 p-2 bg-warning rounded text-xs font-mono break-all">
           {setupCommand}
         </code>
         <IconButton
@@ -73,7 +73,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
           title={copied ? "Copied!" : "Copy to clipboard"}
         >
           {copied ? (
-            <Check className={`${iconMd} text-[color:var(--accent-success)]`} />
+            <Check className={`${iconMd} text-accent-success`} />
           ) : (
             <Copy className={iconMd} />
           )}

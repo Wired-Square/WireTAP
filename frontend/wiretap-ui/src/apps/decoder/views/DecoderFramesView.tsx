@@ -8,7 +8,7 @@ import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
-import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
+import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
@@ -569,7 +569,7 @@ function FrameCard({
   // per-mux payloads share — a reassembled tunnel message does not, so it passes
   // an empty array and renders uncoloured.
   const renderRawBytesRow = (bytes: number[], styles = byteColourStyles) => (
-    <div className="font-mono text-xs bg-[var(--bg-surface)] px-2 py-0.5 rounded inline-flex gap-2">
+    <div className="font-mono text-xs bg-surface px-2 py-0.5 rounded inline-flex gap-2">
       <span>
         {bytes.map((b, idx) => (
           <span
@@ -637,7 +637,7 @@ function FrameCard({
   return (
     <div className="space-y-2">
       <div
-        className="flex items-center gap-3 text-sm font-semibold text-[color:var(--text-primary)]"
+        className="flex items-center gap-3 text-sm font-semibold text-primary"
         onContextMenu={onFrameContextMenu ? (e) => {
           e.preventDefault();
           onFrameContextMenu(frame, decodedFrame, { x: e.clientX, y: e.clientY });
@@ -741,7 +741,7 @@ function FrameCard({
             </div>
           ))
         : rawBytes && !hasMux && renderRawBytesRow(rawBytes))}
-      <div className="rounded border border-[color:var(--border-default)]">
+      <div className="rounded border border-default">
         {(() => {
           // Separate plain signals (no muxValue) from mux signals
           const plainSignals = decodedSignals.filter(s => s.muxValue === undefined);
@@ -789,9 +789,9 @@ function FrameCard({
             const nameColor = getTextColour(baseColour, signalDef);
             const valueColor = getTextColour(baseColour, signalDef);
             const rowBg = isBright
-              ? "bg-[var(--table-row-highlight)]"
+              ? "bg-table-row-highlight"
               : (idx + rowOffset) % 2 === 0
-              ? "bg-[var(--table-row-alt)]"
+              ? "bg-table-row-alt"
               : bgSurface;
             const timestampStr = formatSignalTimestamp(decoded.timestamp, displayTimeFormat, startTimeSeconds);
             const signalMismatch = signalDef ? signalHasMismatch(signalDef) : null;
@@ -812,7 +812,7 @@ function FrameCard({
                     </span>
                   )}
                   <span
-                    className="text-[color:var(--text-primary)] transition-colors duration-200"
+                    className="text-primary transition-colors duration-200"
                     style={nameColor ? { color: nameColor } : undefined}
                   >
                     {decoded.name}
@@ -825,8 +825,8 @@ function FrameCard({
                   {signalDef?._inherited && (
                     <span
                       className={`${caption} italic flex items-center gap-1 ${
-                        signalMismatch === true ? 'text-[color:var(--status-danger-text)]' :
-                        signalMismatch === false ? 'text-[color:var(--status-success-text)]' : 'text-[color:var(--status-cyan-text)]'
+                        signalMismatch === true ? 'text-danger' :
+                        signalMismatch === false ? 'text-success' : 'text-cyan'
                       }`}
                       title={
                         signalMismatch === true ? `Mismatch with source frame ${frame.mirrorOf}` :
@@ -842,7 +842,7 @@ function FrameCard({
                 </div>
                 <div className={flexRowGap2}>
                   <span
-                    className="font-mono transition-colors duration-200 text-[color:var(--text-secondary)]"
+                    className="font-mono transition-colors duration-200 text-secondary"
                     style={valueColor ? { color: valueColor } : undefined}
                   >
                     {formatSignalValue(decoded)}
@@ -887,7 +887,7 @@ function FrameCard({
                 return (
                   <div key={`mux-${muxValue}`}>
                     {/* Mux value header */}
-                    <div className="px-3 py-1.5 text-xs bg-purple-600/10 border-t border-[color:var(--border-default)] flex items-center gap-2">
+                    <div className="px-3 py-1.5 text-xs bg-purple-600/10 border-t border-default flex items-center gap-2">
                       <span className="text-purple-500">🔀</span>
                       <span className="font-medium text-purple-600">
                         Mux {muxValue}
@@ -1489,7 +1489,7 @@ export default function DecoderFramesView({
     const maxChars = totalStr.length * 2 + 4;
     return (
       <span
-        className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}
+        className={`px-1.5 text-xs font-mono tabular-nums text-center ${textSecondary}`}
         style={{ minWidth: `${maxChars}ch` }}
       >
         {currentStr} of {totalStr}

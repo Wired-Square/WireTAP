@@ -78,12 +78,12 @@ export function renderDeltaNode(deltaUs: number): React.ReactNode {
     { className: "inline-flex items-baseline gap-1" },
     React.createElement(
       "span",
-      { className: "text-[color:var(--text-primary)] font-semibold" },
+      { className: "text-primary font-semibold" },
       `${secondsMs}s`
     ),
     React.createElement(
       "span",
-      { className: "text-[11px] text-[color:var(--text-muted)]" },
+      { className: "text-2xs text-muted" },
       `${microsRemainder.toString().padStart(3, "0")}µs`
     )
   );

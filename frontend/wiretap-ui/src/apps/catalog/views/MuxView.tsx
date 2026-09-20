@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, bgSecondary, sectionHeaderText, hoverLight } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, bgSurface, sectionHeaderText, hoverLight } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
@@ -72,7 +72,7 @@ export default function MuxView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("muxView.title")}</h3>
+        <h3 className="text-lg font-semibold text-primary">{t("muxView.title")}</h3>
         <div className={flexRowGap2}>
           <Button
             onClick={() => onAddCase(selectedNode.path)}
@@ -87,7 +87,7 @@ export default function MuxView({
             onClick={() => onEditMux(selectedNode.path, selectedNode.metadata?.properties || {})}
             title={t("muxView.editMux")}
           >
-            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+            <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
 
           {/* Pattern A delete */}
@@ -96,12 +96,12 @@ export default function MuxView({
             tone="danger"
             title={t("muxView.deleteMux")}
           >
-            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+            <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
         </div>
       </div>
 
-      <div className={`p-3 ${bgSecondary} rounded-lg`}>
+      <div className={`p-3 ${bgSurface} rounded-lg`}>
         <div className={labelSmallMuted}>{t("muxView.name")}</div>
         <div className={monoBody}>
           {selectedNode.metadata?.muxName || t("muxView.nameNa")}
@@ -109,8 +109,8 @@ export default function MuxView({
       </div>
 
       {ranges.length > 0 && (
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-          <div className="text-xs font-medium text-[color:var(--text-secondary)] mb-3">
+        <div className="p-4 bg-surface rounded-lg">
+          <div className="text-xs font-medium text-secondary mb-3">
             {t("muxView.byteLayout")}
           </div>
           <BitPreview
@@ -125,9 +125,9 @@ export default function MuxView({
       )}
 
       {selectedNode.metadata?.properties?.notes && (
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("muxView.notes")}</div>
-          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
+          <div className="text-sm text-secondary whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -137,8 +137,8 @@ export default function MuxView({
 
       {selectedNode.metadata?.muxDefaultCase && (
         <Card tone="info">
-          <div className="text-xs font-medium text-[color:var(--status-info-text)] mb-1">{t("muxView.defaultCase")}</div>
-          <div className="font-mono text-sm text-[color:var(--status-info-text)]">
+          <div className="text-xs font-medium text-info mb-1">{t("muxView.defaultCase")}</div>
+          <div className="font-mono text-sm text-info">
             {selectedNode.metadata.muxDefaultCase}
           </div>
         </Card>
@@ -155,10 +155,10 @@ export default function MuxView({
               return (
                 <div
                   key={idx}
-                  className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
+                  className={`p-3 ${bgSurface} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
                   onClick={() => onSelectNode(caseNode)}
                 >
-                  <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                  <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                     <span className="shrink-0">📍</span>
                     <span className="truncate">{caseNode.key}</span>
                     <span className={caption}>
@@ -170,7 +170,7 @@ export default function MuxView({
                       {caseSignals.map((sig: any, sIdx: number) => (
                         <div key={sIdx} className="truncate">
                           ⚡ {sig.name || t("muxView.signalDefault", { idx: sIdx + 1 })}
-                          <span className="ml-1 text-[color:var(--text-muted)]">
+                          <span className="ml-1 text-muted">
                             ({sig.start_bit ?? 0}:{sig.bit_length ?? 0})
                           </span>
                         </div>

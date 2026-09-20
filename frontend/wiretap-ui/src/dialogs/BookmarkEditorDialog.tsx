@@ -9,7 +9,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { iconMd, flexRowGap2 } from "../styles/spacing";
 import Dialog, { DialogBody, DialogHeader, DialogTitle } from "../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton, DangerButton, Select } from "../components/forms";
-import { labelSmall, captionMuted, borderDefault, bgSecondary, sectionHeaderText, emptyStateText } from "../styles";
+import { labelSmall, captionMuted, borderDefault, bgSurface, sectionHeaderText, emptyStateText } from "../styles";
 import {
   getAllFavorites,
   updateFavorite,
@@ -259,7 +259,7 @@ export default function BookmarkEditorDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} size="xl" onClose={onClose} className="h-[500px]">
+    <Dialog isOpen={isOpen} size="xl" onClose={onClose} className="h-125">
       <DialogHeader>
         <div className={flexRowGap2}>
           <DialogTitle>{t("bookmarkEditor.title")}</DialogTitle>
@@ -283,20 +283,20 @@ export default function BookmarkEditorDialog({
           ) : bookmarks.length === 0 ? (
             <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.empty")}</div>
           ) : (
-            <div className="divide-y divide-[color:var(--border-default)]">
+            <div className="divide-y divide-default">
               {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
                 <div key={pid}>
                   {!profileId && (
-                    <div className={`px-3 py-2 bg-[var(--bg-surface)] ${labelSmall}`}>
+                    <div className={`px-3 py-2 bg-surface ${labelSmall}`}>
                       {pid}
                     </div>
                   )}
                   {profileBookmarks.map((bookmark) => (
                     <div
                       key={bookmark.id}
-                      className={`flex items-center w-full hover:bg-[var(--hover-bg)] ${
+                      className={`flex items-center w-full hover:bg-hover ${
                         selectedId === bookmark.id
-                          ? "bg-[var(--status-info-bg)] border-l-2 border-[color:var(--status-info-text)]"
+                          ? "bg-info border-l-2 border-info-text"
                           : ""
                       }`}
                     >
@@ -405,7 +405,7 @@ export default function BookmarkEditorDialog({
               {!profileId && (
                 <div className="space-y-1">
                   <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
-                  <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-[color:var(--text-secondary)]`}>
+                  <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSurface} text-secondary`}>
                     {selectedBookmark.profileId}
                   </div>
                 </div>

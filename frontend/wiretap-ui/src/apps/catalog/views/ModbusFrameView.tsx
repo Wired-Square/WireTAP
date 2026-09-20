@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { labelSmall, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
+import { labelSmall, labelSmallMuted, monoBody, bgSurface } from "../../../styles";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
 
@@ -34,8 +34,8 @@ export default function ModbusFrameView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-[color:var(--text-muted)]">{t("modbusFrame.subtitle")}</p>
-          <div className="text-lg font-bold text-[color:var(--text-primary)]">
+          <p className="text-sm text-muted">{t("modbusFrame.subtitle")}</p>
+          <div className="text-lg font-bold text-primary">
             {selectedNode.key}
           </div>
         </div>
@@ -46,7 +46,7 @@ export default function ModbusFrameView({
                 onClick={() => onEditFrame(selectedNode)}
                 title={t("modbusFrame.editFrame")}
               >
-                <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                <Pencil className={`${iconMd} text-secondary`} />
               </IconButton>
             )}
             {onDeleteFrame && (
@@ -55,7 +55,7 @@ export default function ModbusFrameView({
                 tone="danger"
                 title={t("modbusFrame.deleteFrame")}
               >
-                <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                <Trash2 className={`${iconMd} text-red`} />
               </IconButton>
             )}
           </div>
@@ -64,7 +64,7 @@ export default function ModbusFrameView({
 
       {/* Property cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusFrame.registerNumber")}
           </div>
@@ -73,11 +73,11 @@ export default function ModbusFrameView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusFrame.deviceAddress")}
             {deviceAddressInherited && (
-              <span className="ml-1 text-[color:var(--text-blue)]" title={t("modbusFrame.deviceAddressInheritedTooltip")}>
+              <span className="ml-1 text-blue" title={t("modbusFrame.deviceAddressInheritedTooltip")}>
                 {t("modbusFrame.deviceAddressInheritedSuffix")}
               </span>
             )}
@@ -87,7 +87,7 @@ export default function ModbusFrameView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusFrame.registerType")}
           </div>
@@ -96,7 +96,7 @@ export default function ModbusFrameView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusFrame.lengthRegisters")}
           </div>
@@ -105,7 +105,7 @@ export default function ModbusFrameView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusFrame.slave")}
           </div>
@@ -115,11 +115,11 @@ export default function ModbusFrameView({
         </div>
 
         {interval !== undefined && (
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("modbusFrame.interval")}
               {intervalInherited && (
-                <span className="ml-1 text-[color:var(--text-blue)]" title={t("modbusFrame.intervalInheritedTooltip")}>
+                <span className="ml-1 text-blue" title={t("modbusFrame.intervalInheritedTooltip")}>
                   {t("modbusFrame.intervalInheritedSuffix")}
                 </span>
               )}
@@ -133,11 +133,11 @@ export default function ModbusFrameView({
 
       {/* Notes */}
       {notes && (
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
             {t("modbusFrame.notes")}
           </div>
-          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
+          <div className="text-sm text-secondary whitespace-pre-wrap">
             {Array.isArray(notes) ? notes.join("\n") : notes}
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function ModbusFrameView({
 
       {/* Signals info */}
       {selectedNode.children && selectedNode.children.length > 0 && (
-        <div className="text-sm text-[color:var(--text-muted)]">
+        <div className="text-sm text-muted">
           {t("modbusFrame.childNodesHint", { count: selectedNode.children.length })}
         </div>
       )}

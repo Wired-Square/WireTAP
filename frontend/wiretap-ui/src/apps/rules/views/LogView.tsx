@@ -6,7 +6,6 @@ import { useRulesStore } from "../stores/rulesStore";
 import {
   textPrimary,
   textSecondary,
-  textTertiary,
   textDanger,
   borderDefault,
 } from "../../../styles";
@@ -20,7 +19,7 @@ export default function LogView() {
 
   if (entries.length === 0) {
     return (
-      <div className={`text-sm ${textTertiary}`}>{t("log.empty", "No activity yet")}</div>
+      <div className={`text-sm ${textSecondary}`}>{t("log.empty", "No activity yet")}</div>
     );
   }
 
@@ -34,10 +33,10 @@ export default function LogView() {
         {entries.map((entry, idx) => {
           const dotClass =
             entry.type === "success"
-              ? "bg-[var(--status-success-text)]"
+              ? "bg-success-text"
               : entry.type === "error"
-                ? "bg-[var(--status-danger-text)]"
-                : "bg-[var(--status-info-text)]";
+                ? "bg-danger-text"
+                : "bg-info-text";
           const textClass = entry.type === "error" ? textDanger : textPrimary;
           return (
             <div
@@ -48,7 +47,7 @@ export default function LogView() {
               <span className={`flex-1 min-w-0 break-words ${textClass}`}>
                 {entry.text}
               </span>
-              <span className={`shrink-0 font-mono ${textTertiary}`}>
+              <span className={`shrink-0 font-mono ${textSecondary}`}>
                 {new Date(entry.timestamp).toLocaleTimeString(i18n.language)}
               </span>
             </div>

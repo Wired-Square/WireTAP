@@ -19,7 +19,7 @@ export default function MetadataSection({
 }: MetadataSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
+      <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
         Catalog Metadata
       </h3>
 

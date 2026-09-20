@@ -375,7 +375,7 @@ export default function FrameDefEditor({
       {/* Main layout: left (grid + signal list) | right (properties) */}
       <div className="flex flex-1 gap-2 min-h-0">
         {/* Left column */}
-        <div className="flex-[2] flex flex-col gap-2 min-h-0">
+        <div className="flex-2 flex flex-col gap-2 min-h-0">
           <Card padding="sm" className="flex-1 min-h-0 overflow-auto">
             <BitGrid
               payloadBytes={payloadBytes}

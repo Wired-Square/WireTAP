@@ -12,7 +12,7 @@ export default function MessageOrderToolPanel() {
     <div className="space-y-2 text-xs">
       <div className="space-y-1">
         <label className={toolPanelLabel}>
-          Start Message ID <span className="text-[color:var(--text-muted)]">(optional)</span>
+          Start Message ID <span className="text-muted">(optional)</span>
         </label>
         <Input
           type="text"
@@ -31,7 +31,7 @@ export default function MessageOrderToolPanel() {
           }}
           mono
         />
-        <p className="text-[color:var(--text-muted)] text-[10px]">
+        <p className="text-muted text-2xs">
           Leave empty to auto-detect from gap analysis
         </p>
       </div>

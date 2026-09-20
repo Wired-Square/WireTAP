@@ -110,9 +110,9 @@ export default function CaptureList({
 
   return (
     <div className={borderDivider}>
-      <div className="px-4 py-2 bg-[var(--bg-surface)] flex items-center justify-between">
+      <div className="px-4 py-2 bg-surface flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Archive className={`${iconXs} text-[color:var(--text-muted)]`} />
+          <Archive className={`${iconXs} text-muted`} />
           <span className={sectionHeader}>
             {t("ioSourcePicker.captures.title")}
           </span>
@@ -144,18 +144,18 @@ export default function CaptureList({
               onKeyDown={(e) => !isRenaming && e.key === "Enter" && onSelectCapture(capture.id)}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer ${
                 isThisCaptureSelected
-                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-                  : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--status-info-text)]`
+                  ? "bg-info border border-info"
+                  : `${bgSurface} border border-default hover:border-info-text`
               }`}
             >
               {isInSession ? (
-                <Database className={`${iconMd} flex-shrink-0 text-[color:var(--text-cyan)]`} />
+                <Database className={`${iconMd} flex-shrink-0 text-cyan`} />
               ) : (
                 <FileText
                   className={`${iconMd} flex-shrink-0 ${
                     capture.kind === "bytes"
-                      ? "text-[color:var(--text-purple)]"
-                      : "text-[color:var(--status-info-text)]"
+                      ? "text-purple"
+                      : "text-info"
                   }`}
                 />
               )}
@@ -173,7 +173,7 @@ export default function CaptureList({
                       if (e.key === "Escape") cancelRename();
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className={`${textMedium} w-full bg-transparent border-b border-[color:var(--status-info-text)] outline-none`}
+                    className={`${textMedium} w-full bg-transparent border-b border-info-text outline-none`}
                   />
                 ) : (
                   <div className={`${textMedium} truncate`}>
@@ -194,7 +194,7 @@ export default function CaptureList({
                 </div>
               </div>
               {isThisCaptureSelected && (
-                <Check className={`${iconMd} text-[color:var(--status-info-text)] flex-shrink-0`} />
+                <Check className={`${iconMd} text-info flex-shrink-0`} />
               )}
               <IconButton
                 onClick={(e) => {

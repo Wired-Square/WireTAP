@@ -199,7 +199,7 @@ function ToggleField({
         />
         {trailing}
       </div>
-      {hint && <p className="text-xs text-[color:var(--text-muted)] mt-1 ml-6">{hint}</p>}
+      {hint && <p className="text-xs text-muted mt-1 ml-6">{hint}</p>}
     </div>
   );
 }
@@ -276,7 +276,7 @@ export default function IOConnectionFields({
         <h4 className={textMedium}>
           {t("ioProfileDialog.common.canInterfaces")}
           {probe.gvretState === "success" && (
-            <span className="ml-2 text-xs text-[color:var(--text-green)]">
+            <span className="ml-2 text-xs text-green">
               {t("ioProfileDialog.common.deviceOnline")}
             </span>
           )}
@@ -319,7 +319,7 @@ export default function IOConnectionFields({
         deviceBusConfig.length === 0 &&
         probe.gvretState !== "probing" &&
         probe.gvretState !== "error" && (
-          <p className="text-sm text-[color:var(--text-muted)]">
+          <p className="text-sm text-muted">
             {t("ioProfileDialog.common.clickProbeHint")}
           </p>
         )}
@@ -376,12 +376,12 @@ export default function IOConnectionFields({
         />
 
         <div className={`border-t ${borderDefault} pt-4 mt-6`}>
-          <h4 className="font-semibold text-[color:var(--text-primary)] mb-4">
+          <h4 className="font-semibold text-primary mb-4">
             {t("ioProfileDialog.mqtt.messageFormats")}
           </h4>
 
           {formats.map(({ kind, label, placeholder }) => (
-            <div key={kind} className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
+            <div key={kind} className="mb-4 p-4 bg-surface rounded-lg">
               <div className="mb-3">
                 <CheckboxField
                   checked={profile.connection.formats?.[kind]?.enabled || false}
@@ -1041,7 +1041,7 @@ export default function IOConnectionFields({
                   </span>
                 )}
                 {probe.gsUsbResult?.supports_fd === true && (
-                  <span className="text-xs text-[color:var(--text-success)]">
+                  <span className="text-xs text-green">
                     {t("ioProfileDialog.gsUsb.fdCapable")}
                   </span>
                 )}

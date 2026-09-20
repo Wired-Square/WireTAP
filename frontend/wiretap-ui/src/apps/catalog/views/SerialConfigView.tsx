@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Cable, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
-import { caption, labelSmallMuted, monoBody, bgSecondary } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, bgSurface } from "../../../styles";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
 
@@ -31,14 +31,14 @@ export default function SerialConfigView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[var(--purple-bg)] rounded-lg">
-            <Cable className={`${iconLg} text-[color:var(--purple-text)]`} />
+          <div className="p-2 bg-purple rounded-lg">
+            <Cable className={`${iconLg} text-purple`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-[color:var(--text-primary)]">
+            <div className="text-lg font-bold text-primary">
               {t("serialConfig.title")}
             </div>
-            <p className="text-sm text-[color:var(--text-muted)]">
+            <p className="text-sm text-muted">
               {t("serialConfig.subtitle")}
             </p>
           </div>
@@ -48,14 +48,14 @@ export default function SerialConfigView({
             onClick={onEditConfig}
             title={t("serialConfig.editTooltip")}
           >
-            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+            <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
         )}
       </div>
 
       {/* Property cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 ${bgSecondary} rounded-lg col-span-2`}>
+        <div className={`p-4 ${bgSurface} rounded-lg col-span-2`}>
           <div className={labelSmallMuted}>
             {t("serialConfig.encoding")}
           </div>
@@ -73,8 +73,8 @@ export default function SerialConfigView({
       </div>
 
       {/* Info box */}
-      <div className="p-4 bg-[var(--info-bg)] rounded-lg border border-[color:var(--info-border)]">
-        <p className="text-sm text-[color:var(--info-text)]">
+      <div className="p-4 bg-info rounded-lg border border-info">
+        <p className="text-sm text-info">
           <strong>{t("serialConfig.noteTitle")}</strong> {t("serialConfig.noteText")}
         </p>
       </div>

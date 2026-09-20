@@ -256,7 +256,7 @@ export default function CatalogTreePanel({
                   {group.label && (
                     <button
                       onClick={() => toggleGroup(group.label)}
-                      className="flex items-center gap-1 w-full px-1 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]"
+                      className="flex items-center gap-1 w-full px-1 py-0.5 rounded text-2xs font-semibold uppercase tracking-wide text-muted hover:bg-hover"
                     >
                       {collapsed ? (
                         <ChevronRight className={`${iconXs} flex-shrink-0`} />
@@ -264,7 +264,7 @@ export default function CatalogTreePanel({
                         <ChevronDown className={`${iconXs} flex-shrink-0`} />
                       )}
                       <span className="truncate">{group.label}</span>
-                      <span className="text-[color:var(--text-muted)] opacity-70">· {group.frames.length}</span>
+                      <span className="text-muted opacity-70">· {group.frames.length}</span>
                     </button>
                   )}
                   {!collapsed && group.frames.map((frame) => renderTreeNode(frame, 0))}

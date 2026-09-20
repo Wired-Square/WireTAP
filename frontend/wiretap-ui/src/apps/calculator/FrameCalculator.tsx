@@ -13,7 +13,7 @@ import { useSettings } from "../../hooks/useSettings";
 import { readClipboardText, writeClipboardText } from "../../api/clipboard";
 import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
 import { caption, captionMuted, borderDivider, bgSurface } from "../../styles";
-import { borderDataView, bgDataView } from "../../styles/colourTokens";
+import { borderDefault, bgDataView } from "../../styles/colourTokens";
 import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
@@ -525,7 +525,7 @@ export default function FrameCalculator() {
     <>
       <AppLayout topBar={topBar}>
         {/* Bubble container */}
-        <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden ${bgDataView}`}>
+        <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDefault} overflow-hidden ${bgDataView}`}>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="grid grid-cols-1 gap-4">
             {groups.map((g, groupIdx) => {
@@ -542,7 +542,7 @@ export default function FrameCalculator() {
                   <div className="min-w-0">
                     {/* Header */}
                     <div className="mb-3">
-                      <div className="text-sm font-semibold text-[color:var(--text-primary)]">
+                      <div className="text-sm font-semibold text-primary">
                         Group {g.index}
                       </div>
                       <div className={captionMuted}>
@@ -562,7 +562,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyHexValue")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -576,7 +576,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyUnsigned")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -590,7 +590,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignedTwos")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -604,7 +604,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignedOnes")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -618,7 +618,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copySignMag")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -632,7 +632,7 @@ export default function FrameCalculator() {
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             title={t("tooltips.copyText")}
                           >
-                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                            <Copy className={`${iconXs} text-secondary`} />
                           </IconButton>
                         </div>
                       </div>
@@ -640,7 +640,7 @@ export default function FrameCalculator() {
                   </div>
 
                   {/* Bottom section: Bit preview - always below values */}
-                  <div className="flex-shrink-0 pt-2 border-t border-[color:var(--border-default)] overflow-hidden">
+                  <div className="flex-shrink-0 pt-2 border-t border-default overflow-hidden">
                     <div className="flex justify-between items-center group mb-2">
                       <span className="text-sm">{t("labels.binary")}</span>
                       <IconButton
@@ -649,7 +649,7 @@ export default function FrameCalculator() {
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
                         title={t("tooltips.copyBinary")}
                       >
-                        <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
+                        <Copy className={`${iconXs} text-secondary`} />
                       </IconButton>
                     </div>
                     <ScalingByteBits
@@ -703,9 +703,9 @@ export default function FrameCalculator() {
 
           {/* Divider */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-[var(--hover-bg)]" />
+            <div className="flex-1 h-px bg-hover" />
             <span className={captionMuted}>or custom</span>
-            <div className="flex-1 h-px bg-[var(--hover-bg)]" />
+            <div className="flex-1 h-px bg-hover" />
           </div>
 
           {/* Custom unit selector */}
@@ -769,7 +769,7 @@ export default function FrameCalculator() {
         isOpen={showHistoryDialog}
         onClose={handleHistoryDialogClose}
         title={t("dialogs.memory.title")}
-        icon={<History className="text-[color:var(--accent-primary)]" />}
+        icon={<History className="text-accent-primary" />}
       >
         <DialogBody>
           <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -780,14 +780,14 @@ export default function FrameCalculator() {
                   key={index}
                   className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
                     isCurrentItem
-                      ? "border-[color:var(--accent-primary)] bg-[var(--status-info-bg)]"
-                      : "border-[color:var(--border-default)] hover:bg-[var(--hover-bg)]"
+                      ? "border-accent-primary bg-info"
+                      : "border-default hover:bg-hover"
                   }`}
                 >
-                  <span className="text-xs text-[color:var(--text-muted)] w-6">
+                  <span className="text-xs text-muted w-6">
                     {index + 1}
                   </span>
-                  <span className="flex-1 font-led text-sm text-[color:var(--accent-primary)] uppercase tracking-wider truncate">
+                  <span className="flex-1 font-led text-sm text-accent-primary uppercase tracking-wider truncate">
                     {item}
                   </span>
                   <div className="flex items-center gap-1">
@@ -906,7 +906,7 @@ export default function FrameCalculator() {
         size="sm"
         onClose={() => setShowScaleDialog(false)}
         title={t("dialogs.scale.title")}
-        icon={<Divide className="text-[color:var(--accent-primary)]" />}
+        icon={<Divide className="text-accent-primary" />}
       >
         <DialogBody className="space-y-4">
           {/* Raw value display */}
@@ -914,7 +914,7 @@ export default function FrameCalculator() {
             <label className={`block ${sectionHeaderText} mb-1`}>
               Raw Value (from hex)
             </label>
-            <div className="px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm">
+            <div className="px-3 py-2 rounded border bg-surface border-default font-mono text-sm">
               {groups.length > 0 ? groups[0].unsigned.toString() : "—"}
             </div>
           </div>
@@ -955,11 +955,11 @@ export default function FrameCalculator() {
 
             return (
               <Card tone="info" padding="lg">
-                <div className="text-sm text-[color:var(--text-secondary)] mb-1">
+                <div className="text-sm text-secondary mb-1">
                   Scale Factor (DBC)
                 </div>
                 <div className={flexRowGap2}>
-                  <span className="text-2xl font-mono font-semibold text-[color:var(--accent-primary)]">
+                  <span className="text-2xl font-mono font-semibold text-accent-primary">
                     {scale.toPrecision(6)}
                   </span>
                   <IconButton
@@ -967,7 +967,7 @@ export default function FrameCalculator() {
                     size="sm"
                     title={t("tooltips.copyScaleFactor")}
                   >
-                    <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
+                    <Copy className={`${iconMd} text-accent-primary`} />
                   </IconButton>
                 </div>
                 <div className={`${caption} mt-2 font-mono`}>

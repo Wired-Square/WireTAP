@@ -37,7 +37,7 @@ export default function DeviceHeader() {
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-[color:var(--border-default)]">
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-default">
       <SecondaryButton onClick={handleBack} disabled={leaving} size="sm">
         <span className="flex items-center gap-1.5">
           <ArrowLeft className={iconMd} />

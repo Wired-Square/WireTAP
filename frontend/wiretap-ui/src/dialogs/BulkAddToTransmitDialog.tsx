@@ -137,11 +137,11 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
         <div className="space-y-1">
           <label className={labelSmall}>{t("bulkAddToTransmit.targetSession")}</label>
           {transmitSession ? (
-            <p className="text-sm text-[color:var(--text-primary)] font-medium">
+            <p className="text-sm text-primary font-medium">
               {transmitSession.profileName}
             </p>
           ) : (
-            <p className="text-sm text-[color:var(--status-danger-text)]">
+            <p className="text-sm text-danger">
               {t("bulkAddToTransmit.noSession")}
             </p>
           )}
@@ -179,7 +179,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
               className="flex-1"
               maxLength={8}
             />
-            <span className="text-[color:var(--text-secondary)] text-sm">–</span>
+            <span className="text-secondary text-sm">–</span>
             <Input
               type="text"
               value={maxIdRaw}
@@ -199,7 +199,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
             </Button>
           </div>
           {rangeError ? (
-            <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>
+            <p className="text-xs text-danger">{rangeError}</p>
           ) : (
             <p className={helpText}>
               {matchingIds.length > 0

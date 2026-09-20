@@ -385,7 +385,7 @@ export default function ResultsPanel({
 
       {/* Results list */}
       <div className="flex-1 overflow-auto" ref={resultsScrollRef}>
-        <div className="divide-y divide-[var(--border-default)]">
+        <div className="divide-y divide-default">
           {paginatedResults.map((result, index) => (
             <div data-result-row key={pageStart + index}>
               <ResultRow
@@ -564,9 +564,9 @@ function ResultRow({
           {dist.count.toLocaleString()}
         </span>
         <div className="flex-1 flex items-center gap-2">
-          <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded overflow-hidden">
+          <div className="flex-1 h-2 bg-surface rounded overflow-hidden">
             <div
-              className="h-full bg-[var(--text-data-green)] rounded"
+              className="h-full bg-text-green rounded"
               style={{ width: `${Math.min(dist.percentage, 100)}%` }}
             />
           </div>

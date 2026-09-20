@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 import ColourPicker from "../components/ColourPicker";
 import { cssToBrgb } from "../utils/brgbColour";
 import {
@@ -258,12 +258,12 @@ export default function IndicatorConfigDialog({
                 onChange={(e) => setBlinkPeriod(parseInt(e.target.value) || 0)}
                 onBlur={() => writeBlinkPeriod(blinkPeriod)}
               />
-              <span className={`text-xs ${textTertiary}`}>{t("indicatorConfigDialog.fields.ms")}</span>
+              <span className={`text-xs ${textSecondary}`}>{t("indicatorConfigDialog.fields.ms")}</span>
             </div>
           </div>
         )}
 
-        <div className={`mb-4 pt-4 border-t border-[color:var(--border-default)]`}>
+        <div className={`mb-4 pt-4 border-t border-default`}>
           <label className={labelDefault}>{t("indicatorConfigDialog.fields.trigger")}</label>
         </div>
 
@@ -369,7 +369,7 @@ export default function IndicatorConfigDialog({
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
               <Input type="text" size="lg" mono className="w-32" value={gateSignalId} onChange={(e) => setGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
-              <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
+              <span className={`text-2xs block mt-1 ${textSecondary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>
         )}
@@ -400,7 +400,7 @@ export default function IndicatorConfigDialog({
             <div>
               <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
               <Input type="text" size="lg" mono className="w-32" value={thrGateSignalId} onChange={(e) => setThrGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
-              <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
+              <span className={`text-2xs block mt-1 ${textSecondary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>
         )}

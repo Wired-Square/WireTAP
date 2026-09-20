@@ -11,7 +11,7 @@ import { diffCatalog, parseCatalog } from "../../api/catalog";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { Eye, X } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
-import { borderDataView, bgDataView } from "../../styles/colourTokens";
+import { borderDefault, bgDataView } from "../../styles/colourTokens";
 import { iconSm } from "../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading } from "../../styles/typography";
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
@@ -537,7 +537,7 @@ function CatalogEditorInner() {
       }
     >
       {/* Bubble container */}
-      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
+      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDefault} overflow-hidden`}>
         <div className={`flex-1 flex min-h-0 overflow-hidden ${bgDataView}`}>
         {/* Tree View Panel - Only show in UI mode */}
         {editMode === "ui" && (
@@ -610,7 +610,7 @@ function CatalogEditorInner() {
           {editMode === "text" ? (
             <>
               {catalogPath && (
-                <div className="flex items-center px-3 py-1.5 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
+                <div className="flex items-center px-3 py-1.5 border-b border-default bg-surface">
                   <Tabs variant="segmented">
                     <Tab selected={textView === "edit"} onClick={() => setTextView("edit")}>
                       {t("editor.textViewEdit", "Edit")}
@@ -638,7 +638,7 @@ function CatalogEditorInner() {
               )}
             </>
           ) : (
-            <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden bg-[var(--bg-primary)]">
+            <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden bg-primary">
               {!catalogPath ? (
                 <div className={emptyStateContainer}>
                   <div className={emptyStateText}>

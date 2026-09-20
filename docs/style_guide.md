@@ -32,11 +32,12 @@ effects from [../frontend/wiretap-ui/src/main.tsx](../frontend/wiretap-ui/src/ma
 
 These are non-negotiable in this codebase:
 
-1. **Use the CSS-variable tokens.** `text-gray-400` becomes `textDataSecondary`
-   (or another data-text token); `bg-zinc-800` becomes `bgSurface`. The tokens
-   read `:root` variables that `useTheme` sets, so one variable change re-themes
-   every use. A raw palette class is fixed to one theme and looks wrong in the
-   other.
+1. **Use the theme's colours.** `text-gray-400` becomes `textSecondary` (or
+   `text-secondary` written out); `bg-zinc-800` becomes `bgSurface`. Every
+   colour utility reads a `:root` variable that `useTheme` sets, so one variable
+   change re-themes every use. A raw palette class is fixed to one theme and
+   looks wrong in the other, and a `var(--x)` spelled inside a class fails the
+   build — the theme's colours are named, not spelled.
 2. **Australian English** in all UI strings, comments, identifiers. "Colour",
    "centralised", "organisation". Project-wide rule from
    [../CLAUDE.md](../CLAUDE.md).
@@ -81,23 +82,47 @@ monospace). `font-mono`, the reset's `code` / `pre` rule and the tables'
 `mono` all read `--font-mono`, so the app has one data face and a `ch` in
 a column width means the same on macOS and Windows.
 
-`useTheme` ([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts))
-toggles `.dark` on `<html>` and sets the theme variables on `:root` from the
-user's settings:
+The theme is one `:root` block in `WireTAP.css` (light) and one `.dark`
+block (dark) — surfaces, text, borders, the four user-settable accents, six
+status sets of `bg` / `text` / `border`, thirteen data accents and the
+BitPreview signal colours. `useTheme`
+([../frontend/wiretap-ui/src/hooks/useTheme.ts](../frontend/wiretap-ui/src/hooks/useTheme.ts))
+toggles `.dark` on `<html>` and overrides the eleven user-settable variables
+inline from the `theme_*` settings.
 
-- `--bg-primary`, `--bg-surface`, `--text-primary`, `--text-secondary`,
-  `--border-default`, `--data-bg`, `--accent-primary`, status colours, etc.
+**Every theme variable is a colour utility by name.** The generator reads the
+`:root` block and names each variable in the `text-`, `bg-` and `border-`
+families (and the families that share their role: `fill-`, `stroke-`,
+`placeholder-`, `decoration-` and `accent-` with text; `from-` / `to-` with
+bg; `divide-`, `ring-` and `outline-` with border). The class value is the
+variable minus `--` and `status-`, and minus the family's own role where the
+name carries one:
 
-Tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts)
-are arbitrary-value utilities that read those variables:
+| Variable | text | bg | border |
+|---|---|---|---|
+| `--text-muted` | `text-muted` | `bg-text-muted` | `border-text-muted` |
+| `--bg-surface` | — | `bg-surface` | — |
+| `--border-default` | — | `bg-border-default` | `border-default` |
+| `--status-info-text` | `text-info` | `bg-info-text` | `border-info-text` |
+| `--status-info-bg` | — | `bg-info` | — |
+| `--status-info-border` | — | `bg-info-border` | `border-info` |
+| `--text-amber` (data accent) | `text-amber` | `bg-text-amber` | `border-text-amber` |
+| `--accent-primary` | `text-accent-primary` | `bg-accent-primary` | `border-accent-primary` |
+| `--bg-hover` | — | `bg-hover`, `hover:bg-hover` | — |
 
-```ts
-export const textPrimary = "text-[color:var(--text-primary)]";
-export const bgSurface = "bg-[var(--bg-surface)]";
-```
+So a dot painted in the info colour is `bg-info-text`, a hairline drawn as a
+`div` is `bg-border-default`, and `text-purple` is always the purple data
+accent (the purple and cyan tones' text reads it too). An alpha works as on
+any colour: `text-accent-primary/70`. Adding a variable to `WireTAP.css`
+adds its utilities — one declaration per line, the way the block is written,
+because the generator (and the guard) reads `^--name:`. A name two variables
+would share fails generation.
 
-Result: a single CSS variable change at runtime re-themes everything that uses
-the token. Hardcoded `text-zinc-100` will not update.
+The tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts)
+name the common ones (`textPrimary = "text-primary"`, `bgSurface =
+"bg-surface"`); the class and the token are interchangeable. The palette
+classes (`text-red-500`, `bg-slate-900`) still compile, for the raw-palette
+sites the register lists — a new site should not add one.
 
 The class vocabulary is Tailwind 4's, kept when the framework was removed so no
 component had to change. The old rule that `dark:` variants "don't work on
@@ -113,55 +138,52 @@ styling goes through the variables.
 
 | Token | Class | Use |
 |---|---|---|
-| `bgPrimary` | `bg-[var(--bg-primary)]` | App background |
-| `bgSurface` | `bg-[var(--bg-surface)]` | Dialogs, panels, cards |
-| `bgDataView` | `bg-[var(--data-bg)]` | Data table background |
-| `textPrimary` | `text-[color:var(--text-primary)]` | Headings, main content |
-| `textSecondary` | `text-[color:var(--text-secondary)]` | Descriptions, labels |
-| `textTertiary` | `text-[color:var(--text-secondary)] opacity-80` | Muted info |
-| `textMuted` | `text-[color:var(--text-muted)]` | Disabled, placeholder |
-| `textDataPrimary` / `-Secondary` / `-Tertiary` / `-Muted` / `-Placeholder` / `-Disabled` | (data CSS vars) | Text inside data views; `-Disabled` pairs with a themed accent for inactive state |
-| `borderDefault` | `border-[color:var(--border-default)]` | Default border |
-| `borderSubtle` | `border-[color:var(--border-default)] opacity-50` | Dividers |
-| `borderDivider` | `border-b border-[color:var(--border-default)]` | Section separators |
-| `bgSuccess` / `bgDanger` / `bgWarning` / `bgInfo` | (status CSS vars) | Status backgrounds |
-| `textSuccess` / `textDanger` / `textWarning` / `textInfo` | (status CSS vars) | Status text |
-| `borderSuccess` / `borderDanger` / `borderWarning` / `borderInfo` | (status CSS vars) | Status borders |
-| `bgPurple` / `textPurple` / `borderPurple` | (purple CSS vars) | Purple highlights |
-| `bgCyan` / `textCyan` / `borderCyan` | (cyan CSS vars) | CAN-FD / enhanced protocol |
-| `textDataGreen` / `-Yellow` / `-Orange` / `-Purple` / `-Amber` / `-Cyan` | (text-{colour} CSS vars) | Cell / syntax highlighting |
-| `bgInteractive` | `bg-[var(--accent-primary)] hover:brightness-110` | Primary action background |
-| `textInteractive` | `text-[color:var(--accent-primary)] hover:brightness-110` | Primary action text |
-| `hoverBg` / `hoverLight` / `hoverSubtle` / `hoverDataItem` / `hoverDataRow` | brightness or `var(--hover-bg)` | Hover states |
-| `dataViewContainer` | `rounded-lg border border-… overflow-hidden` | Standard data "bubble" |
+| `bgPrimary` | `bg-primary` | App background |
+| `bgSurface` | `bg-surface` | Dialogs, panels, cards, toolbars |
+| `bgDataView` | `bg-data` | Data table background |
+| `textPrimary` | `text-primary` | Headings, main content |
+| `textSecondary` | `text-secondary` | Descriptions, labels, data-view secondary text |
+| `textMuted` | `text-muted` | Disabled, placeholder |
+| `textDataPrimary` | `text-data-primary` | Text inside data views |
+| `textDataTertiary` / `-Muted` / `-Disabled` | `text-secondary opacity-80` / `-60` / `text-muted opacity-50` | Reduced emphasis in data views; `-Disabled` pairs with a themed accent for inactive state |
+| `borderDefault` | `border-default` | Default border |
+| `borderDivider` | `border-b border-default` | Section separators |
+| `bgSuccess` / `bgDanger` / `bgInfo` | `bg-success` / `bg-danger` / `bg-info` | Status tints (`bg-warning`, `bg-purple`, `bg-cyan` written out) |
+| `textSuccess` / `textDanger` / `textWarning` / `textInfo` | `text-success` … | Status text |
+| `borderSuccess` / `borderDanger` | `border-success` / `border-danger` | Status borders (`border-warning`, `border-info`, `border-purple`, `border-cyan` written out) |
+| `textDataGreen` / `-Yellow` / `-Orange` / `-Purple` / `-Amber` / `-Cyan` | `text-green` … | Cell / syntax highlighting; the other data accents (`text-red`, `text-blue`, `text-pink`, `text-sky`, `text-indigo`, `text-teal`, `text-emerald`) written out |
+| `hoverBg` / `hoverLight` | `hover:bg-hover` / `hover:brightness-95` | Hover states |
+| `dataViewContainer` | `rounded-lg border border-default overflow-hidden` | Standard data "bubble" |
 
 ### Typography — [typography.ts](../frontend/wiretap-ui/src/styles/typography.ts)
 
 | Token | Use |
 |---|---|
 | `h1` / `h2` / `h3` / `h4` | Heading levels |
-| `bodyDefault` / `bodyLarge` / `bodySmall` | Body text |
+| `bodyDefault` / `bodySmall` | Body text |
 | `mono` / `monoBody` | Code / monospace |
 | `caption` / `captionMuted` | Captions |
 | `emphasis` / `textMedium` | Inline emphasis |
 | `labelSmall` / `labelSmallMuted` / `sectionHeader` / `sectionHeaderText` | Labels and section headers |
-| `truncate` / `lineClamp2` / `lineClamp3` | Truncation |
+| `truncate` | Truncation |
 | `emptyStateContainer` / `emptyStateText` / `emptyStateHeading` / `emptyStateDescription` / `emptyStateHint` | "No data" / "Not connected" displays |
 
 ### Spacing — [spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts)
 
 | Token | Class | Use |
 |---|---|---|
-| `paddingSection` | `p-8` | Large sections |
-| `paddingButton` / `paddingButtonSm` | `px-4 py-2` / `px-3 py-1.5` | Button padding |
-| `paddingIconButton` | `p-2` | Icon buttons |
 | `paddingAppBarX` / `marginAppContent` | `px-4` / `m-2` | App-bar / panel chrome |
-| `gapTight` / `gapSmall` / `gapDefault` / `gapLarge` / `gapXLarge` | `gap-1`/`-2`/`-4`/`-6`/`-8` | Flex/grid gaps |
+| `roundedDefault` | `rounded-lg` | Panel radius |
+| `sectionDivider` | `pt-4 border-t border-default` | Titled-section divider |
+| `gapSmall` / `gapDefault` | `gap-2` / `gap-4` | Flex/grid gaps |
 | `spaceYTight` / `-Small` / `-Default` / `-Large` | `space-y-1`/`-2`/`-4`/`-6` | Vertical spacing |
-| `marginSection` / `marginHeading` / `marginParagraph` | `mb-6`/`-4`/`-2` | Trailing margins |
-| `roundedSm` / `roundedDefault` / `roundedLarge` / `roundedFull` | `rounded` / `-lg` / `-xl` / `-full` | Border radius |
 | `iconXs` … `icon2xl` | `w-3 h-3` … `w-8 h-8` | Icon sizes |
-| `flexRow` / `flexRowGap1`/`-2`/`-3` | flex helpers | Row layouts |
+| `flexRowGap2` / `-3` | `flex items-center gap-2` / `-3` | Row layouts |
+
+Sizes are the spacing scale, in quarter-rems — `min-w-45` is 180 px, `w-22.5`
+is 90 px — and text the size scale, which has a `2xs` step (10 px on a 14 px
+line) below `xs`; an arbitrary `[…]` value is for what the scale cannot say
+(a `vh`, a grid template, a property list), never a length or a size.
 
 ### Buttons — [Button.tsx](../frontend/wiretap-ui/src/components/Button.tsx)
 
@@ -611,11 +633,11 @@ panels) don't need the streaming machinery. Wrap content in
 `dataViewContainer` directly and draw the strip with `<Tabs>` / `<Tab>`:
 
 ```tsx
-import { dataViewContainer, bgDataView, bgDataToolbar } from "../../styles";
+import { dataViewContainer, bgDataView, bgSurface } from "../../styles";
 import { Tab, Tabs } from "../../components/Tabs";
 
 <div className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}>
-  <Tabs className={`flex-shrink-0 px-1 ${bgDataToolbar}`}>
+  <Tabs className={`flex-shrink-0 px-1 ${bgSurface}`}>
     {tabs.map((tab) => (
       <Tab key={tab.id} selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
         {tab.label}
@@ -676,12 +698,12 @@ indicator in the operational footer:
 
 | State | Token | Meaning |
 |---|---|---|
-| `connected` | `bg-[var(--status-success-text)]` | Active, streaming/usable now |
-| `connecting` / `probing` | `bg-[var(--status-info-text)] animate-pulse` | Transient — work in flight |
-| `connectable` | `bg-[var(--status-info-text)]` | Reachable (mDNS scan or recent probe) but not in use |
-| `paused` | `bg-[var(--status-warning-text)]` | (Sessions only — pause state) |
-| `unknown` | `bg-[color:var(--text-muted)]` | Not yet probed and not seen by background discovery |
-| `missing` / `error` | `bg-[var(--status-danger-text)]` | Last probe failed, or active connection in error |
+| `connected` | `bg-success-text` | Active, streaming/usable now |
+| `connecting` / `probing` | `bg-info-text animate-pulse` | Transient — work in flight |
+| `connectable` | `bg-info-text` | Reachable (mDNS scan or recent probe) but not in use |
+| `paused` | `bg-warning-text` | (Sessions only — pause state) |
+| `unknown` | `bg-text-muted` | Not yet probed and not seen by background discovery |
+| `missing` / `error` | `bg-danger-text` | Last probe failed, or active connection in error |
 
 Never hardcode `bg-green-500` etc. — colours must track the active
 theme via the status CSS variables.
@@ -866,18 +888,18 @@ value.toLocaleString(i18n.language);
 
 | ❌ Don't | ✅ Do |
 |---|---|
-| `text-gray-400` in data tables | `textDataSecondary` / `textDataTertiary` / `textDataMuted` |
+| `text-gray-400` in data tables | `textSecondary` / `textDataTertiary` / `textDataMuted` |
 | `bg-blue-600/30 text-blue-400` ad-hoc chip | `<Badge tone="primary">` — `mono` in a data panel |
 | `<input className="w-full px-4 py-2 rounded-lg border …">` | `<Input size="lg">` — the class carries the look, the border and the focus ring |
 | `<select className={…}>` | `<Select>` — draws the app's chevron on both platforms |
 | `<input type="checkbox" className="accent-blue-500">` | `<Checkbox>` — the theme's accent, drawn the same on WebKit and WebView2 |
-| `style={{ color: 'var(--text-secondary)' }}` | `className={textSecondary}` |
+| `style={{ color: 'var(--text-secondary)' }}` / `text-[color:var(--text-secondary)]` | `className={textSecondary}` — or `text-secondary` written out |
 | `<Button>Save</Button>` | `<Button>{t("common:actions.save")}</Button>` |
 | `<button className="px-3 py-1.5 rounded bg-blue-600 text-white …">` | `<Button variant="solid" tone="primary">` — the tone reads the theme's accent |
 | `<button className={`p-1 rounded ${hoverBg}`}>` | `<IconButton size="sm">` |
 | `hover:bg-zinc-700` / `hover:brightness-95` | `hoverBg`, or `<Card interactive>` for a clickable card |
 | `<div className="p-4 rounded-lg border …">` | `<Card padding="lg">` — `tone` for a tinted section |
-| `<div className="p-3 bg-[var(--status-danger-bg)] border …">{error}</div>` | `<Alert tone="danger">{error}</Alert>` — the tone draws the box, the text and the glyph |
+| `<div className="p-3 bg-danger border …">{error}</div>` | `<Alert tone="danger">{error}</Alert>` — the tone draws the box, the text and the glyph |
 
 ## Adding a new app
 
@@ -1002,8 +1024,9 @@ adjacency so related tooling is visible at a glance.
 
 ## Future improvements (non-blocking)
 
-- The long tail (alias variables, unused exports, the escaped `var(--x)`
-  selectors) — the closing stage of the Tailwind Removal Handover. The list
-  rows still written as raw `<button>`s are in the register as a lists family.
+- The raw-palette tail (the session canvas nodes, the result views' hues)
+  and this guide's rewrite around the primitives — the closing stage of the
+  Tailwind Removal Handover. The list rows still written as raw `<button>`s
+  are in the register as a lists family.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.

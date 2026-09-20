@@ -17,7 +17,7 @@ import { PaginationToolbar, TimelineSection, BYTE_PAGE_SIZE_OPTIONS } from '../.
 import { Table } from '../../../../components/Table';
 import {
   bgDataView,
-  textDataSecondary,
+  textSecondary,
   textDataTertiary,
   textDataGreen,
   textDataYellow,
@@ -310,7 +310,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
 
   // Byte count info for toolbar
   const byteCountInfo = (
-    <span className={`text-xs ${textDataSecondary}`}>
+    <span className={`text-xs ${textSecondary}`}>
       {t("serial.byteCount", { count: byteCount.toLocaleString() })}
       {isStreaming && (
         <span className={`ml-2 ${textDataGreen} bg-green-900/30 px-1.5 py-0.5 rounded font-medium`}>

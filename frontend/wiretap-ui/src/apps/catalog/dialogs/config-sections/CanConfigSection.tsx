@@ -211,7 +211,7 @@ export default function CanConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
+        <div className="p-4 space-y-4 border-t border-default">
           {/* Default Byte Order */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
@@ -355,7 +355,7 @@ export default function CanConfigSection({
           </div>
 
           {/* Header Fields Section */}
-          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
+          <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -405,7 +405,7 @@ export default function CanConfigSection({
                         </IconButton>
 
                         {/* Field name */}
-                        <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
+                        <span className="w-28 font-medium text-sm text-primary truncate">
                           {field.name}
                         </span>
 
@@ -486,7 +486,7 @@ export default function CanConfigSection({
 
             {/* Add new field form */}
             {isAddingField && (
-              <div className="p-3 bg-[var(--bg-green-subtle)] rounded-lg border border-[color:var(--border-green)]">
+              <div className="p-3 bg-success rounded-lg border border-success">
                 <div className="flex items-center gap-2 mb-3">
                   {/* Field type dropdown */}
                   <Select
@@ -559,7 +559,7 @@ export default function CanConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
+        <div className={`px-4 py-2 ${caption} border-t border-default`}>
           Byte order: {defaultEndianness}
           {defaultInterval !== undefined && ` • Interval: ${defaultInterval}ms`}
           {defaultExtended !== undefined && ` • Extended: ${defaultExtended ? "Yes" : "No"}`}

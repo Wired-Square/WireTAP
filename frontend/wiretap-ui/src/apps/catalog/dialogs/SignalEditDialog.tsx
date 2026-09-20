@@ -214,7 +214,7 @@ export default function SignalEditDialog({
                 />
                 <label
                   htmlFor="signal-signed"
-                  className={`${labelSmall} ${isFormatDisabled ? "text-[color:var(--text-muted)]" : ""}`}
+                  className={`${labelSmall} ${isFormatDisabled ? "text-muted" : ""}`}
                 >
                   {t("signalEdit.signed")}
                 </label>
@@ -312,7 +312,7 @@ export default function SignalEditDialog({
               >
                 <Select
                   size="lg"
-                  className={!fields.endianness ? "text-[color:var(--text-muted)]" : ""}
+                  className={!fields.endianness ? "text-muted" : ""}
                   value={fields.endianness || ""}
                   onChange={(e) => setFields({ ...fields, endianness: e.target.value === "" ? undefined : e.target.value as "little" | "big" })}
                 >

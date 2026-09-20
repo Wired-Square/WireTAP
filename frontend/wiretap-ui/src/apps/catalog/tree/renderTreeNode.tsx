@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { hoverLight } from "../../../styles";
-import { textMuted } from "../../../styles/colourTokens";
+import { textMuted, textSecondary } from "../../../styles/colourTokens";
 import { formatFrameId as formatId } from "../../../utils/frameIds";
 import { parseCanIdToNumber } from "../utils";
 import type { TomlNode } from "../types";
@@ -33,17 +33,17 @@ export type CreateRenderTreeNodeArgs = {
  * CAN/Modbus/Serial. Copy (Link2) and mirror (Layers) indicators are separate.
  */
 const NODE_ICON: Record<string, { Icon: LucideIcon; cls: string }> = {
-  "can-frame":     { Icon: Network,  cls: "text-[color:var(--text-green)]" },
-  "modbus-frame":  { Icon: Server,   cls: "text-[color:var(--text-amber)]" },
-  "serial-frame":  { Icon: Cable,    cls: "text-[color:var(--text-purple)]" },
+  "can-frame":     { Icon: Network,  cls: "text-green" },
+  "modbus-frame":  { Icon: Server,   cls: "text-amber" },
+  "serial-frame":  { Icon: Cable,    cls: "text-purple" },
   "can-config":    { Icon: Settings, cls: textMuted },
   "modbus-config": { Icon: Settings, cls: textMuted },
   "serial-config": { Icon: Settings, cls: textMuted },
-  signal:          { Icon: Zap,           cls: "text-[color:var(--text-amber)]" },
+  signal:          { Icon: Zap,           cls: "text-amber" },
   checksum:        { Icon: Lock,          cls: textMuted },
   meta:            { Icon: ClipboardList, cls: textMuted },
   node:            { Icon: User,          cls: textMuted },
-  mux:             { Icon: Shuffle,       cls: "text-[color:var(--accent-blue)]" },
+  mux:             { Icon: Shuffle,       cls: "text-blue" },
   "mux-case":      { Icon: MapPin,        cls: textMuted },
 };
 
@@ -71,7 +71,7 @@ export function createRenderTreeNode({
       <div key={nodePath}>
         <div
           className={`flex items-center gap-1 px-2 py-1.5 ${hoverLight} cursor-pointer rounded ${
-            isSelected ? "bg-[var(--selected-bg)] text-[color:var(--selected-text)]" : ""
+            isSelected ? "bg-info text-info" : ""
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={() => onNodeClick(node)}
@@ -98,12 +98,12 @@ export function createRenderTreeNode({
           <span className="text-sm truncate flex items-center gap-1.5">
             {isCopy && (
               <span title={`Copied from ${node.metadata?.copyFrom}`}>
-                <Link2 className={`${iconSm} text-[color:var(--accent-blue)] flex-shrink-0`} />
+                <Link2 className={`${iconSm} text-blue flex-shrink-0`} />
               </span>
             )}
             {isMirror && (
               <span title={`Mirror of ${node.metadata?.mirrorOf}`}>
-                <Layers className={`${iconSm} text-[color:var(--accent-purple)] flex-shrink-0`} />
+                <Layers className={`${iconSm} text-purple flex-shrink-0`} />
               </span>
             )}
             {(() => {
@@ -126,7 +126,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span>{id}</span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -163,13 +163,13 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
-                      <span className="tree-secondary-text text-xs">
+                      <span className={`${textSecondary} text-xs`}>
                         ({node.metadata?.muxStartBit}:{node.metadata?.muxBitLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -185,7 +185,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span>{node.key}</span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -213,13 +213,13 @@ export function createRenderTreeNode({
                     )}
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
-                      <span className="tree-secondary-text text-xs">
+                      <span className={`${textSecondary} text-xs`}>
                         ({node.metadata?.signalStartBit}:{node.metadata?.signalBitLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -239,18 +239,18 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
                     {algorithm && (
-                      <span className="text-[color:var(--accent-purple)] text-xs font-medium">
+                      <span className="text-purple text-xs font-medium">
                         [{algorithm}]
                       </span>
                     )}
                     {startByte !== undefined && byteLength !== undefined && (
-                      <span className="tree-secondary-text text-xs">
+                      <span className={`${textSecondary} text-xs`}>
                         (byte {startByte}:{byteLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -266,7 +266,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span>{node.key}</span>
                   {truncatedNote && (
-                    <span className="tree-secondary-text text-xs italic">
+                    <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
                     </span>
                   )}
@@ -277,7 +277,7 @@ export function createRenderTreeNode({
             )}
             {node.type === "array" && ` [${node.metadata?.arrayItems?.length || 0}]`}
             {node.type === "value" && node.value !== undefined && (
-              <span className="tree-secondary-text ml-1">
+              <span className={`${textSecondary} ml-1`}>
                 = {String(node.value).substring(0, 20)}
                 {String(node.value).length > 20 ? "..." : ""}
               </span>

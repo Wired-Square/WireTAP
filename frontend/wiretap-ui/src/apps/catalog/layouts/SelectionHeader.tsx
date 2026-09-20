@@ -58,22 +58,22 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] flex items-center gap-3">
+        <h2 className="text-2xl font-bold text-primary flex items-center gap-3">
           {selectedNode.metadata?.isCopy && (
             <span title={`Copied from ${selectedNode.metadata?.copyFrom}`}>
-              <Link2 className={`${iconXl} text-[color:var(--accent-primary)]`} />
+              <Link2 className={`${iconXl} text-accent-primary`} />
             </span>
           )}
           {selectedNode.metadata?.isMirror && (
             <span title={`Mirror of ${selectedNode.metadata?.mirrorOf}`}>
-              <Layers className={`${iconXl} text-[color:var(--accent-purple)]`} />
+              <Layers className={`${iconXl} text-purple`} />
             </span>
           )}
           {idLabel ? (
             <span className={flexRowGap2}>
               <span>{idLabel.primary}</span>
               {idLabel.secondary && (
-                <span className="text-[color:var(--text-muted)] text-lg">({idLabel.secondary})</span>
+                <span className="text-muted text-lg">({idLabel.secondary})</span>
               )}
             </span>
           ) : (
@@ -84,19 +84,19 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
           <div className="flex gap-2">
             {onEdit && (
               <IconButton onClick={onEdit} title="Edit frame">
-                <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+                <Pencil className={`${iconMd} text-secondary`} />
               </IconButton>
             )}
             {onDelete && (
               <IconButton onClick={onDelete} tone="danger" title="Delete frame">
-                <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+                <Trash2 className={`${iconMd} text-danger`} />
               </IconButton>
             )}
           </div>
         )}
       </div>
 
-      <div className={`${flexRowGap2} text-sm text-[color:var(--text-muted)]`}>
+      <div className={`${flexRowGap2} text-sm text-muted`}>
         <Badge size="lg">{labelForNode(selectedNode)}</Badge>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
         {selectedNode.metadata?.isCopy && (

@@ -139,7 +139,7 @@ export default function FindBar() {
   return (
     <div className="flex items-center gap-1.5">
       <div className="relative flex-1">
-        <Search className={`${iconSm} absolute left-2 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)] pointer-events-none`} />
+        <Search className={`${iconSm} absolute left-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none`} />
         <Input
           ref={inputRef}
           id={CATALOG_SEARCH_INPUT_ID}
@@ -153,7 +153,7 @@ export default function FindBar() {
       </div>
 
       {hasQuery && (
-        <span className="text-xs text-[color:var(--text-muted)] tabular-nums whitespace-nowrap">
+        <span className="text-xs text-muted tabular-nums whitespace-nowrap">
           {matchCount > 0
             ? t("findBar.currentOfTotal", { current: currentMatch, total: matchCount })
             : t("findBar.noResults")}

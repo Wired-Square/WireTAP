@@ -9,9 +9,9 @@ import { Button } from "../../../../components/Button";
 type SectionTone = "success" | "purple" | "warning";
 
 const WELL: Record<SectionTone, string> = {
-  success: "bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]",
-  purple: "bg-[var(--status-purple-bg)] text-[color:var(--status-purple-text)]",
-  warning: "bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]",
+  success: "bg-success text-success",
+  purple: "bg-purple text-purple",
+  warning: "bg-warning text-warning",
 };
 
 export interface ConfigSectionHeaderProps {
@@ -45,20 +45,20 @@ export function ConfigSectionHeader({
       tabIndex={0}
       onClick={onToggleExpanded}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onToggleExpanded(); }}
-      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors"
+      className="w-full flex items-center justify-between px-4 py-3 hover:bg-hover transition-colors"
     >
       <div className="flex items-center gap-3">
         <Chevron className={`${iconMd} text-slate-500`} />
         <div className={`p-1.5 rounded ${WELL[tone]}`}>{icon}</div>
-        <span className="font-medium text-[color:var(--text-primary)]">{label}</span>
+        <span className="font-medium text-primary">{label}</span>
         {isConfigured && (
-          <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
+          <span className="flex items-center gap-1 text-xs text-green">
             <Check className={iconXs} />
             configured
           </span>
         )}
         {showWarning && (
-          <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
+          <span className="flex items-center gap-1 text-xs text-amber">
             <AlertTriangle className={iconXs} />
             frames exist, no config
           </span>

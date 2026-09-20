@@ -346,7 +346,7 @@ export default function SessionManager() {
       <Dialog isOpen={addSourceSessionId !== null} onClose={() => setAddSourceSessionId(null)} size="sm" title={t("addSource.title")}>
         <DialogBody>
           {availableProfiles.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">
+            <p className="text-sm text-muted">
               {t("addSource.noProfiles")}
             </p>
           ) : (
@@ -355,10 +355,10 @@ export default function SessionManager() {
                 <button
                   key={profile.id}
                   onClick={() => handleAddSourceConfirm(profile.id)}
-                  className="w-full text-left px-3 py-2 rounded text-sm text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors"
+                  className="w-full text-left px-3 py-2 rounded text-sm text-primary hover:bg-hover transition-colors"
                 >
                   <span className="font-medium">{profile.name}</span>
-                  <span className="text-[color:var(--text-muted)] ml-2 text-xs">
+                  <span className="text-muted ml-2 text-xs">
                     {profile.kind}
                   </span>
                 </button>

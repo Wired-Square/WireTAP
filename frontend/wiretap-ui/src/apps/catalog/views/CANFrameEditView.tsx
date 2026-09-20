@@ -39,8 +39,8 @@ export default function CANFrameEditView({
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{resolvedTitle}</h2>
-        <p className="text-sm text-[color:var(--text-muted)]">{resolvedSubtitle}</p>
+        <h2 className="text-2xl font-bold text-primary mb-2">{resolvedTitle}</h2>
+        <p className="text-sm text-muted">{resolvedSubtitle}</p>
       </div>
 
       <div className="space-y-4">

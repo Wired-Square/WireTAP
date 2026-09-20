@@ -43,7 +43,7 @@ export default function FlexSeparator() {
   return (
     <div
       ref={ref}
-      className={`w-px h-5 bg-[var(--border-default)] mx-1 shrink-0 transition-opacity ${
+      className={`w-px h-5 bg-border-default mx-1 shrink-0 transition-opacity ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     />

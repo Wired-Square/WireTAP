@@ -168,7 +168,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
 
   if (!framingResults && !payloadResults) {
     return (
-      <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
+      <div className="flex items-center justify-center h-full text-muted">
         {t("serialAnalysis.runPrompt")}
       </div>
     );
@@ -183,12 +183,12 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
       <div className="h-full overflow-y-auto p-4 pb-8 space-y-6">
         {/* Summary Header */}
         <Card tone="info" padding="lg" className="flex items-center gap-4">
-          <Layers className={`${icon2xl} text-[color:var(--status-info-text)]`} />
+          <Layers className={`${icon2xl} text-info`} />
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
+            <h3 className="text-lg font-semibold text-primary">
               {t("serialAnalysis.framingTitle")}
             </h3>
-            <p className="text-sm text-[color:var(--text-muted)] mt-1">
+            <p className="text-sm text-muted mt-1">
               {t("serialAnalysis.framingByteCount", { count: framingResult.byteCount.toLocaleString() })}
             </p>
           </div>
@@ -211,10 +211,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
               <Info className={iconMd} />
               <span>{t("serialAnalysis.summary")}</span>
             </div>
-            <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
+            <ul className="space-y-1 text-sm text-secondary">
               {framingResult.notes.map((note, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-[color:var(--text-muted)] mt-0.5">•</span>
+                  <span className="text-muted mt-0.5">•</span>
                   <span>{note}</span>
                 </li>
               ))}
@@ -246,12 +246,12 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                       key={idx}
                       className={`p-3 rounded-lg border ${
                         isApplied
-                          ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
+                          ? "bg-info border-info"
                           : idx === 0 && candidate.confidence >= 70
-                            ? "bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]"
+                            ? "bg-success border-success"
                             : candidate.confidence >= 50
-                              ? "bg-[var(--status-warning-bg)] border-[color:var(--status-warning-border)]"
-                              : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
+                              ? "bg-warning border-warning"
+                              : "bg-surface border-default"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -272,19 +272,19 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm text-[color:var(--text-secondary)] mt-1">
+                          <div className="text-sm text-secondary mt-1">
                             <span className={
                               candidate.confidence >= 70
-                                ? "text-[color:var(--text-green)] font-medium"
+                                ? "text-green font-medium"
                                 : candidate.confidence >= 50
-                                  ? "text-[color:var(--text-amber)]"
+                                  ? "text-amber"
                                   : ""
                             }>
                               {t("serialAnalysis.confidencePercent", { percent: candidate.confidence })}
                             </span>
-                            <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                            <span className="mx-2 text-muted">|</span>
                             {t("serialAnalysis.estFrames", { count: candidate.estimatedFrameCount.toLocaleString() })}
-                            <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                            <span className="mx-2 text-muted">|</span>
                             {t("serialAnalysis.avgFrameLength", { count: candidate.avgFrameLength })}
                           </div>
                           {candidate.notes.length > 0 && (
@@ -320,11 +320,11 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         </div>
 
         {/* Next Steps */}
-        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+        <div className="p-4 bg-surface rounded-lg">
           <h4 className={`${sectionHeaderText} mb-2`}>
             {t("serialAnalysis.nextSteps")}
           </h4>
-          <ol className="text-sm text-[color:var(--text-secondary)] space-y-1 list-decimal list-inside">
+          <ol className="text-sm text-secondary space-y-1 list-decimal list-inside">
             <li>{t("serialAnalysis.nextStep1")}</li>
             <li>{t("serialAnalysis.nextStep2")}</li>
             <li>{t("serialAnalysis.nextStep3")}</li>
@@ -344,12 +344,12 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
   return (
     <div className="h-full overflow-y-auto p-4 pb-8 space-y-6">
       {/* Summary Header */}
-      <div className="flex items-center gap-4 p-4 bg-[var(--bg-surface)] rounded-lg">
+      <div className="flex items-center gap-4 p-4 bg-surface rounded-lg">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
+          <h3 className="text-lg font-semibold text-primary">
             {t("serialAnalysis.frameStructureTitle")}
           </h3>
-          <p className="text-sm text-[color:var(--text-muted)] mt-1">
+          <p className="text-sm text-muted mt-1">
             {t("serialAnalysis.framesAnalyzed", { count: analysisResult.frameCount.toLocaleString() })}
             {analysisResult.hasVaryingLength
               ? ` ${t("serialAnalysis.lengthRange", { min: analysisResult.minLength, max: analysisResult.maxLength })}`
@@ -375,10 +375,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
             <Info className={iconMd} />
             <span>{t("serialAnalysis.summary")}</span>
           </div>
-          <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
+          <ul className="space-y-1 text-sm text-secondary">
             {analysisResult.notes.map((note, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-[color:var(--text-muted)] mt-0.5">•</span>
+                <span className="text-muted mt-0.5">•</span>
                 <span>{note}</span>
               </li>
             ))}
@@ -397,7 +397,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         </div>
 
         {analysisResult.candidateIdGroups.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)] italic">
+          <p className="text-sm text-muted italic">
             {t("serialAnalysis.noIdPatterns")}
           </p>
         ) : (
@@ -412,10 +412,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                     key={idx}
                     className={`p-3 rounded-lg border ${
                       isApplied
-                        ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
+                        ? "bg-info border-info"
                         : idx === 0
-                          ? "bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]"
-                          : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
+                          ? "bg-success border-success"
+                          : "bg-surface border-default"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -436,13 +436,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             </Badge>
                           )}
                         </div>
-                        <div className="text-sm text-[color:var(--text-secondary)] mt-1">
+                        <div className="text-sm text-secondary mt-1">
                           {t("serialAnalysis.distinctValues", { count: candidate.uniqueValues.length })}
-                          <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                          <span className="mx-2 text-muted">|</span>
                           {t("serialAnalysis.confidencePercent", { percent: candidate.confidence.toFixed(0) })}
                         </div>
                         {candidate.notes.length > 0 && (
-                          <div className="text-xs text-[color:var(--text-muted)] mt-1">
+                          <div className="text-xs text-muted mt-1">
                             {candidate.notes.join(" • ")}
                           </div>
                         )}
@@ -469,10 +469,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                     {candidate.uniqueValues.length <= 20 && (
                       <div className={`mt-2 pt-2 border-t ${
                         isApplied
-                          ? "border-[color:var(--status-info-border)]"
+                          ? "border-info"
                           : idx === 0
-                            ? "border-[color:var(--status-success-border)]"
-                            : "border-[color:var(--border-default)]"
+                            ? "border-success"
+                            : "border-default"
                       }`}>
                         <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleValues")}</div>
                         <div className="flex flex-wrap gap-1">
@@ -507,7 +507,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         </div>
 
         {analysisResult.candidateSourceAddresses.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)] italic">
+          <p className="text-sm text-muted italic">
             {t("serialAnalysis.noSourcePatterns")}
           </p>
         ) : (
@@ -522,10 +522,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                     key={idx}
                     className={`p-3 rounded-lg border ${
                       isApplied
-                        ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
+                        ? "bg-info border-info"
                         : idx === 0
-                          ? "bg-[var(--status-purple-bg)] border-[color:var(--status-purple-border)]"
-                          : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
+                          ? "bg-purple border-purple"
+                          : "bg-surface border-default"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -546,13 +546,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             </Badge>
                           )}
                         </div>
-                        <div className="text-sm text-[color:var(--text-secondary)] mt-1">
+                        <div className="text-sm text-secondary mt-1">
                           {t("serialAnalysis.distinctAddresses", { count: candidate.uniqueValues.length })}
-                          <span className="mx-2 text-[color:var(--text-muted)]">|</span>
+                          <span className="mx-2 text-muted">|</span>
                           {t("serialAnalysis.confidencePercent", { percent: candidate.confidence.toFixed(0) })}
                         </div>
                         {candidate.notes.length > 0 && (
-                          <div className="text-xs text-[color:var(--text-muted)] mt-1">
+                          <div className="text-xs text-muted mt-1">
                             {candidate.notes.join(" • ")}
                           </div>
                         )}
@@ -579,10 +579,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                     {candidate.uniqueValues.length <= 20 && (
                       <div className={`mt-2 pt-2 border-t ${
                         isApplied
-                          ? "border-[color:var(--status-info-border)]"
+                          ? "border-info"
                           : idx === 0
-                            ? "border-[color:var(--status-purple-border)]"
-                            : "border-[color:var(--border-default)]"
+                            ? "border-purple"
+                            : "border-default"
                       }`}>
                         <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleAddresses")}</div>
                         <div className="flex flex-wrap gap-1">
@@ -617,7 +617,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         </div>
 
         {analysisResult.candidateChecksums.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)] italic">
+          <p className="text-sm text-muted italic">
             {t("serialAnalysis.noChecksumPatterns")}
           </p>
         ) : (

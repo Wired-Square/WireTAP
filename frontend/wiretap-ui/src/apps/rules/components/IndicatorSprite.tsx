@@ -3,7 +3,7 @@
 // SVG indicator sprite inspired by WireTAP logo — rounded square outer,
 // filled inner section. Defined as SVG symbol for reuse via <use>.
 
-import { textTertiary } from "../../../styles";
+import { textSecondary } from "../../../styles";
 
 interface IndicatorSpriteProps {
   colour: string;
@@ -64,7 +64,7 @@ export default function IndicatorSprite({
         <use href="#indicator-sprite" />
       </svg>
       {label && (
-        <span className={`text-xs ${textTertiary} text-center truncate max-w-[60px]`}>
+        <span className={`text-xs ${textSecondary} text-center truncate max-w-15`}>
           {label}
         </span>
       )}

@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { FileText, Pencil, Network, Cable, Check } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, bgSecondary, captionMuted, sectionHeaderText } from "../../../styles";
+import { labelSmallMuted, monoBody, bgSurface, captionMuted, sectionHeaderText } from "../../../styles";
 import type { MetaFields, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Card } from "../../../components/Card";
@@ -34,14 +34,14 @@ export default function MetaView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[var(--accent-bg)] rounded-lg">
-            <FileText className={`${iconLg} text-[color:var(--accent-text)]`} />
+          <div className="p-2 bg-info rounded-lg">
+            <FileText className={`${iconLg} text-info`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-[color:var(--text-primary)]">
+            <div className="text-lg font-bold text-primary">
               {t("metaView.title")}
             </div>
-            <p className="text-sm text-[color:var(--text-muted)]">
+            <p className="text-sm text-muted">
               {t("metaView.subtitle")}
             </p>
           </div>
@@ -50,13 +50,13 @@ export default function MetaView({
           onClick={onEditMeta}
           title={t("metaView.editTooltip")}
         >
-          <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+          <Pencil className={`${iconMd} text-secondary`} />
         </IconButton>
       </div>
 
       {/* Property cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("metaView.name")} <span className="text-red-500">{t("metaView.required")}</span>
           </div>
@@ -65,7 +65,7 @@ export default function MetaView({
           </div>
         </div>
 
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+        <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("metaView.version")} <span className="text-red-500">{t("metaView.required")}</span>
           </div>
@@ -83,14 +83,14 @@ export default function MetaView({
 
         {/* CAN Config */}
         <ProtocolConfigCard
-          icon={<Network className={`${iconMd} text-[color:var(--status-success)]`} />}
-          iconBg="bg-[var(--status-success-bg)]"
+          icon={<Network className={`${iconMd} text-success`} />}
+          iconBg="bg-success"
           name={t("metaView.canName")}
           isConfigured={!!canConfig}
           hasFrames={hasCanFrames}
         >
           {canConfig && (
-            <div className="text-xs text-[color:var(--text-muted)]">
+            <div className="text-xs text-muted">
               <span>{t("metaView.byteOrder", { order: canConfig.default_endianness })}</span>
               {canConfig.default_interval !== undefined && (
                 <span> • {t("metaView.intervalMs", { ms: canConfig.default_interval })}</span>
@@ -107,14 +107,14 @@ export default function MetaView({
 
         {/* Serial Config */}
         <ProtocolConfigCard
-          icon={<Cable className={`${iconMd} text-[color:var(--status-info)]`} />}
-          iconBg="bg-[var(--status-info-bg)]"
+          icon={<Cable className={`${iconMd} text-info`} />}
+          iconBg="bg-info"
           name={t("metaView.serialName")}
           isConfigured={!!serialConfig}
           hasFrames={hasSerialFrames}
         >
           {serialConfig && (
-            <div className="text-xs text-[color:var(--text-muted)]">
+            <div className="text-xs text-muted">
               <span>{t("metaView.encoding", { encoding: serialConfig.encoding?.toUpperCase() })}</span>
               {serialConfig.byte_order && (
                 <span> • {serialConfig.byte_order === 'big' ? t("metaView.endianBE") : t("metaView.endianLE")}</span>
@@ -134,14 +134,14 @@ export default function MetaView({
 
         {/* Modbus Config */}
         <ProtocolConfigCard
-          icon={<Network className={`${iconMd} text-[color:var(--status-warning)]`} />}
-          iconBg="bg-[var(--status-warning-bg)]"
+          icon={<Network className={`${iconMd} text-warning`} />}
+          iconBg="bg-warning"
           name={t("metaView.modbusName")}
           isConfigured={!!modbusConfig}
           hasFrames={hasModbusFrames}
         >
           {modbusConfig && (
-            <div className="text-xs text-[color:var(--text-muted)]">
+            <div className="text-xs text-muted">
               {modbusConfig.device_address !== undefined && (
                 <span>{t("metaView.address", { addr: modbusConfig.device_address })} • </span>
               )}
@@ -189,15 +189,15 @@ function ProtocolConfigCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
-          <span className="font-medium text-sm text-[color:var(--text-primary)]">{name}</span>
+          <span className="font-medium text-sm text-primary">{name}</span>
           {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--status-success)]">
+            <span className="flex items-center gap-1 text-xs text-success">
               <Check className={iconXs} />
               {t("metaView.configured")}
             </span>
           )}
           {showWarning && (
-            <span className="text-xs text-[color:var(--status-warning)]">
+            <span className="text-xs text-warning">
               {t("metaView.framesNoConfig")}
             </span>
           )}

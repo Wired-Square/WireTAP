@@ -67,18 +67,18 @@ export interface FrameLinkDevicePickerProps {
 function dotClassFor(state: DeviceVisualState): string {
   switch (state) {
     case "connected":
-      return "bg-[var(--status-success-text)]";
+      return "bg-success-text";
     case "connectable":
-      return "bg-[var(--status-info-text)]";
+      return "bg-info-text";
     case "connecting":
     case "probing":
-      return "bg-[var(--status-info-text)] animate-pulse";
+      return "bg-info-text animate-pulse";
     case "missing":
     case "error":
-      return "bg-[var(--status-danger-text)]";
+      return "bg-danger-text";
     case "unknown":
     default:
-      return "bg-[color:var(--text-muted)]";
+      return "bg-text-muted";
   }
 }
 
@@ -172,7 +172,7 @@ export default function FrameLinkDevicePicker({
         <span className="max-w-40 truncate">{buttonLabel}</span>
       </Button>
 
-      <Popover {...picker.popover} role="listbox" className="menu min-w-[260px] max-w-[360px]">
+      <Popover {...picker.popover} role="listbox" className="menu min-w-65 max-w-90">
           {devices.length === 0 ? (
             <div className={`px-3 py-2 ${textSecondary}`}>
               {t("framelinkPicker.empty")}
@@ -202,7 +202,7 @@ export default function FrameLinkDevicePicker({
                     {d.label}
                   </span>
                   <span
-                    className={`font-mono text-[11px] text-[color:var(--text-muted)] truncate`}
+                    className={`font-mono text-xs text-muted truncate`}
                   >
                     {d.host}:{d.port}
                   </span>
@@ -220,28 +220,28 @@ function StateSuffix({ state }: { state: DeviceVisualState }) {
   const { t } = useTranslation("common");
   if (state === "connected") {
     return (
-      <span className={`text-[11px] ${textSuccess}`}>
+      <span className={`text-xs ${textSuccess}`}>
         {t("framelinkPicker.state.connected")}
       </span>
     );
   }
   if (state === "connecting") {
     return (
-      <span className={`text-[11px] ${textWarning}`}>
+      <span className={`text-xs ${textWarning}`}>
         {t("framelinkPicker.state.connecting")}
       </span>
     );
   }
   if (state === "probing") {
     return (
-      <span className={`text-[11px] ${textWarning}`}>
+      <span className={`text-xs ${textWarning}`}>
         {t("framelinkPicker.state.checking")}
       </span>
     );
   }
   if (state === "missing" || state === "error") {
     return (
-      <span className={`text-[11px] ${textDanger}`}>
+      <span className={`text-xs ${textDanger}`}>
         {t("framelinkPicker.state.missing")}
       </span>
     );

@@ -58,7 +58,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? "border-blue-500"
     : isError
     ? "border-red-500"
-    : "border-[color:var(--border-default)]";
+    : "border-default";
 
   const bgColour = isRunning
     ? "bg-green-500/10"
@@ -68,7 +68,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? "bg-blue-500/10"
     : isError
     ? "bg-red-500/10"
-    : "bg-[var(--bg-surface)]";
+    : "bg-surface";
 
   const stateIcon = isRunning ? (
     <Radio className={`${iconXs} text-green-500 animate-pulse`} />
@@ -94,7 +94,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-[180px] shadow-lg`}
+      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-45 shadow-lg`}
     >
       {/* Output handles on the right edge (same style as app input handle) */}
       {Array.from({ length: totalOutputHandles }, (_, i) => (
@@ -129,7 +129,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
                 }
               />
               <span
-                className={`text-[10px] font-mono ${
+                className={`text-2xs font-mono ${
                   enabled ? textDataCyan : textDataDisabled
                 }`}
               >
@@ -145,7 +145,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
               position={Position.Left}
               className="!w-3 !h-3 !bg-cyan-800 !border-2 !border-dashed !border-cyan-600 !opacity-40 !relative !transform-none !top-0 !left-0"
             />
-            <span className={`text-[10px] font-mono ${textMuted} opacity-40`}>
+            <span className={`text-2xs font-mono ${textMuted} opacity-40`}>
               {nextInputBus}
             </span>
           </div>
@@ -156,7 +156,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <Database className={`${iconSm} text-cyan-400`} />
-            <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
+            <span className="font-medium text-sm text-primary truncate">
               {label}
             </span>
           </div>
@@ -164,13 +164,13 @@ function SessionNode({ data, selected }: SessionNodeProps) {
           {/* State indicator */}
           <div className="flex items-center gap-2 mb-2">
             {stateIcon}
-            <span className="text-xs text-[color:var(--text-secondary)]">
+            <span className="text-xs text-secondary">
               {stateLabel}
             </span>
           </div>
 
           {/* Details */}
-          <div className="space-y-1 text-xs text-[color:var(--text-muted)]">
+          <div className="space-y-1 text-xs text-muted">
             <div className="flex items-center gap-1">
               <Users className={iconXs} />
               <span>
@@ -182,7 +182,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
                 {t("node.session.framesBuffered", { count: session.captureFrameCount })}
               </div>
             )}
-            <div className="text-[10px] opacity-70">{session.sourceType === "capture" ? "sqlite" : session.sourceType}</div>
+            <div className="text-2xs opacity-70">{session.sourceType === "capture" ? "sqlite" : session.sourceType}</div>
           </div>
         </div>
       </div>

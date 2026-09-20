@@ -6,7 +6,7 @@ import type { TFunction } from "i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog, { DialogBody } from "../components/Dialog";
 import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
-import { borderDefault, spaceYSmall, textTertiary } from "../styles";
+import { borderDefault, spaceYSmall, textSecondary } from "../styles";
 import MessageOrderToolPanel from "../apps/discovery/views/tools/MessageOrderToolPanel";
 import ChangesToolPanel from "../apps/discovery/views/tools/ChangesToolPanel";
 import SerialFramingToolPanel from "../apps/discovery/views/tools/SerialFramingToolPanel";
@@ -233,17 +233,17 @@ export default function ToolboxDialog({
                 disabled={isDisabled}
                 className={`flex items-start gap-3 w-full p-3 rounded-lg text-left transition-all ${
                   isDisabled
-                    ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
+                    ? "bg-surface text-muted cursor-not-allowed"
                     : isActive
-                      ? "bg-purple-100 text-[color:var(--text-purple)] ring-2 ring-purple-500"
-                      : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] ring-1 ring-[color:var(--border-default)] hover:ring-2 hover:ring-purple-400"
+                      ? "bg-purple-100 text-purple ring-2 ring-purple-500"
+                      : "bg-surface text-secondary ring-1 ring-default hover:ring-2 hover:ring-purple-400"
                 }`}
                 title={disabledReason ?? (isActive ? t("toolbox.showAllTools") : label)}
               >
-                <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-[color:var(--text-purple)]" : ""}`} />
+                <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-purple" : ""}`} />
                 <div>
                   <div className="font-medium text-sm">{label}</div>
-                  <div className={`text-xs mt-0.5 ${isActive ? "text-[color:var(--text-purple)] opacity-70" : "text-[color:var(--text-muted)]"}`}>
+                  <div className={`text-xs mt-0.5 ${isActive ? "text-purple opacity-70" : "text-muted"}`}>
                     {description}
                   </div>
                 </div>
@@ -275,7 +275,7 @@ export default function ToolboxDialog({
         {/* Selection count and run button (for analysis tools, not modbus scan) */}
         {effectiveTool && !isActiveModbusScan && (
           <div className={`border-t ${borderDefault} pt-3 ${spaceYSmall}`}>
-            <div className={`text-sm ${textTertiary}`}>
+            <div className={`text-sm ${textSecondary}`}>
               {getSelectionText(t, effectiveTool, effectiveSelectedCount, isSerialMode, isFilteredView)}
             </div>
             <Button
@@ -298,14 +298,14 @@ export default function ToolboxDialog({
 
         {/* Help text when no tool selected */}
         {!effectiveTool && availableTools.some((tool) => isToolAvailable(tool)) && (
-          <div className={`text-xs ${textTertiary} text-center py-2`}>
+          <div className={`text-xs ${textSecondary} text-center py-2`}>
             {t("toolbox.selectTool")}
           </div>
         )}
 
         {/* Help text when no data */}
         {!availableTools.some(t => isToolAvailable(t)) && (
-          <div className={`text-xs ${textTertiary} text-center py-2`}>
+          <div className={`text-xs ${textSecondary} text-center py-2`}>
             {isSerialMode ? t("toolbox.noDataSerial") : t("toolbox.noDataDefault")}
           </div>
         )}

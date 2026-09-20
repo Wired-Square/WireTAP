@@ -29,12 +29,12 @@ export default function SelectionSetsView({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+      <h2 className="text-xl font-semibold text-primary">
         {t("selectionSets.title")}
       </h2>
 
       {selectionSets.length === 0 ? (
-        <div className="text-center py-12 text-[color:var(--text-muted)]">
+        <div className="text-center py-12 text-muted">
           <Star className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>{t("selectionSets.empty.heading")}</p>
           <p className="text-sm mt-2">{t("selectionSets.empty.description")}</p>
@@ -51,9 +51,9 @@ export default function SelectionSetsView({
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
-                    <h4 className="font-medium text-[color:var(--text-primary)]">{set.name}</h4>
+                    <h4 className="font-medium text-primary">{set.name}</h4>
                   </div>
-                  <div className="mt-1 text-sm text-[color:var(--text-muted)]">
+                  <div className="mt-1 text-sm text-muted">
                     {t("selectionSets.frameSummary", { count: total, selected, total })}
                     {" · "}
                     {t("selectionSets.createdAt", { date: formatDate(set.createdAt) })}
@@ -65,14 +65,14 @@ export default function SelectionSetsView({
                     onClick={() => onEditSelectionSet(set)}
                     title={t("selectionSets.actions.edit")}
                   >
-                    <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
+                    <Edit2 className={`${iconMd} text-muted`} />
                   </IconButton>
                   <IconButton
                     onClick={() => onDeleteSelectionSet(set)}
                     tone="danger"
                     title={t("selectionSets.actions.delete")}
                   >
-                    <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                    <Trash2 className={`${iconMd} text-red`} />
                   </IconButton>
                 </div>
               </Card>

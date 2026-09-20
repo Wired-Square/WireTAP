@@ -11,9 +11,8 @@ import { displayProtocols, protocolLabel, protocolTone } from "../../../utils/pr
 import { PrimaryButton } from "../../../components/forms/DialogButtons";
 import {
   h2,
-  textTertiary,
-  textPrimary,
   textSecondary,
+  textPrimary,
   spaceYLarge,
   spaceYSmall,
   gapSmall,
@@ -263,7 +262,7 @@ export default function DataIOView({
       </div>
 
       {ioProfiles.length === 0 ? (
-        <div className={`text-center py-12 ${textTertiary}`}>
+        <div className={`text-center py-12 ${textSecondary}`}>
           <Cable className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>{t("dataIO.empty.heading")}</p>
           <p className="text-sm mt-2">{t("dataIO.empty.description")}</p>
@@ -354,7 +353,7 @@ export default function DataIOView({
         <div className={spaceYSmall}>
           <div>
             <h3 className={`font-medium ${textPrimary}`}>{t("dataIO.unsaved.heading")}</h3>
-            <p className={`text-sm ${textTertiary}`}>{t("dataIO.unsaved.description")}</p>
+            <p className={`text-sm ${textSecondary}`}>{t("dataIO.unsaved.description")}</p>
           </div>
           {adHocProfiles.map((profile) => (
             <Card

@@ -178,7 +178,7 @@ export default function AppTopBar({
         {/* Frame Picker (if provided) */}
         {framePicker && (
           <>
-            <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
+            <ChevronRight className={`${iconSm} text-muted shrink-0`} />
             <Button
               onClick={framePicker.onOpen}
               disabled={framePicker.disabled}
@@ -189,7 +189,7 @@ export default function AppTopBar({
               }
             >
               <ListFilter className={`${iconSm} flex-shrink-0`} />
-              <span className="text-[color:var(--text-muted)]">
+              <span className="text-muted">
                 {framePicker.selectedCount}/{framePicker.frameCount}
               </span>
             </Button>
@@ -199,7 +199,7 @@ export default function AppTopBar({
         {/* Catalog (if provided) */}
         {catalog && (
           <>
-            <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
+            <ChevronRight className={`${iconSm} text-muted shrink-0`} />
             <CatalogButton
               catalogs={catalog.catalogs}
               catalogPath={catalog.catalogPath}

@@ -342,7 +342,7 @@ export default function McpServerView() {
         <label className={labelDefault}>Connect a client</label>
         <p className={helpText}>For Claude Code, run:</p>
         <div className="flex items-start gap-2">
-          <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded p-3 text-[color:var(--text-primary)]">
+          <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-primary border border-default rounded p-3 text-primary">
             {addCommand}
           </pre>
           <Button

@@ -26,7 +26,7 @@ import { PaginationToolbar, TimelineSection, FRAME_PAGE_SIZE_OPTIONS } from '../
 import ByteExtractionDialog from './ByteExtractionDialog';
 import ChecksumExtractionDialog from './ChecksumExtractionDialog';
 import { configFromSerialChecksum, serialChecksumFromConfig } from './checksumConfig';
-import { bgDataToolbar, borderDataView } from '../../../../styles';
+import { bgSurface, borderDefault } from '../../../../styles';
 import { pageCount, pageForOffset, resolvePageSize } from "../../../../utils/pageSize";
 import type { TimeDisplayFormat } from "../../../../types/common";
 import { Button } from "../../../../components/Button";
@@ -643,7 +643,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toolbar - hidden after accepting */}
       {!accepted && (totalFrames > 0 || useBackendBuffer) && (
-        <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar} flex items-center gap-3`}>
+        <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDefault} ${bgSurface} flex items-center gap-3`}>
           {/* Extraction Badges */}
           <ExtractionBadge
             label={t("serial.extractionLabelId")}

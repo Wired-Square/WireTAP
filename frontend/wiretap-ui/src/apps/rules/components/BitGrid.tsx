@@ -5,7 +5,7 @@
 // to anchor selection and complete ranges for placing signals.
 
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { type PlacedSignal, buildBitOwnerMap } from "../utils/bitGrid";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/forms";
@@ -85,13 +85,13 @@ export default function BitGrid({
     <div className="flex flex-col">
       {/* Header row */}
       <div className="flex items-center gap-1 px-1 pb-1">
-        <div className={`w-10 text-right text-[10px] font-mono pr-1 ${textTertiary}`}>
+        <div className={`w-10 text-right text-2xs font-mono pr-1 ${textSecondary}`}>
           Byte
         </div>
         {COLUMN_HEADERS.map((bit) => (
           <div
             key={bit}
-            className={`w-6 h-5 flex items-center justify-center text-[10px] font-mono ${textSecondary}`}
+            className={`w-6 h-5 flex items-center justify-center text-2xs font-mono ${textSecondary}`}
           >
             {bit}
           </div>
@@ -124,7 +124,7 @@ export default function BitGrid({
       {/* Scrollable grid */}
       <div
         ref={scrollRef}
-        className="overflow-y-auto max-h-[400px] border rounded border-[color:var(--border-default)]"
+        className="overflow-y-auto max-h-100 border rounded border-default"
       >
         {Array.from({ length: payloadBytes }, (_, byteOffset) => (
           <ByteRow
@@ -184,7 +184,7 @@ const ByteRow = forwardRef<HTMLDivElement, ByteRowProps>(function ByteRow(
     <div ref={ref} className="flex items-center gap-1 px-1" style={{ height: 24 }}>
       <button
         onClick={() => onByteClick(byteOffset)}
-        className={`w-10 text-right text-[10px] font-mono pr-1 shrink-0 cursor-pointer hover:underline ${textSecondary}`}
+        className={`w-10 text-right text-2xs font-mono pr-1 shrink-0 cursor-pointer hover:underline ${textSecondary}`}
       >
         {byteOffset}
       </button>
@@ -251,13 +251,13 @@ function BitCell({
 }: BitCellProps) {
   return (
     <button
-      className={`w-6 h-5 text-[10px] font-mono flex items-center justify-center rounded-sm cursor-pointer ${bgClass ?? ""} ${isAnchor ? "ring-2 ring-yellow-400" : ""}`}
+      className={`w-6 h-5 text-2xs font-mono flex items-center justify-center rounded-sm cursor-pointer ${bgClass ?? ""} ${isAnchor ? "ring-2 ring-yellow-400" : ""}`}
       style={cellStyle}
       onClick={() => onBitClick(bitIndex)}
       onMouseEnter={() => onBitHover(bitIndex)}
       onMouseLeave={() => onBitHover(null)}
     >
-      <span className={owner !== null ? textPrimary : textTertiary}>
+      <span className={owner !== null ? textPrimary : textSecondary}>
         {bitIndex}
       </span>
     </button>

@@ -73,7 +73,7 @@ export default function DiffView({ lines }: DiffViewProps) {
       {lines.map((line, i) => (
         <div
           key={i}
-          className={`flex w-max min-w-full leading-[1.5rem] border-l-2 ${accentBorder(line.kind)} ${rowTint(line.kind)}`}
+          className={`flex w-max min-w-full leading-6 border-l-2 ${accentBorder(line.kind)} ${rowTint(line.kind)}`}
         >
           {/* Pinned gutter — opaque so content scrolling under it never bleeds through. */}
           <span

@@ -79,11 +79,11 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
     <Card padding="none" className="flex flex-col h-full overflow-hidden">
       {/* Header — drag handle with title and overflow menu */}
       <div
-        className="drag-handle cursor-grab active:cursor-grabbing select-none border-b border-[var(--border-default)] bg-[var(--bg-primary)]"
+        className="drag-handle cursor-grab active:cursor-grabbing select-none border-b border-default bg-primary"
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center px-2 py-0.5">
-          <div className="flex-1 min-w-0 text-xs font-medium text-[color:var(--text-primary)] truncate">
+          <div className="flex-1 min-w-0 text-xs font-medium text-primary truncate">
             {panel.title}
           </div>
 

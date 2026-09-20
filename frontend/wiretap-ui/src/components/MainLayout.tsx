@@ -19,7 +19,7 @@ import { storeGet, storeSet } from "../api/store";
 import { getStartupNotices, type StartupNotice } from "../api/appStatus";
 import FlashNotification from "./FlashNotification";
 import { icon2xl } from "../styles/spacing";
-import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
+import { bgPrimary, textPrimary, textSecondary } from "../styles/colourTokens";
 import "dockview-react/dist/styles/dockview.css";
 import LogoMenu from "./LogoMenu";
 import AppTab from "./AppTab";
@@ -63,7 +63,7 @@ function PanelLoading() {
     <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className={`text-sm ${textTertiary}`}>Loading...</span>
+        <span className={`text-sm ${textSecondary}`}>Loading...</span>
       </div>
     </div>
   );
@@ -87,7 +87,7 @@ class PanelErrorBoundary extends React.Component<
         <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
           <div className="flex flex-col items-center gap-3 p-6 max-w-md text-center">
             <span className={`text-sm font-medium ${textPrimary}`}>Panel Error</span>
-            <span className={`text-xs ${textTertiary} break-all`}>{this.state.error.message}</span>
+            <span className={`text-xs ${textSecondary} break-all`}>{this.state.error.message}</span>
             <Button
               onClick={() => this.setState({ error: null })}
               variant="solid"
@@ -165,7 +165,7 @@ function Watermark(_props: IWatermarkPanelProps) {
             WireTAP
           </h1>
           {version && (
-            <span className={`absolute left-full ml-3 text-sm ${textTertiary} font-ubuntu whitespace-nowrap`}>
+            <span className={`absolute left-full ml-3 text-sm ${textSecondary} font-ubuntu whitespace-nowrap`}>
               v{version}
             </span>
           )}
@@ -190,7 +190,7 @@ function Watermark(_props: IWatermarkPanelProps) {
                 {groupIndex > 0 && (
                   <div
                     aria-hidden
-                    className="self-stretch w-px bg-[color:var(--border-default)] opacity-50"
+                    className="self-stretch w-px bg-border-default opacity-50"
                   />
                 )}
                 <div className="flex flex-wrap justify-center gap-2 px-4">
@@ -618,7 +618,7 @@ export default function MainLayout() {
       <div className={`h-screen flex items-center justify-center ${bgPrimary}`}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className={`text-sm ${textTertiary}`}>Loading layout...</span>
+          <span className={`text-sm ${textSecondary}`}>Loading layout...</span>
         </div>
       </div>
     );

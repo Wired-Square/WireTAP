@@ -176,7 +176,7 @@ export function SessionButton({
     if (!ioState || !ioProfile) return null;
     if (ioState === "running") return "bg-green-500";
     if (ioState === "paused") return "bg-yellow-500";
-    if (ioState === "stopped") return "bg-[color:var(--text-muted)]";
+    if (ioState === "stopped") return "bg-text-muted";
     if (ioState === "starting") return "bg-blue-500 animate-pulse";
     if (ioState.startsWith("Error")) return "bg-red-500";
     return null;
@@ -200,7 +200,7 @@ export function SessionButton({
       )}
       <span className="max-w-40 truncate">{displayName}</span>
       {sessionId && !sessionIdInDisplayName && (
-        <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
+        <span className="text-muted text-xs font-mono">{sessionId}</span>
       )}
     </Button>
   );
@@ -236,12 +236,12 @@ function getSessionDetails({
 
   let statusLabel: SessionDetails["statusLabel"] = null;
   if (ioState && ioProfile) {
-    if (ioState === "running")       statusLabel = { label: "Running",  colour: "text-[color:var(--status-success-text)]" };
-    else if (ioState === "paused")   statusLabel = { label: "Paused",   colour: "text-[color:var(--status-warning-text)]" };
-    else if (ioState === "stopped")  statusLabel = { label: "Stopped",  colour: "text-[color:var(--text-muted)]" };
-    else if (ioState === "starting") statusLabel = { label: "Starting", colour: "text-[color:var(--status-info-text)]" };
-    else if (ioState.startsWith("Error")) statusLabel = { label: ioState, colour: "text-[color:var(--status-danger-text)]" };
-    else statusLabel = { label: ioState, colour: "text-[color:var(--text-secondary)]" };
+    if (ioState === "running")       statusLabel = { label: "Running",  colour: "text-success" };
+    else if (ioState === "paused")   statusLabel = { label: "Paused",   colour: "text-warning" };
+    else if (ioState === "stopped")  statusLabel = { label: "Stopped",  colour: "text-muted" };
+    else if (ioState === "starting") statusLabel = { label: "Starting", colour: "text-info" };
+    else if (ioState.startsWith("Error")) statusLabel = { label: ioState, colour: "text-danger" };
+    else statusLabel = { label: ioState, colour: "text-secondary" };
   }
 
   let typeLabel: string;
@@ -453,8 +453,8 @@ export function IOSessionControls({
 
   const speedLabel = speed === 1 ? "1x" : `${speed}x`;
   const detailRow = "flex items-center justify-between gap-3 mb-1";
-  const detailKey = "text-[color:var(--text-muted)]";
-  const detailVal = "font-medium text-[color:var(--text-primary)]";
+  const detailKey = "text-muted";
+  const detailVal = "font-medium text-primary";
 
   return (
     <div className="relative shrink-0">
@@ -492,7 +492,7 @@ export function IOSessionControls({
         />
       </Popover>
 
-      <Menu {...menu.popover} className="max-w-[280px]">
+      <Menu {...menu.popover} className="max-w-70">
           {/* Details */}
           <div className="px-3 py-2 text-xs cursor-default">
             {statusLabel && (
@@ -508,7 +508,7 @@ export function IOSessionControls({
             {captureMetadata?.id && (
               <div className={detailRow}>
                 <span className={detailKey}>Capture</span>
-                <span className={`${detailVal} truncate max-w-[160px]`}>
+                <span className={`${detailVal} truncate max-w-40`}>
                   {captureMetadata.name || captureMetadata.id}
                 </span>
               </div>
@@ -526,7 +526,7 @@ export function IOSessionControls({
               </div>
             )}
             {interfaceEntries.length > 0 && (
-              <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-[color:var(--border-default)]">
+              <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-default">
                 <span className={`${detailKey} shrink-0 pt-1`}>
                   {interfaceEntries.length > 1 ? "Interfaces" : "Interface"}
                 </span>
@@ -541,14 +541,14 @@ export function IOSessionControls({
                         openDeviceSettings(entry.profileId, isStreaming ? sessionId ?? null : null);
                       }}
                       title={t("session.interfaceSettings", { name: entry.label })}
-                      className={`group flex items-center gap-1.5 justify-end -mr-1.5 px-1.5 py-1 ${roundedDefault} hover:bg-[var(--hover-bg)] transition-colors text-right`}
+                      className={`group flex items-center gap-1.5 justify-end -mr-1.5 px-1.5 py-1 ${roundedDefault} hover:bg-hover transition-colors text-right`}
                     >
-                      <span className="text-[color:var(--text-primary)] truncate max-w-[170px]">
+                      <span className="text-primary truncate max-w-42.5">
                         {entry.label}
                         {entry.kind ? ` (${entry.kind})` : ""}
                       </span>
                       <Settings2
-                        className={`${iconSm} shrink-0 text-[color:var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity`}
+                        className={`${iconSm} shrink-0 text-muted opacity-0 group-hover:opacity-100 transition-opacity`}
                       />
                     </button>
                   ))}
@@ -588,7 +588,7 @@ export function IOSessionControls({
               title={supportsSpeed ? undefined : "Speed control (available for captures)"}
             >
               <span className="flex-1">Speed</span>
-              <span className="text-[color:var(--text-muted)]">{speedLabel}</span>
+              <span className="text-muted">{speedLabel}</span>
             </MenuItem>
           )}
           {showBookmark && (

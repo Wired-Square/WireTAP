@@ -57,7 +57,7 @@ export default function BookmarksView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        <h2 className="text-xl font-semibold text-primary">
           {t("bookmarks.title")}
         </h2>
         {canCreate && (
@@ -78,7 +78,7 @@ export default function BookmarksView({
         <div className="space-y-6">
           {Object.entries(bookmarksByProfile).map(([profileId, profileBookmarks]) => (
             <div key={profileId} className="space-y-3">
-              <h3 className="text-sm font-medium text-[color:var(--text-muted)]">
+              <h3 className="text-sm font-medium text-muted">
                 {getProfileName(profileId)}
               </h3>
               <div className="space-y-2">
@@ -90,9 +90,9 @@ export default function BookmarksView({
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <h4 className="font-medium text-[color:var(--text-primary)]">{bookmark.name}</h4>
+                        <h4 className="font-medium text-primary">{bookmark.name}</h4>
                       </div>
-                      <div className="mt-1 text-sm text-[color:var(--text-muted)] font-mono">
+                      <div className="mt-1 text-sm text-muted font-mono">
                         {formatTimeRange(bookmark)}
                       </div>
                     </div>
@@ -101,14 +101,14 @@ export default function BookmarksView({
                         onClick={() => onEditBookmark(bookmark)}
                         title={t("bookmarks.actions.edit")}
                       >
-                        <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
+                        <Edit2 className={`${iconMd} text-muted`} />
                       </IconButton>
                       <IconButton
                         onClick={() => onDeleteBookmark(bookmark)}
                         tone="danger"
                         title={t("bookmarks.actions.delete")}
                       >
-                        <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                        <Trash2 className={`${iconMd} text-red`} />
                       </IconButton>
                     </div>
                   </Card>

@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { caption, captionMuted } from "../styles/typography";
-import { textDataMuted, textDataSecondary } from "../styles";
+import { textDataMuted, textSecondary } from "../styles";
 import { Input } from "./forms";
 
 /** Filter configuration */
@@ -54,7 +54,7 @@ export default function FilterOptionsPanel({
     return (
       <div className="space-y-3">
         <label className="block text-sm">
-          <span className={textDataSecondary}>Minimum frame length:</span>
+          <span className={textSecondary}>Minimum frame length:</span>
           <Input
             type="number"
             value={minLength}

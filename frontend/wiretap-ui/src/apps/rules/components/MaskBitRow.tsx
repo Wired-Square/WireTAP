@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 
 interface MaskBitRowProps {
   label: string;
@@ -27,11 +27,11 @@ export default function MaskBitRow({
     <div>
       {showHeader && (
         <div className="flex items-center gap-1 mb-1">
-          <div className={`w-16 text-[10px] font-mono ${textTertiary}`}>bit</div>
+          <div className={`w-16 text-2xs font-mono ${textSecondary}`}>bit</div>
           {bits.map((bitIdx) => (
             <div
               key={bitIdx}
-              className={`${CELL_WIDTH} text-center text-[10px] font-mono ${textTertiary}`}
+              className={`${CELL_WIDTH} text-center text-2xs font-mono ${textSecondary}`}
             >
               {bitIdx}
             </div>
@@ -39,17 +39,17 @@ export default function MaskBitRow({
         </div>
       )}
       <div className="flex items-center gap-1">
-        <div className={`w-16 text-[10px] font-mono ${textSecondary}`}>{label}</div>
+        <div className={`w-16 text-2xs font-mono ${textSecondary}`}>{label}</div>
         {bits.map((bitIdx) => {
           const bitVal = (value >>> bitIdx) & 1;
           const maskBit = mask !== undefined ? (mask >>> bitIdx) & 1 : 1;
           const isDontCare = dimWhenMaskZero && maskBit === 0;
           const display = isDontCare ? "·" : String(bitVal);
-          const colour = isDontCare ? textTertiary : textPrimary;
+          const colour = isDontCare ? textSecondary : textPrimary;
           return (
             <div
               key={bitIdx}
-              className={`${CELL_WIDTH} h-5 flex items-center justify-center text-[11px] font-mono ${colour}`}
+              className={`${CELL_WIDTH} h-5 flex items-center justify-center text-xs font-mono ${colour}`}
             >
               {display}
             </div>

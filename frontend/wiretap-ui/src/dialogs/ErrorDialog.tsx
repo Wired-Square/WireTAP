@@ -43,7 +43,7 @@ export default function ErrorDialog({
           <div>
             <div className={`${labelSmall} mb-2`}>{t("error.technicalDetails")}</div>
             <Card padding="lg">
-              <pre className="text-xs text-[color:var(--text-primary)] font-mono whitespace-pre-wrap break-words">
+              <pre className="text-xs text-primary font-mono whitespace-pre-wrap break-words">
                 {details}
               </pre>
             </Card>

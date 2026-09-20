@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useTransmitStore, CAN_FD_DLC_VALUES } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  textDataSecondary,
+  textSecondary,
 } from "../../../styles/colourTokens";
 import { Button } from "../../../components/Button";
 import { Input, Select } from "../../../components/forms";
@@ -129,7 +129,7 @@ export default function CanFrameEditor() {
 
         cells.push(
           <div key={i} className="flex flex-col items-center">
-            <span className={`${textDataSecondary} text-[10px] mb-0.5`}>
+            <span className={`${textSecondary} text-2xs mb-0.5`}>
               {i.toString().padStart(2, "0")}
             </span>
             <Input
@@ -169,9 +169,9 @@ export default function CanFrameEditor() {
       <div className="flex items-end gap-4 flex-wrap">
         {/* Frame ID */}
         <div className="flex flex-col">
-          <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.frameId")}</label>
+          <label className={`${textSecondary} text-xs mb-1`}>{t("canEditor.frameId")}</label>
           <div className="flex items-center">
-            <span className={`${textDataSecondary} text-sm mr-1`}>0x</span>
+            <span className={`${textSecondary} text-sm mr-1`}>0x</span>
             <Input
               type="text"
               value={canEditor.frameId}
@@ -186,7 +186,7 @@ export default function CanFrameEditor() {
 
         {/* DLC */}
         <div className="flex flex-col">
-          <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.dlc")}</label>
+          <label className={`${textSecondary} text-xs mb-1`}>{t("canEditor.dlc")}</label>
           <Select
             value={canEditor.dlc}
             onChange={handleDlcChange}
@@ -203,7 +203,7 @@ export default function CanFrameEditor() {
         {/* Bus (only for multi-bus) */}
         {isMultiBus && (
           <div className="flex flex-col">
-            <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.bus")}</label>
+            <label className={`${textSecondary} text-xs mb-1`}>{t("canEditor.bus")}</label>
             <Select
               value={canEditor.bus}
               onChange={handleBusChange}
@@ -221,7 +221,7 @@ export default function CanFrameEditor() {
 
       {/* Second Row: Flags */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`${textDataSecondary} text-xs mr-2`}>{t("canEditor.flags")}</span>
+        <span className={`${textSecondary} text-xs mr-2`}>{t("canEditor.flags")}</span>
 
         {supportsExtended && (
           <Button
@@ -275,14 +275,14 @@ export default function CanFrameEditor() {
       {/* Third Row: Data Bytes */}
       {canEditor.dlc > 0 && !canEditor.isRtr && (
         <div className="space-y-2">
-          <label className={`${textDataSecondary} text-xs`}>{t("canEditor.dataBytes")}</label>
+          <label className={`${textSecondary} text-xs`}>{t("canEditor.dataBytes")}</label>
           <div className="space-y-1">{renderDataGrid()}</div>
         </div>
       )}
 
       {/* RTR notice */}
       {canEditor.isRtr && (
-        <div className={`${textDataSecondary} text-xs italic`}>
+        <div className={`${textSecondary} text-xs italic`}>
           {t("canEditor.rtrNotice")}
         </div>
       )}

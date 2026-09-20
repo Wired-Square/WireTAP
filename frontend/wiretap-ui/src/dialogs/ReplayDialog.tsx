@@ -236,7 +236,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                   mono
                   className="flex-1"
                 />
-                <span className="text-[color:var(--text-secondary)] text-sm">–</span>
+                <span className="text-secondary text-sm">–</span>
                 <Input
                   type="number"
                   min={1}
@@ -257,7 +257,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                 </Button>
               </div>
               {rangeError && bufferLength > 0 ? (
-                <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>
+                <p className="text-xs text-danger">{rangeError}</p>
               ) : bufferLength === 0 ? (
                 <p className={helpText}>{t("replay.noFrames")}</p>
               ) : captureMode.enabled ? (
@@ -359,7 +359,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                 checked={loop}
                 onChange={(e) => setLoop(e.target.checked)}
               />
-              <span className="text-sm text-[color:var(--text-secondary)]">{t("replay.loopLabel")}</span>
+              <span className="text-sm text-secondary">{t("replay.loopLabel")}</span>
             </label>
           </>
         )}

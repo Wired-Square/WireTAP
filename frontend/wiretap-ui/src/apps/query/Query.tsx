@@ -430,7 +430,7 @@ function QueryInner() {
         {activeTab === "stats" && (
           captureId
             ? <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                <p className="text-xs text-[color:var(--text-muted)]">
+                <p className="text-xs text-muted">
                   {t("stats.backendOnly")}
                 </p>
               </div>

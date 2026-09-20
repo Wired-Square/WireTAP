@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 
 import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
-import { textDataSecondary, textDataGreen } from "../../../styles/colourTokens";
+import { textSecondary, textDataGreen } from "../../../styles/colourTokens";
 import { textDanger } from "../../../styles";
 import {
   emptyStateContainer,
@@ -204,7 +204,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
             hidePagination={isLive}
             leftContent={
               <div className="flex items-center gap-3">
-                <span className={`${textDataSecondary} text-sm`}>
+                <span className={`${textSecondary} text-sm`}>
                   {t("history.frameSummary", { count: totalCount, formatted: totalCount.toLocaleString(i18n.language) })}
                 </span>
                 <Button

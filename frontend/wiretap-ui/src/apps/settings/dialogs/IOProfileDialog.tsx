@@ -220,11 +220,11 @@ export default function IOProfileDialog({
               }, {});
 
               return (
-                <div key={iface.index} className={`rounded bg-[var(--bg-primary)] border ${borderDefault}`}>
+                <div key={iface.index} className={`rounded bg-primary border ${borderDefault}`}>
                   <button
                     type="button"
                     onClick={() => setFlExpandedIface((prev) => ({ ...prev, [iface.index]: !prev[iface.index] }))}
-                    className="w-full flex items-center justify-between py-2 px-2 text-left hover:bg-[var(--bg-surface)] transition-colors rounded"
+                    className="w-full flex items-center justify-between py-2 px-2 text-left hover:bg-surface transition-colors rounded"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {expanded ? <ChevronDown className={iconMd} /> : <ChevronRight className={iconMd} />}
@@ -302,7 +302,7 @@ export default function IOProfileDialog({
           onClick={onCancel}
           title={t("ioProfileDialog.back")}
         >
-          <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
+          <ArrowLeft className={`${iconLg} text-muted`} />
         </IconButton>
       </DialogHeader>
       <DialogBody className="space-y-4">

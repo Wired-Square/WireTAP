@@ -60,7 +60,7 @@ export default function DecoderConflictDialog({
             }}
             className={`w-full px-4 py-2.5 text-left ${hoverLight} transition-colors`}
           >
-            <span className={`${textMedium} text-[color:var(--text-muted)]`}>
+            <span className={`${textMedium} text-muted`}>
               {t("decoderConflict.none")}
             </span>
           </button>

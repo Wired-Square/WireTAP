@@ -8,12 +8,12 @@ import { useTranslation } from "react-i18next";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import type { ReplayLogEntry } from "../../../stores/transmitStore";
 import {
-  bgDataToolbar,
+  bgSurface,
   bgDataView,
-  borderDataView,
+  borderDefault,
   textDanger,
   textDataCyan,
-  textDataSecondary,
+  textSecondary,
   textInfo,
   textSuccess,
   textWarning,
@@ -50,7 +50,7 @@ export default function TransmitReplayView() {
     <div className="flex flex-col h-full">
       {/* Active replay banners */}
       {replayEntries.length > 0 && (
-        <div className={`border-b ${borderDataView}`}>
+        <div className={`border-b ${borderDefault}`}>
           {replayEntries.map(([replayId, info]) => {
             const pct =
               info.totalFrames > 0
@@ -59,12 +59,12 @@ export default function TransmitReplayView() {
             return (
               <div
                 key={replayId}
-                className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar}`}
+                className={`flex items-center gap-3 px-4 py-2 ${bgSurface}`}
               >
                 <Play size={12} className={`shrink-0 ${textInfo}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs ${textDataSecondary}`}>
+                    <span className={`text-xs ${textSecondary}`}>
                       {info.profileName && (
                         <span className="mr-1.5">{info.profileName}</span>
                       )}
@@ -72,13 +72,13 @@ export default function TransmitReplayView() {
                       <span className="ml-1.5 font-mono">
                         {info.framesSent} / {info.totalFrames}
                       </span>
-                      <span className="ml-1.5 text-[color:var(--text-secondary)]">
+                      <span className="ml-1.5 text-secondary">
                         {info.speed}×
                       </span>
                     </span>
-                    <span className={`text-xs font-mono ${textDataSecondary}`}>{pct}%</span>
+                    <span className={`text-xs font-mono ${textSecondary}`}>{pct}%</span>
                   </div>
-                  <div className="h-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                  <div className="h-1 rounded-full bg-surface overflow-hidden">
                     <div
                       className="h-full bg-blue-500 transition-all duration-200"
                       style={{ width: `${pct}%` }}
@@ -125,9 +125,9 @@ export default function TransmitReplayView() {
         <>
           {/* Toolbar */}
           <div
-            className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
+            className={`flex items-center gap-3 px-4 py-2 ${bgSurface} border-b ${borderDefault}`}
           >
-            <span className={`${textDataSecondary} text-sm`}>
+            <span className={`${textSecondary} text-sm`}>
               {t("replay.eventSummary", { count: replayLog.length })}
             </span>
 
@@ -233,12 +233,12 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
   return (
     <tr>
       <td>{icon}</td>
-      <td className={`font-mono ${textDataSecondary}`}>{formatHumanUs(timestamp * 1000)}</td>
-      <td className={textDataSecondary}>
-        <span className="truncate max-w-[120px] block">{profileName}</span>
+      <td className={`font-mono ${textSecondary}`}>{formatHumanUs(timestamp * 1000)}</td>
+      <td className={textSecondary}>
+        <span className="truncate max-w-30 block">{profileName}</span>
       </td>
       <td>{kindBadge}</td>
-      <td className={`font-mono ${textDataSecondary}`}>{details}</td>
+      <td className={`font-mono ${textSecondary}`}>{details}</td>
       <td>
         {onRestart && (
           <Button

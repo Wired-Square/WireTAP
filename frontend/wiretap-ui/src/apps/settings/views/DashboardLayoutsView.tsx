@@ -29,12 +29,12 @@ export default function DashboardLayoutsView({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+      <h2 className="text-xl font-semibold text-primary">
         {t("dashboardLayouts.title")}
       </h2>
 
       {dashboardLayouts.length === 0 ? (
-        <div className="text-center py-12 text-[color:var(--text-muted)]">
+        <div className="text-center py-12 text-muted">
           <LayoutGrid className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>{t("dashboardLayouts.empty.heading")}</p>
           <p className="text-sm mt-2">{t("dashboardLayouts.empty.description")}</p>
@@ -49,9 +49,9 @@ export default function DashboardLayoutsView({
             >
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <h4 className="font-medium text-[color:var(--text-primary)]">{layout.name}</h4>
+                  <h4 className="font-medium text-primary">{layout.name}</h4>
                 </div>
-                <div className="mt-1 text-sm text-[color:var(--text-muted)]">
+                <div className="mt-1 text-sm text-muted">
                   {t("dashboardLayouts.panelCount", { count: layout.panels.length })}
                   {layout.catalogFilename && ` · ${layout.catalogFilename}`}
                   {" · "}
@@ -64,14 +64,14 @@ export default function DashboardLayoutsView({
                   onClick={() => onEditDashboardLayout(layout)}
                   title={t("dashboardLayouts.actions.edit")}
                 >
-                  <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
+                  <Edit2 className={`${iconMd} text-muted`} />
                 </IconButton>
                 <IconButton
                   onClick={() => onDeleteDashboardLayout(layout)}
                   tone="danger"
                   title={t("dashboardLayouts.actions.delete")}
                 >
-                  <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
+                  <Trash2 className={`${iconMd} text-red`} />
                 </IconButton>
               </div>
             </Card>

@@ -61,11 +61,11 @@ export default function IconStatePanel({ panel, svgRef: svgRefProp }: Props) {
     >
       <Icon
         ref={svgElRef}
-        className="flex-1 min-h-0 w-auto h-full max-h-[70%]"
+        className="flex-1 min-h-0 w-auto h-full max-h-7/10"
         style={{ color: colour, opacity, filter: glow, transition: "all 0.15s ease-out" }}
         strokeWidth={1.75}
       />
-      <span className="text-xs font-medium text-[color:var(--text-secondary)] truncate max-w-full">
+      <span className="text-xs font-medium text-secondary truncate max-w-full">
         {state?.label ?? sig.displayName ?? sig.signalName}
       </span>
     </PanelTooltip>

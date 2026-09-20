@@ -83,7 +83,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
 
       // Scroll the match into view only if it's outside the current viewport.
       // Derive the real line height and top padding from the live element so
-      // the maths matches the rendered textarea (leading-[1.5rem] = 24px, p-4 = 16px).
+      // the maths matches the rendered textarea (leading-6 = 24px, p-4 = 16px).
       const style = getComputedStyle(ta);
       const lineHeight = parseFloat(style.lineHeight) || 24;
       const padTop = parseFloat(style.paddingTop) || 0;
@@ -128,7 +128,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
   const currentMatch = textFind.currentIndex + 1;
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2 bg-[var(--bg-surface)] ${borderDivider}`}>
+    <div className={`flex items-center gap-2 px-4 py-2 bg-surface ${borderDivider}`}>
       <Input
         ref={inputRef}
         type="text"
@@ -139,7 +139,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
         className="flex-1"
       />
 
-      <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center">
+      <span className="text-sm text-muted min-w-15 text-center">
         {textFind.query.trim()
           ? matchCount > 0
             ? textFind.currentIndex >= 0

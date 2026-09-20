@@ -190,7 +190,7 @@ export default function ModbusScanResultView({
 
       {/* Progress bar */}
       {isScanning && progress && progress.total > 0 && (
-        <div className="h-1 bg-[var(--bg-surface)]">
+        <div className="h-1 bg-surface">
           <div
             className="h-full bg-purple-500 transition-all duration-200"
             style={{ width: `${Math.min(100, (progress.current / progress.total) * 100)}%` }}

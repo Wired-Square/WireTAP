@@ -264,7 +264,7 @@ export default function CsvFileOrderDialog({
     return [
       {
         label: "Remove from list",
-        icon: <Trash2 className="text-[color:var(--text-muted)]" />,
+        icon: <Trash2 className="text-muted" />,
         onClick: () => removeEntry(idx),
       },
     ];
@@ -301,12 +301,12 @@ export default function CsvFileOrderDialog({
             <span className="w-5 shrink-0" />
             <span className="w-5 shrink-0" />
             <span
-              className={`${textMuted} text-[10px] uppercase tracking-wider flex-1 min-w-0`}
+              className={`${textMuted} text-2xs uppercase tracking-wider flex-1 min-w-0`}
             >
               File
             </span>
             <span
-              className={`${textMuted} text-[10px] uppercase tracking-wider w-14 text-center`}
+              className={`${textMuted} text-2xs uppercase tracking-wider w-14 text-center`}
             >
               Header
             </span>
@@ -361,7 +361,7 @@ export default function CsvFileOrderDialog({
                     title="Drag to reorder"
                   >
                     <GripVertical
-                      className={`${iconSm} text-[color:var(--text-muted)]`}
+                      className={`${iconSm} text-muted`}
                     />
                   </div>
 

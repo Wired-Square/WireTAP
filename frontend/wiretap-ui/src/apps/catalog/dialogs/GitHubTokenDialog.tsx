@@ -60,7 +60,7 @@ export default function GitHubTokenDialog({ isOpen, onClose }: Props) {
       <DialogBody className="space-y-4">
         {identity && (
           <div className="flex items-center gap-2 flex-wrap">
-            <ShareIcon.Success className={`${iconMd} text-[color:var(--accent-success)]`} />
+            <ShareIcon.Success className={`${iconMd} text-accent-success`} />
             <span className={textMedium}>{identity.login}</span>
             {identity.scopes.length > 0 ? (
               identity.scopes.map((scope) => (

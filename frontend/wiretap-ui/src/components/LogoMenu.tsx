@@ -72,7 +72,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
         </Button>
       )}
 
-      <Menu {...menu.popover} size="lg" className="min-w-[180px]">
+      <Menu {...menu.popover} size="lg" className="min-w-45">
         {menuGroups.map((g, groupIndex) => (
           <div key={g.group}>
             {groupIndex > 0 && <MenuSeparator />}

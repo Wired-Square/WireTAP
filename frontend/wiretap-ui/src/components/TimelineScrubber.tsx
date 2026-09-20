@@ -242,17 +242,17 @@ export default function TimelineScrubber({
         onMouseLeave={handleTrackMouseLeave}
       >
         {/* Track background */}
-        <div className="absolute inset-x-0 h-1.5 bg-[var(--bg-tertiary)] rounded-full" />
+        <div className="absolute inset-x-0 h-1.5 bg-tertiary rounded-full" />
 
         {/* Filled portion */}
         <div
-          className="absolute left-0 h-1.5 bg-[var(--accent-primary)] rounded-full"
+          className="absolute left-0 h-1.5 bg-accent-primary rounded-full"
           style={{ width: `${positionPercent}%` }}
         />
 
         {/* Handle */}
         <div
-          className={`absolute w-3.5 h-3.5 bg-[var(--accent-primary)] rounded-full shadow-md transform -translate-x-1/2 ${
+          className={`absolute w-3.5 h-3.5 bg-accent-primary rounded-full shadow-md transform -translate-x-1/2 ${
             disabled
               ? "cursor-not-allowed"
               : isDragging
@@ -266,7 +266,7 @@ export default function TimelineScrubber({
         {/* Hover tooltip */}
         {hoverPosition !== null && !isDragging && !disabled && (
           <div
-            className="absolute bottom-5 transform -translate-x-1/2 px-2 py-1 bg-[var(--bg-primary)] text-[color:var(--text-primary)] text-xs rounded shadow-lg whitespace-nowrap pointer-events-none z-10"
+            className="absolute bottom-5 transform -translate-x-1/2 px-2 py-1 bg-primary text-primary text-xs rounded shadow-lg whitespace-nowrap pointer-events-none z-10"
             style={{
               left: `${hoverPercent}%`,
             }}

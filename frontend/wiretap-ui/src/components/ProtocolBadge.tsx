@@ -21,9 +21,9 @@ export interface ProtocolBadgeProps {
 }
 
 const LIGHT: Record<StreamingStatus, { colour: string; title: string }> = {
-  live: { colour: "bg-[var(--accent-success)]", title: "Live" },
-  paused: { colour: "bg-[var(--accent-warning)]", title: "Paused" },
-  stopped: { colour: "bg-[var(--accent-danger)]", title: "Stopped" },
+  live: { colour: "bg-accent-success", title: "Live" },
+  paused: { colour: "bg-accent-warning", title: "Paused" },
+  stopped: { colour: "bg-accent-danger", title: "Stopped" },
 };
 
 export default function ProtocolBadge({

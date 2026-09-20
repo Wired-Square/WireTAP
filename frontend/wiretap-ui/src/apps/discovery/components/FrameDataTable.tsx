@@ -13,7 +13,7 @@ import { formatHumanUs, TIME_COLUMN_CHARS } from '../../../utils/timeFormat';
 import type { TimeDisplayFormat } from '../../../types/common';
 import {
   bgDataView,
-  textDataSecondary,
+  textSecondary,
   textDataTertiary,
   textDataYellow,
   textDataOrange,
@@ -387,7 +387,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                     }
                   </td>
                 )}
-                <td className={textDataSecondary}>{frame.dlc}</td>
+                <td className={textSecondary}>{frame.dlc}</td>
                 <td>
                   {showAscii ? (
                     <>

@@ -42,7 +42,7 @@ export default function SecurePasswordField({
       <label className={`${labelDefault} mb-2`}>
         {label} {optional && <span className="text-slate-500">(optional)</span>}
         {isSecurelyStored && (
-          <span className="ml-2 inline-flex items-center gap-1 text-xs text-[color:var(--accent-success)]">
+          <span className="ml-2 inline-flex items-center gap-1 text-xs text-accent-success">
             <Shield className={iconXs} />
             Secure
           </span>
@@ -76,7 +76,7 @@ export default function SecurePasswordField({
           placeholder={hasStoredPassword ? "••••••••••••" : placeholder}
           className={`pr-10 ${
             hasStoredPassword
-              ? "border-[color:var(--border-success)] placeholder-[color:var(--accent-success)]"
+              ? "border-success placeholder-accent-success"
               : ""
           }`}
         />
@@ -95,7 +95,7 @@ export default function SecurePasswordField({
       </div>
 
       {hasStoredPassword && (
-        <p className={`mt-1 ${helpText} text-[color:var(--accent-success)]`}>
+        <p className={`mt-1 ${helpText} text-accent-success`}>
           Password stored in system keychain. Leave empty to keep current password.
         </p>
       )}

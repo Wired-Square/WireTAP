@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary } from "../../../styles";
 import { Badge } from "../../../components/Badge";
 import { type PlacedSignal, BYTE_ORDER_LE } from "../utils/bitGrid";
 
@@ -13,7 +13,7 @@ interface SignalListProps {
 export default function SignalList({ signals, selectedIndex, onSelect }: SignalListProps) {
   if (signals.length === 0) {
     return (
-      <div className={`flex items-center justify-center h-full text-center px-4 text-sm ${textTertiary}`}>
+      <div className={`flex items-center justify-center h-full text-center px-4 text-sm ${textSecondary}`}>
         No signals defined. Click bits in the grid to add signals.
       </div>
     );
@@ -29,8 +29,8 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
             onClick={() => onSelect(index)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
               isSelected
-                ? "bg-[var(--hover-bg)] brightness-110"
-                : "hover:bg-[var(--hover-bg)]"
+                ? "bg-hover brightness-110"
+                : "hover:bg-hover"
             }`}
           >
             {/* Colour dot */}
@@ -40,7 +40,7 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
             />
 
             {/* Signal name */}
-            <span className={`flex-1 text-sm truncate ${signal.name ? textPrimary : textTertiary}`}>
+            <span className={`flex-1 text-sm truncate ${signal.name ? textPrimary : textSecondary}`}>
               {signal.name || "(unnamed)"}
             </span>
 

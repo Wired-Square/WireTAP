@@ -35,39 +35,39 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
       size="xl"
       title={t("decoderInfo.title")}
       subtitle={t("decoderInfo.subtitle")}
-      icon={<FileText className="text-[color:var(--status-info-text)]" />}
+      icon={<FileText className="text-info" />}
     >
       <DialogBody className="space-y-6">
         {/* Meta Section */}
         <MetaSection knowledge={knowledge} t={t} />
 
         {/* Stats Summary */}
-        <div className="flex flex-wrap gap-4 text-xs p-3 bg-[var(--bg-surface)] rounded-lg">
-          <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{frameCount}</span> {t("decoderInfo.stats.frames")}
+        <div className="flex flex-wrap gap-4 text-xs p-3 bg-surface rounded-lg">
+          <span className="text-muted">
+            <span className="font-medium text-primary">{frameCount}</span> {t("decoderInfo.stats.frames")}
           </span>
           {muxCount > 0 && (
-            <span className="text-[color:var(--text-orange)]">
+            <span className="text-orange">
               <span className="font-medium">{muxCount}</span> {t("decoderInfo.stats.mux")}
             </span>
           )}
           {burstCount > 0 && (
-            <span className="text-[color:var(--text-cyan)]">
+            <span className="text-cyan">
               <span className="font-medium">{burstCount}</span> {t("decoderInfo.stats.burst")}
             </span>
           )}
           {multiBusCount > 0 && (
-            <span className="text-[color:var(--status-danger-text)]">
+            <span className="text-danger">
               <span className="font-medium">{multiBusCount}</span> {t("decoderInfo.stats.multiBus")}
             </span>
           )}
           {knowledge.analysisRun && (
-            <span className="text-[color:var(--text-green)] ml-auto">
+            <span className="text-green ml-auto">
               {t("decoderInfo.stats.analysisRun")}
             </span>
           )}
           {!knowledge.analysisRun && (
-            <span className="text-[color:var(--text-amber)] ml-auto">
+            <span className="text-amber ml-auto">
               {t("decoderInfo.stats.runAnalysis")}
             </span>
           )}
@@ -95,30 +95,30 @@ function MetaSection({ knowledge, t }: MetaSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Layers className={`${iconMd} text-[color:var(--text-purple)]`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <Layers className={`${iconMd} text-purple`} />
+        <h3 className="text-xs font-medium text-secondary">
           {t("decoderInfo.meta.title")}
         </h3>
       </div>
       <Card className="space-y-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-[color:var(--text-muted)]">default_frame</span>
-          <span className="font-mono text-[color:var(--text-primary)]">"{meta.defaultFrame}"</span>
+          <span className="text-muted">default_frame</span>
+          <span className="font-mono text-primary">"{meta.defaultFrame}"</span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-[color:var(--text-muted)]">default_endianness</span>
-          <span className="font-mono text-[color:var(--text-primary)]">"{meta.defaultEndianness}"</span>
+          <span className="text-muted">default_endianness</span>
+          <span className="font-mono text-primary">"{meta.defaultEndianness}"</span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-[color:var(--text-muted)]">default_interval</span>
+          <span className="text-muted">default_interval</span>
           {meta.defaultInterval !== null ? (
-            <span className="font-mono text-[color:var(--text-green)]">{meta.defaultInterval}</span>
+            <span className="font-mono text-green">{meta.defaultInterval}</span>
           ) : (
-            <span className="text-[color:var(--text-muted)] italic">{t("decoderInfo.meta.notDetermined")}</span>
+            <span className="text-muted italic">{t("decoderInfo.meta.notDetermined")}</span>
           )}
         </div>
         {meta.defaultInterval !== null && (
-          <div className="text-[10px] text-[color:var(--text-muted)] pt-1">
+          <div className="text-2xs text-muted pt-1">
             {t("decoderInfo.meta.basedOnGroup", {
               count: knowledge.intervalGroups.find(g => g.intervalMs === meta.defaultInterval)?.frameIds.length ?? 0,
             })}
@@ -145,8 +145,8 @@ function FramesSection({ knowledge, t }: FramesSectionProps) {
     return (
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Clock className={`${iconMd} text-[color:var(--text-muted)]`} />
-          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+          <Clock className={`${iconMd} text-muted`} />
+          <h3 className="text-xs font-medium text-secondary">
             {t("decoderInfo.frames.title")}
           </h3>
         </div>
@@ -158,8 +158,8 @@ function FramesSection({ knowledge, t }: FramesSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Clock className={`${iconMd} text-[color:var(--text-green)]`} />
-        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
+        <Clock className={`${iconMd} text-green`} />
+        <h3 className="text-xs font-medium text-secondary">
           {t("decoderInfo.frames.titleWithCount", { count: frames.length })}
         </h3>
       </div>
@@ -190,7 +190,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className={flexRowGap2}>
-          <span className="font-mono font-semibold text-sm text-[color:var(--text-primary)]">
+          <span className="font-mono font-semibold text-sm text-primary">
             {formatFrameId(frame.frameId)}
           </span>
           <span className={captionMuted}>
@@ -202,7 +202,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
         </div>
         <div className={flexRowGap2}>
           {frame.intervalMs !== undefined && (
-            <span className="text-xs text-[color:var(--text-green)]">
+            <span className="text-xs text-green">
               {formatMs(frame.intervalMs)}
             </span>
           )}
@@ -241,13 +241,13 @@ function FrameCard({ frame, t }: FrameCardProps) {
 
       {/* Burst Details */}
       {frame.burstInfo && (
-        <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
+        <div className="text-2xs text-muted mb-2">
           {t("decoderInfo.frames.burstDetails", {
             count: frame.burstInfo.burstCount,
             period: formatMs(frame.burstInfo.burstPeriodMs),
           })}
           {frame.burstInfo.flags.length > 0 && (
-            <span className="ml-1 text-[color:var(--text-cyan)]">
+            <span className="ml-1 text-cyan">
               ({frame.burstInfo.flags.join(", ")})
             </span>
           )}
@@ -256,7 +256,7 @@ function FrameCard({ frame, t }: FrameCardProps) {
 
       {/* Multi-bus Details */}
       {frame.multiBusInfo && (
-        <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
+        <div className="text-2xs text-muted mb-2">
           {t("decoderInfo.frames.seenOnBuses")} {frame.multiBusInfo.buses.map(b => (
             <span key={b} className="ml-1">
               {b} ({frame.multiBusInfo!.countPerBus[b]}×)
@@ -267,18 +267,18 @@ function FrameCard({ frame, t }: FrameCardProps) {
 
       {/* Signals */}
       {allSignals.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[color:var(--border-default)]">
-          <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
+        <div className="mt-2 pt-2 border-t border-default">
+          <div className="text-2xs font-medium text-muted mb-1">
             {t("decoderInfo.frames.signalsTitle")}
           </div>
           <div className="space-y-1">
             {allSignals.map((signal, idx) => (
               <div
                 key={idx}
-                className={`flex items-center justify-between text-[10px] ${
+                className={`flex items-center justify-between text-2xs ${
                   signal.source === 'default'
-                    ? 'text-[color:var(--text-muted)] italic'
-                    : 'text-[color:var(--text-secondary)]'
+                    ? 'text-muted italic'
+                    : 'text-secondary'
                 }`}
               >
                 <span className="font-mono">{signal.name}</span>
@@ -294,13 +294,13 @@ function FrameCard({ frame, t }: FrameCardProps) {
 
       {/* Notes */}
       {frame.notes.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[color:var(--border-default)]">
-          <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
+        <div className="mt-2 pt-2 border-t border-default">
+          <div className="text-2xs font-medium text-muted mb-1">
             {t("decoderInfo.frames.notesTitle")}
           </div>
           <ul className="space-y-0.5">
             {frame.notes.map((note, idx) => (
-              <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
+              <li key={idx} className="text-2xs text-secondary">
                 • {note}
               </li>
             ))}
@@ -322,9 +322,9 @@ type MuxDetailsProps = {
 
 function MuxDetails({ mux, t }: MuxDetailsProps) {
   return (
-    <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
+    <div className="text-2xs text-muted mb-2">
       <div className="flex items-center gap-2 mb-1">
-        <span className="font-medium text-[color:var(--text-orange)]">
+        <span className="font-medium text-orange">
           {mux.isTwoByte ? t("decoderInfo.mux.selectorTwoByte") : t("decoderInfo.mux.selectorOneByte")}
         </span>
         <span className="font-mono">
@@ -335,14 +335,14 @@ function MuxDetails({ mux, t }: MuxDetailsProps) {
         </span>
       </div>
       <div className="flex flex-wrap gap-1">
-        <span className="text-[color:var(--text-muted)]">{t("decoderInfo.mux.casesLabel")}</span>
+        <span className="text-muted">{t("decoderInfo.mux.casesLabel")}</span>
         {mux.cases.slice(0, 16).map((c) => (
           <Badge key={c} tone="warning" size="sm" mono>
             {mux.isTwoByte ? `${Math.floor(c / 256)}.${c % 256}` : c}
           </Badge>
         ))}
         {mux.cases.length > 16 && (
-          <span className="text-[color:var(--text-muted)]">
+          <span className="text-muted">
             {t("decoderInfo.mux.more", { count: mux.cases.length - 16 })}
           </span>
         )}

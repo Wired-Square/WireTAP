@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
-import { textSecondary, textTertiary, borderDefault } from "../../../styles";
+import { textSecondary, borderDefault } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import ColourPicker from "../components/ColourPicker";
 import PalettePreview from "../components/PalettePreview";
@@ -117,7 +117,7 @@ export default function PaletteEditorDialog({
     <Dialog isOpen={isOpen} onClose={onClose} size="xl" title={t("paletteDialog.title")}>
       <DialogBody>
         {loading && (
-          <div className={`flex items-center justify-center py-8 ${textTertiary}`}>
+          <div className={`flex items-center justify-center py-8 ${textSecondary}`}>
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="ml-2 text-sm">{t("paletteDialog.loading")}</span>
           </div>
@@ -128,7 +128,7 @@ export default function PaletteEditorDialog({
         )}
 
         {!loading && palettes.length === 0 && (
-          <p className={`text-sm ${textTertiary} py-4`}>
+          <p className={`text-sm ${textSecondary} py-4`}>
             {t("paletteDialog.noPalettes")}
           </p>
         )}
@@ -155,7 +155,7 @@ export default function PaletteEditorDialog({
 
             {/* Gradient preview */}
             <div>
-              <span className={`text-[10px] uppercase tracking-wider ${textTertiary}`}>
+              <span className={`text-2xs uppercase tracking-wider ${textSecondary}`}>
                 {t("paletteDialog.fields.preview")}
               </span>
               <div className="mt-1">
@@ -166,7 +166,7 @@ export default function PaletteEditorDialog({
             {/* Colour stops */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className={`text-[10px] uppercase tracking-wider ${textTertiary}`}>
+                <span className={`text-2xs uppercase tracking-wider ${textSecondary}`}>
                   {t("paletteDialog.fields.colourStops", { count: entries.length })}
                 </span>
                 <Button
@@ -190,7 +190,7 @@ export default function PaletteEditorDialog({
                       }
                       title={t("paletteDialog.fields.stopTitle", { index: i })}
                     />
-                    <span className={`text-[9px] ${textTertiary}`}>{i}</span>
+                    <span className={`text-2xs ${textSecondary}`}>{i}</span>
                   </div>
                 ))}
               </div>
@@ -220,7 +220,7 @@ export default function PaletteEditorDialog({
             </div>
 
             {selectedPalette && (
-              <div className={`text-xs ${textTertiary}`}>
+              <div className={`text-xs ${textSecondary}`}>
                 {t("paletteDialog.fields.summary", {
                   id: formatHexId(selectedPalette.signal_start),
                   count: entries.length,

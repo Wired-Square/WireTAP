@@ -71,7 +71,7 @@ export default function QueuePanel({ onSelectQuery, onRemoveQuery }: Props) {
 
       {/* Queue list */}
       <div className="flex-1 overflow-auto">
-        <div className="divide-y divide-[var(--border-default)]">
+        <div className="divide-y divide-default">
           {queue.map((query) => (
             <QueueItem
               key={query.id}

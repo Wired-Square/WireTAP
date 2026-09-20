@@ -174,7 +174,7 @@ export default function UnifiedConfigDialog({
       size="xl"
       title="Catalog Configuration"
       subtitle="Configure catalog metadata and protocol settings"
-      icon={<Settings className="text-[color:var(--text-accent)]" />}
+      icon={<Settings className="text-accent-primary" />}
     >
       <DialogBody className="space-y-6">
         {/* Metadata Section */}
@@ -187,7 +187,7 @@ export default function UnifiedConfigDialog({
 
         {/* Protocol Configurations */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
             Protocol Configurations
           </h3>
 

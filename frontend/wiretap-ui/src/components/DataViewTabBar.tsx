@@ -10,8 +10,8 @@ import TimeDisplay from './TimeDisplay';
 import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
 import ContextMenu from './ContextMenu';
 import {
-  bgDataToolbar,
-  borderDataView,
+  bgSurface,
+  borderDefault,
   hoverBg,
 } from '../styles';
 import { iconXs } from '../styles/spacing';
@@ -107,7 +107,7 @@ export default function DataViewTabBar({
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   return (
-    <div className={`flex-shrink-0 flex items-center border-b ${borderDataView} ${bgDataToolbar}`}>
+    <div className={`flex-shrink-0 flex items-center border-b ${borderDefault} ${bgSurface}`}>
       {/* Protocol badge with status light */}
       <div className="ml-1">
         <ProtocolBadge

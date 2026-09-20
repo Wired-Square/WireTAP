@@ -199,22 +199,22 @@ export default function BitPreview({
   const { colorByKey, legendEntries } = useMemo(() => {
     // Stick to cool blues/teals so claimed bits share a family of colours (avoid red except for overlaps).
     const signalPalette = [
-      "bg-[var(--signal-blue-1)]",
-      "bg-[var(--signal-blue-2)]",
-      "bg-[var(--signal-blue-3)]",
-      "bg-[var(--signal-blue-4)]",
-      "bg-[var(--signal-sky-1)]",
-      "bg-[var(--signal-sky-2)]",
-      "bg-[var(--signal-cyan-1)]",
-      "bg-[var(--signal-cyan-2)]",
-      "bg-[var(--signal-teal-1)]",
-      "bg-[var(--signal-teal-2)]",
+      "bg-signal-blue-1",
+      "bg-signal-blue-2",
+      "bg-signal-blue-3",
+      "bg-signal-blue-4",
+      "bg-signal-sky-1",
+      "bg-signal-sky-2",
+      "bg-signal-cyan-1",
+      "bg-signal-cyan-2",
+      "bg-signal-teal-1",
+      "bg-signal-teal-2",
     ];
 
     const muxPalette = [
-      "bg-[var(--signal-purple-1)]",
-      "bg-[var(--signal-violet-1)]",
-      "bg-[var(--signal-fuchsia-1)]",
+      "bg-signal-purple-1",
+      "bg-signal-violet-1",
+      "bg-signal-fuchsia-1",
     ];
 
     const makeKey = (r: BitRange) =>
@@ -342,7 +342,7 @@ export default function BitPreview({
     return (
       <div key={byteIdx} className="flex items-center" style={{ gap: `${scaling.gap}px` }}>
         <div
-          className="font-mono text-[color:var(--text-muted)] shrink-0 flex items-center justify-center rounded bg-[var(--bg-muted)]"
+          className="font-mono text-muted shrink-0 flex items-center justify-center rounded bg-tertiary"
           style={{ fontSize: `${scaling.fontSize}px`, width: `${scaling.labelWidth}px`, height: `${scaling.bitHeight}px` }}
         >
           {byteIdx}
@@ -400,14 +400,14 @@ export default function BitPreview({
               : undefined;
             const availableClass = binaryZeroColour
               ? ''
-              : 'bg-[var(--bg-muted)] border border-[color:var(--border-default)]';
+              : 'bg-tertiary border border-default';
 
             const bgColor = isDragSelected
-              ? 'bg-[var(--status-warning)]'
+              ? 'bg-warning-text'
               : isOverlap
               ? 'bg-red-500'
               : rangeType === 'current'
-              ? 'bg-[var(--status-success)]'
+              ? 'bg-success-text'
               : rangeColorClass
               ? rangeColorClass
               : availableClass;
@@ -457,7 +457,7 @@ export default function BitPreview({
 
         {scaling.bytesPerRow === 1 && (
           <div
-            className="font-mono text-[color:var(--text-muted)] shrink-0 text-right overflow-hidden"
+            className="font-mono text-muted shrink-0 text-right overflow-hidden"
             style={{ fontSize: `${scaling.fontSize}px`, width: `${scaling.rangeWidth}px` }}
           >
             {startBit}-{endBit - 1}
@@ -493,14 +493,14 @@ export default function BitPreview({
         {hasOverlap && (
           <div className={flexRowGap2}>
             <div className="w-4 h-4 bg-red-500 rounded" />
-            <span className="text-[color:var(--text-secondary)]">{t('bitPreview.legendOverlap')}</span>
+            <span className="text-secondary">{t('bitPreview.legendOverlap')}</span>
           </div>
         )}
 
         {interactive && (
           <div className={flexRowGap2}>
-            <div className="w-4 h-4 bg-[var(--status-warning)] rounded" />
-            <span className="text-[color:var(--text-secondary)]">{t('bitPreview.instruction')}</span>
+            <div className="w-4 h-4 bg-warning-text rounded" />
+            <span className="text-secondary">{t('bitPreview.instruction')}</span>
           </div>
         )}
 
@@ -509,7 +509,7 @@ export default function BitPreview({
             {legendEntries.map((entry) => (
               <div key={entry.key} className="flex items-center gap-1">
                 <div className={`w-4 h-4 rounded ${entry.className}`} />
-                <span className="text-[color:var(--text-secondary)]">
+                <span className="text-secondary">
                   {entry.label}
                 </span>
               </div>

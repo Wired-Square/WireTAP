@@ -201,7 +201,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
           <>
             {/* Frame ID selection */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("hypothesis.fields.frameId")}
               </label>
               <div className="flex gap-2 mb-2">
@@ -237,7 +237,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 </Select>
               )}
               {sortedFrameIds.length === 0 && (
-                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                <p className="text-2xs text-muted mt-1">
                   {t("hypothesis.fields.noFrames")}
                 </p>
               )}
@@ -245,7 +245,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
             {/* Bit lengths */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("hypothesis.fields.bitLengths")}
               </label>
               <div className="flex gap-2 flex-wrap">
@@ -265,7 +265,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
             {/* Endianness */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("hypothesis.fields.endianness")}
               </label>
               <div className="flex gap-2">
@@ -291,7 +291,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
             {/* Bit range */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-[color:var(--text-secondary)]">
+                <label className="text-xs font-medium text-secondary">
                   {t("hypothesis.fields.bitRange")}
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer">
@@ -299,7 +299,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     checked={byteAligned}
                     onChange={(e) => setByteAligned(e.target.checked)}
                   />
-                  <span className="text-[10px] text-[color:var(--text-muted)]">
+                  <span className="text-2xs text-muted">
                     {t("hypothesis.fields.byteAligned")}
                   </span>
                 </label>
@@ -317,7 +317,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     placeholder={t("hypothesis.fields.startBit")}
                   />
                 </div>
-                <span className="text-[color:var(--text-muted)] self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
+                <span className="text-muted self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
                 <div className="flex-1">
                   <Input
                     type="number"
@@ -339,7 +339,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 checked={signed}
                 onChange={(e) => setSigned(e.target.checked)}
               />
-              <span className="text-xs text-[color:var(--text-secondary)]">
+              <span className="text-xs text-secondary">
                 {t("hypothesis.fields.signed")}
               </span>
             </label>
@@ -351,7 +351,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   checked={useAnalysisHints}
                   onChange={(e) => setUseAnalysisHints(e.target.checked)}
                 />
-                <span className="text-xs text-[color:var(--text-secondary)]">
+                <span className="text-xs text-secondary">
                   {t("hypothesis.fields.useHints")}
                 </span>
               </label>
@@ -369,7 +369,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {showAdvanced && (
                 <div className="flex gap-3 mt-2">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
+                    <label className="block text-2xs text-muted mb-0.5">
                       {t("hypothesis.fields.factor")}
                     </label>
                     <Input
@@ -381,7 +381,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
+                    <label className="block text-2xs text-muted mb-0.5">
                       {t("hypothesis.fields.offset")}
                     </label>
                     <Input
@@ -398,7 +398,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
             {/* Candidate count preview */}
             {canPreview && (
-              <p className="text-[10px] text-[color:var(--text-muted)]">
+              <p className="text-2xs text-muted">
                 {t("hypothesis.preview.summary", { count: candidates.length })}
                 {candidates.length >= 500 && t("hypothesis.preview.cap")}
               </p>
@@ -444,7 +444,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 <ChevronsUp className="w-3 h-3" />
                 {t("hypothesis.actions.topN", { count: 20 })}
               </Button>
-              <span className={`text-[10px] ${textSecondary} ml-auto`}>
+              <span className={`text-2xs ${textSecondary} ml-auto`}>
                 {t("hypothesis.actions.selectionSummary", { count: selectedCount, panels: estimatedPanels })}
               </span>
             </div>
@@ -458,7 +458,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left ${
                     selectedCandidates.has(c.signalName)
                       ? "bg-blue-600/10 border border-blue-600/30"
-                      : "bg-[var(--bg-primary)] border border-transparent hover:bg-[var(--hover-bg)]"
+                      : "bg-primary border border-transparent hover:bg-hover"
                   }`}
                 >
                   <Checkbox
@@ -466,11 +466,11 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     readOnly
                     className="pointer-events-none"
                   />
-                  <span className="text-[color:var(--text-primary)] font-mono truncate flex-1">
+                  <span className="text-primary font-mono truncate flex-1">
                     {c.signalName}
                   </span>
                   {frameMode === 'all' && (
-                    <span className="text-[color:var(--text-muted)] shrink-0 tabular-nums">
+                    <span className="text-muted shrink-0 tabular-nums">
                       {formatFrameId(c.frameId)}
                     </span>
                   )}
@@ -480,7 +480,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 </button>
               ))}
               {candidates.length === 0 && (
-                <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
+                <p className="text-xs text-muted text-center py-4">
                   {t("hypothesis.preview.noMatches")}
                 </p>
               )}

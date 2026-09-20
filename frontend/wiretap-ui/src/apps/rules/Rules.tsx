@@ -8,10 +8,10 @@ import AppLayout from "../../components/AppLayout";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useRulesStore, type RulesTab } from "./stores/rulesStore";
 import {
-  textTertiary,
+  textSecondary,
   textDanger,
   bgDataView,
-  bgDataToolbar,
+  bgSurface,
   dataViewContainer,
 } from "../../styles";
 import { Tab, Tabs } from "../../components/Tabs";
@@ -218,7 +218,7 @@ export default function Rules() {
 
       {/* No devices configured */}
       {!hasFramelinkProfiles && (
-        <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
+        <div className={`flex-1 flex items-center justify-center ${textSecondary}`}>
           <div className="text-center">
             <Workflow className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="text-sm">{t("states.noDevices")}</p>
@@ -231,7 +231,7 @@ export default function Rules() {
 
       {/* Connecting */}
       {device?.connecting && (
-        <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
+        <div className={`flex-1 flex items-center justify-center ${textSecondary}`}>
           <Loader2 className="w-6 h-6 animate-spin" />
           <span className="ml-2 text-sm">
             {t("states.connectingTo", { label: device.label, defaultValue: "Connecting to {{label}}…" })}
@@ -241,7 +241,7 @@ export default function Rules() {
 
       {/* Devices configured but none active — prompt to use the picker */}
       {hasFramelinkProfiles && !device && (
-        <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
+        <div className={`flex-1 flex items-center justify-center ${textSecondary}`}>
           <div className="text-center">
             <Workflow className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="text-sm">{t("states.selectDevice")}</p>
@@ -254,7 +254,7 @@ export default function Rules() {
 
       {/* Connection failed — show retry */}
       {device && !device.connecting && !device.connected && (
-        <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
+        <div className={`flex-1 flex items-center justify-center ${textSecondary}`}>
           <div className="text-center">
             <p className={`text-sm ${textDanger}`}>
               {t("states.connectFailed", { label: device.label, defaultValue: "Failed to connect to {{label}}" })}
@@ -272,7 +272,7 @@ export default function Rules() {
       {/* Connected — main content (data-view bubble) */}
       {device?.connected && (
         <div className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}>
-          <Tabs className={`flex-shrink-0 px-1 ${bgDataToolbar}`}>
+          <Tabs className={`flex-shrink-0 px-1 ${bgSurface}`}>
             {TAB_KEYS.map((tab) => (
               <Tab key={tab.id} selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
                 {t(`tabs.${tab.i18nKey}`)}

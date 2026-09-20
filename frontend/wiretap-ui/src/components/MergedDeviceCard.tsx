@@ -48,7 +48,7 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
         <div
           key={bar}
           className={`w-1 rounded-sm transition-colors ${
-            bar <= strength ? "bg-green-500" : "bg-[var(--border-default)]"
+            bar <= strength ? "bg-green-500" : "bg-border-default"
           }`}
           style={{ height: `${bar * 25}%` }}
         />
@@ -63,7 +63,7 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
 
 // The edge always reads blue when asserted — it represents "BLE says this
 // exists", independent of the capability's own colour family.
-const BLE_RING = "ring-1 ring-[color:var(--status-info-border)]";
+const BLE_RING = "ring-1 ring-info";
 
 function CapabilityBadge({
   label,

@@ -155,22 +155,22 @@ export default function SourceList({
 
     return (
       <div>
-        <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
+        <div className={`px-4 py-2 bg-surface ${sectionHeader}`}>
           {t("ioSourcePicker.sources.source")}
         </div>
         <div className="px-3 py-2">
           <button
             onClick={() => onSelectSource(null)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 bg-info border border-info"
           >
-            <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center border-[color:var(--status-info-text)]">
-              <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />
+            <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center border-info-text">
+              <div className="w-2 h-2 rounded-full bg-info-text" />
             </div>
             <div className="flex-1 min-w-0">
               <span className={`${textMedium} truncate`}>{displayName}</span>
-              <div className={`${caption} text-[color:var(--text-muted)]`}>{subtitle}</div>
+              <div className={`${caption} text-muted`}>{subtitle}</div>
             </div>
-            <span className="text-xs text-[color:var(--status-info-text)]">{t("ioSourcePicker.sources.change")}</span>
+            <span className="text-xs text-info">{t("ioSourcePicker.sources.change")}</span>
           </button>
         </div>
       </div>
@@ -210,11 +210,11 @@ export default function SourceList({
         subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails,
         icon: GitMerge,
-        iconColour: "text-[color:var(--text-purple)]",
-        bgSelected: "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]",
-        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-purple)]`,
-        indicatorColour: "border-[color:var(--text-purple)]",
-        dotColour: "bg-[var(--text-purple)]",
+        iconColour: "text-purple",
+        bgSelected: "bg-purple border border-purple",
+        bgHover: `${bgSurface} border border-default hover:border-text-purple`,
+        indicatorColour: "border-text-purple",
+        dotColour: "bg-text-purple",
       };
     } else if (isCapture) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
@@ -228,11 +228,11 @@ export default function SourceList({
         subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails: `${profileName} (${storageBackend})`,
         icon: Database,
-        iconColour: "text-[color:var(--text-cyan)]",
-        bgSelected: "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]",
-        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-cyan)]`,
-        indicatorColour: "border-[color:var(--text-cyan)]",
-        dotColour: "bg-[var(--text-cyan)]",
+        iconColour: "text-cyan",
+        bgSelected: "bg-info border border-info",
+        bgHover: `${bgSurface} border border-default hover:border-text-cyan`,
+        indicatorColour: "border-text-cyan",
+        dotColour: "bg-text-cyan",
       };
     } else {
       // Single-source session (e.g., a WireTAP backend)
@@ -248,11 +248,11 @@ export default function SourceList({
         subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails: `${profileName} (${deviceKind})`,
         icon: Database,
-        iconColour: "text-[color:var(--text-green)]",
-        bgSelected: "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]",
-        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-green)]`,
-        indicatorColour: "border-[color:var(--text-green)]",
-        dotColour: "bg-[var(--text-green)]",
+        iconColour: "text-green",
+        bgSelected: "bg-success border border-success",
+        bgHover: `${bgSurface} border border-default hover:border-text-green`,
+        indicatorColour: "border-text-green",
+        dotColour: "bg-text-green",
       };
     }
   };
@@ -321,7 +321,7 @@ export default function SourceList({
       {renderAfterSessions}
 
       {!hideRecorded && recordedProfiles.length > 0 && (
-        <div className="border-b border-[color:var(--border-default)]">
+        <div className="border-b border-default">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Database className={iconXs} />
             <span>{t("ioSourcePicker.sources.recorded")}</span>
@@ -346,7 +346,7 @@ export default function SourceList({
       )}
 
       {!hideExternal && (
-        <div className="border-b border-[color:var(--border-default)]">
+        <div className="border-b border-default">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <FolderOpen className={iconXs} />
             <span>{t("ioSourcePicker.sources.external")}</span>
@@ -357,18 +357,18 @@ export default function SourceList({
               disabled={isLoading}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors disabled:opacity-50 ${
                 isCsvSelected
-                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-                  : "hover:bg-[var(--hover-bg)] border border-transparent"
+                  ? "bg-info border border-info"
+                  : "hover:bg-hover border border-transparent"
               }`}
             >
               <div
                 className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                   isCsvSelected
-                    ? "border-[color:var(--status-info-text)]"
-                    : "border-[color:var(--border-default)]"
+                    ? "border-info-text"
+                    : "border-default"
                 }`}
               >
-                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
+                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-info-text" />}
               </div>
               <div className="flex-1 min-w-0">
                 <span className={textMedium}>{t("ioSourcePicker.sources.csv")}</span>
@@ -383,7 +383,7 @@ export default function SourceList({
 
   // ── Devices tab body: real-time sources ──
   const devicesBody = (realtimeProfiles.length > 0 || !!onNewDevice) && (
-    <div className="border-b border-[color:var(--border-default)]">
+    <div className="border-b border-default">
       <div className={`px-4 py-1.5 ${captionMuted} flex items-center justify-between`}>
         <div className="flex items-center gap-1.5">
           <Wifi className={iconXs} />
@@ -450,10 +450,10 @@ export default function SourceList({
           <button
             onClick={onNewDevice}
             disabled={isLoading}
-            className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors border border-dashed border-[color:var(--border-default)] hover:bg-[var(--hover-bg)] hover:border-[color:var(--status-info-text)] disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors border border-dashed border-default hover:bg-hover hover:border-info-text disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            <Plus className={`${iconMd} text-[color:var(--text-muted)]`} />
-            <span className={`${textMedium} text-[color:var(--text-muted)]`}>
+            <Plus className={`${iconMd} text-muted`} />
+            <span className={`${textMedium} text-muted`}>
               {t("ioSourcePicker.sources.newDevice")}
             </span>
           </button>
@@ -464,7 +464,7 @@ export default function SourceList({
 
   // ── Sessions tab body: joinable active sessions ──
   const sessionsBody = (
-    <div className="border-b border-[color:var(--border-default)]">
+    <div className="border-b border-default">
       <div className="px-3 pt-2 pb-2 space-y-1">
         {joinableSessions.map((session) => {
           const isSelected = checkedSourceId === session.sessionId;
@@ -480,7 +480,7 @@ export default function SourceList({
               }`}
             >
               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                isSelected ? info.indicatorColour : "border-[color:var(--border-default)]"
+                isSelected ? info.indicatorColour : "border-default"
               }`}>
                 {isSelected && (
                   <div className={`w-2 h-2 rounded-full ${info.dotColour}`} />
@@ -507,15 +507,15 @@ export default function SourceList({
                   <span>{info.subtitle}</span>
                   {session.captureId && (
                     <>
-                      <span className="text-[color:var(--text-muted)]">·</span>
-                      <span className="text-[color:var(--text-cyan)]">
+                      <span className="text-muted">·</span>
+                      <span className="text-cyan">
                         {t("ioSourcePicker.sources.framesCount", { count: session.captureFrameCount?.toLocaleString() ?? "?" })}
                       </span>
                     </>
                   )}
                 </div>
                 {info.sourceDetails && (
-                  <div className={`${caption} text-[color:var(--text-muted)] truncate mt-0.5`}>
+                  <div className={`${caption} text-muted truncate mt-0.5`}>
                     └─ {info.sourceDetails}
                   </div>
                 )}
@@ -544,7 +544,7 @@ export default function SourceList({
         : devicesBody}
 
       {readProfiles.length === 0 && !isCsvSelected && (
-        <div className="p-4 text-sm text-[color:var(--text-muted)]">
+        <div className="p-4 text-sm text-muted">
           {t("ioSourcePicker.sources.noSources")}
         </div>
       )}
@@ -603,42 +603,42 @@ function SourceButton({
 
   const getIndicatorColor = () => {
     if (isDisabled) {
-      return "border-[color:var(--border-default)]";
+      return "border-default";
     }
     if (useCheckbox && isChecked) {
-      return "border-[color:var(--text-purple)] bg-[var(--text-purple)]";
+      return "border-text-purple bg-text-purple";
     }
     if (liveAndChecked) {
       return isStopped
-        ? "border-[color:var(--text-amber)]"
-        : "border-[color:var(--text-green)]";
+        ? "border-text-amber"
+        : "border-text-green";
     }
     if (isChecked) {
-      return "border-[color:var(--status-info-text)]";
+      return "border-info-text";
     }
-    return "border-[color:var(--border-default)]";
+    return "border-default";
   };
 
   return (
     <div
       className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
         isDisabled
-          ? "opacity-60 cursor-not-allowed border border-[color:var(--border-default)] bg-[var(--bg-surface)]"
+          ? "opacity-60 cursor-not-allowed border border-default bg-surface"
           : isLoading
           ? "opacity-50 cursor-not-allowed"
           : useCheckbox && isChecked
-          ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)] cursor-pointer"
+          ? "bg-purple border border-purple cursor-pointer"
           : liveAndChecked
           ? isStopped
-            ? "bg-[var(--status-warning-bg)] border border-[color:var(--status-warning-border)] cursor-pointer"
-            : "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)] cursor-pointer"
+            ? "bg-warning border border-warning cursor-pointer"
+            : "bg-success border border-success cursor-pointer"
           : isChecked
-          ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] cursor-pointer"
+          ? "bg-info border border-info cursor-pointer"
           : isLive
           ? isStopped
-            ? "bg-[var(--status-warning-bg)]/50 border border-[color:var(--status-warning-border)] hover:bg-[var(--status-warning-bg)] cursor-pointer"
-            : "bg-[var(--status-success-bg)]/50 border border-[color:var(--status-success-border)] hover:bg-[var(--status-success-bg)] cursor-pointer"
-          : "hover:bg-[var(--hover-bg)] border border-transparent cursor-pointer"
+            ? "bg-warning/50 border border-warning hover:bg-warning cursor-pointer"
+            : "bg-success/50 border border-success hover:bg-success cursor-pointer"
+          : "hover:bg-hover border border-transparent cursor-pointer"
       }`}
       onClick={isDisabled || isLoading ? undefined : () => onSelect(isChecked && !useCheckbox ? null : profile.id)}
       role={isDisabled ? undefined : "button"}
@@ -653,16 +653,16 @@ function SourceButton({
           <div className={`w-2 h-2 rounded-full ${
             liveAndChecked
               ? isStopped
-                ? "bg-[var(--text-amber)]"
-                : "bg-[var(--text-green)]"
-              : "bg-[var(--status-info-text)]"
+                ? "bg-text-amber"
+                : "bg-text-green"
+              : "bg-info-text"
           }`} />
         ) : null}
       </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
           {isDefault && <Bookmark className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />}
-          <span className={`${textMedium} truncate ${isDisabled ? "!text-[color:var(--text-muted)]" : ""}`}>
+          <span className={`${textMedium} truncate ${isDisabled ? "!text-muted" : ""}`}>
             {profile.name}
           </span>
           {busNumber !== undefined && (
@@ -685,15 +685,15 @@ function SourceButton({
             )
           )}
         </div>
-        <div className={`text-xs ${isDisabled ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}`}>
+        <div className={`text-xs ${isDisabled ? "text-muted" : "text-muted"}`}>
           {isDisabled && disabledReason ? (
-            <span>{profile.kind} · <span className="text-[color:var(--text-muted)]">{disabledReason}</span></span>
+            <span>{profile.kind} · <span className="text-muted">{disabledReason}</span></span>
           ) : usageInfo && usageInfo.sessionCount > 0 ? (
             <span className="flex items-center gap-1.5">
               <span>{profile.kind}</span>
               {usageInfo.configLocked && (
                 <span title={t("ioSourcePicker.sources.configLocked")}>
-                  <Lock className={`${iconXs} text-[color:var(--text-amber)]`} />
+                  <Lock className={`${iconXs} text-amber`} />
                 </span>
               )}
               {usageInfo.sessionIds.slice(0, 2).map((sid) => (
@@ -702,7 +702,7 @@ function SourceButton({
                 </Badge>
               ))}
               {usageInfo.sessionCount > 2 && (
-                <span className="text-[color:var(--text-muted)]">+{usageInfo.sessionCount - 2}</span>
+                <span className="text-muted">+{usageInfo.sessionCount - 2}</span>
               )}
             </span>
           ) : (
@@ -722,7 +722,7 @@ function SourceButton({
               }}
               title={t("ioSourcePicker.sources.editDevice")}
             >
-              <Pencil className={`${iconXs} text-[color:var(--text-muted)]`} />
+              <Pencil className={`${iconXs} text-muted`} />
             </IconButton>
           )}
           {onDiscard && (
@@ -734,7 +734,7 @@ function SourceButton({
               tone="danger"
               title={t("ioSourcePicker.sources.discardDevice")}
             >
-              <Trash2 className={`${iconXs} text-[color:var(--text-muted)]`} />
+              <Trash2 className={`${iconXs} text-muted`} />
             </IconButton>
           )}
         </div>

@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
-import { caption, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
+import { caption, bgSurface, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
@@ -32,7 +32,7 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
             tone="danger"
             title={t("genericChildren.deleteTooltip")}
           >
-            <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
+            <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
         )}
       </div>
@@ -42,18 +42,18 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
           {selectedNode.children!.map((child, idx) => (
             <div
               key={idx}
-              className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
+              className={`p-3 ${bgSurface} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
               onClick={() => onSelectNode(child)}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-[color:var(--text-primary)] mb-1 flex items-center gap-2">
+                  <div className="font-medium text-primary mb-1 flex items-center gap-2">
                     {child.type === "signal" && <span>⚡</span>}
                     {child.key}
                   </div>
 
                   {child.type === "value" && child.value !== undefined && (
-                    <div className="font-mono text-xs text-[color:var(--text-muted)] truncate">
+                    <div className="font-mono text-xs text-muted truncate">
                       {String(child.value)}
                     </div>
                   )}

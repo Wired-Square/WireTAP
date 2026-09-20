@@ -7,7 +7,7 @@ import {
   h2,
   sectionHeader,
   textPrimary,
-  textTertiary,
+  textSecondary,
 } from "../../../styles";
 import { SettingRadioGroup } from "../components/rows";
 import type { ThemeMode, ThemeColours } from "../stores/settingsStore";
@@ -125,7 +125,7 @@ export default function DisplayView({
             {t("display.themeColours.resetAll")}
           </Button>
         </div>
-        <p className={`text-sm ${textTertiary}`}>{t("display.themeColours.help")}</p>
+        <p className={`text-sm ${textSecondary}`}>{t("display.themeColours.help")}</p>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Light Mode Colours */}
@@ -216,7 +216,7 @@ export default function DisplayView({
 
       <div className="space-y-3">
         <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.signals.title")}</h3>
-        <p className={`text-sm ${textTertiary}`}>{t("display.signals.help")}</p>
+        <p className={`text-sm ${textSecondary}`}>{t("display.signals.help")}</p>
         <div className="space-y-2">
           {(["none", "low", "medium", "high"] as const).map((key) => (
             <div key={key} className={flexRowGap2}>
@@ -239,7 +239,7 @@ export default function DisplayView({
 
       <div className="space-y-3">
         <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.binary.title")}</h3>
-        <p className={`text-sm ${textTertiary}`}>{t("display.binary.help")}</p>
+        <p className={`text-sm ${textSecondary}`}>{t("display.binary.help")}</p>
         <div className="space-y-2">
           {[
             {
@@ -282,7 +282,7 @@ export default function DisplayView({
             {t("display.frameEditor.resetAll")}
           </Button>
         </div>
-        <p className={`text-sm ${textTertiary}`}>{t("display.frameEditor.help")}</p>
+        <p className={`text-sm ${textSecondary}`}>{t("display.frameEditor.help")}</p>
         <div className="space-y-2">
           {frameEditorColours.map((colour, i) => (
             <div key={i} className={flexRowGap2}>

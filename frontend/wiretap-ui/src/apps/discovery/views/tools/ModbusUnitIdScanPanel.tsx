@@ -72,7 +72,7 @@ export default function ModbusUnitIdScanPanel({ onStartScan }: Props) {
 
       {/* Fallback register config */}
       <div className="space-y-2 pt-1">
-        <label className={`${textMuted} text-[10px] uppercase tracking-wider`}>
+        <label className={`${textMuted} text-2xs uppercase tracking-wider`}>
           {t("modbusUnitId.fallbackProbe")}
         </label>
         <FieldRow>

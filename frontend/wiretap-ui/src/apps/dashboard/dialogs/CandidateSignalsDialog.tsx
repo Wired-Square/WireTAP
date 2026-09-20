@@ -159,7 +159,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
           <>
             {/* Frame ID */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("candidates.fields.frameId")}
               </label>
               <Select
@@ -175,7 +175,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 ))}
               </Select>
               {sortedFrameIds.length === 0 && (
-                <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                <p className="text-2xs text-muted mt-1">
                   {t("candidates.fields.noFrames")}
                 </p>
               )}
@@ -183,7 +183,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
             {/* Bit lengths */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("candidates.fields.bitLengths")}
               </label>
               <div className="flex gap-2">
@@ -203,7 +203,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
             {/* Endianness */}
             <div>
-              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+              <label className="block text-xs font-medium text-secondary mb-1">
                 {t("candidates.fields.endianness")}
               </label>
               <div className="flex gap-2">
@@ -229,7 +229,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
             {/* Byte range */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                <label className="block text-xs font-medium text-secondary mb-1">
                   {t("candidates.fields.startByte")}
                 </label>
                 <Input
@@ -242,7 +242,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                <label className="block text-xs font-medium text-secondary mb-1">
                   {t("candidates.fields.endByte")}
                 </label>
                 <Input
@@ -263,7 +263,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   checked={useAnalysisHints}
                   onChange={(e) => setUseAnalysisHints(e.target.checked)}
                 />
-                <span className="text-xs text-[color:var(--text-secondary)]">
+                <span className="text-xs text-secondary">
                   {t("candidates.fields.useHints")}
                 </span>
               </label>
@@ -285,30 +285,30 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
           <>
             {/* Preview list */}
             <div>
-              <p className="text-xs text-[color:var(--text-secondary)] mb-2">
+              <p className="text-xs text-secondary mb-2">
                 {t("candidates.preview.summary", { count: candidates.length })}
               </p>
               <div className="max-h-48 overflow-y-auto space-y-0.5 text-xs">
                 {candidates.map((c) => (
                   <div
                     key={c.signalName}
-                    className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--bg-primary)]"
+                    className="flex items-center gap-2 px-2 py-1 rounded bg-primary"
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: SIGNAL_COLOURS[candidates.indexOf(c) % SIGNAL_COLOURS.length] }}
                     />
-                    <span className="text-[color:var(--text-primary)] font-mono">
+                    <span className="text-primary font-mono">
                       {c.signalName}
                     </span>
-                    <span className="text-[color:var(--text-muted)] ml-auto">
+                    <span className="text-muted ml-auto">
                       {c.label}
                     </span>
                   </div>
                 ))}
               </div>
               {candidates.length === 0 && (
-                <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
+                <p className="text-xs text-muted text-center py-4">
                   {t("candidates.preview.noMatches")}
                 </p>
               )}
