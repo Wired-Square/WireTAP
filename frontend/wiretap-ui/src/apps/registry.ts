@@ -50,8 +50,7 @@ export type AppHue =
   | "teal"
   | "emerald"
   | "cyan"
-  | "orange"
-  | "amber";
+  | "orange";
 
 type AppVisual = {
   icon: LucideIcon;

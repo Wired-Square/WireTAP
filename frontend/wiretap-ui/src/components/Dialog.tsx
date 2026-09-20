@@ -1,7 +1,8 @@
 // The dialog primitive: renders the `.dialog` classes in styles/components.css.
 // One surface in three slots — a pinned header, a scrolling body, a pinned
 // footer. `onClose` makes it dismissible: the header's ✕, Escape and a click on
-// the backdrop all call it; a dialog that must be answered passes none.
+// the backdrop all call it; a dialog that must be answered passes none. Tab
+// stays inside the frame while it is open.
 
 import {
   createContext,
@@ -10,6 +11,7 @@ import {
   useId,
   useRef,
   type HTMLAttributes,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -44,6 +46,21 @@ interface DialogContextValue {
 
 const DialogContext = createContext<DialogContextValue>({ titleId: "" });
 
+const TABBABLE = ':is(a[href], button, input, select, textarea, [tabindex]):not(:disabled, [tabindex="-1"])';
+
+function trapTab(e: KeyboardEvent<HTMLDivElement>) {
+  if (e.key !== "Tab" || e.defaultPrevented) return;
+  const frame = e.currentTarget;
+  const tabbables = frame.querySelectorAll<HTMLElement>(TABBABLE);
+  const first = tabbables[0];
+  const last = tabbables[tabbables.length - 1];
+  const active = document.activeElement;
+  const atEdge = active === frame || active === (e.shiftKey ? first : last);
+  if (!atEdge) return;
+  e.preventDefault();
+  (e.shiftKey ? last : first)?.focus();
+}
+
 export function Dialog({ isOpen, onClose, size = "md", title, subtitle, icon, className = "", children }: DialogProps) {
   const titleId = useId();
   const frameRef = useRef<HTMLDivElement>(null);
@@ -77,6 +94,7 @@ export function Dialog({ isOpen, onClose, size = "md", title, subtitle, icon, cl
           aria-labelledby={titleId}
           tabIndex={-1}
           className={`dialog ${size !== "md" ? `dialog--${size} ` : ""}${className}`}
+          onKeyDown={trapTab}
         >
           {title !== undefined && (
             <DialogHeader>

@@ -28,7 +28,10 @@ export default function FlashNotification({
 
   // The tints are translucent in the dark theme, so the toast sits on a surface.
   return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in rounded-lg bg-surface shadow-lg">
+    <div
+      role={type === "error" ? "alert" : "status"}
+      className="fixed top-4 right-4 z-50 animate-fade-in rounded-lg bg-surface shadow-lg"
+    >
       <Alert
         tone={type === "error" ? "danger" : type}
         className="min-w-62.5 max-w-100"

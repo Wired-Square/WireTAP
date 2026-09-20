@@ -325,7 +325,10 @@ of them. Props:
 Inside an alert, a heading line is `font-medium` and a detail line
 `text-xs`; do not recolour the text. A message that needs its own layout as
 well — a summary header with a big icon, a row per finding with its own
-glyph — is a toned `<Card>`, not an alert.
+glyph — is a toned `<Card>`, not an alert. An alert carries no live region:
+it is mostly explanatory copy inside a dialog, and announcing every one on
+every render would drown the reader — the toast (`FlashNotification`) is
+the live region, `status` for a notice and `alert` for an error.
 
 ### Dialogs — [Dialog.tsx](../frontend/wiretap-ui/src/components/Dialog.tsx)
 
@@ -359,7 +362,8 @@ Anything that is not a body or footer — a `TabStrip`, a `LoadStatus` banner �
 can sit between the slots as a direct child; only the body gives way when the
 window is short. Escape reaches only the dialog opened last, so a picker
 hosted by another dialog closes alone. Focus moves into the dialog on open and
-back to the opener on close.
+back to the opener on close, and Tab wraps inside the frame while it is open
+— the trap `aria-modal` promises.
 
 ### Tabs — [Tabs.tsx](../frontend/wiretap-ui/src/components/Tabs.tsx)
 
@@ -390,7 +394,8 @@ sizes it to 14 px. The declarative forms are
 clips it, placed under its `anchorRef` — above when there is no room, clamped
 to the window — or `at` a point, and dismissed by Escape and a mousedown
 outside it. `<Menu>` is a popover with `role="menu"`, ↑ ↓ Home End between its
-items, and focus returned to the opener. Props:
+items, Tab closing it, and focus returned to the opener — so the next Tab
+continues from the trigger. Props:
 
 | Prop | Values | Notes |
 |---|---|---|

@@ -1,9 +1,10 @@
 // The menu primitive: renders the `.popover` and `.menu` classes in
 // styles/components.css. `Popover` is the floating surface — portalled to the
 // body, placed against an anchor or at a point, dismissed by Escape and a
-// click outside; `Menu` is a popover with menu semantics, arrow-key focus and
-// focus returned to the opener; `MenuItem`, `MenuSeparator` and `MenuHeading`
-// are its rows. An item closes the menu after its click unless told to stay.
+// click outside; `Menu` is a popover with menu semantics, arrow-key focus,
+// Tab closing it and focus returned to the opener; `MenuItem`, `MenuSeparator`
+// and `MenuHeading` are its rows. An item closes the menu after its click
+// unless told to stay.
 // `usePopover` holds the open state between a trigger and its popover.
 
 import {
@@ -145,6 +146,10 @@ export function Menu({ open, onClose, size = "md", className = "", onKeyDown, ch
         className={`menu ${size === "lg" ? "menu--lg " : ""}${className}`}
         onKeyDown={(e) => {
           onKeyDown?.(e);
+          if (e.key === "Tab" && !e.defaultPrevented) {
+            e.preventDefault();
+            onClose();
+          }
           moveFocusAlong(e, KEYS, '[role^="menuitem"]:not(:disabled)');
         }}
         {...rest}

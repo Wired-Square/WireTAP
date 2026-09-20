@@ -7,14 +7,17 @@ obvious.
 
 ## What exists
 
-**vitest only.** 25 files, ~200 tests, `environment: "node"`
-([vite.config.ts](../frontend/wiretap-ui/vite.config.ts)). There is **no jsdom, no
-@testing-library, no Playwright, no WebDriver**. Nothing renders: every test is
-a pure-logic test over stores, utils, and hook logic.
+**vitest only.** 26 files, ~210 tests, `environment: "node"`
+([vite.config.ts](../frontend/wiretap-ui/vite.config.ts)). There is **no
+@testing-library, no Playwright, no WebDriver**, and one rendered test:
+`src/tests/dialogTabTrap.test.tsx` opts into jsdom with a
+`// @vitest-environment jsdom` pragma. Every other test is a pure-logic test
+over stores, utils, and hook logic.
 
 That is a deliberate shape, not a gap left by accident — the app's logic lives
 in Zustand stores and pure modules precisely so it can be tested without a DOM.
-Keep new logic testable that way before adding a rendering dependency.
+Keep new logic testable that way; the pragma is for a primitive's DOM contract,
+not for a store that could have been tested without one.
 
 ```
 npm run test:run    # vitest, one shot

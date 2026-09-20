@@ -6,6 +6,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **WireTAP now requires macOS 13.** The installer refuses an older system, where the app already rendered its colours wrong.
+
+- **Keyboard focus stays where it should.** Tab and Shift+Tab now cycle inside an open dialog instead of escaping to the window behind it, and Tab closes an open menu and returns you to the button that opened it. In the Dashboard's layout menu that drops a half-typed name — press Enter to save it first. Toasts are announced by screen readers.
+
 - **The MCP server's plumbing is now shared with the other Wired Square MCP servers.** Which tools exist, what they return and how the bearer token, origin check and Session Manager connect/disconnect entries behave are unchanged; a client that opens with the legacy `initialize` handshake while asking for `2026-07-28` is now answered with `2025-11-25`, which every such client already speaks. Nothing to do.
 
 - **Every colour in the app is now one of the theme's.** The last few hundred places that painted their own — the session canvas nodes and their handles, the state glyphs and text in Session Details, the result views' section glyphs, the source picker's warnings, the required-field marks, the loading spinners, the flow diagram in Rules and the toasts — now read the same status tones and data accents as everything else, so they follow the theme and match the badges and dots beside them. Visible: a running session's node on the canvas is tinted green rather than outlined, a paused one blue, a stopped one amber; a source is the same purple, cyan or green on the canvas, in the picker and on the session button; a toast is a tinted message with a glyph rather than a solid block; the two analysis panels' tabs are Discovery's purple, as their contents already were. Nothing moves.
