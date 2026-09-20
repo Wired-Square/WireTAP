@@ -5,7 +5,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { EllipsisVertical } from "lucide-react";
 
-import { iconSm } from "../styles/spacing";
 import { IconButton, type ButtonVariant } from "./Button";
 import { Menu, MenuItem, MenuSeparator, usePopover } from "./Menu";
 
@@ -63,14 +62,20 @@ export default function OverflowMenu({
   title,
   variant,
   className,
-  trigger = <EllipsisVertical className={iconSm} />,
+  trigger = <EllipsisVertical />,
 }: Props) {
   const items = rawItems.filter(Boolean) as OverflowMenuItem[];
   const menu = usePopover();
 
   return (
     <>
-      <IconButton {...menu.trigger} title={title} aria-label={title} variant={variant} className={className}>
+      <IconButton
+        {...menu.trigger}
+        title={title}
+        aria-label={title}
+        variant={variant}
+        className={`menu__trigger ${className ?? ""}`}
+      >
         {trigger}
       </IconButton>
 

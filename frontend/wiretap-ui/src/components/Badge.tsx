@@ -27,7 +27,7 @@ export function badgeClass(
     variant !== "tonal" && `badge--${variant}`,
     tone !== "neutral" && `badge--${tone}`,
     size !== "md" && `badge--${size}`,
-    mono && "font-mono",
+    mono && "badge--mono",
     className,
   ]
     .filter(Boolean)
@@ -52,8 +52,8 @@ export interface SummaryBadgeProps extends Omit<BadgeProps, "children"> {
 export function SummaryBadge({ label, value, size = "lg", ...rest }: SummaryBadgeProps) {
   return (
     <Badge size={size} {...rest}>
-      <span className="opacity-70">{label}:</span>
-      <span className="font-mono text-primary">{value}</span>
+      <span className="badge__label">{label}:</span>
+      <span className="badge__value">{value}</span>
     </Badge>
   );
 }

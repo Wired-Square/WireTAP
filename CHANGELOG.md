@@ -6,7 +6,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds and the bookmark dialogs use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter.
+- **Time bounds are entered in the platform's date-time fields.** The Query app's time bounds and the bookmark dialogs use the same native date-time field as the frames toolbar and the time controller, with a clear button beside a filled field, instead of the third-party calendar pop-up — so they type, tab and read the same as every other time field, and the app is about 200 kB lighter. A toast's dismiss button is now labelled in the app's language.
 
 - **WireTAP now requires macOS 13.** The installer refuses an older system, where the app already rendered its colours wrong.
 

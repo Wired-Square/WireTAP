@@ -1,11 +1,8 @@
-// Escape reaches only the layer opened last: dialogs, menus and popovers share
-// one stack, so a menu over a dialog closes alone and the dialog on the next
-// press. A layer without a dismiss handler still holds the top, which is how
-// a dialog that must be answered swallows Escape.
+// The React face of the dismiss stack in behaviour/dismiss.ts: a layer for as
+// long as `open` holds, reading the latest handler and `inside` refs.
 
 import { useEffect, useRef, type RefObject } from "react";
-
-const layers: symbol[] = [];
+import { pushDismissLayer } from "./behaviour/dismiss";
 
 export interface DismissOptions {
   /** Elements a mousedown may land in without dismissing; none means clicks are not watched */
@@ -21,24 +18,9 @@ export function useDismiss(open: boolean, onDismiss: (() => void) | undefined, {
 
   useEffect(() => {
     if (!open) return;
-    const self = Symbol("layer");
-    layers.push(self);
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || e.isComposing) return;
-      if (layers[layers.length - 1] !== self || !onDismissRef.current) return;
-      e.preventDefault();
-      onDismissRef.current();
-    };
-    const onMouseDown = (e: MouseEvent) => {
-      if (insideRef.current?.some((r) => r.current?.contains(e.target as Node))) return;
-      onDismissRef.current?.();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    if (watchClicks) document.addEventListener("mousedown", onMouseDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("mousedown", onMouseDown);
-      layers.splice(layers.indexOf(self), 1);
-    };
+    return pushDismissLayer({
+      onDismiss: () => onDismissRef.current?.(),
+      isInside: watchClicks ? (target) => insideRef.current?.some((r) => r.current?.contains(target)) ?? false : undefined,
+    });
   }, [open, watchClicks]);
 }

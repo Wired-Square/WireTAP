@@ -7,10 +7,12 @@ obvious.
 
 ## What exists
 
-**vitest only.** 26 files, ~210 tests, `environment: "node"`
+**vitest only.** 27 files, ~220 tests, `environment: "node"`
 ([vite.config.ts](../frontend/wiretap-ui/vite.config.ts)). There is **no
-@testing-library, no Playwright, no WebDriver**, and one rendered test:
-`src/tests/dialogTabTrap.test.tsx` opts into jsdom with a
+@testing-library, no Playwright, no WebDriver**, and two DOM tests:
+`src/tests/dialogTabTrap.test.tsx` (the dialog rendered, Tab trapped) and
+`src/tests/primitiveBehaviour.test.ts` (the dismiss stack, focus movement and
+popover placement under the primitives, no React) opt into jsdom with a
 `// @vitest-environment jsdom` pragma. Every other test is a pure-logic test
 over stores, utils, and hook logic.
 

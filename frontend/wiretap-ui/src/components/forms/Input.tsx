@@ -15,7 +15,7 @@ export interface InputStyleProps {
 }
 
 export function inputClass({ size = "md", tone, mono }: InputStyleProps = {}, className = ""): string {
-  return ["input", size !== "md" && `input--${size}`, tone && `input--${tone}`, mono && "font-mono", className]
+  return ["input", size !== "md" && `input--${size}`, tone && `input--${tone}`, mono && "input--mono", className]
     .filter(Boolean)
     .join(" ");
 }

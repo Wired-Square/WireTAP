@@ -10,6 +10,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { FALLBACK_LANGUAGE, NAMESPACES, resources } from './locales';
+import { setPrimitiveStrings } from './components/strings';
 
 void i18n.use(initReactI18next).init({
   resources,
@@ -22,6 +23,12 @@ void i18n.use(initReactI18next).init({
     escapeValue: false,
   },
   returnNull: false,
+});
+
+// The primitives' own words come from the same resources without importing them.
+setPrimitiveStrings({
+  close: () => i18n.t('common:actions.close'),
+  dismiss: () => i18n.t('common:actions.dismiss'),
 });
 
 export default i18n;

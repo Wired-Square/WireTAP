@@ -377,6 +377,8 @@ lifting to `--text-primary`, the current tab underlined 2 px in
 |---|---|---|
 | `variant` | `underline` (default) · `segmented` | Segmented is the pill form for a mode switch (Local / UTC, Both / ID / Data, Edit / Diff): a `--bg-tertiary` trough at `--radius-control`, the current tab lifted on `--bg-primary`, 26 px tall to sit beside `sm` controls |
 | `inline` | `boolean` | No hairline of its own — the strip sits in a bar that draws one (`DataViewTabBar`) |
+| `inset` | `boolean` | Its own 8 px inset and `--bg-surface` fill — the strip is the first row of a flush dialog body (`TabStrip`) |
+| `sticky` | `boolean` | Pinned at the top of the scroller below it |
 
 A tab trails `<TabCount tone>` (`neutral` · `success` · `warning` ·
 `purple` — what the count is, not decoration) and `<TabDot tone>` (`purple`
@@ -417,9 +419,21 @@ an item closes the menu after its click unless `keepOpen`),
 option list is a `<Popover role="listbox">` of `<MenuItem role="option"
 aria-selected>` rows. Escape reaches only the layer opened last — dialogs,
 menus and popovers share one stack in
-[dismiss.ts](../frontend/wiretap-ui/src/components/dismiss.ts) — so a menu
-over a dialog closes alone. `ContextMenu` (items at a point) and
-`OverflowMenu` (a kebab with items) are the declarative forms.
+[behaviour/dismiss.ts](../frontend/wiretap-ui/src/components/behaviour/dismiss.ts)
+(`useDismiss` in `dismiss.ts` is its React face) — so a menu over a dialog
+closes alone. `ContextMenu` (items at a point) and `OverflowMenu` (a kebab
+with items) are the declarative forms.
+
+The behaviour under these — the dismiss stack, arrow-key and Tab focus
+movement, focus returned to the opener, where a popover lands — is plain
+TypeScript in
+[components/behaviour/](../frontend/wiretap-ui/src/components/behaviour/),
+with no React in it (a test asserts as much) and its own DOM-level tests. The
+primitives are thin over it. The few words a primitive says itself — the
+dialog's ✕, the toast's dismiss — come through
+[strings.ts](../frontend/wiretap-ui/src/components/strings.ts), which
+`i18n.ts` points at the `common` resources once, so no primitive imports the
+translation layer.
 
 ### Data tables — [Table.tsx](../frontend/wiretap-ui/src/components/Table.tsx)
 
@@ -1082,6 +1096,7 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/styles/typography.ts](../frontend/wiretap-ui/src/styles/typography.ts) | Headings, body, mono, form labels and help text, empty-state, truncation |
 | [../frontend/wiretap-ui/src/styles/spacing.ts](../frontend/wiretap-ui/src/styles/spacing.ts) | Padding, gaps, vertical spacing, margins, radius, icon sizes, flex helpers |
 | [../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/) | `Button`, `Badge`, `Card`, `Alert`, `Dialog`, `Tabs`, `Menu`, `Table`, `AppIcon` and `forms/` — the primitives, over `styles/components.css` |
+| [../frontend/wiretap-ui/src/components/behaviour/](../frontend/wiretap-ui/src/components/behaviour/) | The dismiss stack, focus movement and popover placement the primitives call — plain TypeScript, no React |
 | [../frontend/wiretap-ui/src/styles/index.ts](../frontend/wiretap-ui/src/styles/index.ts) | Single barrel — import from here |
 | [../frontend/wiretap-ui/src/locales/en-AU/common.json](../frontend/wiretap-ui/src/locales/en-AU/common.json) | Buttons, generic states, errors, units |
 | [../frontend/wiretap-ui/src/locales/en-AU/settings.json](../frontend/wiretap-ui/src/locales/en-AU/settings.json) | Settings panel strings |

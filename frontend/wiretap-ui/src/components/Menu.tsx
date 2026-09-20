@@ -24,10 +24,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useDismiss } from "./dismiss";
-import { moveFocusAlong } from "./rovingFocus";
-
-const GAP = 2;
-const MARGIN = 4;
+import { moveFocusAlong, rememberFocus } from "./behaviour/focus";
+import { placePopover } from "./behaviour/placement";
 
 export interface PopoverProps extends HTMLAttributes<HTMLDivElement> {
   open: boolean;
@@ -42,10 +40,6 @@ export interface PopoverProps extends HTMLAttributes<HTMLDivElement> {
   matchWidth?: boolean;
 }
 
-function clamp(value: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(value, hi));
-}
-
 export const Popover = forwardRef<HTMLDivElement, PopoverProps>(
   ({ open, onClose, anchorRef, at, align = "start", matchWidth = false, className = "", style, children, ...rest }, ref) => {
     const innerRef = useRef<HTMLDivElement>(null);
@@ -57,21 +51,16 @@ export const Popover = forwardRef<HTMLDivElement, PopoverProps>(
     useLayoutEffect(() => {
       const el = innerRef.current;
       if (!open || !el) return;
-      const { offsetWidth: w, offsetHeight: h } = el;
-      const anchor = anchorRef?.current?.getBoundingClientRect();
-      let top = atY ?? 0;
-      let left = atX ?? 0;
-      if (anchor) {
-        top = anchor.bottom + GAP;
-        if (top + h > window.innerHeight - MARGIN) top = anchor.top - GAP - h;
-        left = align === "end" ? anchor.right - w : anchor.left;
-      }
-      setPlaced({
-        top: clamp(top, MARGIN, window.innerHeight - h - MARGIN),
-        left: clamp(left, MARGIN, window.innerWidth - w - MARGIN),
-        width: matchWidth && anchor ? anchor.width : undefined,
-        visibility: "visible",
-      });
+      const placement = placePopover(
+        { width: el.offsetWidth, height: el.offsetHeight },
+        {
+          anchor: anchorRef?.current?.getBoundingClientRect(),
+          at: atX !== undefined && atY !== undefined ? { x: atX, y: atY } : undefined,
+          align,
+          matchWidth,
+        },
+      );
+      setPlaced({ ...placement, visibility: "visible" });
     }, [open, anchorRef, atX, atY, align, matchWidth]);
 
     if (!open) return null;
@@ -128,11 +117,9 @@ export function Menu({ open, onClose, size = "md", className = "", onKeyDown, ch
   // Focus moves into the menu on open and back to the opener on close.
   useEffect(() => {
     if (!open) return;
-    const opener = document.activeElement as HTMLElement | null;
+    const restore = rememberFocus();
     menuRef.current?.focus();
-    return () => {
-      if (opener && document.contains(opener)) opener.focus();
-    };
+    return restore;
   }, [open]);
 
   return (
@@ -186,7 +173,7 @@ export const MenuItem = forwardRef<HTMLButtonElement, MenuItemProps>(
         type={type}
         role={checked === undefined ? "menuitem" : "menuitemcheckbox"}
         aria-checked={checked}
-        className={menuItemClass(tone, `${hint ? "items-start " : ""}${className}`)}
+        className={menuItemClass(tone, className)}
         onClick={(e) => {
           onClick?.(e);
           if (!keepOpen) close();

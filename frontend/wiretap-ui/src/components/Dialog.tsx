@@ -11,15 +11,14 @@ import {
   useId,
   useRef,
   type HTMLAttributes,
-  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
 import { X } from "lucide-react";
 import { IconButton } from "./Button";
 import { useDismiss } from "./dismiss";
-import { iconLg } from "../styles/spacing";
-import { useTranslation } from "react-i18next";
+import { rememberFocus, trapTab } from "./behaviour/focus";
+import { primitiveString } from "./strings";
 
 export type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
@@ -46,21 +45,6 @@ interface DialogContextValue {
 
 const DialogContext = createContext<DialogContextValue>({ titleId: "" });
 
-const TABBABLE = ':is(a[href], button, input, select, textarea, [tabindex]):not(:disabled, [tabindex="-1"])';
-
-function trapTab(e: KeyboardEvent<HTMLDivElement>) {
-  if (e.key !== "Tab" || e.defaultPrevented) return;
-  const frame = e.currentTarget;
-  const tabbables = frame.querySelectorAll<HTMLElement>(TABBABLE);
-  const first = tabbables[0];
-  const last = tabbables[tabbables.length - 1];
-  const active = document.activeElement;
-  const atEdge = active === frame || active === (e.shiftKey ? first : last);
-  if (!atEdge) return;
-  e.preventDefault();
-  (e.shiftKey ? last : first)?.focus();
-}
-
 export function Dialog({ isOpen, onClose, size = "md", title, subtitle, icon, className = "", children }: DialogProps) {
   const titleId = useId();
   const frameRef = useRef<HTMLDivElement>(null);
@@ -69,12 +53,10 @@ export function Dialog({ isOpen, onClose, size = "md", title, subtitle, icon, cl
   // Focus moves into the frame on open and back to the opener on close.
   useEffect(() => {
     if (!isOpen) return;
-    const opener = document.activeElement as HTMLElement | null;
+    const restore = rememberFocus();
     const frame = frameRef.current;
     if (frame && !frame.contains(document.activeElement)) frame.focus();
-    return () => {
-      if (opener && document.contains(opener)) opener.focus();
-    };
+    return restore;
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -116,14 +98,13 @@ export default Dialog;
 
 /** A custom header row; draws the ✕ itself when the dialog is dismissible. */
 export function DialogHeader({ className = "", children, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  const { t } = useTranslation("common");
   const { onClose } = useContext(DialogContext);
   return (
     <div className={`dialog__header ${className}`} {...rest}>
       {children}
       {onClose && (
-        <IconButton onClick={onClose} label={t("actions.close")} size="sm">
-          <X className={iconLg} />
+        <IconButton onClick={onClose} label={primitiveString("close")} size="sm" className="dialog__close">
+          <X />
         </IconButton>
       )}
     </div>

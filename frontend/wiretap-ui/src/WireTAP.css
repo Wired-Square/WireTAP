@@ -319,21 +319,6 @@ html, body {
   --signal-fuchsia-1: #e879f9;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
-}
-
 /* Sonar-ripple emitted by the session-picker activity dot. The animation-duration
    is set inline and scales with the live frame-arrival rate. */
 @keyframes activity-ripple {

@@ -17,13 +17,11 @@
   .top-0 { top: 0 }
   .top-1 { top: 0.25rem }
   .top-1\/2 { top: 50% }
-  .top-4 { top: 1rem }
   .top-full { top: 100% }
   .\!right-0 { right: 0 !important }
   .right-0 { right: 0 }
   .right-1 { right: 0.25rem }
   .right-2 { right: 0.5rem }
-  .right-4 { right: 1rem }
   .bottom-0 { bottom: 0 }
   .bottom-5 { bottom: 1.25rem }
   .\!left-0 { left: 0 !important }
@@ -32,7 +30,6 @@
   .left-2\.5 { left: 0.625rem }
   .left-full { left: 100% }
   .z-10 { z-index: 10 }
-  .z-50 { z-index: 50 }
   .col-span-2 { grid-column: span 2 / span 2 }
   .-m-0\.5 { margin: -0.125rem }
   .m-2 { margin: 0.5rem }
@@ -174,7 +171,6 @@
   .max-w-70 { max-width: 17.5rem }
   .max-w-75 { max-width: 18.75rem }
   .max-w-90 { max-width: 22.5rem }
-  .max-w-100 { max-width: 25rem }
   .max-w-full { max-width: 100% }
   .max-w-md { max-width: 28rem }
   .max-w-sm { max-width: 24rem }
@@ -192,7 +188,6 @@
   .min-w-45 { min-width: 11.25rem }
   .min-w-50 { min-width: 12.5rem }
   .min-w-55 { min-width: 13.75rem }
-  .min-w-62\.5 { min-width: 15.625rem }
   .min-w-65 { min-width: 16.25rem }
   .min-w-80 { min-width: 20rem }
   .min-w-full { min-width: 100% }

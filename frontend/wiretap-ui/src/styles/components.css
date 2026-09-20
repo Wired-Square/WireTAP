@@ -215,7 +215,7 @@
 
   /* ---- Inputs ------------------------------------------------------------
      .input [.input--xs|--sm|--lg] (md when none) [.input--danger|--warning]
-     on an <input>, <select> or <textarea>; .select [.select--<size>] wraps a
+     [.input--mono] on an <input>, <select> or <textarea>; .select [.select--<size>] wraps a
      <select> to draw its chevron; .check [.check--radio] [.check--sm] on a
      checkbox or radio. Heights match the button scale so a control and the
      button beside it share a row. */
@@ -274,6 +274,10 @@
   .input--lg {
     --input-h: 40px;
     --input-px: 12px;
+  }
+
+  .input--mono {
+    font-family: var(--font-mono);
   }
 
   .input--danger,
@@ -406,7 +410,8 @@
   /* ---- Badges ------------------------------------------------------------
      .badge [.badge--outline] (tonal when none)
             [.badge--primary|--success|--danger|--warning|--purple|--cyan]
-            (neutral when none) [.badge--sm|--lg] (md when none)
+            (neutral when none) [.badge--sm|--lg] (md when none) [.badge--mono]
+            (.badge__label, .badge__value — the summary pair)
      A label, not a control, so its own scale: sm 16 · md 20 · lg 24. The tones
      are the buttons' tint sets; a badge that answers a click is a tonal
      button. */
@@ -443,6 +448,20 @@
   .badge--lg {
     --badge-h: 24px;
     --badge-px: 8px;
+  }
+
+  .badge--mono {
+    font-family: var(--font-mono);
+  }
+
+  /* A `label: value` pair — the label dimmed, the value in the data face. */
+  .badge__label {
+    opacity: 0.7;
+  }
+
+  .badge__value {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
   }
 
   .badge--outline {
@@ -650,9 +669,48 @@
     --alert-text: var(--status-danger-text);
   }
 
+  /* The toast: an alert floated at the window's corner (.toast > .alert,
+     .toast__message, .toast__dismiss). The tints are translucent in the dark
+     theme, so it sits on a surface. */
+  .toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+    border-radius: var(--radius-panel);
+    background-color: var(--bg-surface);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    animation: fade-in 0.2s ease-out;
+  }
+
+  .toast > .alert {
+    min-width: 250px;
+    max-width: 400px;
+  }
+
+  .toast__message {
+    font-weight: 500;
+  }
+
+  .toast__dismiss > svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   /* ---- Dialogs -----------------------------------------------------------
      .dialog-backdrop > .dialog [.dialog--sm|--lg|--xl|--2xl|--3xl] (md when none)
-       > .dialog__header (.dialog__title, .dialog__subtitle) · .dialog__body · .dialog__footer
+       > .dialog__header (.dialog__title, .dialog__subtitle, .dialog__close) · .dialog__body · .dialog__footer
      One surface in three slots: the header and footer are pinned and the body
      scrolls, so a tall dialog never grows past the window. The width is the
      size; the height is the content. */
@@ -746,7 +804,8 @@
     color: var(--text-muted);
   }
 
-  .dialog__icon > svg {
+  .dialog__icon > svg,
+  .dialog__close > svg {
     width: 20px;
     height: 20px;
   }
@@ -772,7 +831,7 @@
   }
 
   /* ---- Tabs --------------------------------------------------------------
-     .tabs [.tabs--inline] [.tabs--segmented] > .tabs__tab [aria-selected="true"]
+     .tabs [.tabs--inline] [.tabs--inset] [.tabs--sticky] [.tabs--segmented] > .tabs__tab [aria-selected="true"]
        (.tabs__count [--success|--warning|--purple], .tabs__dot [--danger|--warning|--info])
      A strip of choices with one current. The underline form draws a hairline
      under the strip that the current tab's underline cuts; inline drops the
@@ -787,6 +846,18 @@
   .tabs--inline {
     align-self: stretch;
     border-bottom: 0;
+  }
+
+  /* The first row of a flush body: its own inset, and a fill for what scrolls under it. */
+  .tabs--inset {
+    padding-inline: 8px;
+    background-color: var(--bg-surface);
+  }
+
+  .tabs--sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
   .tabs__tab {
@@ -898,7 +969,7 @@
   /* ---- Menus -------------------------------------------------------------
      .popover — the floating surface; .menu [.menu--lg] > .menu__item
        [.menu__item--danger|--warning] [aria-checked|aria-selected="true"]
-       (.menu__icon, .menu__hint) · .menu__separator · .menu__heading
+       (.menu__icon, .menu__hint) · .menu__separator · .menu__heading · .menu__trigger
      One surface for everything that floats over the page: a command menu, a
      picker's option list, a rename box. An item is a full-width row; its tone
      colours the text and the hover tint, and a checked or selected item lights
@@ -1000,6 +1071,17 @@
     display: block;
     color: var(--text-muted);
     white-space: normal;
+  }
+
+  /* A two-line item aligns its glyph with the first line, not the middle. */
+  .menu__item:has(.menu__hint) {
+    align-items: flex-start;
+  }
+
+  /* The kebab that opens an overflow menu, at the glyph size a toolbar uses. */
+  .menu__trigger > svg {
+    width: 14px;
+    height: 14px;
   }
 
   .menu__separator {

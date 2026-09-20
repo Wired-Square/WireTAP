@@ -5,7 +5,7 @@
 // declarative forms over these.
 
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes } from "react";
-import { moveFocusAlong } from "./rovingFocus";
+import { moveFocusAlong } from "./behaviour/focus";
 
 export type TabsVariant = "underline" | "segmented";
 
@@ -13,12 +13,23 @@ export interface TabsProps extends HTMLAttributes<HTMLDivElement> {
   variant?: TabsVariant;
   /** No hairline of its own: the strip sits in a bar that draws one */
   inline?: boolean;
+  /** Its own inset and fill: the strip is the first row of a flush body */
+  inset?: boolean;
+  /** Pinned at the top of the scroller below it */
+  sticky?: boolean;
 }
 
 const KEYS = { ArrowRight: 1, ArrowLeft: -1, Home: "first", End: "last" } as const;
 
-export function Tabs({ variant = "underline", inline = false, className = "", onKeyDown, ...rest }: TabsProps) {
-  const classes = ["tabs", variant !== "underline" && `tabs--${variant}`, inline && "tabs--inline", className];
+export function Tabs({ variant = "underline", inline = false, inset = false, sticky = false, className = "", onKeyDown, ...rest }: TabsProps) {
+  const classes = [
+    "tabs",
+    variant !== "underline" && `tabs--${variant}`,
+    inline && "tabs--inline",
+    inset && "tabs--inset",
+    sticky && "tabs--sticky",
+    className,
+  ];
   return (
     <div
       role="tablist"
