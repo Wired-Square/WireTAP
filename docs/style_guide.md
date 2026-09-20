@@ -1,10 +1,12 @@
 # WireTAP Frontend Style Guide
 
-This guide describes how to build UI in WireTAP — what styling tokens to use,
-how to localise strings, how to register a new app, and which inline patterns
-should be migrated to centralised tokens. It is the canonical reference for
-the frontend; if a question is not answered here, prefer reading the source in
-[../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/) over inventing a new pattern.
+This guide describes how UI is built in WireTAP — the theme and its
+vocabulary, the primitives and where each goes, how to localise strings and
+how to register a new app. It is the canonical reference for the frontend;
+if a question is not answered here, prefer reading the source in
+[../frontend/wiretap-ui/src/styles/](../frontend/wiretap-ui/src/styles/) and
+[../frontend/wiretap-ui/src/components/](../frontend/wiretap-ui/src/components/)
+over inventing a new pattern.
 
 ## Overview
 
@@ -32,12 +34,13 @@ effects from [../frontend/wiretap-ui/src/main.tsx](../frontend/wiretap-ui/src/ma
 
 These are non-negotiable in this codebase:
 
-1. **Use the theme's colours.** `text-gray-400` becomes `textSecondary` (or
-   `text-secondary` written out); `bg-zinc-800` becomes `bgSurface`. Every
-   colour utility reads a `:root` variable that `useTheme` sets, so one variable
-   change re-themes every use. A raw palette class is fixed to one theme and
-   looks wrong in the other, and a `var(--x)` spelled inside a class fails the
-   build — the theme's colours are named, not spelled.
+1. **A colour is one of the theme's, named for what it means.** Every colour
+   utility reads a `:root` variable that `useTheme` sets, so one variable
+   change re-themes every use. There is no palette: `text-red-500`,
+   `bg-slate-900/50` and `bg-[#0b0f14]` all fail generation. Error text is
+   `text-danger`, a hint `text-muted`, a live dot `bg-success-text`, a glyph
+   in a hue `text-purple` — the status tones say what state a thing is in,
+   the data accents which of several things it is (see *Theming model*).
 2. **Australian English** in all UI strings, comments, identifiers. "Colour",
    "centralised", "organisation". Project-wide rule from
    [../CLAUDE.md](../CLAUDE.md).
@@ -49,10 +52,11 @@ These are non-negotiable in this codebase:
    `<button>` is for the families that have no primitive yet — list rows, menu
    items, tabs, cards — and a raw `<input>` is a colour swatch, a range
    slider or an inline rename field.
-5. **Hover states use `hover:brightness-{n}`**, not `hover:bg-{color}-{n}`.
-   Brightness filters work uniformly against a CSS-variable background; bg
-   classes don't. (The button classes mix with `color-mix()` instead, which
-   the components handle for you.)
+5. **The primitive carries the state, not the call site.** A button's hover,
+   press and disabled looks, an input's focus ring, a card's lift, a menu
+   row's highlight are rules in `components.css`; a consumer never re-draws
+   them. The one hover a raw element draws is `hoverBg` (`hover:bg-hover`)
+   on a list row that has no primitive yet.
 
 ## Theming model
 
@@ -111,18 +115,40 @@ name carries one:
 | `--bg-hover` | — | `bg-hover`, `hover:bg-hover` | — |
 
 So a dot painted in the info colour is `bg-info-text`, a hairline drawn as a
-`div` is `bg-border-default`, and `text-purple` is always the purple data
-accent (the purple and cyan tones' text reads it too). An alpha works as on
-any colour: `text-accent-primary/70`. Adding a variable to `WireTAP.css`
-adds its utilities — one declaration per line, the way the block is written,
-because the generator (and the guard) reads `^--name:`. A name two variables
-would share fails generation.
+`div` is `bg-border-default`, a tinted shadow `shadow-accent-danger/30`
+(`shadow-` colours share the bg role), and `text-purple` is always the
+purple data accent (the purple and cyan tones' text reads it too). An alpha
+works as on any colour: `text-accent-primary/70`. Adding a variable to
+`WireTAP.css` adds its utilities — one declaration per line, the way the
+block is written, because the generator (and the guard) reads `^--name:`.
+A name two variables would share fails generation.
+
+Those are the only colours. The palette is gone from the generator and an
+arbitrary colour (`bg-[#0b0f14]`) is refused with it, so a colour the theme
+lacks is a variable to add, not a class to spell; a value that is genuinely
+one element's own (the terminal's xterm background) is a `style` prop named
+once. Five named colours remain — `transparent`, `current`, `inherit`, and
+`white` and `black` for what is the same in both themes: the tick on a
+filled checkbox, the knob on a switch, the bit number on a signal's colour,
+the logo's tile, a scroll-edge shadow. `text-white` is never a way to put
+text on a tone's fill — that is `<Button variant="solid">`, whose text is
+the fill's own.
 
 The tokens in [colourTokens.ts](../frontend/wiretap-ui/src/styles/colourTokens.ts)
 name the common ones (`textPrimary = "text-primary"`, `bgSurface =
-"bg-surface"`); the class and the token are interchangeable. The palette
-classes (`text-red-500`, `bg-slate-900`) still compile, for the raw-palette
-sites the register lists — a new site should not add one.
+"bg-surface"`); the class and the token are interchangeable.
+
+**Which colour a site means.** The status tones (`success`, `danger`,
+`warning`, `info`) say what state something is in: a session running,
+stopped, paused or failed; a probe that succeeded; a required field's mark;
+a value that is missing; a duplicate; the "on" of a toggle in the primary
+accent. The data accents (`--text-<hue>`) say which of several things it is:
+a bus number is cyan, a source address purple, a checksum amber, a frame id
+green, a section glyph its section's hue — and a source's kind is a named
+set, `sourceKindColours` (realtime purple, capture cyan, recorded green),
+read wherever a source is drawn. A spinner or a selected edge is the primary
+accent (`text-accent-primary`, `border-accent-primary`); a selected row is
+the info tint (`bg-info border-info`) or its kind's `tint`.
 
 The class vocabulary is Tailwind 4's, kept when the framework was removed so no
 component had to change. The old rule that `dark:` variants "don't work on
@@ -152,6 +178,7 @@ styling goes through the variables.
 | `textSuccess` / `textDanger` / `textWarning` / `textInfo` | `text-success` … | Status text |
 | `borderSuccess` / `borderDanger` | `border-success` / `border-danger` | Status borders (`border-warning`, `border-info`, `border-purple`, `border-cyan` written out) |
 | `textDataGreen` / `-Yellow` / `-Orange` / `-Purple` / `-Amber` / `-Cyan` | `text-green` … | Cell / syntax highlighting; the other data accents (`text-red`, `text-blue`, `text-pink`, `text-sky`, `text-indigo`, `text-teal`, `text-emerald`) written out |
+| `sourceKindColours[kind]` | `.text` / `.dot` / `.edge` / `.hoverEdge` / `.tint` | The hue a source wears — `realtime` purple, `capture` cyan, `recorded` green — on the picker's rows, the session canvas and the session button |
 | `hoverBg` / `hoverLight` | `hover:bg-hover` / `hover:brightness-95` | Hover states |
 | `dataViewContainer` | `rounded-lg border border-default overflow-hidden` | Standard data "bubble" |
 
@@ -505,6 +532,41 @@ import { Badge } from "../../components/Badge";
 <Badge tone="success" size="lg">{t("status.connected")}</Badge>
 ```
 
+### State glyph, state text, state dot
+
+The tone says the state; the glyph, the text and the dot read the same
+variable so they agree.
+
+```tsx
+import { iconSm, textSuccess, textDanger } from "../../styles";
+import { CircleCheck, CircleX } from "lucide-react";
+
+{ok ? <CircleCheck className={`${iconSm} ${textSuccess}`} /> : <CircleX className={`${iconSm} ${textDanger}`} />}
+<p className={ok ? textSuccess : textDanger}>{message}</p>
+<span className={`w-2 h-2 rounded-full ${ok ? "bg-success-text" : "bg-danger-text"}`} />
+```
+
+### A source in its kind's hue
+
+```tsx
+import { sourceKindColours } from "../../styles";
+
+const look = sourceKindColours[isCapture ? "capture" : isRealtime ? "realtime" : "recorded"];
+<Database className={`${iconSm} ${look.text}`} />
+<div className={`rounded-lg border ${selected ? look.tint : `border-default ${look.hoverEdge}`}`}>…</div>
+```
+
+### Toast
+
+```tsx
+import FlashNotification from "../../components/FlashNotification";
+
+{notice && <FlashNotification message={notice} type="success" onDismiss={() => setNotice(null)} />}
+```
+
+A toast is an `<Alert>` on a surface, pinned top-right; `type` is `info` ·
+`success` · `warning` · `error`, `duration` 0 keeps it until dismissed.
+
 ### Empty state
 
 ```tsx
@@ -705,8 +767,8 @@ indicator in the operational footer:
 | `unknown` | `bg-text-muted` | Not yet probed and not seen by background discovery |
 | `missing` / `error` | `bg-danger-text` | Last probe failed, or active connection in error |
 
-Never hardcode `bg-green-500` etc. — colours must track the active
-theme via the status CSS variables.
+The dot reads the tone's text variable so it matches the glyph and the
+label beside it; there is no other green.
 
 ### Liveness for device pickers
 
@@ -778,8 +840,8 @@ try {
 
 ### Don'ts
 
-- Don't use raw palette classes — `bg-red-500/10`, `text-red-400` — these
-  bypass theming and are wrong in one of the two themes.
+- Don't paint an error yourself — `text-danger` is for a line of error text
+  in a form or a bar; a box around it is `<Alert tone="danger">`.
 - Don't `console.error` user-facing failures and leave them invisible.
   Surface them in the matching banner / dialog / toast.
 - Don't stack two surfaces for the same failure (e.g. banner *and*
@@ -888,16 +950,19 @@ value.toLocaleString(i18n.language);
 
 | ❌ Don't | ✅ Do |
 |---|---|
-| `text-gray-400` in data tables | `textSecondary` / `textDataTertiary` / `textDataMuted` |
+| `text-red-500` / `text-slate-400` / `bg-green-900/30` | `text-danger` / `text-muted` / `bg-success` — the palette does not compile; a colour is a tone or an accent |
+| `bg-[#0b0f14]` / `text-[color:var(--x)]` | A variable in `WireTAP.css` (then `bg-<name>`), or a `style` prop for one element's own colour |
+| `text-white` on `bg-accent-primary` | `<Button variant="solid" tone="primary">` — the fill's text is the fill's own |
+| `text-green-500` glyph in one view, `text-emerald-400` in another | One name for one meaning: `text-success` for a state, `text-green` for a hue, `sourceKindColours` for a source |
 | `bg-blue-600/30 text-blue-400` ad-hoc chip | `<Badge tone="primary">` — `mono` in a data panel |
 | `<input className="w-full px-4 py-2 rounded-lg border …">` | `<Input size="lg">` — the class carries the look, the border and the focus ring |
 | `<select className={…}>` | `<Select>` — draws the app's chevron on both platforms |
 | `<input type="checkbox" className="accent-blue-500">` | `<Checkbox>` — the theme's accent, drawn the same on WebKit and WebView2 |
-| `style={{ color: 'var(--text-secondary)' }}` / `text-[color:var(--text-secondary)]` | `className={textSecondary}` — or `text-secondary` written out |
+| `style={{ color: 'var(--text-secondary)' }}` | `className={textSecondary}` — or `text-secondary` written out |
 | `<Button>Save</Button>` | `<Button>{t("common:actions.save")}</Button>` |
 | `<button className="px-3 py-1.5 rounded bg-blue-600 text-white …">` | `<Button variant="solid" tone="primary">` — the tone reads the theme's accent |
 | `<button className={`p-1 rounded ${hoverBg}`}>` | `<IconButton size="sm">` |
-| `hover:bg-zinc-700` / `hover:brightness-95` | `hoverBg`, or `<Card interactive>` for a clickable card |
+| `<div className="fixed top-4 right-4 bg-green-500 text-white …">` | `<FlashNotification type="success">` — an `<Alert>` on a surface |
 | `<div className="p-4 rounded-lg border …">` | `<Card padding="lg">` — `tone` for a tinted section |
 | `<div className="p-3 bg-danger border …">{error}</div>` | `<Alert tone="danger">{error}</Alert>` — the tone draws the box, the text and the glyph |
 
@@ -942,7 +1007,7 @@ keyed by the same `id`:
 ```ts
 "my-app": {
   icon: Beaker,                          // lucide-react
-  hue: "purple",                         // an AppHue — the .app-hue--<hue> palette
+  hue: "purple",                         // an AppHue — one of the theme's data accents
   load: () => import("./my-app/MyApp"),
 },
 ```
@@ -1022,11 +1087,13 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/components/LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) | App launcher menu |
 | [../crates/wiretap-app/src/lib.rs](../crates/wiretap-app/src/lib.rs) | Native Tauri menu, panel-open events |
 
-## Future improvements (non-blocking)
+## What is not a primitive yet
 
-- The raw-palette tail (the session canvas nodes, the result views' hues)
-  and this guide's rewrite around the primitives — the closing stage of the
-  Tailwind Removal Handover. The list rows still written as raw `<button>`s
-  are in the register as a lists family.
-- Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
-  ready; add a folder + register in `src/locales/index.ts`.
+The option rows inside pickers and dialogs (a `w-full text-left` `<button>`
+with its own hover and selected look), the Settings sidebar, the fake
+checkbox and radio drawn inside a row, the toggle switch in the FrameLink
+signal control, and the Catalog Editor's field tiles are still hand-rolled;
+each is in the register (*Bugs and Feature gaps* in the vault) under
+*Frontend styling*, and a new one should copy an existing row rather than
+invent a third look. Additional locales (`en-US`, `de`, `ja`, …) are a
+folder plus a line in `src/locales/index.ts`.
