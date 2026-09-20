@@ -54,12 +54,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # Deploy keys are per-repo and GitHub authenticates with the first key
+      # offered, so each private repo gets its own ssh host alias pinned to its
+      # key. Anything else under github.com is public and fetches over HTTPS.
       - name: Configure private dependency access
-        uses: webfactory/ssh-agent@v0.10.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.FRAMELINK_DEPLOY_KEY }}
-            ${{ secrets.LIB_WIREDAI_RS_DEPLOYMENT_KEY }}
+        shell: bash
+        env:
+          FRAMELINK_DEPLOY_KEY: ${{ secrets.FRAMELINK_DEPLOY_KEY }}
+          LIB_WIREDAI_RS_DEPLOYMENT_KEY: ${{ secrets.LIB_WIREDAI_RS_DEPLOYMENT_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          route() {
+            local repo=$1 key=$HOME/.ssh/deploy_$1
+            printf '%s\n' "${!2}" > "$key"
+            chmod 600 "$key"
+            printf 'Host %s.github.com\n  HostName github.com\n  User git\n  IdentityFile %s\n  IdentitiesOnly yes\n' "$repo" "$key" >> ~/.ssh/config
+            git config --global url."ssh://git@$repo.github.com/Wired-Square/$repo".insteadOf "ssh://git@github.com/Wired-Square/$repo"
+          }
+          route framelink-rs FRAMELINK_DEPLOY_KEY
+          route lib-wiredai-rs LIB_WIREDAI_RS_DEPLOYMENT_KEY
 
       - name: Force Cargo to use git CLI
         run: echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
