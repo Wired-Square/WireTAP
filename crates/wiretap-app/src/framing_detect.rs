@@ -734,17 +734,21 @@ mod feeder_check {
     /// cycles so the vendor codes clear the hint's occurrence threshold as they
     /// would on any real line, starting at 8 so one of them carries an
     /// exception response.
-    const CYCLE: &str = "01044de20002c69101040401340000bbb602030010000185fc02030200027d8501010000000abc0d0101022a02275d0105001aff00adfd012001c803111a0000650b0060000000050a000401bb03e80832e8016500020807aa01044de20002c69101040401350000ea7602030010000185fc0203020003bc4501010000000abc0d010102d50266ad0105001a0000ec0d012001c803111a0001a4cb0060000000050a000401bb03e80832e80165000209c66a01044de20002c691010404013600001a7602030010000185fc0203020004fd8701010000000abc0d0101022a02275d0105001aff00adfd012001c803111a0002e4ca0060000000050a000401bb03e80832e8016500020a866b018402c2c101044de20002c691010404013700004bb602030010000185fc02030200053c4701010000000abc0d010102d50266ad0105001aff00adfd012001c803111a0003250a0060000000050a000401bb03e80832e8016500020b47ab";
+    const VENDOR_LINE: &str = "01044de20002c69101040401340000bbb602030010000185fc02030200027d8501010000000abc0d0101022a02275d0105001aff00adfd012001c803111a0000650b0060000000050a000401bb03e80832e8016500020807aa01044de20002c69101040401350000ea7602030010000185fc0203020003bc4501010000000abc0d010102d50266ad0105001a0000ec0d012001c803111a0001a4cb0060000000050a000401bb03e80832e80165000209c66a01044de20002c691010404013600001a7602030010000185fc0203020004fd8701010000000abc0d0101022a02275d0105001aff00adfd012001c803111a0002e4ca0060000000050a000401bb03e80832e8016500020a866b018402c2c101044de20002c691010404013700004bb602030010000185fc02030200053c4701010000000abc0d010102d50266ad0105001aff00adfd012001c803111a0003250a0060000000050a000401bb03e80832e8016500020b47ab";
 
-    fn bytes() -> Vec<u8> {
-        (0..CYCLE.len())
+    /// The same line with `--stock`: its 29 spec-defined messages, no vendor
+    /// codes and no broadcast.
+    const STOCK_LINE: &str = "01044de20002c69101040401340000bbb602030010000185fc02030200027d8501010000000abc0d0101022a02275d0105001aff00adfd01044de20002c69101040401350000ea7602030010000185fc0203020003bc4501010000000abc0d010102d50266ad0105001a0000ec0d01044de20002c691010404013600001a7602030010000185fc0203020004fd8701010000000abc0d0101022a02275d0105001aff00adfd018402c2c101044de20002c691010404013700004bb602030010000185fc02030200053c4701010000000abc0d010102d50266ad0105001aff00adfd";
+
+    fn bytes(line: &str) -> Vec<u8> {
+        (0..line.len())
             .step_by(2)
-            .map(|i| u8::from_str_radix(&CYCLE[i..i + 2], 16).unwrap())
+            .map(|i| u8::from_str_radix(&line[i..i + 2], 16).unwrap())
             .collect()
     }
 
-    fn framed(options: &ModbusRtuOptions) -> usize {
-        detect(&bytes(), options)
+    fn framed(line: &str, options: &ModbusRtuOptions) -> usize {
+        detect(&bytes(line), options)
             .candidates
             .iter()
             .find(|c| c.mode == "modbus_rtu")
@@ -765,22 +769,32 @@ mod feeder_check {
         // behind swallow the legitimate messages sitting after them, and barely
         // half the line survives. That is the point of the feeder — the cost of
         // not declaring is far more than the vendor traffic itself.
-        assert_eq!(framed(&stock), 14);
-        assert_eq!(framed(&declared), 41);
+        assert_eq!(framed(VENDOR_LINE, &stock), 14);
+        assert_eq!(framed(VENDOR_LINE, &declared), 41);
 
         // And the tool names everything standing in the way, first time —
         // including the broadcast it cannot itself frame — and, once the user has
         // declared what it said, does not name those again.
-        let hint = detect(&bytes(), &stock);
+        let hint = detect(&bytes(VENDOR_LINE), &stock);
         assert_eq!(hint.unframed_functions, vec![0x20, 0x60, 0x65]);
         assert_eq!(hint.unframed_broadcasts, 4);
         let partial = ModbusRtuOptions {
             vendor_functions: vec![0x20, 0x65],
             ..Default::default()
         };
-        assert_eq!(framed(&partial), 17);
-        let hint = detect(&bytes(), &partial);
+        assert_eq!(framed(VENDOR_LINE, &partial), 17);
+        let hint = detect(&bytes(VENDOR_LINE), &partial);
         assert_eq!(hint.unframed_functions, vec![0x60]);
         assert_eq!(hint.unframed_broadcasts, 4);
+    }
+
+    #[test]
+    fn a_stock_line_frames_whole_with_nothing_declared() {
+        let stock = ModbusRtuOptions::default();
+        let report = detect(&bytes(STOCK_LINE), &stock);
+        assert_eq!(report.candidates[0].mode, "modbus_rtu");
+        assert_eq!(framed(STOCK_LINE, &stock), 29);
+        assert!(report.unframed_functions.is_empty());
+        assert_eq!(report.unframed_broadcasts, 0);
     }
 }
