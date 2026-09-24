@@ -2284,7 +2284,7 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
         for profile_id in &profile_ids {
             crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
         }
-        sessions::replace_session_profiles(session_id, &[bid.clone()]);
+        sessions::swap_session_profiles_for_capture(session_id, bid);
 
         let new_reader = CaptureSource::new(
             app.clone(),
@@ -2752,6 +2752,10 @@ pub struct ActiveSessionInfo {
     /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
     #[serde(default)]
     pub source_profile_ids: Vec<String>,
+    /// Profiles the session was opened from; differs from `source_profile_ids`
+    /// only while a stopped source is replaying its capture
+    #[serde(default)]
+    pub origin_profile_ids: Vec<String>,
     /// Capture ID owned by this session (if any)
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -2815,6 +2819,7 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 subscribers,
                 broker_configs: session.source.broker_configs(),
                 source_profile_ids,
+                origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
                 capture_id,
                 capture_kind,
                 capture_frame_count,
@@ -2935,6 +2940,8 @@ pub struct RegisterSubscriberResult {
     pub subscriber_count: usize,
     /// Error that occurred before this subscriber registered (one-shot, cleared after return)
     pub startup_error: Option<String>,
+    /// Profiles the session was opened from (see `get_session_origin_profile_ids`)
+    pub origin_profile_ids: Vec<String>,
 }
 
 /// Register a subscriber for a session.
@@ -3024,6 +3031,7 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
             capture_kind,
             subscriber_count: subscriber_count_for_session(session_id),
             startup_error,
+            origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
         }
     };
     // Lock released here

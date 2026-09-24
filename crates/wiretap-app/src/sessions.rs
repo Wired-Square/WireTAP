@@ -48,6 +48,11 @@ use std::sync::{
 static SESSION_PROFILES: Lazy<Mutex<HashMap<String, Vec<String>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Profiles a session was opened from, kept while a stopped source is swapped
+/// for its capture so the frontend can still name the source and return to live.
+static SESSION_ORIGIN_PROFILES: Lazy<Mutex<HashMap<String, Vec<String>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 /// Map of profile_id -> session_ids for tracking which sessions use each profile.
 /// This is the reverse of SESSION_PROFILES and is used to:
 /// 1. Show "(in use: sessionId)" indicator in IO picker
@@ -138,6 +143,7 @@ fn take_session_profiles(session_id: &str) -> Vec<String> {
         .ok()
         .and_then(|mut map| map.remove(session_id))
         .unwrap_or_default();
+    forget_origin_profiles(session_id);
 
     // Clean up reverse mapping
     if let Ok(mut map) = PROFILE_SESSIONS.lock() {
@@ -187,6 +193,37 @@ pub fn replace_session_profiles(session_id: &str, new_profile_ids: &[String]) {
                 .insert(session_id.to_string());
         }
     }
+}
+
+/// Swap a stopped source's profiles for its capture, remembering them as the origin.
+pub fn swap_session_profiles_for_capture(session_id: &str, capture_id: &str) {
+    let current = get_session_profile_ids(session_id);
+    if let Ok(mut map) = SESSION_ORIGIN_PROFILES.lock() {
+        map.entry(session_id.to_string()).or_insert(current);
+    }
+    replace_session_profiles(session_id, &[capture_id.to_string()]);
+}
+
+/// Put a resumed source's profiles back in place of its capture.
+fn restore_session_profiles(session_id: &str, profile_ids: &[String]) {
+    replace_session_profiles(session_id, profile_ids);
+    forget_origin_profiles(session_id);
+}
+
+fn forget_origin_profiles(session_id: &str) {
+    if let Ok(mut map) = SESSION_ORIGIN_PROFILES.lock() {
+        map.remove(session_id);
+    }
+}
+
+/// The profiles a session was opened from — its current profiles unless a
+/// stopped source has been swapped for its capture.
+pub fn get_session_origin_profile_ids(session_id: &str) -> Vec<String> {
+    SESSION_ORIGIN_PROFILES
+        .lock()
+        .ok()
+        .and_then(|map| map.get(session_id).cloned())
+        .unwrap_or_else(|| get_session_profile_ids(session_id))
 }
 
 /// Get all profile IDs for a session (without removing them).
@@ -1416,9 +1453,8 @@ pub async fn resume_session_to_live(
         crate::profile_tracker::register_usage(&config.profile_id, &session_id);
     }
 
-    // Restore original profile IDs to SESSION_PROFILES (replacing the capture ID)
     let profile_ids: Vec<String> = configs.iter().map(|c| c.profile_id.clone()).collect();
-    replace_session_profiles(&session_id, &profile_ids);
+    restore_session_profiles(&session_id, &profile_ids);
 
     // Build the new live reader
     let new_reader: Box<dyn IOSource> = if configs.len() == 1 {
@@ -2756,6 +2792,35 @@ pub fn get_session_sources(session_id: String) -> Vec<io::post_session::SourceIn
 #[tauri::command(rename_all = "snake_case")]
 pub fn get_orphaned_capture_ids(session_id: String) -> Vec<String> {
     io::post_session::get_orphaned_capture_ids(&session_id)
+}
+
+#[cfg(test)]
+mod origin_profile_tests {
+    use super::*;
+
+    fn ids(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_origin_survives_the_capture_swap_until_the_source_resumes() {
+        register_session_profiles("s_origin", &ids(&["io_dev"]));
+        swap_session_profiles_for_capture("s_origin", "cap1");
+        assert_eq!(get_session_profile_ids("s_origin"), ids(&["cap1"]));
+        assert_eq!(get_session_origin_profile_ids("s_origin"), ids(&["io_dev"]));
+
+        restore_session_profiles("s_origin", &ids(&["io_dev"]));
+        swap_session_profiles_for_capture("s_origin", "cap2");
+        assert_eq!(get_session_origin_profile_ids("s_origin"), ids(&["io_dev"]));
+    }
+
+    #[test]
+    fn a_destroyed_session_forgets_its_origin() {
+        register_session_profiles("s_gone", &ids(&["io_dev"]));
+        swap_session_profiles_for_capture("s_gone", "cap1");
+        take_session_profiles("s_gone");
+        assert!(get_session_origin_profile_ids("s_gone").is_empty());
+    }
 }
 
 #[cfg(test)]

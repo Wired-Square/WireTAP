@@ -264,6 +264,11 @@ export interface Session {
   sourceType?: string;
   /** Profile IDs in this session whose polling is paused (Rust-authoritative). */
   pausedSourceProfileIds: string[];
+  /**
+   * Profiles the session was opened from (Rust-authoritative) — the source's,
+   * even while it replays its capture after a stop. Empty until Rust reports it.
+   */
+  originProfileIds: string[];
   /** True when adopted from the backend roster (known-only, not UI-owned). */
   external?: boolean;
 }
@@ -918,6 +923,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             [sessionId]: {
               ...s.sessions[sessionId],
               subscriberCount: result.subscriber_count,
+              originProfileIds: result.origin_profile_ids,
             },
           },
         }));
@@ -949,6 +955,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     let subscriberCount = 1;
     let captureId: string | null = null;
     let captureKind: "frames" | "bytes" | null = null;
+    let originProfileIds: string[] | null = null;
 
     if (backendExists) {
       // Join existing backend session using registerSessionSubscriber only
@@ -961,6 +968,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       subscriberCount = regResult.subscriber_count;
       captureId = regResult.capture_id;
       captureKind = regResult.capture_kind;
+      originProfileIds = regResult.origin_profile_ids;
 
       // Handle startup error (error that occurred before listener registered)
       if (regResult.startup_error) {
@@ -1031,6 +1039,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         try {
           const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
           subscriberCount = regResult.subscriber_count;
+          originProfileIds = regResult.origin_profile_ids;
           // Pick up capture info from the registration result (more accurate than our guess)
           if (regResult.capture_id) captureId = regResult.capture_id;
           if (regResult.capture_kind) captureKind = regResult.capture_kind;
@@ -1052,6 +1061,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           subscriberCount = regResult.subscriber_count;
           captureId = regResult.capture_id;
           captureKind = regResult.capture_kind;
+          originProfileIds = regResult.origin_profile_ids;
 
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
@@ -1081,6 +1091,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             catalogPath: null,
             bytesCaptureId: null,
             pausedSourceProfileIds: [],
+            originProfileIds: [],
           };
           set((s) => ({
             sessions: { ...s.sessions, [sessionId]: errorSession },
@@ -1229,6 +1240,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         // Rust owns this; the next roster reconcile fills it in. A session that
         // has only just been created has nothing paused yet.
         pausedSourceProfileIds: existingSession?.pausedSourceProfileIds ?? [],
+        originProfileIds: originProfileIds ?? existingSession?.originProfileIds ?? [],
       };
 
       return {

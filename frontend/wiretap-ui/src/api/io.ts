@@ -923,6 +923,8 @@ export interface RegisterSubscriberResult {
   subscriber_count: number;
   /** Error that occurred before this subscriber registered (one-shot, cleared after return) */
   startup_error: string | null;
+  /** Profiles the session was opened from (Rust-authoritative) */
+  origin_profile_ids: string[];
 }
 
 /**
@@ -1418,6 +1420,8 @@ export interface ActiveSessionInfo {
   brokerConfigs: MultiSourceInput[] | null;
   /** Profile IDs feeding this session */
   sourceProfileIds: string[];
+  /** Profiles the session was opened from — the source's, even while it replays its capture */
+  originProfileIds: string[];
   /** Capture ID owned by this session (if any) */
   captureId: string | null;
   /** Kind of the capture named by `captureId` — travels with the id so the two cannot desync */
@@ -1457,6 +1461,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       bus_mappings: RawBusMapping[];
     }> | null;
     source_profile_ids: string[];
+    origin_profile_ids: string[] | null;
     capture_id: string | null;
     capture_kind: CaptureKind | null;
     capture_frame_count: number | null;
@@ -1479,6 +1484,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       busMappings: c.bus_mappings.map(decodeBusMapping),
     })) ?? null,
     sourceProfileIds: s.source_profile_ids ?? [],
+    originProfileIds: s.origin_profile_ids ?? [],
     captureId: s.capture_id ?? null,
     captureKind: s.capture_kind ?? null,
     captureFrameCount: s.capture_frame_count ?? null,

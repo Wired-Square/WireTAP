@@ -446,7 +446,6 @@ function DiscoveryInner() {
     multiBusProfiles: ioProfiles,
     outputBusToSource,
     sourceProfileId,
-    setSourceProfileId,
     // Session
     session,
     // Profile name (for menu display)
@@ -615,7 +614,7 @@ function DiscoveryInner() {
         setShowBusColumn(true);
       }
     },
-    onBeforeStart: (profileId, options, mode) => {
+    onBeforeStart: (_profileId, options, mode) => {
       // Store serial config for TOML export
       const hasSerialConfig = options.frameIdStartByte !== undefined
         || options.sourceAddressStartByte !== undefined
@@ -632,8 +631,6 @@ function DiscoveryInner() {
       } else {
         setSerialConfig(null);
       }
-
-      setSourceProfileId(profileId);
 
       // Sync framing config (watch mode only)
       if (mode === "connect") {

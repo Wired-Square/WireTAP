@@ -43,6 +43,7 @@ export function reconcileKnownSessions(
       const uniqueFrameCount = info.captureUniqueFrameCount ?? existing.uniqueFrameCount;
       const catalogPath = info.catalogPath ?? null;
       const paused = info.pausedSourceProfileIds;
+      const origin = info.originProfileIds;
       const changed =
         existing.ioState !== info.state ||
         existing.subscriberCount !== info.subscriberCount ||
@@ -55,6 +56,7 @@ export function reconcileKnownSessions(
         // Rust sorts this list, so comparing the joined form is a real
         // comparison rather than an accident of map iteration order.
         existing.pausedSourceProfileIds.join() !== paused.join() ||
+        existing.originProfileIds.join() !== origin.join() ||
         // `catalogPath` is normalised to null when the roster omits it, so
         // normalise the existing side too — an absent (undefined) path must not
         // read as a change against null and rebuild the entry every reconcile.
@@ -70,6 +72,7 @@ export function reconcileKnownSessions(
           catalogPath,
           sourceType: info.sourceType,
           pausedSourceProfileIds: paused,
+          originProfileIds: origin,
           capture: {
             ...existing.capture,
             id: info.captureId ?? existing.capture.id,
@@ -117,6 +120,7 @@ export function reconcileKnownSessions(
       bytesCaptureId: null,
       sourceType: info.sourceType,
       pausedSourceProfileIds: info.pausedSourceProfileIds,
+      originProfileIds: info.originProfileIds,
       external: true,
     };
   }

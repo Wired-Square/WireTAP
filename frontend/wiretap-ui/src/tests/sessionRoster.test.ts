@@ -24,6 +24,7 @@ const info = (sessionId: string, profileId = "io_x") =>
     subscribers: [],
     brokerConfigs: [{ profileId, displayName: "Dev", busMappings: [] }],
     sourceProfileIds: [profileId],
+    originProfileIds: [profileId],
     captureId: null,
     captureFrameCount: null,
     isStreaming: true,
@@ -51,6 +52,7 @@ describe("reconcileKnownSessions", () => {
       // is not quietly asserting the opposite.
       sourceType: "framelink",
       pausedSourceProfileIds: [],
+      originProfileIds: ["io_x"],
       capture: {
         available: false, id: null, kind: null, count: 0, owningSessionId: null,
         startTimeUs: null, endTimeUs: null, name: "My capture", persistent: true,
@@ -116,6 +118,13 @@ describe("reconcileKnownSessions", () => {
     const next = reconcileKnownSessions({ f_mcp1: owned }, [paused]);
     expect(next.f_mcp1).not.toBe(owned);
     expect(next.f_mcp1.pausedSourceProfileIds).toEqual(["io_x"]);
+  });
+
+  // A panel that joined before the roster adopted the session was built without it.
+  it("fills in the origin a joined entry was built without", () => {
+    const joined = ownedSession({ ioState: "running", subscriberCount: 1, capabilities: caps, originProfileIds: [] });
+    const next = reconcileKnownSessions({ f_mcp1: joined }, [info("f_mcp1")]);
+    expect(next.f_mcp1.originProfileIds).toEqual(["io_x"]);
   });
 
   it("removes an external entry that vanished from the roster", () => {

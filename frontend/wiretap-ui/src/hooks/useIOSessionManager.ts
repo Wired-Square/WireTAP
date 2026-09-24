@@ -178,8 +178,6 @@ export interface UseIOSessionManagerResult {
   setMultiBusProfiles: (profiles: string[]) => void;
   /** Source profile ID (preserved when switching to capture) */
   sourceProfileId: string | null;
-  /** Set source profile ID */
-  setSourceProfileId: (profileId: string | null) => void;
   /** Maps output bus number to source info (profileName, deviceBus) */
   outputBusToSource: Map<number, BusSourceInfo>;
 
@@ -348,7 +346,6 @@ export function useIOSessionManager(
 
   // ---- Multi-Bus State (per-instance, not global) ----
   const [multiBusProfiles, setMultiBusProfiles] = useState<string[]>([]);
-  const [sourceProfileId, setSourceProfileId] = useState<string | null>(null);
   const [outputBusToSource, setOutputBusToSource] = useState<Map<number, BusSourceInfo>>(
     () => new Map()
   );
@@ -402,9 +399,10 @@ export function useIOSessionManager(
     effectiveSessionId ? s.sessions[effectiveSessionId]?.byteCount ?? 0 : 0);
   const bytesCaptureId = useSessionStore((s) =>
     effectiveSessionId ? s.sessions[effectiveSessionId]?.bytesCaptureId ?? null : null);
-  // Rust-authoritative, so it is known for a session this app only joined.
-  const sessionProfileId = useSessionStore((s) =>
-    effectiveSessionId ? s.sessions[effectiveSessionId]?.profileId || null : null);
+  // Rust-authoritative, so it is known for a session this app only joined, and
+  // survives a stopped source replaying its capture.
+  const sourceProfileId = useSessionStore((s) =>
+    effectiveSessionId ? s.sessions[effectiveSessionId]?.originProfileIds[0] ?? null : null);
 
   // Resolve a profile id, falling back to the ad-hoc registry.
   //
@@ -568,7 +566,6 @@ export function useIOSessionManager(
     // Clear all session-related state
     setMultiBusProfiles([]);
     setMultiSessionId(null);
-    setSourceProfileId(null);
     setIsWatching(false);
     setIsLoading(false);
     setIsDetached(false);
@@ -587,7 +584,6 @@ export function useIOSessionManager(
 
       if (adopt) {
         setIoProfile(orphanedCaptureIds[0]);
-        setSourceProfileId(orphanedCaptureIds[0]);
       } else {
         if (recent.length >= CAPTURE_ADOPTION_LIMIT) {
           tlog.info(
@@ -657,8 +653,8 @@ export function useIOSessionManager(
     [currentTimeUs, isStreaming, isRealtime, captureStartTimeUs]
   );
   const eventOwner = useMemo(
-    () => eventOwnerForSession({ sourceProfileId: sessionProfileId, ioProfile, profiles: ioProfiles, captureId }),
-    [sessionProfileId, ioProfile, ioProfiles, captureId]
+    () => eventOwnerForSession({ sourceProfileId, ioProfile, profiles: ioProfiles, captureId }),
+    [sourceProfileId, ioProfile, ioProfiles, captureId]
   );
 
   // ---- Handlers ----
@@ -674,7 +670,6 @@ export function useIOSessionManager(
       setMultiBusProfiles([]);
       setMultiSessionId(null);
       setIoProfile(null);
-      setSourceProfileId(null);
       setIsWatching(false);
       setIsDetached(false);
       await session.leave();
@@ -950,7 +945,6 @@ export function useIOSessionManager(
 
       setMultiBusProfiles([]);
       setIoProfile(sessionId);
-      setSourceProfileId(profileId);
 
       attachSessionCatalog(sessionId, opts.catalogPath);
     } else {
@@ -964,10 +958,6 @@ export function useIOSessionManager(
       // startMultiBusSession fills in any missing mappings from the profile's
       // declared bus list, so a single profile needs nothing special here.
       await startMultiBusSession(profileIds, opts);
-
-      if (profileIds.length === 1) {
-        setSourceProfileId(profileIds[0]);
-      }
     }
 
     if (opts.speed !== undefined) {
@@ -1069,7 +1059,6 @@ export function useIOSessionManager(
 
         setMultiBusProfiles([]);
         setIoProfile(sessionId);
-        setSourceProfileId(profileId);
 
         attachSessionCatalog(sessionId, opts.catalogPath);
       } else {
@@ -1095,7 +1084,7 @@ export function useIOSessionManager(
       setLoadError(msg);
       setIsLoading(false);
     }
-  }, [session, appName, ioProfiles, startMultiBusSession, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
+  }, [session, appName, ioProfiles, startMultiBusSession, setMultiBusProfiles, setIoProfile, streamCompletedRef]);
 
 
   // Stop ingest: stop session, clear ingest state
@@ -1143,15 +1132,14 @@ export function useIOSessionManager(
     // Clear multi-bus state when connecting to a single source
     setMultiBusProfiles([]);
 
-    // Set profile to the generated session ID and track the original profile
+    // Set profile to the generated session ID
     setIoProfile(sessionId);
-    setSourceProfileId(profileId);
     if (opts?.speed !== undefined) {
       setPlaybackSpeedProp?.(opts.speed);
     }
 
     // Note: Do NOT set isWatching - session is connected but not streaming to us
-  }, [session, appName, setMultiBusProfiles, setIoProfile, setSourceProfileId, setPlaybackSpeedProp]);
+  }, [session, appName, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
 
   // Re-window the source: stop if streaming, cleanup, reconfigure or reinitialise with the new range
   const jumpToTimeRange = useCallback(
@@ -1222,7 +1210,6 @@ export function useIOSessionManager(
 
       // Step 5: Update manager state (use session ID so callbacks are registered correctly)
       setIoProfile(sessionId);
-      setSourceProfileId(targetProfileId);
 
       // Step 6: Mark as watching and reset state
       setIsWatching(true);
@@ -1329,7 +1316,6 @@ export function useIOSessionManager(
     multiBusProfiles,
     setMultiBusProfiles,
     sourceProfileId,
-    setSourceProfileId,
     outputBusToSource,
 
     // Effective Session
