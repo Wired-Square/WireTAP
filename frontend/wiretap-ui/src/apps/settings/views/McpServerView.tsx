@@ -209,7 +209,7 @@ export default function McpServerView() {
       ),
     },
     {
-      label: "Allow UI control (open panels)",
+      label: "Allow UI control (open panels, click and type)",
       checked: allowUiControl,
       setter: setAllowUiControl,
       help: (

@@ -65,15 +65,9 @@ reqwest = { version = "0.12", features = ["json"] }
 # frontend @sentry/react SDK. Needs >= 0.42 for structured logs.
 sentry = { version = "0.42", features = ["logs"] }
 rumqttc = "0.24"
-# MCP server — exposes live runtime state to an external MCP client over a
-# localhost streamable-HTTP transport (opt-in via settings). The hosting layer
-# (identity, transport, bearer gate, connection tracking) is wiredai-mcp's; rmcp
-# and schemars stay declared here because rmcp's macros emit `rmcp::` paths into
-# this crate. Keep rmcp's major in step with the lib's. Pinned by tag; a local
-# `.cargo/config.toml` paths override covers the dev loop (same pattern as framelink).
-rmcp = { version = "3.4", features = ["server", "macros"] }
-schemars = "1"
-wiredai-mcp = { git = "ssh://git@github.com/Wired-Square/lib-wiredai-rs.git", tag = "v0.1.0", features = ["http"] }
+# MCP server (opt-in via settings). rmcp comes through wiredai-mcp's re-export;
+# a local `.cargo/config.toml` paths override covers the dev loop.
+wiredai-mcp = { git = "ssh://git@github.com/Wired-Square/lib-wiredai-rs.git", tag = "v0.2.0", features = ["http", "dom"] }
 tokio-modbus = { version = "0.17", default-features = false, features = ["tcp"] }
 tokio-tungstenite = "0.26"
 rusqlite = { version = "0.32", features = ["bundled"] }

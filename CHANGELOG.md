@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **An MCP client can drive the WireTAP window.** With the MCP server on, `query` and `wait_for` read what the window is showing — an element's text, value, checked and disabled state, and whether it is on screen. With *Allow UI control* on, `click`, `type` and `press` operate it. They act inside the page, so the window needs no focus and can sit behind other apps while an agent tests it.
+
 ## [0.12.0] - 2026-09-20
 
 ### Added

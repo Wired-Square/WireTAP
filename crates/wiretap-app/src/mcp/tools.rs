@@ -15,7 +15,9 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::json;
+use wiredai_mcp::dom::{self, DomBridge};
 use wiredai_mcp::result::{internal_error as err, ok_json};
+use wiredai_mcp::rmcp;
 use wiredai_mcp::router::{compose, mark_read_only};
 use wiredai_mcp::server::{ServerIdentity, ToolListCache};
 
@@ -50,7 +52,7 @@ impl WireTapTools {
         let mut router = Self::read_router();
         mark_read_only(&mut router);
         compose(
-            router,
+            router + dom::read_router(),
             [
                 cfg.control.then(Self::control_router),
                 cfg.session_control.then(Self::session_control_router),
@@ -58,6 +60,7 @@ impl WireTapTools {
                 cfg.catalog_modify.then(Self::catalog_modify_router),
                 cfg.dashboard_write.then(Self::dashboard_write_router),
                 cfg.ui_control.then(Self::ui_control_router),
+                cfg.ui_control.then(dom::drive_router),
             ],
         )
     }
@@ -75,7 +78,9 @@ impl WireTapTools {
                  attach_source surfaces a session in a source-aware tab (discovery, \
                  decoder, transmit, query, or dashboard) so the human sees what the agent is \
                  working on. Tier 2 tools (discovery analysis, decoded signals, live \
-                 frame map) require the WireTAP window to be open.",
+                 frame map) require the WireTAP window to be open, as do the DOM tools: \
+                 query and wait_for read the window, and with UI control click, type and \
+                 press drive it without needing focus.",
             )
     }
 }
@@ -322,6 +327,12 @@ use std::sync::atomic::Ordering as AtomicOrdering;
 async fn bridge_call(method: &str, params: impl serde::Serialize) -> Result<CallToolResult, McpError> {
     let value = serde_json::to_value(params).map_err(|e| err(e.to_string()))?;
     ok_json(super::bridge::request(method, value, BRIDGE_TIMEOUT).await.map_err(err)?)
+}
+
+impl DomBridge for WireTapTools {
+    async fn call(&self, op: &str, args: serde_json::Value, timeout: Duration) -> Result<serde_json::Value, String> {
+        super::bridge::request(&format!("dom.{op}"), args, timeout).await
+    }
 }
 
 // ── Read tools (Tier 1 Rust-native + Tier 2 frontend bridge) ─────────────────
@@ -1401,5 +1412,17 @@ impl WireTapTools {
         Parameters(p): Parameters<OpenAppParams>,
     ) -> Result<CallToolResult, McpError> {
         bridge_call("ui.openPanel", json!({ "panelId": p.panel_id, "args": p.args })).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn vendored_dom_ops_match_the_library() {
+        let vendored = include_str!("../../../../frontend/wiretap-ui/src/services/domOps.ts");
+        assert!(
+            vendored == wiredai_mcp::dom::OPS_TS,
+            "re-copy crates/wiredai-mcp/js/dom-ops.ts from lib-wiredai-rs to frontend/wiretap-ui/src/services/domOps.ts"
+        );
     }
 }

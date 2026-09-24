@@ -17,6 +17,7 @@ import { openPanel } from "../utils/windowCommunication";
 import { openDashboard } from "../api/dashboards";
 import { parseDashboard } from "../utils/dashboards";
 import { useDashboardStore } from "../stores/dashboardStore";
+import { DOM_OPS, runDomOp } from "./domOps";
 
 // Bounds so a huge live buffer can't produce an enormous MCP response.
 const MAX_FRAME_IDS = 64;
@@ -136,4 +137,7 @@ export function initMcpBridge(): void {
   wsTransport.registerBridgeMethod("decoder.signals", decoderSignals);
   wsTransport.registerBridgeMethod("live.frameMap", liveFrameMap);
   wsTransport.registerBridgeMethod("ui.openPanel", uiOpenPanel);
+  for (const op of DOM_OPS) {
+    wsTransport.registerBridgeMethod(`dom.${op}`, (args) => runDomOp(op, args));
+  }
 }

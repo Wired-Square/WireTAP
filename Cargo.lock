@@ -8514,8 +8514,8 @@ dependencies = [
 
 [[package]]
 name = "wiredai-mcp"
-version = "0.1.0"
-source = "git+ssh://git@github.com/Wired-Square/lib-wiredai-rs.git?tag=v0.1.0#c0b1c944a3b8c3419ee1e626d67754bcb595af10"
+version = "0.2.0"
+source = "git+ssh://git@github.com/Wired-Square/lib-wiredai-rs.git?tag=v0.2.0#e825b3a4ac279cb55f3352625eb17fd1149f3403"
 dependencies = [
  "axum",
  "ipnet",
@@ -8551,10 +8551,8 @@ dependencies = [
  "nusb 0.2.3",
  "once_cell",
  "reqwest 0.12.28",
- "rmcp",
  "rumqttc",
  "rusqlite",
- "schemars 1.2.1",
  "sentry",
  "serde",
  "serde_json",
