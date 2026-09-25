@@ -364,11 +364,6 @@ export function useIOSessionManager(
   const pendingJoin = useSessionStore((s) => s.pendingJoins[appName]);
   const clearPendingJoin = useSessionStore((s) => s.clearPendingJoin);
 
-  // ---- Multi-Session ID State ----
-  // Generated dynamically when starting a multi-source session to avoid collisions
-  // between multiple windows of the same app type
-  const [multiSessionId, setMultiSessionId] = useState<string | null>(null);
-
   // ---- Stream Completed Ref ----
   // Use provided ref (from app) or create a local one
   const localStreamCompletedRef = useRef(false);
@@ -380,9 +375,9 @@ export function useIOSessionManager(
   const selfReconfigureRef = useRef(0);
 
   // ---- Derived Values ----
-  // Effective session ID: multiSessionId takes priority (all realtime sources now use it),
-  // ioProfile is fallback (recorded sources, capture profiles)
-  const effectiveSessionId = multiSessionId ?? ioProfile ?? undefined;
+  // ioProfile holds the session id for every source kind, so a path that switches
+  // source by setting it alone cannot leave the app on the session it left.
+  const effectiveSessionId = ioProfile ?? undefined;
 
   // Frame counts are Rust-authoritative — pushed live (FrameCounts 0x16) onto the
   // session in the store. Read them here so the UI renders them directly; no TS
@@ -565,7 +560,6 @@ export function useIOSessionManager(
 
     // Clear all session-related state
     setMultiBusProfiles([]);
-    setMultiSessionId(null);
     setIsWatching(false);
     setIsLoading(false);
     setIsDetached(false);
@@ -668,7 +662,6 @@ export function useIOSessionManager(
     const disconnect = async () => {
       onBeforeWatch?.();
       setMultiBusProfiles([]);
-      setMultiSessionId(null);
       setIoProfile(null);
       setIsWatching(false);
       setIsDetached(false);
@@ -857,7 +850,6 @@ export function useIOSessionManager(
     // It will see the backend already exists and join it properly
     setMultiBusProfiles(profileIds);
     setOutputBusToSource(busToSource);
-    setMultiSessionId(sessionId);
     setIoProfile(sessionId);
     setIsDetached(false);
 
@@ -873,8 +865,6 @@ export function useIOSessionManager(
     session.markSessionSwitch(sessionId);
     onBeforeWatch?.();
     resetWatchFrameCount();
-    // Reset multiSessionId when switching sessions so effectiveSessionId updates cleanly
-    setMultiSessionId(null);
 
     // Join the session and set up heartbeats
     await joinMultiSourceSession({
@@ -887,10 +877,6 @@ export function useIOSessionManager(
     // Update state
     setIoProfile(sessionId);
     setMultiBusProfiles(sourceProfileIds || []);
-    // Set multiSessionId when joining with profiles so effectiveSessionId computation works
-    if (sourceProfileIds && sourceProfileIds.length > 0) {
-      setMultiSessionId(sessionId);
-    }
     setIsDetached(false);
     await session.rejoin(sessionId);
   }, [appName, session, setIoProfile, setMultiBusProfiles, onBeforeWatch, resetWatchFrameCount]);

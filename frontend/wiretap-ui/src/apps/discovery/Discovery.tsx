@@ -567,31 +567,32 @@ function DiscoveryInner() {
   // Fetch capture metadata and frame info when:
   // - Joining a session already in capture mode (another app stopped)
   // - Session is paused with captured data (for stepping through frames)
+  // Keyed on the capture id: a source switch clears the metadata while the departing
+  // session is still current, so the first fetch reads the old capture.
   useEffect(() => {
-    const shouldFetchMetadata = sessionId && sessionCaptureId && !captureMetadata && (
+    const shouldFetchMetadata = sessionId && sessionCaptureId && captureMetadata?.id !== sessionCaptureId && (
       (isCaptureMode && !isStreaming) ||  // Explicit capture mode
       (isPaused && captureCount > 0)       // Paused with captured frames
     );
+    if (!shouldFetchMetadata) return;
 
-    if (shouldFetchMetadata) {
-      (async () => {
-        try {
-          // Fetch capture metadata
-          const meta = await getCaptureMetadata(sessionCaptureId);
-          if (meta) {
-            setCaptureMetadata(meta);
-            enableCaptureMode(meta.count);
-
-            // Fetch frame info from backend capture (populates frame picker)
-            const frameInfoList = await getCaptureFrameInfo(sessionCaptureId);
-            console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from capture`);
-            setFrameInfoFromCapture(frameInfoList);
-          }
-        } catch (err) {
-          console.warn('[Discovery] Failed to fetch capture data:', err);
-        }
-      })();
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const meta = await getCaptureMetadata(sessionCaptureId);
+        if (!meta) return;
+        // Fetch frame info from backend capture (populates frame picker)
+        const frameInfoList = await getCaptureFrameInfo(sessionCaptureId);
+        if (cancelled) return;
+        setCaptureMetadata(meta);
+        enableCaptureMode(meta.count);
+        console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from capture`);
+        setFrameInfoFromCapture(frameInfoList);
+      } catch (err) {
+        console.warn('[Discovery] Failed to fetch capture data:', err);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [isCaptureMode, isStreaming, isPaused, captureCount, captureMetadata, sessionId, sessionCaptureId, enableCaptureMode, setFrameInfoFromCapture]);
 
   // Keep paused ref in sync with manager state (for callbacks that can't access manager directly)
