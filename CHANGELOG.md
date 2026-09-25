@@ -17,6 +17,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Modbus TCP or Virtual Device session that has died says so.** A Modbus TCP session whose every poll group has given up on register errors, or a Virtual Device whose tasks have ended, now reads as stopped rather than running.
 - **Long serial and Modbus RTU messages arrive intact.** A message over 251 bytes used to corrupt its own length on the way to the window, so it arrived truncated and every frame after it in the same batch came through as garbage. Messages of any length now arrive whole.
 - **Changing a live session's framing updates its byte stream too.** Picking a serial catalogue mid-stream switches the source's framing in place; the session now also reports and captures the raw bytes that keep flowing afterwards, where before a session that started framed without raw bytes dropped them.
+- **Escape and a click outside close form dialogs.** Dialogs with a Cancel button — IO profiles, new catalogue, the Catalog Editor's node, signal, mux and checksum editors, the export and save dialogs among them — now close on Escape and on a click outside, exactly as Cancel does, and those with a title bar gain its ✕. The IO profile dialog's back arrow gives way to that ✕.
 
 ## [0.12.0] - 2026-09-20
 

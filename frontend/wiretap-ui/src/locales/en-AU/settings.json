@@ -382,7 +382,6 @@
   "ioProfileDialog": {
     "edit": "Edit IO Profile",
     "add": "Add IO Profile",
-    "back": "Go back without saving",
     "type": "Type",
     "kinds": {
       "framelink": "FrameLink",

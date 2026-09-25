@@ -44,7 +44,7 @@ export default function ExportReportDialog({
   };
 
   return (
-    <Dialog isOpen={open}>
+    <Dialog isOpen={open} onClose={onCancel}>
       <DialogBody className="space-y-4">
         <div className="text-lg font-semibold text-primary">
           {title}

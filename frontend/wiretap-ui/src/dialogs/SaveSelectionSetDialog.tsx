@@ -37,7 +37,7 @@ export default function SaveSelectionSetDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} title={t("saveSelectionSet.title")}>
+    <Dialog isOpen={isOpen} onClose={onClose} title={t("saveSelectionSet.title")}>
       <DialogBody className="space-y-4">
         <div className="space-y-3">
           {/* Name input */}

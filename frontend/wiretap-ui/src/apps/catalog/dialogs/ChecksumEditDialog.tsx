@@ -63,7 +63,7 @@ export default function ChecksumEditDialog({
   const expectedOutputBytes = selectedAlgorithm?.outputBytes ?? 1;
 
   return (
-    <Dialog isOpen={open} size="xl" title={editingIndex !== null ? "Edit Checksum" : "Add Checksum"}>
+    <Dialog isOpen={open} onClose={onCancel} size="xl" title={editingIndex !== null ? "Edit Checksum" : "Add Checksum"}>
       <DialogBody className="space-y-4">
         {/* Name */}
         <FormField label="Name" required variant="default">

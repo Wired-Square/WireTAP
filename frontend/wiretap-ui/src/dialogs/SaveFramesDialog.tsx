@@ -68,7 +68,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
   const displayInterval = knowledgeInterval ?? meta.default_interval;
 
   return (
-    <Dialog isOpen={open} size="lg">
+    <Dialog isOpen={open} onClose={onCancel} size="lg">
       <DialogBody className={spaceYDefault}>
         <div className={h3}>{t('saveFrames.title')}</div>
 

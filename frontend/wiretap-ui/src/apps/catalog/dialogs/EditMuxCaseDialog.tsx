@@ -36,7 +36,7 @@ export default function EditMuxCaseDialog({
   const caseError = useMemo(() => validationErrors.find((e) => e.field === "case"), [validationErrors]);
 
   return (
-    <Dialog isOpen={open} title="Edit Mux Case">
+    <Dialog isOpen={open} onClose={onCancel} title="Edit Mux Case">
       <DialogBody className="space-y-4">
         <FormField label="Case Value" required variant="default">
           <Input

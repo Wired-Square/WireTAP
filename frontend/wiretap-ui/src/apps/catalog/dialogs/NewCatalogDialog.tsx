@@ -89,7 +89,7 @@ export default function NewCatalogDialog({
   const currentProtocolConfig = protocols.find((p) => p.type === selectedProtocol);
 
   return (
-    <Dialog isOpen={open} size="xl" title={t("newCatalog.title")}>
+    <Dialog isOpen={open} onClose={onCancel} size="xl" title={t("newCatalog.title")}>
       <DialogBody>
         {metaError && (
           <Alert tone="danger" className="mb-4">

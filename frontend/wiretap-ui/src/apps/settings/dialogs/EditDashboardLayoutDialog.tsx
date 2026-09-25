@@ -22,7 +22,7 @@ export default function EditDashboardLayoutDialog({
   const { t } = useTranslation("settings");
 
   return (
-    <Dialog isOpen={isOpen} title={t("dialogs.editDashboardLayout.title")}>
+    <Dialog isOpen={isOpen} onClose={onCancel} title={t("dialogs.editDashboardLayout.title")}>
       <DialogBody className="space-y-4">
         <FormField label={t("dialogs.editDashboardLayout.name")} variant="default">
           <Input

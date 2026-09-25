@@ -112,7 +112,7 @@ export default function MuxEditDialog({
   })();
 
   return (
-    <Dialog isOpen={open} size="xl" title={title}>
+    <Dialog isOpen={open} onClose={onCancel} size="xl" title={title}>
       <DialogBody className="space-y-4">
         {/* Name */}
         <FormField label="Name" required variant="default">

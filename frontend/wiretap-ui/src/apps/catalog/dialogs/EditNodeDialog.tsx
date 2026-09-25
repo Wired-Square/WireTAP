@@ -45,7 +45,7 @@ export default function EditNodeDialog({
   const nodeError = useMemo(() => validationErrors.find((e) => e.field === "node"), [validationErrors]);
 
   return (
-    <Dialog isOpen={open} title="Edit Node">
+    <Dialog isOpen={open} onClose={onCancel} title="Edit Node">
       <DialogBody className="space-y-4">
         <FormField label="Node Name" required variant="default">
           <Input

@@ -7,9 +7,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
-import { iconMd, iconXs, iconLg } from "../../../styles/spacing";
-import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../../components/Dialog";
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { iconMd, iconXs } from "../../../styles/spacing";
+import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import type { IOProfile, ConnectionFieldValue } from "../../../hooks/useSettings";
 import { isProfileKind } from "../../../hooks/useSettings";
 import FrameLinkSignalControl, { signalSortKey } from "../components/FrameLinkSignalControl";
@@ -25,7 +25,6 @@ import { useConnectionProbe, usePlatformInfo } from "../../../components/io/useC
 import { borderDefault, spaceYDefault, caption, textMedium, textMuted } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
-import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { Alert } from "../../../components/Alert";
 
@@ -293,18 +292,12 @@ export default function IOProfileDialog({
   );
 
   return (
-    <Dialog isOpen={isOpen} size="xl">
-      <DialogHeader>
-        <DialogTitle>
-          {editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
-        </DialogTitle>
-        <IconButton
-          onClick={onCancel}
-          title={t("ioProfileDialog.back")}
-        >
-          <ArrowLeft className={`${iconLg} text-muted`} />
-        </IconButton>
-      </DialogHeader>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onCancel}
+      size="xl"
+      title={editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
+    >
       <DialogBody className="space-y-4">
         {/* Profile Type - filtered based on platform availability */}
         <FormField label={t("ioProfileDialog.type")} variant="default">

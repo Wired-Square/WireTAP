@@ -36,7 +36,7 @@ export default function AddNodeDialog({
   onAdd,
 }: AddNodeDialogProps) {
   return (
-    <Dialog isOpen={open} title="Add Node">
+    <Dialog isOpen={open} onClose={onCancel} title="Add Node">
       <DialogBody className="space-y-4">
         <FormField label="Node Name" required variant="default">
           <Input

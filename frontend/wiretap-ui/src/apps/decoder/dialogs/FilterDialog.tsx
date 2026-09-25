@@ -47,7 +47,7 @@ export default function FilterDialog({
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
 
   return (
-    <Dialog isOpen={isOpen} size="sm" title={t("filterDialog.title")}>
+    <Dialog isOpen={isOpen} onClose={onClose} size="sm" title={t("filterDialog.title")}>
       <DialogBody className="space-y-4">
         {/* Frame ID Filter */}
         <div className="space-y-2">

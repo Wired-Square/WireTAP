@@ -25,7 +25,7 @@ export default function DuplicateCatalogDialog({
   const { t } = useTranslation("settings");
 
   return (
-    <Dialog isOpen={isOpen} title={t("dialogs.duplicateCatalog.title")}>
+    <Dialog isOpen={isOpen} onClose={onCancel} title={t("dialogs.duplicateCatalog.title")}>
       <DialogBody className="space-y-4">
         <FormField label={t("dialogs.duplicateCatalog.newName")} variant="default">
           <Input

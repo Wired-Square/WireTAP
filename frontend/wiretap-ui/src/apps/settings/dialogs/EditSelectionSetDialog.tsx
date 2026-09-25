@@ -22,7 +22,7 @@ export default function EditSelectionSetDialog({
   const { t } = useTranslation("settings");
 
   return (
-    <Dialog isOpen={isOpen} title={t("dialogs.editSelectionSet.title")}>
+    <Dialog isOpen={isOpen} onClose={onCancel} title={t("dialogs.editSelectionSet.title")}>
       <DialogBody className="space-y-4">
         <FormField label={t("dialogs.editSelectionSet.name")} variant="default">
           <Input

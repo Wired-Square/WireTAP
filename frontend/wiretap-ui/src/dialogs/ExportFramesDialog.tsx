@@ -83,7 +83,7 @@ export default function ExportFramesDialog({
   const summaryKey = dataMode === "bytes" ? "exportFrames.summary_bytes" : "exportFrames.summary_frames";
 
   return (
-    <Dialog isOpen={open} size="sm">
+    <Dialog isOpen={open} onClose={onCancel} size="sm">
       <DialogBody className="space-y-4">
         <div className={h3}>{title}</div>
         <div className={bodyDefault}>{t(summaryKey, { count: itemCount })}</div>

@@ -36,7 +36,7 @@ export default function AddMuxCaseDialog({
   const caseError = useMemo(() => validationErrors.find((e) => e.field === "case"), [validationErrors]);
 
   return (
-    <Dialog isOpen={open} title="Add Mux Case">
+    <Dialog isOpen={open} onClose={onCancel} title="Add Mux Case">
       <DialogBody className="space-y-4">
         <FormField label="Case Value" required variant="default">
           <Input

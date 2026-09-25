@@ -157,6 +157,7 @@ export default function SignalEditDialog({
   return (
     <Dialog
       isOpen={open}
+      onClose={onCancel}
       size="3xl"
       title={editingIndex !== null ? t("signalEdit.editTitle") : t("signalEdit.addTitle")}
     >

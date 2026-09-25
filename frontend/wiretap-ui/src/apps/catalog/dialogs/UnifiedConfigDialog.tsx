@@ -171,6 +171,7 @@ export default function UnifiedConfigDialog({
   return (
     <Dialog
       isOpen={open}
+      onClose={onCancel}
       size="xl"
       title="Catalog Configuration"
       subtitle="Configure catalog metadata and protocol settings"
