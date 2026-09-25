@@ -1227,11 +1227,10 @@ impl WireTapTools {
         let sessions = crate::io::list_sessions().await;
         let session = sessions.iter().find(|s| s.session_id == p.session_id);
         let progress = state.as_ref().and_then(|s| s.progress.clone());
-        // No scan state and no session means the sweep finished and cleaned up.
-        let status = state
-            .as_ref()
-            .map(|s| s.status.clone())
-            .unwrap_or_else(|| if session.is_some() { "complete" } else { "unknown" }.to_string());
+        let status = scan_status(
+            state.as_ref().map(|s| s.status.clone()),
+            session.map(|s| &s.state),
+        );
         ok_json(json!({
             "session_id": p.session_id,
             "status": status,
@@ -1415,8 +1414,52 @@ impl WireTapTools {
     }
 }
 
+/// A sweep publishes no state until its first progress tick, so a live session
+/// without one is still connecting; with no session at all it has cleaned up.
+fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOState>) -> String {
+    use crate::io::IOState;
+    published.unwrap_or_else(|| {
+        match session_state {
+            Some(IOState::Starting | IOState::Running) => "scanning",
+            Some(IOState::Error(_)) => "error",
+            Some(_) => "complete",
+            None => "unknown",
+        }
+        .to_string()
+    })
+}
+
 #[cfg(test)]
 mod tests {
+    use super::scan_status;
+    use crate::io::IOState;
+
+    #[test]
+    fn a_running_scan_with_no_progress_yet_is_scanning() {
+        assert_eq!(scan_status(None, Some(&IOState::Running)), "scanning");
+        assert_eq!(scan_status(None, Some(&IOState::Starting)), "scanning");
+    }
+
+    #[test]
+    fn a_scan_session_that_is_not_running_is_complete() {
+        assert_eq!(scan_status(None, Some(&IOState::Stopped)), "complete");
+    }
+
+    #[test]
+    fn a_scan_session_that_failed_is_an_error() {
+        assert_eq!(scan_status(None, Some(&IOState::Error("timeout".into()))), "error");
+    }
+
+    #[test]
+    fn a_scan_with_no_session_is_unknown() {
+        assert_eq!(scan_status(None, None), "unknown");
+    }
+
+    #[test]
+    fn published_scan_status_wins() {
+        assert_eq!(scan_status(Some("error".into()), Some(&IOState::Running)), "error");
+    }
+
     #[test]
     fn vendored_dom_ops_match_the_library() {
         let vendored = include_str!("../../../../frontend/wiretap-ui/src/services/domOps.ts");
