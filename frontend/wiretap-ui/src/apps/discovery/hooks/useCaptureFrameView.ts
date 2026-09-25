@@ -16,7 +16,7 @@ import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import { useSessionStore } from "../../../stores/sessionStore";
 import type { FrameMessage } from "../../../types/frame";
 import { groupKeysByProtocol, type ProtocolFrames } from "../../../utils/frameKey";
-import { pageCount, pageForOffset, type ResolvedPageSize } from "../../../utils/pageSize";
+import { pageCount, pageForWindow, type ResolvedPageSize } from "../../../utils/pageSize";
 
 /** Frame with pre-computed hex bytes for display */
 export type FrameWithHex = FrameMessage & { hexBytes: string[] };
@@ -448,7 +448,7 @@ export function useCaptureFrameView(
     ? Math.max(0, totalCount - frames.length)
     : clampAnchor(anchorRow, totalCount, pageSize);
   // Page buttons still move in whole pages; the anchor is what a resize preserves.
-  const currentPage = pageForOffset(pageStartIndex, pageSize);
+  const currentPage = pageForWindow(pageStartIndex, pageSize, totalCount);
   const setCurrentPage = useCallback((page: number) => {
     setAnchorRow(Math.max(0, page) * (pageSizeRef.current ?? 1));
   }, []);

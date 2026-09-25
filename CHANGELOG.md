@@ -7,6 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
+- **A short last page reads as the last page.** Discovery fills a short last page from the rows before it, but the pager still read "1 / 2" there with Next and Last enabled. It now reads "2 / 2" and Previous goes back a page.
 
 ## [0.12.1] - 2026-09-25
 

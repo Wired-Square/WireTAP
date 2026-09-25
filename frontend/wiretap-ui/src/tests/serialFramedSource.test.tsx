@@ -107,6 +107,17 @@ describe("FramedDataView paging", () => {
     act(() => root.unmount());
   });
 
+  it("reports a last page clamped to the end as the last page", async () => {
+    const { host, root } = await mount({});
+    const button = (title: string) => host.querySelector<HTMLButtonElement>(`[title="pagination.${title}"]`)!;
+    await act(async () => button("nextPage").click());
+
+    expect(host.textContent).toContain("2 / 2");
+    expect(button("nextPage").disabled).toBe(true);
+    expect(button("lastPage").disabled).toBe(true);
+    act(() => root.unmount());
+  });
+
   it("pages a stored source's capture while its session runs, rather than tailing it", async () => {
     const { host, root } = await mount({ isStreaming: true, isRecorded: true });
     expect(host.textContent).toContain("1 / 2");

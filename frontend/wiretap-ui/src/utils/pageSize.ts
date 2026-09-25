@@ -64,3 +64,9 @@ export const pageCount = (totalRows: number, pageSize: ResolvedPageSize): number
 /** The page an absolute row offset lands on, or 0 while the size is unresolved. */
 export const pageForOffset = (offset: number, pageSize: ResolvedPageSize): number =>
   pageSize === null ? 0 : Math.floor(Math.max(0, offset) / pageSize);
+
+/** The page a window starting at `offset` shows — the last page once the window reaches the end. */
+export const pageForWindow = (offset: number, pageSize: ResolvedPageSize, totalRows: number): number =>
+  pageSize !== null && offset + pageSize >= totalRows
+    ? pageCount(totalRows, pageSize) - 1
+    : pageForOffset(offset, pageSize);

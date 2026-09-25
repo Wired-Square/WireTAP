@@ -12,6 +12,7 @@ import {
   pageSizeFromOptionValue,
   pageCount,
   pageForOffset,
+  pageForWindow,
 } from "../utils/pageSize";
 import { computeAutoRows, shouldCommit } from "../hooks/useAutoRowCount";
 
@@ -77,6 +78,12 @@ describe("pageCount / pageForOffset", () => {
     // scrub called setCurrentPage(Infinity).
     expect(pageCount(500, null)).toBe(1);
     expect(pageForOffset(1234, null)).toBe(0);
+  });
+
+  it("puts a window clamped to the end on the last page", () => {
+    expect(pageForWindow(13, 20, 33)).toBe(1);
+    expect(pageForWindow(25, 20, 100)).toBe(1);
+    expect(pageForWindow(0, null, 33)).toBe(0);
   });
 
   it("never locates a negative page", () => {
