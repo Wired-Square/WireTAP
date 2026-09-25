@@ -472,6 +472,7 @@ export default function Settings() {
         onMigratePassword={handlers.handleSaveProfile}
         onUpdateProfileField={handlers.updateProfileField}
         onUpdateConnectionField={handlers.updateConnectionField}
+        onPersistProbe={handlers.persistProbedFields}
       />
 
       {/* Delete IO Profile Confirmation Dialog */}

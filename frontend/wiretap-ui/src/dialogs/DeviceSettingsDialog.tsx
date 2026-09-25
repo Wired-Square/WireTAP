@@ -74,6 +74,14 @@ function DeviceSettingsForm({
     setDraft((prev) => ({ ...prev, connection: { ...prev.connection, [key]: value } }) as IOProfile);
   }, []);
 
+  // Laid over the stored connection, not the draft, so the draft's other edits
+  // wait for Apply.
+  const persistProbe = useCallback((fields: Record<string, unknown>) => {
+    reconfigureDevice(profile.id, { ...profile.connection, ...fields }).catch((e) =>
+      setError(e instanceof Error ? e.message : String(e)),
+    );
+  }, [profile.id, profile.connection]);
+
   const probe = useConnectionProbe({
     profile: draft,
     // Probing opens the port, which a streaming session holds exclusively — it
@@ -82,6 +90,7 @@ function DeviceSettingsForm({
     platform,
     probeProfileId: profile.id,
     onUpdateConnectionField: updateConnectionField as (key: string, value: unknown) => void,
+    onPersistProbe: profile.ephemeral ? undefined : persistProbe,
     probeFailedText: t("deviceSettings.probeFailed"),
   });
 

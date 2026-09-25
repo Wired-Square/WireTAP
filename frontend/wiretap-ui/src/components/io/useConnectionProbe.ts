@@ -13,7 +13,7 @@ import { PROBE_DEBOUNCE_MS } from "../../constants";
 import { probeSlcanDevice } from "../../api/serial";
 import { probeGsUsbDevice } from "../../api/gs_usb";
 import { probeDevice, type GvretDeviceInfo } from "../../api/io";
-import { framelinkProbeDevice } from "../../api/framelink";
+import { framelinkProbeDevice, type FrameLinkProbeResult } from "../../api/framelink";
 import {
   apiDatabaseProtocols,
   apiProbeBackend,
@@ -71,6 +71,27 @@ export function usePlatformInfo(): PlatformInfo {
   return info;
 }
 
+/** The connection fields a FrameLink probe fills; an identity field it did not report is left alone. */
+export function framelinkProbeFields(result: FrameLinkProbeResult): Record<string, unknown> {
+  const { device_id, board_name, board_revision } = result;
+  return {
+    interfaces: result.interfaces.map(({ index, iface_type, name, type_name }) => ({
+      index,
+      iface_type,
+      name,
+      type_name,
+    })),
+    ...Object.fromEntries(
+      Object.entries({ device_id, board_name, board_revision }).filter(([, value]) => value),
+    ),
+  };
+}
+
+/** A stored profile with a probe's fields laid over its connection, and nothing else changed. */
+export function withProbedFields(stored: IOProfile, fields: Record<string, unknown>): IOProfile {
+  return { ...stored, connection: { ...stored.connection, ...fields } } as IOProfile;
+}
+
 export interface ConnectionProbe {
   slcanState: DeviceProbeState;
   slcanResult: DeviceProbeResult | null;
@@ -112,6 +133,11 @@ export interface UseConnectionProbeOptions {
   probeProfileId: string | null;
   /** Apply a probe result back onto the form (interfaces, bus count). */
   onUpdateConnectionField: (key: string, value: unknown) => void;
+  /**
+   * Write a FrameLink probe's fields through to the stored profile. Omitted for
+   * a profile that is not saved, where the result stays form state.
+   */
+  onPersistProbe?: (fields: Record<string, unknown>) => void;
   /** Label for a failed GVRET probe. */
   probeFailedText: string;
 }
@@ -122,6 +148,7 @@ export function useConnectionProbe({
   platform,
   probeProfileId,
   onUpdateConnectionField,
+  onPersistProbe,
   probeFailedText,
 }: UseConnectionProbeOptions): ConnectionProbe {
   const [slcanState, setSlcanState] = useState<DeviceProbeState>("idle");
@@ -303,27 +330,15 @@ export function useConnectionProbe({
     setFramelinkState("probing");
     setFramelinkError(null);
     try {
-      const result = await framelinkProbeDevice(host, Number(port) || 120, 5);
-      onUpdateConnectionField(
-        "interfaces",
-        result.interfaces.map((i) => ({
-          index: i.index,
-          iface_type: i.iface_type,
-          name: i.name,
-          type_name: i.type_name,
-        })),
-      );
-      if (result.device_id) onUpdateConnectionField("device_id", result.device_id);
-      if (result.board_name) onUpdateConnectionField("board_name", result.board_name);
-      if (result.board_revision) {
-        onUpdateConnectionField("board_revision", result.board_revision);
-      }
+      const fields = framelinkProbeFields(await framelinkProbeDevice(host, Number(port) || 120, 5));
+      for (const [key, value] of Object.entries(fields)) onUpdateConnectionField(key, value);
+      onPersistProbe?.(fields);
       setFramelinkState("success");
     } catch (e) {
       setFramelinkError(e instanceof Error ? e.message : String(e));
       setFramelinkState("error");
     }
-  }, [profile, onUpdateConnectionField]);
+  }, [profile, onUpdateConnectionField, onPersistProbe]);
 
   // ── WireTAP backend (probes from loose url + key, so it works unsaved) ─────
 

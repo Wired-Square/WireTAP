@@ -19,6 +19,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Long serial and Modbus RTU messages arrive intact.** A message over 251 bytes used to corrupt its own length on the way to the window, so it arrived truncated and every frame after it in the same batch came through as garbage. Messages of any length now arrive whole.
 - **Changing a live session's framing updates its byte stream too.** Picking a serial catalogue mid-stream switches the source's framing in place; the session now also reports and captures the raw bytes that keep flowing afterwards, where before a session that started framed without raw bytes dropped them.
 - **Escape and a click outside close form dialogs.** Dialogs with a Cancel button — IO profiles, new catalogue, the Catalog Editor's node, signal, mux and checksum editors, the export and save dialogs among them — now close on Escape and on a click outside, exactly as Cancel does, and those with a title bar gain its ✕. The IO profile dialog's back arrow gives way to that ✕.
+- **Re-probing a FrameLink device keeps what it found.** On a saved device, the interfaces, device id and board a successful re-probe reports are now written to the device straight away, instead of being lost unless you also saved the form. Other unsaved edits in the form still wait for Save. A device that has not been saved yet keeps the result in the form as before.
 
 ## [0.12.0] - 2026-09-20
 

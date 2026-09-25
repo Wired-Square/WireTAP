@@ -19,6 +19,7 @@ import {
   validateProfileForm,
 } from '../../../../settings/ioProfileForm';
 import { clearProfileProbeCache } from '../../../../api/ephemeralProfiles';
+import { withProbedFields } from '../../../../components/io/useConnectionProbe';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { useAdHocProfileStore } from '../../../../stores/adHocProfileStore';
 import { withAppError } from '../../../../utils/appError';
@@ -203,6 +204,15 @@ export function useIOProfileHandlers() {
     });
   };
 
+  // Only the probe's fields reach the stored profile, so other unsaved edits in
+  // the form stay unsaved.
+  const persistProbedFields = (fields: Record<string, unknown>) => {
+    const { ui, ioProfiles } = useSettingsStore.getState();
+    const id = ui.dialogPayload.editingProfileId;
+    const stored = ioProfiles.profiles.find((p) => p.id === id);
+    if (id && stored) updateProfile(id, withProbedFields(stored, fields));
+  };
+
   // Promote an ad-hoc device to a saved profile, then drop it from the
   // ephemeral registry so it appears once, in the saved list.
   const handleSaveAdHocProfile = async (profile: IOProfile) => {
@@ -252,6 +262,7 @@ export function useIOProfileHandlers() {
     handleDiscardAdHocProfile,
     updateProfileField,
     updateConnectionField,
+    persistProbedFields,
     toggleDefaultRead,
   };
 }

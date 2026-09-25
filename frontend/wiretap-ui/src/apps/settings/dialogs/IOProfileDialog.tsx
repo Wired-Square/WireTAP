@@ -42,6 +42,8 @@ type Props = {
 
   onUpdateProfileField: (field: keyof IOProfile, value: any) => void;
   onUpdateConnectionField: (key: string, value: ConnectionFieldValue) => void;
+  /** Write a probe's findings through to the stored profile. */
+  onPersistProbe: (fields: Record<string, unknown>) => void;
 };
 
 export default function IOProfileDialog({
@@ -54,6 +56,7 @@ export default function IOProfileDialog({
   onMigratePassword,
   onUpdateProfileField,
   onUpdateConnectionField,
+  onPersistProbe,
 }: Props) {
   const { t } = useTranslation("settings");
   const catalogs = useCatalogList();
@@ -78,6 +81,7 @@ export default function IOProfileDialog({
     // GVRET's probe resolves a profile by id, so a new profile must be saved first.
     probeProfileId: editingProfileId,
     onUpdateConnectionField: onUpdateConnectionField as (key: string, value: unknown) => void,
+    onPersistProbe,
     probeFailedText: t("ioProfileDialog.probeFailed"),
   });
 
