@@ -613,13 +613,21 @@ pub(crate) async fn find_probe_by_address(addr: SocketAddr) -> Option<FrameLinkP
         .map(|conn| conn.probe_cache.clone())
 }
 
-/// Load the board definition for the device, using cached board info.
+/// The device's board definition: its downloaded TOML, which carries the
+/// user-signal labels, else the embedded def for its board and revision.
 pub(crate) async fn load_board_def(device_id: &str) -> Option<framelink::board::BoardDef> {
     let pool = POOL.lock().await;
     let conn = pool.get(device_id).filter(|c| c.session.is_alive())?;
-    let name = conn.probe_cache.board_name.as_ref()?;
-    let rev = conn.probe_cache.board_revision.as_ref()?;
-    framelink::board::load_board_def(name, rev)
+    let from_device = conn
+        .editable_board_def
+        .lock()
+        .ok()
+        .and_then(|ed| ed.as_ref()?.to_board_def().ok());
+    from_device.or_else(|| {
+        let name = conn.probe_cache.board_name.as_ref()?;
+        let rev = conn.probe_cache.board_revision.as_ref()?;
+        framelink::board::load_board_def(name, rev)
+    })
 }
 
 /// Return the interface type for a given interface index.
