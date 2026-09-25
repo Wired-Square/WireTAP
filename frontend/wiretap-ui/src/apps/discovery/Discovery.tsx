@@ -685,15 +685,22 @@ function DiscoveryInner() {
 
   const displayTimeSeconds = isRealtime ? realtimeClock : currentTime;
 
-  // Initialize IO profile and history from settings
+  // The default source is an initial selection only: settings reload on every save
+  // in any window, and reapplying it would retarget a running session.
+  const defaultProfileAppliedRef = useRef(false);
   useEffect(() => {
-    if (settings?.default_read_profile) {
+    if (!settings || defaultProfileAppliedRef.current) return;
+    defaultProfileAppliedRef.current = true;
+    if (settings.default_read_profile && !useDiscoveryUIStore.getState().ioProfile) {
       setIoProfile(settings.default_read_profile);
     }
+  }, [settings, setIoProfile]);
+
+  useEffect(() => {
     if (settings?.discovery_history_buffer) {
       setMaxBuffer(settings.discovery_history_buffer);
     }
-  }, [settings, setIoProfile, setMaxBuffer]);
+  }, [settings, setMaxBuffer]);
 
   // Detect if current profile is serial - use session traits from capabilities
   const prevIsSerialModeRef = useRef(false);
