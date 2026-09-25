@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
+
 ## [0.12.1] - 2026-09-25
 
 ### Added
