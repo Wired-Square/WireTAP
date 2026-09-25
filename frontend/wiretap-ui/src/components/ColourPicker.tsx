@@ -16,7 +16,7 @@ export default function ColourPicker({ label, value, onChange }: ColourPickerPro
         type="color"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 w-12 cursor-pointer bg-transparent border border-default rounded"
+        className="h-8 w-12 rounded"
       />
       <span className={`text-xs font-mono ${textSecondary}`}>{value}</span>
     </label>

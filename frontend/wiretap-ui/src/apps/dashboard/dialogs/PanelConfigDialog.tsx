@@ -353,7 +353,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       onChange={(e) =>
                         updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
                       }
-                      className="h-7 w-10 cursor-pointer bg-transparent border border-default rounded shrink-0"
+                      className="h-7 w-10 rounded shrink-0"
                     />
                   )}
                   {/* Y-axis toggle (line-chart with 2+ signals) */}

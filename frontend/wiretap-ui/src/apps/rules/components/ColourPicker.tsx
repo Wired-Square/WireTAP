@@ -90,7 +90,7 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           type="color"
           value={rgbHex}
           onChange={handleColourInput}
-          className="h-9 w-9 cursor-pointer bg-transparent border border-default rounded-lg p-0"
+          className="h-9 w-9 rounded-lg"
           title="Pick colour"
         />
         {/* Dimmed preview swatch */}

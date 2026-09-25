@@ -407,6 +407,12 @@
     height: 5px;
   }
 
+  /* A swatch holding the page's own colour still needs an edge in both themes. */
+  input[type="color"] {
+    border: 1px solid var(--border-hover);
+    cursor: pointer;
+  }
+
   /* ---- Badges ------------------------------------------------------------
      .badge [.badge--outline] (tonal when none)
             [.badge--primary|--success|--danger|--warning|--purple|--cyan]
