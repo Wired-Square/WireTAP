@@ -33,7 +33,8 @@ interface TabBarProps {
   isRecorded?: boolean;
   onOpenRawBytesViewDialog: () => void;
   onOpenFramingDialog: () => void;
-  onOpenFilterDialog: () => void;
+  /** Omitted where the frames arrive framed and the reader applies its own minimum. */
+  onOpenFilterDialog?: () => void;
   /** Whether framing has been accepted - hides Raw Bytes tab when true */
   framingAccepted?: boolean;
   /** Whether the session emits raw bytes (from capabilities.data_streams) */
@@ -158,8 +159,8 @@ export default function TabBar({
         </Button>
       )}
 
-      {/* Filter button - only on framed tab (filtering applies to frames, not bytes) */}
-      {activeTab === 'framed' && (
+      {/* Filter button - only on framed tab, for client-side framing */}
+      {activeTab === 'framed' && onOpenFilterDialog && (
         <Button
           onClick={onOpenFilterDialog}
           tone="warning"

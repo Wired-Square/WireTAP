@@ -47,6 +47,8 @@ export interface UseBufferFrameViewOptions {
   /** When set, the hook auto-navigates to the page containing this timestamp during pagination mode.
    *  Used for play/play backward and stepping — the hook owns the page state so it handles navigation internally. */
   followTimeUs?: number | null;
+  /** Bump to refetch a capture refilled under the same id. */
+  revision?: number;
 }
 
 export interface UseBufferFrameViewResult {
@@ -132,6 +134,7 @@ export function useCaptureFrameView(
     isCapturePlayback = false,
     frozen = false,
     followTimeUs,
+    revision,
   } = options;
 
   const [frames, setFrames] = useState<FrameWithHex[]>([]);
@@ -275,7 +278,7 @@ export function useCaptureFrameView(
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [captureId, isStreaming, isCapturePlayback, tailSize, pollIntervalMs, onFrameCount]);
+  }, [captureId, isStreaming, isCapturePlayback, tailSize, pollIntervalMs, onFrameCount, revision]);
 
   // PAGINATION MODE: Fetch page when stopped or during buffer playback
   // The total the clamp reads, kept out of the effect's dependencies: refetching on
@@ -335,7 +338,7 @@ export function useCaptureFrameView(
       isMounted = false;
       unsubscribe?.();
     };
-  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selectedFrames, onFrameCount]);
+  }, [captureId, isStreaming, isCapturePlayback, anchorRow, pageSize, selectedFrames, onFrameCount, revision]);
 
   // Navigate to timestamp (for timeline scrub and step following)
   const navigateToTimestamp = useCallback(

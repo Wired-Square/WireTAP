@@ -2,12 +2,13 @@
 //
 // Display and configure framed serial data with ID/source/checksum extraction.
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDiscoveryStore, type FrameMessage } from '../../../../stores/discoveryStore';
+import { useDiscoveryStore } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
-import { getCaptureFramesPaginatedById, getCaptureMetadataById, findCaptureOffsetForTimestamp, type CaptureFrame } from '../../../../api/capture';
+import { useCaptureFrameView } from '../../hooks/useCaptureFrameView';
+import type { ProtocolFrames } from '../../../../utils/frameKey';
 import type { SerialFrameConfig } from '../../../../utils/frameExport';
 import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
 import {
@@ -27,7 +28,7 @@ import ByteExtractionDialog from './ByteExtractionDialog';
 import ChecksumExtractionDialog from './ChecksumExtractionDialog';
 import { configFromSerialChecksum, serialChecksumFromConfig } from './checksumConfig';
 import { bgSurface, borderDefault } from '../../../../styles';
-import { pageCount, pageForOffset, resolvePageSize } from "../../../../utils/pageSize";
+import { resolvePageSize } from "../../../../utils/pageSize";
 import type { TimeDisplayFormat } from "../../../../types/common";
 import { Button } from "../../../../components/Button";
 
@@ -182,8 +183,14 @@ function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplet
 // Framed Bytes View
 // ============================================================================
 
+/** Every frame in the capture: the Framed tab has no picker. */
+const ALL_FRAMES: ProtocolFrames[] = [];
+
 interface FramedDataViewProps {
-  frames: FrameMessage[];
+  /** The capture to page — client-side framing's derived one or the session's own (`framedSource`). */
+  captureId: string | null;
+  /** Owning session, so a live tail refetches as the reader's frames land. */
+  sessionId: string | null;
   onAccept: (serialConfig?: SerialFrameConfig) => void | Promise<unknown>;
   onApplyIdMapping: (config: ExtractionConfig) => void;
   onClearIdMapping?: () => void;
@@ -193,20 +200,9 @@ interface FramedDataViewProps {
   framingMode?: string;
   displayTimeFormat?: TimeDisplayFormat;
   isStreaming?: boolean;
-  /**
-   * The session's own frames capture, for a reader that frames for itself.
-   *
-   * Client-side framing derives a capture and puts its id in the serial store;
-   * a SLIP or Modbus RTU reader frames on the wire and writes straight into the
-   * session's capture, deriving nothing. Without this the tab counts frames it
-   * has no way to page.
-   */
-  sessionFramesCaptureId: string | null;
-  /** Frame count for `sessionFramesCaptureId`; drives the refetch while streaming. */
-  sessionFramesCount: number;
 }
 
-export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false, sessionFramesCaptureId, sessionFramesCount }: FramedDataViewProps) {
+export default function FramedDataView({ captureId, sessionId, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false }: FramedDataViewProps) {
   const { t } = useTranslation("discovery");
   // Column visibility from UI store (shared with CAN views and ByteView)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
@@ -217,33 +213,28 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
   const pageSizeSetting = useDiscoverySerialStore((s) => s.framedPageSize);
   const setPageSize = useDiscoverySerialStore((s) => s.setFramedPageSize);
   const [autoRows, setAutoRows] = useState<number | null>(null);
-
-  // Backend buffer ID and frame count (set when framing is applied in backend)
-  const framedCaptureId = useDiscoverySerialStore((s) => s.framedCaptureId);
-  const backendFrameCount = useDiscoverySerialStore((s) => s.backendFrameCount);
-  // Trigger to force refetch when framing is reapplied (even if buffer ID/count unchanged)
+  const pageSize = resolvePageSize(pageSizeSetting, autoRows);
+  // Re-framing refills the derived capture under the same id.
   const framedDataTrigger = useDiscoverySerialStore((s) => s.framedDataTrigger);
 
-  // Local pagination state
-  const [currentPage, setCurrentPage] = useState(0);
-
-  // Backend buffer state
-  const fetchInFlightRef = useRef(false);
-  const missedFetchRef = useRef(false);
-  const [backendFrames, setBackendFrames] = useState<FrameMessage[]>([]);
-  const [backendTimeRange, setBackendTimeRange] = useState<{ min: number; max: number } | null>(null);
-  const [isLoadingPage, setIsLoadingPage] = useState(false);
-
-  // Client-side framing pages its derived capture; otherwise the session's own,
-  // where a reader that frames on the wire puts its frames. One decision, so the
-  // id and the count cannot come from different sides.
-  const [pagedCaptureId, pagedFrameCount] =
-    framedCaptureId !== null
-      ? ([framedCaptureId, backendFrameCount] as const)
-      : ([sessionFramesCaptureId, sessionFramesCount] as const);
-
-  // Determine if we're using backend buffer mode
-  const useBackendBuffer = pagedCaptureId !== null;
+  const {
+    frames,
+    totalCount,
+    isLoading,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    timeRange: captureTimeRange,
+    navigateToTimestamp,
+  } = useCaptureFrameView({
+    captureId,
+    sessionId,
+    isStreaming,
+    selectedFrames: ALL_FRAMES,
+    pageSize,
+    tailSize: pageSize,
+    revision: framedDataTrigger,
+  });
 
   // Extraction configurations - read directly from serial store
   const idConfig = useDiscoverySerialStore((s) => s.frameIdExtractionConfig);
@@ -296,118 +287,11 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     }
   }, [serialConfig]);
 
-  // Fetch buffer metadata when backend buffer ID changes (for time range only)
-  useEffect(() => {
-    if (!pagedCaptureId) {
-      setBackendFrames([]);
-      setBackendTimeRange(null);
-      return;
-    }
-
-    const fetchMetadata = async () => {
-      try {
-        const metadata = await getCaptureMetadataById(pagedCaptureId);
-        if (metadata) {
-          if (metadata.start_time_us !== null && metadata.end_time_us !== null) {
-            setBackendTimeRange({ min: metadata.start_time_us, max: metadata.end_time_us });
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch buffer metadata:', error);
-      }
-    };
-
-    fetchMetadata();
-    setCurrentPage(0); // Reset to first page when buffer changes
-  }, [pagedCaptureId]);
-
-  // Filter to complete frames only (for prop-based frames)
-  const completeFrames = useMemo(() => {
-    if (useBackendBuffer) {
-      return backendFrames; // Backend frames are already filtered
-    }
-    return frames.filter(f => !f.incomplete);
-  }, [useBackendBuffer, backendFrames, frames]);
-
-  // Total frame count - use the paged capture's count for backend mode (updates during streaming)
-  const totalFrames = useBackendBuffer ? pagedFrameCount : completeFrames.length;
-
-  // The one resolved page size in this component — declared above the fetch effect so the
-  // effect closes over it rather than resolving a second time from its own arguments.
-  const effectivePageSize = resolvePageSize(pageSizeSetting, autoRows, totalFrames);
-
-  // Fetch frames from backend when page changes or frame count updates (backend buffer mode)
-  useEffect(() => {
-    // The null check belongs in the condition, with the size in the deps, so the fetch
-    // re-runs when the measurement lands — see docs/capture-flow.md § Auto rows-per-page.
-    if (!useBackendBuffer || !pagedCaptureId || pagedFrameCount === 0) return;
-    if (effectivePageSize === null) return;
-
-    // A tail fetch can outlast the 500ms frame-count signal on a large capture.
-    // Skip while one is in flight and run once more on completion, so fetches can
-    // neither queue up on the capture-store mutex nor land out of order and
-    // overwrite newer rows with older ones — the same guard `useCaptureFrameView`
-    // documents for the CAN tail, which this path now shares the cadence of.
-    if (fetchInFlightRef.current) {
-      missedFetchRef.current = true;
-      return;
-    }
-
-    const fetchPage = async () => {
-      fetchInFlightRef.current = true;
-      // The pagination toolbar is hidden while streaming, so a spinner there is
-      // two wasted renders per tick.
-      if (!isStreaming) setIsLoadingPage(true);
-      try {
-        // During streaming, always show the last page (latest frames)
-        const offset = isStreaming
-          ? Math.max(0, pagedFrameCount - effectivePageSize)
-          : currentPage * effectivePageSize;
-        // Fetch from the specific frames buffer by ID (not the active buffer)
-        const response = await getCaptureFramesPaginatedById(pagedCaptureId, offset, effectivePageSize);
-
-        // Convert CaptureFrame to FrameMessage
-        const fetchedFrames: FrameMessage[] = response.frames.map((f: CaptureFrame) => ({
-          protocol: f.protocol,
-          timestamp_us: f.timestamp_us,
-          frame_id: f.frame_id,
-          bus: f.bus,
-          dlc: f.dlc,
-          bytes: f.bytes,
-          is_extended: f.is_extended,
-          is_fd: f.is_fd,
-          source_address: f.source_address,
-          incomplete: false,
-        }));
-
-        setBackendFrames(fetchedFrames);
-      } catch (error) {
-        console.error('Failed to fetch frames from backend:', error);
-        setBackendFrames([]);
-      } finally {
-        fetchInFlightRef.current = false;
-        if (!isStreaming) setIsLoadingPage(false);
-        if (missedFetchRef.current) {
-          missedFetchRef.current = false;
-          fetchPage();
-        }
-      }
-    };
-
-    fetchPage();
-  }, [useBackendBuffer, pagedCaptureId, currentPage, effectivePageSize, pagedFrameCount, isStreaming, framedDataTrigger]);
-
-  // Check if any frame has source_address set
-  const hasSourceAddresses = useBackendBuffer
-    ? backendFrames.some(f => f.source_address !== undefined)
-    : frames.some(f => f.source_address !== undefined);
+  const hasSourceAddresses = frames.some(f => f.source_address !== undefined);
 
   // Sample frames for the byte-extraction dialogs, which only render 5 preview
   // rows — the current page is a fine source for that.
-  const sampleFrames = useMemo(() => {
-    const sourcFrames = useBackendBuffer ? backendFrames : completeFrames;
-    return sourcFrames.slice(0, 50).map(f => f.bytes);
-  }, [useBackendBuffer, backendFrames, completeFrames]);
+  const sampleFrames = useMemo(() => frames.slice(0, 50).map(f => f.bytes), [frames]);
 
   /**
    * Byte just past each declared header field. Hints for where the checksummed
@@ -421,64 +305,11 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     return boundaries;
   }, [idConfig, srcConfig]);
 
-  const totalPages = pageCount(totalFrames, effectivePageSize);
-
-  // Reset page when streaming starts or when frame count changes significantly
-  useEffect(() => {
-    if (isStreaming) {
-      setCurrentPage(0);
-    }
-  }, [isStreaming]);
-
-  // Clamp current page when total pages decreases
-  useEffect(() => {
-    if (currentPage >= totalPages) {
-      setCurrentPage(Math.max(0, totalPages - 1));
-    }
-  }, [currentPage, totalPages]);
-
-  // Time range for timeline scrubber
-  const timeRange = useMemo(() => {
-    if (useBackendBuffer) {
-      if (!backendTimeRange) return { min: 0, max: 0, current: 0 };
-      const current = backendFrames[0]?.timestamp_us ?? backendTimeRange.min;
-      return { min: backendTimeRange.min, max: backendTimeRange.max, current };
-    }
-    if (completeFrames.length === 0) return { min: 0, max: 0, current: 0 };
-    const min = completeFrames[0].timestamp_us;
-    const max = completeFrames[completeFrames.length - 1].timestamp_us;
-    const startIndex = currentPage * (effectivePageSize ?? 0);
-    const current = completeFrames[Math.min(startIndex, completeFrames.length - 1)]?.timestamp_us ?? min;
-    return { min, max, current };
-  }, [useBackendBuffer, backendTimeRange, backendFrames, completeFrames, currentPage, effectivePageSize]);
-
-  // Handle timeline scrub - find page containing the target time
-  const handleTimelineScrub = useCallback(async (targetTimeUs: number) => {
-    if (useBackendBuffer) {
-      // Use backend binary search to find offset
-      try {
-        const offset = await findCaptureOffsetForTimestamp(pagedCaptureId!, targetTimeUs, []);
-        setCurrentPage(pageForOffset(offset, effectivePageSize));
-      } catch (error) {
-        console.error('Failed to seek to timestamp:', error);
-      }
-      return;
-    }
-
-    if (completeFrames.length === 0) return;
-
-    // Linear scan to find frame at or just after target time
-    let targetIndex = 0;
-    for (let i = 0; i < completeFrames.length; i++) {
-      if (completeFrames[i].timestamp_us >= targetTimeUs) {
-        targetIndex = i;
-        break;
-      }
-      targetIndex = i; // Last frame if target is after all frames
-    }
-
-    setCurrentPage(pageForOffset(targetIndex, effectivePageSize));
-  }, [useBackendBuffer, completeFrames, effectivePageSize]);
+  const timeRange = {
+    min: captureTimeRange?.startUs ?? 0,
+    max: captureTimeRange?.endUs ?? 0,
+    current: frames[0]?.timestamp_us ?? captureTimeRange?.startUs ?? 0,
+  };
 
   const handleApplyIdConfig = (config: ExtractionConfig) => {
     onApplyIdMapping(config);
@@ -541,7 +372,6 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
         if (prevTimestampUs === null) return '0.000000s';
         return renderDeltaNode(timestampUs - prevTimestampUs);
       case 'delta-start':
-        // Use time range min for delta-start (works for both local and backend modes)
         if (timeRange.min === 0) return '0.000000s';
         return renderDeltaNode(timestampUs - timeRange.min);
       case 'timestamp':
@@ -552,34 +382,15 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     }
   }, [displayTimeFormat, timeRange.min]);
 
-  // Prepare frames for display with pagination
-  const displayFrames = useMemo(() => {
-    if (useBackendBuffer) {
-      // In backend buffer mode, frames are fetched paginated
-      return backendFrames;
-    }
-    // Auto fit not measured yet — the slices below would silently come back empty.
-    if (effectivePageSize === null) return [];
-    if (isStreaming) {
-      // During streaming, show latest frames (auto-scroll behavior)
-      const startIndex = Math.max(0, totalFrames - effectivePageSize);
-      return completeFrames.slice(startIndex);
-    }
-    // After streaming/accept, paginate normally
-    const startIndex = currentPage * effectivePageSize;
-    const endIndex = startIndex + effectivePageSize;
-    return completeFrames.slice(startIndex, endIndex);
-  }, [useBackendBuffer, backendFrames, completeFrames, isStreaming, totalFrames, effectivePageSize, currentPage]);
-
   // Apply ID and source extraction configs to frames for display
   // This is needed for streaming sessions where frames come directly from backend
   // without the extraction applied
   const processedFrames = useMemo(() => {
     if (!idConfig && !srcConfig) {
-      return displayFrames;
+      return frames;
     }
 
-    return displayFrames.map(frame => {
+    return frames.map(frame => {
       let newFrame = { ...frame };
 
       // Apply ID extraction if configured
@@ -624,7 +435,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
 
       return newFrame;
     });
-  }, [displayFrames, idConfig, srcConfig]);
+  }, [frames, idConfig, srcConfig]);
 
   // Custom byte renderer with extraction region coloring
   const renderColoredBytes = useCallback((frame: FrameRow) => {
@@ -642,7 +453,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Toolbar - hidden after accepting */}
-      {!accepted && (totalFrames > 0 || useBackendBuffer) && (
+      {!accepted && captureId !== null && (
         <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDefault} ${bgSurface} flex items-center gap-3`}>
           {/* Extraction Badges */}
           <ExtractionBadge
@@ -677,7 +488,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
       )}
 
       {/* Pagination Toolbar - shown after accepting, when not streaming */}
-      {accepted && !isStreaming && totalFrames > 0 && (
+      {accepted && !isStreaming && totalCount > 0 && (
         <PaginationToolbar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -689,17 +500,17 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
             setPageSize(size);
             setCurrentPage(0);
           }}
-          isLoading={isLoadingPage}
+          isLoading={isLoading}
         />
       )}
 
       {/* Timeline Scrubber - shown after accepting, when not streaming, with multiple frames */}
       <TimelineSection
-        show={accepted && !isStreaming && totalFrames > 1}
+        show={accepted && !isStreaming && totalCount > 1}
         minTimeUs={timeRange.min}
         maxTimeUs={timeRange.max}
         currentTimeUs={timeRange.current}
-        onPositionChange={handleTimelineScrub}
+        onPositionChange={navigateToTimestamp}
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={timeRange.min}
       />
@@ -712,7 +523,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
         showSourceAddress={hasSourceAddresses}
         sourceByteCount={srcConfig?.numBytes ?? 2}
         renderBytes={renderColoredBytes}
-        emptyMessage={isLoadingPage ? t("serial.loadingFrames") : accepted ? t("serial.framingAccepted") : t("serial.applyFramingHint")}
+        emptyMessage={isLoading ? t("serial.loadingFrames") : accepted ? t("serial.framingAccepted") : t("serial.applyFramingHint")}
         showAscii={showAsciiColumn}
         showBus={showBusColumn}
         autoFit={pageSizeSetting === "auto"}
@@ -754,8 +565,8 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
         isOpen={showChecksumDialog}
         onClose={() => setShowChecksumDialog(false)}
         sampleFrames={sampleFrames}
-        captureId={pagedCaptureId}
-        captureFrameCount={pagedFrameCount}
+        captureId={captureId}
+        captureFrameCount={totalCount}
         initialConfig={checksumConfig}
         headerBoundaries={headerBoundaries}
         onApply={handleApplyChecksumConfig}

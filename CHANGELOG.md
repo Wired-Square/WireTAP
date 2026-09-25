@@ -10,6 +10,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Discovery's serial view agrees with itself on a port that frames its own traffic.** On a SLIP or Modbus RTU serial source, the Framed tab's count now matches the frames it pages rather than the smaller number held in memory. The minimum frame length filter and the Filtered tab no longer appear there, because they never applied to it: set a minimum length under Filter in the source picker when you open the port instead.
 - **Dark theme reaches the controls the system draws.** On Windows, scrollbars, number steppers, colour pickers and dropdown lists now draw dark in the dark theme, and a colour picker shows its swatch without the grey frame, with an outline that stays visible whatever colour it holds.
 - **A panel that joins a session knows its source.** Query no longer stays greyed out after joining a WireTAP Backend session, and jumping to an event from a panel that joined one now re-windows the archive instead of failing.
 - **A Modbus scan that is still connecting reads as scanning.** Polling a sweep's progress over MCP reported it complete, with no progress, for the whole of its connect phase — over a minute against an unreachable device. It now reports scanning until the session stops, complete only after, and error if it failed.

@@ -1135,6 +1135,7 @@ function DiscoveryInner() {
             // which a frame pager must not be handed.
             sessionFramesCaptureId={captureKind === "bytes" ? null : activeCaptureId}
             sessionFramesCount={liveFrameCount}
+            sessionId={sessionId}
             bytesCaptureId={sessionBytesCaptureId}
             byteCount={watchByteCount}
           />

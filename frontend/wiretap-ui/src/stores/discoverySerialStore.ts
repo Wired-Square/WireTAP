@@ -56,6 +56,30 @@ export type ByteExtractionConfig = {
   endianness: 'big' | 'little';
 };
 
+/** The capture the Framed tab reads, the frames in it, and who framed them. */
+export type FramedSource = {
+  captureId: string | null;
+  frameCount: number;
+  /** Framed on the wire by the reader (SLIP, Modbus RTU), so the client-side filter has nothing to filter. */
+  readerFramed: boolean;
+};
+
+/**
+ * Client-side framing's derived capture when there is one, else the session's
+ * own frame capture. One decision, so the id and the count cannot come from
+ * different sides.
+ */
+export function framedSource(
+  derived: { framedCaptureId: string | null; backendFrameCount: number },
+  session: { captureId: string | null; frameCount: number },
+): FramedSource {
+  if (derived.framedCaptureId !== null) {
+    return { captureId: derived.framedCaptureId, frameCount: derived.backendFrameCount, readerFramed: false };
+  }
+  const readerFramed = session.captureId !== null;
+  return { captureId: session.captureId, frameCount: readerFramed ? session.frameCount : 0, readerFramed };
+}
+
 /** Serial view tab IDs (string to support dynamic tool output tabs) */
 export type SerialTabId = string;
 
