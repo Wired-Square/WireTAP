@@ -78,7 +78,8 @@ export function computeAutoRows(m: {
  * A changed row count is necessary but not sufficient: a container sitting exactly on a
  * row boundary would otherwise flip back and forth on sub-pixel noise, and each flip is
  * a backend refetch. Requiring the usable height to have moved by half a row makes the
- * change unambiguous.
+ * change unambiguous. A new row height is never noise — it is how the first real row
+ * replaces the assumed one.
  */
 export function shouldCommit(
   next: number,
@@ -86,9 +87,10 @@ export function shouldCommit(
   usablePx: number,
   committedUsablePx: number,
   rowHeight: number,
+  committedRowHeight: number,
 ): boolean {
   if (next === committed) return false;
-  if (committed === null) return true; // first measurement
+  if (committed === null || rowHeight !== committedRowHeight) return true;
   return Math.abs(usablePx - committedUsablePx) >= Math.max(8, rowHeight / 2);
 }
 
@@ -165,7 +167,7 @@ export function useAutoRowCount({
     const next = computeAutoRows({ availPx, headerPx, reservedPx, rowHeight, minRows, maxRows });
     if (next === 0) return;
 
-    const commit = shouldCommit(next, committed.rows, usablePx, committed.usablePx, rowHeight);
+    const commit = shouldCommit(next, committed.rows, usablePx, committed.usablePx, rowHeight, committed.rowHeight);
     committedRef.current = { rows: commit ? next : committed.rows, usablePx, rowHeight, isMeasured };
 
     // Bail out of the update when nothing a consumer can see has changed.

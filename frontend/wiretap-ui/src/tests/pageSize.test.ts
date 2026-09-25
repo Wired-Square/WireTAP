@@ -108,20 +108,26 @@ describe("computeAutoRows", () => {
 
 describe("shouldCommit", () => {
   it("commits the first measurement", () => {
-    expect(shouldCommit(30, null, 739, 0, 24)).toBe(true);
+    expect(shouldCommit(30, null, 739, 0, 24, 24)).toBe(true);
   });
 
   it("ignores a recomputation that lands on the same count", () => {
-    expect(shouldCommit(30, 30, 739, 735, 24)).toBe(false);
+    expect(shouldCommit(30, 30, 739, 735, 24, 24)).toBe(false);
   });
 
   it("holds a count change that is within half a row of noise", () => {
     // Container resting on a row boundary: without this, sub-pixel drift flips the count
     // back and forth, and every flip is a refetch.
-    expect(shouldCommit(31, 30, 745, 739, 24)).toBe(false);
+    expect(shouldCommit(31, 30, 745, 739, 24, 24)).toBe(false);
   });
 
   it("commits once the height has genuinely moved", () => {
-    expect(shouldCommit(34, 30, 835, 739, 24)).toBe(true);
+    expect(shouldCommit(34, 30, 835, 739, 24, 24)).toBe(true);
+  });
+
+  it("commits the fit from the first real row over the assumed height", () => {
+    // Nothing above the rows changes size when they land, so the height gate alone
+    // left the fallback's count standing with empty space below it.
+    expect(shouldCommit(31, 26, 624, 624, 20, 24)).toBe(true);
   });
 });
