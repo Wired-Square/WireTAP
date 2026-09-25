@@ -26,7 +26,8 @@ use tokio_modbus::prelude::*;
 use super::poll::{run_poll_task, FrameSink};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
-    emit_device_connected, emit_stream_ended, IOCapabilities, IOSource, IOState, Protocol,
+    emit_device_connected, emit_stream_ended, lifecycle::SourceLifecycle, IOCapabilities, IOSource,
+    IOState, Protocol,
 };
 
 // ============================================================================
@@ -128,6 +129,7 @@ pub struct ModbusTcpSource {
     cancel_flag: Arc<AtomicBool>,
     pause_flag: Arc<AtomicBool>,
     task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
+    lifecycle: SourceLifecycle,
 }
 
 impl ModbusTcpSource {
@@ -141,6 +143,7 @@ impl ModbusTcpSource {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             pause_flag: Arc::new(AtomicBool::new(false)),
             task_handles: Vec::new(),
+            lifecycle: SourceLifecycle::new(),
         }
     }
 }
@@ -206,7 +209,9 @@ impl IOSource for ModbusTcpSource {
             self.config.polls.len()
         );
 
-        // Spawn one poll task per group
+        // Shared by every poll task, so the source reads stopped once the last
+        // group has given up on its register errors.
+        let ended = Arc::new(self.lifecycle.guard(IOState::Stopped));
         for poll in &self.config.polls {
             let poll = poll.clone();
             let ctx = ctx.clone();
@@ -214,7 +219,9 @@ impl IOSource for ModbusTcpSource {
             let pause = self.pause_flag.clone();
             let max_register_errors = self.config.max_register_errors;
             let session_id = self.session_id.clone();
+            let ended = ended.clone();
             let handle = tauri::async_runtime::spawn(async move {
+                let _ended = ended;
                 run_poll_task(
                     poll,
                     ctx,
@@ -281,7 +288,7 @@ impl IOSource for ModbusTcpSource {
     }
 
     fn state(&self) -> IOState {
-        self.state.clone()
+        self.lifecycle.state_or(&self.state)
     }
 
     fn session_id(&self) -> &str {

@@ -21,6 +21,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::{interval, Duration};
 
 use crate::capture_store::{self, CaptureKind, TimestampedByte};
+use crate::io::lifecycle::{SourceLifecycle, SourceLifecycleGuard};
 use crate::io::{
     emit_device_connected, emit_stream_ended, now_us, signal_bytes_ready, signal_frames_ready,
     CanTransmitFrame, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle,
@@ -107,7 +108,6 @@ enum LoopbackMessage {
 
 /// Virtual source — emits synthetic frames/bytes and optionally echoes transmits
 pub struct VirtualSource {
-    app: AppHandle,
     session_id: String,
     config: VirtualDeviceConfig,
     state: IOState,
@@ -119,10 +119,11 @@ pub struct VirtualSource {
     task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
     /// Sender into the loopback task (None if loopback is disabled)
     loopback_tx: std::sync::Mutex<Option<UnboundedSender<LoopbackMessage>>>,
+    lifecycle: SourceLifecycle,
 }
 
 impl VirtualSource {
-    pub fn new(app: AppHandle, session_id: String, config: VirtualDeviceConfig) -> Self {
+    pub fn new(_app: AppHandle, session_id: String, config: VirtualDeviceConfig) -> Self {
         let bus_traffic_flags: Vec<Arc<AtomicBool>> = config
             .interfaces
             .iter()
@@ -137,7 +138,6 @@ impl VirtualSource {
             })
             .collect();
         Self {
-            app,
             session_id,
             config,
             state: IOState::Stopped,
@@ -146,6 +146,7 @@ impl VirtualSource {
             bus_cadence_intervals,
             task_handles: Vec::new(),
             loopback_tx: std::sync::Mutex::new(None),
+            lifecycle: SourceLifecycle::new(),
         }
     }
 }
@@ -249,18 +250,18 @@ impl IOSource for VirtualSource {
             iface_summary.join(", ")
         );
 
-        // Spawn one generator task per bus interface
+        let ended = Arc::new(self.lifecycle.guard(IOState::Stopped));
         for (idx, iface) in self.config.interfaces.iter().enumerate() {
             let traffic_flag = self.bus_traffic_flags[idx].clone();
             let cadence_interval = self.bus_cadence_intervals[idx].clone();
             let handle = spawn_bus_generator(
-                self.app.clone(),
                 self.session_id.clone(),
                 self.config.traffic_type.clone(),
                 iface.clone(),
                 self.cancel_flag.clone(),
                 traffic_flag,
                 cadence_interval,
+                ended.clone(),
             );
             self.task_handles.push(handle);
         }
@@ -268,11 +269,11 @@ impl IOSource for VirtualSource {
         // Spawn loopback task if enabled
         if let Some(rx) = loopback_rx {
             let handle = spawn_loopback_handler(
-                self.app.clone(),
                 self.session_id.clone(),
                 self.config.traffic_type.clone(),
                 self.cancel_flag.clone(),
                 rx,
+                ended,
             );
             self.task_handles.push(handle);
         }
@@ -399,7 +400,7 @@ impl IOSource for VirtualSource {
     }
 
     fn state(&self) -> IOState {
-        self.state.clone()
+        self.lifecycle.state_or(&self.state)
     }
 
     fn session_id(&self) -> &str {
@@ -436,15 +437,16 @@ pub fn canfd_patterns() -> Vec<(u32, Vec<u8>)> {
 
 /// Spawn a background task that generates traffic for a single bus interface
 fn spawn_bus_generator(
-    _app: AppHandle,
     session_id: String,
     traffic_type: VirtualTrafficType,
     iface: VirtualInterfaceConfig,
     cancel_flag: Arc<AtomicBool>,
     traffic_enabled: Arc<AtomicBool>,
     cadence_interval_us: Arc<AtomicU64>,
+    ended: Arc<SourceLifecycleGuard>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
+        let _ended = ended;
         let hz = iface.frame_rate_hz.clamp(0.1, 1000.0);
         let mut current_interval_us = (1_000_000.0 / hz) as u64;
         let mut ticker = interval(Duration::from_micros(current_interval_us));
@@ -605,13 +607,14 @@ fn spawn_bus_generator(
 
 /// Spawn a task that handles loopback: echoes transmitted frames/bytes back as received
 fn spawn_loopback_handler(
-    _app: AppHandle,
     session_id: String,
     traffic_type: VirtualTrafficType,
     cancel_flag: Arc<AtomicBool>,
     mut loopback_rx: tokio::sync::mpsc::UnboundedReceiver<LoopbackMessage>,
+    ended: Arc<SourceLifecycleGuard>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
+        let _ended = ended;
         let mut throttle = SignalThrottle::new();
         loop {
             if cancel_flag.load(Ordering::Relaxed) {
