@@ -34,9 +34,10 @@ textarea:focus-visible,
   outline-offset: -1px;
 }
 
-/* A dialog takes focus on open so Escape and Tab land inside it; the frame
-   itself is not a control and draws no ring. */
-.dialog:focus-visible {
+/* A dialog takes focus on open so Escape and Tab land inside it, and a menu
+   so its arrow keys work; the frame itself is not a control and draws no ring. */
+.dialog:focus-visible,
+.menu:focus-visible {
   outline: none;
 }
 
