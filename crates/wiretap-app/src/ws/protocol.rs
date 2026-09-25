@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-pub const PROTOCOL_VERSION: u8 = 1;
+pub const PROTOCOL_VERSION: u8 = 2;
 pub const HEADER_SIZE: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,12 +191,12 @@ impl TryFrom<u16> for FrameType {
 }
 
 // ============================================================================
-// Frame Envelope  (12-byte header + data)
+// Frame Envelope  (15-byte header + data)
 //
-// Layout: [timestamp_us: u64 LE][bus: u8][type: u16 LE][len: u8][data: len bytes]
+// Layout: [timestamp_us: u64 LE][bus: u8][type: u16 LE][len: u32 LE][data: len bytes]
 // ============================================================================
 
-pub const ENVELOPE_HEADER_SIZE: usize = 12;
+pub const ENVELOPE_HEADER_SIZE: usize = 15;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct FrameEnvelope {
@@ -212,7 +212,7 @@ impl FrameEnvelope {
         out.extend_from_slice(&self.timestamp_us.to_le_bytes());
         out.push(self.bus);
         out.extend_from_slice(&(self.frame_type as u16).to_le_bytes());
-        out.push(self.data.len() as u8);
+        out.extend_from_slice(&(self.data.len() as u32).to_le_bytes());
         out.extend_from_slice(&self.data);
         out
     }
@@ -230,7 +230,7 @@ impl FrameEnvelope {
         let timestamp_us = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
         let bus          = bytes[8];
         let frame_type   = FrameType::try_from(u16::from_le_bytes(bytes[9..11].try_into().unwrap()))?;
-        let len          = bytes[11] as usize;
+        let len          = u32::from_le_bytes(bytes[11..15].try_into().unwrap()) as usize;
 
         let total = ENVELOPE_HEADER_SIZE + len;
         if bytes.len() < total {
@@ -673,7 +673,7 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         out.extend_from_slice(&frame.timestamp_us.to_le_bytes());
         out.push(frame.bus);
         out.extend_from_slice(&(frame_type as u16).to_le_bytes());
-        out.push(data_len as u8);
+        out.extend_from_slice(&(data_len as u32).to_le_bytes());
         if let Some(p) = prefix {
             out.extend_from_slice(&p.to_le_bytes());
         }
@@ -978,11 +978,8 @@ mod tests {
 
     #[test]
     fn envelope_decode_insufficient_body_returns_error() {
-        // Valid 12-byte header claiming 10 bytes of data, but buffer ends there
         let mut buf = vec![0u8; ENVELOPE_HEADER_SIZE];
-        // timestamp = 0, bus = 0
-        buf[9]  = 0x01; // frame_type low byte = Can
-        buf[10] = 0x00; // frame_type high byte
+        buf[9]  = 0x01; // frame_type = Can
         buf[11] = 10;   // len = 10, but no body follows
         let result = FrameEnvelope::decode(&buf);
         assert_eq!(result, Err(ProtocolError::InsufficientData { needed: ENVELOPE_HEADER_SIZE + 10, available: ENVELOPE_HEADER_SIZE }));
@@ -1113,6 +1110,26 @@ mod tests {
         assert_eq!(env.bus, 2);
         assert_eq!(u32::from_le_bytes(env.data[..4].try_into().unwrap()), 0x0265);
         assert_eq!(&env.data[4..], &raw[..]);
+    }
+
+    #[test]
+    fn batch_carries_a_message_longer_than_a_byte_can_count() {
+        let rtu: Vec<u8> = (0..300).map(|i| i as u8).collect();
+        let serial = vec![0x5A; 300];
+        let batch = encode_frame_batch(&[
+            make_frame_message("modbus_rtu", false, 0x0110, 1, rtu.clone(), None),
+            make_frame_message("serial", false, 0, 0, serial.clone(), None),
+            make_frame_message("can", false, 0x123, 0, vec![0xAA], None),
+        ]);
+
+        let (e1, n1) = FrameEnvelope::decode(&batch).unwrap();
+        let (e2, n2) = FrameEnvelope::decode(&batch[n1..]).unwrap();
+        let (e3, n3) = FrameEnvelope::decode(&batch[n1 + n2..]).unwrap();
+
+        assert_eq!(&e1.data[4..], &rtu[..]);
+        assert_eq!(e2.data, serial);
+        assert_eq!(CanFrame::decode(&e3.data).unwrap().id, 0x123);
+        assert_eq!(n1 + n2 + n3, batch.len());
     }
 
     #[test]

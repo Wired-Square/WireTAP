@@ -11,7 +11,8 @@ import { trackAlloc } from "./memoryDiag";
 // Constants
 // ============================================================================
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+export const ENVELOPE_HEADER_SIZE = 15;
 export const HEADER_SIZE = 4;
 
 export const MsgType = {
@@ -135,11 +136,11 @@ export function encodeHeartbeat(): ArrayBuffer {
 /**
  * Decode a FrameData batch message.
  *
- * Each frame envelope is 12 bytes:
- *   [0..8)  timestamp_us  u64 LE
- *   [8]     bus           u8
- *   [9..11) frame_type    u16 LE
- *   [11]    len           u8   (total data bytes, including id_flags for CAN)
+ * Each frame envelope is 15 bytes:
+ *   [0..8)   timestamp_us  u64 LE
+ *   [8]      bus           u8
+ *   [9..11)  frame_type    u16 LE
+ *   [11..15) len           u32 LE (total data bytes, including id_flags for CAN)
  *
  * timestamp_us is u64 but Number is safe up to 2^53 (~285 years of microseconds).
  */
@@ -152,13 +153,13 @@ export function decodeFrameBatch(
   let offset = headerOffset;
 
   while (offset < buf.byteLength) {
-    if (offset + 12 > buf.byteLength) break;
+    if (offset + ENVELOPE_HEADER_SIZE > buf.byteLength) break;
 
     const timestamp_us = Number(view.getBigUint64(offset, true));
     const bus = view.getUint8(offset + 8);
     const frameType = view.getUint16(offset + 9, true);
-    const len = view.getUint8(offset + 11);
-    offset += 12;
+    const len = view.getUint32(offset + 11, true);
+    offset += ENVELOPE_HEADER_SIZE;
 
     if (offset + len > buf.byteLength) break;
 

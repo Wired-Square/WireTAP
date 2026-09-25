@@ -7,20 +7,31 @@
 // in ws/protocol.rs.
 
 import { describe, it, expect } from "vitest";
-import { decodeFrameBatch, FrameType } from "../services/wsProtocol";
+import { decodeFrameBatch, ENVELOPE_HEADER_SIZE, FrameType } from "../services/wsProtocol";
 import { formatModbusRtuId, formatProtocolFrameId, splitModbusRtuId } from "../utils/frameIds";
 
-/** Mirrors `encode_frame_batch` in crates/wiretap-app/src/ws/protocol.rs for one prefixed frame. */
-function envelope(frameType: number, bus: number, prefix: number, payload: number[]): ArrayBuffer {
-  const buf = new ArrayBuffer(12 + 4 + payload.length);
+/** Mirrors `encode_frame_batch` in crates/wiretap-app/src/ws/protocol.rs; a null prefix is a serial frame. */
+function envelope(frameType: number, bus: number, prefix: number | null, payload: number[]): ArrayBuffer {
+  const prefixLen = prefix === null ? 0 : 4;
+  const buf = new ArrayBuffer(ENVELOPE_HEADER_SIZE + prefixLen + payload.length);
   const view = new DataView(buf);
   view.setBigUint64(0, 1_789_162_108_768_476n, true);
   view.setUint8(8, bus);
   view.setUint16(9, frameType, true);
-  view.setUint8(11, 4 + payload.length);
-  view.setUint32(12, prefix, true);
-  new Uint8Array(buf).set(payload, 16);
+  view.setUint32(11, prefixLen + payload.length, true);
+  if (prefix !== null) view.setUint32(ENVELOPE_HEADER_SIZE, prefix, true);
+  new Uint8Array(buf).set(payload, ENVELOPE_HEADER_SIZE + prefixLen);
   return buf;
+}
+
+function batch(...envelopes: ArrayBuffer[]): ArrayBuffer {
+  const out = new Uint8Array(envelopes.reduce((n, e) => n + e.byteLength, 0));
+  let offset = 0;
+  for (const e of envelopes) {
+    out.set(new Uint8Array(e), offset);
+    offset += e.byteLength;
+  }
+  return out.buffer;
 }
 
 describe("Modbus RTU archive rows", () => {
@@ -38,6 +49,25 @@ describe("Modbus RTU archive rows", () => {
     const [frame] = decodeFrameBatch(envelope(FrameType.Modbus, 0, 5013, [0x00, 0x2a]), 0);
     expect(frame.protocol).toBe("modbus");
     expect(frame.frame_id).toBe(5013);
+  });
+
+  it("carry a message longer than a byte can count without corrupting the rest of the batch", () => {
+    const rtu = Array.from({ length: 300 }, (_, i) => i & 0xff);
+    const serial = new Array(300).fill(0x5a);
+    const frames = decodeFrameBatch(
+      batch(
+        envelope(FrameType.ModbusRtu, 1, 0x0110, rtu),
+        envelope(FrameType.Serial, 0, null, serial),
+        envelope(FrameType.Can, 0, 0x123, [0xaa]),
+      ),
+      0,
+    );
+    expect(frames.map((f) => f.protocol)).toEqual(["modbus_rtu", "serial", "can"]);
+    expect(frames[0].bytes).toEqual(rtu);
+    expect(frames[0].dlc).toBe(300);
+    expect(frames[1].bytes).toEqual(serial);
+    expect(frames[2].frame_id).toBe(0x123);
+    expect(frames[2].bytes).toEqual([0xaa]);
   });
 
   it("read as unit/function, not as a CAN id", () => {

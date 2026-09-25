@@ -1675,8 +1675,8 @@ without the subscribe push a session opened on one reported zero forever.
 
 **Only the count crosses the wire.** One small message twice a second, whatever
 the baud rate; the rows are read from the capture on demand. Streaming the bytes
-themselves would tie WS traffic to link speed (a `FrameEnvelope` caps at 255
-bytes of payload behind a 12-byte header) and would keep a second copy of data
+themselves would tie WS traffic to link speed (a `FrameEnvelope` puts a
+15-byte header on every chunk) and would keep a second copy of data
 the capture already holds durably. This is the same "capture is the display
 source" contract the frames table follows — see
 [capture-flow.md § The capture is the display source](capture-flow.md#the-capture-is-the-display-source).

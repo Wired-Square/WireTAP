@@ -15,6 +15,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Modbus scan that is still connecting reads as scanning.** Polling a sweep's progress over MCP reported it complete, with no progress, for the whole of its connect phase — over a minute against an unreachable device. It now reports scanning until the session stops, complete only after, and error if it failed.
 - **FrameLink user-signal names show everywhere.** The names you gave a device's user signals now appear in its frame definition, generator and transformer lists and its signal readouts, not only in the signal picker. They come from the board definition stored on the device, falling back to the built-in one when it has none.
 - **A Modbus TCP or Virtual Device session that has died says so.** A Modbus TCP session whose every poll group has given up on register errors, or a Virtual Device whose tasks have ended, now reads as stopped rather than running.
+- **Long serial and Modbus RTU messages arrive intact.** A message over 251 bytes used to corrupt its own length on the way to the window, so it arrived truncated and every frame after it in the same batch came through as garbage. Messages of any length now arrive whole.
 
 ## [0.12.0] - 2026-09-20
 
