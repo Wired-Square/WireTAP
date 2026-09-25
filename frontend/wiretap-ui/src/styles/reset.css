@@ -165,6 +165,15 @@
     height: auto;
   }
 
+  ::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  ::-webkit-color-swatch {
+    border: 0;
+    border-radius: inherit;
+  }
+
   [hidden]:where(:not([hidden="until-found"])) {
     display: none !important;
   }

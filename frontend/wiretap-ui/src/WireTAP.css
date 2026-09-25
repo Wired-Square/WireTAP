@@ -179,6 +179,7 @@ html, body {
 
   color: var(--text-primary);
   background-color: var(--bg-primary);
+  color-scheme: light;
 
   -webkit-text-size-adjust: 100%;
 
@@ -259,6 +260,8 @@ html, body {
 }
 
 .dark {
+  color-scheme: dark;
+
   --bg-primary: #0f172a;
   --bg-surface: #1e293b;
   --bg-tertiary: #475569;
