@@ -16,6 +16,7 @@ All notable changes to WireTAP will be documented in this file.
 - **FrameLink user-signal names show everywhere.** The names you gave a device's user signals now appear in its frame definition, generator and transformer lists and its signal readouts, not only in the signal picker. They come from the board definition stored on the device, falling back to the built-in one when it has none.
 - **A Modbus TCP or Virtual Device session that has died says so.** A Modbus TCP session whose every poll group has given up on register errors, or a Virtual Device whose tasks have ended, now reads as stopped rather than running.
 - **Long serial and Modbus RTU messages arrive intact.** A message over 251 bytes used to corrupt its own length on the way to the window, so it arrived truncated and every frame after it in the same batch came through as garbage. Messages of any length now arrive whole.
+- **Changing a live session's framing updates its byte stream too.** Picking a serial catalogue mid-stream switches the source's framing in place; the session now also reports and captures the raw bytes that keep flowing afterwards, where before a session that started framed without raw bytes dropped them.
 
 ## [0.12.0] - 2026-09-20
 

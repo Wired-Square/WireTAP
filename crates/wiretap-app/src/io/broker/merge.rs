@@ -83,7 +83,6 @@ pub(super) async fn run_merge_task(
     app: AppHandle,
     session_id: String,
     sources: Vec<SourceConfig>,
-    _emits_raw_bytes: bool,
     _bytes_capture_id: Option<String>,
     stop_flag: Arc<AtomicBool>,
     _pause_flag: Arc<AtomicBool>,

@@ -110,9 +110,9 @@ pub struct IOBroker {
     transmit_channels: TransmitChannels,
     /// Control channels by source index for live framing changes (serial only)
     control_channels: ControlChannels,
-    /// Live framing-encoding overrides by source index (set via `set_framing`),
-    /// consulted by `combined_capabilities` so `rx_frames` reflects the change.
-    framing_overrides: Arc<Mutex<HashMap<usize, String>>>,
+    /// Live framing changes by source index (set via `set_framing`), which
+    /// `data_streams` reads over the static config.
+    framing_overrides: Arc<Mutex<HashMap<usize, SetFramingRequest>>>,
     /// Bus mappings a source revised for itself once connected, by source index.
     ///
     /// The mappings in `sources` are a pre-connect guess read off the profile.
@@ -133,8 +133,6 @@ pub struct IOBroker {
     source_pause_flags: SourcePauseFlags,
     /// Derived session traits from all interfaces
     session_traits: InterfaceTraits,
-    /// Whether this session emits raw bytes (for serial sources without framing)
-    emits_raw_bytes: bool,
     /// Per-bus signal generator controls for virtual sources (populated on start)
     virtual_bus_controls: VirtualBusControls,
     /// Command channel to the merge task for hot source add/remove
@@ -156,6 +154,36 @@ pub struct IOBroker {
     /// at registration is the only thing left to tell it — and
     /// `endpoint_in_use_by_poller` reads it to decide whether a sweep may run.
     lifecycle: SourceLifecycle,
+}
+
+/// What `sources` emit: a non-serial source always frames; a serial source
+/// frames once it has framing and streams bytes when asked to. A live
+/// `set_framing` replaces a source's config for both.
+///
+/// `sessions::apply_serial_overrides` settles both serial fields against the
+/// profile before the config reaches us, so this reads the answer rather than
+/// restating the rule.
+fn data_streams(
+    sources: &[SourceConfig],
+    live: &HashMap<usize, SetFramingRequest>,
+) -> SessionDataStreams {
+    let mut streams = SessionDataStreams { rx_frames: false, rx_bytes: false };
+    for (idx, source) in sources.iter().enumerate() {
+        if source.profile_kind != "serial" {
+            streams.rx_frames = true;
+            continue;
+        }
+        let (framing, raw_bytes) = match live.get(&idx) {
+            Some(req) => (req.encoding.as_str(), req.emit_raw_bytes),
+            None => (
+                source.serial.framing_encoding.as_deref().unwrap_or("raw"),
+                source.serial.emit_raw_bytes.unwrap_or(false),
+            ),
+        };
+        streams.rx_frames |= framing != "raw";
+        streams.rx_bytes |= raw_bytes;
+    }
+    streams
 }
 
 impl IOBroker {
@@ -183,8 +211,8 @@ impl IOBroker {
     }
 
     /// Change serial framing on every serial source in place (no reconnect).
-    /// Records the new encoding so `combined_capabilities` reflects `rx_frames`,
-    /// then signals each serial reader to swap its framer.
+    /// Records the request so `data_streams` reflects it, then signals each
+    /// serial reader to swap its framer.
     pub fn set_framing(&self, req: SetFramingRequest) -> Result<(), String> {
         {
             let channels = self
@@ -199,7 +227,7 @@ impl IOBroker {
                 .lock()
                 .map_err(|e| format!("Failed to lock framing overrides: {}", e))?;
             for (idx, sender) in channels.iter() {
-                overrides.insert(*idx, req.encoding.clone());
+                overrides.insert(*idx, req.clone());
                 let _ = sender.try_send(req.clone());
             }
         }
@@ -222,6 +250,16 @@ impl IOBroker {
                 "[IOBroker] Created frame capture {} for session {} after live framing change",
                 capture_id, self.session_id
             );
+        }
+        if req.emit_raw_bytes
+            && capture_store::get_session_bytes_capture_id(&self.session_id).is_none()
+        {
+            capture_store::create_session_capture_inactive(
+                &self.session_id,
+                CaptureKind::Bytes,
+                self.session_id.clone(),
+            );
+            emit_capture_changed(&self.session_id);
         }
         Ok(())
     }
@@ -271,15 +309,6 @@ impl IOBroker {
 
         let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
 
-        // `sessions::apply_serial_overrides` settles both serial fields against
-        // the profile before the config reaches us, so this reads the answer
-        // rather than restating the rule. It used to derive it from
-        // `framing_encoding`, which single-source sessions left absent — read as
-        // "raw", so a framed device got a bytes capture nothing wrote to.
-        let emits_raw_bytes = sources
-            .iter()
-            .any(|s| s.profile_kind == "serial" && s.serial.emit_raw_bytes.unwrap_or(false));
-
         Ok(Self {
             app,
             session_id,
@@ -296,7 +325,6 @@ impl IOBroker {
             resolved_mappings: Arc::new(Mutex::new(HashMap::new())),
             source_pause_flags: Arc::new(Mutex::new(HashMap::new())),
             session_traits,
-            emits_raw_bytes,
             virtual_bus_controls: Arc::new(Mutex::new(HashMap::new())),
             merge_cmd_tx: Arc::new(Mutex::new(None)),
             virtual_cmd_txs: Arc::new(Mutex::new(HashMap::new())),
@@ -412,24 +440,11 @@ impl IOBroker {
             .unwrap_or_else(|| self.session_traits.clone())
     }
 
-    /// Whether this session produces framed messages: any non-serial source
-    /// does, and a serial source does once it has framing.
-    ///
-    /// Honours a live `set_framing` override over the static config. Both the
-    /// capability and the decision to create a frames capture in `start()` read
-    /// this — they were two copies of the rule, and only one of them knew about
-    /// overrides.
-    fn emits_frames(&self) -> bool {
-        let overrides = self.framing_overrides.lock().ok();
-        self.sources.iter().enumerate().any(|(idx, s)| {
-            let framing = overrides
-                .as_ref()
-                .and_then(|o| o.get(&idx))
-                .map(String::as_str)
-                .or(s.serial.framing_encoding.as_deref())
-                .unwrap_or("raw");
-            s.profile_kind != "serial" || framing != "raw"
-        })
+    /// Both the capability and the captures `start()` creates read this — they
+    /// were two copies of the rule, and only one of them knew about overrides.
+    fn data_streams(&self) -> SessionDataStreams {
+        let live = self.framing_overrides.lock().unwrap_or_else(|e| e.into_inner());
+        data_streams(&self.sources, &live)
     }
 
     /// Get combined capabilities from all sources
@@ -469,10 +484,7 @@ impl IOBroker {
                 tx_bytes: session_traits.tx_bytes,
                 ..session_traits.clone()
             },
-            data_streams: SessionDataStreams {
-                rx_frames: self.emits_frames(),
-                rx_bytes: self.emits_raw_bytes,
-            },
+            data_streams: self.data_streams(),
             // The transport, not the stream: a framed serial link is still one
             // the Discovery serial view belongs on, even with no raw bytes.
             serial_link: self.sources.iter().any(|s| s.profile_kind == "serial"),
@@ -642,8 +654,8 @@ impl IOSource for IOBroker {
             *slot = None;
         }
 
-        // Determine if any source produces actual frames (vs just raw bytes)
-        let has_framing = self.emits_frames();
+        let SessionDataStreams { rx_frames: has_framing, rx_bytes: emits_raw_bytes } =
+            self.data_streams();
 
         // Orphan any existing capture owned by this session (e.g., from a previous time-range jump)
         // This makes the old capture selectable in "Orphaned Captures" while creating a fresh one
@@ -663,7 +675,7 @@ impl IOSource for IOBroker {
             );
         }
 
-        if self.emits_raw_bytes {
+        if emits_raw_bytes {
             if has_framing {
                 // Create a bytes capture in addition to frames capture (not as active)
                 bytes_capture_id = Some(capture_store::create_session_capture_inactive(
@@ -700,7 +712,6 @@ impl IOSource for IOBroker {
         let tx = self.tx.clone();
         let transmit_channels = self.transmit_channels.clone();
         let control_channels = self.control_channels.clone();
-        let emits_raw_bytes = self.emits_raw_bytes;
 
         // Take the receiver - we'll use it in the merge task
         // This should always succeed now since we checked/recreated above
@@ -749,7 +760,6 @@ impl IOSource for IOBroker {
                 app,
                 session_id,
                 sources,
-                emits_raw_bytes,
                 bytes_capture_id,
                 stop_flag,
                 pause_flag,
@@ -1038,5 +1048,71 @@ impl IOSource for IOBroker {
 
     fn resume_source_polling(&self, profile_id: &str) -> Result<(), String> {
         self.resume_source(profile_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn serial(framing: &str, emit_raw_bytes: bool) -> SourceConfig {
+        SourceConfig {
+            profile_kind: "serial".into(),
+            serial: SerialOverrides {
+                framing_encoding: Some(framing.into()),
+                emit_raw_bytes: Some(emit_raw_bytes),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn set_framing(encoding: &str, emit_raw_bytes: bool) -> SetFramingRequest {
+        SetFramingRequest {
+            encoding: encoding.into(),
+            frame_id_start_byte: None,
+            frame_id_bytes: None,
+            frame_id_big_endian: true,
+            source_address_start_byte: None,
+            source_address_bytes: None,
+            source_address_big_endian: true,
+            min_frame_length: 0,
+            emit_raw_bytes,
+            modbus: None,
+        }
+    }
+
+    fn streams(sources: &[SourceConfig], live: &[(usize, SetFramingRequest)]) -> (bool, bool) {
+        let s = data_streams(sources, &live.iter().cloned().collect());
+        (s.rx_frames, s.rx_bytes)
+    }
+
+    #[test]
+    fn a_serial_source_streams_what_its_config_says() {
+        assert_eq!(streams(&[serial("raw", true)], &[]), (false, true));
+        assert_eq!(streams(&[serial("slip", false)], &[]), (true, false));
+        assert_eq!(streams(&[serial("slip", true)], &[]), (true, true));
+    }
+
+    #[test]
+    fn a_live_framing_change_moves_both_streams() {
+        let framed_only = [serial("slip", false)];
+        assert_eq!(streams(&framed_only, &[(0, set_framing("delimiter", true))]), (true, true));
+        assert_eq!(streams(&framed_only, &[(0, set_framing("raw", true))]), (false, true));
+
+        let raw = [serial("raw", true)];
+        assert_eq!(streams(&raw, &[(0, set_framing("slip", false))]), (true, false));
+    }
+
+    #[test]
+    fn a_live_change_applies_only_to_its_own_source() {
+        let sources = [serial("slip", false), serial("raw", true)];
+        assert_eq!(streams(&sources, &[(0, set_framing("raw", false))]), (false, true));
+    }
+
+    #[test]
+    fn a_non_serial_source_always_frames_and_never_streams_bytes() {
+        let can = SourceConfig { profile_kind: "gvret_tcp".into(), ..Default::default() };
+        assert_eq!(streams(&[can], &[]), (true, false));
     }
 }
