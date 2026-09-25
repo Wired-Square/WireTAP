@@ -42,7 +42,7 @@ pub struct FrameLinkProbeResult {
 
 /// Probe a FrameLink device to discover its capabilities.
 /// Returns cached data if a managed connection already exists (device accepts only 1 client).
-/// Otherwise triggers a connection via connect_by_address, which populates the probe cache.
+/// Otherwise triggers a connection via connect_to_addr, which populates the probe cache.
 pub async fn probe_framelink(
     host: &str,
     port: u16,
@@ -66,7 +66,7 @@ pub async fn probe_framelink(
         host, port, timeout_sec
     );
 
-    let device_id = shared::connect_by_address(host, port, timeout_sec).await?;
+    let device_id = shared::connect_to_addr(addr, &format!("{host}:{port}"), timeout_sec).await?;
 
     shared::get_cached_probe(&device_id)
         .await

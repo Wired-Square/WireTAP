@@ -250,9 +250,18 @@ pub(crate) async fn connect_by_address(
     let addr = crate::io::net::resolve_host_port(host, port)
         .await
         .map_err(|e| e.user_message())?;
+    connect_to_addr(addr, &format!("{host}:{port}"), timeout_sec).await
+}
 
+/// [`connect_by_address`] for an address already resolved. `display_key` names
+/// the device in messages and stands in for its id when it reports none.
+pub(crate) async fn connect_to_addr(
+    addr: SocketAddr,
+    display_key: &str,
+    timeout_sec: f64,
+) -> Result<String, String> {
     // Per-key lock: only one connection attempt per address at a time
-    let connecting = ConnectingGuard::acquire(format!("addr:{}:{}", host, port));
+    let connecting = ConnectingGuard::acquire(format!("addr:{display_key}"));
     let _guard = connecting.lock.clone().lock_owned().await;
 
     // Check if this address already has a live connection in the pool
@@ -265,18 +274,16 @@ pub(crate) async fn connect_by_address(
         }
     }
 
-    // Create new connection
-    let display_key = format!("{}:{}", host, port);
     let session = tokio::time::timeout(
         Duration::from_secs_f64(timeout_sec),
         FrameLinkSession::connect(addr),
     )
     .await
-    .map_err(|_| IoError::timeout(&display_key, "connect").user_message())?
-    .map_err(|e| IoError::connection(&display_key, e.to_string()).user_message())?;
+    .map_err(|_| IoError::timeout(display_key, "connect").user_message())?
+    .map_err(|e| IoError::connection(display_key, e.to_string()).user_message())?;
 
     let (iface_types, probe_cache, editable_board_def) =
-        match fetch_capabilities(&session, &display_key, timeout_sec).await {
+        match fetch_capabilities(&session, display_key, timeout_sec).await {
             Ok(caps) => caps,
             Err(e) => {
                 // A device that will not describe itself is usually one that
@@ -288,7 +295,7 @@ pub(crate) async fn connect_by_address(
                 // socket, and a FrameLink device serves exactly one client, so
                 // the probe cannot get in until this one is gone.
                 drop(session);
-                return Err(diagnose_failed_connect(addr, &display_key, e)
+                return Err(diagnose_failed_connect(addr, display_key, e)
                     .await
                     .user_message());
             }
@@ -297,7 +304,7 @@ pub(crate) async fn connect_by_address(
     let device_id = probe_cache
         .device_id
         .clone()
-        .unwrap_or_else(|| display_key.clone());
+        .unwrap_or_else(|| display_key.to_string());
 
     let conn = Arc::new(ManagedConnection {
         session,
@@ -561,7 +568,7 @@ pub(crate) async fn get_connection(
         },
     };
 
-    connect_by_address(&addr.ip().to_string(), addr.port(), timeout_sec).await?;
+    connect_to_addr(addr, &addr.to_string(), timeout_sec).await?;
     POOL.lock()
         .await
         .get(device_id)
