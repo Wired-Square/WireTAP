@@ -4,7 +4,15 @@ import { describe, it, expect, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
-const pageFetch = vi.fn(async () => ({ frames: [], capture_indices: [], total_count: 0 }));
+const FRAMED_TOTAL = 33;
+const pageFetch = vi.fn(async (_captureId: string, offset: number, limit: number) => {
+  const rows = Array.from({ length: Math.max(0, Math.min(limit, FRAMED_TOTAL - offset)) }, (_, i) => offset + i);
+  return {
+    frames: rows.map((row) => ({ protocol: "serial", timestamp_us: row * 1000, frame_id: 0, bus: 0, dlc: 1, bytes: [row] })),
+    capture_indices: rows.map((row) => row + 1),
+    total_count: FRAMED_TOTAL,
+  };
+});
 vi.mock("../api/capture", () => ({
   getCaptureFramesPaginatedFiltered: pageFetch,
   getCaptureFramesTail: vi.fn(),
@@ -16,8 +24,9 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(async () => {}),
 }));
 
-const { framedSource } = await import("../stores/discoverySerialStore");
+const { framedSource, useDiscoverySerialStore } = await import("../stores/discoverySerialStore");
 const { useCaptureFrameView } = await import("../apps/discovery/hooks/useCaptureFrameView");
+const { default: FramedDataView } = await import("../apps/discovery/views/serial/FramedDataView");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -61,6 +70,46 @@ describe("useCaptureFrameView revision", () => {
     await act(async () => root.render(<View revision={1} />));
 
     expect(pageFetch.mock.calls.length).toBe(before + 1);
+    act(() => root.unmount());
+  });
+});
+
+describe("FramedDataView paging", () => {
+  async function mount(props: { isStreaming?: boolean; isRecorded?: boolean }) {
+    useDiscoverySerialStore.getState().setFramedPageSize(20);
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(
+        <FramedDataView
+          captureId="cap_framed"
+          sessionId={null}
+          onAccept={() => {}}
+          onApplyIdMapping={() => {}}
+          onApplySourceMapping={() => {}}
+          accepted={false}
+          {...props}
+        />,
+      ),
+    );
+    return { host, root };
+  }
+
+  it("reaches every frame of a capture longer than a page before framing is accepted", async () => {
+    const { host, root } = await mount({});
+    expect(host.textContent).toContain("1 / 2");
+
+    const next = host.querySelector<HTMLButtonElement>('[title="pagination.nextPage"]')!;
+    await act(async () => next.click());
+
+    const rows = host.querySelectorAll("tbody > tr");
+    expect(rows[rows.length - 1].querySelector("td")?.textContent).toBe(String(FRAMED_TOTAL));
+    act(() => root.unmount());
+  });
+
+  it("pages a stored source's capture while its session runs, rather than tailing it", async () => {
+    const { host, root } = await mount({ isStreaming: true, isRecorded: true });
+    expect(host.textContent).toContain("1 / 2");
     act(() => root.unmount());
   });
 });

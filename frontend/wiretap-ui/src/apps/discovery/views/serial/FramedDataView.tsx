@@ -200,9 +200,11 @@ interface FramedDataViewProps {
   framingMode?: string;
   displayTimeFormat?: TimeDisplayFormat;
   isStreaming?: boolean;
+  /** A stored source: its capture is complete, so it is paged rather than tailed. */
+  isRecorded?: boolean;
 }
 
-export default function FramedDataView({ captureId, sessionId, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false }: FramedDataViewProps) {
+export default function FramedDataView({ captureId, sessionId, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false, isRecorded = false }: FramedDataViewProps) {
   const { t } = useTranslation("discovery");
   // Column visibility from UI store (shared with CAN views and ByteView)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
@@ -219,6 +221,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
 
   const {
     frames,
+    captureIndices,
     totalCount,
     isLoading,
     currentPage,
@@ -226,10 +229,12 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     totalPages,
     timeRange: captureTimeRange,
     navigateToTimestamp,
+    tailing,
   } = useCaptureFrameView({
     captureId,
     sessionId,
     isStreaming,
+    isCapturePlayback: isRecorded,
     selectedFrames: ALL_FRAMES,
     pageSize,
     tailSize: pageSize,
@@ -487,8 +492,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         </div>
       )}
 
-      {/* Pagination Toolbar - shown after accepting, when not streaming */}
-      {accepted && !isStreaming && totalCount > 0 && (
+      {!tailing && totalCount > 0 && (
         <PaginationToolbar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -504,9 +508,9 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         />
       )}
 
-      {/* Timeline Scrubber - shown after accepting, when not streaming, with multiple frames */}
+      {/* Timeline Scrubber - shown after accepting, when paging, with multiple frames */}
       <TimelineSection
-        show={accepted && !isStreaming && totalCount > 1}
+        show={accepted && !tailing && totalCount > 1}
         minTimeUs={timeRange.min}
         maxTimeUs={timeRange.max}
         currentTimeUs={timeRange.current}
@@ -519,6 +523,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
       <FrameDataTable
         displayTimeFormat={displayTimeFormat}
         frames={processedFrames}
+        captureIndices={captureIndices}
         formatTime={formatTime}
         showSourceAddress={hasSourceAddresses}
         sourceByteCount={srcConfig?.numBytes ?? 2}

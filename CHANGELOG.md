@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Discovery's serial view agrees with itself on a port that frames its own traffic.** On a SLIP or Modbus RTU serial source, the Framed tab's count now matches the frames it pages rather than the smaller number held in memory. The minimum frame length filter and the Filtered tab no longer appear there, because they never applied to it: set a minimum length under Filter in the source picker when you open the port instead.
 - **Re-probing a FrameLink device keeps what it found.** On a saved device, the interfaces, device id and board a successful re-probe reports are now written to the device straight away, instead of being lost unless you also saved the form. Other unsaved edits in the form still wait for Save. A device that has not been saved yet keeps the result in the form as before.
 - **Settings no longer undo a change made elsewhere.** A device-settings Apply, a re-probe, an MCP client or Settings in another window could each change a saved device, only for the next unrelated setting you touched to write the old copy back. Every window now picks up such a change as it lands, without losing a setting you changed there at the same moment.
+- **Every framed serial frame can be reached.** Discovery's Framed tab now shows its pager as soon as framing is applied, not only after you accept it, and pages a stored capture instead of showing only its last page. On Auto rows per page, tables now fill the space below them instead of stopping a few rows short.
 
 ## [0.12.0] - 2026-09-20
 

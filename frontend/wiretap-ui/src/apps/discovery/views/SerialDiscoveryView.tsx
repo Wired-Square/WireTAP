@@ -242,6 +242,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
             framingMode={framingConfig?.mode}
             displayTimeFormat={displayTimeFormat}
             isStreaming={isStreaming}
+            isRecorded={isRecorded}
           />
         )}
         {activeTab === 'filtered' && (
