@@ -8,7 +8,7 @@ import {
   setWakeSettings as setWakeSettingsApi,
   setLogLevel as setLogLevelApi,
 } from '../../../api';
-import { emit } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../../../events/registry';
 import { getOrCreateDefaultDirs } from '../../../utils/defaultPaths';
 import {
@@ -20,6 +20,7 @@ import {
   type DashboardLayout,
 } from '../../../utils/dashboardLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
+import { rebaseSettings, stableStringify } from '../../../settings/rebaseSettings';
 // Types
 export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
 
@@ -141,15 +142,6 @@ const initialDialogPayload: DialogPayload = {
   dashboardLayoutToDelete: null,
 };
 
-// Stable stringify helper for change detection
-function stableStringify(value: any): string {
-  if (value === null || value === undefined) return String(value);
-  if (typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
-  const keys = Object.keys(value).sort();
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify((value as any)[k])).join(',') + '}';
-}
-
 // Store state interface
 interface SettingsState {
   // Locations
@@ -247,6 +239,7 @@ interface SettingsState {
 
   // Actions - Loading
   loadSettings: () => Promise<void>;
+  rebaseOnDisk: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
   loadDashboardLayouts: () => Promise<void>;
 
@@ -342,6 +335,9 @@ const scheduleSave = (save: () => Promise<void>) => {
     save();
   }, 1000);
 };
+
+// Only the latest rebase applies: an older read landing last would roll back a newer one.
+let rebaseGeneration = 0;
 
 /**
  * Migrate old-style per-interface FrameLink profiles into grouped device profiles.
@@ -504,6 +500,161 @@ function buildAppSettings(s: SettingsState) {
   };
 }
 
+type DirectoryValidations = Pick<
+  SettingsState['locations'],
+  'decoderValidation' | 'dumpValidation' | 'reportValidation'
+>;
+
+async function validateDir(path: string): Promise<DirectoryValidation | null> {
+  if (!path) return null;
+  try {
+    return await validateDirectoryApi(path);
+  } catch {
+    return { exists: false, writable: false, error: 'Validation failed' };
+  }
+}
+
+function carriedValidations(before: SettingsState['locations'], next: AppSettings): DirectoryValidations {
+  return {
+    decoderValidation: next.decoder_dir === before.decoderDir ? before.decoderValidation : null,
+    dumpValidation: next.dump_dir === before.dumpDir ? before.dumpValidation : null,
+    reportValidation: next.report_dir === before.reportDir ? before.reportValidation : null,
+  };
+}
+
+/** Read settings.json, migrated and normalised, without writing anything back. */
+async function readSettings() {
+  const raw = await loadSettingsApi();
+
+  let defaultDirs: { decoders: string; dumps: string; reports: string } | null = null;
+  if (!raw.decoder_dir || !raw.dump_dir || !raw.report_dir) {
+    try {
+      defaultDirs = await getOrCreateDefaultDirs();
+    } catch (err) {
+      console.warn('Could not get/create default directories:', err);
+    }
+  }
+
+  // Migrate old per-interface FrameLink profiles to grouped device profiles
+  const migration = migrateFrameLinkProfiles(raw.io_profiles || []);
+  let defaultRead = raw.default_read_profile ?? null;
+  let defaultWrites = raw.default_write_profiles ?? [];
+  if (migration.removedIds.size > 0) {
+    // If default profiles were merged away, clear them (the surviving profile ID is kept)
+    if (defaultRead && migration.removedIds.has(defaultRead)) {
+      defaultRead = null;
+    }
+    defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
+  }
+
+  const normalized = normalizeSettings(
+    {
+      ...raw,
+      io_profiles: migration.profiles,
+      default_read_profile: defaultRead,
+      default_write_profiles: defaultWrites,
+    },
+    defaultDirs,
+  );
+  return { raw, normalized, migrated: migration.removedIds.size > 0 };
+}
+
+type SettingsSlices = Pick<SettingsState, 'locations' | 'ioProfiles' | 'display' | 'buffers' | 'general' | 'mcp'>;
+
+function settingsSlices(normalized: AppSettings, validations: DirectoryValidations): SettingsSlices {
+  return {
+    locations: {
+      configPath: normalized.config_path,
+      decoderDir: normalized.decoder_dir,
+      dumpDir: normalized.dump_dir,
+      reportDir: normalized.report_dir,
+      ...validations,
+    },
+    ioProfiles: {
+      profiles: normalized.io_profiles,
+      defaultReadProfile: normalized.default_read_profile || null,
+      defaultWriteProfiles: normalized.default_write_profiles || [],
+    },
+    display: {
+      frameIdFormat: normalized.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
+      saveFrameIdFormat: normalized.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
+      timeFormat: (['delta-last', 'delta-start', 'timestamp'].includes(normalized.display_time_format || '')
+        ? normalized.display_time_format
+        : 'human') as 'delta-last' | 'delta-start' | 'timestamp' | 'human',
+      timezone: normalized.display_timezone === 'utc' ? 'utc' : 'local',
+      signalColours: {
+        none: normalized.signal_colour_none || defaultSignalColours.none,
+        low: normalized.signal_colour_low || defaultSignalColours.low,
+        medium: normalized.signal_colour_medium || defaultSignalColours.medium,
+        high: normalized.signal_colour_high || defaultSignalColours.high,
+      },
+      binaryOneColour: normalized.binary_one_colour || '#14b8a6',
+      binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
+      binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
+      frameEditorColours: normalized.frame_editor_colours ?? defaultFrameEditorColours(),
+      themeMode: normalized.theme_mode || 'auto',
+      themeColours: {
+        bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
+        bgSurfaceLight: normalized.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
+        textPrimaryLight: normalized.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
+        textSecondaryLight: normalized.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
+        borderDefaultLight: normalized.theme_border_default_light || defaultThemeColours.borderDefaultLight,
+        dataBgLight: normalized.theme_data_bg_light || defaultThemeColours.dataBgLight,
+        dataTextPrimaryLight: normalized.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
+        bgPrimaryDark: normalized.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
+        bgSurfaceDark: normalized.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
+        textPrimaryDark: normalized.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
+        textSecondaryDark: normalized.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
+        borderDefaultDark: normalized.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
+        dataBgDark: normalized.theme_data_bg_dark || defaultThemeColours.dataBgDark,
+        dataTextPrimaryDark: normalized.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
+        accentPrimary: normalized.theme_accent_primary || defaultThemeColours.accentPrimary,
+        accentSuccess: normalized.theme_accent_success || defaultThemeColours.accentSuccess,
+        accentDanger: normalized.theme_accent_danger || defaultThemeColours.accentDanger,
+        accentWarning: normalized.theme_accent_warning || defaultThemeColours.accentWarning,
+      },
+    },
+    buffers: {
+      clearCapturesOnStart: normalized.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+      captureStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
+      discoveryHistorySize: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
+      queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
+      graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
+      decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+      decoderMaxFilteredFrames: normalized.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+      decoderMaxDecodedFrames: normalized.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
+      decoderMaxDecodedPerSource: normalized.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+      transmitMaxHistory: normalized.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
+    },
+    general: {
+      defaultFrameType: normalized.default_frame_type ?? 'can',
+      sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
+      preventIdleSleep: normalized.prevent_idle_sleep ?? true,
+      keepDisplayAwake: normalized.keep_display_awake ?? false,
+      logLevel: normalized.log_level ?? "off",
+      telemetryEnabled: normalized.telemetry_enabled ?? false,
+      telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
+      usageAnalyticsEnabled: normalized.usage_analytics_enabled ?? false,
+      usageAnalyticsConsentGiven: normalized.usage_analytics_consent_given ?? false,
+      installId: normalized.install_id ?? "",
+      modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+      smpPort: normalized.smp_port ?? 1337,
+      language: normalized.language ?? "en-AU",
+    },
+    mcp: {
+      serverEnabled: normalized.mcp_server_enabled ?? false,
+      allowControl: normalized.mcp_allow_control ?? false,
+      allowSessionControl: normalized.mcp_allow_session_control ?? false,
+      allowCatalogWrite: normalized.mcp_allow_catalog_write ?? false,
+      allowCatalogModify: normalized.mcp_allow_catalog_modify ?? false,
+      allowDashboardWrite: normalized.mcp_allow_dashboard_write ?? false,
+      allowUiControl: normalized.mcp_allow_ui_control ?? false,
+      serverPort: normalized.mcp_server_port ?? 8787,
+      serverToken: normalized.mcp_server_token ?? "",
+    },
+  };
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Initial state
   locations: {
@@ -592,155 +743,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Loading actions
   loadSettings: async () => {
     try {
-      const settings = await loadSettingsApi();
-
-      // Get default directories for empty paths
-      let defaultDirs: { decoders: string; dumps: string; reports: string } | null = null;
-      if (!settings.decoder_dir || !settings.dump_dir || !settings.report_dir) {
-        try {
-          defaultDirs = await getOrCreateDefaultDirs();
-        } catch (err) {
-          console.warn('Could not get/create default directories:', err);
-        }
-      }
-
-      const decoderDir = settings.decoder_dir || defaultDirs?.decoders || '';
-      const dumpDir = settings.dump_dir || defaultDirs?.dumps || '';
-      const reportDir = settings.report_dir || defaultDirs?.reports || '';
-
-      // Validate directories
-      const validateDir = async (path: string): Promise<DirectoryValidation | null> => {
-        if (!path) return null;
-        try {
-          return await validateDirectoryApi(path);
-        } catch {
-          return { exists: false, writable: false, error: 'Validation failed' };
-        }
-      };
-
-      const [decoderValidation, dumpValidation, reportValidation] = await Promise.all([
-        validateDir(decoderDir),
-        validateDir(dumpDir),
-        validateDir(reportDir),
-      ]);
-
-      // Migrate old per-interface FrameLink profiles to grouped device profiles
-      const migration = migrateFrameLinkProfiles(settings.io_profiles || []);
-      let defaultRead = settings.default_read_profile ?? null;
-      let defaultWrites = settings.default_write_profiles ?? [];
-      if (migration.removedIds.size > 0) {
-        // If default profiles were merged away, clear them (the surviving profile ID is kept)
-        if (defaultRead && migration.removedIds.has(defaultRead)) {
-          defaultRead = null;
-        }
-        defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
-      }
-
-      // One shared normalise routine (settings/appSettings) fills every missing
-      // field with its default, applied on top of the migrated profiles.
-      const normalized = normalizeSettings(
-        {
-          ...settings,
-          io_profiles: migration.profiles,
-          default_read_profile: defaultRead,
-          default_write_profiles: defaultWrites,
-        },
-        defaultDirs,
+      const { raw, normalized, migrated } = await readSettings();
+      const [decoderValidation, dumpValidation, reportValidation] = await Promise.all(
+        [normalized.decoder_dir, normalized.dump_dir, normalized.report_dir].map(validateDir),
       );
-
-      set({
-        locations: {
-          configPath: normalized.config_path,
-          decoderDir: normalized.decoder_dir,
-          dumpDir: normalized.dump_dir,
-          reportDir: normalized.report_dir,
-          decoderValidation,
-          dumpValidation,
-          reportValidation,
-        },
-        ioProfiles: {
-          profiles: normalized.io_profiles,
-          defaultReadProfile: normalized.default_read_profile || null,
-          defaultWriteProfiles: normalized.default_write_profiles || [],
-        },
-        display: {
-          frameIdFormat: normalized.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
-          saveFrameIdFormat: normalized.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
-          timeFormat: (['delta-last', 'delta-start', 'timestamp'].includes(normalized.display_time_format || '')
-            ? normalized.display_time_format
-            : 'human') as 'delta-last' | 'delta-start' | 'timestamp' | 'human',
-          timezone: normalized.display_timezone === 'utc' ? 'utc' : 'local',
-          signalColours: {
-            none: normalized.signal_colour_none || defaultSignalColours.none,
-            low: normalized.signal_colour_low || defaultSignalColours.low,
-            medium: normalized.signal_colour_medium || defaultSignalColours.medium,
-            high: normalized.signal_colour_high || defaultSignalColours.high,
-          },
-          binaryOneColour: normalized.binary_one_colour || '#14b8a6',
-          binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
-          binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
-          frameEditorColours: normalized.frame_editor_colours ?? defaultFrameEditorColours(),
-          themeMode: normalized.theme_mode || 'auto',
-          themeColours: {
-            bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
-            bgSurfaceLight: normalized.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
-            textPrimaryLight: normalized.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
-            textSecondaryLight: normalized.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
-            borderDefaultLight: normalized.theme_border_default_light || defaultThemeColours.borderDefaultLight,
-            dataBgLight: normalized.theme_data_bg_light || defaultThemeColours.dataBgLight,
-            dataTextPrimaryLight: normalized.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
-            bgPrimaryDark: normalized.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
-            bgSurfaceDark: normalized.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
-            textPrimaryDark: normalized.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
-            textSecondaryDark: normalized.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
-            borderDefaultDark: normalized.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
-            dataBgDark: normalized.theme_data_bg_dark || defaultThemeColours.dataBgDark,
-            dataTextPrimaryDark: normalized.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
-            accentPrimary: normalized.theme_accent_primary || defaultThemeColours.accentPrimary,
-            accentSuccess: normalized.theme_accent_success || defaultThemeColours.accentSuccess,
-            accentDanger: normalized.theme_accent_danger || defaultThemeColours.accentDanger,
-            accentWarning: normalized.theme_accent_warning || defaultThemeColours.accentWarning,
-          },
-        },
-        buffers: {
-          clearCapturesOnStart: normalized.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
-          captureStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
-          discoveryHistorySize: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
-          queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
-          graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
-          decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-          decoderMaxFilteredFrames: normalized.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-          decoderMaxDecodedFrames: normalized.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
-          decoderMaxDecodedPerSource: normalized.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-          transmitMaxHistory: normalized.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
-        },
-        general: {
-          defaultFrameType: normalized.default_frame_type ?? 'can',
-          sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
-          preventIdleSleep: normalized.prevent_idle_sleep ?? true,
-          keepDisplayAwake: normalized.keep_display_awake ?? false,
-          logLevel: normalized.log_level ?? "off",
-          telemetryEnabled: normalized.telemetry_enabled ?? false,
-          telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
-          usageAnalyticsEnabled: normalized.usage_analytics_enabled ?? false,
-          usageAnalyticsConsentGiven: normalized.usage_analytics_consent_given ?? false,
-          installId: normalized.install_id ?? "",
-          modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-          smpPort: normalized.smp_port ?? 1337,
-          language: normalized.language ?? "en-AU",
-        },
-        mcp: {
-          serverEnabled: normalized.mcp_server_enabled ?? false,
-          allowControl: normalized.mcp_allow_control ?? false,
-          allowSessionControl: normalized.mcp_allow_session_control ?? false,
-          allowCatalogWrite: normalized.mcp_allow_catalog_write ?? false,
-          allowCatalogModify: normalized.mcp_allow_catalog_modify ?? false,
-          allowDashboardWrite: normalized.mcp_allow_dashboard_write ?? false,
-          allowUiControl: normalized.mcp_allow_ui_control ?? false,
-          serverPort: normalized.mcp_server_port ?? 8787,
-          serverToken: normalized.mcp_server_token ?? "",
-        },
-      });
+      set(settingsSlices(normalized, { decoderValidation, dumpValidation, reportValidation }));
 
       // Baseline for dirty-tracking. Build it from the just-applied slices via
       // the same buildAppSettings the dirty check uses, so a clean load is never
@@ -749,13 +756,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // form is re-persisted below.
       const baseline = buildAppSettings(get());
       set({
-        originalSettings: migration.removedIds.size > 0
-          ? { ...baseline, io_profiles: settings.io_profiles || [] }
-          : baseline,
+        originalSettings: migrated ? { ...baseline, io_profiles: raw.io_profiles || [] } : baseline,
       });
 
       // Persist migrated settings so old profiles are not re-migrated next load
-      if (migration.removedIds.size > 0) {
+      if (migrated) {
         scheduleSave(get().saveSettings);
       }
 
@@ -771,6 +776,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
+  },
+
+  rebaseOnDisk: async () => {
+    const generation = ++rebaseGeneration;
+    if (!get().originalSettings) return;
+    let normalized: AppSettings;
+    try {
+      ({ normalized } = await readSettings());
+    } catch (error) {
+      console.error('Failed to reload settings:', error);
+      return;
+    }
+    const state = get();
+    if (generation !== rebaseGeneration || !state.originalSettings) return;
+
+    const fresh = buildAppSettings({ ...state, ...settingsSlices(normalized, state.locations) });
+    const merged = rebaseSettings(state.originalSettings, buildAppSettings(state), fresh);
+    set({ ...settingsSlices(merged, carriedValidations(state.locations, merged)), originalSettings: fresh });
   },
 
   loadSelectionSets: async () => {
@@ -798,16 +821,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().hasUnsavedChanges()) return;
 
     try {
+      const before = get().originalSettings;
       const settings = buildAppSettings(get());
-
       await saveSettingsApi(settings);
-      set({ originalSettings: settings });
-
-      // Notify other windows
-      await emit(WINDOW_EVENTS.SETTINGS_CHANGED, {
-        settings,
-        timestamp: Date.now(),
-      });
+      // A rebase on the backend's announcement of this save may have landed first.
+      if (get().originalSettings === before) set({ originalSettings: settings });
     } catch (error) {
       console.error('Failed to save settings:', error);
     }
@@ -1306,3 +1324,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     scheduleSave(get().saveSettings);
   },
 }));
+
+// Every settings write is announced by the backend, this window's own saves included.
+void listen(WINDOW_EVENTS.SETTINGS_CHANGED, () => {
+  void useSettingsStore.getState().rebaseOnDisk();
+}).catch((error: unknown) => {
+  console.error('[settingsStore] Failed to watch for settings changes:', error);
+});

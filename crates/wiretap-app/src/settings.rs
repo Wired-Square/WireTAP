@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
+
+/// `WINDOW_EVENTS.SETTINGS_CHANGED` in `src/events/registry.ts`.
+const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IOProfile {
@@ -774,6 +777,13 @@ pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<
 
     // Keep the cached telemetry consent + install id in sync (read on every emit).
     crate::telemetry::refresh_consent(&settings);
+
+    // Every window's settings store rebases on this, so a write from any path
+    // (another window, a device reconfigure, MCP) is not undone by its next save.
+    let _ = app.emit(
+        SETTINGS_CHANGED_EVENT,
+        serde_json::json!({ "settings": &settings }),
+    );
 
     Ok(())
 }
