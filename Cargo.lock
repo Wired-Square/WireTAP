@@ -8643,6 +8643,7 @@ name = "wiretap-io"
 version = "0.16.13"
 source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.13#3e7b6eb774fb0b05c8de698b3e152cf5908fda30"
 dependencies = [
+ "nix 0.29.0",
  "serialport",
  "thiserror 2.0.18",
  "tokio",

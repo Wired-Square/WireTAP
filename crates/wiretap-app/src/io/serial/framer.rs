@@ -131,7 +131,7 @@ trait FramerImpl {
 
 /// The trailing bytes at end of stream, when there are any: not a message, and
 /// marked as such.
-fn residue(bytes: Vec<u8>) -> Vec<SerialFrame> {
+pub(super) fn residue(bytes: Vec<u8>) -> Vec<SerialFrame> {
     if bytes.is_empty() {
         return Vec::new();
     }
@@ -304,7 +304,7 @@ struct ModbusRtuFramer {
 /// One reassembled message as a frame. The CRC verdict rides along: under a
 /// lenient policy it is the only thing distinguishing a recovered message from a
 /// guessed one.
-fn rtu_frame(msg: ModbusRtuMessage) -> SerialFrame {
+pub(super) fn rtu_frame(msg: ModbusRtuMessage) -> SerialFrame {
     SerialFrame {
         bytes: msg.raw,
         incomplete: false,

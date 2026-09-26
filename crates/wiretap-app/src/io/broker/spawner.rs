@@ -284,23 +284,7 @@ async fn run_serial_reader(
         source_idx, config.framing_encoding, overrides.framing_encoding, config.frame_id_config
     );
 
-    run_serial_source(
-        source_idx,
-        config.port,
-        config.baud_rate,
-        config.data_bits,
-        config.stop_bits,
-        config.parity,
-        config.framing_encoding,
-        config.frame_id_config,
-        config.source_address_config,
-        config.min_frame_length,
-        config.emit_raw_bytes,
-        bus_mappings,
-        stop_flag,
-        tx,
-    )
-    .await;
+    run_serial_source(source_idx, config, bus_mappings, stop_flag, tx).await;
     Ok(())
 }
 

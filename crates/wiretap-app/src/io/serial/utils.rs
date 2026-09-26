@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, Parity as SpParity, StopBits};
 use tokio::sync::mpsc;
+use wiretap_io::serial::{LineSettings, Parity as LineParity};
 
 use super::framer::{FrameIdConfig, FramingEncoding};
 use crate::io::types::ModbusRtuOptions;
@@ -22,7 +23,7 @@ use crate::settings::IOProfile;
 /// Probe whether a serial port still enumerates on the host, so an access-denied
 /// failure can be told apart as "in use" (still present) vs "disconnected/reset"
 /// (gone).
-fn probe_serial_presence(port_name: &str) -> DevicePresence {
+pub(super) fn probe_serial_presence(port_name: &str) -> DevicePresence {
     match serialport::available_ports() {
         Ok(ports) if ports.iter().any(|p| p.port_name == port_name) => DevicePresence::Present,
         Ok(_) => DevicePresence::Absent,
@@ -113,10 +114,7 @@ pub fn to_serialport_stop_bits(bits: u8) -> StopBits {
 #[derive(Clone, Debug)]
 pub struct SerialSourceConfig {
     pub port: String,
-    pub baud_rate: u32,
-    pub data_bits: u8,
-    pub stop_bits: u8,
-    pub parity: Parity,
+    pub line: LineSettings,
     pub framing_encoding: FramingEncoding,
     pub frame_id_config: Option<FrameIdConfig>,
     pub source_address_config: Option<FrameIdConfig>,
@@ -179,13 +177,19 @@ pub fn parse_profile_for_source(
 
     // Line settings come from `io::device_kinds`, the one declaration the form
     // also seeds from.
-    let baud_rate = conn_i64(profile, "baud_rate").unwrap_or_default() as u32;
-    let data_bits = conn_i64(profile, "data_bits").unwrap_or_default() as u8;
-    let stop_bits = conn_i64(profile, "stop_bits").unwrap_or_default() as u8;
-    let parity = match conn_str(profile, "parity").unwrap_or_default().as_str() {
-        "odd" => Parity::Odd,
-        "even" => Parity::Even,
-        _ => Parity::None,
+    // Out-of-range bits read as 8N1, as they always have; the library refuses them.
+    let line = LineSettings {
+        baud: conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
+        data_bits: match conn_i64(profile, "data_bits") {
+            Some(bits @ 5..=7) => bits as u8,
+            _ => 8,
+        },
+        parity: match conn_str(profile, "parity").unwrap_or_default().as_str() {
+            "odd" => LineParity::Odd,
+            "even" => LineParity::Even,
+            _ => LineParity::None,
+        },
+        stop_bits: if conn_i64(profile, "stop_bits") == Some(2) { 2 } else { 1 },
     };
 
     // Session override, then profile, then the kind default — resolved by the
@@ -265,10 +269,7 @@ pub fn parse_profile_for_source(
 
     Some(SerialSourceConfig {
         port,
-        baud_rate,
-        data_bits,
-        stop_bits,
-        parity,
+        line,
         framing_encoding,
         frame_id_config,
         source_address_config,

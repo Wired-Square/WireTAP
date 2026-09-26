@@ -154,21 +154,23 @@ impl ModbusRtuOptions {
     /// A stream configured for this line. Both opt-ins union with whatever a
     /// catalogue declares, which is the crate's contract for them.
     pub fn stream(&self) -> wiretap_catalog::ModbusRtuStream {
-        let policy = if self.validate_crc {
-            wiretap_catalog::CrcPolicy::Strict
-        } else {
-            wiretap_catalog::CrcPolicy::Lenient
-        };
-        let mut stream =
-            wiretap_catalog::ModbusRtuStream::with_crc_policy(self.device_address, policy)
-                .with_vendor_functions(&self.vendor_functions);
-        if self.allow_broadcast {
-            stream = stream.allow_broadcast();
+        wiretap_catalog::ModbusRtuOptions::from(self).stream()
+    }
+}
+
+impl From<&ModbusRtuOptions> for wiretap_catalog::ModbusRtuOptions {
+    fn from(options: &ModbusRtuOptions) -> Self {
+        Self {
+            device_address: options.device_address,
+            crc: if options.validate_crc {
+                wiretap_catalog::CrcPolicy::Strict
+            } else {
+                wiretap_catalog::CrcPolicy::Lenient
+            },
+            vendor_functions: options.vendor_functions.clone(),
+            allow_broadcast: options.allow_broadcast,
+            any_function: options.any_function,
         }
-        if self.any_function {
-            stream = stream.frame_any_function();
-        }
-        stream
     }
 }
 
