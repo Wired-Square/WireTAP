@@ -1,9 +1,8 @@
 // io/modbus_tcp/conn.rs
 //
 // A Modbus TCP connection that never hangs: one context plus a per-request
-// timeout and reconnect policy, shared by the poll path and the discovery
-// sweeps. `tokio-modbus` has no per-request timeout of its own. A read ends in
-// one of three outcomes:
+// timeout and reconnect policy, for the discovery sweeps. `tokio-modbus` has
+// no per-request timeout of its own. A read ends in one of three outcomes:
 //
 //   - a value            → the register exists
 //   - a Modbus exception → the device is alive but won't serve this request
@@ -89,12 +88,6 @@ impl ModbusConn {
 
     pub fn addr(&self) -> SocketAddr {
         self.addr
-    }
-
-    /// Address later requests, and any reconnect, to another unit on this socket.
-    pub fn set_unit(&mut self, unit_id: u8) {
-        self.ctx.set_slave(Slave(unit_id));
-        self.unit_id = unit_id;
     }
 
     async fn reconnect(&mut self) -> Result<(), String> {
@@ -205,23 +198,6 @@ mod tests {
                 assert!(matches!(outcome, ReadOutcome::Silent(_)), "{:?}", outcome);
                 assert!(started.elapsed() < Duration::from_millis(1000));
             }
-        })
-        .await
-        .expect("a read hung");
-    }
-
-    #[tokio::test]
-    async fn the_unit_set_before_a_timeout_survives_the_reconnect() {
-        timeout(Duration::from_secs(5), async {
-            let (port, mut units) = silent_device().await;
-            let mut conn = ModbusConn::connect("127.0.0.1", port, 1, 100, 0, false)
-                .await
-                .unwrap();
-            conn.set_unit(7);
-            conn.read(&RegisterType::Holding, 0, 1).await;
-            conn.read(&RegisterType::Holding, 0, 1).await;
-            assert_eq!(units.recv().await, Some((1, 7)));
-            assert_eq!(units.recv().await, Some((2, 7)));
         })
         .await
         .expect("a read hung");

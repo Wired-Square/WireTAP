@@ -9,37 +9,24 @@
 // pointed the shared context at the poll's slave, so every register in a
 // multi-slave catalogue was silently read from the connection's `unit_id`, and
 // it reported the session's output bus rather than the device address. This
-// module is that loop, once, with every sink behind `FrameSink`.
-//
-// The per-tick mutable state (throttle, `ReadHealth`) stays inside
-// `run_poll_task` rather than moving into the sink — same reasoning as
-// `io/periodic.rs`: a closure-based runner would force the state into
-// Arc/Mutex or hit async-closure `Send` limits on stable Rust.
+// module is that loop, once: one `wiretap_io` poll task per source, drained
+// into a `FrameSink`.
 
-use std::sync::{atomic::AtomicBool, Arc};
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
+use std::net::{IpAddr, SocketAddr};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::{mpsc, watch};
+use wiretap_io::modbus::{
+    spawn, ModbusTcp, PollEvent, PollTask, Poller, TaskEvent, TaskOptions, TcpOptions,
+    TransportError, UnitSource,
+};
 
-use super::conn::{ModbusConn, ReadOutcome};
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
-use crate::io::periodic::Cadence;
 use crate::io::types::SourceMessage;
 use crate::io::{emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
 
-// ============================================================================
-// Read result
-// ============================================================================
-
-/// A successful read, still in its natural shape. Kept typed (rather than
-/// flattened to bytes at the read site) so `PollEmitMode::PerRegister` can split
-/// it per register — one flat `Vec<u8>` can't tell you where the coils end.
-pub enum ReadData {
-    Registers(Vec<u16>),
-    Coils(Vec<bool>),
-}
+pub use wiretap_io::modbus::ReadData;
 
 pub fn register_type_name(rt: &RegisterType) -> &'static str {
     match rt {
@@ -47,23 +34,6 @@ pub fn register_type_name(rt: &RegisterType) -> &'static str {
         RegisterType::Input => "input",
         RegisterType::Coil => "coil",
         RegisterType::Discrete => "discrete",
-    }
-}
-
-/// Why a read failed. A device that answers with an exception is alive and
-/// reachable; an IO error says nothing reached it.
-#[derive(Debug)]
-pub enum ReadError {
-    Exception(String),
-    Io(String),
-}
-
-impl std::fmt::Display for ReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReadError::Exception(e) => write!(f, "Modbus exception: {}", e),
-            ReadError::Io(e) => write!(f, "IO error: {}", e),
-        }
     }
 }
 
@@ -98,8 +68,10 @@ pub fn modbus_frame(frame_id: u32, device_address: u8, bytes: Vec<u8>) -> FrameM
 /// `PerRegister` emits one frame per register keyed by its address, which is what
 /// makes discovery sweeps analysable: the Changes tool then answers "which
 /// register moved" rather than "which block moved".
-pub fn frames_for_read(poll: &PollGroup, data: ReadData) -> Vec<FrameMessage> {
-    match (poll.emit_mode, data) {
+///
+/// Every frame is stamped `at`, when the read completed.
+pub fn frames_for_read(poll: &PollGroup, data: ReadData, at: SystemTime) -> Vec<FrameMessage> {
+    let mut frames = match (poll.emit_mode, data) {
         (PollEmitMode::Block, ReadData::Registers(regs)) => {
             vec![modbus_frame(
                 poll.frame_id,
@@ -117,7 +89,14 @@ pub fn frames_for_read(poll: &PollGroup, data: ReadData) -> Vec<FrameMessage> {
         (PollEmitMode::PerRegister, data) => {
             per_register_frames(poll.start_register, poll.device_address, data)
         }
+    };
+    let timestamp_us = at
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_micros() as u64);
+    for frame in &mut frames {
+        frame.timestamp_us = timestamp_us;
     }
+    frames
 }
 
 /// One frame per address, keyed by the address itself: a register carries its
@@ -214,122 +193,149 @@ impl FrameSink {
 // Poll task
 // ============================================================================
 
-const POLL_TIMEOUT_MS: u64 = 2000;
+const POLL_OP_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// Open the connection every poll group of one source shares.
-pub async fn connect_for_polling(
+/// What a source asks of its running poll.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PollControl {
+    Run,
+    Pause,
+    Stop,
+}
+
+/// Connect, then spawn one poll task for all of a source's groups. Connecting
+/// first means a device that is down fails the session start.
+pub async fn start_polling(
     host: &str,
     port: u16,
     unit_id: u8,
-) -> Result<Arc<Mutex<ModbusConn>>, String> {
-    let conn = ModbusConn::connect(host, port, unit_id, POLL_TIMEOUT_MS, 0, false).await?;
-    Ok(Arc::new(Mutex::new(conn)))
+    polls: &[PollGroup],
+) -> Result<PollTask<PollGroup>, String> {
+    let endpoint = tcp_endpoint(host, port);
+    let options = TcpOptions {
+        op_timeout: POLL_OP_TIMEOUT,
+        unit_id,
+        ..TcpOptions::default()
+    };
+    let mut conn = ModbusTcp::new(endpoint.clone(), options);
+    conn.connect()
+        .await
+        .map_err(|e| format!("Failed to connect to Modbus TCP server at {endpoint}: {e}"))?;
+    Ok(spawn_polls(conn, polls, TaskOptions::default()))
 }
 
-/// A group's failure counters, and what they decide: whether this tick reads,
-/// how long an exception backs off, and when IO errors give up.
-struct ReadHealth {
-    interval: Duration,
-    io_errors: u32,
-    exceptions: u32,
-    ticks_to_skip: u32,
-}
-
-impl ReadHealth {
-    fn new(interval_ms: u64) -> Self {
-        Self {
-            interval: Duration::from_millis(interval_ms.max(1)),
-            io_errors: 0,
-            exceptions: 0,
-            ticks_to_skip: 0,
-        }
-    }
-
-    fn should_read(&mut self) -> bool {
-        if self.ticks_to_skip == 0 {
-            return true;
-        }
-        self.ticks_to_skip -= 1;
-        false
-    }
-
-    /// Returns whether the group was backing off.
-    fn on_ok(&mut self) -> bool {
-        let was_backing_off = self.exceptions > 0;
-        self.io_errors = 0;
-        self.exceptions = 0;
-        self.ticks_to_skip = 0;
-        was_backing_off
-    }
-
-    fn on_exception(&mut self) -> Duration {
-        self.io_errors = 0;
-        self.exceptions += 1;
-        let delay = FrameBackoff::default().delay(self.interval, self.exceptions);
-        let ticks = delay.as_millis().div_ceil(self.interval.as_millis());
-        self.ticks_to_skip = u32::try_from(ticks.saturating_sub(1)).unwrap_or(u32::MAX);
-        delay
-    }
-
-    /// Returns whether the group should stop; a `limit` of 0 never does.
-    fn on_io_error(&mut self, limit: u32) -> bool {
-        self.io_errors += 1;
-        limit > 0 && self.io_errors >= limit
+fn tcp_endpoint(host: &str, port: u16) -> String {
+    match host.parse::<IpAddr>() {
+        Ok(ip) => SocketAddr::from((ip, port)).to_string(),
+        Err(_) => format!("{host}:{port}"),
     }
 }
 
-/// Poll one register group on its interval until cancelled, paused-through, or
-/// stopped by `max_register_errors` consecutive IO errors (0 = never give up).
-/// A Modbus exception backs the group off instead of counting towards the limit.
-pub async fn run_poll_task(
-    poll: PollGroup,
-    conn: Arc<Mutex<ModbusConn>>,
-    max_register_errors: u32,
-    cancel: Arc<AtomicBool>,
-    pause: Arc<AtomicBool>,
-    sink: FrameSink,
-) {
-    let mut cadence = Cadence::new(poll.interval_ms, cancel, Some(pause));
-    let type_name = register_type_name(&poll.register_type);
-    let label = sink.label();
-    let mut first_poll = true;
-    let mut health = ReadHealth::new(poll.interval_ms);
-    let mut throttle = SignalThrottle::new();
-
-    tlog!(
-        "{} poll task started: {} reg {} count {} every {}ms (frame_id={}, slave={}, emit={:?})",
-        label,
-        type_name,
-        poll.start_register,
-        poll.count,
-        poll.interval_ms,
-        poll.frame_id,
-        poll.device_address,
-        poll.emit_mode
+fn spawn_polls(conn: ModbusTcp, polls: &[PollGroup], options: TaskOptions) -> PollTask<PollGroup> {
+    let items = polls.iter().map(PollGroup::to_item);
+    let poller = Poller::new(
+        items,
+        UnitSource::Item,
+        FrameBackoff::default(),
+        Instant::now(),
     );
+    spawn(conn, poller, options)
+}
 
-    while cadence.next().await.is_some() {
-        if !health.should_read() {
-            continue;
+/// Whether a run of `consecutive` failures has reached `limit`; 0 never does.
+fn exhausted(consecutive: u32, limit: u32) -> bool {
+    limit > 0 && consecutive >= limit
+}
+
+enum Wake {
+    Event(Option<TaskEvent<PollGroup>>),
+    Control(PollControl),
+}
+
+/// Drain `task` into `sink` until `control` says stop, every group has been
+/// retired after `max_register_errors` consecutive transport errors, or the
+/// device has stayed unreachable for that many connection attempts. A Modbus
+/// exception backs its group off instead of counting.
+pub async fn run_poll_task(
+    mut task: PollTask<PollGroup>,
+    mut control: watch::Receiver<PollControl>,
+    sink: FrameSink,
+    max_register_errors: u32,
+) {
+    let mut drain = Drain {
+        label: sink.label(),
+        sink,
+        max_register_errors,
+        throttle: SignalThrottle::new(),
+        first_poll: true,
+    };
+    let mut connects = 0u32;
+
+    loop {
+        let wake = tokio::select! {
+            event = task.next_event() => Wake::Event(event),
+            changed = control.changed() => Wake::Control(match changed {
+                Ok(()) => *control.borrow_and_update(),
+                Err(_) => PollControl::Stop,
+            }),
+        };
+        match wake {
+            Wake::Control(PollControl::Run) => task.resume(),
+            Wake::Control(PollControl::Pause) => task.pause(),
+            Wake::Control(PollControl::Stop) => break,
+            Wake::Event(None | Some(TaskEvent::AllRetired)) => return,
+            Wake::Event(Some(TaskEvent::Connected)) => {
+                connects += 1;
+                if connects > 1 {
+                    tlog!("{} reconnected", drain.label);
+                }
+            }
+            Wake::Event(Some(TaskEvent::Batch(events))) => {
+                for event in events {
+                    drain.on_poll_event(event, &task).await;
+                }
+            }
+            Wake::Event(Some(TaskEvent::Disconnected {
+                error,
+                consecutive,
+                retry_in,
+            })) => {
+                if drain.gives_up_on_disconnect(&error, consecutive, retry_in) {
+                    break;
+                }
+            }
         }
+    }
+    task.stop().await;
+}
 
-        let outcome = {
-            let mut conn = conn.lock().await;
-            // One TCP connection multiplexes all slaves; switching inside the
-            // held lock keeps concurrent poll tasks from racing the unit id.
-            conn.set_unit(poll.device_address);
-            conn.read(&poll.register_type, poll.start_register, poll.count).await
-        };
-        let result = match outcome {
-            ReadOutcome::Registers(regs) => Ok(ReadData::Registers(regs)),
-            ReadOutcome::Coils(coils) => Ok(ReadData::Coils(coils)),
-            ReadOutcome::Exception(m) => Err(ReadError::Exception(m)),
-            ReadOutcome::Silent(m) => Err(ReadError::Io(m)),
-        };
+struct Drain {
+    sink: FrameSink,
+    label: String,
+    max_register_errors: u32,
+    throttle: SignalThrottle,
+    first_poll: bool,
+}
 
-        match result {
-            Ok(data) => {
-                if health.on_ok() {
+impl Drain {
+    fn limit_text(&self) -> String {
+        match self.max_register_errors {
+            0 => "∞".to_string(),
+            limit => limit.to_string(),
+        }
+    }
+
+    async fn on_poll_event(&mut self, event: PollEvent<PollGroup>, task: &PollTask<PollGroup>) {
+        let label = &self.label;
+        match event {
+            PollEvent::Read {
+                tag: poll,
+                reading,
+                recovered,
+                ..
+            } => {
+                let type_name = register_type_name(&poll.register_type);
+                if recovered {
                     tlog!(
                         "{} {} reg {} recovered, back to every {}ms",
                         label,
@@ -338,10 +344,8 @@ pub async fn run_poll_task(
                         poll.interval_ms
                     );
                 }
-
-                let frames = frames_for_read(&poll, data);
-
-                if first_poll {
+                let frames = frames_for_read(&poll, reading.data, reading.at);
+                if self.first_poll {
                     tlog!(
                         "{} first poll OK: {} reg {} → {} frame(s)",
                         label,
@@ -349,63 +353,97 @@ pub async fn run_poll_task(
                         poll.start_register,
                         frames.len()
                     );
-                    first_poll = false;
+                    self.first_poll = false;
                 }
-
-                sink.frames(frames, &mut throttle).await;
+                self.sink.frames(frames, &mut self.throttle).await;
             }
-            Err(e @ ReadError::Exception(_)) => {
-                let delay = health.on_exception();
+            PollEvent::Exception {
+                tag: poll,
+                code,
+                retry_in,
+                ..
+            } => {
+                let type_name = register_type_name(&poll.register_type);
                 tlog!(
-                    "{} error reading {} at {}: {} (next read in {:?})",
+                    "{} error reading {} at {}: Modbus exception: {} (next read in {:?})",
                     label,
                     type_name,
                     poll.start_register,
-                    e,
-                    delay
+                    code,
+                    retry_in
                 );
-                sink.error(format!(
-                    "Modbus read error ({} @ {}): {}",
-                    type_name, poll.start_register, e
+                self.sink.error(format!(
+                    "Modbus read error ({} @ {}): Modbus exception: {}",
+                    type_name, poll.start_register, code
                 ));
             }
-            Err(e @ ReadError::Io(_)) => {
-                let stop = health.on_io_error(max_register_errors);
-
+            PollEvent::Transport {
+                item,
+                tag: poll,
+                error,
+                consecutive,
+                ..
+            } => {
+                let type_name = register_type_name(&poll.register_type);
                 tlog!(
-                    "{} error reading {} at {}: {} ({}/{})",
+                    "{} error reading {} at {}: IO error: {} ({}/{})",
                     label,
                     type_name,
                     poll.start_register,
-                    e,
-                    health.io_errors,
-                    if max_register_errors > 0 {
-                        max_register_errors.to_string()
-                    } else {
-                        "∞".to_string()
-                    }
+                    error,
+                    consecutive,
+                    self.limit_text()
                 );
-                sink.error(format!(
-                    "Modbus read error ({} @ {}): {}",
-                    type_name, poll.start_register, e
+                self.sink.error(format!(
+                    "Modbus read error ({} @ {}): IO error: {}",
+                    type_name, poll.start_register, error
                 ));
-
-                if stop {
+                if exhausted(consecutive, self.max_register_errors) {
+                    task.retire(item);
                     tlog!(
                         "{} stopped polling {} reg {} after {} consecutive errors",
                         label,
                         type_name,
                         poll.start_register,
-                        health.io_errors
+                        consecutive
                     );
-                    sink.error(format!(
+                    self.sink.error(format!(
                         "Stopped polling {} @ {} after {} consecutive errors",
-                        type_name, poll.start_register, health.io_errors
+                        type_name, poll.start_register, consecutive
                     ));
-                    break;
                 }
             }
         }
+    }
+
+    fn gives_up_on_disconnect(
+        &self,
+        error: &TransportError,
+        consecutive: u32,
+        retry_in: Duration,
+    ) -> bool {
+        if exhausted(consecutive, self.max_register_errors) {
+            tlog!(
+                "{} stopped polling after {} failed connection attempts: {}",
+                self.label,
+                consecutive,
+                error
+            );
+            self.sink.error(format!(
+                "Stopped polling after {consecutive} failed connection attempts: {error}"
+            ));
+            return true;
+        }
+        tlog!(
+            "{} disconnected: {} ({}/{}), reconnecting in {:?}",
+            self.label,
+            error,
+            consecutive,
+            self.limit_text(),
+            retry_in
+        );
+        self.sink.error(format!("Modbus connection lost: {error}"));
+        false
     }
 }
 
@@ -425,79 +463,14 @@ mod tests {
         }
     }
 
-    fn skipped_ticks(health: &mut ReadHealth) -> u32 {
-        let mut skipped = 0;
-        while !health.should_read() {
-            skipped += 1;
-        }
-        skipped
-    }
-
-    #[test]
-    fn an_exception_backs_off_to_twice_the_interval_then_four_times() {
-        let mut health = ReadHealth::new(1000);
-        assert_eq!(health.on_exception(), Duration::from_secs(2));
-        assert_eq!(skipped_ticks(&mut health), 1);
-        assert_eq!(health.on_exception(), Duration::from_secs(4));
-        assert_eq!(skipped_ticks(&mut health), 3);
-    }
-
-    #[test]
-    fn backoff_caps_at_ten_minutes() {
-        let mut health = ReadHealth::new(1000);
-        for _ in 0..40 {
-            health.on_exception();
-        }
-        assert_eq!(health.on_exception(), Duration::from_secs(600));
-        assert_eq!(skipped_ticks(&mut health), 599);
-    }
-
-    #[test]
-    fn exceptions_do_not_count_towards_the_io_error_limit() {
-        let mut health = ReadHealth::new(1000);
-        for _ in 0..100 {
-            health.on_exception();
-        }
-        assert!(!health.on_io_error(2));
-    }
-
-    #[test]
-    fn io_errors_still_stop_at_the_limit() {
-        let mut health = ReadHealth::new(1000);
-        assert!(!health.on_io_error(3));
-        assert!(!health.on_io_error(3));
-        assert!(health.on_io_error(3));
-    }
-
-    #[test]
-    fn a_limit_of_zero_never_stops_on_io_errors() {
-        let mut health = ReadHealth::new(1000);
-        assert!((0..1000).all(|_| !health.on_io_error(0)));
-    }
-
-    #[test]
-    fn an_exception_resets_the_io_error_count() {
-        let mut health = ReadHealth::new(1000);
-        health.on_io_error(2);
-        health.on_exception();
-        assert!(!health.on_io_error(2));
-    }
-
-    #[test]
-    fn a_success_resets_the_backoff() {
-        let mut health = ReadHealth::new(1000);
-        health.on_exception();
-        health.on_exception();
-        assert!(health.on_ok());
-        assert!(health.should_read());
-        assert!(!health.on_ok());
-        assert_eq!(health.on_exception(), Duration::from_secs(2));
-    }
-
     #[test]
     fn block_mode_emits_one_frame_for_the_whole_read() {
         let p = poll(RegisterType::Holding, 100, 2, PollEmitMode::Block);
-        let frames = frames_for_read(&p, ReadData::Registers(vec![0x1234, 0xABCD]));
+        let frames = frames_for_read(
+            &p,
+            ReadData::Registers(vec![0x1234, 0xABCD]),
+            SystemTime::now(),
+        );
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].frame_id, 13007);
         assert_eq!(frames[0].bytes, vec![0x12, 0x34, 0xAB, 0xCD]);
@@ -507,7 +480,11 @@ mod tests {
     #[test]
     fn per_register_mode_keys_each_frame_by_its_address() {
         let p = poll(RegisterType::Holding, 100, 3, PollEmitMode::PerRegister);
-        let frames = frames_for_read(&p, ReadData::Registers(vec![0x0001, 0xFFFF, 0x4D42]));
+        let frames = frames_for_read(
+            &p,
+            ReadData::Registers(vec![0x0001, 0xFFFF, 0x4D42]),
+            SystemTime::now(),
+        );
         assert_eq!(frames.len(), 3);
         assert_eq!(
             frames.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
@@ -520,14 +497,18 @@ mod tests {
     #[test]
     fn every_frame_carries_the_slave_address_as_its_bus() {
         let p = poll(RegisterType::Input, 0, 2, PollEmitMode::PerRegister);
-        let frames = frames_for_read(&p, ReadData::Registers(vec![1, 2]));
+        let frames = frames_for_read(&p, ReadData::Registers(vec![1, 2]), SystemTime::now());
         assert!(frames.iter().all(|f| f.bus == 3));
     }
 
     #[test]
     fn per_register_coils_emit_one_byte_each() {
         let p = poll(RegisterType::Coil, 8, 3, PollEmitMode::PerRegister);
-        let frames = frames_for_read(&p, ReadData::Coils(vec![true, false, true]));
+        let frames = frames_for_read(
+            &p,
+            ReadData::Coils(vec![true, false, true]),
+            SystemTime::now(),
+        );
         assert_eq!(
             frames.iter().map(|f| (f.frame_id, f.bytes.clone())).collect::<Vec<_>>(),
             vec![(8, vec![1]), (9, vec![0]), (10, vec![1])]
@@ -537,7 +518,11 @@ mod tests {
     #[test]
     fn block_coils_stay_packed_lsb_first() {
         let p = poll(RegisterType::Coil, 0, 3, PollEmitMode::Block);
-        let frames = frames_for_read(&p, ReadData::Coils(vec![true, false, true]));
+        let frames = frames_for_read(
+            &p,
+            ReadData::Coils(vec![true, false, true]),
+            SystemTime::now(),
+        );
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].bytes, vec![0b0000_0101]);
     }
@@ -583,7 +568,7 @@ bit_length = 20
             coils[i] = true;
         }
         let p = poll(RegisterType::Coil, 13007, 24, PollEmitMode::Block);
-        let frames = frames_for_read(&p, ReadData::Coils(coils));
+        let frames = frames_for_read(&p, ReadData::Coils(coils), SystemTime::now());
         assert_eq!(frames[0].bytes, vec![0x09, 0x01, 0x02]);
 
         let d = decode_by_id(&catalog, frames[0].frame_id, &frames[0].bytes).unwrap();
@@ -592,5 +577,198 @@ bit_length = 20
         assert_eq!(value("Coil3"), 1.0);
         assert_eq!(value("Coil17"), 1.0);
         assert_eq!(value("Wide"), 131_337.0); // 0x020109, coils 0·3·8·17
+    }
+
+    #[test]
+    fn every_frame_is_stamped_with_the_time_of_its_read() {
+        let p = poll(RegisterType::Holding, 0, 2, PollEmitMode::PerRegister);
+        let at = UNIX_EPOCH + Duration::from_micros(1_700_000_000_123_456);
+        let frames = frames_for_read(&p, ReadData::Registers(vec![1, 2]), at);
+        assert!(frames
+            .iter()
+            .all(|f| f.timestamp_us == 1_700_000_000_123_456));
+    }
+
+    #[test]
+    fn a_run_of_failures_is_exhausted_at_the_limit_and_never_at_zero() {
+        assert!(!exhausted(1, 2));
+        assert!(exhausted(2, 2));
+        assert!(exhausted(3, 2));
+        assert!((1..10_000).all(|n| !exhausted(n, 0)));
+    }
+
+    #[test]
+    fn an_ipv6_host_is_bracketed_and_a_name_is_left_alone() {
+        assert_eq!(tcp_endpoint("::1", 502), "[::1]:502");
+        assert_eq!(tcp_endpoint("10.0.0.5", 502), "10.0.0.5:502");
+        assert_eq!(tcp_endpoint("plc.local", 1502), "plc.local:1502");
+    }
+
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::Notify;
+    use tokio::time::timeout;
+
+    /// A holding-register device on loopback whose registers read back their
+    /// own address. A read at `drop_at` loses the connection instead of being
+    /// answered; once `answers` replies have gone out the device goes away and
+    /// refuses every connection.
+    struct Device {
+        port: u16,
+        reads: Arc<Mutex<Vec<u16>>>,
+    }
+
+    async fn device(drop_at: Option<u16>, answers: Option<usize>) -> Device {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let reads = Arc::new(Mutex::new(Vec::new()));
+        let remaining = Arc::new(Mutex::new(answers));
+        let gone = Arc::new(Notify::new());
+        let (seen, left, vanish) = (reads.clone(), remaining.clone(), gone.clone());
+        tokio::spawn(async move {
+            loop {
+                let mut socket = tokio::select! {
+                    accepted = listener.accept() => accepted.unwrap().0,
+                    () = vanish.notified() => return,
+                };
+                let (seen, left, vanish) = (seen.clone(), left.clone(), vanish.clone());
+                tokio::spawn(async move {
+                    let mut header = [0u8; 7];
+                    while socket.read_exact(&mut header).await.is_ok() {
+                        let mut pdu = [0u8; 5];
+                        socket.read_exact(&mut pdu).await.unwrap();
+                        let start = u16::from_be_bytes([pdu[1], pdu[2]]);
+                        let count = u16::from_be_bytes([pdu[3], pdu[4]]);
+                        seen.lock().unwrap().push(start);
+                        let exhausted = match left.lock().unwrap().as_mut() {
+                            Some(0) => true,
+                            Some(n) => {
+                                *n -= 1;
+                                false
+                            }
+                            None => false,
+                        };
+                        if exhausted {
+                            vanish.notify_one();
+                            return;
+                        }
+                        if Some(start) == drop_at {
+                            return;
+                        }
+                        let mut reply = vec![0x03, (count * 2) as u8];
+                        for register in start..start + count {
+                            reply.extend(register.to_be_bytes());
+                        }
+                        let mut adu = header[..4].to_vec();
+                        adu.extend((reply.len() as u16 + 1).to_be_bytes());
+                        adu.push(header[6]);
+                        adu.extend(reply);
+                        if socket.write_all(&adu).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        Device { port, reads }
+    }
+
+    fn holding(start: u16, count: u16) -> PollGroup {
+        PollGroup {
+            register_type: RegisterType::Holding,
+            start_register: start,
+            count,
+            interval_ms: 1000,
+            frame_id: 42,
+            device_address: 1,
+            emit_mode: PollEmitMode::Block,
+        }
+    }
+
+    async fn spawn_on(device: &Device, polls: &[PollGroup]) -> PollTask<PollGroup> {
+        let options = TcpOptions {
+            op_timeout: Duration::from_millis(500),
+            ..TcpOptions::default()
+        };
+        let mut conn = ModbusTcp::new(format!("127.0.0.1:{}", device.port), options);
+        conn.connect().await.unwrap();
+        let fast_reconnects = TaskOptions {
+            reconnect_initial: Duration::from_millis(10),
+            reconnect_max: Duration::from_millis(20),
+            ..TaskOptions::default()
+        };
+        spawn_polls(conn, polls, fast_reconnects)
+    }
+
+    fn broker_sink() -> (FrameSink, mpsc::Receiver<SourceMessage>) {
+        let (tx, rx) = mpsc::channel(64);
+        (FrameSink::Broker { source_idx: 0, tx }, rx)
+    }
+
+    #[tokio::test]
+    async fn a_read_becomes_frames_stamped_when_it_was_read_and_stop_ends_the_run() {
+        let device = device(None, None).await;
+        let task = spawn_on(&device, &[holding(5, 2)]).await;
+        let (sink, mut frames) = broker_sink();
+        let (control, control_rx) = watch::channel(PollControl::Run);
+        let before = now_us();
+        let run = tokio::spawn(run_poll_task(task, control_rx, sink, 1));
+
+        let Some(SourceMessage::Frames(0, batch)) = frames.recv().await else {
+            panic!("no frames");
+        };
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].frame_id, 42);
+        assert_eq!(batch[0].bytes, vec![0, 5, 0, 6]);
+        assert!((before..=now_us()).contains(&batch[0].timestamp_us));
+
+        control.send_replace(PollControl::Stop);
+        timeout(Duration::from_secs(2), run)
+            .await
+            .expect("stop hung")
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_group_that_keeps_losing_the_link_is_retired_at_the_limit() {
+        let device = device(Some(1000), None).await;
+        let task = spawn_on(&device, &[holding(1000, 1)]).await;
+        let (sink, _frames) = broker_sink();
+        let (_control, control_rx) = watch::channel(PollControl::Run);
+
+        timeout(
+            Duration::from_secs(2),
+            run_poll_task(task, control_rx, sink, 2),
+        )
+        .await
+        .expect("the last group retired but the run went on");
+        assert_eq!(*device.reads.lock().unwrap(), [1000, 1000]);
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_device_ends_the_run_at_the_limit() {
+        let device = device(None, Some(0)).await;
+        let task = spawn_on(&device, &[holding(0, 1)]).await;
+        let (sink, _frames) = broker_sink();
+        let (_control, control_rx) = watch::channel(PollControl::Run);
+
+        timeout(
+            Duration::from_secs(2),
+            run_poll_task(task, control_rx, sink, 2),
+        )
+        .await
+        .expect("the device was gone but the run went on");
+    }
+
+    #[tokio::test]
+    async fn a_limit_of_zero_keeps_reconnecting() {
+        let device = device(None, Some(0)).await;
+        let task = spawn_on(&device, &[holding(0, 1)]).await;
+        let (sink, _frames) = broker_sink();
+        let (_control, control_rx) = watch::channel(PollControl::Run);
+
+        let run = run_poll_task(task, control_rx, sink, 0);
+        assert!(timeout(Duration::from_millis(300), run).await.is_err());
     }
 }

@@ -438,7 +438,7 @@ pub async fn io_start_repeat_transmit(
 
         // Fire immediately, then once per interval. Cadence handles the cancel
         // check; subsequent ticks aren't skewed by the first transmit's latency.
-        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone);
         while cadence.next().await.is_some() {
             let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
             let (_, error) = write_and_notify(&result, &mut throttle);
@@ -555,7 +555,7 @@ pub async fn io_start_serial_repeat_transmit(
         };
 
         // Fire immediately, then once per interval (see io_start_repeat_transmit).
-        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone);
         while cadence.next().await.is_some() {
             let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
             let error = write_and_notify(&result, &mut throttle);
@@ -663,7 +663,7 @@ pub async fn io_start_repeat_group(
         // Fire the first cycle immediately, then one cycle per interval
         // (see io_start_repeat_transmit). All frames in a cycle are sent
         // back-to-back; the interval spaces the cycles.
-        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone);
         'outer: while cadence.next().await.is_some() {
             // Send all frames in sequence (no delays between them)
             for frame in &frames {

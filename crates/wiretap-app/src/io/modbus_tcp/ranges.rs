@@ -10,6 +10,8 @@
 // `modbus_polls` parameter with no new plumbing.
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use wiretap_catalog::modbus::{chunk_ranges, RangeSpec, RegisterRange};
 
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
 
@@ -86,82 +88,46 @@ impl Default for ModbusRangeSpec {
 
 /// Split each range into poll groups no larger than one Modbus request.
 ///
-/// The `max_groups` cap is load-bearing, not cosmetic: every poll group becomes
-/// its own task sharing one mutexed connection, so an unbounded sweep would
-/// spawn hundreds of tasks contending on the same socket at the same interval —
-/// the effective poll rate collapses and the device gets hammered.
+/// The `max_groups` cap is load-bearing, not cosmetic: every group is its own
+/// read on the source's one connection, so an unbounded sweep would make each
+/// poll pass hundreds of requests long and hammer the device.
 pub fn build_polls_from_ranges(spec: &ModbusRangeSpec) -> Result<Vec<PollGroup>, String> {
-    if spec.ranges.is_empty() {
-        return Err("No register ranges given".to_string());
-    }
-    if spec.block_size == 0 {
-        return Err("Block size must be at least 1".to_string());
-    }
-    // A zero interval is not a fast poll, it is a panic: `Cadence` hands the
-    // interval to `tokio::time::interval`, which rejects a zero period — inside
-    // a detached poll task, where it takes the source down with no diagnosis.
-    // Checked here rather than at each caller because every author of a spec
-    // (the picker, MCP) would otherwise have to know.
-    if spec.interval_ms == 0 || spec.ranges.iter().any(|r| r.interval_ms == Some(0)) {
-        return Err("Poll interval must be at least 1 ms".to_string());
-    }
+    let catalogue_spec = RangeSpec {
+        ranges: spec
+            .ranges
+            .iter()
+            .map(|r| RegisterRange {
+                register_type: r.register_type.catalog(),
+                start: r.start,
+                end: r.end,
+                interval: r.interval_ms.map(Duration::from_millis),
+                device_address: r.device_address,
+            })
+            .collect(),
+        device_address: spec.device_address,
+        interval: Duration::from_millis(spec.interval_ms),
+        block_size: spec.block_size,
+        max_registers: spec.max_registers,
+    };
+    let items = chunk_ranges(&catalogue_spec, ()).map_err(|e| e.to_string())?;
 
-    let mut total_registers: u32 = 0;
-    for r in &spec.ranges {
-        if r.start > r.end {
-            return Err(format!(
-                "Range {}..{} is inverted — start must be <= end",
-                r.start, r.end
-            ));
-        }
-        total_registers += (r.end as u32) - (r.start as u32) + 1;
-    }
-    if total_registers > spec.max_registers {
+    if items.len() > spec.max_groups as usize {
         return Err(format!(
-            "Range spec covers {} registers, over the {} limit — narrow the range or raise max_registers",
-            total_registers, spec.max_registers
-        ));
-    }
-
-    let mut polls = Vec::new();
-    for r in &spec.ranges {
-        let block = spec.block_size.min(r.register_type.catalog().max_per_read());
-        let interval_ms = r.interval_ms.unwrap_or(spec.interval_ms);
-        let device_address = r.device_address.unwrap_or(spec.device_address);
-
-        let mut pos = r.start;
-        loop {
-            let remaining = r.end - pos + 1;
-            let count = remaining.min(block);
-            polls.push(PollGroup {
-                register_type: r.register_type.clone(),
-                start_register: pos,
-                count,
-                interval_ms,
-                // Only consulted in `Block` mode; `PerRegister` derives an id per
-                // register from `start_register`.
-                frame_id: pos as u32,
-                device_address,
-                emit_mode: spec.emit_mode,
-            });
-            // `pos + count` can overflow u16 at the very top of the address space.
-            match pos.checked_add(count) {
-                Some(next) if next <= r.end => pos = next,
-                _ => break,
-            }
-        }
-    }
-
-    if polls.len() > spec.max_groups as usize {
-        return Err(format!(
-            "Range spec needs {} poll groups, over the {} limit — each group is a task sharing one \
-             connection, so raise block_size or narrow the range",
-            polls.len(),
+            "Range spec needs {} poll groups, over the {} limit — each group is a separate read \
+             on one connection, so raise block_size or narrow the range",
+            items.len(),
             spec.max_groups
         ));
     }
 
-    Ok(polls)
+    // `PerRegister` derives an id per register; `frame_id` is only read in `Block` mode.
+    Ok(items
+        .into_iter()
+        .map(|item| {
+            let frame_id = item.start as u32;
+            PollGroup::from_item(item, frame_id, spec.emit_mode)
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -262,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn too_many_groups_is_rejected_before_spawning_tasks() {
+    fn too_many_groups_is_rejected() {
         let mut s = spec(vec![range(RegisterType::Holding, 0, 8191)]);
         s.max_registers = 65535;
         s.block_size = 1;
@@ -287,9 +253,7 @@ mod tests {
     }
 
     #[test]
-    fn a_zero_interval_is_rejected_rather_than_panicking_a_poll_task() {
-        // `tokio::time::interval` panics on a zero period, and it would do so
-        // inside the detached poll task where nothing reports it.
+    fn a_zero_interval_is_rejected() {
         let mut s = spec(vec![range(RegisterType::Holding, 0, 9)]);
         s.interval_ms = 0;
         assert!(build_polls_from_ranges(&s).unwrap_err().contains("interval"));

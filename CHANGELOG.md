@@ -7,6 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Changed
 
 - **A Modbus register the device rejects is read less often, not given up on.** A poll group whose reads come back as a Modbus exception keeps polling, backing off to once every 10 minutes, and goes back to its normal interval as soon as a read succeeds. *Max Consecutive Register Errors* now counts connection errors only, so a catalogue with registers your device does not implement no longer stops those groups for good.
+- **A Modbus TCP session rides out a device that drops off.** It now reconnects on its own, waiting 1 second between attempts and doubling up to 30 seconds, and reads every register again as soon as the device is back. *Max Consecutive Register Errors* now also limits the reconnect attempts: the session stops after that many fail in a row, and 0 keeps trying for good.
 
 ### Fixed
 

@@ -4,7 +4,7 @@
 //
 // Architecture:
 //   - Connects to a Modbus TCP server (PLC, sensor, etc.)
-//   - Spawns one poll task per PollGroup, each with its own interval timer
+//   - Runs one poll task for all its PollGroups, each group on its own interval
 //   - Each poll response becomes a FrameMessage with protocol="modbus"
 //   - frame_id = register_number from the catalog
 //   - bytes = raw register data (big-endian, 2 bytes per register)
@@ -14,13 +14,12 @@
 
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::time::Duration;
 use tauri::AppHandle;
+use tokio::sync::watch;
+use wiretap_catalog::modbus::PollItem;
 
-use super::poll::{connect_for_polling, run_poll_task, FrameSink};
+use super::poll::{run_poll_task, start_polling, FrameSink, PollControl};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_stream_ended, lifecycle::SourceLifecycle, IOCapabilities, IOSource,
@@ -99,6 +98,32 @@ fn default_device_address() -> u8 {
     1
 }
 
+impl PollGroup {
+    pub(super) fn from_item<T>(item: PollItem<T>, frame_id: u32, emit_mode: PollEmitMode) -> Self {
+        Self {
+            register_type: super::map_register_type(item.register_type),
+            start_register: item.start,
+            count: item.count,
+            interval_ms: item.interval.as_millis() as u64,
+            frame_id,
+            device_address: item.device_address,
+            emit_mode,
+        }
+    }
+
+    /// A zero interval would poll flat out.
+    pub(super) fn to_item(&self) -> PollItem<PollGroup> {
+        PollItem {
+            register_type: self.register_type.catalog(),
+            start: self.start_register,
+            count: self.count,
+            interval: Duration::from_millis(self.interval_ms.max(1)),
+            device_address: self.device_address,
+            tag: self.clone(),
+        }
+    }
+}
+
 /// Modbus TCP source configuration
 #[derive(Clone, Debug)]
 pub struct ModbusTcpConfig {
@@ -123,9 +148,8 @@ pub struct ModbusTcpSource {
     session_id: String,
     config: ModbusTcpConfig,
     state: IOState,
-    cancel_flag: Arc<AtomicBool>,
-    pause_flag: Arc<AtomicBool>,
-    task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
+    control: Option<watch::Sender<PollControl>>,
+    poll_handle: Option<tauri::async_runtime::JoinHandle<()>>,
     lifecycle: SourceLifecycle,
 }
 
@@ -137,10 +161,15 @@ impl ModbusTcpSource {
             session_id,
             config,
             state: IOState::Stopped,
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            pause_flag: Arc::new(AtomicBool::new(false)),
-            task_handles: Vec::new(),
+            control: None,
+            poll_handle: None,
             lifecycle: SourceLifecycle::new(),
+        }
+    }
+
+    fn send_control(&self, command: PollControl) {
+        if let Some(control) = &self.control {
+            control.send_replace(command);
         }
     }
 }
@@ -170,10 +199,14 @@ impl IOSource for ModbusTcpSource {
         }
 
         self.state = IOState::Starting;
-        self.cancel_flag.store(false, Ordering::Relaxed);
 
-        let conn =
-            connect_for_polling(&self.config.host, self.config.port, self.config.unit_id).await?;
+        let task = start_polling(
+            &self.config.host,
+            self.config.port,
+            self.config.unit_id,
+            &self.config.polls,
+        )
+        .await?;
 
         // Create frame capture
         capture_store::create_session_capture(&self.session_id, CaptureKind::Frames, self.session_id.clone());
@@ -195,45 +228,28 @@ impl IOSource for ModbusTcpSource {
             self.config.polls.len()
         );
 
-        // Shared by every poll task, so the source reads stopped once the last
-        // group has given up on its register errors.
-        let ended = Arc::new(self.lifecycle.guard(IOState::Stopped));
-        for poll in &self.config.polls {
-            let poll = poll.clone();
-            let conn = conn.clone();
-            let cancel = self.cancel_flag.clone();
-            let pause = self.pause_flag.clone();
-            let max_register_errors = self.config.max_register_errors;
-            let session_id = self.session_id.clone();
-            let ended = ended.clone();
-            let handle = tauri::async_runtime::spawn(async move {
-                let _ended = ended;
-                run_poll_task(
-                    poll,
-                    conn,
-                    max_register_errors,
-                    cancel,
-                    pause,
-                    FrameSink::SessionCapture { session_id },
-                )
-                .await;
-            });
-            self.task_handles.push(handle);
-        }
+        let (control, control_rx) = watch::channel(PollControl::Run);
+        let ended = self.lifecycle.guard(IOState::Stopped);
+        let sink = FrameSink::SessionCapture {
+            session_id: self.session_id.clone(),
+        };
+        let max_register_errors = self.config.max_register_errors;
+        self.poll_handle = Some(tauri::async_runtime::spawn(async move {
+            let _ended = ended;
+            run_poll_task(task, control_rx, sink, max_register_errors).await;
+        }));
+        self.control = Some(control);
 
         self.state = IOState::Running;
         Ok(())
     }
 
     async fn stop(&mut self) -> Result<(), String> {
-        self.cancel_flag.store(true, Ordering::Relaxed);
-
-        // Wait for all poll tasks to finish
-        for handle in self.task_handles.drain(..) {
+        self.send_control(PollControl::Stop);
+        if let Some(handle) = self.poll_handle.take() {
             let _ = handle.await;
         }
 
-        // Disconnect (the context is dropped when all Arc refs are released)
         tlog!("[ModbusTCP:{}] Stopped", self.session_id);
         emit_stream_ended(&self.session_id, "stopped", "ModbusTCP");
 
@@ -245,7 +261,7 @@ impl IOSource for ModbusTcpSource {
         if self.state != IOState::Running {
             return Err("Source is not running".to_string());
         }
-        self.pause_flag.store(true, Ordering::Relaxed);
+        self.send_control(PollControl::Pause);
         self.state = IOState::Paused;
         tlog!("[ModbusTCP:{}] Polling paused", self.session_id);
         Ok(())
@@ -255,7 +271,7 @@ impl IOSource for ModbusTcpSource {
         if self.state != IOState::Paused {
             return Err("Source is not paused".to_string());
         }
-        self.pause_flag.store(false, Ordering::Relaxed);
+        self.send_control(PollControl::Run);
         self.state = IOState::Running;
         tlog!("[ModbusTCP:{}] Polling resumed", self.session_id);
         Ok(())

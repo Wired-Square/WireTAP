@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use tauri::AppHandle;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::time::{Duration, interval};
 
 use super::types::{SerialOverrides, SourceConfig};
@@ -17,7 +17,7 @@ use crate::io::bus_mapping::BusMapping;
 use crate::io::gvret::run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
-use crate::io::modbus_tcp::poll::{connect_for_polling, run_poll_task, FrameSink};
+use crate::io::modbus_tcp::poll::{run_poll_task, start_polling, FrameSink, PollControl};
 use crate::io::modbus_tcp::PollGroup;
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
@@ -757,7 +757,7 @@ async fn run_modbus_tcp_client(
         return Ok(());
     }
 
-    let conn = connect_for_polling(&host, port, unit_id).await?;
+    let task = start_polling(&host, port, unit_id, &polls).await?;
     let address = format!("{}:{}", host, port);
 
     // Signal that we're connected
@@ -775,39 +775,38 @@ async fn run_modbus_tcp_client(
         source_idx, address, unit_id, polls.len(), output_bus
     );
 
-    // Spawn one poll task per group
-    let mut poll_handles = Vec::new();
-    for poll in &polls {
-        let tx_clone = tx.clone();
-        let conn_clone = conn.clone();
-        let stop_clone = stop_flag.clone();
-        let pause_clone = pause_flag.clone();
-        let poll = poll.clone();
-
-        let handle = tokio::spawn(async move {
-            run_poll_task(
-                poll,
-                conn_clone,
-                max_register_errors,
-                stop_clone,
-                pause_clone,
-                FrameSink::Broker {
-                    source_idx,
-                    tx: tx_clone,
-                },
-            )
-            .await;
-        });
-        poll_handles.push(handle);
-    }
-
-    // Wait for all poll tasks to finish
-    for handle in poll_handles {
-        let _ = handle.await;
+    let (control, control_rx) = watch::channel(PollControl::Run);
+    let sink = FrameSink::Broker {
+        source_idx,
+        tx: tx.clone(),
+    };
+    tokio::select! {
+        () = run_poll_task(task, control_rx, sink, max_register_errors) => {}
+        () = relay_source_flags(&stop_flag, &pause_flag, &control) => {}
     }
 
     let _ = tx
         .send(SourceMessage::Ended(source_idx, EndReason::Stopped))
         .await;
     Ok(())
+}
+
+/// The broker signals its sources through shared flags and a poll task takes
+/// commands, so this relays one to the other until it is dropped.
+async fn relay_source_flags(
+    stop: &AtomicBool,
+    pause: &AtomicBool,
+    control: &watch::Sender<PollControl>,
+) {
+    loop {
+        let wanted = if stop.load(Ordering::Relaxed) {
+            PollControl::Stop
+        } else if pause.load(Ordering::Relaxed) {
+            PollControl::Pause
+        } else {
+            PollControl::Run
+        };
+        control.send_if_modified(|current| std::mem::replace(current, wanted) != wanted);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }

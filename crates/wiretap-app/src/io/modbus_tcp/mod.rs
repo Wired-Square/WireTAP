@@ -108,18 +108,12 @@ pub fn build_polls_from_catalog(catalog_toml: &str) -> Result<Vec<PollGroup>, St
         Err(e) => return Err(format!("Failed to parse catalog: {e}")),
     };
     Ok(manifest
-        .frames
-        .iter()
-        .filter(|f| !f.disabled)
-        .map(|f| PollGroup {
-            register_type: map_register_type(f.register_type),
-            start_register: manifest.protocol_address(f),
-            count: f.length,
-            interval_ms: f.interval_ms,
-            frame_id: f.register_number as u32,
-            device_address: f.device_address,
-            // Catalogue signals are bit offsets into the whole block.
-            emit_mode: PollEmitMode::Block,
+        .poll_items(|_, f| f.register_number as u32)
+        .into_iter()
+        // Catalogue signals are bit offsets into the whole block.
+        .map(|item| {
+            let frame_id = item.tag;
+            PollGroup::from_item(item, frame_id, PollEmitMode::Block)
         })
         .collect())
 }
