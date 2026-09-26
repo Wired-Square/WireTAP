@@ -3958,7 +3958,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 3.5.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -8584,8 +8584,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.16.5"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.5#4eac078e73ef02a05e6a1cb9bfd484e0e76b83e7"
+version = "0.16.6"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.6#746fb94980c250d52fd5e362130a0f9e538a4946"
 dependencies = [
  "rayon",
  "serde",
@@ -8594,8 +8594,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.16.5"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.5#4eac078e73ef02a05e6a1cb9bfd484e0e76b83e7"
+version = "0.16.6"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.6#746fb94980c250d52fd5e362130a0f9e538a4946"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8610,8 +8610,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-checksum"
-version = "0.16.5"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.5#4eac078e73ef02a05e6a1cb9bfd484e0e76b83e7"
+version = "0.16.6"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.6#746fb94980c250d52fd5e362130a0f9e538a4946"
 dependencies = [
  "rayon",
  "serde",
@@ -8620,8 +8620,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.16.5"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.5#4eac078e73ef02a05e6a1cb9bfd484e0e76b83e7"
+version = "0.16.6"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.6#746fb94980c250d52fd5e362130a0f9e538a4946"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -8640,8 +8640,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-protocol"
-version = "0.16.5"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.5#4eac078e73ef02a05e6a1cb9bfd484e0e76b83e7"
+version = "0.16.6"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.6#746fb94980c250d52fd5e362130a0f9e538a4946"
 
 [[package]]
 name = "wit-bindgen"
