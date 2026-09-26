@@ -8570,7 +8570,6 @@ dependencies = [
  "tauri-plugin-store",
  "time",
  "tokio",
- "tokio-modbus",
  "tokio-tungstenite",
  "toml 0.8.23",
  "tracing-subscriber",

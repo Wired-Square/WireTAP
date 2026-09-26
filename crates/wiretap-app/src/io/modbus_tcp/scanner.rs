@@ -14,16 +14,17 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
 use tokio::time::{sleep, Duration};
 
-use super::conn::{ModbusConn, ReadOutcome};
 use super::poll::{modbus_frame, per_register_frames, register_type_name, FrameSink, ReadData};
 use super::reader::RegisterType;
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes};
+use wiretap_io::modbus::{DeviceIdCode, ModbusTcp, ReadRequest, Reading, RequestError, TcpOptions};
 use crate::io::SignalThrottle;
 
 /// Device identification info discovered via FC43 (Read Device Identification)
@@ -143,6 +144,40 @@ pub fn clear_scan_state(session_id: &str) {
 // ============================================================================
 // Configuration
 // ============================================================================
+
+async fn resolve(host: &str, port: u16) -> Result<SocketAddr, String> {
+    crate::io::net::resolve_host_port(host, port)
+        .await
+        .map_err(|e| e.user_message())
+}
+
+/// A sweep's connection. The connect is bounded by the same timeout as each
+/// request, so an unreachable device costs one timeout, not the OS's.
+fn sweep_connection(
+    addr: SocketAddr,
+    timeout_ms: u64,
+    settle_ms: u64,
+    reconnect_per_request: bool,
+) -> ModbusTcp {
+    let timeout = Duration::from_millis(timeout_ms);
+    let options = TcpOptions {
+        connect_timeout: timeout,
+        op_timeout: timeout,
+        settle: Duration::from_millis(settle_ms),
+        reconnect_per_request,
+        ..TcpOptions::default()
+    };
+    ModbusTcp::new(addr.to_string(), options)
+}
+
+fn read_request(register_type: &RegisterType, start: u16, count: u16, unit: u8) -> ReadRequest {
+    ReadRequest {
+        register_type: register_type.catalog(),
+        start,
+        count,
+        unit: Some(unit),
+    }
+}
 
 fn default_timeout_ms() -> u64 {
     2000
@@ -559,19 +594,20 @@ pub async fn scan_registers(
         config.max_requests
     );
 
-    let mut conn = ModbusConn::connect(
-        &config.host,
-        config.port,
-        config.unit_id,
+    let addr = resolve(&config.host, config.port).await?;
+    let mut conn = sweep_connection(
+        addr,
         config.timeout_ms,
         config.connect_settle_ms,
         config.reconnect_per_request,
-    )
-    .await?;
+    );
+    conn.connect()
+        .await
+        .map_err(|e| format!("Failed to connect to Modbus TCP server: {e}"))?;
 
     tlog!(
         "[ModbusScan] Connected to {} (unit {})",
-        conn.addr(),
+        addr,
         config.unit_id
     );
 
@@ -626,29 +662,24 @@ pub async fn scan_registers(
             }
 
             let outcome = conn
-                .read(&config.register_type, start, count)
+                .read(read_request(&config.register_type, start, count, config.unit_id))
                 .await;
             requests += 1;
 
-            if outcome.device_replied() {
+            if !matches!(outcome, Err(RequestError::Transport(_))) {
                 consecutive_timeouts = 0;
             }
 
             match outcome {
-                ReadOutcome::Registers(_) | ReadOutcome::Coils(_) => {
-                    let data = match outcome {
-                        ReadOutcome::Registers(d) => ReadData::Registers(d),
-                        ReadOutcome::Coils(d) => ReadData::Coils(d),
-                        _ => unreachable!("matched a success arm"),
-                    };
-                    let frames = per_register_frames(start, config.unit_id, data);
+                Ok(reading) => {
+                    let frames = per_register_frames(start, config.unit_id, reading.data);
                     if pass == 1 {
                         found_addrs.extend(frames.iter().map(|f| f.frame_id as u16));
                     }
                     found_count += frames.len() as u32;
                     sink.frames(frames, &mut frame_throttle).await;
                 }
-                ReadOutcome::Exception(_) => {
+                Err(RequestError::Exception { .. }) => {
                     // The device answered, so the address is the problem —
                     // bisect to find exactly which ones are illegal.
                     if count > 1 {
@@ -659,7 +690,7 @@ pub async fn scan_registers(
                     }
                     // A single register that excepts simply doesn't exist.
                 }
-                ReadOutcome::Silent(reason) => {
+                Err(RequestError::Transport(reason)) => {
                     consecutive_timeouts += 1;
                     tlog!(
                         "[ModbusScan] {} {}..{} silent: {} ({}/{})",
@@ -741,8 +772,6 @@ pub async fn scan_unit_ids(
     session_id: Option<String>,
     sink: &FrameSink,
 ) -> Result<ScanCompletePayload, String> {
-    use tokio_modbus::prelude::*;
-
     let start_time = std::time::Instant::now();
     let mut reporter = ProgressReporter::new(session_id);
     let mut frame_throttle = SignalThrottle::new();
@@ -763,9 +792,7 @@ pub async fn scan_unit_ids(
         config.inter_request_delay_ms
     );
 
-    let addr = crate::io::net::resolve_host_port(&config.host, config.port)
-        .await
-        .map_err(|e| e.user_message())?;
+    let addr = resolve(&config.host, config.port).await?;
 
     let mut found_count: u32 = 0;
     let mut requests: u32 = 0;
@@ -782,35 +809,25 @@ pub async fn scan_unit_ids(
         }
 
         let mut unit_found = false;
+        let mut conn = sweep_connection(addr, config.timeout_ms, config.connect_settle_ms, false);
 
         if fc43_supported {
-            // FC43 has no wrapper on ModbusConn — it's the one request the sweep
-            // makes that isn't a register read.
-            let ident = tokio::time::timeout(
-                Duration::from_millis(config.timeout_ms),
-                async {
-                    tcp::connect_slave(addr, Slave(unit_id))
-                        .await
-                        .map_err(|e| e.to_string())?
-                        .read_device_identification(ReadCode::Basic, 0x00)
-                        .await
-                        .map_err(|e| e.to_string())
-                },
-            )
-            .await;
+            let ident = conn
+                .read_device_identification(Some(unit_id), DeviceIdCode::Basic, 0x00)
+                .await;
             requests += 1;
 
             match ident {
-                Ok(Ok(Ok(response))) => {
+                Ok(identification) => {
                     fc43_tested = true;
                     unit_found = true;
 
                     let mut vendor = None;
                     let mut product_code = None;
                     let mut revision = None;
-                    for obj in &response.device_id_objects {
-                        let text = obj.value_as_str().map(String::from);
-                        match obj.id {
+                    for (id, value) in identification.objects {
+                        let text = String::from_utf8(value).ok();
+                        match id {
                             0x00 => vendor = text,
                             0x01 => product_code = text,
                             0x02 => revision = text,
@@ -846,11 +863,11 @@ pub async fn scan_unit_ids(
 
                     tlog!("[ModbusScan] Unit {} identified via FC43: {}", unit_id, summary);
                 }
-                Ok(Ok(Err(_exc))) => {
+                Err(RequestError::Exception { .. }) => {
                     // Alive, but doesn't serve FC43 — fall through to the probe.
                     fc43_tested = true;
                 }
-                _ => {
+                Err(RequestError::Transport(_)) => {
                     if !fc43_tested {
                         fc43_tested = true;
                         fc43_supported = false;
@@ -865,16 +882,7 @@ pub async fn scan_unit_ids(
         }
 
         if !unit_found {
-            let Ok(mut conn) = ModbusConn::connect(
-                &config.host,
-                config.port,
-                unit_id,
-                config.timeout_ms,
-                config.connect_settle_ms,
-                false,
-            )
-            .await
-            else {
+            if conn.connect().await.is_err() {
                 reporter.update(ScanProgressPayload {
                     current: (unit_id - config.start_unit_id + 1) as u32,
                     total,
@@ -886,14 +894,14 @@ pub async fn scan_unit_ids(
                     sleep(Duration::from_millis(config.inter_request_delay_ms)).await;
                 }
                 continue;
-            };
+            }
             let outcome = conn
-                .read(&config.register_type, config.test_register, 1)
+                .read(read_request(&config.register_type, config.test_register, 1, unit_id))
                 .await;
             requests += 1;
 
-            match outcome {
-                ReadOutcome::Registers(data) => {
+            match outcome.map(|reading| reading.data) {
+                Ok(ReadData::Registers(data)) => {
                     found_count += 1;
                     sink.frames(
                         vec![modbus_frame(
@@ -906,7 +914,7 @@ pub async fn scan_unit_ids(
                     .await;
                     tlog!("[ModbusScan] Unit {} responded ({} reg {})", unit_id, type_name, config.test_register);
                 }
-                ReadOutcome::Coils(data) => {
+                Ok(ReadData::Coils(data)) => {
                     found_count += 1;
                     sink.frames(
                         vec![modbus_frame(
@@ -919,7 +927,7 @@ pub async fn scan_unit_ids(
                     .await;
                     tlog!("[ModbusScan] Unit {} responded ({} reg {})", unit_id, type_name, config.test_register);
                 }
-                ReadOutcome::Exception(_) => {
+                Err(RequestError::Exception { .. }) => {
                     // An exception still proves the unit is there — emit an
                     // empty frame so it shows up as present but unreadable.
                     found_count += 1;
@@ -930,7 +938,7 @@ pub async fn scan_unit_ids(
                     .await;
                     tlog!("[ModbusScan] Unit {} alive (exception on reg {})", unit_id, config.test_register);
                 }
-                ReadOutcome::Silent(_) => {}
+                Err(RequestError::Transport(_)) => {}
             }
         }
 
@@ -976,12 +984,14 @@ pub async fn scan_unit_ids(
 // Function Code Probe
 // ============================================================================
 
-fn verdict_for(outcome: ReadOutcome) -> FcVerdict {
-    match outcome {
-        ReadOutcome::Registers(values) => FcVerdict::Values { values },
-        ReadOutcome::Coils(values) => FcVerdict::Bits { values },
-        ReadOutcome::Exception(message) => FcVerdict::Exception { message },
-        ReadOutcome::Silent(_) => FcVerdict::Silent,
+fn verdict_for(outcome: Result<Reading, RequestError>) -> FcVerdict {
+    match outcome.map(|reading| reading.data) {
+        Ok(ReadData::Registers(values)) => FcVerdict::Values { values },
+        Ok(ReadData::Coils(values)) => FcVerdict::Bits { values },
+        Err(RequestError::Exception { code, .. }) => FcVerdict::Exception {
+            message: code.to_string(),
+        },
+        Err(RequestError::Transport(_)) => FcVerdict::Silent,
     }
 }
 
@@ -1001,6 +1011,7 @@ pub async fn probe_function_codes(
         return Err("No unit IDs to probe".to_string());
     }
 
+    let addr = resolve(&config.host, config.port).await?;
     let mut results = Vec::new();
 
     for unit_id in config.unit_ids {
@@ -1010,31 +1021,20 @@ pub async fn probe_function_codes(
 
         // A fresh connection per unit: a device that rejects an unknown slave
         // may drop the socket, and we don't want that to taint the next unit.
-        let mut conn = match ModbusConn::connect(
-            &config.host,
-            config.port,
-            unit_id,
-            config.timeout_ms,
-            config.connect_settle_ms,
-            false,
-        )
-        .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                tlog!("[ModbusScan] Probe unit {}: connect failed: {}", unit_id, e);
-                results.push(FcProbeEntry {
-                    unit_id,
-                    holding: FcVerdict::Silent,
-                    input: FcVerdict::Silent,
-                    coil: FcVerdict::Silent,
-                    discrete: FcVerdict::Silent,
-                    responded: false,
-                    supported_types: Vec::new(),
-                });
-                continue;
-            }
-        };
+        let mut conn = sweep_connection(addr, config.timeout_ms, config.connect_settle_ms, false);
+        if let Err(e) = conn.connect().await {
+            tlog!("[ModbusScan] Probe unit {}: connect failed: {}", unit_id, e);
+            results.push(FcProbeEntry {
+                unit_id,
+                holding: FcVerdict::Silent,
+                input: FcVerdict::Silent,
+                coil: FcVerdict::Silent,
+                discrete: FcVerdict::Silent,
+                responded: false,
+                supported_types: Vec::new(),
+            });
+            continue;
+        }
         let mut verdicts = Vec::new();
         for rt in [
             RegisterType::Holding,
@@ -1042,7 +1042,9 @@ pub async fn probe_function_codes(
             RegisterType::Coil,
             RegisterType::Discrete,
         ] {
-            let outcome = conn.read(&rt, config.test_register, 1).await;
+            let outcome = conn
+                .read(read_request(&rt, config.test_register, 1, unit_id))
+                .await;
             verdicts.push((rt, verdict_for(outcome)));
         }
 
@@ -1081,7 +1083,10 @@ pub async fn probe_function_codes(
 
 #[cfg(test)]
 mod tests {
+    use super::super::fake_device::{self, device, Reply};
     use super::*;
+    use tokio::time::timeout;
+    use wiretap_io::modbus::{ExceptionCode, TransportError};
 
     #[test]
     fn a_config_without_an_address_falls_back_to_the_documented_defaults() {
@@ -1240,8 +1245,104 @@ mod tests {
 
     #[test]
     fn a_silent_read_is_not_evidence_the_device_replied() {
-        assert!(!ReadOutcome::Silent("timeout".into()).device_replied());
-        assert!(ReadOutcome::Exception("illegal".into()).device_replied());
-        assert!(ReadOutcome::Registers(vec![1]).device_replied());
+        let silent = RequestError::Transport(TransportError::Timeout {
+            after: Duration::from_millis(100),
+        });
+        assert!(!verdict_for(Err(silent)).supported());
+        let refused = RequestError::Exception {
+            code: ExceptionCode::IllegalDataAddress,
+            latency: Duration::ZERO,
+        };
+        assert!(verdict_for(Err(refused)).supported());
+    }
+
+    fn register_sweep(port: u16, start: u16, end: u16) -> ModbusScanConfig {
+        let mut config: ModbusScanConfig = serde_json::from_value(serde_json::json!({
+            "port": port, "register_type": "holding", "start_register": start,
+            "end_register": end, "chunk_size": 8, "inter_request_delay_ms": 0,
+        }))
+        .unwrap();
+        config.timeout_ms = 100;
+        config.max_consecutive_timeouts = 2;
+        config
+    }
+
+    async fn sweep(config: ModbusScanConfig) -> ScanCompletePayload {
+        let cancel = Arc::new(AtomicBool::new(false));
+        timeout(
+            Duration::from_secs(5),
+            scan_registers(config, cancel, None, &FrameSink::Discard),
+        )
+        .await
+        .expect("the sweep hung")
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_device_that_never_replies_ends_the_sweep_at_the_timeout_budget() {
+        let device = device(|_| Reply::Silent).await;
+        let result = sweep(register_sweep(device.port, 0, 99)).await;
+        assert!(result.truncated);
+        assert_eq!(result.requests, 2);
+        assert_eq!(result.found_count, 0);
+    }
+
+    #[tokio::test]
+    async fn an_exception_is_bisected_down_to_the_missing_register() {
+        let device = device(|request| match request.start()..request.start() + request.count() {
+            range if range.contains(&3) => Reply::Exception(0x02),
+            _ => fake_device::registers(request),
+        })
+        .await;
+        let result = sweep(register_sweep(device.port, 0, 7)).await;
+        assert_eq!(
+            result.blocks.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
+            [(0, 2), (4, 7)]
+        );
+        assert_eq!(
+            result.gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
+            [(3, 3)]
+        );
+    }
+
+    /// Unit 1 identifies itself; unit 2 refuses FC43 and answers a register read.
+    fn gateway(request: &fake_device::Request) -> Reply {
+        match (request.unit, request.function()) {
+            (1, 0x2B) => {
+                let mut pdu = vec![0x2B, 0x0E, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 4];
+                pdu.extend(b"Acme");
+                Reply::Pdu(pdu)
+            }
+            (_, 0x2B) => Reply::Exception(0x01),
+            _ => fake_device::registers(request),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_unit_scan_asks_each_unit_over_one_connection() {
+        let device = device(gateway).await;
+        let config: UnitIdScanConfig = serde_json::from_value(serde_json::json!({
+            "port": device.port, "start_unit_id": 1, "end_unit_id": 2, "test_register": 0,
+            "register_type": "holding", "inter_request_delay_ms": 0, "timeout_ms": 500,
+        }))
+        .unwrap();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let result = timeout(
+            Duration::from_secs(5),
+            scan_unit_ids(config, cancel, None, &FrameSink::Discard),
+        )
+        .await
+        .expect("the unit scan hung")
+        .unwrap();
+
+        assert_eq!(result.found_count, 2);
+        assert_eq!(result.devices.len(), 1);
+        assert_eq!(result.devices[0].vendor.as_deref(), Some("Acme"));
+        let asked: Vec<(usize, u8, u8)> = device
+            .requests()
+            .iter()
+            .map(|r| (r.connection, r.unit, r.function()))
+            .collect();
+        assert_eq!(asked, [(1, 1, 0x2B), (2, 2, 0x2B), (2, 2, 0x03)]);
     }
 }

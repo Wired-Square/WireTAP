@@ -4,7 +4,6 @@
 // - Source: catalog-driven polling of known registers
 // - Scanner: one-shot discovery of registers and active unit IDs
 
-mod conn;
 #[cfg(test)]
 mod fake_device;
 pub mod poll;
