@@ -7,8 +7,9 @@ use crate::capture_store::{FrameSelection, ProtocolFrames};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use tokio_modbus::client::tcp;
-use tokio_modbus::prelude::*;
+use wiretap_io::modbus::{
+    ExceptionCode, ModbusTcp, ReadData, ReadRequest, Reading, RequestError, WriteRefused,
+};
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -122,41 +123,42 @@ fn validate_or_reject(content: &str) -> Result<(), McpError> {
     )))
 }
 
-/// Shape a tokio-modbus read result (values, device exception, or IO error) into a tool result.
-fn modbus_read_json<T, E1, E2>(
+fn modbus_exception_json(rt: &str, address: u16, code: ExceptionCode) -> serde_json::Value {
+    json!({"ok":false,"register_type":rt,"address":address,"exception":code.to_string(),"exception_code":code.code()})
+}
+
+/// A transport error is the tool's error: it cannot say whether the device saw
+/// the request.
+fn modbus_read_json(
     rt: &str,
     address: u16,
     count: u16,
-    r: Result<Result<Vec<T>, E1>, E2>,
-) -> Result<CallToolResult, McpError>
-where
-    T: serde::Serialize,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-{
+    r: Result<Reading, RequestError>,
+) -> Result<serde_json::Value, String> {
     match r {
-        Ok(Ok(values)) => ok_json(json!({"ok":true,"register_type":rt,"address":address,"count":count,"values":values})),
-        Ok(Err(exc)) => ok_json(json!({"ok":false,"register_type":rt,"address":address,"exception":exc.to_string()})),
-        Err(e) => Err(err(format!("Modbus IO error reading {rt} {address}: {e}"))),
+        Ok(reading) => {
+            let values = match reading.data {
+                ReadData::Registers(v) => json!(v),
+                ReadData::Coils(v) => json!(v),
+            };
+            Ok(json!({"ok":true,"register_type":rt,"address":address,"count":count,"values":values}))
+        }
+        Err(RequestError::Exception { code, .. }) => Ok(modbus_exception_json(rt, address, code)),
+        Err(RequestError::Transport(e)) => Err(format!("Modbus IO error reading {rt} {address}: {e}")),
     }
 }
 
-/// Shape a tokio-modbus write result (success, device exception, or IO error) into a tool result.
-fn modbus_write_json<W, R, E1, E2>(
+fn modbus_write_json(
     rt: &str,
     address: u16,
-    written: W,
-    r: Result<Result<R, E1>, E2>,
-) -> Result<CallToolResult, McpError>
-where
-    W: serde::Serialize,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-{
+    written: impl serde::Serialize,
+    r: Result<Result<Duration, RequestError>, WriteRefused>,
+) -> Result<serde_json::Value, String> {
     match r {
-        Ok(Ok(_)) => ok_json(json!({"ok":true,"register_type":rt,"address":address,"written":written})),
-        Ok(Err(exc)) => ok_json(json!({"ok":false,"register_type":rt,"address":address,"exception":exc.to_string()})),
-        Err(e) => Err(err(format!("Modbus IO error writing {rt} {address}: {e}"))),
+        Ok(Ok(_)) => Ok(json!({"ok":true,"register_type":rt,"address":address,"written":written})),
+        Ok(Err(RequestError::Exception { code, .. })) => Ok(modbus_exception_json(rt, address, code)),
+        Ok(Err(RequestError::Transport(e))) => Err(format!("Modbus IO error writing {rt} {address}: {e}")),
+        Err(refused) => Ok(json!({"ok":false,"register_type":rt,"address":address,"sent":false,"refused":refused.to_string()})),
     }
 }
 
@@ -173,21 +175,20 @@ fn modbus_endpoint_of(
     Ok(crate::io::modbus_endpoint(profile))
 }
 
-/// Open a transient Modbus TCP connection to the device behind a session's
-/// source profile. NB: opens a second connection alongside the running poller —
-/// single-connection devices may contend.
-async fn connect_session_modbus(
+/// The session's Modbus source profile, which names its device and keys its poll.
+fn session_modbus_profile(
     app: &tauri::AppHandle,
     session_id: &str,
-) -> Result<tokio_modbus::client::Context, McpError> {
-    let (host, port, unit_id) =
-        crate::io::session_modbus_endpoint(app, session_id).map_err(err)?;
-    let addr = crate::io::net::resolve_host_port(&host, port)
-        .await
-        .map_err(|e| err(e.user_message()))?;
-    tcp::connect_slave(addr, Slave(unit_id))
-        .await
-        .map_err(|e| err(format!("Connect to {addr} (unit {unit_id}) failed: {e}")))
+) -> Result<crate::settings::IOProfile, McpError> {
+    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
+    crate::io::modbus_tcp::session_modbus_profile(&settings, session_id)
+        .cloned()
+        .ok_or_else(|| err(format!("Session '{session_id}' has no Modbus source profile")))
+}
+
+fn transient_connection(profile: &crate::settings::IOProfile) -> ModbusTcp {
+    let (host, port, unit_id) = crate::io::modbus_endpoint(profile);
+    crate::io::modbus_tcp::poll::device_connection(&host, port, unit_id)
 }
 
 // ── Modbus discovery helpers ─────────────────────────────────────────────────
@@ -501,21 +502,26 @@ impl WireTapTools {
         ok_json(json!({ "valid": errors.is_empty(), "errors": errors }))
     }
 
-    #[tool(description = "Live one-off Modbus read of a register/coil block from a session's configured device. Returns the values, or the exact device exception (e.g. 'Server device failure'). Opens a transient connection — may contend with the running poller on single-connection devices.")]
+    #[tool(description = "Live one-off Modbus read of a register/coil block from a session's configured device. Returns the values, or { ok: false, exception, exception_code } when the device rejects the read (e.g. 'Server Device Failure'). Opens its own short-lived connection beside any running poll, so a device that accepts only one client may refuse it.")]
     async fn modbus_read(
         &self,
         Parameters(p): Parameters<ModbusReadParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = connect_session_modbus(&self.app, &p.session_id).await?;
-        let (a, c) = (p.address, p.count.max(1));
         let rt = p.register_type.to_lowercase();
-        match rt.as_str() {
-            "holding" => modbus_read_json(&rt, a, c, ctx.read_holding_registers(a, c).await),
-            "input" => modbus_read_json(&rt, a, c, ctx.read_input_registers(a, c).await),
-            "coil" => modbus_read_json(&rt, a, c, ctx.read_coils(a, c).await),
-            "discrete" => modbus_read_json(&rt, a, c, ctx.read_discrete_inputs(a, c).await),
-            other => Err(err(format!("Unknown register_type '{other}' (use holding/input/coil/discrete)"))),
-        }
+        let register_type = match rt.as_str() {
+            "holding" => wiretap_catalog::RegisterType::Holding,
+            "input" => wiretap_catalog::RegisterType::Input,
+            "coil" => wiretap_catalog::RegisterType::Coil,
+            "discrete" => wiretap_catalog::RegisterType::Discrete,
+            other => return Err(err(format!("Unknown register_type '{other}' (use holding/input/coil/discrete)"))),
+        };
+        let profile = session_modbus_profile(&self.app, &p.session_id)?;
+        let (start, count) = (p.address, p.count.max(1));
+        let request = ReadRequest { register_type, start, count, unit: None };
+        let r = transient_connection(&profile).read(request).await;
+        modbus_read_json(&rt, start, count, r)
+            .map_err(err)
+            .and_then(ok_json)
     }
 
     // ── Tier 2: frontend bridge ──────────────────────────────────────────────
@@ -939,7 +945,7 @@ impl WireTapTools {
     }
 
     #[tool(
-        description = "Live Modbus write to holding registers or coils on a session's configured device. Returns success or the exact device exception. Opens a transient connection — may contend with the running poller.",
+        description = "Live Modbus write to holding registers or coils on a session's configured device. While the session polls the device, the write goes over the poll's own connection between reads; otherwise over a short-lived connection. Returns { ok: true }, { ok: false, exception, exception_code } when the device rejects the write, or { ok: false, sent: false, refused } when it was never sent: the poll's connection is down, its write queue is full, or the poll has stopped.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
     async fn modbus_write(
@@ -949,28 +955,28 @@ impl WireTapTools {
         if p.values.is_empty() {
             return Err(err("No values to write".to_string()));
         }
-        let mut ctx = connect_session_modbus(&self.app, &p.session_id).await?;
+        let profile = session_modbus_profile(&self.app, &p.session_id)?;
+        let writer = crate::io::modbus_tcp::poll::poll_writer(&p.session_id, &profile.id);
         let a = p.address;
-        match p.register_type.to_lowercase().as_str() {
+        let result = match p.register_type.to_lowercase().as_str() {
             "holding" => {
-                let r = if p.values.len() == 1 {
-                    ctx.write_single_register(a, p.values[0]).await
-                } else {
-                    ctx.write_multiple_registers(a, &p.values).await
+                let r = match writer {
+                    Some(writer) => writer.write_registers(None, a, p.values.clone()).await,
+                    None => Ok(transient_connection(&profile).write_registers(None, a, &p.values).await),
                 };
                 modbus_write_json("holding", a, &p.values, r)
             }
             "coil" => {
                 let bits: Vec<bool> = p.values.iter().map(|v| *v != 0).collect();
-                let r = if bits.len() == 1 {
-                    ctx.write_single_coil(a, bits[0]).await
-                } else {
-                    ctx.write_multiple_coils(a, &bits).await
+                let r = match writer {
+                    Some(writer) => writer.write_coils(None, a, bits.clone()).await,
+                    None => Ok(transient_connection(&profile).write_coils(None, a, &bits).await),
                 };
                 modbus_write_json("coil", a, &bits, r)
             }
-            other => Err(err(format!("register_type '{other}' is not writable (use holding or coil)"))),
-        }
+            other => return Err(err(format!("register_type '{other}' is not writable (use holding or coil)"))),
+        };
+        result.map_err(err).and_then(ok_json)
     }
 }
 
@@ -1431,8 +1437,38 @@ fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOSt
 
 #[cfg(test)]
 mod tests {
-    use super::scan_status;
+    use super::{modbus_write_json, scan_status};
     use crate::io::IOState;
+    use std::time::Duration;
+    use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
+
+    #[test]
+    fn a_refused_write_reads_as_not_sent() {
+        let result = modbus_write_json("holding", 7, [1], Err(WriteRefused::Disconnected)).unwrap();
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["sent"], false);
+        assert_eq!(result["refused"], "not connected");
+    }
+
+    #[test]
+    fn a_rejected_write_names_the_exception_and_its_code() {
+        let rejected = RequestError::Exception {
+            code: ExceptionCode::IllegalDataAddress,
+            latency: Duration::ZERO,
+        };
+        let result = modbus_write_json("holding", 7, [1], Ok(Err(rejected))).unwrap();
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["exception_code"], 2);
+        assert!(result.get("sent").is_none());
+    }
+
+    #[test]
+    fn a_write_lost_in_transit_is_an_error() {
+        let lost = RequestError::Transport(TransportError::Timeout {
+            after: Duration::from_secs(2),
+        });
+        assert!(modbus_write_json("coil", 7, [true], Ok(Err(lost))).is_err());
+    }
 
     #[test]
     fn a_running_scan_with_no_progress_yet_is_scanning() {

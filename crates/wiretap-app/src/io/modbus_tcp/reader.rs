@@ -19,7 +19,7 @@ use tauri::AppHandle;
 use tokio::sync::watch;
 use wiretap_catalog::modbus::PollItem;
 
-use super::poll::{run_poll_task, start_polling, FrameSink, PollControl};
+use super::poll::{register_writer, run_poll_task, start_polling, FrameSink, PollControl};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_stream_ended, lifecycle::SourceLifecycle, IOCapabilities, IOSource,
@@ -127,6 +127,7 @@ impl PollGroup {
 /// Modbus TCP source configuration
 #[derive(Clone, Debug)]
 pub struct ModbusTcpConfig {
+    pub profile_id: String,
     /// Server hostname or IP
     pub host: String,
     /// Server port (default 502)
@@ -234,8 +235,10 @@ impl IOSource for ModbusTcpSource {
             session_id: self.session_id.clone(),
         };
         let max_register_errors = self.config.max_register_errors;
+        let writer = register_writer(&self.session_id, &self.config.profile_id, task.writer());
         self.poll_handle = Some(tauri::async_runtime::spawn(async move {
             let _ended = ended;
+            let _writer = writer;
             run_poll_task(task, control_rx, sink, max_register_errors).await;
         }));
         self.control = Some(control);

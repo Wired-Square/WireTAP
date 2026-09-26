@@ -869,6 +869,7 @@ pub async fn create_reader_session(
             tlog!("[create_reader_session] Parsed {} Modbus poll groups for {}:{} unit {}", polls.len(), host, port, unit_id);
 
             let config = ModbusTcpConfig {
+                profile_id: profile.id.clone(),
                 host,
                 port,
                 unit_id,

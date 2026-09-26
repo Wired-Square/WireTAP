@@ -17,7 +17,9 @@ use crate::io::bus_mapping::BusMapping;
 use crate::io::gvret::run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
-use crate::io::modbus_tcp::poll::{run_poll_task, start_polling, FrameSink, PollControl};
+use crate::io::modbus_tcp::poll::{
+    register_writer, run_poll_task, start_polling, FrameSink, PollControl,
+};
 use crate::io::modbus_tcp::PollGroup;
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
@@ -100,6 +102,7 @@ pub(super) async fn run_source_reader(
         }
         "modbus_tcp" => {
             run_modbus_tcp_client(
+                &session_id,
                 source_idx,
                 &profile,
                 bus_mappings,
@@ -730,6 +733,7 @@ fn spawn_bus_generator(
 /// Modbus TCP client source: connects to a Modbus TCP server and polls registers.
 /// Extracted from ModbusTcpSource to work within the multi-source framework.
 async fn run_modbus_tcp_client(
+    session_id: &str,
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
@@ -775,6 +779,7 @@ async fn run_modbus_tcp_client(
         source_idx, address, unit_id, polls.len(), output_bus
     );
 
+    let _writer = register_writer(session_id, &profile.id, task.writer());
     let (control, control_rx) = watch::channel(PollControl::Run);
     let sink = FrameSink::Broker {
         source_idx,

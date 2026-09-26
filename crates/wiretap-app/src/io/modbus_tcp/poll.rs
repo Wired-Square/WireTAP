@@ -12,12 +12,15 @@
 // module is that loop, once: one `wiretap_io` poll task per source, drained
 // into a `FrameSink`.
 
+use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch};
 use wiretap_io::modbus::{
-    spawn, ModbusTcp, PollEvent, PollTask, Poller, TaskEvent, TaskOptions, TcpOptions,
-    TransportError, UnitSource,
+    spawn, ModbusTcp, PollEvent, PollTask, PollWriter, Poller, TaskEvent, TaskOptions,
+    TcpOptions, TransportError, UnitSource,
 };
 
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
@@ -203,6 +206,17 @@ pub enum PollControl {
     Stop,
 }
 
+/// A connection to a Modbus profile's device with the poll's timeouts. It
+/// connects on first use.
+pub fn device_connection(host: &str, port: u16, unit_id: u8) -> ModbusTcp {
+    let options = TcpOptions {
+        op_timeout: POLL_OP_TIMEOUT,
+        unit_id,
+        ..TcpOptions::default()
+    };
+    ModbusTcp::new(tcp_endpoint(host, port), options)
+}
+
 /// Connect, then spawn one poll task for all of a source's groups. Connecting
 /// first means a device that is down fails the session start.
 pub async fn start_polling(
@@ -211,17 +225,47 @@ pub async fn start_polling(
     unit_id: u8,
     polls: &[PollGroup],
 ) -> Result<PollTask<PollGroup>, String> {
-    let endpoint = tcp_endpoint(host, port);
-    let options = TcpOptions {
-        op_timeout: POLL_OP_TIMEOUT,
-        unit_id,
-        ..TcpOptions::default()
-    };
-    let mut conn = ModbusTcp::new(endpoint.clone(), options);
+    let mut conn = device_connection(host, port, unit_id);
     conn.connect()
         .await
-        .map_err(|e| format!("Failed to connect to Modbus TCP server at {endpoint}: {e}"))?;
+        .map_err(|e| format!("Failed to connect to Modbus TCP server: {e}"))?;
     Ok(spawn_polls(conn, polls, TaskOptions::default()))
+}
+
+type WriterKey = (String, String);
+
+static POLL_WRITERS: LazyLock<Mutex<HashMap<WriterKey, (u64, PollWriter)>>> =
+    LazyLock::new(Default::default);
+static NEXT_REGISTRATION: AtomicU64 = AtomicU64::new(0);
+
+/// Keeps a running poll's writer reachable by its session and source profile
+/// until dropped.
+pub struct WriterRegistration {
+    key: WriterKey,
+    id: u64,
+}
+
+pub fn register_writer(session_id: &str, profile_id: &str, writer: PollWriter) -> WriterRegistration {
+    let key = (session_id.to_string(), profile_id.to_string());
+    let id = NEXT_REGISTRATION.fetch_add(1, Ordering::Relaxed);
+    POLL_WRITERS.lock().unwrap().insert(key.clone(), (id, writer));
+    WriterRegistration { key, id }
+}
+
+/// The writer of the poll running for `profile_id` in `session_id`, if any.
+pub fn poll_writer(session_id: &str, profile_id: &str) -> Option<PollWriter> {
+    let key = (session_id.to_string(), profile_id.to_string());
+    POLL_WRITERS.lock().unwrap().get(&key).map(|(_, writer)| writer.clone())
+}
+
+impl Drop for WriterRegistration {
+    fn drop(&mut self) {
+        // A restarted source may register its new poll before the old one ends.
+        let mut writers = POLL_WRITERS.lock().unwrap();
+        if writers.get(&self.key).is_some_and(|(id, _)| *id == self.id) {
+            writers.remove(&self.key);
+        }
+    }
 }
 
 fn tcp_endpoint(host: &str, port: u16) -> String {
@@ -604,75 +648,8 @@ bit_length = 20
         assert_eq!(tcp_endpoint("plc.local", 1502), "plc.local:1502");
     }
 
-    use std::sync::{Arc, Mutex};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
-    use tokio::sync::Notify;
+    use super::super::fake_device::{self, device, Device, Reply};
     use tokio::time::timeout;
-
-    /// A holding-register device on loopback whose registers read back their
-    /// own address. A read at `drop_at` loses the connection instead of being
-    /// answered; once `answers` replies have gone out the device goes away and
-    /// refuses every connection.
-    struct Device {
-        port: u16,
-        reads: Arc<Mutex<Vec<u16>>>,
-    }
-
-    async fn device(drop_at: Option<u16>, answers: Option<usize>) -> Device {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let reads = Arc::new(Mutex::new(Vec::new()));
-        let remaining = Arc::new(Mutex::new(answers));
-        let gone = Arc::new(Notify::new());
-        let (seen, left, vanish) = (reads.clone(), remaining.clone(), gone.clone());
-        tokio::spawn(async move {
-            loop {
-                let mut socket = tokio::select! {
-                    accepted = listener.accept() => accepted.unwrap().0,
-                    () = vanish.notified() => return,
-                };
-                let (seen, left, vanish) = (seen.clone(), left.clone(), vanish.clone());
-                tokio::spawn(async move {
-                    let mut header = [0u8; 7];
-                    while socket.read_exact(&mut header).await.is_ok() {
-                        let mut pdu = [0u8; 5];
-                        socket.read_exact(&mut pdu).await.unwrap();
-                        let start = u16::from_be_bytes([pdu[1], pdu[2]]);
-                        let count = u16::from_be_bytes([pdu[3], pdu[4]]);
-                        seen.lock().unwrap().push(start);
-                        let exhausted = match left.lock().unwrap().as_mut() {
-                            Some(0) => true,
-                            Some(n) => {
-                                *n -= 1;
-                                false
-                            }
-                            None => false,
-                        };
-                        if exhausted {
-                            vanish.notify_one();
-                            return;
-                        }
-                        if Some(start) == drop_at {
-                            return;
-                        }
-                        let mut reply = vec![0x03, (count * 2) as u8];
-                        for register in start..start + count {
-                            reply.extend(register.to_be_bytes());
-                        }
-                        let mut adu = header[..4].to_vec();
-                        adu.extend((reply.len() as u16 + 1).to_be_bytes());
-                        adu.push(header[6]);
-                        adu.extend(reply);
-                        if socket.write_all(&adu).await.is_err() {
-                            return;
-                        }
-                    }
-                });
-            }
-        });
-        Device { port, reads }
-    }
 
     fn holding(start: u16, count: u16) -> PollGroup {
         PollGroup {
@@ -708,7 +685,7 @@ bit_length = 20
 
     #[tokio::test]
     async fn a_read_becomes_frames_stamped_when_it_was_read_and_stop_ends_the_run() {
-        let device = device(None, None).await;
+        let device = device(fake_device::registers).await;
         let task = spawn_on(&device, &[holding(5, 2)]).await;
         let (sink, mut frames) = broker_sink();
         let (control, control_rx) = watch::channel(PollControl::Run);
@@ -732,7 +709,11 @@ bit_length = 20
 
     #[tokio::test]
     async fn a_group_that_keeps_losing_the_link_is_retired_at_the_limit() {
-        let device = device(Some(1000), None).await;
+        let device = device(|request| match request.start() {
+            1000 => Reply::Drop,
+            _ => fake_device::registers(request),
+        })
+        .await;
         let task = spawn_on(&device, &[holding(1000, 1)]).await;
         let (sink, _frames) = broker_sink();
         let (_control, control_rx) = watch::channel(PollControl::Run);
@@ -743,12 +724,13 @@ bit_length = 20
         )
         .await
         .expect("the last group retired but the run went on");
-        assert_eq!(*device.reads.lock().unwrap(), [1000, 1000]);
+        let starts: Vec<u16> = device.requests().iter().map(|r| r.start()).collect();
+        assert_eq!(starts, [1000, 1000]);
     }
 
     #[tokio::test]
     async fn an_unreachable_device_ends_the_run_at_the_limit() {
-        let device = device(None, Some(0)).await;
+        let device = device(|_| Reply::Vanish).await;
         let task = spawn_on(&device, &[holding(0, 1)]).await;
         let (sink, _frames) = broker_sink();
         let (_control, control_rx) = watch::channel(PollControl::Run);
@@ -762,8 +744,41 @@ bit_length = 20
     }
 
     #[tokio::test]
+    async fn a_write_goes_over_the_poll_s_own_connection() {
+        let device = device(fake_device::registers).await;
+        let task = spawn_on(&device, &[holding(0, 1)]).await;
+        let _registered = register_writer("write-session", "profile", task.writer());
+
+        let writer = poll_writer("write-session", "profile").expect("no writer registered");
+        let written = timeout(Duration::from_secs(2), writer.write_registers(None, 7, vec![42]))
+            .await
+            .expect("the write hung");
+        assert!(matches!(written, Ok(Ok(_))), "{written:?}");
+
+        let requests = device.requests();
+        assert!(requests.iter().any(|r| r.function() == 0x06 && r.start() == 7));
+        assert!(requests.iter().all(|r| r.connection == 1));
+        task.stop().await;
+    }
+
+    #[tokio::test]
+    async fn a_writer_is_reachable_only_while_its_poll_is_registered() {
+        let device = device(fake_device::registers).await;
+        let old = spawn_on(&device, &[holding(0, 1)]).await;
+        let new = spawn_on(&device, &[holding(0, 1)]).await;
+
+        let stale = register_writer("restarted", "profile", old.writer());
+        let current = register_writer("restarted", "profile", new.writer());
+        drop(stale);
+        assert!(poll_writer("restarted", "profile").is_some());
+        assert!(poll_writer("restarted", "other-profile").is_none());
+        drop(current);
+        assert!(poll_writer("restarted", "profile").is_none());
+    }
+
+    #[tokio::test]
     async fn a_limit_of_zero_keeps_reconnecting() {
-        let device = device(None, Some(0)).await;
+        let device = device(|_| Reply::Vanish).await;
         let task = spawn_on(&device, &[holding(0, 1)]).await;
         let (sink, _frames) = broker_sink();
         let (_control, control_rx) = watch::channel(PollControl::Run);
