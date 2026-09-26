@@ -11,19 +11,20 @@
 // it reported the session's output bus rather than the device address. This
 // module is that loop, once, with every sink behind `FrameSink`.
 //
-// The per-tick mutable state (throttle, error counters) stays inside
+// The per-tick mutable state (throttle, `ReadHealth`) stays inside
 // `run_poll_task` rather than moving into the sink — same reasoning as
 // `io/periodic.rs`: a closure-based runner would force the state into
 // Arc/Mutex or hit async-closure `Send` limits on stable Rust.
 
 use std::sync::{atomic::AtomicBool, Arc};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio_modbus::client;
 use tokio_modbus::prelude::*;
 
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
-use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes};
+use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
 use crate::io::periodic::Cadence;
 use crate::io::types::SourceMessage;
@@ -50,36 +51,52 @@ pub fn register_type_name(rt: &RegisterType) -> &'static str {
     }
 }
 
-/// Read one block. `Ok` is a successful read, `Err` covers both Modbus
-/// exceptions and IO errors — the poll loop treats them alike (the scanner,
-/// which must tell them apart, has its own richer outcome type).
+/// Why a read failed. A device that answers with an exception is alive and
+/// reachable; an IO error says nothing reached it.
+#[derive(Debug)]
+pub enum ReadError {
+    Exception(String),
+    Io(String),
+}
+
+impl std::fmt::Display for ReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReadError::Exception(e) => write!(f, "Modbus exception: {}", e),
+            ReadError::Io(e) => write!(f, "IO error: {}", e),
+        }
+    }
+}
+
+fn read_result<T, E: std::fmt::Display, I: std::fmt::Display>(
+    result: Result<Result<T, E>, I>,
+) -> Result<T, ReadError> {
+    match result {
+        Ok(Ok(data)) => Ok(data),
+        Ok(Err(exc)) => Err(ReadError::Exception(exc.to_string())),
+        Err(e) => Err(ReadError::Io(e.to_string())),
+    }
+}
+
+/// Read one block. The scanner, which must tell more outcomes apart, has its own
+/// richer outcome type.
 pub async fn read_block(
     ctx: &mut client::Context,
     register_type: &RegisterType,
     start: u16,
     count: u16,
-) -> Result<ReadData, String> {
+) -> Result<ReadData, ReadError> {
     match register_type {
-        RegisterType::Holding => match ctx.read_holding_registers(start, count).await {
-            Ok(Ok(data)) => Ok(ReadData::Registers(data)),
-            Ok(Err(exc)) => Err(format!("Modbus exception: {}", exc)),
-            Err(e) => Err(format!("IO error: {}", e)),
-        },
-        RegisterType::Input => match ctx.read_input_registers(start, count).await {
-            Ok(Ok(data)) => Ok(ReadData::Registers(data)),
-            Ok(Err(exc)) => Err(format!("Modbus exception: {}", exc)),
-            Err(e) => Err(format!("IO error: {}", e)),
-        },
-        RegisterType::Coil => match ctx.read_coils(start, count).await {
-            Ok(Ok(data)) => Ok(ReadData::Coils(data)),
-            Ok(Err(exc)) => Err(format!("Modbus exception: {}", exc)),
-            Err(e) => Err(format!("IO error: {}", e)),
-        },
-        RegisterType::Discrete => match ctx.read_discrete_inputs(start, count).await {
-            Ok(Ok(data)) => Ok(ReadData::Coils(data)),
-            Ok(Err(exc)) => Err(format!("Modbus exception: {}", exc)),
-            Err(e) => Err(format!("IO error: {}", e)),
-        },
+        RegisterType::Holding => {
+            read_result(ctx.read_holding_registers(start, count).await).map(ReadData::Registers)
+        }
+        RegisterType::Input => {
+            read_result(ctx.read_input_registers(start, count).await).map(ReadData::Registers)
+        }
+        RegisterType::Coil => read_result(ctx.read_coils(start, count).await).map(ReadData::Coils),
+        RegisterType::Discrete => {
+            read_result(ctx.read_discrete_inputs(start, count).await).map(ReadData::Coils)
+        }
     }
 }
 
@@ -230,8 +247,61 @@ impl FrameSink {
 // Poll task
 // ============================================================================
 
+/// A group's failure counters, and what they decide: whether this tick reads,
+/// how long an exception backs off, and when IO errors give up.
+struct ReadHealth {
+    interval: Duration,
+    io_errors: u32,
+    exceptions: u32,
+    ticks_to_skip: u32,
+}
+
+impl ReadHealth {
+    fn new(interval_ms: u64) -> Self {
+        Self {
+            interval: Duration::from_millis(interval_ms.max(1)),
+            io_errors: 0,
+            exceptions: 0,
+            ticks_to_skip: 0,
+        }
+    }
+
+    fn should_read(&mut self) -> bool {
+        if self.ticks_to_skip == 0 {
+            return true;
+        }
+        self.ticks_to_skip -= 1;
+        false
+    }
+
+    /// Returns whether the group was backing off.
+    fn on_ok(&mut self) -> bool {
+        let was_backing_off = self.exceptions > 0;
+        self.io_errors = 0;
+        self.exceptions = 0;
+        self.ticks_to_skip = 0;
+        was_backing_off
+    }
+
+    fn on_exception(&mut self) -> Duration {
+        self.io_errors = 0;
+        self.exceptions += 1;
+        let delay = FrameBackoff::default().delay(self.interval, self.exceptions);
+        let ticks = delay.as_millis().div_ceil(self.interval.as_millis());
+        self.ticks_to_skip = u32::try_from(ticks.saturating_sub(1)).unwrap_or(u32::MAX);
+        delay
+    }
+
+    /// Returns whether the group should stop; a `limit` of 0 never does.
+    fn on_io_error(&mut self, limit: u32) -> bool {
+        self.io_errors += 1;
+        limit > 0 && self.io_errors >= limit
+    }
+}
+
 /// Poll one register group on its interval until cancelled, paused-through, or
-/// stopped by `max_register_errors` consecutive failures (0 = never give up).
+/// stopped by `max_register_errors` consecutive IO errors (0 = never give up).
+/// A Modbus exception backs the group off instead of counting towards the limit.
 pub async fn run_poll_task(
     poll: PollGroup,
     ctx: Arc<Mutex<client::Context>>,
@@ -244,7 +314,7 @@ pub async fn run_poll_task(
     let type_name = register_type_name(&poll.register_type);
     let label = sink.label();
     let mut first_poll = true;
-    let mut consecutive_errors: u32 = 0;
+    let mut health = ReadHealth::new(poll.interval_ms);
     let mut throttle = SignalThrottle::new();
 
     tlog!(
@@ -260,6 +330,10 @@ pub async fn run_poll_task(
     );
 
     while cadence.next().await.is_some() {
+        if !health.should_read() {
+            continue;
+        }
+
         let result = {
             let mut ctx = ctx.lock().await;
             // One TCP connection multiplexes all slaves: point the shared context
@@ -271,7 +345,15 @@ pub async fn run_poll_task(
 
         match result {
             Ok(data) => {
-                consecutive_errors = 0;
+                if health.on_ok() {
+                    tlog!(
+                        "{} {} reg {} recovered, back to every {}ms",
+                        label,
+                        type_name,
+                        poll.start_register,
+                        poll.interval_ms
+                    );
+                }
 
                 let frames = frames_for_read(&poll, data);
 
@@ -288,8 +370,23 @@ pub async fn run_poll_task(
 
                 sink.frames(frames, &mut throttle).await;
             }
-            Err(e) => {
-                consecutive_errors += 1;
+            Err(e @ ReadError::Exception(_)) => {
+                let delay = health.on_exception();
+                tlog!(
+                    "{} error reading {} at {}: {} (next read in {:?})",
+                    label,
+                    type_name,
+                    poll.start_register,
+                    e,
+                    delay
+                );
+                sink.error(format!(
+                    "Modbus read error ({} @ {}): {}",
+                    type_name, poll.start_register, e
+                ));
+            }
+            Err(e @ ReadError::Io(_)) => {
+                let stop = health.on_io_error(max_register_errors);
 
                 tlog!(
                     "{} error reading {} at {}: {} ({}/{})",
@@ -297,7 +394,7 @@ pub async fn run_poll_task(
                     type_name,
                     poll.start_register,
                     e,
-                    consecutive_errors,
+                    health.io_errors,
                     if max_register_errors > 0 {
                         max_register_errors.to_string()
                     } else {
@@ -309,17 +406,17 @@ pub async fn run_poll_task(
                     type_name, poll.start_register, e
                 ));
 
-                if max_register_errors > 0 && consecutive_errors >= max_register_errors {
+                if stop {
                     tlog!(
                         "{} stopped polling {} reg {} after {} consecutive errors",
                         label,
                         type_name,
                         poll.start_register,
-                        consecutive_errors
+                        health.io_errors
                     );
                     sink.error(format!(
                         "Stopped polling {} @ {} after {} consecutive errors",
-                        type_name, poll.start_register, consecutive_errors
+                        type_name, poll.start_register, health.io_errors
                     ));
                     break;
                 }
@@ -342,6 +439,75 @@ mod tests {
             device_address: 3,
             emit_mode: emit,
         }
+    }
+
+    fn skipped_ticks(health: &mut ReadHealth) -> u32 {
+        let mut skipped = 0;
+        while !health.should_read() {
+            skipped += 1;
+        }
+        skipped
+    }
+
+    #[test]
+    fn an_exception_backs_off_to_twice_the_interval_then_four_times() {
+        let mut health = ReadHealth::new(1000);
+        assert_eq!(health.on_exception(), Duration::from_secs(2));
+        assert_eq!(skipped_ticks(&mut health), 1);
+        assert_eq!(health.on_exception(), Duration::from_secs(4));
+        assert_eq!(skipped_ticks(&mut health), 3);
+    }
+
+    #[test]
+    fn backoff_caps_at_ten_minutes() {
+        let mut health = ReadHealth::new(1000);
+        for _ in 0..40 {
+            health.on_exception();
+        }
+        assert_eq!(health.on_exception(), Duration::from_secs(600));
+        assert_eq!(skipped_ticks(&mut health), 599);
+    }
+
+    #[test]
+    fn exceptions_do_not_count_towards_the_io_error_limit() {
+        let mut health = ReadHealth::new(1000);
+        for _ in 0..100 {
+            health.on_exception();
+        }
+        assert!(!health.on_io_error(2));
+    }
+
+    #[test]
+    fn io_errors_still_stop_at_the_limit() {
+        let mut health = ReadHealth::new(1000);
+        assert!(!health.on_io_error(3));
+        assert!(!health.on_io_error(3));
+        assert!(health.on_io_error(3));
+    }
+
+    #[test]
+    fn a_limit_of_zero_never_stops_on_io_errors() {
+        let mut health = ReadHealth::new(1000);
+        assert!((0..1000).all(|_| !health.on_io_error(0)));
+    }
+
+    #[test]
+    fn an_exception_resets_the_io_error_count() {
+        let mut health = ReadHealth::new(1000);
+        health.on_io_error(2);
+        health.on_exception();
+        assert!(!health.on_io_error(2));
+    }
+
+    #[test]
+    fn a_success_resets_the_backoff() {
+        let mut health = ReadHealth::new(1000);
+        health.on_exception();
+        health.on_exception();
+        assert!(health.on_ok());
+        assert!(health.should_read());
+        assert!(!health.on_ok());
+        assert_eq!(health.on_exception(), Duration::from_secs(2));
     }
 
     #[test]

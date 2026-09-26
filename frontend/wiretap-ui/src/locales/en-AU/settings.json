@@ -14,7 +14,7 @@
       "title": "Modbus",
       "maxRegisterErrors": {
         "label": "Max Consecutive Register Errors",
-        "help": "Stop polling a register group after this many consecutive read errors. Set to 0 to retry indefinitely."
+        "help": "Stop polling a register group after this many consecutive connection errors. Set to 0 to retry indefinitely. A register the device rejects is not counted: it is read less often instead, down to once every 10 minutes."
       }
     },
     "power": {

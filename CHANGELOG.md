@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **A Modbus register the device rejects is read less often, not given up on.** A poll group whose reads come back as a Modbus exception keeps polling, backing off to once every 10 minutes, and goes back to its normal interval as soon as a read succeeds. *Max Consecutive Register Errors* now counts connection errors only, so a catalogue with registers your device does not implement no longer stops those groups for good.
+
 ### Fixed
 
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
