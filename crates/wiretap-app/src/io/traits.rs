@@ -148,8 +148,8 @@ pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
 /// What a bus of this kind may be set to, for the source picker to offer.
 ///
 /// A single entry means the choice is already made and the picker renders no
-/// dropdown — which is most kinds. Only the GVRETs and FrameLink's CAN
-/// interfaces have a genuine CAN-versus-FD choice to make.
+/// dropdown — which is most kinds. GVRET's transmit command has no FD flag,
+/// so its kinds offer CAN alone.
 ///
 /// **Modbus is deliberately absent.** A serial port is read as Modbus by way of
 /// its framing encoding (`framing_encoding: "modbus_rtu"`) and the attached
@@ -158,12 +158,10 @@ pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
 /// other two.
 pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
     match super::device_kinds::canonical_kind(kind) {
-        "gvret_tcp" | "gvret_usb" | "framelink" | "slcan" | "gs_usb" | "socketcan" => {
-            &[Protocol::Can, Protocol::CanFd]
-        }
+        "framelink" | "slcan" | "gs_usb" | "socketcan" => &[Protocol::Can, Protocol::CanFd],
         "modbus_tcp" => &[Protocol::Modbus],
         "serial" => &[Protocol::Serial],
-        "mqtt" | "wiretap" | "capture" | "virtual" => &[Protocol::Can],
+        "gvret_tcp" | "gvret_usb" | "mqtt" | "wiretap" | "capture" | "virtual" => &[Protocol::Can],
         _ => &[],
     }
 }

@@ -92,6 +92,8 @@ pub enum SourceMessage {
 pub struct TransmitRequest {
     /// Encoded frame bytes ready to send
     pub data: Vec<u8>,
+    /// Set in place of `data` for a source whose device library encodes the frame.
+    pub frame: Option<wiretap_io::can::CanFrame>,
     /// Sync oneshot channel to send the result back
     pub result_tx: std_mpsc::SyncSender<Result<(), String>>,
 }

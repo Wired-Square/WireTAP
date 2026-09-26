@@ -24,6 +24,7 @@ mod recorded;
 // Real-time drivers
 pub mod gs_usb; // pub for Tauri command access
 pub mod bus_mapping; // Device bus -> session bus, shared by every multi-bus driver
+mod can_task; // Frames in and transmits out of a wiretap-io CAN task
 pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
 mod mqtt;

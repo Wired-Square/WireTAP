@@ -13,7 +13,6 @@
 // into a `FrameSink`.
 
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -216,7 +215,7 @@ pub fn device_connection(host: &str, port: u16, unit_id: u8) -> ModbusTcp {
         unit_id,
         ..TcpOptions::default()
     };
-    ModbusTcp::new(tcp_endpoint(host, port), options)
+    ModbusTcp::new(crate::io::net::tcp_endpoint(host, port), options)
 }
 
 /// Connect, then spawn one poll task for all of a source's groups. Connecting
@@ -267,13 +266,6 @@ impl Drop for WriterRegistration {
         if writers.get(&self.key).is_some_and(|(id, _)| *id == self.id) {
             writers.remove(&self.key);
         }
-    }
-}
-
-fn tcp_endpoint(host: &str, port: u16) -> String {
-    match host.parse::<IpAddr>() {
-        Ok(ip) => SocketAddr::from((ip, port)).to_string(),
-        Err(_) => format!("{host}:{port}"),
     }
 }
 
@@ -641,13 +633,6 @@ bit_length = 20
         assert!(exhausted(2, 2));
         assert!(exhausted(3, 2));
         assert!((1..10_000).all(|n| !exhausted(n, 0)));
-    }
-
-    #[test]
-    fn an_ipv6_host_is_bracketed_and_a_name_is_left_alone() {
-        assert_eq!(tcp_endpoint("::1", 502), "[::1]:502");
-        assert_eq!(tcp_endpoint("10.0.0.5", 502), "10.0.0.5:502");
-        assert_eq!(tcp_endpoint("plc.local", 1502), "plc.local:1502");
     }
 
     use super::super::fake_device::{self, device, Device, Reply};

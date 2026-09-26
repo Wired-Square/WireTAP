@@ -458,7 +458,7 @@ impl IOSource for GsUsbSource {
         // Fire-and-forget: queue into the device's 32-slot channel and return
         // immediately. Channel full = backpressure from the USB write task.
         let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
-        tx.try_send(TransmitRequest { data, result_tx })
+        tx.try_send(TransmitRequest { data, frame: None, result_tx })
             .map_err(|e| format!("Transmit buffer full ({})", e))?;
         Ok(TransmitResult::success())
     }

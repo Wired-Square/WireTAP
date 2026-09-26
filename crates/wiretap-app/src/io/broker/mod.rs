@@ -19,6 +19,7 @@ const SOURCE_CHANNEL_CAPACITY: usize = 1024;
 
 use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
+use super::can_task::can_frame;
 use super::gvret::validate_gvret_frame;
 #[cfg(not(target_os = "ios"))]
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
@@ -526,8 +527,16 @@ impl IOBroker {
         drop(channels); // Release lock before blocking
 
         // Encode the frame based on the profile kind
+        let mut frame = None;
         let data = match route.profile_kind.as_str() {
-            "gvret_tcp" | "gvret_usb" => {
+            "gvret_tcp" => {
+                if let Err(result) = validate_gvret_frame(&routed_frame) {
+                    return Ok(result);
+                }
+                frame = Some(can_frame(&routed_frame));
+                Vec::new()
+            }
+            "gvret_usb" => {
                 if let Err(result) = validate_gvret_frame(&routed_frame) {
                     return Ok(result);
                 }
@@ -573,7 +582,7 @@ impl IOBroker {
         // but we don't block waiting for it. Device write errors are logged by
         // the device task.
         let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
-        tx.try_send(TransmitRequest { data, result_tx })
+        tx.try_send(TransmitRequest { data, frame, result_tx })
             .map_err(|e| format!("Transmit buffer full ({})", e))?;
         Ok(TransmitResult::queued())
     }
@@ -615,6 +624,7 @@ impl IOBroker {
         let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest {
             data,
+            frame: None,
             result_tx,
         })
         .map_err(|e| format!("Serial transmit buffer full ({})", e))?;
