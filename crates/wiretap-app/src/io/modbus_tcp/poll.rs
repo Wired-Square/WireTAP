@@ -197,6 +197,7 @@ impl FrameSink {
 // ============================================================================
 
 const POLL_OP_TIMEOUT: Duration = Duration::from_secs(2);
+const IDLE_RECONNECT: Duration = Duration::from_secs(20);
 
 /// What a source asks of its running poll.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -211,6 +212,7 @@ pub enum PollControl {
 pub fn device_connection(host: &str, port: u16, unit_id: u8) -> ModbusTcp {
     let options = TcpOptions {
         op_timeout: POLL_OP_TIMEOUT,
+        idle_reconnect: Some(IDLE_RECONNECT),
         unit_id,
         ..TcpOptions::default()
     };

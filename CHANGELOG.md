@@ -12,6 +12,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A slowly polled Modbus TCP device no longer alternates failed and good reads.** Many devices close a connection left idle for 30 seconds or more, and the next read used to fail on it. A connection idle for 20 seconds is now replaced before the read, so a poll interval longer than that no longer counts errors towards *Max Consecutive Register Errors*.
 - **A Modbus TCP device that stops answering no longer freezes polling.** A device that went quiet without closing the connection used to hang every poll group on it for good. Each read now gives up after 2 seconds and reconnects before the next one, and the timeout counts towards *Max Consecutive Register Errors* like any other connection error.
 - **A Modbus scan gives up on an unreachable device within its timeout.** Connecting used to wait as long as the operating system allowed; it now counts against the scan's timeout. A unit ID scan also asks each unit over one connection, where it used to open a second for the register fallback.
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
