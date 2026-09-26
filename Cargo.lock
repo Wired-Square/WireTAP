@@ -257,7 +257,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -268,7 +268,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -293,7 +293,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
  "wl-clipboard-rs",
  "x11rb",
 ]
@@ -1700,7 +1700,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1916,7 +1916,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2881,7 +2881,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -3752,7 +3752,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.18",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3924,7 +3924,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3999,7 +3999,7 @@ dependencies = [
  "rustix 1.1.4",
  "slab",
  "tokio",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5318,7 +5318,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5331,7 +5331,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6047,7 +6047,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6775,7 +6775,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7285,7 +7285,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.18",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7354,7 +7354,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8584,8 +8584,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 dependencies = [
  "rayon",
  "serde",
@@ -8594,8 +8594,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8610,8 +8610,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-checksum"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 dependencies = [
  "rayon",
  "serde",
@@ -8620,8 +8620,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -8640,8 +8640,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-io"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 dependencies = [
  "thiserror 2.0.18",
  "tokio",
@@ -8651,8 +8651,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-protocol"
-version = "0.16.10"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.10#80760adb29dbb753472743f04c83b31cda64d22a"
+version = "0.16.11"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.11#cdcbed81dd5ead48a752d44c6e61d06a6c1fc894"
 
 [[package]]
 name = "wit-bindgen"
