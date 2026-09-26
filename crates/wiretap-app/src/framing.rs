@@ -172,104 +172,7 @@ mod desktop {
             return Err("No bytes in capture".to_string());
         }
 
-        // Build default framing encoding from config
-        let default_encoding = build_encoding(&config.framing)?;
-
-        // Group bytes by bus/interface for per-interface framing
-        // This prevents bytes from different interfaces from being mixed during framing
-        use std::collections::HashMap;
-        let mut bytes_by_bus: HashMap<u8, Vec<(usize, &capture_store::TimestampedByte)>> = HashMap::new();
-        for (i, byte) in bytes.iter().enumerate() {
-            bytes_by_bus
-                .entry(byte.bus)
-                .or_default()
-                .push((i, byte));
-        }
-
-        // Apply framing separately per interface
-        // Each interface gets its own framer (potentially with different encoding) to avoid mixing byte streams
-        let mut frame_data: Vec<(Vec<u8>, usize, bool, Option<bool>, u8)> = Vec::new(); // (bytes, start_idx, incomplete, crc_valid, bus)
-
-        for (bus, bus_bytes) in bytes_by_bus.iter() {
-            // A per-interface override for this bus, else the session default.
-            let encoding = match config.per_interface.as_ref().and_then(|m| m.get(bus)) {
-                Some(interface_config) => build_encoding(interface_config)?,
-                None => default_encoding.clone(),
-            };
-
-            let mut framer = SerialFramer::new(encoding);
-            let mut current_frame_start_idx = bus_bytes.first().map(|(i, _)| *i).unwrap_or(0);
-
-            for (original_idx, byte) in bus_bytes.iter() {
-                let frames = framer.feed(&[byte.byte]);
-                for frame in frames {
-                    frame_data.push((frame.bytes, current_frame_start_idx, frame.incomplete, frame.crc_valid, *bus));
-                    // Next frame starts after this byte
-                    current_frame_start_idx = *original_idx + 1;
-                }
-            }
-
-            // Handle flushed frames for this interface. Modbus RTU can still
-            // recover whole messages here, so this is a list, not one residue.
-            for frame in framer.flush() {
-                frame_data.push((frame.bytes, current_frame_start_idx, frame.incomplete, frame.crc_valid, *bus));
-            }
-        }
-
-        // Sort frames by their start index (original byte order) for consistent ordering
-        frame_data.sort_by_key(|(_, start_idx, _, _, _)| *start_idx);
-
-        // Apply minimum length filter - separate into passed and filtered.
-        // Partition the owned tuples, not references, so each payload moves into
-        // its FrameMessage instead of being cloned once per frame.
-        let min_length = config.min_length.unwrap_or(1);
-        let (passed_frames, filtered_frames): (Vec<_>, Vec<_>) = frame_data
-            .into_iter()
-            .enumerate()
-            .partition(|(_, (frame_bytes, _, _, _, _))| frame_bytes.len() >= min_length);
-
-        // One builder for both lists. They were byte-for-byte duplicates, which
-        // is how the live and flush paths in the serial reader had drifted apart
-        // on `incomplete`; the only thing separating these two is which side of
-        // the length filter the frame fell on.
-        //
-        // `crc_valid` is dropped here, and nothing is lost by it: the decode
-        // path recomputes the same verdict from the same bytes when it
-        // interprets the message, so the Decoder's Modbus tab reports it
-        // whether the frames are live or out of a capture. Persisting it would
-        // only matter to a view that wants the verdict without decoding.
-        let to_message = |(idx, (frame_bytes, start_idx, incomplete, _crc_valid, bus)): (
-            usize,
-            (Vec<u8>, usize, bool, Option<bool>, u8),
-        )| {
-            let extract = |cfg: &Option<FrameIdConfig>| {
-                cfg.as_ref()
-                    .and_then(|c| extract_frame_id(&frame_bytes, c))
-            };
-            let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
-            let source_address = extract(&config.source_address_config).map(|v| v as u16);
-            let dlc = frame_bytes.len() as u8;
-
-            FrameMessage {
-                protocol: "serial".to_string(),
-                // Timestamp of the frame's first byte.
-                timestamp_us: bytes.get(start_idx).map(|b| b.timestamp_us).unwrap_or(0),
-                frame_id,
-                bus,
-                dlc,
-                bytes: frame_bytes,
-                is_extended: false,
-                is_fd: false,
-                source_address,
-                incomplete: incomplete.then_some(true),
-                direction: None,
-            }
-        };
-
-        let frame_messages: Vec<FrameMessage> =
-            passed_frames.into_iter().map(&to_message).collect();
-        let filtered_messages: Vec<FrameMessage> =
-            filtered_frames.into_iter().map(&to_message).collect();
+        let (frame_messages, filtered_messages) = frame_messages(&bytes, &config)?;
 
         let frame_count = frame_messages.len();
         let filtered_count = filtered_messages.len();
@@ -310,6 +213,184 @@ mod desktop {
             filtered_count,
             filtered_capture_id,
         })
+    }
+
+    /// Frame a byte capture, stamping each message at its last byte as a live
+    /// line and the gateway archive do. Returns the messages at or above the
+    /// minimum length, then those below it.
+    fn frame_messages(
+        bytes: &[capture_store::TimestampedByte],
+        config: &BackendFramingConfig,
+    ) -> Result<(Vec<FrameMessage>, Vec<FrameMessage>), String> {
+        // Build default framing encoding from config
+        let default_encoding = build_encoding(&config.framing)?;
+
+        // Group bytes by bus/interface for per-interface framing
+        // This prevents bytes from different interfaces from being mixed during framing
+        use std::collections::HashMap;
+        let mut bytes_by_bus: HashMap<u8, Vec<(usize, &capture_store::TimestampedByte)>> = HashMap::new();
+        for (i, byte) in bytes.iter().enumerate() {
+            bytes_by_bus
+                .entry(byte.bus)
+                .or_default()
+                .push((i, byte));
+        }
+
+        // Apply framing separately per interface
+        // Each interface gets its own framer (potentially with different encoding) to avoid mixing byte streams
+        let mut frame_data: Vec<(Vec<u8>, usize, bool, Option<bool>, u8)> = Vec::new(); // (bytes, end_idx, incomplete, crc_valid, bus)
+
+        for (bus, bus_bytes) in bytes_by_bus.iter() {
+            // A per-interface override for this bus, else the session default.
+            let encoding = match config.per_interface.as_ref().and_then(|m| m.get(bus)) {
+                Some(interface_config) => build_encoding(interface_config)?,
+                None => default_encoding.clone(),
+            };
+
+            let mut framer = SerialFramer::new(encoding);
+            let mut released = Vec::new();
+            for (original_idx, byte) in bus_bytes.iter() {
+                released.extend(framer.feed(&[byte.byte]).into_iter().map(|f| (f, *original_idx)));
+            }
+            // Modbus RTU can still recover whole messages here, so this is a
+            // list, not one residue.
+            let last_idx = bus_bytes.last().map_or(0, |(i, _)| *i);
+            released.extend(framer.flush().into_iter().map(|f| (f, last_idx)));
+
+            // RTU names where each message ended: a sync releases the messages
+            // it buffered on a later byte than the one each ended on.
+            for (frame, released_by) in released {
+                let end_idx = frame
+                    .end_offset
+                    .and_then(|end| bus_bytes.get((end as usize).checked_sub(1)?))
+                    .map_or(released_by, |(i, _)| *i);
+                frame_data.push((frame.bytes, end_idx, frame.incomplete, frame.crc_valid, *bus));
+            }
+        }
+
+        // Sort frames by their last byte (original byte order) for consistent ordering
+        frame_data.sort_by_key(|(_, end_idx, _, _, _)| *end_idx);
+
+        // Apply minimum length filter - separate into passed and filtered.
+        // Partition the owned tuples, not references, so each payload moves into
+        // its FrameMessage instead of being cloned once per frame.
+        let min_length = config.min_length.unwrap_or(1);
+        let (passed_frames, filtered_frames): (Vec<_>, Vec<_>) = frame_data
+            .into_iter()
+            .enumerate()
+            .partition(|(_, (frame_bytes, _, _, _, _))| frame_bytes.len() >= min_length);
+
+        // One builder for both lists. They were byte-for-byte duplicates, which
+        // is how the live and flush paths in the serial reader had drifted apart
+        // on `incomplete`; the only thing separating these two is which side of
+        // the length filter the frame fell on.
+        //
+        // `crc_valid` is dropped here, and nothing is lost by it: the decode
+        // path recomputes the same verdict from the same bytes when it
+        // interprets the message, so the Decoder's Modbus tab reports it
+        // whether the frames are live or out of a capture. Persisting it would
+        // only matter to a view that wants the verdict without decoding.
+        let to_message = |(idx, (frame_bytes, end_idx, incomplete, _crc_valid, bus)): (
+            usize,
+            (Vec<u8>, usize, bool, Option<bool>, u8),
+        )| {
+            let extract = |cfg: &Option<FrameIdConfig>| {
+                cfg.as_ref()
+                    .and_then(|c| extract_frame_id(&frame_bytes, c))
+            };
+            let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
+            let source_address = extract(&config.source_address_config).map(|v| v as u16);
+            let dlc = frame_bytes.len() as u8;
+
+            FrameMessage {
+                protocol: "serial".to_string(),
+                timestamp_us: bytes.get(end_idx).map(|b| b.timestamp_us).unwrap_or(0),
+                frame_id,
+                bus,
+                dlc,
+                bytes: frame_bytes,
+                is_extended: false,
+                is_fd: false,
+                source_address,
+                incomplete: incomplete.then_some(true),
+                direction: None,
+            }
+        };
+
+        Ok((
+            passed_frames.into_iter().map(&to_message).collect(),
+            filtered_frames.into_iter().map(&to_message).collect(),
+        ))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use capture_store::TimestampedByte;
+
+        fn config(mode: &str) -> BackendFramingConfig {
+            BackendFramingConfig {
+                framing: InterfaceFramingConfig {
+                    mode: mode.to_string(),
+                    delimiter: None,
+                    max_length: None,
+                    modbus: None,
+                },
+                min_length: None,
+                frame_id_config: None,
+                source_address_config: None,
+                per_interface: None,
+            }
+        }
+
+        /// Byte `i` is stamped `1_000 + 10 * i`.
+        fn stamped(line: &[u8]) -> Vec<TimestampedByte> {
+            line.iter()
+                .enumerate()
+                .map(|(i, &byte)| TimestampedByte {
+                    byte,
+                    timestamp_us: 1_000 + 10 * i as u64,
+                    bus: 0,
+                })
+                .collect()
+        }
+
+        fn rtu(hex: &str) -> Vec<u8> {
+            let mut out = crate::hex::parse_bytes(hex).unwrap();
+            out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
+            out
+        }
+
+        fn stamps(bytes: &[TimestampedByte], config: &BackendFramingConfig) -> Vec<u64> {
+            let (passed, _) = frame_messages(bytes, config).unwrap();
+            passed.iter().map(|m| m.timestamp_us).collect()
+        }
+
+        #[test]
+        fn a_modbus_message_is_stamped_at_its_last_byte() {
+            let line = [rtu("01044DE20002"), rtu("010404012C0000")].concat();
+            assert_eq!(stamps(&stamped(&line), &config("modbus_rtu")), vec![1_070, 1_160]);
+        }
+
+        /// `01 03 40` opens a plausible 69-byte response, so the framer holds
+        /// everything behind it until that candidate fails, then releases the
+        /// messages it held all at once.
+        #[test]
+        fn messages_a_sync_releases_together_keep_their_own_last_bytes() {
+            let exchange = [rtu("01044DE20002"), rtu("010404012C0000")];
+            let mut line = vec![0x01, 0x03, 0x40];
+            let mut last_bytes = Vec::new();
+            for message in exchange.iter().cycle().take(8) {
+                line.extend(message);
+                last_bytes.push(1_000 + 10 * (line.len() as u64 - 1));
+            }
+            assert_eq!(stamps(&stamped(&line), &config("modbus_rtu")), last_bytes);
+        }
+
+        #[test]
+        fn a_delimited_message_is_stamped_at_its_delimiter() {
+            assert_eq!(stamps(&stamped(b"AB\nCDE\n"), &config("raw")), vec![1_020, 1_060]);
+        }
     }
 }
 

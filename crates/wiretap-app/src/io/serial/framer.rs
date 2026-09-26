@@ -60,6 +60,9 @@ pub struct SerialFrame {
     /// question does not apply — another encoding, or a trailing residue that is
     /// not a message at all.
     pub crc_valid: Option<bool>,
+    /// For Modbus RTU: bytes fed through this message's last byte. A message
+    /// buffered before the framer synced is released by a later byte.
+    pub end_offset: Option<u64>,
 }
 
 /// Configuration for extracting frame ID from frame bytes
@@ -136,6 +139,7 @@ fn residue(bytes: Vec<u8>) -> Vec<SerialFrame> {
         bytes,
         incomplete: true,
         crc_valid: None,
+        end_offset: None,
     }]
 }
 
@@ -186,6 +190,7 @@ impl FramerImpl for DelimiterFramer {
                             bytes: frame,
                             incomplete: false,
                             crc_valid: None,
+                            end_offset: None,
                         });
                     }
                 }
@@ -198,6 +203,7 @@ impl FramerImpl for DelimiterFramer {
                     bytes: frame,
                     incomplete: false,
                     crc_valid: None,
+                    end_offset: None,
                 });
             }
         }
@@ -241,6 +247,7 @@ impl FramerImpl for SlipFramer {
                             bytes: frame,
                             incomplete: false,
                             crc_valid: None,
+                            end_offset: None,
                         });
                     }
                     self.in_escape = false;
@@ -302,6 +309,7 @@ fn rtu_frame(msg: ModbusRtuMessage) -> SerialFrame {
         bytes: msg.raw,
         incomplete: false,
         crc_valid: Some(msg.crc_valid),
+        end_offset: Some(msg.end_offset),
     }
 }
 
@@ -358,6 +366,7 @@ impl FramerImpl for RawFramer {
                     bytes: frame,
                     incomplete: false,
                     crc_valid: None,
+                    end_offset: None,
                 });
             }
         }
@@ -369,6 +378,7 @@ impl FramerImpl for RawFramer {
                 bytes: frame,
                 incomplete: false,
                 crc_valid: None,
+                end_offset: None,
             });
         }
 
