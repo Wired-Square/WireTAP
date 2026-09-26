@@ -2,16 +2,12 @@
 //
 // Per-protocol source spawning for broker sessions.
 
-use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::mpsc;
-use tokio::sync::Mutex;
 use tokio::time::{Duration, interval};
-use tokio_modbus::client::{self, tcp};
-use tokio_modbus::prelude::*;
 
 use super::types::{SerialOverrides, SourceConfig};
 use crate::io::device_kinds::{
@@ -21,7 +17,7 @@ use crate::io::bus_mapping::BusMapping;
 use crate::io::gvret::run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
-use crate::io::modbus_tcp::poll::{run_poll_task, FrameSink};
+use crate::io::modbus_tcp::poll::{connect_for_polling, run_poll_task, FrameSink};
 use crate::io::modbus_tcp::PollGroup;
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
@@ -761,18 +757,7 @@ async fn run_modbus_tcp_client(
         return Ok(());
     }
 
-    // Resolve server address (accepts a hostname or an IP literal)
-    let addr: SocketAddr = crate::io::net::resolve_host_port(&host, port)
-        .await
-        .map_err(|e| e.user_message())?;
-
-    // Connect to the Modbus TCP server
-    let slave = Slave(unit_id);
-    let ctx = tcp::connect_slave(addr, slave)
-        .await
-        .map_err(|e| format!("Failed to connect to Modbus TCP server at {}: {}", addr, e))?;
-
-    let ctx: Arc<Mutex<client::Context>> = Arc::new(Mutex::new(ctx));
+    let conn = connect_for_polling(&host, port, unit_id).await?;
     let address = format!("{}:{}", host, port);
 
     // Signal that we're connected
@@ -794,7 +779,7 @@ async fn run_modbus_tcp_client(
     let mut poll_handles = Vec::new();
     for poll in &polls {
         let tx_clone = tx.clone();
-        let ctx_clone = ctx.clone();
+        let conn_clone = conn.clone();
         let stop_clone = stop_flag.clone();
         let pause_clone = pause_flag.clone();
         let poll = poll.clone();
@@ -802,7 +787,7 @@ async fn run_modbus_tcp_client(
         let handle = tokio::spawn(async move {
             run_poll_task(
                 poll,
-                ctx_clone,
+                conn_clone,
                 max_register_errors,
                 stop_clone,
                 pause_clone,

@@ -10,6 +10,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A Modbus TCP device that stops answering no longer freezes polling.** A device that went quiet without closing the connection used to hang every poll group on it for good. Each read now gives up after 2 seconds and reconnects before the next one, and the timeout counts towards *Max Consecutive Register Errors* like any other connection error.
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
 - **A short last page reads as the last page.** Discovery fills a short last page from the rows before it, but the pager still read "1 / 2" there with Next and Last enabled. It now reads "2 / 2" and Previous goes back a page.
 

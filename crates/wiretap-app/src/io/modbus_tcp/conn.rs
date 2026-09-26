@@ -1,21 +1,13 @@
 // io/modbus_tcp/conn.rs
 //
-// A scan connection: one Modbus TCP context plus the timing and reconnect
-// policy a discovery sweep needs.
+// A Modbus TCP connection that never hangs: one context plus a per-request
+// timeout and reconnect policy, shared by the poll path and the discovery
+// sweeps. `tokio-modbus` has no per-request timeout of its own. A read ends in
+// one of three outcomes:
 //
-// The poll path (`poll.rs`) can assume a device that behaves — it only ever
-// reads registers a catalogue says exist. A sweep cannot. It probes addresses
-// that may be illegal, on devices whose stacks range from industrial gateways to
-// the single-connection microcontroller in a cheap UPS, and it has to tell three
-// outcomes apart:
-//
-//   - a value          → the register exists
-//   - a Modbus exception → the register does not, and the reply says which
-//   - silence          → no information at all, most often a function code the
-//                        device simply doesn't implement
-//
-// That third case is why this module exists. `tokio-modbus` has no per-request
-// timeout, so silence would otherwise hang until the OS gave up.
+//   - a value            → the register exists
+//   - a Modbus exception → the device is alive but won't serve this request
+//   - silence            → a timeout or transport failure; no information
 
 use std::net::SocketAddr;
 use tokio::time::{sleep, timeout, Duration};
@@ -46,8 +38,7 @@ impl ReadOutcome {
     }
 }
 
-/// A Modbus TCP connection with a scan's timing policy attached.
-pub struct ScanConn {
+pub struct ModbusConn {
     addr: SocketAddr,
     ctx: client::Context,
     unit_id: u8,
@@ -67,7 +58,7 @@ pub struct ScanConn {
     needs_reconnect: bool,
 }
 
-impl ScanConn {
+impl ModbusConn {
     pub async fn connect(
         host: &str,
         port: u16,
@@ -98,6 +89,12 @@ impl ScanConn {
 
     pub fn addr(&self) -> SocketAddr {
         self.addr
+    }
+
+    /// Address later requests, and any reconnect, to another unit on this socket.
+    pub fn set_unit(&mut self, unit_id: u8) {
+        self.ctx.set_slave(Slave(unit_id));
+        self.unit_id = unit_id;
     }
 
     async fn reconnect(&mut self) -> Result<(), String> {
@@ -163,5 +160,70 @@ impl ScanConn {
                 ReadOutcome::Silent("no reply within the timeout".to_string())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpListener;
+    use tokio::sync::mpsc;
+
+    /// Accepts every connection and never replies, reporting each request as
+    /// (connection number, unit id).
+    async fn silent_device() -> (u16, mpsc::UnboundedReceiver<(usize, u8)>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (units, rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            let mut connection = 0;
+            while let Ok((mut socket, _)) = listener.accept().await {
+                connection += 1;
+                let units = units.clone();
+                tokio::spawn(async move {
+                    let mut request = [0u8; 12];
+                    while socket.read_exact(&mut request).await.is_ok() {
+                        let _ = units.send((connection, request[6]));
+                    }
+                });
+            }
+        });
+        (port, rx)
+    }
+
+    #[tokio::test]
+    async fn a_device_that_never_replies_reads_as_silent_within_the_timeout() {
+        timeout(Duration::from_secs(5), async {
+            let (port, _units) = silent_device().await;
+            let mut conn = ModbusConn::connect("127.0.0.1", port, 1, 100, 0, false)
+                .await
+                .unwrap();
+            for _ in 0..2 {
+                let started = tokio::time::Instant::now();
+                let outcome = conn.read(&RegisterType::Holding, 0, 1).await;
+                assert!(matches!(outcome, ReadOutcome::Silent(_)), "{:?}", outcome);
+                assert!(started.elapsed() < Duration::from_millis(1000));
+            }
+        })
+        .await
+        .expect("a read hung");
+    }
+
+    #[tokio::test]
+    async fn the_unit_set_before_a_timeout_survives_the_reconnect() {
+        timeout(Duration::from_secs(5), async {
+            let (port, mut units) = silent_device().await;
+            let mut conn = ModbusConn::connect("127.0.0.1", port, 1, 100, 0, false)
+                .await
+                .unwrap();
+            conn.set_unit(7);
+            conn.read(&RegisterType::Holding, 0, 1).await;
+            conn.read(&RegisterType::Holding, 0, 1).await;
+            assert_eq!(units.recv().await, Some((1, 7)));
+            assert_eq!(units.recv().await, Some((2, 7)));
+        })
+        .await
+        .expect("a read hung");
     }
 }

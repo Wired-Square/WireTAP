@@ -19,11 +19,8 @@ use std::sync::{
     Arc,
 };
 use tauri::AppHandle;
-use tokio::sync::Mutex;
-use tokio_modbus::client::{self, tcp};
-use tokio_modbus::prelude::*;
 
-use super::poll::{run_poll_task, FrameSink};
+use super::poll::{connect_for_polling, run_poll_task, FrameSink};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_stream_ended, lifecycle::SourceLifecycle, IOCapabilities, IOSource,
@@ -175,19 +172,8 @@ impl IOSource for ModbusTcpSource {
         self.state = IOState::Starting;
         self.cancel_flag.store(false, Ordering::Relaxed);
 
-        // Resolve server address (accepts a hostname or an IP literal)
-        let addr = crate::io::net::resolve_host_port(&self.config.host, self.config.port)
-            .await
-            .map_err(|e| e.user_message())?;
-
-        // Connect to the Modbus TCP server
-        let slave = Slave(self.config.unit_id);
-        let ctx = tcp::connect_slave(addr, slave)
-            .await
-            .map_err(|e| format!("Failed to connect to Modbus TCP server at {}: {}", addr, e))?;
-
-        // Wrap the context in an Arc<Mutex> so poll tasks can share it
-        let ctx: Arc<Mutex<client::Context>> = Arc::new(Mutex::new(ctx));
+        let conn =
+            connect_for_polling(&self.config.host, self.config.port, self.config.unit_id).await?;
 
         // Create frame capture
         capture_store::create_session_capture(&self.session_id, CaptureKind::Frames, self.session_id.clone());
@@ -214,7 +200,7 @@ impl IOSource for ModbusTcpSource {
         let ended = Arc::new(self.lifecycle.guard(IOState::Stopped));
         for poll in &self.config.polls {
             let poll = poll.clone();
-            let ctx = ctx.clone();
+            let conn = conn.clone();
             let cancel = self.cancel_flag.clone();
             let pause = self.pause_flag.clone();
             let max_register_errors = self.config.max_register_errors;
@@ -224,7 +210,7 @@ impl IOSource for ModbusTcpSource {
                 let _ended = ended;
                 run_poll_task(
                     poll,
-                    ctx,
+                    conn,
                     max_register_errors,
                     cancel,
                     pause,

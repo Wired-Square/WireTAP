@@ -20,9 +20,8 @@ use std::sync::{atomic::AtomicBool, Arc};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use tokio_modbus::client;
-use tokio_modbus::prelude::*;
 
+use super::conn::{ModbusConn, ReadOutcome};
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
@@ -64,38 +63,6 @@ impl std::fmt::Display for ReadError {
         match self {
             ReadError::Exception(e) => write!(f, "Modbus exception: {}", e),
             ReadError::Io(e) => write!(f, "IO error: {}", e),
-        }
-    }
-}
-
-fn read_result<T, E: std::fmt::Display, I: std::fmt::Display>(
-    result: Result<Result<T, E>, I>,
-) -> Result<T, ReadError> {
-    match result {
-        Ok(Ok(data)) => Ok(data),
-        Ok(Err(exc)) => Err(ReadError::Exception(exc.to_string())),
-        Err(e) => Err(ReadError::Io(e.to_string())),
-    }
-}
-
-/// Read one block. The scanner, which must tell more outcomes apart, has its own
-/// richer outcome type.
-pub async fn read_block(
-    ctx: &mut client::Context,
-    register_type: &RegisterType,
-    start: u16,
-    count: u16,
-) -> Result<ReadData, ReadError> {
-    match register_type {
-        RegisterType::Holding => {
-            read_result(ctx.read_holding_registers(start, count).await).map(ReadData::Registers)
-        }
-        RegisterType::Input => {
-            read_result(ctx.read_input_registers(start, count).await).map(ReadData::Registers)
-        }
-        RegisterType::Coil => read_result(ctx.read_coils(start, count).await).map(ReadData::Coils),
-        RegisterType::Discrete => {
-            read_result(ctx.read_discrete_inputs(start, count).await).map(ReadData::Coils)
         }
     }
 }
@@ -247,6 +214,18 @@ impl FrameSink {
 // Poll task
 // ============================================================================
 
+const POLL_TIMEOUT_MS: u64 = 2000;
+
+/// Open the connection every poll group of one source shares.
+pub async fn connect_for_polling(
+    host: &str,
+    port: u16,
+    unit_id: u8,
+) -> Result<Arc<Mutex<ModbusConn>>, String> {
+    let conn = ModbusConn::connect(host, port, unit_id, POLL_TIMEOUT_MS, 0, false).await?;
+    Ok(Arc::new(Mutex::new(conn)))
+}
+
 /// A group's failure counters, and what they decide: whether this tick reads,
 /// how long an exception backs off, and when IO errors give up.
 struct ReadHealth {
@@ -304,7 +283,7 @@ impl ReadHealth {
 /// A Modbus exception backs the group off instead of counting towards the limit.
 pub async fn run_poll_task(
     poll: PollGroup,
-    ctx: Arc<Mutex<client::Context>>,
+    conn: Arc<Mutex<ModbusConn>>,
     max_register_errors: u32,
     cancel: Arc<AtomicBool>,
     pause: Arc<AtomicBool>,
@@ -334,13 +313,18 @@ pub async fn run_poll_task(
             continue;
         }
 
-        let result = {
-            let mut ctx = ctx.lock().await;
-            // One TCP connection multiplexes all slaves: point the shared context
-            // at this poll's device address before reading. Done inside the held
-            // lock so concurrent poll tasks can't race the slave id.
-            ctx.set_slave(Slave(poll.device_address));
-            read_block(&mut ctx, &poll.register_type, poll.start_register, poll.count).await
+        let outcome = {
+            let mut conn = conn.lock().await;
+            // One TCP connection multiplexes all slaves; switching inside the
+            // held lock keeps concurrent poll tasks from racing the unit id.
+            conn.set_unit(poll.device_address);
+            conn.read(&poll.register_type, poll.start_register, poll.count).await
+        };
+        let result = match outcome {
+            ReadOutcome::Registers(regs) => Ok(ReadData::Registers(regs)),
+            ReadOutcome::Coils(coils) => Ok(ReadData::Coils(coils)),
+            ReadOutcome::Exception(m) => Err(ReadError::Exception(m)),
+            ReadOutcome::Silent(m) => Err(ReadError::Io(m)),
         };
 
         match result {

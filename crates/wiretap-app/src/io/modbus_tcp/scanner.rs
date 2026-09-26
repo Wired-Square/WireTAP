@@ -20,7 +20,7 @@ use std::sync::{
 };
 use tokio::time::{sleep, Duration};
 
-use super::conn::{ReadOutcome, ScanConn};
+use super::conn::{ModbusConn, ReadOutcome};
 use super::poll::{modbus_frame, per_register_frames, register_type_name, FrameSink, ReadData};
 use super::reader::RegisterType;
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes};
@@ -559,7 +559,7 @@ pub async fn scan_registers(
         config.max_requests
     );
 
-    let mut conn = ScanConn::connect(
+    let mut conn = ModbusConn::connect(
         &config.host,
         config.port,
         config.unit_id,
@@ -784,7 +784,7 @@ pub async fn scan_unit_ids(
         let mut unit_found = false;
 
         if fc43_supported {
-            // FC43 has no wrapper on ScanConn — it's the one request the sweep
+            // FC43 has no wrapper on ModbusConn — it's the one request the sweep
             // makes that isn't a register read.
             let ident = tokio::time::timeout(
                 Duration::from_millis(config.timeout_ms),
@@ -865,7 +865,7 @@ pub async fn scan_unit_ids(
         }
 
         if !unit_found {
-            let Ok(mut conn) = ScanConn::connect(
+            let Ok(mut conn) = ModbusConn::connect(
                 &config.host,
                 config.port,
                 unit_id,
@@ -1010,7 +1010,7 @@ pub async fn probe_function_codes(
 
         // A fresh connection per unit: a device that rejects an unknown slave
         // may drop the socket, and we don't want that to taint the next unit.
-        let mut conn = match ScanConn::connect(
+        let mut conn = match ModbusConn::connect(
             &config.host,
             config.port,
             unit_id,
