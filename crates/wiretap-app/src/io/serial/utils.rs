@@ -5,15 +5,13 @@
 
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, Parity as SpParity, StopBits};
-use tokio::sync::mpsc;
 use wiretap_io::serial::{LineSettings, Parity as LineParity};
 
 use super::framer::{FrameIdConfig, FramingEncoding};
 use crate::io::types::ModbusRtuOptions;
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
-use crate::io::error::{DevicePresence, IoError};
-use crate::io::types::SourceMessage;
+use crate::io::error::DevicePresence;
 use crate::settings::IOProfile;
 
 // ============================================================================
@@ -23,27 +21,12 @@ use crate::settings::IOProfile;
 /// Probe whether a serial port still enumerates on the host, so an access-denied
 /// failure can be told apart as "in use" (still present) vs "disconnected/reset"
 /// (gone).
-pub(super) fn probe_serial_presence(port_name: &str) -> DevicePresence {
+pub(crate) fn probe_serial_presence(port_name: &str) -> DevicePresence {
     match serialport::available_ports() {
         Ok(ports) if ports.iter().any(|p| p.port_name == port_name) => DevicePresence::Present,
         Ok(_) => DevicePresence::Absent,
         Err(_) => DevicePresence::Unknown,
     }
-}
-
-/// Classify a serial read failure (probing the port's presence to distinguish
-/// "in use" from "disconnected") and send it as a `SourceMessage::Error`. Call
-/// from the terminal error arm of a serial-family blocking read loop — probing
-/// and classifying together is the only correct usage, so it lives in one place.
-pub(crate) fn send_serial_read_error(
-    tx: &mpsc::Sender<SourceMessage>,
-    source_idx: usize,
-    port_name: &str,
-    err: &std::io::Error,
-) {
-    let presence = probe_serial_presence(port_name);
-    let msg = IoError::device_stream_error_message(port_name, err, presence);
-    let _ = tx.blocking_send(SourceMessage::Error(source_idx, msg));
 }
 
 // ============================================================================
@@ -166,19 +149,10 @@ fn extraction(
     })
 }
 
-/// Parse an IOProfile into a SerialSourceConfig, applying session-level overrides.
-///
-/// Returns `None` if the port is not specified in the profile.
-pub fn parse_profile_for_source(
-    profile: &IOProfile,
-    overrides: &SerialOverrides,
-) -> Option<SerialSourceConfig> {
-    let port = conn_str(profile, "port")?;
-
-    // Line settings come from `io::device_kinds`, the one declaration the form
-    // also seeds from.
-    // Out-of-range bits read as 8N1, as they always have; the library refuses them.
-    let line = LineSettings {
+/// A profile's line, from `io::device_kinds`, the one declaration the form also
+/// seeds from. Out-of-range bits read as 8N1, as they always have.
+pub(crate) fn line_settings(profile: &IOProfile) -> LineSettings {
+    LineSettings {
         baud: conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
         data_bits: match conn_i64(profile, "data_bits") {
             Some(bits @ 5..=7) => bits as u8,
@@ -190,7 +164,19 @@ pub fn parse_profile_for_source(
             _ => LineParity::None,
         },
         stop_bits: if conn_i64(profile, "stop_bits") == Some(2) { 2 } else { 1 },
-    };
+    }
+}
+
+/// Parse an IOProfile into a SerialSourceConfig, applying session-level overrides.
+///
+/// Returns `None` if the port is not specified in the profile.
+pub fn parse_profile_for_source(
+    profile: &IOProfile,
+    overrides: &SerialOverrides,
+) -> Option<SerialSourceConfig> {
+    let port = conn_str(profile, "port")?;
+
+    let line = line_settings(profile);
 
     // Session override, then profile, then the kind default — resolved by the
     // same function the broker uses to decide which captures to create, so the

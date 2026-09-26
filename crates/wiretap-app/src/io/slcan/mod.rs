@@ -7,8 +7,4 @@
 
 pub mod reader; // pub for Tauri command access (probe_slcan_device)
 
-// Re-export public items
-pub use reader::encode_transmit_frame;
-
-// Internal items used by multi_source
 pub(crate) use reader::run_source as run_slcan_source;

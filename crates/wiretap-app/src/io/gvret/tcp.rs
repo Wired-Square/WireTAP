@@ -3,24 +3,23 @@
 // GVRET over TCP: the desktop's probe, and the session's source on
 // `wiretap_io::can::gvret`.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc as std_mpsc, Arc};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use wiretap_io::can::gvret::{open as open_gvret, GvretOptions, Link};
-use wiretap_io::can::{CanError, CanEvent, CanOptions, ResolveError, TransportError};
+use wiretap_io::can::{CanError, ResolveError, TransportError};
 
 use super::common::{
-    absorb_num_buses_reply, clamp_bus_count, mappings_from_num_buses, GvretDeviceInfo,
-    NumBusesOutcome,
+    absorb_num_buses_reply, handshake_failed, GvretDeviceInfo, NumBusesOutcome, Stream,
 };
-use crate::io::bus_mapping::{apply_bus_mappings_batch, BusMapping};
-use crate::io::can_task::{forward_transmits, frame_message};
+use crate::io::bus_mapping::BusMapping;
+use crate::io::can_task::{can_options, link_lost, serve};
 use crate::io::error::IoError;
 use crate::io::net::tcp_endpoint;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::types::SourceMessage;
 use wiretap_protocol::gvret;
 
 /// Ask a connected device how many buses it has.
@@ -168,8 +167,6 @@ pub async fn probe_gvret_tcp(
 // Multi-Source Streaming
 // ============================================================================
 
-const STOP_POLL: Duration = Duration::from_millis(50);
-
 /// Worded as `resolve_host_port` and the probe word a failed connect.
 fn connect_failed(host: &str, device: &str, error: TransportError) -> IoError {
     match error {
@@ -188,79 +185,10 @@ fn connect_failed(host: &str, device: &str, error: TransportError) -> IoError {
     }
 }
 
-/// A link lost during the handshake reads as it did when the desktop asked
-/// GET_NUMBUSES itself.
 fn open_failed(host: &str, device: &str, error: CanError) -> String {
-    let outcome = match error {
-        CanError::Connect(e) => return connect_failed(host, device, e).user_message(),
-        CanError::Closed => NumBusesOutcome::Closed,
-        CanError::Read(e) => NumBusesOutcome::Failed(e.to_string()),
-        other => return format!("{device}: {other}"),
-    };
-    mappings_from_num_buses(outcome, &[], device)
-        .err()
-        .unwrap_or_default()
-}
-
-/// A closed link ends the source as disconnected; any other loss, an
-/// unanswered keepalive included, is an error.
-fn link_lost(source_idx: usize, device: &str, error: CanError) -> SourceMessage {
     match error {
-        CanError::Closed => SourceMessage::Ended(source_idx, EndReason::Disconnected),
-        other => SourceMessage::Error(source_idx, format!("{device}: {other}")),
-    }
-}
-
-struct Stream {
-    source_idx: usize,
-    device: String,
-    address: String,
-    profile_mappings: Vec<BusMapping>,
-    mappings: Vec<BusMapping>,
-}
-
-impl Stream {
-    /// What the broker is told of `event`, or the loss that ends the source.
-    fn on_event(&mut self, event: CanEvent) -> Result<Vec<SourceMessage>, CanError> {
-        match event {
-            CanEvent::Connected(info) => {
-                if !info.keepalive {
-                    tlog!(
-                        "[gvret_tcp] {} does not answer keepalives, so a silent drop will not be seen",
-                        self.device
-                    );
-                }
-                let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
-                    NumBusesOutcome::Answered(clamp_bus_count(n))
-                });
-                if let Ok(mappings) =
-                    mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
-                {
-                    self.mappings = mappings;
-                }
-                Ok(vec![
-                    SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
-                    SourceMessage::Connected(
-                        self.source_idx,
-                        "gvret_tcp".to_string(),
-                        self.address.clone(),
-                        None,
-                    ),
-                ])
-            }
-            CanEvent::Read(reads) => {
-                let frames = apply_bus_mappings_batch(
-                    reads.into_iter().map(frame_message).collect(),
-                    &self.mappings,
-                );
-                Ok(if frames.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![SourceMessage::Frames(self.source_idx, frames)]
-                })
-            }
-            CanEvent::Disconnected { error, .. } => Err(error),
-        }
+        CanError::Connect(e) => connect_failed(host, device, e).user_message(),
+        other => handshake_failed(device, other),
     }
 }
 
@@ -279,9 +207,7 @@ pub async fn run_source(
         endpoint: tcp_endpoint(&host, port),
         connect_timeout: Duration::from_secs_f64(timeout_sec),
     };
-    let mut options = CanOptions::default();
-    options.reopen = None;
-    let mut task = match open_gvret(link, GvretOptions::default(), options).await {
+    let task = match open_gvret(link, GvretOptions::default(), can_options(false)).await {
         Ok(task) => task,
         Err(e) => {
             let _ = tx
@@ -294,60 +220,36 @@ pub async fn run_source(
         }
     };
 
-    let reader_running = Arc::new(());
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-    forward_transmits(transmit_rx, task.writer(), Arc::downgrade(&reader_running));
-    let _ = tx
-        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
-        .await;
-
-    let mut stream = Stream {
+    let address = format!("{}:{}", host, port);
+    let mut stream = Stream::new(
         source_idx,
-        device,
-        address: format!("{}:{}", host, port),
-        mappings: bus_mappings.clone(),
-        profile_mappings: bus_mappings,
-    };
-    let mut poll = tokio::time::interval(STOP_POLL);
-    let lost = loop {
-        tokio::select! {
-            event = task.next_event() => {
-                let Some(event) = event else { break Some(CanError::Closed) };
-                match stream.on_event(event) {
-                    Ok(messages) => {
-                        for message in messages {
-                            let _ = tx.send(message).await;
-                        }
-                    }
-                    Err(error) => break Some(error),
-                }
-            }
-            _ = poll.tick() => {
-                if stop_flag.load(Ordering::SeqCst) {
-                    break None;
-                }
-            }
-        }
-    };
-
-    let ended = match lost {
-        Some(error) => link_lost(source_idx, &stream.device, error),
-        None => {
-            task.stop().await;
-            SourceMessage::Ended(source_idx, EndReason::Stopped)
-        }
-    };
-    let _ = tx.send(ended).await;
+        "gvret_tcp",
+        device.clone(),
+        address,
+        bus_mappings,
+    );
+    serve(
+        task,
+        source_idx,
+        false,
+        &stop_flag,
+        &tx,
+        |event| stream.on_event(event),
+        |error| link_lost(source_idx, &device, error),
+    )
+    .await;
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::common::{MAX_BUSES, NUMBUSES_TIMEOUT};
+    use super::super::common::NUMBUSES_TIMEOUT;
     use super::*;
-    use std::time::UNIX_EPOCH;
+    use crate::io::types::{EndReason, TransmitRequest};
+    use std::sync::atomic::Ordering;
+    use std::sync::mpsc as std_mpsc;
     use tokio::net::TcpListener;
     use tokio::time::timeout;
-    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use wiretap_io::can::CanFrame;
     use wiretap_protocol::gvret::ClientCommand;
 
     /// Serve one connection, handing it to `serve`, and ask the listener what
@@ -440,8 +342,6 @@ mod tests {
         );
     }
 
-    // --- the source on wiretap_io --------------------------------------------
-
     const DEVICE: &str = "gvret_tcp(10.0.0.9:23)";
 
     fn mapping(device_bus: u8, enabled: bool, output_bus: u8) -> BusMapping {
@@ -451,116 +351,6 @@ mod tests {
             output_bus,
             ..BusMapping::default()
         }
-    }
-
-    fn stream(profile_mappings: Vec<BusMapping>) -> Stream {
-        Stream {
-            source_idx: 3,
-            device: DEVICE.to_string(),
-            address: "10.0.0.9:23".to_string(),
-            mappings: profile_mappings.clone(),
-            profile_mappings,
-        }
-    }
-
-    fn connected(buses: Option<u8>) -> CanEvent {
-        let mut info = DeviceInfo::default();
-        info.buses = buses;
-        info.keepalive = true;
-        CanEvent::Connected(info)
-    }
-
-    fn resolved(messages: &[SourceMessage]) -> &[BusMapping] {
-        match messages {
-            [SourceMessage::MappingsResolved(3, mappings), SourceMessage::Connected(3, kind, address, None)] =>
-            {
-                assert_eq!(
-                    (kind.as_str(), address.as_str()),
-                    ("gvret_tcp", "10.0.0.9:23")
-                );
-                mappings
-            }
-            _ => panic!("expected MappingsResolved then Connected"),
-        }
-    }
-
-    #[test]
-    fn a_connect_reconciles_the_profile_to_the_reported_bus_count() {
-        let mut s = stream(vec![mapping(0, true, 0)]);
-        let messages = s.on_event(connected(Some(2))).unwrap();
-        let mappings = resolved(&messages);
-        assert_eq!(mappings.len(), 2);
-        assert_eq!(mappings[1].device_bus, 1);
-    }
-
-    #[test]
-    fn an_implausible_bus_count_is_clamped() {
-        let mut s = stream(vec![mapping(0, true, 0)]);
-        let messages = s.on_event(connected(Some(0))).unwrap();
-        assert_eq!(resolved(&messages).len(), MAX_BUSES as usize);
-    }
-
-    #[test]
-    fn a_device_that_never_says_keeps_the_profiles_buses() {
-        let mut s = stream(vec![mapping(2, true, 5)]);
-        let messages = s.on_event(connected(None)).unwrap();
-        let mappings = resolved(&messages);
-        assert_eq!(mappings.len(), 1);
-        assert_eq!((mappings[0].device_bus, mappings[0].output_bus), (2, 5));
-    }
-
-    #[test]
-    fn a_read_is_mapped_onto_the_sessions_buses() {
-        let mut s = stream(vec![mapping(0, true, 7), mapping(1, false, 1)]);
-        let read = |bus, at_us| CanRead {
-            frame: CanFrame::data(bus, 0x100, false, false, false, vec![bus]),
-            direction: Direction::Rx,
-            at: UNIX_EPOCH + Duration::from_micros(at_us),
-            device_us: Some(at_us),
-        };
-        let messages = s
-            .on_event(CanEvent::Read(vec![read(0, 10), read(1, 20)]))
-            .unwrap();
-        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
-            panic!("expected one Frames");
-        };
-        assert_eq!(frames.len(), 1, "the muted bus is dropped");
-        assert_eq!((frames[0].bus, frames[0].timestamp_us), (7, 10));
-
-        let muted = s.on_event(CanEvent::Read(vec![read(1, 30)])).unwrap();
-        assert!(muted.is_empty(), "no empty Frames");
-    }
-
-    #[test]
-    fn a_loss_ends_the_stream_with_its_kind() {
-        let mut s = stream(vec![]);
-        let lost = s.on_event(CanEvent::Disconnected {
-            error: CanError::Unresponsive,
-            consecutive: 1,
-            retry_in: None,
-        });
-        assert!(matches!(lost, Err(CanError::Unresponsive)));
-    }
-
-    #[test]
-    fn a_closed_link_is_a_disconnect_and_any_other_loss_an_error() {
-        assert!(matches!(
-            link_lost(3, DEVICE, CanError::Closed),
-            SourceMessage::Ended(3, EndReason::Disconnected)
-        ));
-        let SourceMessage::Error(3, unresponsive) = link_lost(3, DEVICE, CanError::Unresponsive)
-        else {
-            panic!("expected an error");
-        };
-        assert_eq!(unresponsive, format!("{DEVICE}: device stopped answering"));
-        let SourceMessage::Error(3, read) = link_lost(
-            3,
-            DEVICE,
-            CanError::Read(std::io::Error::other("connection reset")),
-        ) else {
-            panic!("expected an error");
-        };
-        assert!(read.contains("connection reset"), "got: {read}");
     }
 
     #[test]
@@ -802,5 +592,38 @@ mod tests {
             next(&mut rx, Duration::from_secs(3)).await,
             SourceMessage::Ended(3, EndReason::Disconnected)
         ));
+    }
+
+    #[tokio::test]
+    async fn a_listen_only_source_is_offered_no_transmit() {
+        let (port, _commands) = fake_gvret(usize::MAX, false).await;
+        let link = Link::Tcp {
+            endpoint: format!("127.0.0.1:{port}"),
+            connect_timeout: Duration::from_secs(2),
+        };
+        let task = open_gvret(link, GvretOptions::default(), can_options(true))
+            .await
+            .expect("open");
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, mut rx) = mpsc::channel(64);
+        let flag = stop.clone();
+        tokio::spawn(async move {
+            let mut stream = Stream::new(3, "gvret_tcp", DEVICE.into(), "here".into(), vec![]);
+            let on_event = |event| stream.on_event(event);
+            serve(task, 3, true, &flag, &tx, on_event, |_| panic!("not lost")).await
+        });
+        let within = Duration::from_secs(3);
+        assert!(matches!(
+            next(&mut rx, within).await,
+            SourceMessage::MappingsResolved(3, _)
+        ));
+        stop.store(true, Ordering::SeqCst);
+        loop {
+            match next(&mut rx, within).await {
+                SourceMessage::Ended(3, EndReason::Stopped) => break,
+                SourceMessage::TransmitReady(..) => panic!("offered a transmit"),
+                _ => {}
+            }
+        }
     }
 }

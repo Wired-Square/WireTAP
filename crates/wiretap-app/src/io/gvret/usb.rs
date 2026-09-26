@@ -6,19 +6,22 @@
 // Protocol reference: https://github.com/collin80/GVRET
 
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc as std_mpsc, Arc, Mutex};
+use std::io::Write;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use wiretap_io::can::gvret::{open as open_gvret, GvretOptions, Link};
+use wiretap_io::serial::LineSettings;
 
 use super::common::{
-    absorb_num_buses_reply, decode_mapped, resolve_source_mappings, GvretDeviceInfo,
-    NumBusesOutcome, NUMBUSES_TIMEOUT,
+    absorb_num_buses_reply, handshake_failed, GvretDeviceInfo, NumBusesOutcome, Stream,
 };
-use crate::io::bus_mapping::{apply_bus_mappings_batch, BusMapping};
+use crate::io::bus_mapping::BusMapping;
+use crate::io::can_task::{can_options, port_lost, serve};
 use crate::io::error::IoError;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::serial::utils::probe_serial_presence;
+use crate::io::types::SourceMessage;
 use wiretap_protocol::gvret;
 
 /// A probe may wait longer than a streaming reader: it is a deliberate user
@@ -162,195 +165,68 @@ pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, Io
 pub async fn run_source(
     source_idx: usize,
     port: String,
-    baud_rate: u32,
+    line: LineSettings,
     bus_mappings: Vec<BusMapping>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    // Open serial port
-    let serial_port = match serialport::new(&port, baud_rate)
-        .timeout(Duration::from_millis(10))
-        .open()
-    {
-        Ok(p) => p,
+    let device = gvret_usb_device(&port);
+    let link = Link::Serial {
+        path: port.clone(),
+        line,
+    };
+    let task = match open_gvret(link, GvretOptions::default(), can_options(false)).await {
+        Ok(task) => task,
         Err(e) => {
             let _ = tx
                 .send(SourceMessage::Error(
                     source_idx,
-                    format!("Failed to open port: {}", e),
+                    handshake_failed(&device, e),
                 ))
                 .await;
             return;
         }
     };
 
-    // Wrap in Arc<Mutex> for shared access between read and transmit
-    let serial_port = Arc::new(Mutex::new(serial_port));
-
-    // Clear buffers and initialize (do all sync work without awaiting)
-    let init_result: Result<(), String> = (|| {
-        let mut port = serial_port
-            .lock()
-            .map_err(|e| format!("Port lock poisoned: {}", e))?;
-        let _ = port.clear(serialport::ClearBuffer::All);
-
-        // Enable binary mode
-        port.write_all(&gvret::SYNC)
-            .map_err(|e| format!("Failed to enable binary mode: {}", e))?;
-        let _ = port.flush();
-        Ok(())
-    })();
-
-    if let Err(e) = init_result {
-        let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
-        return;
-    }
-
-    std::thread::sleep(Duration::from_millis(100));
-
-    // Send the device-info probe and ask how many buses the device has. Both are
-    // blocking serial reads that can take the full enumeration timeout against a
-    // device that never answers, so they go to the blocking pool rather than
-    // holding a runtime worker — every source starts on its own worker, so a
-    // handful of silent adapters would otherwise stall the whole executor.
-    let probe_port = serial_port.clone();
-    let probe = tokio::task::spawn_blocking(move || match probe_port.lock() {
-        Ok(mut port) => {
-            let _ = port.write_all(&gvret::REQ_DEV_INFO);
-            let _ = port.flush();
-            let mut decoder = gvret::DeviceDecoder::new();
-            let mut pending = Vec::new();
-            let outcome =
-                query_num_buses(&mut **port, &mut decoder, &mut pending, NUMBUSES_TIMEOUT);
-            Ok((outcome, decoder, pending))
-        }
-        Err(e) => Err(format!("Port lock poisoned: {}", e)),
-    })
-    .await;
-
-    let (outcome, mut decoder, pending) = match probe {
-        Ok(Ok(probe)) => probe,
-        Ok(Err(msg)) => {
-            let _ = tx.send(SourceMessage::Error(source_idx, msg)).await;
-            return;
-        }
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Enumeration task failed: {}", e),
-                ))
-                .await;
-            return;
-        }
-    };
-
-    // The mappings we were handed came off the profile before this connection
-    // existed, so they can carry a bus this device does not have — or, more
-    // expensively, miss one it does.
-    let Some(bus_mappings) = resolve_source_mappings(
-        outcome,
-        &bus_mappings,
-        &gvret_usb_device(&port),
+    let mut stream = Stream::new(
         source_idx,
-        &tx,
-    )
-    .await
-    else {
-        return;
-    };
-
-    // Whatever arrived during the exchange above can only be mapped now.
-    let pending = apply_bus_mappings_batch(pending, &bus_mappings);
-    if !pending.is_empty() {
-        let _ = tx.send(SourceMessage::Frames(source_idx, pending)).await;
-    }
-
-    // Create transmit channel and send it to the merge task
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-    let _ = tx
-        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
-        .await;
-
-    tlog!(
-        "[gvret_usb] Source {} connected to {}, transmit channel ready",
-        source_idx,
-        port
+        "gvret_usb",
+        device.clone(),
+        port.clone(),
+        bus_mappings,
     );
+    serve(
+        task,
+        source_idx,
+        false,
+        &stop_flag,
+        &tx,
+        |event| stream.on_event(event),
+        |error| port_lost(source_idx, &device, &port, error, probe_serial_presence),
+    )
+    .await;
+}
 
-    // Emit device-connected event
-    let _ = tx
-        .send(SourceMessage::Connected(
-            source_idx,
-            "gvret_usb".to_string(),
-            port.clone(),
-            None,
-        ))
-        .await;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiretap_io::serial::Parity;
 
-    // Read loop (blocking, so we run it in a blocking task)
-    let tx_clone = tx.clone();
-    let stop_flag_clone = stop_flag.clone();
-    let serial_port_clone = serial_port.clone();
-    let port_name = port.clone();
-
-    // Spawn blocking task for serial reading
-    let blocking_handle = tokio::task::spawn_blocking(move || {
-        // `decoder` carries over from the enumeration above, so a message that
-        // straddled the end of it is completed rather than re-read.
-        let mut read_buf = [0u8; 2048];
-
-        while !stop_flag_clone.load(Ordering::SeqCst) {
-            // Check for transmit requests (non-blocking)
-            while let Ok(req) = transmit_rx.try_recv() {
-                let result = match serial_port_clone.lock() {
-                    Ok(mut port) => port
-                        .write_all(&req.data)
-                        .and_then(|_| port.flush())
-                        .map_err(|e| format!("Write error: {}", e)),
-                    Err(e) => Err(format!("Port lock poisoned: {}", e)),
-                };
-                let _ = req.result_tx.send(result);
-            }
-
-            // Read data
-            let read_result = match serial_port_clone.lock() {
-                Ok(mut port) => port.read(&mut read_buf),
-                Err(_) => {
-                    let _ = tx_clone.blocking_send(SourceMessage::Error(
-                        source_idx,
-                        "Port lock poisoned during read".to_string(),
-                    ));
-                    return;
-                }
-            };
-
-            match read_result {
-                Ok(0) => {
-                    // No data
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                Ok(n) => {
-                    let frames = decode_mapped(&mut decoder, &read_buf[..n], &bus_mappings);
-                    if !frames.is_empty() {
-                        let _ = tx_clone.blocking_send(SourceMessage::Frames(source_idx, frames));
-                    }
-                }
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                    // Timeout - continue
-                }
-                Err(e) => {
-                    crate::io::serial::utils::send_serial_read_error(
-                        &tx_clone, source_idx, &port_name, &e,
-                    );
-                    return;
-                }
-            }
-        }
-
-        let _ = tx_clone.blocking_send(SourceMessage::Ended(source_idx, EndReason::Stopped));
-    });
-
-    // Wait for the blocking task
-    let _ = blocking_handle.await;
+    #[tokio::test]
+    async fn a_port_that_will_not_open_is_named() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let line = LineSettings {
+            baud: 115_200,
+            data_bits: 8,
+            parity: Parity::None,
+            stop_bits: 1,
+        };
+        let path = "/nonexistent/wiretap-gvret".to_string();
+        let stop = Arc::new(AtomicBool::new(false));
+        run_source(3, path, line, vec![], stop, tx).await;
+        let Some(SourceMessage::Error(3, error)) = rx.recv().await else {
+            panic!("expected an error");
+        };
+        assert!(error.contains("/nonexistent/wiretap-gvret"), "got: {error}");
+    }
 }

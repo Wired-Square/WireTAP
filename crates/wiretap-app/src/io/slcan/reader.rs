@@ -12,19 +12,19 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::{atomic::AtomicBool, Arc};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
+use wiretap_io::can::slcan::{open as open_slcan, SlcanOptions};
+use wiretap_io::can::{CanError, CanEvent};
+use wiretap_io::serial::LineSettings;
 
-use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
+use crate::io::bus_mapping::BusMapping;
+use crate::io::can_task::{can_options, mapped_frames, open_failed, port_lost, serve};
 use crate::io::error::IoError;
-use crate::io::serial::utils as serial_utils;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
-use crate::io::{now_us, CanTransmitFrame, FrameMessage};
+use crate::io::serial::utils::{self as serial_utils, probe_serial_presence};
+use crate::io::types::SourceMessage;
 use wiretap_protocol::slcan;
 
 // ============================================================================
@@ -85,43 +85,6 @@ fn default_parity() -> String {
 #[allow(dead_code)]
 fn default_data_bitrate() -> u32 {
     2_000_000
-}
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/// Name a bitrate as an `S` command, or say which ones this protocol can name.
-///
-/// The protocol has no way to ask for a rate outside its table, so an
-/// unsupported one is a configuration error rather than a device failure.
-pub fn find_bitrate_command(bitrate: u32) -> Result<&'static str, IoError> {
-    slcan::bitrate_command(bitrate).ok_or_else(|| {
-        IoError::configuration(format!(
-            "Invalid CAN bitrate {}. Valid bitrates: {}",
-            bitrate,
-            rate_list(&slcan::NOMINAL_BITRATES)
-        ))
-    })
-}
-
-/// The same for a CAN FD data-phase bitrate (`Y`).
-pub fn find_data_bitrate_command(bitrate: u32) -> Result<&'static str, IoError> {
-    slcan::data_bitrate_command(bitrate).ok_or_else(|| {
-        IoError::configuration(format!(
-            "Invalid CAN FD data bitrate {}. Valid bitrates: {}",
-            bitrate,
-            rate_list(&slcan::DATA_BITRATES)
-        ))
-    })
-}
-
-fn rate_list(table: &[(u32, &str)]) -> String {
-    table
-        .iter()
-        .map(|(rate, _)| rate.to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 // ============================================================================
@@ -379,246 +342,75 @@ fn send_and_read(port: &mut Box<dyn serialport::SerialPort>, cmd: &[u8]) -> Opti
 // Multi-Source Streaming
 // ============================================================================
 
-/// Turn a decoded SLCAN frame into a `FrameMessage`.
-///
-/// SLCAN carries no timestamp and no bus number, so both come from here: the
-/// host clock, and bus 0 for the session's mapping to renumber. BRS survives
-/// the decode but has nowhere to go — `FrameMessage` has no field for it.
-fn frame_message(f: slcan::Frame) -> FrameMessage {
-    FrameMessage {
-        protocol: "can".to_string(),
-        timestamp_us: now_us(),
-        frame_id: f.arb_id,
-        bus: 0,
-        dlc: f.data.len() as u8,
-        bytes: f.data,
-        is_extended: f.extended,
-        is_fd: f.fd,
-        source_address: None,
-        incomplete: None,
-        direction: None,
+/// What the broker is told of `event`, or the loss that ends the source.
+fn on_event(
+    source_idx: usize,
+    port: &str,
+    mappings: &[BusMapping],
+    event: CanEvent,
+) -> Result<Vec<SourceMessage>, CanError> {
+    match event {
+        CanEvent::Connected(info) => {
+            tlog!(
+                "[slcan] Source {} connected to {} (firmware: {:?}, fd: {})",
+                source_idx,
+                port,
+                info.firmware,
+                info.fd
+            );
+            Ok(vec![SourceMessage::Connected(
+                source_idx,
+                "slcan".to_string(),
+                port.to_string(),
+                None,
+            )])
+        }
+        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
+            .into_iter()
+            .collect()),
+        CanEvent::Disconnected { error, .. } => Err(error),
     }
-}
-
-/// Encode a frame as the SLCAN line that transmits it.
-pub fn encode_transmit_frame(frame: &CanTransmitFrame) -> Vec<u8> {
-    slcan::encode_frame(&slcan::Frame::data(
-        frame.frame_id,
-        frame.is_extended,
-        frame.is_fd,
-        frame.is_brs,
-        frame.data.clone(),
-    ))
 }
 
 /// Run slcan source and send frames to merge task
 pub async fn run_source(
     source_idx: usize,
-    port_path: String,
-    baud_rate: u32,
+    port: String,
+    line: LineSettings,
     bitrate: u32,
     silent_mode: bool,
-    enable_fd: bool,
-    data_bitrate: u32,
+    data_bitrate: Option<u32>,
     bus_mappings: Vec<BusMapping>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    let device = format!("slcan({})", port_path);
-
-    // Open serial port
-    let serial_port = match serialport::new(&port_path, baud_rate)
-        .timeout(Duration::from_millis(2))
-        .open()
-    {
-        Ok(p) => p,
+    let device = format!("slcan({})", port);
+    let options = SlcanOptions {
+        path: port.clone(),
+        line,
+        bitrate,
+        data_bitrate,
+    };
+    let task = match open_slcan(options, can_options(silent_mode)).await {
+        Ok(task) => task,
         Err(e) => {
             let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    IoError::connection(&device, e.to_string()).to_string(),
-                ))
+                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
                 .await;
             return;
         }
     };
 
-    // Clone the serial port handle so read and write can run concurrently
-    // without mutex contention. try_clone() duplicates the OS file descriptor.
-    let write_port = match serial_port.try_clone() {
-        Ok(p) => Some(p),
-        Err(e) => {
-            tlog!("[slcan] Failed to clone serial port for write thread: {} — falling back to shared mutex", e);
-            None
-        }
-    };
-
-    // Initialize slcan (serial_port is exclusively ours before spawning threads)
-    let mut serial_port = serial_port;
-    let init_result: Result<(), String> = (|| {
-        let port = &mut serial_port;
-        let _ = port.clear(serialport::ClearBuffer::All);
-
-        // Wait for device to be ready
-        std::thread::sleep(Duration::from_millis(200));
-
-        // Each command is answered, and some firmware is unhappy being written
-        // to mid-reply, so every step pauses before the next.
-        let mut send = |what: &str, cmd: &str| -> Result<(), String> {
-            port.write_all(cmd.as_bytes())
-                .map_err(|e| IoError::protocol(&device, format!("{}: {}", what, e)).to_string())?;
-            let _ = port.flush();
-            std::thread::sleep(Duration::from_millis(50));
-            Ok(())
-        };
-
-        send("close channel", slcan::CLOSE)?;
-        send(
-            "set bitrate",
-            find_bitrate_command(bitrate).map_err(String::from)?,
-        )?;
-        // A data-phase bitrate is what puts the device into FD mode; there is
-        // no separate command for it.
-        if enable_fd {
-            send(
-                "set data bitrate",
-                find_data_bitrate_command(data_bitrate).map_err(String::from)?,
-            )?;
-        }
-        send(
-            "set mode",
-            if silent_mode {
-                slcan::MODE_SILENT
-            } else {
-                slcan::MODE_NORMAL
-            },
-        )?;
-        send("open channel", slcan::OPEN)?;
-
-        Ok(())
-    })();
-
-    if let Err(e) = init_result {
-        let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
-        return;
-    }
-
-    // Create transmit channel (only if not in silent mode)
-    let (transmit_tx, transmit_rx) = std::sync::mpsc::sync_channel::<TransmitRequest>(32);
-    if !silent_mode {
-        let _ = tx
-            .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
-            .await;
-    }
-
-    tlog!(
-        "[slcan] Source {} connected to {} (bitrate: {}, silent: {}, fd: {}{})",
+    serve(
+        task,
         source_idx,
-        port_path,
-        bitrate,
         silent_mode,
-        enable_fd,
-        if enable_fd {
-            format!(", data_bitrate: {}", data_bitrate)
-        } else {
-            String::new()
-        }
-    );
-
-    // Emit device-connected event
-    let _ = tx
-        .send(SourceMessage::Connected(
-            source_idx,
-            "slcan".to_string(),
-            port_path.clone(),
-            None,
-        ))
-        .await;
-
-    // Spawn dedicated write thread if we have a cloned port handle.
-    // This runs independently of the read loop — no mutex contention.
-    let stop_flag_write = stop_flag.clone();
-    if let Some(mut w_port) = write_port {
-        if !silent_mode {
-            std::thread::Builder::new()
-                .name(format!("slcan-tx-{}", source_idx))
-                .spawn(move || {
-                    while !stop_flag_write.load(Ordering::SeqCst) {
-                        match transmit_rx.recv_timeout(Duration::from_millis(50)) {
-                            Ok(req) => {
-                                let result = w_port
-                                    .write_all(&req.data)
-                                    .and_then(|_| w_port.flush())
-                                    .map_err(|e| format!("Write error: {}", e));
-                                let _ = req.result_tx.send(result);
-                            }
-                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-                        }
-                    }
-                })
-                .ok();
-        }
-    } else {
-        // Fallback: no clone available — transmit handled inline in read loop (old path)
-        // This shouldn't happen on supported platforms but keeps things working.
-        tlog!("[slcan] Write thread not available, transmit will be handled in read loop");
-    }
-
-    // Read loop (blocking) — owns the original serial port handle directly
-    let tx_clone = tx.clone();
-    let stop_flag_clone = stop_flag.clone();
-    let port_name = port_path.clone();
-
-    let blocking_handle = tokio::task::spawn_blocking(move || {
-        let mut decoder = slcan::LineDecoder::new();
-        let mut read_buf = [0u8; 256];
-
-        while !stop_flag_clone.load(Ordering::SeqCst) {
-            // Read data — no mutex, we own this handle
-            let read_result = serial_port.read(&mut read_buf);
-
-            match read_result {
-                Ok(n) if n > 0 => {
-                    // A device's replies come down the same wire as its frames;
-                    // only the frames are traffic.
-                    let pending_frames: Vec<FrameMessage> = decoder
-                        .feed(&read_buf[..n])
-                        .into_iter()
-                        .filter_map(|line| match line {
-                            slcan::Line::Frame(f) => Some(frame_message(f)),
-                            slcan::Line::Reply(_) => None,
-                        })
-                        .filter_map(|mut f| apply_bus_mapping(&mut f, &bus_mappings).then_some(f))
-                        .collect();
-
-                    if !pending_frames.is_empty() {
-                        let _ = tx_clone
-                            .blocking_send(SourceMessage::Frames(source_idx, pending_frames));
-                    }
-                }
-                Ok(0) => {
-                    std::thread::sleep(Duration::from_millis(1));
-                }
-                Ok(_) => {}
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                    // Timeout — continue
-                }
-                Err(e) => {
-                    serial_utils::send_serial_read_error(&tx_clone, source_idx, &port_name, &e);
-                    return;
-                }
-            }
-        }
-
-        // Close channel
-        let _ = serial_port.write_all(slcan::CLOSE.as_bytes());
-        let _ = serial_port.flush();
-
-        let _ = tx_clone.blocking_send(SourceMessage::Ended(source_idx, EndReason::Stopped));
-    });
-
-    let _ = blocking_handle.await;
+        &stop_flag,
+        &tx,
+        |event| on_event(source_idx, &port, &bus_mappings, event),
+        |error| port_lost(source_idx, &device, &port, error, probe_serial_presence),
+    )
+    .await;
 }
 
 // ============================================================================
@@ -628,89 +420,135 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::UNIX_EPOCH;
+    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use wiretap_io::serial::Parity;
 
-    fn tx(frame_id: u32, is_extended: bool, is_fd: bool, is_brs: bool, data: Vec<u8>) -> Vec<u8> {
-        encode_transmit_frame(&CanTransmitFrame {
-            frame_id,
-            data,
-            bus: 0,
-            is_extended,
-            is_fd,
-            is_brs,
-            is_rtr: false,
-        })
+    fn mapping(enabled: bool, output_bus: u8) -> BusMapping {
+        BusMapping {
+            device_bus: 0,
+            enabled,
+            output_bus,
+            ..BusMapping::default()
+        }
     }
 
-    fn line(bytes: Vec<u8>) -> String {
-        String::from_utf8(bytes).expect("ascii")
+    fn read(frame: CanFrame) -> CanRead {
+        CanRead {
+            frame,
+            direction: Direction::Rx,
+            at: UNIX_EPOCH + Duration::from_micros(1_000),
+            device_us: None,
+        }
     }
 
     #[test]
-    fn a_classic_transmit_is_a_t_line() {
-        assert_eq!(
-            line(tx(0x123, false, false, false, vec![0xAA, 0xBB])),
-            "t1232AABB\r"
+    fn a_connect_is_announced_as_slcan_on_its_port() {
+        let messages = on_event(
+            3,
+            "/dev/cu.x",
+            &[],
+            CanEvent::Connected(DeviceInfo::default()),
+        )
+        .unwrap();
+        let [SourceMessage::Connected(3, kind, port, None)] = messages.as_slice() else {
+            panic!("expected Connected alone");
+        };
+        assert_eq!((kind.as_str(), port.as_str()), ("slcan", "/dev/cu.x"));
+    }
+
+    /// SLCAN has no bus number: every frame is bus 0 until the mapping moves it.
+    #[test]
+    fn a_read_lands_on_the_mapped_bus_at_its_read_time() {
+        let frames = vec![read(CanFrame::data(
+            0,
+            0x123,
+            false,
+            false,
+            false,
+            vec![1, 2],
+        ))];
+        let messages = on_event(3, "p", &[mapping(true, 4)], CanEvent::Read(frames)).unwrap();
+        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
+            panic!("expected one Frames");
+        };
+        assert_eq!((frames[0].bus, frames[0].timestamp_us), (4, 1_000));
+
+        let muted = vec![read(CanFrame::data(0, 0x123, false, false, false, vec![]))];
+        let muted = on_event(3, "p", &[mapping(false, 4)], CanEvent::Read(muted)).unwrap();
+        assert!(muted.is_empty());
+    }
+
+    /// `FrameMessage` has no RTR flag, so a remote request arrives as an empty
+    /// data frame, as it did before the library read it.
+    #[test]
+    fn a_remote_request_arrives_as_an_empty_frame() {
+        let remote = vec![read(CanFrame::remote(0, 0x123, false, 3))];
+        let messages = on_event(3, "p", &[mapping(true, 0)], CanEvent::Read(remote)).unwrap();
+        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
+            panic!("expected one Frames");
+        };
+        assert_eq!((frames[0].dlc, frames[0].bytes.len()), (0, 0));
+    }
+
+    #[test]
+    fn a_loss_ends_the_stream() {
+        let lost = on_event(
+            3,
+            "p",
+            &[],
+            CanEvent::Disconnected {
+                error: CanError::Closed,
+                consecutive: 1,
+                retry_in: None,
+            },
         );
-        assert_eq!(
-            line(tx(0x12345678, true, false, false, vec![0x11])),
-            "T12345678111\r"
+        assert!(matches!(lost, Err(CanError::Closed)));
+    }
+
+    async fn first_message(bitrate: u32) -> SourceMessage {
+        let (tx, mut rx) = mpsc::channel(8);
+        run_source(
+            3,
+            "/nonexistent/wiretap-slcan".to_string(),
+            LineSettings {
+                baud: 115_200,
+                data_bits: 8,
+                parity: Parity::None,
+                stop_bits: 1,
+            },
+            bitrate,
+            false,
+            None,
+            vec![],
+            Arc::new(AtomicBool::new(false)),
+            tx,
+        )
+        .await;
+        rx.recv().await.expect("a message")
+    }
+
+    #[tokio::test]
+    async fn a_port_that_will_not_open_is_named() {
+        let SourceMessage::Error(3, error) = first_message(500_000).await else {
+            panic!("expected an error");
+        };
+        assert!(error.contains("/nonexistent/wiretap-slcan"), "got: {error}");
+    }
+
+    #[tokio::test]
+    async fn a_bitrate_slcan_cannot_name_says_which_ones_it_can() {
+        let SourceMessage::Error(3, error) = first_message(300_000).await else {
+            panic!("expected an error");
+        };
+        assert!(
+            error.contains("300000"),
+            "should name what was asked: {error}"
         );
-    }
-
-    /// The regression this move exists to fix: a CAN FD transmit used to go out
-    /// as `t<id>8<hex>`, which is a classic frame claiming eight bytes and
-    /// carrying twelve — malformed, and silently so.
-    #[test]
-    fn an_fd_transmit_uses_an_fd_prefix_and_a_length_code() {
-        assert_eq!(
-            line(tx(0x7E0, false, true, false, vec![0x11; 12])),
-            format!("d7E09{}\r", "11".repeat(12)),
-            "code 9 is twelve bytes"
+        assert!(
+            error.contains("500000"),
+            "and what it could have been: {error}"
         );
-    }
-
-    #[test]
-    fn a_bit_rate_switch_changes_the_prefix() {
-        assert!(line(tx(0x7E0, false, true, true, vec![0x22; 8])).starts_with('b'));
-        assert!(line(tx(0x7E0, true, true, true, vec![0x22; 8])).starts_with('B'));
-        assert!(line(tx(0x7E0, false, true, false, vec![0x22; 8])).starts_with('d'));
-    }
-
-    #[test]
-    fn a_full_fd_payload_is_the_longest_line() {
-        assert_eq!(tx(0x1FFFFFFF, true, true, true, vec![0; 64]).len(), 139);
-    }
-
-    #[test]
-    fn a_received_frame_becomes_a_frame_message() {
-        let f = slcan::parse_frame("t1234AABBCCDD").expect("a frame");
-        let m = frame_message(f);
-        assert_eq!((m.frame_id, m.bus, m.dlc), (0x123, 0, 4));
-        assert_eq!(m.bytes, vec![0xAA, 0xBB, 0xCC, 0xDD]);
-        assert!(!m.is_extended && !m.is_fd);
-    }
-
-    /// `dlc` on a `FrameMessage` is a byte count, not the code the line carried.
-    #[test]
-    fn an_fd_frame_message_carries_the_length_not_the_code() {
-        let f = slcan::parse_frame(&format!("d7E09{}", "11".repeat(12))).expect("a frame");
-        let m = frame_message(f);
-        assert!(m.is_fd);
-        assert_eq!(m.dlc, 12);
-        assert_eq!(m.bytes.len(), 12);
-    }
-
-    #[test]
-    fn a_bitrate_that_slcan_cannot_name_says_which_ones_it_can() {
-        assert_eq!(find_bitrate_command(500_000).unwrap(), "S6\r");
-        assert_eq!(find_bitrate_command(1_000_000).unwrap(), "S8\r");
-        assert_eq!(find_data_bitrate_command(2_000_000).unwrap(), "Y2\r");
-
-        let err = find_bitrate_command(300_000)
-            .expect_err("not a valid rate")
-            .to_string();
-        assert!(err.contains("300000"), "should name what was asked: {err}");
-        assert!(err.contains("500000"), "and what it could have been: {err}");
     }
 
     #[test]

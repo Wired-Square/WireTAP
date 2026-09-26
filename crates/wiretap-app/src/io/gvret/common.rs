@@ -10,9 +10,11 @@
 
 use std::time::Duration;
 
+use wiretap_io::can::{CanError, CanEvent};
 use wiretap_protocol::gvret::{self, DeviceMessage};
 
-use crate::io::bus_mapping::{apply_bus_mapping, gvret_protocols, BusMapping};
+use crate::io::bus_mapping::{gvret_protocols, BusMapping};
+use crate::io::can_task::{mapped_frames, open_failed};
 use crate::io::types::SourceMessage;
 use crate::io::{now_us, CanTransmitFrame, FrameMessage, TransmitResult};
 
@@ -104,21 +106,6 @@ pub fn absorb_num_buses_reply(
     count
 }
 
-/// Decode a read and apply the session's bus mappings — the streaming loop of
-/// both transports, so they cannot drift in what they do with a frame.
-pub fn decode_mapped(
-    decoder: &mut gvret::DeviceDecoder,
-    chunk: &[u8],
-    mappings: &[BusMapping],
-) -> Vec<FrameMessage> {
-    decoder
-        .feed(chunk)
-        .into_iter()
-        .filter_map(frame_from)
-        .filter_map(|mut f| apply_bus_mapping(&mut f, mappings).then_some(f))
-        .collect()
-}
-
 // ============================================================================
 // Device Info Types
 // ============================================================================
@@ -168,8 +155,7 @@ fn reconcile_to_bus_count(profile_mappings: &[BusMapping], bus_count: u8) -> Vec
         .collect()
 }
 
-/// How long a streaming reader waits for the device to answer GET_NUMBUSES.
-/// Shared, so the two transports cannot drift in how patient they are.
+/// How long a source waits for GET_NUMBUSES: `GvretOptions::probe_timeout`'s default.
 pub const NUMBUSES_TIMEOUT: Duration = Duration::from_millis(1500);
 
 /// What happened when we asked a device how many buses it has.
@@ -226,33 +212,82 @@ pub fn mappings_from_num_buses(
     }
 }
 
-/// Settle a source's bus mappings from an enumeration attempt and tell the
-/// broker, or report the failure that ends the source.
-///
-/// `None` means the caller should return. Both transports go through here so the
-/// announce cannot be forgotten in one of them — `MappingsResolved` is what feeds
-/// `available_buses` and transmit routing, so a source that streams without
-/// sending it looks single-bus to everything downstream.
-pub async fn resolve_source_mappings(
-    outcome: NumBusesOutcome,
-    profile_mappings: &[BusMapping],
-    label: &str,
+/// A link lost during the handshake reads as it did when the desktop asked
+/// GET_NUMBUSES itself.
+pub fn handshake_failed(device: &str, error: CanError) -> String {
+    let outcome = match error {
+        CanError::Closed => NumBusesOutcome::Closed,
+        CanError::Read(e) => NumBusesOutcome::Failed(e.to_string()),
+        other => return open_failed(device, other),
+    };
+    mappings_from_num_buses(outcome, &[], device)
+        .err()
+        .unwrap_or_default()
+}
+
+/// A GVRET source on either link, as the broker sees it.
+pub struct Stream {
     source_idx: usize,
-    tx: &tokio::sync::mpsc::Sender<SourceMessage>,
-) -> Option<Vec<BusMapping>> {
-    match mappings_from_num_buses(outcome, profile_mappings, label) {
-        Ok(mappings) => {
-            let _ = tx
-                .send(SourceMessage::MappingsResolved(
-                    source_idx,
-                    mappings.clone(),
-                ))
-                .await;
-            Some(mappings)
+    kind: &'static str,
+    device: String,
+    address: String,
+    profile_mappings: Vec<BusMapping>,
+    mappings: Vec<BusMapping>,
+}
+
+impl Stream {
+    pub fn new(
+        source_idx: usize,
+        kind: &'static str,
+        device: String,
+        address: String,
+        bus_mappings: Vec<BusMapping>,
+    ) -> Self {
+        Self {
+            source_idx,
+            kind,
+            device,
+            address,
+            mappings: bus_mappings.clone(),
+            profile_mappings: bus_mappings,
         }
-        Err(e) => {
-            let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
-            None
+    }
+
+    /// What the broker is told of `event`, or the loss that ends the source.
+    ///
+    /// Every connect re-resolves the mappings from the bus count, since
+    /// `MappingsResolved` is what feeds `available_buses` and transmit routing.
+    pub fn on_event(&mut self, event: CanEvent) -> Result<Vec<SourceMessage>, CanError> {
+        match event {
+            CanEvent::Connected(info) => {
+                if !info.keepalive {
+                    tlog!(
+                        "[gvret] {} does not answer keepalives, so a silent drop will not be seen",
+                        self.device
+                    );
+                }
+                let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
+                    NumBusesOutcome::Answered(clamp_bus_count(n))
+                });
+                if let Ok(mappings) =
+                    mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
+                {
+                    self.mappings = mappings;
+                }
+                Ok(vec![
+                    SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
+                    SourceMessage::Connected(
+                        self.source_idx,
+                        self.kind.to_string(),
+                        self.address.clone(),
+                        None,
+                    ),
+                ])
+            }
+            CanEvent::Read(reads) => Ok(mapped_frames(self.source_idx, reads, &self.mappings)
+                .into_iter()
+                .collect()),
+            CanEvent::Disconnected { error, .. } => Err(error),
         }
     }
 }
@@ -300,6 +335,8 @@ pub fn validate_gvret_frame(frame: &CanTransmitFrame) -> Result<(), TransmitResu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::UNIX_EPOCH;
+    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
     #[test]
     fn test_validate_classic_can_too_long() {
         let frame = CanTransmitFrame {
@@ -517,37 +554,110 @@ mod tests {
         assert_eq!(pending[1].frame_id, 0x124);
     }
 
-    /// The decoder carries over from enumeration into streaming, so a message
-    /// split across that boundary is neither lost nor seen twice.
-    #[test]
-    fn a_message_straddling_the_end_of_the_probe_survives_it() {
-        let bytes = wire(0x321, false, 0, &[9], false);
-        let (first, rest) = bytes.split_at(5);
+    // --- a source on wiretap_io --------------------------------------------
 
-        let mut decoder = gvret::DeviceDecoder::new();
-        let mut pending = Vec::new();
-        assert_eq!(
-            absorb_num_buses_reply(&mut decoder, first, &mut pending),
-            None
-        );
-        assert!(pending.is_empty());
+    const DEVICE: &str = "gvret_tcp(10.0.0.9:23)";
 
-        let frames = decode_mapped(&mut decoder, rest, &[]);
-        assert_eq!(frames.len(), 1);
-        assert_eq!(frames[0].frame_id, 0x321);
+    fn stream(profile_mappings: Vec<BusMapping>) -> Stream {
+        Stream::new(
+            3,
+            "gvret_tcp",
+            DEVICE.to_string(),
+            "10.0.0.9:23".to_string(),
+            profile_mappings,
+        )
+    }
+
+    fn connected(buses: Option<u8>) -> CanEvent {
+        let mut info = DeviceInfo::default();
+        info.buses = buses;
+        info.keepalive = true;
+        CanEvent::Connected(info)
+    }
+
+    fn resolved(messages: &[SourceMessage]) -> &[BusMapping] {
+        match messages {
+            [SourceMessage::MappingsResolved(3, mappings), SourceMessage::Connected(3, kind, address, None)] =>
+            {
+                assert_eq!(
+                    (kind.as_str(), address.as_str()),
+                    ("gvret_tcp", "10.0.0.9:23")
+                );
+                mappings
+            }
+            _ => panic!("expected MappingsResolved then Connected"),
+        }
     }
 
     #[test]
-    fn streaming_applies_the_bus_mappings() {
-        let mappings = [
+    fn a_connect_reconciles_the_profile_to_the_reported_bus_count() {
+        let mut s = stream(vec![reconcile_mapping(0, true, 0)]);
+        let messages = s.on_event(connected(Some(2))).unwrap();
+        let mappings = resolved(&messages);
+        assert_eq!(mappings.len(), 2);
+        assert_eq!(mappings[1].device_bus, 1);
+    }
+
+    #[test]
+    fn an_implausible_bus_count_is_clamped() {
+        let mut s = stream(vec![reconcile_mapping(0, true, 0)]);
+        let messages = s.on_event(connected(Some(0))).unwrap();
+        assert_eq!(resolved(&messages).len(), MAX_BUSES as usize);
+    }
+
+    #[test]
+    fn a_device_that_never_says_keeps_the_profiles_buses() {
+        let mut s = stream(vec![reconcile_mapping(2, true, 5)]);
+        let messages = s.on_event(connected(None)).unwrap();
+        let mappings = resolved(&messages);
+        assert_eq!(mappings.len(), 1);
+        assert_eq!((mappings[0].device_bus, mappings[0].output_bus), (2, 5));
+    }
+
+    #[test]
+    fn a_read_is_mapped_onto_the_sessions_buses() {
+        let mut s = stream(vec![
             reconcile_mapping(0, true, 7),
             reconcile_mapping(1, false, 1),
-        ];
-        let mut bytes = wire(0x100, false, 0, &[1], false);
-        bytes.extend(wire(0x200, false, 1, &[2], false));
-
-        let frames = decode_mapped(&mut gvret::DeviceDecoder::new(), &bytes, &mappings);
+        ]);
+        let read = |bus, at_us| CanRead {
+            frame: CanFrame::data(bus, 0x100, false, false, false, vec![bus]),
+            direction: Direction::Rx,
+            at: UNIX_EPOCH + Duration::from_micros(at_us),
+            device_us: Some(at_us),
+        };
+        let messages = s
+            .on_event(CanEvent::Read(vec![read(0, 10), read(1, 20)]))
+            .unwrap();
+        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
+            panic!("expected one Frames");
+        };
         assert_eq!(frames.len(), 1, "the muted bus is dropped");
-        assert_eq!(frames[0].bus, 7, "and the other is renumbered");
+        assert_eq!((frames[0].bus, frames[0].timestamp_us), (7, 10));
+
+        let muted = s.on_event(CanEvent::Read(vec![read(1, 30)])).unwrap();
+        assert!(muted.is_empty(), "no empty Frames");
+    }
+
+    #[test]
+    fn a_loss_ends_the_stream_with_its_kind() {
+        let mut s = stream(vec![]);
+        let lost = s.on_event(CanEvent::Disconnected {
+            error: CanError::Unresponsive,
+            consecutive: 1,
+            retry_in: None,
+        });
+        assert!(matches!(lost, Err(CanError::Unresponsive)));
+    }
+
+    #[test]
+    fn a_link_lost_in_the_handshake_says_how() {
+        let closed = handshake_failed(DEVICE, CanError::Closed);
+        assert!(closed.contains("closed the connection"), "got: {closed}");
+        let reset = handshake_failed(
+            DEVICE,
+            CanError::Read(std::io::Error::other("connection reset")),
+        );
+        assert!(reset.contains("connection reset"), "got: {reset}");
     }
 }

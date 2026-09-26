@@ -25,6 +25,8 @@ use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
 #[cfg(not(target_os = "ios"))]
+use crate::io::serial::utils::line_settings;
+#[cfg(not(target_os = "ios"))]
 use crate::io::slcan::run_slcan_source;
 use crate::io::framelink::reader::run_source as run_framelink_source;
 use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
@@ -152,9 +154,9 @@ async fn run_gvret_usb_reader(
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
-    let baud_rate = req_i64(profile, "baud_rate")? as u32;
 
-    run_gvret_usb_source(source_idx, port, baud_rate, bus_mappings, stop_flag, tx).await;
+    run_gvret_usb_source(source_idx, port, line_settings(profile), bus_mappings, stop_flag, tx)
+        .await;
     Ok(())
 }
 
@@ -167,19 +169,18 @@ async fn run_slcan_reader(
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
-    let baud_rate = req_i64(profile, "baud_rate")? as u32;
     let bitrate = req_i64(profile, "bitrate")? as u32;
     let silent_mode = req_bool(profile, "silent_mode")?;
-    let enable_fd = req_bool(profile, "enable_fd")?;
-    let data_bitrate = req_i64(profile, "data_bitrate")? as u32;
+    let data_bitrate = req_bool(profile, "enable_fd")?
+        .then(|| req_i64(profile, "data_bitrate").map(|bps| bps as u32))
+        .transpose()?;
 
     run_slcan_source(
         source_idx,
         port,
-        baud_rate,
+        line_settings(profile),
         bitrate,
         silent_mode,
-        enable_fd,
         data_bitrate,
         bus_mappings,
         stop_flag,

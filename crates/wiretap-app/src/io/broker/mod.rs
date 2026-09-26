@@ -21,8 +21,6 @@ use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
 use super::can_task::can_frame;
 use super::gvret::validate_gvret_frame;
-#[cfg(not(target_os = "ios"))]
-use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
 use super::socketcan::encode_frame as encode_socketcan_frame;
 use super::lifecycle::SourceLifecycle;
@@ -529,28 +527,20 @@ impl IOBroker {
         // Encode the frame based on the profile kind
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
-            "gvret_tcp" => {
+            "gvret_tcp" | "gvret_usb" => {
                 if let Err(result) = validate_gvret_frame(&routed_frame) {
                     return Ok(result);
                 }
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }
-            "gvret_usb" => {
-                if let Err(result) = validate_gvret_frame(&routed_frame) {
-                    return Ok(result);
-                }
-                wiretap_protocol::gvret::encode_transmit(
-                    routed_frame.frame_id,
-                    routed_frame.is_extended,
-                    routed_frame.bus,
-                    &routed_frame.data,
-                )
-            }
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             "gs_usb" => encode_gs_usb_frame(&routed_frame, 0).to_vec(),
             #[cfg(not(target_os = "ios"))]
-            "slcan" => encode_slcan_frame(&routed_frame),
+            "slcan" => {
+                frame = Some(can_frame(&routed_frame));
+                Vec::new()
+            }
             #[cfg(target_os = "linux")]
             "socketcan" => encode_socketcan_frame(&routed_frame),
             "framelink" => encode_framelink_can_tx(&routed_frame),
