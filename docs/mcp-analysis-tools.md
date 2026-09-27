@@ -18,7 +18,7 @@ The server speaks **MCP `2026-07-28`** over Streamable HTTP at
 `http://127.0.0.1:<mcp_server_port>/mcp`, default port 8787. The hosting layer —
 identity, the supported-version list, the `tools/list` cache hints, the bearer
 gate, `Host`/`Origin` policy and connection tracking — is the shared
-[`wiredai-mcp`](https://github.com/Wired-Square/lib-wiredai-rs) crate (over `rmcp`
+[`wslib-ai-mcp`](https://github.com/Wired-Square/wslib-ai-rs) crate (over `rmcp`
 3.4); this repo owns only the tools
 ([crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs)) and
 the settings-to-lifecycle mapping

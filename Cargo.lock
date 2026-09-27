@@ -8513,22 +8513,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wiredai-mcp"
-version = "0.2.0"
-source = "git+ssh://git@github.com/Wired-Square/lib-wiredai-rs.git?tag=v0.2.0#e825b3a4ac279cb55f3352625eb17fd1149f3403"
-dependencies = [
- "axum",
- "ipnet",
- "rmcp",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "wiretap"
 version = "0.12.1"
 dependencies = [
@@ -8573,13 +8557,13 @@ dependencies = [
  "toml 0.8.23",
  "tracing-subscriber",
  "windows-sys 0.59.0",
- "wiredai-mcp",
  "wiretap-analysis",
  "wiretap-catalog",
  "wiretap-checksum",
  "wiretap-decode",
  "wiretap-io",
  "wiretap-protocol",
+ "wslib-ai-mcp",
 ]
 
 [[package]]
@@ -8822,6 +8806,22 @@ dependencies = [
  "windows-core 0.61.2",
  "windows-version",
  "x11-dl",
+]
+
+[[package]]
+name = "wslib-ai-mcp"
+version = "0.1.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-ai-rs.git?tag=v0.1.1#392bcb7395a9741f678891a26f8ee3a70d42ec69"
+dependencies = [
+ "axum",
+ "ipnet",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

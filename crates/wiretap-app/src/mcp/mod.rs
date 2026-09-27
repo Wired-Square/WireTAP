@@ -3,7 +3,7 @@
 //! MCP server — exposes live WireTAP runtime state to an external MCP client
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only
 //! unless `mcp_allow_control` is also enabled. The transport, bearer gate and
-//! connection tracking are `wiredai-mcp`'s; this module owns the settings
+//! connection tracking are `wslib-ai-mcp`'s; this module owns the settings
 //! mapping and the start/stop lifecycle. Tier 2 tools reach frontend-only state
 //! via [`bridge`].
 
@@ -18,9 +18,9 @@ use std::time::Duration;
 
 use once_cell::sync::Lazy;
 use tauri::Emitter;
-use wiredai_mcp::CancellationToken;
-use wiredai_mcp::http::{self, ConnectionObserver, HttpConfig};
-use wiredai_mcp::server::ToolServer;
+use wslib_ai_mcp::CancellationToken;
+use wslib_ai_mcp::http::{self, ConnectionObserver, HttpConfig};
+use wslib_ai_mcp::server::ToolServer;
 
 use tools::WireTapTools;
 

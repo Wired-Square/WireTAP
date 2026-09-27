@@ -1,6 +1,6 @@
-// The page half of wiredai-mcp's `dom` tools. Vendored byte-for-byte from
-// lib-wiredai-rs `crates/wiredai-mcp/js/dom-ops.ts`; the Rust side holds the
-// same text as `wiredai_mcp::dom::OPS_TS`. No framework or transport imports:
+// The page half of wslib-ai-mcp's `dom` tools. Vendored byte-for-byte from
+// wslib-ai-rs `crates/wslib-ai-mcp/js/dom-ops.ts`; the Rust side holds the
+// same text as `wslib_ai_mcp::dom::OPS_TS`. No framework or transport imports:
 // the consumer carries (op, args) here and the result or thrown error back.
 
 type Box = Pick<DOMRect, "left" | "top" | "right" | "bottom">;

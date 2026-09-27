@@ -16,11 +16,11 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::json;
-use wiredai_mcp::dom::{self, DomBridge};
-use wiredai_mcp::result::{internal_error as err, ok_json};
-use wiredai_mcp::rmcp;
-use wiredai_mcp::router::{compose, mark_read_only};
-use wiredai_mcp::server::{ServerIdentity, ToolListCache};
+use wslib_ai_mcp::dom::{self, DomBridge};
+use wslib_ai_mcp::result::{internal_error as err, ok_json};
+use wslib_ai_mcp::rmcp;
+use wslib_ai_mcp::router::{compose, mark_read_only};
+use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
@@ -1501,8 +1501,8 @@ mod tests {
     fn vendored_dom_ops_match_the_library() {
         let vendored = include_str!("../../../../frontend/wiretap-ui/src/services/domOps.ts");
         assert!(
-            vendored == wiredai_mcp::dom::OPS_TS,
-            "re-copy crates/wiredai-mcp/js/dom-ops.ts from lib-wiredai-rs to frontend/wiretap-ui/src/services/domOps.ts"
+            vendored == wslib_ai_mcp::dom::OPS_TS,
+            "re-copy crates/wslib-ai-mcp/js/dom-ops.ts from wslib-ai-rs to frontend/wiretap-ui/src/services/domOps.ts"
         );
     }
 }

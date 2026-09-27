@@ -4,9 +4,9 @@
 //! the tool-call arguments into it) and `JsonSchema` (rmcp publishes the schema
 //! in `tools/list`).
 
-use rmcp::schemars::JsonSchema;
+use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
-use wiredai_mcp::rmcp;
+use wslib_ai_mcp::rmcp;
 
 fn default_count() -> usize {
     100
@@ -27,14 +27,12 @@ fn default_one() -> u16 {
 // ── Tier 1 (Rust-native) ────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct SessionIdParams {
     /// Session ID (as returned by `list_sessions`).
     pub session_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct AttachSourceParams {
     /// Session ID (as returned by `list_sessions`).
     pub session_id: String,
@@ -45,14 +43,12 @@ pub struct AttachSourceParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct CaptureIdParams {
     /// Capture ID (as returned by `list_captures`).
     pub capture_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct GetFramesParams {
     /// Capture ID (as returned by `list_captures`).
     pub capture_id: String,
@@ -65,7 +61,6 @@ pub struct GetFramesParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct QueryFramesParams {
     /// Capture ID (as returned by `list_captures`).
     pub capture_id: String,
@@ -86,7 +81,6 @@ pub struct QueryFramesParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct TailLogParams {
     /// Number of trailing log lines to return (default 200).
     #[serde(default = "default_lines")]
@@ -94,7 +88,6 @@ pub struct TailLogParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ReadCatalogParams {
     /// Catalog filename (e.g. `sungrow_shx.toml`) or display name, as listed by `list_catalogs`.
     pub name: String,
@@ -103,7 +96,6 @@ pub struct ReadCatalogParams {
 // ── Tier 2 (frontend bridge) ─────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct DiscoveryAnalysisParams {
     /// Optional: restrict to a single session.
     #[serde(default)]
@@ -114,7 +106,6 @@ pub struct DiscoveryAnalysisParams {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct DecodedSignalsParams {
     /// Optional: restrict to a single session.
     #[serde(default)]
@@ -127,7 +118,6 @@ pub struct DecodedSignalsParams {
 // ── Control (gated behind `mcp_allow_control`) ───────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct TransmitFrameParams {
     /// Session ID to transmit through (must be a transmit-capable session).
     pub session_id: String,
@@ -147,7 +137,6 @@ pub struct TransmitFrameParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct RepeatTransmitStartParams {
     /// Session ID to transmit through (must be a transmit-capable session).
     pub session_id: String,
@@ -170,7 +159,6 @@ pub struct RepeatTransmitStartParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct RepeatTransmitStopParams {
     /// The `queue_id` returned by `repeat_transmit_start`.
     pub queue_id: String,
@@ -178,7 +166,6 @@ pub struct RepeatTransmitStopParams {
 
 /// Bytes to put into a byte capture, as a serial port would have produced them.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct IngestBytesParams {
     /// The bytes, as hex. Whitespace, commas and `0x` prefixes are ignored, so
     /// `01 04 4D E2` and `01044de2` are the same input.
@@ -200,7 +187,6 @@ pub struct IngestBytesParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ReplayCaptureParams {
     /// Session ID to replay through (must be transmit-capable).
     pub session_id: String,
@@ -215,7 +201,6 @@ pub struct ReplayCaptureParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ReplayIdParams {
     /// Replay ID (returned by `replay_capture`).
     pub replay_id: String,
@@ -226,7 +211,6 @@ pub struct ReplayIdParams {
 /// Mirrors `crate::io::ModbusRange`. Kept separate so the IO layer doesn't grow
 /// a `schemars` dependency just to be describable over MCP.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusRangeParam {
     /// `holding`, `input`, `coil`, or `discrete`.
     #[serde(default = "default_register_type")]
@@ -245,7 +229,6 @@ pub struct ModbusRangeParam {
 
 /// A catalogue-free poll plan — what to poll on a device you have no decoder for.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusRangeSpecParam {
     /// The spans to poll. At least one is required.
     pub ranges: Vec<ModbusRangeParam>,
@@ -310,7 +293,6 @@ pub fn parse_register_type(s: &str) -> Result<crate::io::RegisterType, String> {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct OpenSessionParams {
     /// IO profile id to open a session for (as listed by `list_io_profiles`).
     pub profile_id: String,
@@ -341,7 +323,6 @@ pub struct OpenSessionParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusReadParams {
     /// Session whose configured Modbus device (host/port/unit) to read from.
     pub session_id: String,
@@ -357,7 +338,6 @@ pub struct ModbusReadParams {
 
 /// Where to reach a Modbus device — either a saved profile, or an address.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusTargetParams {
     /// Modbus profile to take host/port/unit from (as listed by `list_io_profiles`).
     #[serde(default)]
@@ -374,7 +354,6 @@ pub struct ModbusTargetParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusScanParams {
     #[serde(flatten)]
     pub target: ModbusTargetParams,
@@ -432,7 +411,6 @@ pub struct ModbusScanParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusUnitScanParams {
     #[serde(flatten)]
     pub target: ModbusTargetParams,
@@ -461,7 +439,6 @@ pub struct ModbusUnitScanParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusProbeParams {
     #[serde(flatten)]
     pub target: ModbusTargetParams,
@@ -478,7 +455,6 @@ pub struct ModbusProbeParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct SetProfileCatalogParams {
     /// Profile to bind the catalogue to (as listed by `list_io_profiles`).
     pub profile_id: String,
@@ -502,7 +478,6 @@ fn default_last_unit() -> u8 {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ModbusWriteParams {
     /// Session whose configured Modbus device (host/port/unit) to write to.
     pub session_id: String,
@@ -519,7 +494,6 @@ pub struct ModbusWriteParams {
 
 /// Validate catalog TOML without writing it (read-only dry run).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ValidateCatalogParams {
     /// Full catalog TOML to validate.
     pub content: String,
@@ -527,7 +501,6 @@ pub struct ValidateCatalogParams {
 
 /// Create a new catalog file (gated by the catalog-write permission).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct CreateCatalogParams {
     /// Target filename within the decoder directory (a `.toml` suffix is added
     /// if missing). Must be a bare name — no path separators.
@@ -538,7 +511,6 @@ pub struct CreateCatalogParams {
 
 /// Overwrite an existing catalog file (gated by the catalog-modify permission).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct UpdateCatalogParams {
     /// Existing catalog filename (or display name) to overwrite.
     pub filename: String,
@@ -548,7 +520,6 @@ pub struct UpdateCatalogParams {
 
 /// Write a dashboard artifact (gated by the dashboard-write permission).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct DashboardParams {
     /// Target filename in the dashboards dir (a `.dashboard.json` suffix is added
     /// if missing). Must be a bare name — no path separators.
@@ -559,7 +530,6 @@ pub struct DashboardParams {
 
 /// Open (or focus) an app/panel in the running window (gated by the ui-control permission).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct OpenAppParams {
     /// App/panel id, e.g. "dashboard", "discovery", "decoder", "query".
     pub panel_id: String,
@@ -586,7 +556,6 @@ fn default_bucket_ms() -> u32 {
 
 /// Per-frame-id rollup (count, first/last, dlc) for a capture or WireTAP backend source.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct FrameInventoryParams {
     /// Capture ID (mutually exclusive with `profile_id`).
     #[serde(default)]
@@ -604,7 +573,6 @@ pub struct FrameInventoryParams {
 
 /// Per-byte static/counter/sensor roles for one frame id.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ByteProfileParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -630,7 +598,6 @@ fn default_min_likeness() -> u8 {
 
 /// Scan a source for checksums, frame id by frame id.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ChecksumScanParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -654,7 +621,6 @@ pub struct ChecksumScanParams {
 
 /// Diff a decoder catalog against a data source + confidence rollup.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct CatalogCoverageParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -679,7 +645,6 @@ pub struct CatalogCoverageParams {
 
 /// Base params for a per-frame analytical query (frame_changes, first_last).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct FrameQueryParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -702,7 +667,6 @@ pub struct FrameQueryParams {
 
 /// Per-byte query (byte_changes, distribution).
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct ByteQueryParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -723,7 +687,6 @@ pub struct ByteQueryParams {
 
 /// Mux statistics query.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct MuxQueryParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -750,7 +713,6 @@ pub struct MuxQueryParams {
 
 /// Gap analysis query.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct GapQueryParams {
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -771,7 +733,6 @@ pub struct GapQueryParams {
 
 /// Frequency query.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
 pub struct FrequencyQueryParams {
     #[serde(default)]
     pub capture_id: Option<String>,
