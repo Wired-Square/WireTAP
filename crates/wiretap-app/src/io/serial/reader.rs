@@ -79,11 +79,10 @@ enum Framer {
 impl Framer {
     fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalog>) -> Self {
         match encoding {
-            FramingEncoding::Raw => Self::Unframed,
             FramingEncoding::ModbusRtu(options) => {
                 Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
             }
-            encoding => Self::Serial(SerialFramer::new(encoding)),
+            encoding => SerialFramer::new(encoding).map_or(Self::Unframed, Self::Serial),
         }
     }
 
@@ -103,8 +102,8 @@ impl Framer {
             Self::Serial(framer) => stamped(framer.flush(), now),
             Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
+                let leftover = stamped(residue(trailing, tap.bytes_fed()), now);
                 tap.reset();
-                let leftover = stamped(residue(trailing), now);
                 messages.into_iter().map(tapped).chain(leftover).collect()
             }
         }
@@ -243,7 +242,8 @@ impl LiveLine {
             .filter(|(f, _)| f.bytes.len() >= self.min_frame_length)
             .filter_map(|(frame, timestamp_us)| {
                 let extract = |cfg: Option<&FrameIdConfig>| {
-                    cfg.and_then(|c| extract_frame_id(&frame.bytes, c))
+                    cfg.and_then(FrameIdConfig::field)
+                        .and_then(|f| extract_frame_id(&frame.bytes, &f))
                 };
                 let frame_id = extract(self.frame_id_config.as_ref()).unwrap_or(0);
                 let source_address = extract(self.source_address_config.as_ref()).map(|v| v as u16);
@@ -494,6 +494,7 @@ pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::serial::DelimiterOptions;
     use crate::io::types::ModbusRtuOptions;
     use wiretap_io::serial::Parity as LineParity;
 
@@ -656,11 +657,11 @@ mod tests {
     #[test]
     fn a_stop_while_waiting_ends_stopped_with_nothing_left_to_flush() {
         let mut line = live(
-            FramingEncoding::Delimiter {
+            FramingEncoding::Delimiter(DelimiterOptions {
                 delimiter: vec![b'\n'],
                 max_length: 64,
                 include_delimiter: false,
-            },
+            }),
             false,
         );
         line.read(b"half", at(1));

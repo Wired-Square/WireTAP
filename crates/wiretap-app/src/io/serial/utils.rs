@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serialport::{DataBits, Parity as SpParity, StopBits};
 use wiretap_io::serial::{LineSettings, Parity as LineParity, SerialError};
 
-use super::framer::{FrameIdConfig, FramingEncoding};
+use super::framer::{DelimiterOptions, FrameIdConfig, FramingEncoding};
 use crate::io::types::ModbusRtuOptions;
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
@@ -150,11 +150,11 @@ pub fn framing_from_str(encoding: &str, modbus: Option<&ModbusRtuOptions>) -> Fr
     match encoding {
         "slip" => FramingEncoding::Slip,
         "modbus_rtu" => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
-        "delimiter" => FramingEncoding::Delimiter {
+        "delimiter" => FramingEncoding::Delimiter(DelimiterOptions {
             delimiter: vec![0x0A],
             max_length: 1024,
             include_delimiter: false,
-        },
+        }),
         _ => FramingEncoding::Raw,
     }
 }
@@ -262,11 +262,11 @@ pub fn parse_profile_for_source(
                 .or_else(|| conn_i64(profile, "max_frame_length").map(|n| n as usize))
                 .unwrap_or(1024);
             let include_delimiter = conn_bool(profile, "include_delimiter").unwrap_or(false);
-            FramingEncoding::Delimiter {
+            FramingEncoding::Delimiter(DelimiterOptions {
                 delimiter,
                 max_length,
                 include_delimiter,
-            }
+            })
         }
         "raw" | _ => FramingEncoding::Raw,
     };

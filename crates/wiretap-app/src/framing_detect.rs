@@ -46,6 +46,7 @@ mod desktop {
     use crate::capture_store;
     use crate::io::serial::{FramingEncoding, SerialFramer};
     use crate::io::ModbusRtuOptions;
+    use wiretap_protocol::slip;
 
     /// How much of the tail to analyse. Matches what the frontend used to fetch.
     const DEFAULT_SAMPLE_BYTES: usize = 100_000;
@@ -136,7 +137,9 @@ mod desktop {
 
     /// Every complete frame one encoding recovers from `bytes`.
     fn frames_for(bytes: &[u8], encoding: FramingEncoding) -> Vec<Vec<u8>> {
-        let mut framer = SerialFramer::new(encoding);
+        let Some(mut framer) = SerialFramer::new(encoding) else {
+            return Vec::new();
+        };
         let fed = framer.feed(bytes);
         fed.into_iter()
             .chain(framer.flush())
@@ -150,11 +153,8 @@ mod desktop {
     // ========================================================================
 
     fn test_slip(bytes: &[u8]) -> Option<FramingCandidate> {
-        const SLIP_END: u8 = 0xC0;
-        const SLIP_ESC: u8 = 0xDB;
-
-        let end_count = bytes.iter().filter(|&&b| b == SLIP_END).count();
-        let esc_count = bytes.iter().filter(|&&b| b == SLIP_ESC).count();
+        let end_count = bytes.iter().filter(|&&b| b == slip::END).count();
+        let esc_count = bytes.iter().filter(|&&b| b == slip::ESC).count();
         if end_count < 2 {
             return None;
         }

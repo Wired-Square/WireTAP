@@ -35,7 +35,7 @@ mod desktop {
     use crate::{
         capture_store,
         io::FrameMessage,
-        io::serial::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer},
+        io::serial::{extract_frame_id, DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer},
     };
 
     /// Per-interface framing configuration (overrides default for specific bus)
@@ -95,11 +95,11 @@ mod desktop {
                     Some(hex) => crate::hex::parse_bytes(hex)?,
                     None => vec![0x0A], // Default LF
                 };
-                Ok(FramingEncoding::Delimiter {
+                Ok(FramingEncoding::Delimiter(DelimiterOptions {
                     delimiter,
                     max_length: cfg.max_length.unwrap_or(1024),
                     include_delimiter: false,
-                })
+                }))
             }
             mode => Err(format!("Unknown framing mode: {}", mode)),
         }
@@ -250,23 +250,19 @@ mod desktop {
                 None => default_encoding.clone(),
             };
 
-            let mut framer = SerialFramer::with_catalog(encoding, catalog);
-            let mut released = Vec::new();
-            for (original_idx, byte) in bus_bytes.iter() {
-                released.extend(framer.feed(&[byte.byte]).into_iter().map(|f| (f, *original_idx)));
-            }
-            // Modbus RTU can still recover whole messages here, so this is a
-            // list, not one residue.
-            let last_idx = bus_bytes.last().map_or(0, |(i, _)| *i);
-            released.extend(framer.flush().into_iter().map(|f| (f, last_idx)));
+            let Some(mut framer) = SerialFramer::with_catalog(encoding, catalog) else {
+                continue;
+            };
+            let line: Vec<u8> = bus_bytes.iter().map(|(_, byte)| byte.byte).collect();
+            // Modbus RTU can still recover whole messages at the flush, so it is
+            // a list, not one residue.
+            let mut released = framer.feed(&line);
+            released.extend(framer.flush());
 
-            // RTU names where each message ended: a sync releases the messages
-            // it buffered on a later byte than the one each ended on.
-            for (frame, released_by) in released {
-                let end_idx = frame
-                    .end_offset
-                    .and_then(|end| bus_bytes.get((end as usize).checked_sub(1)?))
-                    .map_or(released_by, |(i, _)| *i);
+            // Each frame's last byte, not the one that released it: a sync
+            // releases the RTU messages it buffered on a later byte.
+            for frame in released {
+                let (end_idx, _) = bus_bytes[frame.end_offset as usize - 1];
                 frame_data.push((frame.bytes, end_idx, frame.incomplete, frame.crc_valid, *bus));
             }
         }
@@ -299,7 +295,8 @@ mod desktop {
         )| {
             let extract = |cfg: &Option<FrameIdConfig>| {
                 cfg.as_ref()
-                    .and_then(|c| extract_frame_id(&frame_bytes, c))
+                    .and_then(FrameIdConfig::field)
+                    .and_then(|f| extract_frame_id(&frame_bytes, &f))
             };
             let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
             let source_address = extract(&config.source_address_config).map(|v| v as u16);
