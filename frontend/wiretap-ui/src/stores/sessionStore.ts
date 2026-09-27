@@ -473,6 +473,8 @@ export interface SessionStore {
     title: string;
     message: string;
     details: string | null;
+    /** The session whose stream raised it; it closes when that session runs again. */
+    sessionId: string | null;
   };
   /** Show the global app error dialog. `fingerprint` sets a stable Sentry grouping
    * key so device-identified messages (which vary by port/OS code) still group as
@@ -481,7 +483,8 @@ export interface SessionStore {
     title: string,
     message: string,
     details?: string,
-    fingerprint?: string
+    fingerprint?: string,
+    sessionId?: string
   ) => void;
   /** Close the global app error dialog */
   closeAppError: () => void;
@@ -587,6 +590,7 @@ async function setupSessionEventSubscribers(
           ioState: stateType,
           ...(errorMsg ? { errorMessage: errorMsg } : {}),
         });
+        if (stateType === "running") closeStreamErrorFor(sessionId);
         invokeCallbacks(eventListeners, "onStateChange", stateType);
       })
     );
@@ -660,7 +664,7 @@ async function setupSessionEventSubscribers(
                 // show it directly rather than a generic sentence. A stable
                 // fingerprint keeps these grouped as one Sentry issue despite the
                 // device name / OS code varying.
-                showAppError("Stream Error", error, undefined, "stream-error");
+                showAppError("Stream Error", error, undefined, "stream-error", sessionId);
               }
             }
             updateSession(sessionId, {
@@ -886,6 +890,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     title: "",
     message: "",
     details: null,
+    sessionId: null,
   },
 
   // ---- Session Lifecycle ----
@@ -1930,7 +1935,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     ),
 
   // ---- Global App Error Dialog ----
-  showAppError: (title, message, details, fingerprint) => {
+  showAppError: (title, message, details, fingerprint, sessionId) => {
     Sentry.captureMessage(message, {
       level: "error",
       extra: { title, details },
@@ -1942,6 +1947,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         title,
         message,
         details: details ?? null,
+        sessionId: sessionId ?? null,
       },
     });
   },
@@ -1953,6 +1959,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         title: "",
         message: "",
         details: null,
+        sessionId: null,
       },
     }),
 
@@ -2012,6 +2019,12 @@ getEventListeners = () => useSessionStore.getState()._eventListeners;
 
 // Initialize the showAppError getter for error handling
 getGlobalShowAppError = () => useSessionStore.getState().showAppError;
+
+/** A source that came back (a replugged serial adapter) clears the error it raised. */
+export function closeStreamErrorFor(sessionId: string) {
+  const { appErrorDialog, closeAppError } = useSessionStore.getState();
+  if (appErrorDialog.isOpen && appErrorDialog.sessionId === sessionId) closeAppError();
+}
 
 // Listen for capture events from other windows.
 // App-lifetime listeners; HMR guard prevents double-registration during dev.
