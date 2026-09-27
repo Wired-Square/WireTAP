@@ -164,8 +164,6 @@ struct ApiFrameRow {
     ts_us: i64,
     id: u32,
     extended: bool,
-    /// A message length for Modbus, whose ceiling of 256 is one past `u8`.
-    dlc: u16,
     is_fd: bool,
     bus: u8,
     #[allow(dead_code)]
@@ -237,24 +235,11 @@ impl CursorFetcher {
             self.exhausted = true;
         }
 
-        let mut frames = Vec::with_capacity(batch.frames.len());
-        for row in batch.frames {
-            let bytes = hex::decode(&row.data_hex)
-                .map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
-            frames.push(FrameMessage {
-                protocol: self.protocol.frame_tag().to_string(),
-                timestamp_us: row.ts_us as u64,
-                frame_id: row.id,
-                bus: row.bus,
-                dlc: row.dlc.min(u8::MAX as u16) as u8,
-                bytes,
-                is_extended: row.extended,
-                is_fd: row.is_fd,
-                source_address: None,
-                incomplete: None,
-                direction: None,
-            });
-        }
+        let mut frames = batch
+            .frames
+            .into_iter()
+            .map(|row| frame_from_row(self.protocol, row))
+            .collect::<Result<Vec<_>, _>>()?;
         if let Some(rem) = self.remaining.as_mut() {
             if frames.len() as i64 > *rem {
                 frames.truncate(*rem as usize);
@@ -264,6 +249,26 @@ impl CursorFetcher {
         }
         Ok(frames)
     }
+}
+
+/// The row's `dlc` is the archive's CAN length code, so the length comes from
+/// the payload instead.
+fn frame_from_row(protocol: ArchiveProtocol, row: ApiFrameRow) -> Result<FrameMessage, String> {
+    let bytes =
+        hex::decode(&row.data_hex).map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
+    Ok(FrameMessage {
+        protocol: protocol.frame_tag().to_string(),
+        timestamp_us: row.ts_us as u64,
+        frame_id: row.id,
+        bus: row.bus,
+        dlc: bytes.len().min(u8::MAX as usize) as u8,
+        bytes,
+        is_extended: row.extended,
+        is_fd: row.is_fd,
+        source_address: None,
+        incomplete: None,
+        direction: None,
+    })
 }
 
 /// Store the latest playback position and signal it (throttled). Shared by the
@@ -505,4 +510,41 @@ async fn run_api_stream(
         emit_stream_ended(&session_id, "complete", "BackendAPI");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(json: serde_json::Value) -> ApiFrameRow {
+        serde_json::from_value(json).unwrap()
+    }
+
+    #[test]
+    fn an_fd_row_takes_its_length_from_the_payload_not_the_length_code() {
+        let frame = frame_from_row(
+            ArchiveProtocol::Can,
+            row(serde_json::json!({
+                "ts_us": 1, "id": 0x123, "extended": false, "dlc": 15, "is_fd": true,
+                "bus": 0, "dir": "rx", "data_hex": "ab".repeat(64),
+            })),
+        )
+        .unwrap();
+        assert_eq!(frame.dlc, 64);
+        assert_eq!(frame.bytes.len(), 64);
+    }
+
+    #[test]
+    fn a_modbus_message_longer_than_u8_saturates() {
+        let frame = frame_from_row(
+            ArchiveProtocol::Modbus,
+            row(serde_json::json!({
+                "ts_us": 1, "id": 0x0103, "extended": false, "dlc": 256, "is_fd": false,
+                "bus": 0, "dir": "rx", "data_hex": "00".repeat(256),
+            })),
+        )
+        .unwrap();
+        assert_eq!(frame.protocol, "modbus_rtu");
+        assert_eq!(frame.dlc, 255);
+    }
 }

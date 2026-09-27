@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **CAN FD frames from a WireTAP Backend archive show their real length.** A 64-byte frame used to read as 15, its length code; captures already stored keep the old value.
 - **A 32-bit hypothesis plots its real value.** In the Dashboard, a Hypothesis Explorer signal 32 bits wide read a value with its top bit set as negative when unsigned, and every negative signed value one too low; both now read correctly.
 - **A Modbus TCP device that closes the connection says so.** The error used to read as a connect failure with an unrelated system code; it now reads "connection closed by the device".
 - **One failed source no longer ends a multi-source session.** A source that reported an error and then stopped was counted out twice, so in a session combining two devices, one failing could end the session while the other was still streaming. Each source is now counted out once.

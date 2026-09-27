@@ -551,8 +551,19 @@ struct InventoryEntry {
     count: i64,
     first_us: i64,
     last_us: i64,
-    /// A message length for Modbus, whose ceiling of 256 is one past `u8`.
+    /// A CAN length code, or a Modbus message length (up to 256).
     max_dlc: u16,
+}
+
+impl InventoryEntry {
+    /// The archive stores a classic frame's code clamped to 8, so a CAN code
+    /// above 8 can only be FD.
+    fn max_len(&self, protocol: ArchiveProtocol) -> u8 {
+        match protocol {
+            ArchiveProtocol::Can => wiretap_protocol::dlc_to_len(self.max_dlc as u8, true) as u8,
+            ArchiveProtocol::Modbus => self.max_dlc.min(u8::MAX as u16) as u8,
+        }
+    }
 }
 
 /// Every entry is the profile's protocol — the gateway groups one protocol at
@@ -594,7 +605,7 @@ pub async fn frame_inventory(
                 e.count,
                 e.first_us,
                 e.last_us,
-                e.max_dlc.min(u8::MAX as u16) as u8,
+                e.max_len(api.protocol),
             )
         })
         .collect())
@@ -1039,6 +1050,23 @@ mod tests {
         assert_eq!(ArchiveProtocol::Modbus.query_suffix(false), "&protocol=modbus");
         assert_eq!(ArchiveProtocol::Can.frame_tag(), "can");
         assert_eq!(ArchiveProtocol::Modbus.frame_tag(), "modbus_rtu");
+    }
+
+    #[test]
+    fn an_inventory_length_code_becomes_a_length_for_can_only() {
+        let entry = |max_dlc| InventoryEntry {
+            frame_id: 0,
+            is_extended: false,
+            count: 1,
+            first_us: 0,
+            last_us: 0,
+            max_dlc,
+        };
+        for (code, len) in [(8, 8), (9, 12), (15, 64)] {
+            assert_eq!(entry(code).max_len(ArchiveProtocol::Can), len);
+        }
+        assert_eq!(entry(15).max_len(ArchiveProtocol::Modbus), 15);
+        assert_eq!(entry(256).max_len(ArchiveProtocol::Modbus), 255);
     }
 
     #[test]
