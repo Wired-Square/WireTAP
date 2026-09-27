@@ -300,17 +300,15 @@ impl Stream {
 ///
 /// Returns Ok(()) if valid, or an error TransmitResult if invalid.
 pub fn validate_gvret_frame(frame: &CanTransmitFrame) -> Result<(), TransmitResult> {
-    // Validate data length
-    if !frame.is_fd && frame.data.len() > 8 {
+    if frame.is_fd {
+        return Err(TransmitResult::error("GVRET cannot send CAN FD frames".into()));
+    }
+    if frame.is_rtr {
+        return Err(TransmitResult::error("GVRET cannot send remote frames".into()));
+    }
+    if frame.data.len() > 8 {
         return Err(TransmitResult::error(format!(
             "Classic CAN frame data too long: {} bytes (max 8)",
-            frame.data.len()
-        )));
-    }
-
-    if frame.is_fd && frame.data.len() > 64 {
-        return Err(TransmitResult::error(format!(
-            "CAN FD frame data too long: {} bytes (max 64)",
             frame.data.len()
         )));
     }
@@ -354,19 +352,19 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_canfd_too_long() {
-        let frame = CanTransmitFrame {
+    fn fd_and_remote_frames_are_refused_before_they_are_queued() {
+        let frame = |is_fd, is_rtr| CanTransmitFrame {
             frame_id: 0x123,
-            data: vec![0; 65], // 65 bytes - too long for CAN FD
+            data: vec![0; 8],
             bus: 0,
             is_extended: false,
-            is_fd: true,
+            is_fd,
             is_brs: false,
-            is_rtr: false,
+            is_rtr,
         };
-
-        let result = validate_gvret_frame(&frame);
-        assert!(result.is_err());
+        assert!(validate_gvret_frame(&frame(true, false)).is_err());
+        assert!(validate_gvret_frame(&frame(false, true)).is_err());
+        assert!(validate_gvret_frame(&frame(false, false)).is_ok());
     }
 
     #[test]
