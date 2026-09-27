@@ -17,7 +17,7 @@ use crate::capture_store::{self, TimestampedByte};
 use crate::io::error::IoError;
 use crate::io::bus_mapping::BusMapping;
 use crate::io::types::SourceMessage;
-use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, FrameMessage, SignalThrottle};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, take_startup_error, FrameMessage, SignalThrottle};
 
 /// Who a source index belongs to, for the two things that have to name a source
 /// after it has started: reconciled bus mappings (by profile) and a disconnect
@@ -158,6 +158,7 @@ pub(super) async fn run_merge_task(
     // The last error a source reported, kept so the session can end as "error"
     // rather than "complete" when every source has failed.
     let mut last_source_error: Option<String> = None;
+    let mut interrupted: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut pending_frames: Vec<FrameMessage> = Vec::new();
     let mut pending_bytes: Vec<TimestampedByte> = Vec::new();
     let mut last_emit = std::time::Instant::now();
@@ -223,6 +224,11 @@ pub(super) async fn run_merge_task(
                         emit_session_error(&session_id, error);
                         live.end(source_idx);
                     }
+                    Some(SourceMessage::Interrupted(source_idx, error)) => {
+                        tlog!("[IOBroker] Source {} interrupted: {}", source_idx, error);
+                        interrupted.insert(source_idx);
+                        emit_session_error(&session_id, error);
+                    }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
                         tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
                         if let Ok(mut channels) = transmit_channels.lock() {
@@ -238,6 +244,17 @@ pub(super) async fn run_merge_task(
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
                         tlog!("[IOBroker] Source {} connected: {} at {}", source_idx, device_type, address);
                         emit_device_connected(&session_id, &device_type, &address, bus_number);
+                        // The session error left the frontend in its error state;
+                        // the session never left its own, so send that again.
+                        if interrupted.remove(&source_idx) {
+                            let session_id = session_id.clone();
+                            tokio::spawn(async move {
+                                take_startup_error(&session_id);
+                                if let Some(state) = crate::io::get_session_state(&session_id).await {
+                                    crate::ws::dispatch::send_session_state(&session_id, &state);
+                                }
+                            });
+                        }
                     }
                     Some(SourceMessage::MappingsResolved(source_idx, mappings)) => {
                         tlog!(

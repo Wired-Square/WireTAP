@@ -99,6 +99,7 @@ impl Framer {
             Self::Serial(framer) => stamped(framer.flush(), now),
             Self::Rtu(tap) => {
                 let (messages, trailing) = tap.finish();
+                tap.reset();
                 let leftover = stamped(residue(trailing), now);
                 messages.into_iter().map(tapped).chain(leftover).collect()
             }
@@ -110,6 +111,7 @@ impl Framer {
 /// `SetFraming` request swaps in place.
 struct LiveLine {
     source_idx: usize,
+    port: String,
     line: LineSettings,
     output_bus: u8,
     bus_mappings: Vec<BusMapping>,
@@ -120,6 +122,7 @@ struct LiveLine {
     emit_raw_bytes: bool,
     /// No byte is stamped before one already handed out, as `RtuTap`'s floor.
     byte_floor_us: u64,
+    waiting_for_device: bool,
 }
 
 impl LiveLine {
@@ -131,6 +134,7 @@ impl LiveLine {
             .unwrap_or(0);
         Self {
             source_idx,
+            port: config.port,
             line: config.line,
             output_bus,
             bus_mappings,
@@ -140,6 +144,45 @@ impl LiveLine {
             min_frame_length: config.min_frame_length,
             emit_raw_bytes: config.emit_raw_bytes,
             byte_floor_us: 0,
+            waiting_for_device: false,
+        }
+    }
+
+    /// A loss is reported once per outage, and flushes the framer so no half
+    /// message is glued onto what the device sends when it returns.
+    fn on_event(
+        &mut self,
+        event: SerialEvent,
+        presence: impl FnOnce(&str) -> DevicePresence,
+    ) -> Vec<SourceMessage> {
+        match event {
+            SerialEvent::Connected => {
+                if std::mem::take(&mut self.waiting_for_device) {
+                    tlog!(
+                        "[serial] Source {} reconnected to {}",
+                        self.source_idx,
+                        self.port
+                    );
+                    self.byte_floor_us = self.byte_floor_us.max(micros(SystemTime::now()));
+                }
+                vec![SourceMessage::Connected(
+                    self.source_idx,
+                    "serial".to_string(),
+                    self.port.clone(),
+                    Some(self.output_bus),
+                )]
+            }
+            SerialEvent::Read { bytes, at } => self.read(&bytes, at),
+            SerialEvent::Disconnected { .. } if self.waiting_for_device => Vec::new(),
+            SerialEvent::Disconnected { error, .. } => {
+                self.waiting_for_device = true;
+                let message = outage_message(&self.port, error, presence);
+                tlog!("[serial] Source {} {}", self.source_idx, message);
+                self.finish()
+                    .into_iter()
+                    .chain([SourceMessage::Interrupted(self.source_idx, message)])
+                    .collect()
+            }
         }
     }
 
@@ -159,6 +202,11 @@ impl LiveLine {
     fn finish(&mut self) -> Option<SourceMessage> {
         let frames = self.framer.finish(SystemTime::now());
         self.frames(frames)
+    }
+
+    fn stopped(&mut self) -> Vec<SourceMessage> {
+        let ended = SourceMessage::Ended(self.source_idx, EndReason::Stopped);
+        self.finish().into_iter().chain([ended]).collect()
     }
 
     /// Byte `i` of an `n`-byte read arrived `wire_time(n - 1 - i)` before the
@@ -250,20 +298,23 @@ impl LiveLine {
 
 /// A zero-byte read is the device going away; any other read error is told
 /// apart as "in use" or "gone" by whether the port still enumerates.
-fn line_lost(
-    source_idx: usize,
+fn outage_message(
     port: &str,
     error: SerialError,
     presence: impl FnOnce(&str) -> DevicePresence,
-) -> SourceMessage {
-    match error {
-        SerialError::Closed => SourceMessage::Ended(source_idx, EndReason::Disconnected),
-        SerialError::Read(e) => SourceMessage::Error(
-            source_idx,
-            IoError::device_stream_error_message(port, &e, presence(port)),
-        ),
-        other => SourceMessage::Error(source_idx, format!("{port}: {other}")),
-    }
+) -> String {
+    let why = match error {
+        SerialError::Closed => "device disconnected".to_string(),
+        SerialError::Read(e) => match IoError::from_device_error(port, &e, presence(port)) {
+            IoError::DeviceDisconnected { .. } => "device disconnected".to_string(),
+            IoError::DeviceBusy { .. } => {
+                "device unavailable, it may be in use by another application".to_string()
+            }
+            _ => SerialError::Read(e).to_string(),
+        },
+        other => other.to_string(),
+    };
+    format!("{port}: {why}, waiting for it to return")
 }
 
 fn transmit_result(written: Result<std::io::Result<()>, WriteRefused>) -> Result<(), String> {
@@ -309,7 +360,6 @@ pub async fn run_source(
     let options = SerialOptions {
         access: Access::ReadWrite,
         read_buffer: 256,
-        reopen: None,
         ..SerialOptions::default()
     };
     let mut task = match serial::open(&port, config.line, options) {
@@ -352,48 +402,34 @@ pub async fn run_source(
     let mut live = LiveLine::new(source_idx, config, bus_mappings);
 
     let mut poll = tokio::time::interval(POLL);
-    let lost = loop {
+    loop {
         tokio::select! {
             event = task.next_event() => match event {
-                Some(SerialEvent::Connected) => {
-                    let connected = SourceMessage::Connected(
-                        source_idx,
-                        "serial".to_string(),
-                        port.clone(),
-                        Some(live.output_bus),
-                    );
-                    let _ = tx.send(connected).await;
-                }
-                Some(SerialEvent::Read { bytes, at }) => {
-                    for message in live.read(&bytes, at) {
+                Some(event) => {
+                    for message in live.on_event(event, probe_serial_presence) {
                         let _ = tx.send(message).await;
                     }
                 }
-                Some(SerialEvent::Disconnected { error, .. }) => break Some(error),
-                None => break Some(SerialError::Closed),
+                None => {
+                    let _ = tx.send(SourceMessage::Ended(source_idx, EndReason::Disconnected)).await;
+                    return;
+                }
             },
             _ = poll.tick() => {
                 if stop_flag.load(Ordering::SeqCst) {
-                    break None;
+                    break;
                 }
                 while let Ok(req) = control_rx.try_recv() {
                     live.set_framing(req);
                 }
             }
         }
-    };
+    }
 
-    let ended = match lost {
-        Some(error) => line_lost(source_idx, &port, error, probe_serial_presence),
-        None => {
-            task.stop().await;
-            if let Some(flushed) = live.finish() {
-                let _ = tx.send(flushed).await;
-            }
-            SourceMessage::Ended(source_idx, EndReason::Stopped)
-        }
-    };
-    let _ = tx.send(ended).await;
+    task.stop().await;
+    for message in live.stopped() {
+        let _ = tx.send(message).await;
+    }
 }
 // ============================================================================
 // Tauri Commands
@@ -499,34 +535,139 @@ mod tests {
             .collect()
     }
 
+    fn lost(error: SerialError) -> SerialEvent {
+        SerialEvent::Disconnected {
+            error,
+            consecutive: 1,
+            retry_in: Some(Duration::from_secs(1)),
+        }
+    }
+
+    fn reopen_failed() -> SerialEvent {
+        let source = std::io::Error::from(std::io::ErrorKind::NotFound);
+        SerialEvent::Disconnected {
+            error: SerialError::Open {
+                path: "/dev/test".to_string(),
+                source,
+            },
+            consecutive: 2,
+            retry_in: Some(Duration::from_secs(1)),
+        }
+    }
+
+    fn present(_: &str) -> DevicePresence {
+        DevicePresence::Present
+    }
+
     #[test]
-    fn a_zero_byte_read_ends_the_source_as_disconnected() {
-        let ended = line_lost(2, "/dev/test", SerialError::Closed, |_| unreachable!());
-        assert!(matches!(
-            ended,
-            SourceMessage::Ended(2, EndReason::Disconnected)
-        ));
+    fn a_loss_while_live_is_reported_once_and_does_not_end_the_source() {
+        let mut line = live(FramingEncoding::Raw, false);
+
+        match &line.on_event(lost(SerialError::Closed), |_| unreachable!())[..] {
+            [SourceMessage::Interrupted(0, message)] => assert_eq!(
+                message,
+                "/dev/test: device disconnected, waiting for it to return"
+            ),
+            _ => panic!("one interruption, and no ending"),
+        }
+        assert!(line.on_event(reopen_failed(), present).is_empty());
+        assert!(line.on_event(lost(SerialError::Closed), present).is_empty());
     }
 
     #[test]
     fn a_read_error_is_classified_by_whether_the_port_still_enumerates() {
-        let denied = || std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        let message =
-            |presence| match line_lost(2, "/dev/test", SerialError::Read(denied()), |port| {
-                assert_eq!(port, "/dev/test");
-                presence
-            }) {
-                SourceMessage::Error(2, message) => message,
-                _ => panic!("a read error is a source error"),
-            };
-        for presence in [DevicePresence::Present, DevicePresence::Absent] {
-            let expected = IoError::device_stream_error_message("/dev/test", &denied(), presence);
-            assert_eq!(message(presence), expected);
-        }
-        assert_ne!(
+        let denied = || SerialError::Read(std::io::ErrorKind::PermissionDenied.into());
+        let message = |presence| {
+            let mut line = live(FramingEncoding::Raw, false);
+            match line
+                .on_event(lost(denied()), |port| {
+                    assert_eq!(port, "/dev/test");
+                    presence
+                })
+                .pop()
+            {
+                Some(SourceMessage::Interrupted(0, message)) => message,
+                _ => panic!("a read error interrupts the source"),
+            }
+        };
+        assert_eq!(
             message(DevicePresence::Present),
-            message(DevicePresence::Absent)
+            "/dev/test: device unavailable, it may be in use by another application, \
+             waiting for it to return"
         );
+        assert_eq!(
+            message(DevicePresence::Absent),
+            "/dev/test: device disconnected, waiting for it to return"
+        );
+    }
+
+    #[test]
+    fn a_reconnect_resumes_with_the_framer_flushed_at_the_loss() {
+        let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
+        let response = rtu(&[0x01, 0x03, 0x02, 0x12, 0x34]);
+        let mut line = live(
+            FramingEncoding::ModbusRtu(ModbusRtuOptions::default()),
+            false,
+        );
+        assert!(line.read(&request[..4], at(1_000_000)).is_empty());
+
+        let at_loss = frames(line.on_event(lost(SerialError::Closed), present));
+        assert_eq!(at_loss.len(), 1);
+        assert_eq!(at_loss[0].bytes, request[..4]);
+        assert_eq!(at_loss[0].incomplete, Some(true));
+
+        assert!(matches!(
+            line.on_event(SerialEvent::Connected, present)[..],
+            [SourceMessage::Connected(0, _, _, Some(0))]
+        ));
+        let resumed = frames(line.read(&response, at(2_000_000)));
+        assert_eq!(
+            resumed.iter().map(|f| f.bytes.clone()).collect::<Vec<_>>(),
+            [response]
+        );
+        assert!(
+            !line.on_event(lost(SerialError::Closed), present).is_empty(),
+            "a new outage is reported again"
+        );
+    }
+
+    #[test]
+    fn raw_bytes_after_a_reconnect_are_not_stamped_before_it() {
+        let mut line = live(FramingEncoding::Raw, true);
+        line.on_event(lost(SerialError::Closed), present);
+        let before = micros(SystemTime::now());
+        line.on_event(SerialEvent::Connected, present);
+
+        let messages = line.on_event(
+            SerialEvent::Read {
+                bytes: vec![1, 2, 3],
+                at: at(1_000_000),
+            },
+            present,
+        );
+        let [SourceMessage::Bytes(0, entries)] = &messages[..] else {
+            panic!("a raw line yields one byte batch");
+        };
+        assert!(entries.iter().all(|e| e.timestamp_us >= before));
+    }
+
+    #[test]
+    fn a_stop_while_waiting_ends_stopped_with_nothing_left_to_flush() {
+        let mut line = live(
+            FramingEncoding::Delimiter {
+                delimiter: vec![b'\n'],
+                max_length: 64,
+                include_delimiter: false,
+            },
+            false,
+        );
+        line.read(b"half", at(1));
+        line.on_event(lost(SerialError::Closed), present);
+
+        assert!(matches!(
+            line.stopped()[..],
+            [SourceMessage::Ended(0, EndReason::Stopped)]
+        ));
     }
 
     #[test]

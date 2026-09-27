@@ -286,6 +286,7 @@ impl FramerImpl for SlipFramer {
     }
 
     fn flush(&mut self) -> Vec<SerialFrame> {
+        self.in_escape = false;
         residue(std::mem::take(&mut self.buffer))
     }
 }
@@ -610,5 +611,16 @@ mod tests {
         assert_eq!(flushed.len(), 1);
         assert!(flushed[0].incomplete);
         assert_eq!(flushed[0].bytes, vec![0x01, 0x02, 0x03]);
+    }
+
+    #[test]
+    fn a_slip_escape_cut_off_by_a_flush_does_not_carry_over() {
+        let mut framer = SerialFramer::new(FramingEncoding::Slip);
+        framer.feed(&[0x01, SLIP_ESC]);
+        framer.flush();
+
+        let frames = framer.feed(&[SLIP_ESC_END, SLIP_END]);
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].bytes, vec![SLIP_ESC_END]);
     }
 }

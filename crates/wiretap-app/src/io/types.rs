@@ -64,6 +64,10 @@ pub enum SourceMessage {
     Ended(usize, EndReason),
     /// Source error (source_index, error)
     Error(usize, String),
+    /// The source lost its device and is waiting for it to return: reported
+    /// like an error, but the source lives on and its next `Connected` resumes.
+    #[cfg_attr(target_os = "ios", allow(dead_code))]
+    Interrupted(usize, String),
     /// Transmit channel is ready (source_index, transmit_sender)
     TransmitReady(usize, TransmitSender),
     /// Control channel is ready (source_index, control_sender) — serial only,
