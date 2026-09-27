@@ -625,25 +625,21 @@ pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
     Ok(refresh_catalog_cache(&app))
 }
 
-/// Extract catalog name from TOML content
+/// `[meta].name` alone, so a catalogue that fails validation still shows its name.
 fn extract_catalog_name(content: &str) -> Option<String> {
-    // Simple parser to extract name from [meta] section
-    for line in content.lines() {
-        let line = line.trim();
-        if line.starts_with("name") && line.contains('=') {
-            if let Some(name_part) = line.split('=').nth(1) {
-                let name = name_part
-                    .trim()
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .to_string();
-                if !name.is_empty() {
-                    return Some(name);
-                }
-            }
-        }
+    #[derive(Deserialize)]
+    struct Head {
+        meta: Option<Meta>,
     }
-    None
+    #[derive(Deserialize)]
+    struct Meta {
+        name: Option<String>,
+    }
+    toml::from_str::<Head>(content)
+        .ok()?
+        .meta?
+        .name
+        .filter(|n| !n.trim().is_empty())
 }
 
 /// Reject a filename that is not a bare, visible name.
@@ -864,6 +860,20 @@ mod tests {
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).expect("write catalogue");
+    }
+
+    #[test]
+    fn catalogue_name_is_read_from_meta_only() {
+        let below_a_signal = "[[frame.can.0x100.signals]]\nname = \"Voltage\"\n\n[meta]\nname = \"Pack\"\n";
+        assert_eq!(extract_catalog_name(below_a_signal).as_deref(), Some("Pack"));
+
+        let commented = "[meta]\nname = \"Pack = BMS\" # the display name\n";
+        assert_eq!(extract_catalog_name(commented).as_deref(), Some("Pack = BMS"));
+
+        let prefix_first = "name_prefix = \"hyp_\"\n[meta]\nname = \"Pack\"\n";
+        assert_eq!(extract_catalog_name(prefix_first).as_deref(), Some("Pack"));
+
+        assert_eq!(extract_catalog_name("[meta]\nversion = 1\n"), None);
     }
 
     /// The scan labels each row from the registry as it walks, using the bytes it read
