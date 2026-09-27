@@ -68,15 +68,14 @@ with `multi_source: false` cannot be combined with others.
 
 | Source            | Module                                   | Temporal  | Protocols     | tx_frames | tx_bytes | multi |
 |-------------------|------------------------------------------|-----------|---------------|-----------|----------|-------|
-| GVRET (TCP/USB)   | [io/gvret/](../crates/wiretap-app/src/io/gvret/)  | realtime  | can, canfd    | ✓         | ✗        | ✓     |
+| GVRET (TCP/USB)   | [io/gvret/](../crates/wiretap-app/src/io/gvret/)  | realtime  | can           | ✓         | ✗        | ✓     |
 | slcan             | [io/slcan/](../crates/wiretap-app/src/io/slcan/)  | realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
 | gs_usb            | [io/gs_usb/](../crates/wiretap-app/src/io/gs_usb/)| realtime  | can, canfd    | ✓/✗       | ✗        | ✓     |
-| SocketCAN         | [io/socketcan/](../crates/wiretap-app/src/io/socketcan/) | realtime | can      | ✓         | ✗        | ✓     |
+| SocketCAN         | [io/socketcan/](../crates/wiretap-app/src/io/socketcan/) | realtime | can, canfd | ✓         | ✗        | ✓     |
 | Serial (framed)   | [io/serial/](../crates/wiretap-app/src/io/serial/)| realtime  | serial¹       | ✗         | ✗        | ✓     |
 | Serial (raw)      | [io/serial/](../crates/wiretap-app/src/io/serial/)| realtime  | serial        | ✗         | ✓        | ✓     |
 | MQTT              | [io/mqtt/](../crates/wiretap-app/src/io/mqtt/)    | realtime  | can           | ✗         | ✗        | ✓     |
 | Modbus TCP        | [io/modbus_tcp/](../crates/wiretap-app/src/io/modbus_tcp/) | realtime | modbus | ✗         | ✗        | ✓     |
-| Modbus RTU        | [io/modbus_rtu/](../crates/wiretap-app/src/io/modbus_rtu/) | realtime | modbus | ✓         | ✗        | ✓     |
 | Modbus scan²      | [io/modbus_tcp/scan_source.rs](../crates/wiretap-app/src/io/modbus_tcp/scan_source.rs) | realtime | modbus | ✗ | ✗ | ✗ |
 | FrameLink         | [io/framelink/](../crates/wiretap-app/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
 | Virtual device    | [io/virtual_device/](../crates/wiretap-app/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
@@ -261,12 +260,15 @@ pool previously had no `remove` at all, so a stopped session held the device's
 only client slot for the life of the process.
 
 **Host resolution.** TCP-based sources accept either a hostname or a literal IP
-for their host. GVRET TCP, Modbus TCP and FrameLink resolve through
-[`io/net.rs::resolve_host_port`](../crates/wiretap-app/src/io/net.rs), a wrapper over
-`tokio::net::lookup_host` that bounds the lookup with `DNS_TIMEOUT` and classifies
-failures as `IoError::DnsResolution`. New TCP transports must resolve through that
-helper — parsing `"host:port"` straight into a `SocketAddr` accepts only numeric
-IPs and rejects any DNS name with "invalid socket address syntax".
+for their host. FrameLink, the GVRET TCP probe and the Modbus scanner resolve
+through [`io/net.rs::resolve_host_port`](../crates/wiretap-app/src/io/net.rs), a
+wrapper over `tokio::net::lookup_host` that bounds the lookup with `DNS_TIMEOUT`
+and classifies failures as `IoError::DnsResolution`. The GVRET TCP reader and the
+Modbus TCP poll hand `net::tcp_endpoint` to `wiretap-io`, which resolves with its
+own bound; GVRET words the library's resolve failure the same way
+(`gvret/tcp.rs::connect_failed`). New TCP transports must do one or the other —
+parsing `"host:port"` straight into a `SocketAddr` accepts only numeric IPs and
+rejects any DNS name with "invalid socket address syntax".
 
 MQTT and the WireTAP backend API are the exceptions: their client libraries
 (rumqttc, reqwest) resolve internally, so the helper cannot wrap them. They get a
@@ -302,12 +304,13 @@ field; `start` and `stop` both clear it. On the frontend, `StreamEnded` maps
 reason `error` to `ioState: "error"` — collapsing every non-paused reason to
 `"stopped"` would overwrite the failure that arrived moments earlier.
 
-**Device errors.** The serial-family read loops (serial, slcan, gvret_usb) route
-read failures through `IoError` via one
-[`serial::utils::send_serial_read_error`](../crates/wiretap-app/src/io/serial/utils.rs)
-helper, which probes port presence (`serialport::available_ports`) to classify
-access-denied as *in use* vs *disconnected* and emits a device-identified,
-actionable message rather than a raw `os error`. Stream errors are shown once,
+**Device errors.** The serial-family readers (serial, slcan, gvret_usb) word a
+read failure through `IoError::device_stream_error_message`, with
+[`serial::utils::probe_serial_presence`](../crates/wiretap-app/src/io/serial/utils.rs)
+(`serialport::available_ports`) telling access-denied apart as *in use* vs
+*disconnected* — `serial/reader.rs::line_lost` for a serial port,
+`can_task::port_lost` for slcan and gvret_usb — so the message names the device
+and says what to do rather than a raw `os error`. Stream errors are shown once,
 centrally, by the `SessionError` handler in `sessionStore.ts` — per-app `onError`
 handlers only log (they must not raise their own dialog, or Sentry double-reports).
 
@@ -735,10 +738,10 @@ the catalogue already covers is how you check a catalogue you suspect is
 incomplete. The two agreeing is the point — the same session should not poll
 different registers depending on who opened it.
 
-The interval is validated in `build_polls_from_ranges` rather than at each
-caller. A zero interval is not a fast poll but a panic: `Cadence` hands it to
-`tokio::time::interval`, which rejects a zero period — inside a detached poll
-task, where it would take the source down with no diagnosis.
+The interval is validated in `build_polls_from_ranges` (by the library's
+`chunk_ranges`) rather than at each caller. A zero interval is not a fast poll:
+it is refused before the poll task starts, where it would otherwise fail with no
+diagnosis.
 
 The distinction the probe draws is the load-bearing one. A Modbus **exception**
 proves the device implements that function code and the address was simply wrong;
@@ -807,10 +810,10 @@ WebSocket client, so it reads the same state from the store and waits for a
 sweep's summary through `await_scan_result`.
 
 **Connection contention.** A sweep opens its own connection. Routing it through
-a running source's connection would avoid that and is not implemented: the poll
-loop's `Arc<Mutex<Context>>` is a local inside `start()`, reachable from no
-registry, and sharing it would let a scan timeout's reconnect swap the socket
-under the poll tasks.
+a running source's connection would avoid that and is not implemented: that
+connection belongs to the source's `wiretap-io` `PollTask`, which is reachable
+only as a `PollWriter` for MCP writes (`modbus_tcp::poll::poll_writer`), not for
+a sweep's reads.
 
 **The tools run from "No source", and are withheld while any source is
 selected.** `SessionShape.hasSource` is the whole condition
@@ -910,13 +913,9 @@ folded in — `start()` reads it to choose resume-vs-restart, so it is not purel
 terminal-state slot — and neither is `fatal_error`, which carries a message
 rather than a state.
 
-⚠ **It is opt-in, and three sources have not opted in**: `modbus_tcp::reader`,
-`modbus_rtu::reader` and `virtual_device` all spawn detached work and return a
-bare `self.state`, so they can still report `Running` after their task has ended.
-Adoption is four mechanical edits (field, `new`, `guard()` at start, `state_or`
-in `state()`), which is exactly the "a rule applied at N call sites" shape — the
-end state is one `SourceState` every `IOSource` holds, so a source cannot keep a
-bare `IOState` that lies. The register carries the entry.
+It is opt-in: a source adopts it with four mechanical edits (field, `new`,
+`guard()` at start, `state_or` in `state()`). `modbus_tcp::reader` and
+`virtual_device` have since opted in, and `modbus_rtu::reader` is gone.
 
 **Per-source pause is readable, so nothing has to remember it.** The broker owns
 `source_pause_flags` (the merge task still creates each flag, into the shared
@@ -1317,7 +1316,8 @@ implementation in `io/serial/framer.rs`: it tried every length from 4 upwards an
 took the first CRC hit, so a short prefix that coincidentally validated beat the
 real message, and it dropped a byte whenever nothing validated, eating the head
 of a split message before its tail arrived. `FramingEncoding::ModbusRtu` now
-constructs a `ModbusRtuStream`, so a message framed off a serial port and one
+constructs a `ModbusRtuStream` (on a live line, inside the library's `RtuTap`,
+which also stamps each message at its last byte), so a message framed off a serial port and one
 recovered from a tunnelled CAN id are framed by identical rules. Three entry
 points, one set of rules — `push` counts frames (a CAN payload is a slice of the
 stream), `push_bytes` does not (a serial line has no frames to count), and
@@ -1902,18 +1902,14 @@ method using a `TransmitPayload` enum. The Transmit app chooses its view from
 protocols → `SerialTransmitView`) and gates the send itself on
 `tx_frames` / `tx_bytes`.
 
-**Interval-driven loops share one cadence.** Repeating transmits (`io_start_repeat_transmit`,
-the serial and group variants in [transmit.rs](../crates/wiretap-app/src/transmit.rs)) and
-Modbus register polling (the poll task in
-[io/broker/spawner.rs](../crates/wiretap-app/src/io/broker/spawner.rs), and the standalone
-[io/modbus_tcp/reader.rs](../crates/wiretap-app/src/io/modbus_tcp/reader.rs)) are the same
-skeleton — fire immediately, then once per interval, stopping on a cancel flag and
-skipping ticks while paused — differing only in the per-tick body (a transmit logs a
-`TransmitResult`; a poll emits a `FrameMessage` into the rx stream). That timing
-triad lives in one place, `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
-callers write `while cadence.next().await.is_some() { … }`. Modbus RTU keeps its own
-sequential scheduler — half-duplex means requests must be strictly ordered, which a
-per-task interval can't express.
+**Repeating transmits share one cadence.** `io_start_repeat_transmit` and the
+serial and group variants in [transmit.rs](../crates/wiretap-app/src/transmit.rs)
+are the same skeleton — fire immediately, then once per interval, stopping on a
+cancel flag and skipping ticks while paused — and that timing triad lives in one
+place, `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
+callers write `while cadence.next().await.is_some() { … }`. Modbus TCP register
+polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
+`PollTask` ([io/modbus_tcp/poll.rs](../crates/wiretap-app/src/io/modbus_tcp/poll.rs)).
 
 ---
 
@@ -1953,8 +1949,9 @@ per-task interval can't express.
 | [crates/wiretap-app/src/io/profiles.rs](../crates/wiretap-app/src/io/profiles.rs) | `reconfigure_device` — write a device's settings and reconnect it |
 | [crates/wiretap-app/src/io/device_kinds.rs](../crates/wiretap-app/src/io/device_kinds.rs) | Per-kind connection defaults and required fields (see [Connection defaults](#connection-defaults--one-table)) |
 | [crates/wiretap-app/src/io/broker/](../crates/wiretap-app/src/io/broker/) | `IOBroker` — source aggregator / merge task |
+| [crates/wiretap-app/src/io/can_task.rs](../crates/wiretap-app/src/io/can_task.rs) | The desktop side of a `wiretap_io::can` task (GVRET, slcan, SocketCAN): reads to `FrameMessage`, `serve`, how a lost link ends the source |
 | [crates/wiretap-app/src/io/signal_throttle.rs](../crates/wiretap-app/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
-| [crates/wiretap-app/src/io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit and Modbus polling |
+| [crates/wiretap-app/src/io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit |
 | [crates/wiretap-app/src/io/post_session.rs](../crates/wiretap-app/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |
 | [crates/wiretap-app/src/ws/server.rs](../crates/wiretap-app/src/ws/server.rs) | WS server, channel allocation, auth |
 | [crates/wiretap-app/src/ws/protocol.rs](../crates/wiretap-app/src/ws/protocol.rs) | Binary message format, `MsgType`, `encode_frame_batch` |
