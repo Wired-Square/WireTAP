@@ -8583,8 +8583,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 dependencies = [
  "rayon",
  "serde",
@@ -8593,8 +8593,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8609,8 +8609,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-checksum"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 dependencies = [
  "rayon",
  "serde",
@@ -8619,8 +8619,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -8640,8 +8640,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-io"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 dependencies = [
  "libc",
  "nix 0.29.0",
@@ -8657,8 +8657,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-protocol"
-version = "0.17.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.0#9572cc43345573b7fd73ef902345061597c2c518"
+version = "0.17.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.17.1#bf0dce4d1477e900fb6e39e034caa27b6741359d"
 
 [[package]]
 name = "wit-bindgen"

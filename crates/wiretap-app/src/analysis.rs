@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 use tauri::AppHandle;
-use wiretap_catalog::model::{Confidence, Signal};
+use wiretap_catalog::model::Confidence;
 
 use crate::capture_db::{hex_id, InventoryRow};
 
@@ -374,43 +374,6 @@ pub struct CoverageReport {
     pub confidence: ConfidenceTally,
 }
 
-/// Collect every directly-defined signal of a frame (own + mux cases, nested),
-/// skipping mirror/copy-inherited duplicates so each definition counts once.
-fn collect_signals<'a>(signals: &'a [Signal], out: &mut Vec<&'a Signal>) {
-    for s in signals {
-        if !s.inherited {
-            out.push(s);
-        }
-    }
-}
-
-fn collect_frame_signals(frame: &wiretap_catalog::model::Frame) -> Vec<&Signal> {
-    let mut out = Vec::new();
-    collect_signals(&frame.signals, &mut out);
-    if let Some(mux) = &frame.mux {
-        collect_mux(mux, &mut out);
-    }
-    out
-}
-
-fn collect_mux<'a>(mux: &'a wiretap_catalog::model::Mux, out: &mut Vec<&'a Signal>) {
-    for case in mux.cases.values() {
-        collect_signals(&case.signals, out);
-        if let Some(inner) = &case.mux {
-            collect_mux(inner, out);
-        }
-    }
-}
-
-fn confidence_str(c: Option<Confidence>) -> &'static str {
-    match c {
-        Some(Confidence::High) => "high",
-        Some(Confidence::Medium) => "medium",
-        Some(Confidence::Low) => "low",
-        Some(Confidence::None) | None => "unset",
-    }
-}
-
 /// A human label for a frame: its catalogue name, falling back to the transmitter.
 fn frame_label(f: &wiretap_catalog::model::Frame) -> Option<String> {
     f.name.clone().or_else(|| f.transmitter.clone())
@@ -502,7 +465,7 @@ pub async fn catalog_coverage(
     let catalog_ids: HashSet<u32> = catalog.frames.iter().map(|f| f.frame_id).collect();
 
     for frame in &catalog.frames {
-        let sigs = collect_frame_signals(frame);
+        let sigs = frame.own_signals();
         for s in &sigs {
             confidence.add(s.confidence);
         }
@@ -544,7 +507,11 @@ pub async fn catalog_coverage(
                         .filter_map(|s| {
                             s.name.clone().map(|name| SignalCoverage {
                                 name,
-                                confidence: confidence_str(s.confidence).into(),
+                                confidence: s
+                                    .confidence
+                                    .filter(|c| *c != Confidence::None)
+                                    .map_or("unset", Confidence::as_str)
+                                    .into(),
                             })
                         })
                         .collect(),
