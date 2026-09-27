@@ -166,17 +166,17 @@ impl ModbusRtuOptions {
 
 impl From<&ModbusRtuOptions> for wiretap_catalog::ModbusRtuOptions {
     fn from(options: &ModbusRtuOptions) -> Self {
-        Self {
-            device_address: options.device_address,
-            crc: if options.validate_crc {
-                wiretap_catalog::CrcPolicy::Strict
-            } else {
-                wiretap_catalog::CrcPolicy::Lenient
-            },
-            vendor_functions: options.vendor_functions.clone(),
-            allow_broadcast: options.allow_broadcast,
-            any_function: options.any_function,
-        }
+        let mut rtu = Self::default();
+        rtu.device_address = options.device_address;
+        rtu.crc = if options.validate_crc {
+            wiretap_catalog::CrcPolicy::Strict
+        } else {
+            wiretap_catalog::CrcPolicy::Lenient
+        };
+        rtu.vendor_functions = options.vendor_functions.clone();
+        rtu.allow_broadcast = options.allow_broadcast;
+        rtu.any_function = options.any_function;
+        rtu
     }
 }
 
