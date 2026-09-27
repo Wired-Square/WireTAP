@@ -552,6 +552,7 @@ mod tests {
                     arb_id,
                     extended,
                     data,
+                    ..
                 }) = commands.recv().await
                 {
                     return (bus, arb_id, extended, data);
