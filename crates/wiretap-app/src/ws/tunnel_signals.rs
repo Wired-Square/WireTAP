@@ -6,7 +6,7 @@
 
 use wiretap_catalog::decode::Decoded;
 use wiretap_catalog::modbus::{decode_rtu_message, exception_label, function_label};
-use wiretap_catalog::{Catalog, ModbusRtuMessage};
+use wiretap_catalog::{Catalog, DirectionBasis, ModbusRtuMessage, Payload};
 
 /// One decoded tunnel message: the signals to merge into the frame's entry, and
 /// the transaction record for the Modbus tab.
@@ -19,9 +19,8 @@ pub struct DecodedTunnelMessage {
 pub fn decode_message(msg: &ModbusRtuMessage, catalog: &Catalog) -> DecodedTunnelMessage {
     let d = decode_rtu_message(catalog, msg);
 
-    // `registers` is register banks only, so it is already empty for a coil frame
-    // and for a vendor code. `data` is the body either way, and the only route to
-    // the payload of a function code nothing models.
+    // `data` is the body whatever the payload, and the only route to the bytes
+    // of a function code nothing models.
     let transaction = serde_json::json!({
         "protocol": "modbus_rtu",
         "direction": msg.direction.as_str(),
@@ -30,7 +29,10 @@ pub fn decode_message(msg: &ModbusRtuMessage, catalog: &Catalog) -> DecodedTunne
         "functionLabel": function_label(msg.function),
         "register": msg.start_register,
         "quantity": msg.quantity,
-        "values": msg.registers,
+        "payload": payload_kind(&msg.payload),
+        "directionBasis": direction_basis(msg.direction_basis),
+        "values": msg.registers(),
+        "coils": msg.coils(),
         "data": msg.data_block(),
         "exception": msg.exception,
         "exceptionLabel": msg.exception.map(exception_label),
@@ -46,6 +48,25 @@ pub fn decode_message(msg: &ModbusRtuMessage, catalog: &Catalog) -> DecodedTunne
     DecodedTunnelMessage {
         signals: [d.header, d.values].concat(),
         transaction,
+    }
+}
+
+fn payload_kind(payload: &Payload) -> &'static str {
+    match payload {
+        Payload::Registers(_) => "registers",
+        Payload::Coils(_) => "coils",
+        Payload::None => "none",
+        _ => "opaque",
+    }
+}
+
+/// An unknown basis reads as a guess: a label that overstates is worse than one
+/// that hedges.
+fn direction_basis(basis: DirectionBasis) -> &'static str {
+    match basis {
+        DirectionBasis::Layout => "layout",
+        DirectionBasis::Pairing => "pairing",
+        _ => "alternation",
     }
 }
 
@@ -115,19 +136,41 @@ unit = "A"
             .collect()
     }
 
-    #[test]
-    fn a_coil_block_is_data_not_values() {
-        let msgs = messages(&["0101000A000A", "010102D502"]);
-        let out = decode_message(&msgs[0], &catalog());
-        assert_eq!(out.transaction["values"].as_array().unwrap().len(), 0);
-        let out = decode_message(&msgs[1], &catalog());
-        assert_eq!(out.transaction["values"].as_array().unwrap().len(), 0);
-        assert_eq!(out.transaction["data"].as_array().unwrap().len(), 2);
+    fn coils(transaction: &serde_json::Value) -> Vec<bool> {
+        transaction["coils"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_bool().unwrap())
+            .collect()
+    }
 
-        for body in ["0105001AFF00", "0105001A0000"] {
+    #[test]
+    fn a_coil_read_carries_coils_not_values() {
+        let msgs = messages(&["0101000A000A", "010102D502"]);
+        let request = decode_message(&msgs[0], &catalog()).transaction;
+        assert_eq!(request["payload"], "none");
+        assert!(coils(&request).is_empty());
+        assert_eq!(request["directionBasis"], "layout");
+
+        let response = decode_message(&msgs[1], &catalog()).transaction;
+        assert_eq!(response["payload"], "coils");
+        assert_eq!(response["values"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            coils(&response),
+            [true, false, true, false, true, false, true, true, false, true]
+        );
+        assert_eq!(response["data"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_single_coil_write_carries_its_state() {
+        for (body, state) in [("0105001AFF00", true), ("0105001A0000", false)] {
             let msgs = messages(&[body]);
-            let out = decode_message(&msgs[0], &catalog());
-            assert_eq!(out.transaction["values"].as_array().unwrap().len(), 0);
+            let out = decode_message(&msgs[0], &catalog()).transaction;
+            assert_eq!(out["payload"], "coils");
+            assert_eq!(out["values"].as_array().unwrap().len(), 0);
+            assert_eq!(coils(&out), [state]);
         }
     }
 
@@ -135,7 +178,9 @@ unit = "A"
     fn a_register_read_carries_its_values() {
         let msgs = messages(&["01044DE20002", "010404012C0000"]);
         let out = decode_message(msgs.last().unwrap(), &catalog());
+        assert_eq!(out.transaction["payload"], "registers");
         assert_eq!(out.transaction["values"].as_array().unwrap().len(), 2);
+        assert!(coils(&out.transaction).is_empty());
     }
 
     #[test]
@@ -145,6 +190,8 @@ unit = "A"
         assert_eq!(msgs.len(), 1);
 
         let out = decode_message(&msgs[0], &catalog());
+        assert_eq!(out.transaction["payload"], "opaque");
+        assert_eq!(out.transaction["directionBasis"], "alternation");
         assert_eq!(out.transaction["values"].as_array().unwrap().len(), 0);
         let data: Vec<u64> = out.transaction["data"]
             .as_array()

@@ -42,6 +42,9 @@
     "response": "Response",
     "unit": "unit {{device}}",
     "frameSpan_other": "{{count}} frames",
+    "directionGuessed": "guessed",
+    "directionGuessedHint": "A vendor function code, so request and response were told apart by their alternation on the line. The label may be the wrong way round.",
+    "coils": "Coils",
     "crcInvalid": "CRC failed",
     "crcInvalidHint": "The trailing CRC-16 does not match. This message was framed from the Modbus length rules alone, so its boundaries may be wrong.",
     "empty": "No Modbus messages yet."

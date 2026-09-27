@@ -298,9 +298,16 @@ export interface DecodedTunnelMessage {
   /** Start register. Null when a read response had no request to inherit from. */
   register?: number | null;
   quantity?: number | null;
-  /** Register values. Empty for a coil bank and for a vendor code — neither has
-   *  registers, and reading one as `u16`s is how coil bytes get mangled. */
+  /** Which of `values` and `coils` holds the message's values, if either. */
+  payload: 'registers' | 'coils' | 'none' | 'opaque';
+  /** What sided the message: `alternation` is a guess from the line's
+   *  request/response rhythm, made for a vendor code. */
+  directionBasis: 'layout' | 'pairing' | 'alternation';
+  /** Register values. Empty unless `payload` is `registers` — reading coil bytes
+   *  as `u16`s is how they get mangled. */
   values: number[];
+  /** Coil or discrete states. Empty unless `payload` is `coils`. */
+  coils: boolean[];
   /** The body between the header and the CRC. The only route to the payload of
    *  a function code nothing models. */
   data: number[];

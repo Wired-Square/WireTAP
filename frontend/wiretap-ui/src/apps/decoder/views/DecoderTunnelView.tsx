@@ -54,6 +54,26 @@ function registerList(t: TunnelTransaction): string {
     .join("  ");
 }
 
+/** Coil states as 0/1 in groups of eight, after the first coil's address. */
+function coilList(t: TunnelTransaction): string {
+  const bits = t.coils.map((c) => (c ? "1" : "0")).join("");
+  const bytes = (bits.match(/.{1,8}/g) ?? []).join(" ");
+  return t.register == null ? bytes : `[${t.register}] ${bytes}`;
+}
+
+function valuesLine(t: TunnelTransaction, coilsLabel: string): string | null {
+  switch (t.payload) {
+    case "registers":
+      return registerList(t);
+    case "coils":
+      return `${coilsLabel} ${coilList(t)}`;
+    case "none":
+      return null;
+    default:
+      return t.data.length > 0 ? t.data.map(byteToHex).join(" ") : null;
+  }
+}
+
 const TransactionRow = memo(function TransactionRow({
   t,
   displayFrameIdFormat,
@@ -67,6 +87,7 @@ const TransactionRow = memo(function TransactionRow({
 }) {
   const isRequest = t.direction === "request";
   const Arrow = isRequest ? ArrowRight : ArrowLeft;
+  const values = valuesLine(t, translate("tunnelView.coils"));
 
   return (
     <div className={`flex flex-col gap-1 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}>
@@ -79,6 +100,14 @@ const TransactionRow = memo(function TransactionRow({
         <span className={isRequest ? textDataCyan : textDataGreen}>
           {translate(`tunnelView.${t.direction}`)}
         </span>
+        {t.directionBasis === "alternation" && (
+          <span
+            className={`${textMuted} text-xs`}
+            title={translate("tunnelView.directionGuessedHint")}
+          >
+            {translate("tunnelView.directionGuessed")}
+          </span>
+        )}
         <span className={`${textMuted} text-xs`}>
           {translate("tunnelView.unit", { device: t.device })}
         </span>
@@ -112,16 +141,8 @@ const TransactionRow = memo(function TransactionRow({
       {t.exceptionLabel && (
         <div className={`${textDanger} text-xs`}>{t.exceptionLabel}</div>
       )}
-      {t.values.length > 0 ? (
-        <div className={`${textDataPrimary} text-xs`}>{registerList(t)}</div>
-      ) : (
-        // A coil bank and a vendor code both carry a body with no registers to
-        // name, and for a vendor code this is the only view of its payload.
-        t.data.length > 0 && (
-          <div className={`${textDataPrimary} text-xs break-all`}>
-            {t.data.map(byteToHex).join(" ")}
-          </div>
-        )
+      {values && (
+        <div className={`${textDataPrimary} text-xs`}>{values}</div>
       )}
       {/* The reassembled message, CRC included. */}
       <div className={`${textMuted} text-xs break-all`}>

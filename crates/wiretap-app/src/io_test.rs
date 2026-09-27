@@ -190,7 +190,7 @@ impl TestConfig {
         let arb_id = msg.arb_id();
         self.can(
             if self.use_extended {
-                Option::<u32>::from(tp::extended_id(arb_id)).expect("a framed message has a framed id")
+                tp::extended_id(arb_id).expect("a framed message has a framed id")
             } else {
                 arb_id
             },
@@ -1480,7 +1480,7 @@ mod tests {
             panic!("expected a CAN frame");
         };
         assert!(frame.is_extended);
-        assert_eq!(Some(frame.frame_id), Option::<u32>::from(tp::extended_id(tp::ID_PING_REQUEST)));
+        assert_eq!(Some(frame.frame_id), tp::extended_id(tp::ID_PING_REQUEST));
         assert!(tp::is_test_pattern_frame(frame.frame_id));
 
         // Sweep ids have no extended form: the length code is their meaning.

@@ -1173,7 +1173,7 @@ allow_broadcast = true
         assert_eq!(out[0].direction, wiretap_catalog::Direction::Response);
         // Carried over from the request: a read response has no address of its own.
         assert_eq!(out[0].start_register, Some(0x6B));
-        assert_eq!(out[0].registers, vec![0x022B, 0x0000, 0x0064]);
+        assert_eq!(out[0].registers(), [0x022B, 0x0000, 0x0064]);
     }
 
     /// An archive row takes the same path, and interprets under codes and
