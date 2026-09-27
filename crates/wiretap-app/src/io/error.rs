@@ -261,33 +261,6 @@ impl IoError {
         }
     }
 
-    /// Classify a device read/open failure and render the full user-facing
-    /// message, appending the raw OS error code (for support) to the device-state
-    /// variants. This is the string a driver sends on `SourceMessage::Error`.
-    pub(crate) fn device_stream_error_message(
-        device: impl Into<String>,
-        err: &std::io::Error,
-        presence: DevicePresence,
-    ) -> String {
-        let classified = Self::from_device_error(device, err, presence);
-        let message = classified.user_message();
-        // Device-state variants are actionable prose with no embedded error text,
-        // so append the raw OS code for support; other variants already carry it.
-        match err.raw_os_error() {
-            Some(code) if classified.is_device_state() => format!("{message} (os error {code})"),
-            _ => message,
-        }
-    }
-
-    /// Whether this is one of the presence/availability device-state variants
-    /// whose `user_message` is actionable prose without an embedded OS error.
-    fn is_device_state(&self) -> bool {
-        matches!(
-            self,
-            Self::DeviceBusy { .. } | Self::DeviceDisconnected { .. } | Self::DeviceNotFound { .. }
-        )
-    }
-
     /// A user-facing, actionable message for the device-state variants (names the
     /// device and states the fix). Other variants fall back to [`Display`]. This
     /// is kept separate from `Display` so the terse machine strings other callers

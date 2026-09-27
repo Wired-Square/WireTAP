@@ -163,7 +163,7 @@ pub async fn run_source(
         interface: interface.clone(),
         fd: true,
     };
-    let task = match open_socketcan(options, can_options(false)).await {
+    let task = match open_socketcan(options, can_options(false, None)).await {
         Ok(task) => task,
         Err(e) => {
             let _ = tx

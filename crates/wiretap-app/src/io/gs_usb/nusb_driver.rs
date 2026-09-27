@@ -171,7 +171,7 @@ fn get_device_config_sync(interface: &Interface) -> Result<DeviceConfig, String>
 
 /// The device hands back what it sent, which export and Test Pattern read as `tx`.
 fn gs_usb_options(listen_only: bool) -> CanOptions {
-    let mut options = can_options(listen_only);
+    let mut options = can_options(listen_only, None);
     options.own_frames = true;
     options
 }

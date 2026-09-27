@@ -21,7 +21,9 @@ use wiretap_io::can::{CanError, CanEvent};
 use wiretap_io::serial::LineSettings;
 
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, mapped_frames, open_failed, port_lost, serve};
+use crate::io::can_task::{
+    can_options, link_lost, mapped_frames, open_failed, serve, PortOutage, PORT_REOPEN,
+};
 use crate::io::error::IoError;
 use crate::io::serial::utils::{self as serial_utils, probe_serial_presence};
 use crate::io::types::SourceMessage;
@@ -391,7 +393,7 @@ pub async fn run_source(
         bitrate,
         data_bitrate,
     };
-    let task = match open_slcan(options, can_options(silent_mode)).await {
+    let task = match open_slcan(options, can_options(silent_mode, PORT_REOPEN)).await {
         Ok(task) => task,
         Err(e) => {
             let _ = tx
@@ -401,14 +403,19 @@ pub async fn run_source(
         }
     };
 
+    let mut outage = PortOutage::new(source_idx, &port);
     serve(
         task,
         source_idx,
         silent_mode,
         &stop_flag,
         &tx,
-        |event| on_event(source_idx, &port, &bus_mappings, event),
-        |error| port_lost(source_idx, &device, &port, error, probe_serial_presence),
+        |event| {
+            outage.on_event(event, probe_serial_presence, |e| {
+                on_event(source_idx, &port, &bus_mappings, e)
+            })
+        },
+        |error| link_lost(source_idx, &device, error),
     )
     .await;
 }
@@ -420,6 +427,8 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::can_task::{lost, reopen_failed};
+    use crate::io::error::DevicePresence;
     use std::time::UNIX_EPOCH;
     use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
     use wiretap_io::serial::Parity;
@@ -492,18 +501,33 @@ mod tests {
     }
 
     #[test]
-    fn a_loss_ends_the_stream() {
-        let lost = on_event(
-            3,
-            "p",
-            &[],
-            CanEvent::Disconnected {
-                error: CanError::Closed,
-                consecutive: 1,
-                retry_in: None,
-            },
+    fn an_unplug_interrupts_once_and_a_replug_resumes() {
+        let mut outage = PortOutage::new(3, "/dev/cu.x");
+        let mut source = |event| {
+            outage
+                .on_event(
+                    event,
+                    |_| DevicePresence::Absent,
+                    |e| on_event(3, "/dev/cu.x", &[], e),
+                )
+                .expect("an outage never ends the source")
+        };
+        let unplugged = source(lost(CanError::Closed));
+        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+            panic!("expected one interruption and no ending");
+        };
+        assert_eq!(
+            message,
+            "/dev/cu.x: device disconnected, waiting for it to return"
         );
-        assert!(matches!(lost, Err(CanError::Closed)));
+        assert!(source(reopen_failed("/dev/cu.x")).is_empty());
+
+        let replugged = source(CanEvent::Connected(DeviceInfo::default()));
+        assert!(matches!(
+            replugged[..],
+            [SourceMessage::Connected(3, _, _, None)]
+        ));
+        assert_eq!(source(lost(CanError::Closed)).len(), 1, "a new outage");
     }
 
     async fn first_message(bitrate: u32) -> SourceMessage {

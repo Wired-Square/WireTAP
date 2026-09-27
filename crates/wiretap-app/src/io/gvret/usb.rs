@@ -18,7 +18,7 @@ use super::common::{
     absorb_num_buses_reply, handshake_failed, GvretDeviceInfo, NumBusesOutcome, Stream,
 };
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, port_lost, serve};
+use crate::io::can_task::{can_options, link_lost, serve, PortOutage, PORT_REOPEN};
 use crate::io::error::IoError;
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
@@ -175,7 +175,13 @@ pub async fn run_source(
         path: port.clone(),
         line,
     };
-    let task = match open_gvret(link, GvretOptions::default(), can_options(false)).await {
+    let task = match open_gvret(
+        link,
+        GvretOptions::default(),
+        can_options(false, PORT_REOPEN),
+    )
+    .await
+    {
         Ok(task) => task,
         Err(e) => {
             let _ = tx
@@ -195,22 +201,78 @@ pub async fn run_source(
         port.clone(),
         bus_mappings,
     );
+    let mut outage = PortOutage::new(source_idx, &port);
     serve(
         task,
         source_idx,
         false,
         &stop_flag,
         &tx,
-        |event| stream.on_event(event),
-        |error| port_lost(source_idx, &device, &port, error, probe_serial_presence),
+        |event| outage.on_event(event, probe_serial_presence, |e| stream.on_event(e)),
+        |error| link_lost(source_idx, &device, error),
     )
     .await;
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::common::MAX_BUSES;
     use super::*;
+    use crate::io::can_task::{lost, reopen_failed};
+    use crate::io::error::DevicePresence;
+    use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
     use wiretap_io::serial::Parity;
+
+    const PORT: &str = "/dev/cu.usbmodem1";
+
+    fn connected(buses: u8) -> CanEvent {
+        let mut info = DeviceInfo::default();
+        info.buses = Some(buses);
+        CanEvent::Connected(info)
+    }
+
+    /// The composition `run_source` serves.
+    fn source() -> impl FnMut(CanEvent) -> Vec<SourceMessage> {
+        let mut stream = Stream::new(3, "gvret_usb", gvret_usb_device(PORT), PORT.into(), vec![]);
+        let mut outage = PortOutage::new(3, PORT);
+        move |event| {
+            outage
+                .on_event(event, |_| DevicePresence::Absent, |e| stream.on_event(e))
+                .expect("an outage never ends the source")
+        }
+    }
+
+    fn buses(messages: &[SourceMessage]) -> usize {
+        match messages {
+            [SourceMessage::MappingsResolved(3, mappings), SourceMessage::Connected(3, ..)] => {
+                mappings.len()
+            }
+            _ => panic!("expected MappingsResolved then Connected"),
+        }
+    }
+
+    #[test]
+    fn an_unplug_interrupts_once_and_a_replug_resolves_the_buses_again() {
+        let mut source = source();
+        assert_eq!(buses(&source(connected(2))), 2);
+
+        let unplugged = source(lost(CanError::Closed));
+        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+            panic!("expected one interruption and no ending");
+        };
+        assert_eq!(
+            message,
+            &format!("{PORT}: device disconnected, waiting for it to return")
+        );
+        assert!(source(reopen_failed(PORT)).is_empty());
+
+        assert_eq!(
+            buses(&source(connected(0))),
+            MAX_BUSES as usize,
+            "another device's count, clamped"
+        );
+        assert_eq!(source(lost(CanError::Unresponsive)).len(), 1);
+    }
 
     #[tokio::test]
     async fn a_port_that_will_not_open_is_named() {

@@ -207,7 +207,7 @@ pub async fn run_source(
         endpoint: tcp_endpoint(&host, port),
         connect_timeout: Duration::from_secs_f64(timeout_sec),
     };
-    let task = match open_gvret(link, GvretOptions::default(), can_options(false)).await {
+    let task = match open_gvret(link, GvretOptions::default(), can_options(false, None)).await {
         Ok(task) => task,
         Err(e) => {
             let _ = tx
@@ -244,6 +244,7 @@ pub async fn run_source(
 mod tests {
     use super::super::common::NUMBUSES_TIMEOUT;
     use super::*;
+    use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
     use std::sync::atomic::Ordering;
     use std::sync::mpsc as std_mpsc;
@@ -392,10 +393,11 @@ mod tests {
         gvret::encode_frame(ts_us, arb_id, false, bus, &[bus, 0xAA], false)
     }
 
-    /// A two-bus GVRET device built from the protocol crate's own device end. It
-    /// answers `keepalives` keepalives, sends a frame with its bus count, then
-    /// three frames 10 ms and 20 ms apart by its clock, and passes on every
-    /// command it hears. With `hang_up` it closes its end after them.
+    /// A two-bus GVRET device built from the protocol crate's own device end. On
+    /// each connection it answers `keepalives` keepalives, sends a frame with its
+    /// bus count, then three frames 10 ms and 20 ms apart by its clock, and
+    /// passes on every command it hears. With `hang_up` it closes its end after
+    /// them.
     async fn fake_gvret(
         keepalives: usize,
         hang_up: bool,
@@ -404,42 +406,43 @@ mod tests {
         let port = listener.local_addr().expect("addr").port();
         let (heard, commands) = mpsc::unbounded_channel();
         tokio::spawn(async move {
-            let (mut sock, _) = listener.accept().await.expect("accept");
-            let mut decoder = gvret::Decoder::new();
-            let mut keepalives = keepalives;
-            let mut buf = [0u8; 1024];
-            loop {
-                let n = match sock.read(&mut buf).await {
-                    Ok(0) | Err(_) => return,
-                    Ok(n) => n,
-                };
-                for command in decoder.feed(&buf[..n]) {
-                    let reply = match command {
-                        ClientCommand::DevInfo => gvret::encode_dev_info(),
-                        ClientCommand::Keepalive if keepalives > 0 => {
-                            keepalives -= 1;
-                            gvret::encode_keepalive()
-                        }
-                        ClientCommand::NumBuses => {
-                            [wire_frame(0, 0x100, 0), gvret::encode_num_buses(2)].concat()
-                        }
-                        _ => Vec::new(),
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut decoder = gvret::Decoder::new();
+                let mut keepalives = keepalives;
+                let mut buf = [0u8; 1024];
+                loop {
+                    let n = match sock.read(&mut buf).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => n,
                     };
-                    let _ = sock.write_all(&reply).await;
-                    if command == ClientCommand::NumBuses {
-                        tokio::time::sleep(Duration::from_millis(200)).await;
-                        let burst = [
-                            wire_frame(1_000_000, 0x200, 0),
-                            wire_frame(1_010_000, 0x201, 1),
-                            wire_frame(1_030_000, 0x202, 0),
-                        ]
-                        .concat();
-                        let _ = sock.write_all(&burst).await;
-                        if hang_up {
-                            let _ = sock.shutdown().await;
+                    for command in decoder.feed(&buf[..n]) {
+                        let reply = match command {
+                            ClientCommand::DevInfo => gvret::encode_dev_info(),
+                            ClientCommand::Keepalive if keepalives > 0 => {
+                                keepalives -= 1;
+                                gvret::encode_keepalive()
+                            }
+                            ClientCommand::NumBuses => {
+                                [wire_frame(0, 0x100, 0), gvret::encode_num_buses(2)].concat()
+                            }
+                            _ => Vec::new(),
+                        };
+                        let _ = sock.write_all(&reply).await;
+                        if command == ClientCommand::NumBuses {
+                            tokio::time::sleep(Duration::from_millis(200)).await;
+                            let burst = [
+                                wire_frame(1_000_000, 0x200, 0),
+                                wire_frame(1_010_000, 0x201, 1),
+                                wire_frame(1_030_000, 0x202, 0),
+                            ]
+                            .concat();
+                            let _ = sock.write_all(&burst).await;
+                            if hang_up {
+                                let _ = sock.shutdown().await;
+                            }
                         }
+                        let _ = heard.send(command);
                     }
-                    let _ = heard.send(command);
                 }
             }
         });
@@ -601,7 +604,7 @@ mod tests {
             endpoint: format!("127.0.0.1:{port}"),
             connect_timeout: Duration::from_secs(2),
         };
-        let task = open_gvret(link, GvretOptions::default(), can_options(true))
+        let task = open_gvret(link, GvretOptions::default(), can_options(true, None))
             .await
             .expect("open");
         let stop = Arc::new(AtomicBool::new(false));
@@ -625,5 +628,78 @@ mod tests {
                 _ => {}
             }
         }
+    }
+
+    /// GVRET USB's outage handling, over the one link a test can unplug.
+    fn start_waiting_out(
+        port: u16,
+        reopen: Duration,
+    ) -> (Arc<AtomicBool>, mpsc::Receiver<SourceMessage>) {
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = mpsc::channel(64);
+        let flag = stop.clone();
+        tokio::spawn(async move {
+            let link = Link::Tcp {
+                endpoint: format!("127.0.0.1:{port}"),
+                connect_timeout: Duration::from_secs(2),
+            };
+            let options = can_options(false, Some(reopen));
+            let task = open_gvret(link, GvretOptions::default(), options)
+                .await
+                .expect("open");
+            let mut stream = Stream::new(3, "gvret_usb", DEVICE.into(), "here".into(), vec![]);
+            let mut outage = PortOutage::new(3, "here");
+            let on_event =
+                |event| outage.on_event(event, |_| unreachable!(), |e| stream.on_event(e));
+            serve(task, 3, false, &flag, &tx, on_event, |e| {
+                link_lost(3, DEVICE, e)
+            })
+            .await
+        });
+        (stop, rx)
+    }
+
+    #[tokio::test]
+    async fn each_outage_is_reported_once_and_a_reconnect_resolves_the_buses_again() {
+        let (port, _commands) = fake_gvret(usize::MAX, true).await;
+        let (stop, mut rx) = start_waiting_out(port, Duration::from_millis(20));
+        let mut seen = Vec::new();
+        while seen.iter().filter(|&&m| m == "interrupted").count() < 2 {
+            seen.push(match next(&mut rx, Duration::from_secs(3)).await {
+                SourceMessage::MappingsResolved(3, m) => {
+                    assert_eq!(m.len(), 2);
+                    "resolved"
+                }
+                SourceMessage::Connected(3, ..) => "connected",
+                SourceMessage::Interrupted(3, _) => "interrupted",
+                SourceMessage::Frames(3, _) | SourceMessage::TransmitReady(3, _) => continue,
+                _ => panic!("the source ended or erred"),
+            });
+        }
+        let interrupted = ["resolved", "connected", "interrupted"];
+        assert_eq!(seen, [interrupted, interrupted].concat());
+        stop.store(true, Ordering::SeqCst);
+    }
+
+    #[tokio::test]
+    async fn a_transmit_while_waiting_is_refused_and_a_stop_ends_the_wait() {
+        let (port, _commands) = fake_gvret(usize::MAX, true).await;
+        let (stop, mut rx) = start_waiting_out(port, Duration::from_secs(60));
+        let (transmit, _) = connect_and_read(&mut rx).await;
+        assert!(matches!(
+            next(&mut rx, Duration::from_secs(3)).await,
+            SourceMessage::Interrupted(3, _)
+        ));
+
+        let frame = CanFrame::data(0, 0x321, false, false, false, vec![1]);
+        assert_eq!(
+            answer(send(&transmit, frame)).await,
+            Err("Transmit refused: not connected".to_string())
+        );
+        stop.store(true, Ordering::SeqCst);
+        assert!(matches!(
+            next(&mut rx, Duration::from_secs(2)).await,
+            SourceMessage::Ended(3, EndReason::Stopped)
+        ));
     }
 }

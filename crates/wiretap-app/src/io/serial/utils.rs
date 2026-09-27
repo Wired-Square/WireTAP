@@ -5,13 +5,13 @@
 
 use serde::{Deserialize, Serialize};
 use serialport::{DataBits, Parity as SpParity, StopBits};
-use wiretap_io::serial::{LineSettings, Parity as LineParity};
+use wiretap_io::serial::{LineSettings, Parity as LineParity, SerialError};
 
 use super::framer::{FrameIdConfig, FramingEncoding};
 use crate::io::types::ModbusRtuOptions;
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
-use crate::io::error::DevicePresence;
+use crate::io::error::{DevicePresence, IoError};
 use crate::settings::IOProfile;
 
 // ============================================================================
@@ -27,6 +27,44 @@ pub(crate) fn probe_serial_presence(port_name: &str) -> DevicePresence {
         Ok(_) => DevicePresence::Absent,
         Err(_) => DevicePresence::Unknown,
     }
+}
+
+/// How a port was lost mid-session, whichever reader lost it.
+pub(crate) enum PortLoss {
+    Closed,
+    Read(std::io::Error),
+    Other(String),
+}
+
+impl From<SerialError> for PortLoss {
+    fn from(error: SerialError) -> Self {
+        match error {
+            SerialError::Closed => Self::Closed,
+            SerialError::Read(e) => Self::Read(e),
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+
+/// A zero-byte read is the device going away; any other read error is told
+/// apart as "in use" or "gone" by whether the port still enumerates.
+pub(crate) fn outage_message(
+    port: &str,
+    loss: PortLoss,
+    presence: impl FnOnce(&str) -> DevicePresence,
+) -> String {
+    let why = match loss {
+        PortLoss::Closed => "device disconnected".to_string(),
+        PortLoss::Read(e) => match IoError::from_device_error(port, &e, presence(port)) {
+            IoError::DeviceDisconnected { .. } => "device disconnected".to_string(),
+            IoError::DeviceBusy { .. } => {
+                "device unavailable, it may be in use by another application".to_string()
+            }
+            _ => format!("read failed: {e}"),
+        },
+        PortLoss::Other(why) => why,
+    };
+    format!("{port}: {why}, waiting for it to return")
 }
 
 // ============================================================================

@@ -18,7 +18,7 @@ use wiretap_io::serial::{
 };
 
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
-use crate::io::error::{DevicePresence, IoError};
+use crate::io::error::DevicePresence;
 use crate::io::types::{ByteEntry, EndReason, SetFramingRequest, SourceMessage, TransmitRequest};
 use crate::io::FrameMessage;
 
@@ -27,7 +27,7 @@ use super::framer::{
     extract_frame_id, residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
 };
 pub use super::utils::Parity;
-use super::utils::{framing_from_str, probe_serial_presence, SerialSourceConfig};
+use super::utils::{framing_from_str, outage_message, probe_serial_presence, SerialSourceConfig};
 
 /// How often the read loop looks at the stop flag and for a framing change.
 const POLL: Duration = Duration::from_millis(50);
@@ -176,7 +176,7 @@ impl LiveLine {
             SerialEvent::Disconnected { .. } if self.waiting_for_device => Vec::new(),
             SerialEvent::Disconnected { error, .. } => {
                 self.waiting_for_device = true;
-                let message = outage_message(&self.port, error, presence);
+                let message = outage_message(&self.port, error.into(), presence);
                 tlog!("[serial] Source {} {}", self.source_idx, message);
                 self.finish()
                     .into_iter()
@@ -294,27 +294,6 @@ impl LiveLine {
             req.encoding
         );
     }
-}
-
-/// A zero-byte read is the device going away; any other read error is told
-/// apart as "in use" or "gone" by whether the port still enumerates.
-fn outage_message(
-    port: &str,
-    error: SerialError,
-    presence: impl FnOnce(&str) -> DevicePresence,
-) -> String {
-    let why = match error {
-        SerialError::Closed => "device disconnected".to_string(),
-        SerialError::Read(e) => match IoError::from_device_error(port, &e, presence(port)) {
-            IoError::DeviceDisconnected { .. } => "device disconnected".to_string(),
-            IoError::DeviceBusy { .. } => {
-                "device unavailable, it may be in use by another application".to_string()
-            }
-            _ => SerialError::Read(e).to_string(),
-        },
-        other => other.to_string(),
-    };
-    format!("{port}: {why}, waiting for it to return")
 }
 
 fn transmit_result(written: Result<std::io::Result<()>, WriteRefused>) -> Result<(), String> {

@@ -16,16 +16,22 @@ use crate::io::bus_mapping::{apply_bus_mappings_batch, BusMapping};
 #[cfg(not(target_os = "ios"))]
 use crate::io::error::DevicePresence;
 use crate::io::error::IoError;
+#[cfg(not(target_os = "ios"))]
+use crate::io::serial::utils::{outage_message, PortLoss};
 use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
 use crate::io::{CanTransmitFrame, FrameMessage};
 
 const STOP_POLL: Duration = Duration::from_millis(50);
 
-/// The session, not the task, decides what a lost device means, so it never reopens.
-pub(crate) fn can_options(listen_only: bool) -> CanOptions {
+/// How often a serial-port adapter lost mid-session is looked for again.
+#[cfg(not(target_os = "ios"))]
+pub(crate) const PORT_REOPEN: Option<Duration> = Some(Duration::from_secs(1));
+
+/// With `reopen: None` the first loss ends the session.
+pub(crate) fn can_options(listen_only: bool, reopen: Option<Duration>) -> CanOptions {
     let mut options = CanOptions::default();
     options.listen_only = listen_only;
-    options.reopen = None;
+    options.reopen = reopen;
     options
 }
 
@@ -109,22 +115,63 @@ pub(crate) fn link_lost(source_idx: usize, device: &str, error: CanError) -> Sou
     }
 }
 
-/// On a serial port a read error is worded by whether the port is still there:
-/// in use by something else, or unplugged.
 #[cfg(not(target_os = "ios"))]
-pub(crate) fn port_lost(
+impl From<CanError> for PortLoss {
+    fn from(error: CanError) -> Self {
+        match error {
+            CanError::Closed => Self::Closed,
+            CanError::Read(e) => Self::Read(e),
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+
+/// A serial-port adapter the task reopens: the first loss of an outage
+/// interrupts the session, and the rest of it is waited out.
+#[cfg(not(target_os = "ios"))]
+pub(crate) struct PortOutage<'a> {
     source_idx: usize,
-    device: &str,
-    port: &str,
-    error: CanError,
-    presence: impl FnOnce(&str) -> DevicePresence,
-) -> SourceMessage {
-    match error {
-        CanError::Read(e) => SourceMessage::Error(
+    port: &'a str,
+    waiting: bool,
+}
+
+#[cfg(not(target_os = "ios"))]
+impl<'a> PortOutage<'a> {
+    pub(crate) fn new(source_idx: usize, port: &'a str) -> Self {
+        Self {
             source_idx,
-            IoError::device_stream_error_message(port, &e, presence(port)),
-        ),
-        other => link_lost(source_idx, device, other),
+            port,
+            waiting: false,
+        }
+    }
+
+    /// Losses are answered here; every other event goes to `driver`.
+    pub(crate) fn on_event(
+        &mut self,
+        event: CanEvent,
+        presence: impl FnOnce(&str) -> DevicePresence,
+        driver: impl FnOnce(CanEvent) -> Result<Vec<SourceMessage>, CanError>,
+    ) -> Result<Vec<SourceMessage>, CanError> {
+        match event {
+            CanEvent::Disconnected { .. } if self.waiting => Ok(Vec::new()),
+            CanEvent::Disconnected { error, .. } => {
+                self.waiting = true;
+                let message = outage_message(self.port, error.into(), presence);
+                tlog!("[can] Source {} {}", self.source_idx, message);
+                Ok(vec![SourceMessage::Interrupted(self.source_idx, message)])
+            }
+            CanEvent::Connected(_) => {
+                if std::mem::take(&mut self.waiting) {
+                    tlog!(
+                        "[can] Source {} reconnected to {}",
+                        self.source_idx,
+                        self.port
+                    );
+                }
+                driver(event)
+            }
+            CanEvent::Read(_) => driver(event),
+        }
     }
 }
 
@@ -196,6 +243,23 @@ fn forward_transmits(
             Err(_) => return,
         }
     });
+}
+
+#[cfg(all(test, not(target_os = "ios")))]
+pub(crate) fn lost(error: CanError) -> CanEvent {
+    CanEvent::Disconnected {
+        error,
+        consecutive: 1,
+        retry_in: PORT_REOPEN,
+    }
+}
+
+#[cfg(all(test, not(target_os = "ios")))]
+pub(crate) fn reopen_failed(port: &str) -> CanEvent {
+    lost(CanError::Open {
+        device: port.into(),
+        source: std::io::ErrorKind::NotFound.into(),
+    })
 }
 
 #[cfg(test)]
@@ -294,34 +358,46 @@ mod tests {
     }
 
     #[cfg(not(target_os = "ios"))]
-    fn port_read_failed(presence: DevicePresence) -> String {
-        let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-        match port_lost(3, DEVICE, PORT, CanError::Read(denied), |port| {
-            assert_eq!(port, PORT, "the port is what is probed");
-            presence
-        }) {
-            SourceMessage::Error(3, message) => message,
-            _ => panic!("expected an error"),
+    fn interruption(outage: &mut PortOutage, error: CanError, presence: DevicePresence) -> String {
+        let messages = outage.on_event(
+            lost(error),
+            |port| {
+                assert_eq!(port, PORT, "the port is what is probed");
+                presence
+            },
+            |_| panic!("a loss is the outage's"),
+        );
+        match messages.unwrap().as_slice() {
+            [SourceMessage::Interrupted(3, message)] => message.clone(),
+            _ => panic!("expected one interruption"),
         }
     }
 
     #[cfg(not(target_os = "ios"))]
     #[test]
-    fn a_port_read_error_says_whether_the_port_is_in_use_or_gone() {
-        assert!(port_read_failed(DevicePresence::Present).contains("in use"));
-        assert!(port_read_failed(DevicePresence::Absent).contains("unplugged"));
-    }
-
-    #[cfg(not(target_os = "ios"))]
-    #[test]
-    fn a_closed_port_is_a_disconnect_without_a_probe() {
-        let ended = port_lost(3, DEVICE, PORT, CanError::Closed, |_| {
-            panic!("a close needs no probe")
-        });
-        assert!(matches!(
-            ended,
-            SourceMessage::Ended(3, EndReason::Disconnected)
-        ));
+    fn a_lost_port_says_why_and_that_it_is_waited_for() {
+        let denied = || CanError::Read(std::io::ErrorKind::PermissionDenied.into());
+        let message =
+            |error, presence| interruption(&mut PortOutage::new(3, PORT), error, presence);
+        assert_eq!(
+            message(CanError::Closed, DevicePresence::Unknown),
+            format!("{PORT}: device disconnected, waiting for it to return")
+        );
+        assert_eq!(
+            message(denied(), DevicePresence::Absent),
+            format!("{PORT}: device disconnected, waiting for it to return")
+        );
+        assert_eq!(
+            message(denied(), DevicePresence::Present),
+            format!(
+                "{PORT}: device unavailable, it may be in use by another application, \
+                 waiting for it to return"
+            )
+        );
+        assert_eq!(
+            message(CanError::Unresponsive, DevicePresence::Present),
+            format!("{PORT}: device stopped answering, waiting for it to return")
+        );
     }
 
     #[test]
