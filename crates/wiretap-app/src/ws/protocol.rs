@@ -1,5 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
+
 pub const PROTOCOL_VERSION: u8 = 2;
 pub const HEADER_SIZE: usize = 4;
 
@@ -263,10 +265,10 @@ pub struct CanFrame {
 
 impl CanFrame {
     pub fn encode(&self) -> Vec<u8> {
-        let id_flags = (self.id & 0x1FFF_FFFF)
-            | if self.is_extended  { 1 << 29 } else { 0 }
+        let id_flags = (self.id & ID_ARB_MASK)
+            | if self.is_extended  { ID_EXTENDED } else { 0 }
             | if self.is_rtr       { 1 << 30 } else { 0 }
-            | if self.direction_tx { 1 << 31 } else { 0 };
+            | if self.direction_tx { ID_TX } else { 0 };
 
         let mut out = Vec::with_capacity(4 + self.payload.len());
         out.extend_from_slice(&id_flags.to_le_bytes());
@@ -306,10 +308,10 @@ pub struct CanFdFrame {
 
 impl CanFdFrame {
     pub fn encode(&self) -> Vec<u8> {
-        let id_flags = (self.id & 0x1FFF_FFFF)
-            | if self.is_extended  { 1 << 29 } else { 0 }
+        let id_flags = (self.id & ID_ARB_MASK)
+            | if self.is_extended  { ID_EXTENDED } else { 0 }
             | if self.brs          { 1 << 30 } else { 0 }
-            | if self.direction_tx { 1 << 31 } else { 0 };
+            | if self.direction_tx { ID_TX } else { 0 };
 
         let mut out = Vec::with_capacity(4 + self.payload.len());
         out.extend_from_slice(&id_flags.to_le_bytes());
@@ -650,9 +652,9 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         let direction_tx = frame.direction.as_deref() == Some("tx");
 
         // Same id_flags word for CAN 2.0 and CAN-FD (rtr/brs bit unset on the wire).
-        let id_flags = (frame.frame_id & 0x1FFF_FFFF)
-            | if frame.is_extended  { 1 << 29 } else { 0 }
-            | if direction_tx       { 1 << 31 } else { 0 };
+        let id_flags = (frame.frame_id & ID_ARB_MASK)
+            | if frame.is_extended  { ID_EXTENDED } else { 0 }
+            | if direction_tx       { ID_TX } else { 0 };
 
         // 4-byte LE prefix preceding the payload inside the envelope data:
         // CAN id_flags, Modbus register number or RTU unit/function word, none
