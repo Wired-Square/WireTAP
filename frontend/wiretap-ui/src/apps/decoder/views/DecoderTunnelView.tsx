@@ -42,6 +42,7 @@ import type { FrameIdFormat } from "../../../types/common";
 interface DecoderTunnelViewProps {
   transactions: TunnelTransaction[];
   displayFrameIdFormat: FrameIdFormat;
+  useLocalTimezone: boolean;
 }
 
 /** Register values as `0xNNNN`, each at the register it sits in. */
@@ -56,10 +57,12 @@ function registerList(t: TunnelTransaction): string {
 const TransactionRow = memo(function TransactionRow({
   t,
   displayFrameIdFormat,
+  useLocalTimezone,
   translate,
 }: {
   t: TunnelTransaction;
   displayFrameIdFormat: FrameIdFormat;
+  useLocalTimezone: boolean;
   translate: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const isRequest = t.direction === "request";
@@ -68,7 +71,7 @@ const TransactionRow = memo(function TransactionRow({
   return (
     <div className={`flex flex-col gap-1 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}>
       <div className="flex items-center gap-3 flex-wrap">
-        <span className={`${textMuted} text-xs`}>{formatHumanUs(t.timestampUs)}</span>
+        <span className={`${textMuted} text-xs`}>{formatHumanUs(t.timestampUs, useLocalTimezone)}</span>
         <span className={`${textDataPurple} font-semibold`}>
           {formatFrameId(t.frameId, displayFrameIdFormat, t.frameId > 0x7ff)}
         </span>
@@ -131,6 +134,7 @@ const TransactionRow = memo(function TransactionRow({
 export default function DecoderTunnelView({
   transactions,
   displayFrameIdFormat,
+  useLocalTimezone,
 }: DecoderTunnelViewProps) {
   const { t } = useTranslation("decoder");
 
@@ -154,6 +158,7 @@ export default function DecoderTunnelView({
             key={`${tx.timestampUs}-${tx.frameId}-${i}`}
             t={tx}
             displayFrameIdFormat={displayFrameIdFormat}
+            useLocalTimezone={useLocalTimezone}
             translate={t}
           />
         ))}

@@ -1146,6 +1146,7 @@ function DecoderInner() {
     >
         <DecoderFramesView
           frames={frameList}
+          useLocalTimezone={settings?.display_timezone === "local"}
           selectedIds={selectedFrames}
           decoded={decoded}
           decodedPerSource={decodedPerSource}

@@ -134,6 +134,7 @@ type Props = {
   hideUnseen?: boolean;
 
   /** Time format for displaying signal timestamps */
+  useLocalTimezone?: boolean;
   displayTimeFormat?: TimeFormat;
 
   /** Stream start time in epoch seconds for delta-start calculation */
@@ -974,6 +975,7 @@ export default function DecoderFramesView({
   onClearHeaderFieldFilter,
   seenHeaderFieldValues,
   hideUnseen = true,
+  useLocalTimezone = false,
   displayTimeFormat = "human",
   streamStartTimeSeconds,
   activeTab: activeTabProp = 'signals',
@@ -1755,6 +1757,7 @@ export default function DecoderFramesView({
           <DecoderTunnelView
             transactions={tunnelTransactions}
             displayFrameIdFormat={displayFrameIdFormat}
+            useLocalTimezone={useLocalTimezone}
           />
         ) : null}
     </AppTabView>

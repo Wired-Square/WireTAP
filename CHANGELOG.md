@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **The Decoder's Modbus tab shows times in your time zone.** It always showed UTC, whatever the display setting, so its times disagreed with Discovery's by your UTC offset.
 - **Catalogue coverage counts a mirrored frame's multiplexed signals once.** A frame mirroring a multiplexed frame counted the copied signals as its own, inflating coverage on catalogues such as the SBR blocks; the Decoder now badges them "Inherited".
 - **The catalogue list shows each catalogue's own name.** A catalogue whose first `name =` line was not the one under `[meta]`, or that had a comment on that line, was listed under the wrong name.
 - **CAN FD frames from a WireTAP Backend archive show their real length.** A 64-byte frame used to read as 15, its length code; captures already stored keep the old value.
