@@ -17,6 +17,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **One failed source no longer ends a multi-source session.** A source that reported an error and then stopped was counted out twice, so in a session combining two devices, one failing could end the session while the other was still streaming. Each source is now counted out once.
 - **A GVRET device that stops answering ends the session.** A device that went quiet without closing the connection, such as an ESP32-RET dropping off Wi-Fi, used to leave the session hanging with no error. WireTAP now checks the link four times a second, and once a device that has answered stops doing so for about 2.5 seconds, the session ends with "device stopped answering". A device that never answers the check keeps streaming as before.
 - **An unplugged GVRET USB or SLCAN adapter ends the session.** A port that closed under the session used to leave it running with nothing arriving; the session now ends as disconnected.
 - **SLCAN and SocketCAN send a remote request as one.** An RTR frame transmitted through either went out as a data frame, and SocketCAN also dropped a CAN FD frame's bit-rate switch; both now go out as asked. Transmit is also no longer offered on a serial port that could not be opened for writing, where sends used to queue and go nowhere.

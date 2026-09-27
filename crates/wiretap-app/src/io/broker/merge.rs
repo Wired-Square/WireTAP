@@ -154,8 +154,7 @@ pub(super) async fn run_merge_task(
         source_handles.push(handle);
     }
 
-    // Track which sources are still active
-    let mut active_sources = sources.len();
+    let mut live = LiveSources::new(source_profiles.keys().copied());
     // The last error a source reported, kept so the session can end as "error"
     // rather than "complete" when every source has failed.
     let mut last_source_error: Option<String> = None;
@@ -174,8 +173,7 @@ pub(super) async fn run_merge_task(
         if stop_flag.load(Ordering::SeqCst) {
             break;
         }
-        // All sources ended and no commands pending
-        if active_sources == 0 {
+        if live.is_empty() {
             break;
         }
 
@@ -214,7 +212,7 @@ pub(super) async fn run_merge_task(
                             last_source_error = Some(error.clone());
                             emit_session_error(&session_id, error);
                         }
-                        active_sources = active_sources.saturating_sub(1);
+                        live.end(source_idx);
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} error: {}", source_idx, error);
@@ -223,7 +221,7 @@ pub(super) async fn run_merge_task(
                         }
                         last_source_error = Some(error.clone());
                         emit_session_error(&session_id, error);
-                        active_sources = active_sources.saturating_sub(1);
+                        live.end(source_idx);
                     }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
                         tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
@@ -339,7 +337,7 @@ pub(super) async fn run_merge_task(
                             &virtual_cmd_txs,
                         );
                         source_handles.push(handle);
-                        active_sources += 1;
+                        live.add(idx);
                         tlog!("[IOBroker] Hot-added source {} (profile '{}')", idx, source_config.profile_id);
                     }
                     Some(MergeCommand::RemoveSource(profile_id)) => {
@@ -350,7 +348,7 @@ pub(super) async fn run_merge_task(
                             tlog!("[IOBroker] Hot-remove: profile '{}' not found in stop flags", profile_id);
                         }
                         forget_pause_flag(&source_pause_flags, &profile_id);
-                        // The source reader will send Ended, which decrements active_sources
+                        // The source reader will send Ended, which counts it out
                     }
                     Some(MergeCommand::PauseSource(profile_id)) => {
                         set_pause_flag(&source_pause_flags, &profile_id, true);
@@ -535,9 +533,49 @@ fn stream_ended_reason(stopped: bool, had_error: bool) -> &'static str {
     }
 }
 
+/// The sources still running. A source that reports an error and then ends is
+/// counted out once, so it cannot end the session while another source is live.
+struct LiveSources(std::collections::HashSet<usize>);
+
+impl LiveSources {
+    fn new(indices: impl IntoIterator<Item = usize>) -> Self {
+        Self(indices.into_iter().collect())
+    }
+
+    fn add(&mut self, index: usize) {
+        self.0.insert(index);
+    }
+
+    fn end(&mut self, index: usize) {
+        self.0.remove(&index);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::stream_ended_reason;
+    use super::{stream_ended_reason, LiveSources};
+
+    #[test]
+    fn a_source_that_errors_and_then_ends_is_counted_out_once() {
+        let mut live = LiveSources::new([0, 1]);
+        live.end(0);
+        live.end(0);
+        assert!(!live.is_empty());
+        live.end(1);
+        assert!(live.is_empty());
+    }
+
+    #[test]
+    fn a_hot_added_source_keeps_the_session_open() {
+        let mut live = LiveSources::new([0]);
+        live.add(1);
+        live.end(0);
+        assert!(!live.is_empty());
+    }
 
     #[test]
     fn a_deliberate_stop_outranks_a_source_error() {
