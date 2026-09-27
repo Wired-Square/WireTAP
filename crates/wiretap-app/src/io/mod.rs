@@ -1364,7 +1364,7 @@ static STARTUP_ERRORS: Lazy<RwLock<HashMap<String, String>>> = Lazy::new(|| RwLo
 /// Store a startup error for a session (called when error occurs with no listeners)
 pub fn store_startup_error(session_id: &str, error: String) {
     if let Ok(mut errors) = STARTUP_ERRORS.write() {
-        tlog!("[reader] Storing startup error for session '{}': {}", session_id, error);
+        tlog!("[reader] Storing session error for session '{}': {}", session_id, error);
         errors.insert(session_id.to_string(), error);
     }
 }
