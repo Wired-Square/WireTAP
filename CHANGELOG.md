@@ -13,6 +13,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **A register scan treats a gateway's "no response from the device" as silence.** When a Modbus gateway answers exception 0x0A or 0x0B for a block, the scan no longer splits it and asks again register by register; it counts towards the silence limit, and the scan's note says the gateway could not reach the device, so check the unit id and the device's wiring. The pause between requests now also applies between the reads that split a refused block.
 - **A Modbus register the device rejects is read less often, not given up on.** A poll group whose reads come back as a Modbus exception keeps polling, backing off to once every 10 minutes, and goes back to its normal interval as soon as a read succeeds. *Max Consecutive Register Errors* now counts connection errors only, so a catalogue with registers your device does not implement no longer stops those groups for good.
 - **A Modbus TCP session rides out a device that drops off.** It now reconnects on its own, waiting 1 second between attempts and doubling up to 30 seconds, and reads every register again as soon as the device is back. *Max Consecutive Register Errors* now also limits the reconnect attempts: the session stops after that many fail in a row, and 0 keeps trying for good.
 - **MCP Modbus writes go over the session's own connection.** While a Modbus TCP session is polling, a write from an MCP client is sent between the session's reads on its connection, so a device that accepts only one client no longer sees a second one. A write that was never sent, because the device is disconnected or too many writes are waiting, comes back as `sent: false` with the reason; one the device rejected names the Modbus exception and its code.
@@ -28,6 +29,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **An MCP register scan over all 65,536 addresses finishes.** Raising `max_registers` to cover the whole address space made the scan run out of memory.
 - **A vendor Modbus message is framed whole.** A message whose code the Modbus spec does not define, such as Sungrow's `0x60`, was sometimes framed a byte short when its shorter form also passed the CRC. Declare the code's length in the catalogue and it is framed at that length.
 - **The Decoder's Modbus tab shows times in your time zone.** It always showed UTC, whatever the display setting, so its times disagreed with Discovery's by your UTC offset.
 - **Catalogue coverage counts a mirrored frame's multiplexed signals once.** A frame mirroring a multiplexed frame counted the copied signals as its own, inflating coverage on catalogues such as the SBR blocks; the Decoder now badges them "Inherited".

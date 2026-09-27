@@ -23,7 +23,10 @@ use tokio::time::{sleep, Duration};
 
 use super::poll::{modbus_frame, per_register_frames, register_type_name, FrameSink, ReadData};
 use super::reader::RegisterType;
-use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes};
+use wiretap_catalog::modbus::{
+    coils_to_bytes, registers_to_bytes, AddressBlock, ExceptionCode, RangeError, ReadOutcome, RegisterSweep,
+    SweepEnd, SweepLimits, SweepProgress, SweepStep,
+};
 use wiretap_io::modbus::{DeviceIdCode, ModbusTcp, ReadRequest, Reading, RequestError, TcpOptions};
 use crate::io::SignalThrottle;
 
@@ -478,58 +481,32 @@ impl ProgressReporter {
 // Register Scanner
 // ============================================================================
 
-/// Turn a sorted list of addresses into contiguous runs.
-fn to_blocks(mut addrs: Vec<u16>) -> Vec<RegisterBlock> {
-    addrs.sort_unstable();
-    addrs.dedup();
-    let mut blocks: Vec<RegisterBlock> = Vec::new();
-    for a in addrs {
-        match blocks.last_mut() {
-            Some(b) if a == b.end + 1 => {
-                b.end = a;
-                b.count += 1;
-            }
-            _ => blocks.push(RegisterBlock {
-                start: a,
-                end: a,
-                count: 1,
-            }),
-        }
-    }
+fn register_blocks(blocks: Vec<AddressBlock>) -> Vec<RegisterBlock> {
     blocks
+        .into_iter()
+        .map(|b| RegisterBlock {
+            start: b.start,
+            end: b.end,
+            count: b.len(),
+        })
+        .collect()
 }
 
-/// The complement of `blocks` within `start..=end`, as contiguous runs.
-///
-/// Derived from the blocks rather than by walking the address space, so a wide
-/// sweep costs one pass over a handful of runs instead of 65k set lookups.
-fn gaps_between(blocks: &[RegisterBlock], start: u16, end: u16) -> Vec<RegisterBlock> {
-    let mut gaps = Vec::new();
-    let mut push = |from: u16, to: u16| {
-        if from <= to {
-            gaps.push(RegisterBlock {
-                start: from,
-                end: to,
-                count: (to as u32) - (from as u32) + 1,
-            });
-        }
-    };
-    let mut cursor = start;
-    for b in blocks {
-        // `checked_sub`, not `saturating_sub`: a block starting at address 0 has
-        // nothing before it, and saturating would report a phantom gap at 0.
-        if let Some(before) = b.start.checked_sub(1) {
-            push(cursor, before);
-        }
-        // `end + 1` can overflow at the top of the address space; there is no
-        // gap beyond the last block in that case anyway.
-        match b.end.checked_add(1) {
-            Some(next) => cursor = next,
-            None => return gaps,
-        }
+/// The planner counts a gateway's 0x0A/0x0B as silence, so a silence stop can
+/// end on either kind.
+enum LastFailure {
+    Transport(String),
+    Exception(ExceptionCode),
+}
+
+fn scan_progress(p: SweepProgress) -> ScanProgressPayload {
+    ScanProgressPayload {
+        current: p.swept,
+        total: p.total,
+        found_count: p.found,
+        pass: p.pass,
+        total_passes: p.passes,
     }
-    push(cursor, end);
-    gaps
 }
 
 /// Scan a range of Modbus registers.
@@ -540,8 +517,8 @@ fn gaps_between(blocks: &[RegisterBlock], start: u16, end: u16) -> Vec<RegisterB
 /// 3. **Exception** → subdivide and retry each half; a single register that
 ///    excepts does not exist. The reply told us the address was the problem,
 ///    so bisecting it is worth the requests.
-/// 4. **Silence** → mark the whole chunk absent and move on. Do *not* subdivide:
-///    a timeout says nothing about which address was at fault, and a device that
+/// 4. **Silence**, or a gateway's 0x0A/0x0B → mark the whole chunk absent and
+///    move on. Do *not* subdivide: a timeout says nothing about which address was at fault, and a device that
 ///    silently ignores a function code would turn one sweep into thousands of
 ///    full-timeout requests. Instead, give up on this register type after
 ///    `max_consecutive_timeouts` and record why.
@@ -555,30 +532,36 @@ pub async fn scan_registers(
     let mut reporter = ProgressReporter::new(session_id);
     let mut frame_throttle = SignalThrottle::new();
 
-    if config.start_register > config.end_register {
-        return Err("Start register must be <= end register".to_string());
-    }
-    if config.chunk_size == 0 {
-        return Err("Chunk size must be > 0".to_string());
-    }
-    // Clamp rather than reject: a caller asking for more than one request can
-    // carry gets the scan it wanted, in requests the device will answer. Only
-    // the frontend clamped before, so an MCP caller could ask for 500 holding
-    // registers in one read and get a truncated block or an exception back.
+    let mut sweep = RegisterSweep::new(
+        config.register_type.catalog(),
+        config.start_register,
+        config.end_register,
+        config.chunk_size,
+        SweepLimits {
+            max_registers: config.max_registers,
+            max_requests: config.max_requests,
+            max_consecutive_silent: config.max_consecutive_timeouts,
+            passes: config.repeat,
+        },
+    )
+    .map_err(|e| match e {
+        RangeError::Inverted { .. } => "Start register must be <= end register".to_string(),
+        RangeError::ZeroBlockSize => "Chunk size must be > 0".to_string(),
+        RangeError::TooManyRegisters { total, limit } => format!(
+            "Range covers {} registers, over the {} limit — narrow the range or raise max_registers",
+            total, limit
+        ),
+        other => other.to_string(),
+    })?;
     let chunk_size = config
         .chunk_size
         .min(config.register_type.catalog().max_per_read());
-
-    let total_registers = (config.end_register as u32) - (config.start_register as u32) + 1;
-    if total_registers > config.max_registers {
-        return Err(format!(
-            "Range covers {} registers, over the {} limit — narrow the range or raise max_registers",
-            total_registers, config.max_registers
-        ));
-    }
-
+    let SweepProgress {
+        total: total_registers,
+        passes,
+        ..
+    } = sweep.progress();
     let type_name = register_type_name(&config.register_type);
-    let passes = config.repeat.max(1);
 
     tlog!(
         "[ModbusScan] Register scan: {} {}-{} ({} regs, chunk={}, delay={}ms, timeout={}ms, \
@@ -611,128 +594,97 @@ pub async fn scan_registers(
         config.unit_id
     );
 
-    let mut found_addrs: Vec<u16> = Vec::with_capacity(total_registers as usize);
-    let mut found_count: u32 = 0;
-    let mut requests: u32 = 0;
-    let mut truncated = false;
-
-    'passes: for pass in 1..=passes {
-        if pass > 1 {
-            if config.repeat_delay_ms > 0 {
-                sleep(Duration::from_millis(config.repeat_delay_ms)).await;
-            }
-            if cancel_flag.load(Ordering::Relaxed) {
-                truncated = true;
-                break;
-            }
-            tlog!("[ModbusScan] Pass {}/{}", pass, passes);
-        }
-
-        let mut scanned_count: u32 = 0;
-        let mut consecutive_timeouts: u32 = 0;
-
-        // Chunk the range, then treat it as a stack so a subdivided chunk's halves
-        // are processed before moving on — hence the reverse, which is the only
-        // thing separating this from the identical walk in `ranges.rs`.
-        let mut work_queue: Vec<(u16, u16)> = Vec::new();
-        let mut pos = config.start_register;
-        loop {
-            let count = (config.end_register - pos + 1).min(chunk_size);
-            work_queue.push((pos, count));
-            match pos.checked_add(count) {
-                Some(next) if next <= config.end_register => pos = next,
-                _ => break,
-            }
-        }
-        work_queue.reverse();
-
-        while let Some((start, count)) = work_queue.pop() {
-            if cancel_flag.load(Ordering::Relaxed) {
-                tlog!("[ModbusScan] Cancelled by user");
-                truncated = true;
-                break 'passes;
-            }
-            if requests >= config.max_requests {
-                reporter.note(format!(
-                    "{}: stopped at the {}-request budget with {} of {} registers swept",
-                    type_name, config.max_requests, scanned_count, total_registers
-                ));
-                truncated = true;
-                break 'passes;
-            }
-
-            let outcome = conn
-                .read(read_request(&config.register_type, start, count, config.unit_id))
-                .await;
-            requests += 1;
-
-            if !matches!(outcome, Err(RequestError::Transport(_))) {
-                consecutive_timeouts = 0;
-            }
-
-            match outcome {
-                Ok(reading) => {
-                    let frames = per_register_frames(start, config.unit_id, reading.data);
-                    if pass == 1 {
-                        found_addrs.extend(frames.iter().map(|f| f.frame_id as u16));
-                    }
-                    found_count += frames.len() as u32;
-                    sink.frames(frames, &mut frame_throttle).await;
+    let mut last_failure = None;
+    let end = loop {
+        match sweep.next_step() {
+            SweepStep::Read(span) => {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    tlog!("[ModbusScan] Cancelled by user");
+                    break None;
                 }
-                Err(RequestError::Exception { .. }) => {
-                    // The device answered, so the address is the problem —
-                    // bisect to find exactly which ones are illegal.
-                    if count > 1 {
-                        let half = count / 2;
-                        work_queue.push((start + half, count - half));
-                        work_queue.push((start, half));
-                        continue;
+                let outcome = match conn
+                    .read(read_request(&config.register_type, span.start, span.count, config.unit_id))
+                    .await
+                {
+                    Ok(reading) => {
+                        let frames = per_register_frames(span.start, config.unit_id, reading.data);
+                        let values = frames.len() as u16;
+                        sink.frames(frames, &mut frame_throttle).await;
+                        ReadOutcome::Answered { values }
                     }
-                    // A single register that excepts simply doesn't exist.
-                }
-                Err(RequestError::Transport(reason)) => {
-                    consecutive_timeouts += 1;
-                    tlog!(
-                        "[ModbusScan] {} {}..{} silent: {} ({}/{})",
-                        type_name,
-                        start,
-                        start + count - 1,
-                        reason,
-                        consecutive_timeouts,
-                        config.max_consecutive_timeouts
-                    );
-                    if config.max_consecutive_timeouts > 0
-                        && consecutive_timeouts >= config.max_consecutive_timeouts
-                    {
-                        reporter.note(format!(
-                            "{}: no response after {} consecutive timeouts ({}) — the device likely \
-                             does not implement this function code",
-                            type_name, consecutive_timeouts, reason
-                        ));
-                        truncated = true;
-                        break 'passes;
+                    Err(RequestError::Exception { code, .. }) => {
+                        last_failure = Some(LastFailure::Exception(code));
+                        ReadOutcome::Refused { code }
                     }
+                    Err(RequestError::Transport(reason)) => {
+                        tlog!(
+                            "[ModbusScan] {} {}..{} silent: {}",
+                            type_name,
+                            span.start,
+                            span.start + span.count - 1,
+                            reason
+                        );
+                        last_failure = Some(LastFailure::Transport(reason.to_string()));
+                        ReadOutcome::Silent
+                    }
+                };
+                sweep.report(outcome);
+                reporter.update(scan_progress(sweep.progress()));
+                if config.inter_request_delay_ms > 0 {
+                    sleep(Duration::from_millis(config.inter_request_delay_ms)).await;
                 }
             }
-
-            scanned_count += count as u32;
-            reporter.update(ScanProgressPayload {
-                current: scanned_count,
-                total: total_registers,
-                found_count,
-                pass,
-                total_passes: passes,
-            });
-
-            if config.inter_request_delay_ms > 0 {
-                sleep(Duration::from_millis(config.inter_request_delay_ms)).await;
+            SweepStep::Pass(pass) => {
+                if config.repeat_delay_ms > 0 {
+                    sleep(Duration::from_millis(config.repeat_delay_ms)).await;
+                }
+                if cancel_flag.load(Ordering::Relaxed) {
+                    break None;
+                }
+                tlog!("[ModbusScan] Pass {}/{}", pass, passes);
             }
+            SweepStep::Done(end) => break Some(end),
         }
+    };
+
+    match end {
+        Some(SweepEnd::OutOfRequests { swept, total }) => reporter.note(format!(
+            "{}: stopped at the {}-request budget with {} of {} registers swept",
+            type_name, config.max_requests, swept, total
+        )),
+        Some(SweepEnd::Silent { consecutive }) => reporter.note(match &last_failure {
+            Some(LastFailure::Exception(code)) => format!(
+                "{}: the gateway reported no response from the device {} times in a row \
+                 (exception 0x{:02X}, {}) — check the unit id and that the device is powered \
+                 and wired",
+                type_name,
+                consecutive,
+                code.code(),
+                code
+            ),
+            transport => format!(
+                "{}: no response after {} consecutive timeouts ({}) — the device likely \
+                 does not implement this function code",
+                type_name,
+                consecutive,
+                match transport {
+                    Some(LastFailure::Transport(reason)) => reason.as_str(),
+                    _ => "no reply",
+                }
+            ),
+        }),
+        _ => {}
     }
+    let truncated = !matches!(end, Some(SweepEnd::Complete));
+    let SweepProgress {
+        found: found_count,
+        requests,
+        ..
+    } = sweep.progress();
+    let blocks = register_blocks(sweep.blocks());
+    let gaps = register_blocks(sweep.gaps());
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
-    let blocks = to_blocks(found_addrs);
-    let gaps = gaps_between(&blocks, config.start_register, config.end_register);
 
     tlog!(
         "[ModbusScan] Register scan complete: {} of {} {} registers in {} block(s), {} requests, {}ms",
@@ -1116,75 +1068,6 @@ mod tests {
         assert_eq!(cfg.unit_id, 7);
     }
 
-    #[test]
-    fn contiguous_addresses_collapse_into_one_block() {
-        let blocks = to_blocks(vec![0, 1, 2, 3]);
-        assert_eq!(blocks.len(), 1);
-        assert_eq!((blocks[0].start, blocks[0].end, blocks[0].count), (0, 3, 4));
-    }
-
-    #[test]
-    fn a_hole_splits_the_run() {
-        let blocks = to_blocks(vec![0, 1, 5, 6, 7]);
-        assert_eq!(
-            blocks.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
-            vec![(0, 1), (5, 7)]
-        );
-    }
-
-    #[test]
-    fn a_wide_sparse_sweep_still_summarises_small() {
-        // 0..24 and 40..62 present, as the Megatec's telemetry block looked.
-        let addrs: Vec<u16> = (0..=24).chain(40..=62).collect();
-        assert_eq!(to_blocks(addrs).len(), 2);
-    }
-
-    #[test]
-    fn gaps_are_the_inverse_of_the_found_set() {
-        let gaps = gaps_between(&to_blocks(vec![0, 1, 2, 6, 7]), 0, 7);
-        assert_eq!(
-            gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
-            vec![(3, 5)]
-        );
-    }
-
-    #[test]
-    fn nothing_found_is_one_gap_spanning_the_range() {
-        let gaps = gaps_between(&[], 10, 19);
-        assert_eq!(gaps.len(), 1);
-        assert_eq!((gaps[0].start, gaps[0].end, gaps[0].count), (10, 19, 10));
-    }
-
-    #[test]
-    fn gaps_at_both_ends_are_reported() {
-        let gaps = gaps_between(&to_blocks(vec![4, 5]), 0, 9);
-        assert_eq!(
-            gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
-            vec![(0, 3), (6, 9)]
-        );
-    }
-
-    #[test]
-    fn a_fully_covered_range_has_no_gaps() {
-        assert!(gaps_between(&to_blocks(vec![0, 1, 2]), 0, 2).is_empty());
-    }
-
-    #[test]
-    fn a_block_ending_at_the_top_of_the_address_space_terminates() {
-        let gaps = gaps_between(&to_blocks(vec![65534, 65535]), 65530, 65535);
-        assert_eq!(
-            gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
-            vec![(65530, 65533)]
-        );
-    }
-
-    #[test]
-    fn duplicate_addresses_from_repeat_passes_do_not_inflate_blocks() {
-        let blocks = to_blocks(vec![5, 5, 6, 6, 7]);
-        assert_eq!(blocks.len(), 1);
-        assert_eq!(blocks[0].count, 3);
-    }
-
     fn payload() -> ScanCompletePayload {
         ScanCompletePayload {
             found_count: 1,
@@ -1303,6 +1186,41 @@ mod tests {
             result.gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
             [(3, 3)]
         );
+    }
+
+    #[tokio::test]
+    async fn a_gateway_target_failure_is_silence_not_bisected() {
+        let device = device(|request| match request.start()..request.start() + request.count() {
+            range if range.contains(&3) => Reply::Exception(0x0B),
+            _ => fake_device::registers(request),
+        })
+        .await;
+        let result = sweep(register_sweep(device.port, 0, 15)).await;
+        assert_eq!(result.requests, 2);
+        assert!(!result.truncated);
+        assert_eq!(
+            result.blocks.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
+            [(8, 15)]
+        );
+        assert_eq!(
+            result.gaps.iter().map(|b| (b.start, b.end)).collect::<Vec<_>>(),
+            [(0, 7)]
+        );
+    }
+
+    #[tokio::test]
+    async fn gateway_target_failures_stop_the_sweep_and_say_so() {
+        let device = device(|_| Reply::Exception(0x0B)).await;
+        let result = sweep(register_sweep(device.port, 0, 99)).await;
+        assert!(result.truncated);
+        assert_eq!(result.requests, 2);
+        let note = &result.notes[0];
+        assert!(
+            note.contains("the gateway reported no response from the device 2 times in a row")
+                && note.contains("exception 0x0B"),
+            "{note}"
+        );
+        assert!(!note.contains("timeouts"), "{note}");
     }
 
     /// Unit 1 identifies itself; unit 2 refuses FC43 and answers a register read.
