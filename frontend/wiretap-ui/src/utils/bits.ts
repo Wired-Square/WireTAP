@@ -21,7 +21,7 @@ export function extractBits(
     return extractBitsBigInt(bytes, startBit, bitLength, endianness, signed);
   }
 
-  // Standard 32-bit path using regular numbers
+  // Arithmetic, not bitwise: a JS shift is int32, so bit 31 would turn the value negative.
   const bits: number[] = [];
   if (endianness === "little") {
     for (let i = 0; i < bytes.length; i++) {
@@ -42,18 +42,15 @@ export function extractBits(
   let value = 0;
   if (endianness === "little") {
     for (let i = slice.length - 1; i >= 0; i--) {
-      value = (value << 1) | slice[i];
+      value = value * 2 + slice[i];
     }
   } else {
     for (let i = 0; i < slice.length; i++) {
-      value = (value << 1) | slice[i];
+      value = value * 2 + slice[i];
     }
   }
-  if (signed && bitLength > 0) {
-    const signBit = 1 << (bitLength - 1);
-    if (value & signBit) {
-      value = value - (1 << bitLength);
-    }
+  if (signed && value >= 2 ** (bitLength - 1)) {
+    value -= 2 ** bitLength;
   }
   return value;
 }
