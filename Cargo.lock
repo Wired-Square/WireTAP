@@ -8558,7 +8558,6 @@ dependencies = [
  "serde_json",
  "serialport",
  "sha1",
- "socketcan",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",
@@ -8643,8 +8642,10 @@ name = "wiretap-io"
 version = "0.16.16"
 source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.16.16#0c2315a1c3739d6358f342639998a250fcd67edf"
 dependencies = [
+ "libc",
  "nix 0.29.0",
  "serialport",
+ "socketcan",
  "thiserror 2.0.18",
  "tokio",
  "tokio-modbus",

@@ -35,6 +35,7 @@ pub mod serial; // pub for Tauri command access (list_serial_ports)
 #[cfg(not(target_os = "ios"))]
 pub mod slcan; // pub for slcan transmit_frame access
 pub mod framelink;
+#[cfg(target_os = "linux")]
 mod socketcan;
 
 // Re-export recorded sources

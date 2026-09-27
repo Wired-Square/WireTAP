@@ -21,8 +21,6 @@ use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
 use super::can_task::can_frame;
 use super::gvret::validate_gvret_frame;
-#[cfg(target_os = "linux")]
-use super::socketcan::encode_frame as encode_socketcan_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
 use super::types::{SetFramingRequest, SourceMessage, TransmitRequest};
@@ -542,7 +540,10 @@ impl IOBroker {
                 Vec::new()
             }
             #[cfg(target_os = "linux")]
-            "socketcan" => encode_socketcan_frame(&routed_frame),
+            "socketcan" => {
+                frame = Some(can_frame(&routed_frame));
+                Vec::new()
+            }
             "framelink" => encode_framelink_can_tx(&routed_frame),
             "virtual" => {
                 // Simple binary loopback encoding: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data

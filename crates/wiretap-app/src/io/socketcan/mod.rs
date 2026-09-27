@@ -5,19 +5,7 @@
 //
 // Requires the interface to be configured first:
 //   sudo ip link set can0 up type can bitrate 500000
-//
-// This module is only fully functional on Linux.
-
-// Allow dead code on non-Linux platforms where this module is not functional
-#![allow(dead_code)]
 
 mod reader;
 
-// Re-export reader types (platform-specific)
-#[cfg(target_os = "linux")]
-#[allow(unused_imports)]
-pub use reader::{encode_frame, run_source, SocketCanConfig, SocketCanSource};
-
-#[cfg(not(target_os = "linux"))]
-#[allow(unused_imports)]
-pub use reader::{encode_frame, run_source, SocketCanConfig};
+pub use reader::run_source;
