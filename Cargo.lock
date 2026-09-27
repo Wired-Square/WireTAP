@@ -8635,6 +8635,7 @@ dependencies = [
  "nusb 0.2.3",
  "tokio",
  "wiretap",
+ "wiretap-io",
 ]
 
 [[package]]

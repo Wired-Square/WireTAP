@@ -1,133 +1,26 @@
 // crates/wiretap-app/src/io/gs_usb/nusb_driver.rs
 //
-// gs_usb reader implementation using nusb crate (Windows and macOS).
-//
-// On Windows and macOS, there's no kernel driver for gs_usb devices, so we access
-// the USB device directly using nusb for control and bulk transfers.
+// gs_usb on Windows and macOS: the passive probe and device list here, and the
+// session's reader on wiretap-io's CAN task.
 
-use async_trait::async_trait;
-use nusb::transfer::{ControlIn, ControlOut, ControlType, Recipient};
+use nusb::transfer::{ControlIn, ControlType, Recipient};
 use nusb::{Interface, MaybeFuture};
-use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc as std_mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 
-/// Timeout for USB bulk-in transfer reads.
-const BULK_TRANSFER_TIMEOUT: Duration = Duration::from_millis(50);
-use tauri::AppHandle;
-
-use super::{
-    bittiming_for_bitrate, calculate_bittiming, can_feature, can_mode, encode_host_frame,
-    Bittiming, BittimingConstraints, Breq, BtConst, BtConstExtended, DeviceConfig, GsUsbConfig,
-    GsUsbDeviceInfo, GsUsbProbeResult, HostFrame, Mode, ECHO_ID_RX, HOST_FORMAT,
-    PERMISSIVE_CONSTRAINTS, PIDS, VID,
-};
-use wiretap_protocol::gs_usb::{CLASSIC_FRAME_BYTES, FD_FRAME_BYTES};
 use tokio::sync::mpsc;
+use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
+use wiretap_io::can::{CanError, CanEvent, CanOptions};
 
-use crate::capture_store::{self, CaptureKind};
+use super::{can_feature, Breq, DeviceConfig, GsUsbDeviceInfo, GsUsbProbeResult, PIDS, VID};
+use crate::io::bus_mapping::BusMapping;
+use crate::io::can_task::{can_options, link_lost, mapped_frames, open_failed, serve};
 use crate::io::error::IoError;
-use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
-use crate::io::lifecycle::SourceLifecycle;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest, TransmitSender};
-use crate::io::{
-    emit_session_error, emit_stream_ended, now_us, signal_frames_ready, CanTransmitFrame,
-    FrameMessage, IOCapabilities, IOSource, IOState, SignalThrottle, TransmitPayload,
-    TransmitResult,
-};
-
-/// Bit timing for one phase: what the device says it accepts, falling back to
-/// what a CAN controller can do at all.
-///
-/// Firmware that under-reports its own limits is common enough that refusing on
-/// its word alone loses working devices.
-fn bittiming(
-    fclk: u32,
-    bitrate: u32,
-    sample_point: f32,
-    limits: Option<&BittimingConstraints>,
-) -> Option<Bittiming> {
-    limits
-        .and_then(|c| calculate_bittiming(fclk, bitrate, sample_point, c))
-        .or_else(|| calculate_bittiming(fclk, bitrate, sample_point, &PERMISSIVE_CONSTRAINTS))
-}
-
-/// Encode a CAN frame as the gs_usb host frame that transmits it — 20 bytes
-/// for classic CAN, 76 for CAN FD.
-pub fn encode_frame(frame: &CanTransmitFrame, channel: u8) -> Vec<u8> {
-    encode_host_frame(&HostFrame::transmit(
-        frame.frame_id,
-        frame.is_extended,
-        frame.is_rtr && !frame.is_fd,
-        frame.is_fd,
-        frame.is_brs,
-        channel,
-        frame.data.clone(),
-    ))
-}
+use crate::io::types::SourceMessage;
 
 /// Timeout for USB control transfers
 const CONTROL_TIMEOUT: Duration = Duration::from_millis(1000);
-
-/// Default bulk IN max packet size (full-speed USB) used when descriptor
-/// lookup fails.
-const DEFAULT_MAX_PACKET_SIZE: usize = 32;
-
-/// Discovered bulk endpoint addresses and max packet size.
-struct BulkEndpoints {
-    in_addr: u8,
-    out_addr: u8,
-    max_packet_size: usize,
-}
-
-/// Discover bulk IN and OUT endpoint addresses and max packet size from USB
-/// descriptors. Falls back to standard gs_usb addresses (0x81/0x02) and
-/// DEFAULT_MAX_PACKET_SIZE if the descriptor tree can't be read.
-fn discover_bulk_endpoints(device: &nusb::Device) -> BulkEndpoints {
-    use nusb::descriptors::TransferType;
-    use nusb::transfer::Direction;
-
-    let config = match device.active_configuration() {
-        Ok(c) => c,
-        Err(_) => {
-            return BulkEndpoints {
-                in_addr: 0x81,
-                out_addr: 0x02,
-                max_packet_size: DEFAULT_MAX_PACKET_SIZE,
-            };
-        }
-    };
-
-    let mut in_addr: Option<u8> = None;
-    let mut out_addr: Option<u8> = None;
-    let mut max_pkt = DEFAULT_MAX_PACKET_SIZE;
-
-    for iface_group in config.interfaces() {
-        for alt in iface_group.alt_settings() {
-            for ep in alt.endpoints() {
-                if ep.transfer_type() == TransferType::Bulk {
-                    match ep.direction() {
-                        Direction::In => {
-                            in_addr = Some(ep.address());
-                            max_pkt = ep.max_packet_size();
-                        }
-                        Direction::Out => {
-                            out_addr = Some(ep.address());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    BulkEndpoints {
-        in_addr: in_addr.unwrap_or(0x81),
-        out_addr: out_addr.unwrap_or(0x02),
-        max_packet_size: max_pkt,
-    }
-}
 
 // ============================================================================
 // Device Matching
@@ -161,29 +54,18 @@ pub fn device_matches(dev: &nusb::DeviceInfo, serial: Option<&str>, bus: u8, add
 
 /// List all gs_usb devices on the system
 pub fn list_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
-    // nusb 0.2 list_devices() returns MaybeFuture - use .wait() for sync blocking
-    let devices: Vec<GsUsbDeviceInfo> = nusb::list_devices()
-        .wait()
-        .map_err(|e| format!("Failed to list USB devices: {}", e))?
-        .filter(|dev| {
-            dev.vendor_id() == VID && PIDS.contains(&dev.product_id())
+    let devices = gsusb::devices().map_err(|e| format!("Failed to list USB devices: {}", e))?;
+    Ok(devices
+        .into_iter()
+        .map(|dev| GsUsbDeviceInfo {
+            bus: dev.bus,
+            address: dev.address,
+            product: dev.product,
+            serial: dev.serial,
+            interface_name: None,
+            interface_up: None,
         })
-        .map(|dev| {
-            // bus_id() returns &str, but for our purposes we use device_address as primary identifier
-            // Parse bus_id as u8 if possible (works on Linux), otherwise use 0
-            let bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-            GsUsbDeviceInfo {
-                bus,
-                address: dev.device_address(),
-                product: dev.product_string().unwrap_or_default().to_string(),
-                serial: dev.serial_number().map(|s| s.to_string()),
-                interface_name: None, // Windows/macOS don't have SocketCAN
-                interface_up: None,
-            }
-        })
-        .collect();
-
-    Ok(devices)
+        .collect())
 }
 
 /// Probe a specific gs_usb device to get its capabilities
@@ -284,776 +166,62 @@ fn get_device_config_sync(interface: &Interface) -> Result<DeviceConfig, String>
 }
 
 // ============================================================================
-// GsUsbSource Implementation
-// ============================================================================
-
-/// gs_usb source for Windows/macOS with transmit support
-pub struct GsUsbSource {
-    app: AppHandle,
-    session_id: String,
-    config: GsUsbConfig,
-    state: IOState,
-    /// The read loop runs on a detached task; a device unplugged mid-session ends
-    /// it without anything calling `stop`.
-    lifecycle: SourceLifecycle,
-    cancel_flag: Arc<AtomicBool>,
-    task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
-    /// Channel sender for transmit requests (allows sync transmit_frame calls)
-    transmit_tx: Arc<Mutex<Option<TransmitSender>>>,
-}
-
-impl GsUsbSource {
-    pub fn new(app: AppHandle, session_id: String, config: GsUsbConfig) -> Self {
-        Self {
-            app,
-            session_id,
-            config,
-            state: IOState::Stopped,
-            lifecycle: SourceLifecycle::new(),
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            task_handle: None,
-            transmit_tx: Arc::new(Mutex::new(None)),
-        }
-    }
-}
-
-#[async_trait]
-impl IOSource for GsUsbSource {
-    fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::realtime_can()
-            .with_tx(!self.config.listen_only, false)
-            .with_buses(vec![self.config.channel])
-    }
-
-    async fn start(&mut self) -> Result<(), String> {
-        if self.state == IOState::Running {
-            return Err("Source is already running".to_string());
-        }
-
-        self.state = IOState::Starting;
-        self.cancel_flag.store(false, Ordering::Relaxed);
-
-        // Create transmit channel (only if not in listen-only mode)
-        let transmit_rx = if !self.config.listen_only {
-            let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-            // Store the sender for transmit_frame calls
-            {
-                let mut guard = self
-                    .transmit_tx
-                    .lock()
-                    .map_err(|e| format!("Failed to lock transmit_tx: {}", e))?;
-                *guard = Some(transmit_tx);
-            }
-            Some(transmit_rx)
-        } else {
-            None
-        };
-
-        let app = self.app.clone();
-        let session_id = self.session_id.clone();
-        let config = self.config.clone();
-        let cancel_flag = self.cancel_flag.clone();
-
-        // Held for the task's life, so an open failure or a device that goes away
-        // mid-stream stops the source claiming it is running.
-        let ended = self.lifecycle.guard(IOState::Stopped);
-        self.task_handle = Some(tauri::async_runtime::spawn(async move {
-            let _ended = ended;
-            run_gs_usb_stream(app, session_id, config, cancel_flag, transmit_rx).await;
-        }));
-        self.state = IOState::Running;
-
-        Ok(())
-    }
-
-    async fn stop(&mut self) -> Result<(), String> {
-        self.cancel_flag.store(true, Ordering::Relaxed);
-
-        // Clear the transmit sender
-        if let Ok(mut guard) = self.transmit_tx.lock() {
-            *guard = None;
-        }
-
-        if let Some(handle) = self.task_handle.take() {
-            let _ = handle.await;
-        }
-
-        self.state = IOState::Stopped;
-        Ok(())
-    }
-
-    async fn pause(&mut self) -> Result<(), String> {
-        Err("gs_usb is a live stream and cannot be paused.".to_string())
-    }
-
-    async fn resume(&mut self) -> Result<(), String> {
-        Err("gs_usb is a live stream and does not support pause/resume.".to_string())
-    }
-
-    fn set_speed(&mut self, _speed: f64) -> Result<(), String> {
-        Err("gs_usb is a live stream and does not support speed control.".to_string())
-    }
-
-    fn set_time_range(
-        &mut self,
-        _start: Option<String>,
-        _end: Option<String>,
-    ) -> Result<(), String> {
-        Err("gs_usb is a live stream and does not support time range filtering.".to_string())
-    }
-
-    fn state(&self) -> IOState {
-        self.lifecycle.state_or(&self.state)
-    }
-
-    fn session_id(&self) -> &str {
-        &self.session_id
-    }
-
-    fn transmit(&self, payload: &TransmitPayload) -> Result<TransmitResult, String> {
-        let frame = match payload {
-            TransmitPayload::CanFrame(f) => f,
-            TransmitPayload::RawBytes(_) => {
-                return Err("gs_usb devices do not support raw byte transmission".to_string());
-            }
-        };
-
-        if self.config.listen_only {
-            return Err(
-                "Cannot transmit in listen-only mode. Disable listen-only in profile settings."
-                    .to_string(),
-            );
-        }
-
-        // Validate frame size
-        let max_len = if frame.is_fd { 64 } else { 8 };
-        if frame.data.len() > max_len {
-            return Ok(TransmitResult::error(format!(
-                "Data length {} exceeds maximum {} bytes for {} frame",
-                frame.data.len(),
-                max_len,
-                if frame.is_fd { "FD" } else { "classic CAN" }
-            )));
-        }
-
-        // FD frames require FD mode to be enabled
-        if frame.is_fd && !self.config.enable_fd {
-            return Ok(TransmitResult::error(
-                "Cannot transmit FD frame: FD mode not enabled in profile settings".to_string(),
-            ));
-        }
-
-        // Encode frame as GsHostFrame
-        let data = encode_frame(frame, self.config.channel);
-
-        // Get the transmit sender
-        let tx = {
-            let guard = self
-                .transmit_tx
-                .lock()
-                .map_err(|e| format!("Failed to lock transmit channel: {}", e))?;
-            guard.clone().ok_or("Not connected (no transmit channel)")?
-        };
-
-        // Fire-and-forget: queue into the device's 32-slot channel and return
-        // immediately. Channel full = backpressure from the USB write task.
-        let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
-        tx.try_send(TransmitRequest { data, frame: None, result_tx })
-            .map_err(|e| format!("Transmit buffer full ({})", e))?;
-        Ok(TransmitResult::success())
-    }
-}
-
-// ============================================================================
-// Stream Implementation
-// ============================================================================
-
-async fn run_gs_usb_stream(
-    _app_handle: AppHandle,
-    session_id: String,
-    config: GsUsbConfig,
-    cancel_flag: Arc<AtomicBool>,
-    transmit_rx: Option<std_mpsc::Receiver<TransmitRequest>>,
-) {
-    // Capture named after session ID (UI prefixes with "Frames:")
-    capture_store::create_session_capture(&session_id, CaptureKind::Frames, session_id.clone());
-    let device_name = format!("gs_usb({}:{})", config.bus, config.address);
-
-    #[allow(unused_assignments)]
-    let mut stream_reason = "disconnected";
-    let mut total_frames: i64 = 0;
-
-    // Find and open device - use .await in async context
-    // Prefer serial number matching when available, fall back to bus:address
-    let device_info = match nusb::list_devices().await {
-        Ok(mut devices) => devices
-            .find(|dev| device_matches(dev, config.serial.as_deref(), config.bus, config.address))
-            .ok_or_else(|| IoError::not_found(&device_name).to_string()),
-        Err(e) => Err(IoError::other(&device_name, format!("list devices: {}", e)).to_string()),
-    };
-
-    let device_info = match device_info {
-        Ok(d) => d,
-        Err(e) => {
-            emit_session_error(&session_id, e);
-            emit_stream_ended(&session_id, "error", "gs_usb");
-            return;
-        }
-    };
-
-    let usb_device = match device_info.open().await {
-        Ok(d) => d,
-        Err(e) => {
-            emit_session_error(&session_id, IoError::connection(&device_name, e.to_string()).to_string());
-            emit_stream_ended(&session_id, "error", "gs_usb");
-            return;
-        }
-    };
-
-    let interface = match usb_device.claim_interface(0).await {
-        Ok(i) => i,
-        Err(_) => {
-            emit_session_error(&session_id, IoError::busy(&device_name).to_string());
-            emit_stream_ended(&session_id, "error", "gs_usb");
-            return;
-        }
-    };
-
-    // Discover bulk endpoints from USB descriptors
-    let endpoints = discover_bulk_endpoints(&usb_device);
-
-    tlog!(
-        "[gs_usb:{}] Opened device at {}:{} (bitrate: {}, listen_only: {}, EP_IN: 0x{:02X}, EP_OUT: 0x{:02X}, max_pkt: {})",
-        session_id, config.bus, config.address, config.bitrate, config.listen_only,
-        endpoints.in_addr, endpoints.out_addr, endpoints.max_packet_size
-    );
-
-    // Initialize device
-    let pad_enabled = match initialize_device(&interface, &config).await {
-        Ok(pad) => pad,
-        Err(e) => {
-            emit_session_error(&session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
-            emit_stream_ended(&session_id, "error", "gs_usb");
-            return;
-        }
-    };
-
-    tlog!("[gs_usb:{}] Device initialized (pad_enabled: {}), starting stream", session_id, pad_enabled);
-
-    // Bulk IN endpoint — use discovered address
-    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(endpoints.in_addr) {
-        Ok(ep) => ep,
-        Err(e) => {
-            emit_session_error(&session_id, IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string());
-            emit_stream_ended(&session_id, "error", "gs_usb");
-            return;
-        }
-    };
-
-    // Spawn a dedicated transmit task if we have a transmit channel.
-    // This ensures transmits are processed immediately without waiting for reads.
-    let transmit_task = if let Some(rx) = transmit_rx {
-        // Bulk OUT endpoint for transmit — use discovered address
-        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(endpoints.out_addr) {
-            Ok(ep) => {
-                tlog!("[gs_usb:{}] Bulk OUT endpoint opened for transmit", session_id);
-                let mut writer = ep.writer(64);
-                let cancel_flag_for_transmit = cancel_flag.clone();
-
-                // Spawn blocking task for transmit handling (writer uses blocking I/O)
-                let handle = tokio::task::spawn_blocking(move || {
-                    while !cancel_flag_for_transmit.load(Ordering::Relaxed) {
-                        match rx.recv_timeout(std::time::Duration::from_millis(10)) {
-                            Ok(req) => {
-                                let result = match writer.write_all(&req.data) {
-                                    Ok(_) => match writer.flush() {
-                                        Ok(_) => Ok(()),
-                                        Err(e) => Err(format!("Flush failed: {}", e)),
-                                    },
-                                    Err(e) => Err(format!("Write failed: {}", e)),
-                                };
-                                // Send result back (ignore errors - caller may have timed out)
-                                let _ = req.result_tx.try_send(result);
-                            }
-                            Err(std_mpsc::RecvTimeoutError::Timeout) => {
-                                // No request, continue loop
-                            }
-                            Err(std_mpsc::RecvTimeoutError::Disconnected) => {
-                                // Channel closed, exit
-                                break;
-                            }
-                        }
-                    }
-                });
-                Some(handle)
-            }
-            Err(e) => {
-                tlog!("[gs_usb:{}] Warning: could not open bulk OUT endpoint: {} (transmit disabled)", session_id, e);
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    let mut pending_frames: Vec<FrameMessage> = Vec::with_capacity(32);
-    let mut last_emit_time = std::time::Instant::now();
-    let emit_interval = Duration::from_millis(25);
-    let mut throttle = SignalThrottle::new();
-
-    // Buffer size: use the actual max packet size from USB descriptors.
-    let buf_size = endpoints.max_packet_size;
-
-    // Pre-submit multiple read requests for better throughput
-    for _ in 0..4 {
-        bulk_in.submit(bulk_in.allocate(buf_size));
-    }
-
-    // Determine frame stride for multi-frame transfer parsing
-    let frame_size = if config.enable_fd { FD_FRAME_BYTES } else { CLASSIC_FRAME_BYTES };
-    let frame_stride = if pad_enabled { buf_size } else { frame_size };
-
-    // Diagnostic counters
-    let mut usb_completions: u64 = 0;
-    let mut rx_frames: u64 = 0;
-    let mut tx_echoes: u64 = 0;
-    let mut parse_fail: u64 = 0;
-    let mut transfer_errors: u64 = 0;
-    let mut multi_frame_transfers: u64 = 0;
-    let mut last_diag = std::time::Instant::now();
-
-    // Read loop - only handles reading, transmit is handled by the dedicated task
-    loop {
-        if cancel_flag.load(Ordering::Relaxed) {
-            stream_reason = "stopped";
-            break;
-        }
-
-        // Check frame limit
-        if let Some(limit) = config.limit {
-            if total_frames >= limit {
-                tlog!(
-                    "[gs_usb:{}] Reached limit of {} frames",
-                    session_id, limit
-                );
-                stream_reason = "complete";
-                break;
-            }
-        }
-
-        // Wait for next transfer completion with timeout
-        let read_result = tokio::time::timeout(
-            BULK_TRANSFER_TIMEOUT,
-            bulk_in.next_complete(),
-        )
-        .await;
-
-        match read_result {
-            Ok(completion) => {
-                match completion.status {
-                    Ok(()) => {
-                        usb_completions += 1;
-                        let actual_len = completion.actual_len;
-                        let data = &completion.buffer[..actual_len];
-
-                        // Determine how many frames are in this transfer
-                        let frame_count = if actual_len > frame_stride {
-                            multi_frame_transfers += 1;
-                            actual_len / frame_stride
-                        } else {
-                            1
-                        };
-
-                        // Parse each frame in the transfer
-                        let mut offset = 0;
-                        for _ in 0..frame_count {
-                            if offset + 4 > actual_len {
-                                break;
-                            }
-
-                            let end = actual_len.min(offset + frame_stride);
-                            let frame_data = &data[offset..end];
-
-                            if let Some(mut frame) = parse_host_frame(frame_data) {
-                                let is_tx = frame.direction.as_deref() == Some("tx");
-                                if is_tx {
-                                    tx_echoes += 1;
-                                } else {
-                                    rx_frames += 1;
-                                }
-                                // Apply bus override if configured
-                                if let Some(bus_override) = config.bus_override {
-                                    frame.bus = bus_override;
-                                }
-                                pending_frames.push(frame);
-                                total_frames += 1;
-                            } else {
-                                parse_fail += 1;
-                            }
-
-                            offset += frame_stride;
-                        }
-
-                        // Resubmit for continuous reading
-                        bulk_in.submit(bulk_in.allocate(buf_size));
-                    }
-                    Err(e) => {
-                        transfer_errors += 1;
-                        tlog!("[gs_usb:{}] Bulk transfer error: {:?}", session_id, e);
-                        stream_reason = "error";
-                        break;
-                    }
-                }
-            }
-            Err(_) => {
-                // Timeout - this is normal for live streams with no traffic
-            }
-        }
-
-        // Store batched frames periodically
-        if last_emit_time.elapsed() >= emit_interval && !pending_frames.is_empty() {
-            let frames = std::mem::take(&mut pending_frames);
-            capture_store::append_frames_to_session(&session_id, frames);
-            if throttle.should_signal("frames-ready") {
-                signal_frames_ready(&session_id);
-            }
-            last_emit_time = std::time::Instant::now();
-        }
-
-        // Periodic diagnostic logging
-        if last_diag.elapsed().as_secs() >= 30 && usb_completions > 0 {
-            tlog!(
-                "[gs_usb:{}] DIAG: completions={}, rx={}, tx_echo={}, parse_fail={}, errors={}, multi_frame={}",
-                session_id, usb_completions, rx_frames, tx_echoes, parse_fail, transfer_errors, multi_frame_transfers
-            );
-            last_diag = std::time::Instant::now();
-        }
-    }
-
-    tlog!(
-        "[gs_usb:{}] Stream ended ({}): completions={}, rx={}, tx_echo={}, parse_fail={}, errors={}, multi_frame={}",
-        session_id, stream_reason, usb_completions, rx_frames, tx_echoes, parse_fail, transfer_errors, multi_frame_transfers
-    );
-
-    // Abort the transmit task when the read loop exits
-    if let Some(task) = transmit_task {
-        task.abort();
-    }
-
-    // Store and signal remaining frames
-    if !pending_frames.is_empty() {
-        capture_store::append_frames_to_session(&session_id, pending_frames);
-        throttle.flush();
-        signal_frames_ready(&session_id);
-    }
-
-    // Stop the device
-    let _ = stop_device(&interface, &config).await;
-
-    emit_stream_ended(&session_id, stream_reason, "gs_usb");
-}
-
-/// Initialize the gs_usb device
-/// Initialize a gs_usb device. Returns whether PAD_PKTS_TO_MAX_PKT_SIZE is enabled.
-pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> Result<bool, String> {
-    // 1. Send HOST_FORMAT (byte order negotiation)
-    let host_format = HOST_FORMAT.to_le_bytes();
-    interface
-        .control_out(ControlOut {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::HostFormat as u8,
-            value: 1,
-            index: config.channel as u16,
-            data: &host_format,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("HOST_FORMAT failed: {:?}", e))?;
-
-    // 2. Query BT_CONST (required by some firmware before setting bit timing)
-    // This matches the Linux gs_usb driver initialization sequence
-    let bt_const_data = interface
-        .control_in(ControlIn {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::BtConst as u8,
-            value: config.channel as u16,
-            index: 0,
-            length: 40,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("BT_CONST query failed: {:?}", e))?;
-
-    // Parse full BT_CONST to get clock, features, and constraints
-    let bt_const = BtConst::from_bytes(&bt_const_data);
-    let reported_fclk = bt_const.map(|c| c.fclk_can).unwrap_or(48_000_000);
-    let fclk_can = config.can_clock_override.unwrap_or(reported_fclk);
-    if config.can_clock_override.is_some() {
-        tlog!(
-            "[gs_usb] CAN clock override: {} Hz (device reported {} Hz)",
-            fclk_can, reported_fclk
-        );
-    }
-    let nominal_constraints = bt_const.map(|c| c.nominal);
-
-    if let Some(ref c) = bt_const {
-        let n = c.nominal;
-        tlog!(
-            "[gs_usb] BT_CONST: feature=0x{:X}, fclk={} Hz, tseg1={}-{}, tseg2={}-{}, brp={}-{}",
-            c.feature, c.fclk_can, n.tseg1_min, n.tseg1_max, n.tseg2_min, n.tseg2_max,
-            n.brp_min, n.brp_max
-        );
-    }
-
-    // Check FD feature flag before attempting FD setup
-    if config.enable_fd {
-        let has_fd = bt_const.map(|c| c.feature & can_feature::FD != 0).unwrap_or(false);
-        if !has_fd {
-            return Err("CAN FD enabled but device does not report FD support in BT_CONST features".to_string());
-        }
-    }
-
-    // 3. Reset device before configuring bittiming (matches Linux gs_usb driver sequence)
-    let reset_mode_bytes = Mode::RESET.to_bytes();
-    interface
-        .control_out(ControlOut {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::Mode as u8,
-            value: config.channel as u16,
-            index: 0,
-            data: &reset_mode_bytes,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("MODE RESET failed: {:?}", e))?;
-
-    // 4. Set bit timing - use device constraints when available
-    let timing = bittiming(
-        fclk_can,
-        config.bitrate,
-        config.sample_point,
-        nominal_constraints.as_ref(),
-    )
-    .or_else(|| bittiming_for_bitrate(config.bitrate))
-    .ok_or_else(|| {
-        format!(
-            "Unsupported bitrate {} with {}% sample point for {} Hz clock.",
-            config.bitrate, config.sample_point, fclk_can
-        )
-    })?;
-
-    {
-        let brp = { timing.brp };
-        let seg1 = { timing.phase_seg1 };
-        let seg2 = { timing.phase_seg2 };
-        let sjw = { timing.sjw };
-        tlog!(
-            "[gs_usb] Nominal timing: brp={}, seg1={}, seg2={}, sjw={} (clock: {} Hz, bitrate: {} bps, sp: {}%)",
-            brp, seg1, seg2, sjw, fclk_can, config.bitrate, config.sample_point
-        );
-    }
-
-    let timing_bytes = timing.to_bytes();
-
-    interface
-        .control_out(ControlOut {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::Bittiming as u8,
-            value: config.channel as u16,
-            index: 0,
-            data: &timing_bytes,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("BITTIMING failed: {:?}", e))?;
-
-    // 4. If FD is enabled, set data phase bit timing
-    if config.enable_fd {
-        // Query BT_CONST_EXT for data phase timing constraints (72-byte extended response).
-        // Only attempt if the device advertises the BT_CONST_EXT feature flag.
-        let has_bt_const_ext = bt_const.map(|c| c.feature & can_feature::BT_CONST_EXT != 0).unwrap_or(false);
-        tlog!("[gs_usb] BT_CONST_EXT feature flag: {}", has_bt_const_ext);
-        let bt_const_ext_result: Option<BtConstExtended> = if has_bt_const_ext {
-            let ext_result = interface
-                .control_in(ControlIn {
-                    control_type: ControlType::Vendor,
-                    recipient: Recipient::Interface,
-                    request: Breq::BtConstExt as u8,
-                    value: config.channel as u16,
-                    index: 0,
-                    length: BtConstExtended::SIZE as u16,
-                }, CONTROL_TIMEOUT)
-                .await;
-            match &ext_result {
-                Ok(data) => {
-                    tlog!("[gs_usb] BT_CONST_EXT response: {} bytes", data.len());
-                },
-                Err(e) => {
-                    tlog!("[gs_usb] BT_CONST_EXT request failed: {:?}", e);
-                }
-            }
-            ext_result
-                .ok()
-                .and_then(|data| {
-                    let parsed = BtConstExtended::from_bytes(&data);
-                    if parsed.is_none() {
-                        tlog!("[gs_usb] BT_CONST_EXT: failed to parse {} bytes (need {})", data.len(), BtConstExtended::SIZE);
-                    }
-                    parsed
-                })
-        } else {
-            tlog!("[gs_usb] BT_CONST_EXT not supported by device, using nominal constraints as fallback");
-            None
-        };
-
-        let fclk_data = bt_const_ext_result.map(|c| c.fclk_can).unwrap_or(fclk_can);
-        let data_constraints = bt_const_ext_result.map(|c| c.data).or(nominal_constraints);
-
-        if let Some(ref dc) = data_constraints {
-            let source = if bt_const_ext_result.is_some() { "BT_CONST_EXT" } else { "BT_CONST (nominal fallback)" };
-            tlog!(
-                "[gs_usb] FD data constraints ({}): tseg1={}-{}, tseg2={}-{}, sjw_max={}, brp={}-{} (inc {}), clock: {} Hz",
-                source, dc.tseg1_min, dc.tseg1_max, dc.tseg2_min, dc.tseg2_max,
-                dc.sjw_max, dc.brp_min, dc.brp_max, dc.brp_inc, fclk_data
-            );
-        } else {
-            tlog!("[gs_usb] FD: No constraints available for data phase, using nominal clock {} Hz", fclk_can);
-        }
-
-        // Calculate data phase timing using device constraints
-        let data_timing = bittiming(
-            fclk_data,
-            config.data_bitrate,
-            config.data_sample_point,
-            data_constraints.as_ref(),
-        )
-        .ok_or_else(|| {
-            if let Some(ref dc) = data_constraints {
-                format!(
-                    "Cannot calculate FD data timing for {} bps at {}% sample point (clock: {} Hz, device limits: tseg1={}-{}, tseg2={}-{}, brp={}-{})",
-                    config.data_bitrate, config.data_sample_point, fclk_data,
-                    dc.tseg1_min, dc.tseg1_max, dc.tseg2_min, dc.tseg2_max, dc.brp_min, dc.brp_max
-                )
-            } else {
-                format!(
-                    "Cannot calculate FD data timing for {} bps at {}% sample point (clock: {} Hz)",
-                    config.data_bitrate, config.data_sample_point, fclk_data
-                )
-            }
-        })?;
-
-        {
-            let brp = { data_timing.brp };
-            let seg1 = { data_timing.phase_seg1 };
-            let seg2 = { data_timing.phase_seg2 };
-            let sjw = { data_timing.sjw };
-            tlog!(
-                "[gs_usb] FD data timing: brp={}, seg1={}, seg2={}, sjw={} (clock: {} Hz, bitrate: {} bps, sp: {}%)",
-                brp, seg1, seg2, sjw, fclk_data, config.data_bitrate, config.data_sample_point
-            );
-        }
-
-        let data_timing_bytes = data_timing.to_bytes();
-
-        tlog!(
-            "[gs_usb] Sending DATA_BITTIMING ({} bytes): {:02X?}",
-            data_timing_bytes.len(), data_timing_bytes
-        );
-
-        interface
-            .control_out(ControlOut {
-                control_type: ControlType::Vendor,
-                recipient: Recipient::Interface,
-                request: Breq::DataBittiming as u8,
-                value: config.channel as u16,
-                index: 0,
-                data: &data_timing_bytes,
-            }, CONTROL_TIMEOUT)
-            .await
-            .map_err(|e| format!("DATA_BITTIMING failed: {:?} (device may not support CAN FD)", e))?;
-    }
-
-    // 4. Set mode and start
-    let mut mode_flags = if config.listen_only {
-        can_mode::LISTEN_ONLY
-    } else {
-        can_mode::NORMAL
-    };
-
-    // Add FD mode flag if enabled
-    if config.enable_fd {
-        mode_flags |= can_mode::FD;
-    }
-
-    // Enable packet padding if device supports it (matches Linux gs_usb driver)
-    let pad_enabled = bt_const.map(|c| c.feature & can_feature::PAD_PKTS_TO_MAX_PKT_SIZE != 0).unwrap_or(false);
-    if pad_enabled {
-        mode_flags |= can_mode::PAD_PKTS_TO_MAX_PKT_SIZE;
-    }
-
-    let mode_bytes = Mode::start(mode_flags).to_bytes();
-
-    interface
-        .control_out(ControlOut {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::Mode as u8,
-            value: config.channel as u16,
-            index: 0,
-            data: &mode_bytes,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("MODE failed: {:?}", e))?;
-
-    Ok(pad_enabled)
-}
-
-/// Stop the gs_usb device
-pub async fn stop_device(interface: &Interface, config: &GsUsbConfig) -> Result<(), String> {
-    let channel = config.channel;
-    let mode_bytes = Mode::RESET.to_bytes();
-
-    interface
-        .control_out(ControlOut {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::Mode as u8,
-            value: channel as u16,
-            index: 0,
-            data: &mode_bytes,
-        }, CONTROL_TIMEOUT)
-        .await
-        .map_err(|e| format!("MODE stop failed: {:?}", e))?;
-
-    Ok(())
-}
-
-/// Read a gs_usb host frame as a `FrameMessage`.
-///
-/// `direction` tells a received frame from the device echoing back one this
-/// host transmitted; nothing downstream distinguishes them otherwise.
-pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
-    let f = super::parse_host_frame(data)?;
-    Some(FrameMessage {
-        protocol: "can".to_string(),
-        timestamp_us: now_us(),
-        frame_id: f.arb_id,
-        bus: f.channel,
-        dlc: f.data.len() as u8,
-        bytes: f.data,
-        is_extended: f.extended,
-        is_fd: f.fd,
-        source_address: None,
-        incomplete: None,
-        direction: Some(if f.echo_id == ECHO_ID_RX { "rx" } else { "tx" }.to_string()),
-    })
-}
-
-// ============================================================================
 // Multi-Source Streaming
 // ============================================================================
 
-/// Run gs_usb source and send frames to merge task
+/// The device hands back what it sent, which export and Test Pattern read as `tx`.
+fn gs_usb_options(listen_only: bool) -> CanOptions {
+    let mut options = can_options(listen_only);
+    options.own_frames = true;
+    options
+}
+
+/// A session maps a gs_usb source as one bus, and the device numbers it by its
+/// channel, so transmits reach that channel and its reads are mapped.
+fn on_channel(mappings: Vec<BusMapping>, channel: u8) -> Vec<BusMapping> {
+    mappings
+        .into_iter()
+        .map(|mapping| BusMapping {
+            device_bus: channel,
+            ..mapping
+        })
+        .collect()
+}
+
+/// What the broker is told of `event`, or the loss that ends the source.
+fn on_event(
+    source_idx: usize,
+    address: &str,
+    channel: u8,
+    mappings: &[BusMapping],
+    event: CanEvent,
+) -> Result<Vec<SourceMessage>, CanError> {
+    match event {
+        CanEvent::Connected(info) => {
+            tlog!(
+                "[gs_usb] Source {} connected to {} channel {} (channels: {:?}, fd: {})",
+                source_idx,
+                address,
+                channel,
+                info.buses,
+                info.fd
+            );
+            Ok(vec![SourceMessage::Connected(
+                source_idx,
+                "gs_usb".to_string(),
+                address.to_string(),
+                Some(channel),
+            )])
+        }
+        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
+            .into_iter()
+            .collect()),
+        CanEvent::Disconnected { error, .. } => Err(error),
+    }
+}
+
+/// Run a gs_usb source on the library's CAN task, one channel per source.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_source(
     source_idx: usize,
     bus: u8,
@@ -1070,269 +238,164 @@ pub async fn run_source(
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    // Find and open device - prefer serial number matching when available
-    let device_info = match nusb::list_devices().await {
-        Ok(mut devices) => devices
-            .find(|dev| device_matches(dev, serial.as_deref(), bus, address))
-            .ok_or_else(|| "Device not found".to_string()),
-        Err(e) => Err(format!("Failed to list devices: {}", e)),
-    };
-
-    let device_info = match device_info {
-        Ok(d) => d,
-        Err(e) => {
-            let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
-            return;
-        }
-    };
-
-    let device = match device_info.open().await {
-        Ok(d) => d,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Failed to open device: {}", e),
-                ))
-                .await;
-            return;
-        }
-    };
-
-    let endpoints = discover_bulk_endpoints(&device);
-
-    let interface = match device.claim_interface(0).await {
-        Ok(i) => i,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Failed to claim interface: {}", e),
-                ))
-                .await;
-            return;
-        }
-    };
-
-    // Build config for initialization
-    let config = GsUsbConfig {
+    let device = format!("gs_usb({}:{})", bus, address);
+    let usb = GsUsbDevice {
+        serial,
         bus,
         address,
-        serial: serial.clone(),
-        bitrate,
-        sample_point,
+        product: String::new(),
+    };
+    let mut gs = GsUsbOptions::new(usb, bitrate);
+    gs.channel = channel;
+    gs.sample_point = Some(sample_point);
+    gs.data = enable_fd.then_some((data_bitrate, Some(data_sample_point)));
+
+    let task = match gsusb::open(gs, gs_usb_options(listen_only)).await {
+        Ok(task) => task,
+        Err(e) => {
+            let _ = tx
+                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
+                .await;
+            return;
+        }
+    };
+
+    let mappings = on_channel(bus_mappings, channel);
+    let _ = tx
+        .send(SourceMessage::MappingsResolved(
+            source_idx,
+            mappings.clone(),
+        ))
+        .await;
+    let address = format!("{}:{}", bus, address);
+    serve(
+        task,
+        source_idx,
         listen_only,
-        channel,
-        limit: None,
-        display_name: None,
-        bus_override: None,
-        enable_fd,
-        data_bitrate,
-        data_sample_point,
-        can_clock_override: None,
-    };
+        &stop_flag,
+        &tx,
+        |event| on_event(source_idx, &address, channel, &mappings, event),
+        |error| link_lost(source_idx, &device, error),
+    )
+    .await;
+}
 
-    // Initialize device
-    let pad_enabled = match initialize_device(&interface, &config).await {
-        Ok(pad) => pad,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Failed to initialize device: {}", e),
-                ))
-                .await;
-            return;
-        }
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::UNIX_EPOCH;
+    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
 
-    tlog!(
-        "[gs_usb] Source {} connected to {}:{} (bitrate: {}, listen_only: {}, EP_IN: 0x{:02X}, EP_OUT: 0x{:02X}, max_pkt: {}, pad: {})",
-        source_idx, bus, address, bitrate, listen_only,
-        endpoints.in_addr, endpoints.out_addr, endpoints.max_packet_size, pad_enabled
-    );
+    use crate::io::can_task::can_frame;
+    use crate::io::types::EndReason;
+    use crate::io::CanTransmitFrame;
 
-    // Emit device-connected event
-    let addr_str = format!("{}:{}", bus, address);
-    let _ = tx
-        .send(SourceMessage::Connected(source_idx, "gs_usb".to_string(), addr_str, Some(channel)))
-        .await;
+    const DEVICE: &str = "gs_usb(0:5)";
 
-    // Bulk IN endpoint — use discovered address
-    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(endpoints.in_addr) {
-        Ok(ep) => ep,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Failed to open bulk IN endpoint: {}", e),
-                ))
-                .await;
-            return;
-        }
-    };
-
-    // Setup transmit channel if not in listen-only mode
-    let transmit_task = if !listen_only {
-        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(endpoints.out_addr) {
-            Ok(ep) => {
-                let (transmit_tx, transmit_rx) =
-                    std_mpsc::sync_channel::<TransmitRequest>(32);
-                let _ = tx
-                    .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
-                    .await;
-
-                let mut writer = ep.writer(64);
-                let stop_flag_for_transmit = stop_flag.clone();
-
-                let handle = tokio::task::spawn_blocking(move || {
-                    while !stop_flag_for_transmit.load(Ordering::Relaxed) {
-                        match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
-                            Ok(req) => {
-                                let result = match writer.write_all(&req.data) {
-                                    Ok(_) => match writer.flush() {
-                                        Ok(_) => Ok(()),
-                                        Err(e) => Err(format!("Flush failed: {}", e)),
-                                    },
-                                    Err(e) => Err(format!("Write failed: {}", e)),
-                                };
-                                let _ = req.result_tx.try_send(result);
-                            }
-                            Err(std_mpsc::RecvTimeoutError::Timeout) => {}
-                            Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
-                        }
-                    }
-                });
-                Some(handle)
-            }
-            Err(e) => {
-                tlog!(
-                    "[gs_usb] Source {} warning: could not open bulk OUT: {}",
-                    source_idx, e
-                );
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    let buf_size = endpoints.max_packet_size;
-
-    // Determine frame stride for multi-frame transfer parsing
-    let frame_size = if enable_fd { FD_FRAME_BYTES } else { CLASSIC_FRAME_BYTES };
-    let frame_stride = if pad_enabled { buf_size } else { frame_size };
-
-    // Pre-submit read requests
-    for _ in 0..4 {
-        bulk_in.submit(bulk_in.allocate(buf_size));
+    fn session_bus(output_bus: u8) -> Vec<BusMapping> {
+        vec![BusMapping {
+            device_bus: 0,
+            output_bus,
+            ..BusMapping::default()
+        }]
     }
 
-    // Read loop
-    let mut usb_completions: u64 = 0;
-    let mut parse_fail: u64 = 0;
-    let mut rx_frames: u64 = 0;
-    let mut tx_echoes: u64 = 0;
-    let mut bus_filtered: u64 = 0;
-    let mut forwarded: u64 = 0;
-    let mut multi_frame_transfers: u64 = 0;
-    let mut last_diag = std::time::Instant::now();
-
-    while !stop_flag.load(Ordering::Relaxed) {
-        let read_result =
-            tokio::time::timeout(BULK_TRANSFER_TIMEOUT, bulk_in.next_complete()).await;
-
-        match read_result {
-            Ok(completion) => match completion.status {
-                Ok(()) => {
-                    usb_completions += 1;
-                    let actual_len = completion.actual_len;
-                    let data = &completion.buffer[..actual_len];
-
-                    // Determine how many frames are in this transfer
-                    let frame_count = if actual_len > frame_stride {
-                        multi_frame_transfers += 1;
-                        actual_len / frame_stride
-                    } else {
-                        1
-                    };
-
-                    // Parse each frame in the transfer
-                    let mut offset = 0;
-                    let mut batch = Vec::new();
-                    for _ in 0..frame_count {
-                        if offset + 4 > actual_len {
-                            break;
-                        }
-
-                        let end = actual_len.min(offset + frame_stride);
-                        let frame_data = &data[offset..end];
-
-                        if let Some(mut frame_msg) = parse_host_frame(frame_data) {
-                            let is_tx = frame_msg.direction.as_deref() == Some("tx");
-                            if is_tx {
-                                tx_echoes += 1;
-                            } else {
-                                rx_frames += 1;
-                            }
-                            if apply_bus_mapping(&mut frame_msg, &bus_mappings) {
-                                forwarded += 1;
-                                batch.push(frame_msg);
-                            } else {
-                                bus_filtered += 1;
-                            }
-                        } else {
-                            parse_fail += 1;
-                        }
-
-                        offset += frame_stride;
-                    }
-
-                    if !batch.is_empty() {
-                        let _ = tx
-                            .send(SourceMessage::Frames(source_idx, batch))
-                            .await;
-                    }
-
-                    bulk_in.submit(bulk_in.allocate(buf_size));
-                }
-                Err(e) => {
-                    let _ = tx
-                        .send(SourceMessage::Error(
-                            source_idx,
-                            format!("Bulk transfer error: {:?}", e),
-                        ))
-                        .await;
-                    break;
-                }
-            },
-            Err(_) => {
-                // Timeout - continue
-            }
-        }
-
-        if last_diag.elapsed().as_secs() >= 30 && usb_completions > 0 {
-            tlog!(
-                "[gs_usb] Source {} DIAG: completions={}, rx={}, tx_echo={}, parse_fail={}, bus_filtered={}, forwarded={}, multi_frame={}",
-                source_idx, usb_completions, rx_frames, tx_echoes, parse_fail, bus_filtered, forwarded, multi_frame_transfers
-            );
-            last_diag = std::time::Instant::now();
+    fn read(frame: CanFrame, direction: Direction) -> CanRead {
+        CanRead {
+            frame,
+            direction,
+            at: UNIX_EPOCH + Duration::from_micros(1_000),
+            device_us: Some(1_000),
         }
     }
 
-    tlog!(
-        "[gs_usb] Source {} ended: completions={}, rx={}, tx_echo={}, parse_fail={}, forwarded={}, multi_frame={}",
-        source_idx, usb_completions, rx_frames, tx_echoes, parse_fail, forwarded, multi_frame_transfers
-    );
-
-    // Cleanup
-    if let Some(task) = transmit_task {
-        task.abort();
+    #[test]
+    fn a_connect_is_announced_on_its_channel() {
+        let info = CanEvent::Connected(DeviceInfo::default());
+        let messages = on_event(3, "0:5", 1, &[], info).unwrap();
+        let [SourceMessage::Connected(3, kind, address, Some(1))] = messages.as_slice() else {
+            panic!("expected Connected alone, on channel 1");
+        };
+        assert_eq!((kind.as_str(), address.as_str()), ("gs_usb", "0:5"));
     }
 
-    let _ = stop_device(&interface, &config).await;
+    #[test]
+    fn a_read_on_the_channel_lands_on_the_sessions_bus() {
+        let mappings = on_channel(session_bus(4), 1);
+        let reads = vec![read(
+            CanFrame::data(1, 0x123, false, false, false, vec![1, 2]),
+            Direction::Rx,
+        )];
+        let messages = on_event(3, "0:5", 1, &mappings, CanEvent::Read(reads)).unwrap();
+        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
+            panic!("expected one Frames");
+        };
+        assert_eq!((frames[0].frame_id, frames[0].bus), (0x123, 4));
+        assert_eq!(frames[0].timestamp_us, 1_000);
+    }
 
-    let _ = tx
-        .send(SourceMessage::Ended(source_idx, EndReason::Stopped))
-        .await;
+    #[test]
+    fn a_transmit_routed_to_the_source_goes_out_on_its_channel() {
+        let route = &on_channel(session_bus(4), 1)[0];
+        let routed = CanTransmitFrame {
+            frame_id: 0x7DF,
+            data: vec![2, 1, 0],
+            bus: route.device_bus,
+            is_extended: false,
+            is_fd: false,
+            is_brs: false,
+            is_rtr: false,
+        };
+        assert_eq!(can_frame(&routed).bus, 1);
+    }
+
+    #[test]
+    fn an_echo_the_device_hands_back_stays_tx() {
+        let reads = vec![
+            read(
+                CanFrame::data(0, 0x10, false, false, false, vec![]),
+                Direction::Rx,
+            ),
+            read(
+                CanFrame::data(0, 0x20, false, false, false, vec![]),
+                Direction::Tx,
+            ),
+        ];
+        let messages = on_event(3, "0:5", 0, &session_bus(0), CanEvent::Read(reads)).unwrap();
+        let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
+            panic!("expected one Frames");
+        };
+        let directions: Vec<_> = frames.iter().map(|f| f.direction.as_deref()).collect();
+        assert_eq!(directions, [None, Some("tx")]);
+    }
+
+    #[test]
+    fn echoes_are_asked_for_and_listen_only_reaches_the_device() {
+        let options = gs_usb_options(true);
+        assert!(options.own_frames && options.listen_only);
+        assert_eq!(options.reopen, None);
+        assert!(!gs_usb_options(false).listen_only);
+    }
+
+    #[test]
+    fn an_unplug_ends_the_source_and_any_other_loss_is_an_error() {
+        let lost = |error| {
+            let event = CanEvent::Disconnected {
+                error,
+                consecutive: 1,
+                retry_in: None,
+            };
+            let error = on_event(3, "0:5", 0, &[], event).err().expect("a loss");
+            link_lost(3, DEVICE, error)
+        };
+        assert!(matches!(
+            lost(CanError::Closed),
+            SourceMessage::Ended(3, EndReason::Disconnected)
+        ));
+        let timed_out = std::io::Error::from(std::io::ErrorKind::TimedOut);
+        let SourceMessage::Error(3, message) = lost(CanError::Read(timed_out)) else {
+            panic!("expected an error");
+        };
+        assert!(message.starts_with("gs_usb(0:5): "), "got: {message}");
+    }
 }

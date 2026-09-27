@@ -30,9 +30,6 @@ use super::{
 };
 use crate::capture_store::{self, CaptureKind};
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-use super::gs_usb::encode_frame as encode_gs_usb_frame;
-
 use merge::run_merge_task;
 pub use types::{SerialOverrides, SourceConfig};
 use types::{ControlChannels, SourcePauseFlags, TransmitChannels, TransmitRoute};
@@ -532,15 +529,7 @@ impl IOBroker {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
-            "gs_usb" => encode_gs_usb_frame(&routed_frame, 0).to_vec(),
-            #[cfg(not(target_os = "ios"))]
-            "slcan" => {
-                frame = Some(can_frame(&routed_frame));
-                Vec::new()
-            }
-            #[cfg(target_os = "linux")]
-            "socketcan" => {
+            "slcan" | "socketcan" | "gs_usb" => {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }

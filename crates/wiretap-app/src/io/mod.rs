@@ -47,9 +47,6 @@ pub use recorded::{
 pub use recorded::{BackendApiConfig, BackendApiSource, BackendApiSourceOptions};
 
 // Re-export driver types
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-#[allow(unused_imports)]
-pub use gs_usb::GsUsbConfig;
 pub use bus_mapping::BusMapping;
 pub use gvret::{probe_gvret_tcp, GvretDeviceInfo};
 pub use modbus_tcp::{
