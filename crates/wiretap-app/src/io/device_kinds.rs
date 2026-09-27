@@ -346,7 +346,7 @@ pub fn conn_u8_list(profile: &IOProfile, key: &str) -> Option<Vec<u8>> {
         if let Some(arr) = v.as_array() {
             return Some(arr.iter().filter_map(|n| u8::try_from(n.as_i64()?).ok()).collect());
         }
-        Some(crate::hex::parse_bytes_lenient(v.as_str()?))
+        Some(wiretap_decode::hex::parse_bytes_lenient(v.as_str()?))
     })
 }
 

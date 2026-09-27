@@ -1027,7 +1027,8 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<IngestBytesParams>,
     ) -> Result<CallToolResult, McpError> {
-        let data = crate::hex::parse_bytes(&p.bytes).map_err(|e| err(format!("bytes: {e}")))?;
+        let data = wiretap_decode::hex::parse_bytes(&p.bytes)
+            .map_err(|e| err(format!("bytes: {e}")))?;
         if data.is_empty() {
             return Err(err("bytes is empty"));
         }

@@ -92,7 +92,9 @@ mod desktop {
             )),
             "raw" => {
                 let delimiter = match cfg.delimiter.as_deref() {
-                    Some(hex) => crate::hex::parse_bytes(hex)?,
+                    Some(hex) => {
+                        wiretap_decode::hex::parse_bytes(hex).map_err(|e| e.to_string())?
+                    }
                     None => vec![0x0A], // Default LF
                 };
                 Ok(FramingEncoding::Delimiter(DelimiterOptions {
@@ -356,7 +358,7 @@ mod desktop {
         }
 
         fn rtu(hex: &str) -> Vec<u8> {
-            let mut out = crate::hex::parse_bytes(hex).unwrap();
+            let mut out = wiretap_decode::hex::parse_bytes(hex).unwrap();
             out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
             out
         }

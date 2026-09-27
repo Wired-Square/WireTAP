@@ -592,7 +592,7 @@ pub fn parse_csv_with_mapping(
         } else if let Some(db_col) = data_bytes_col {
             parts
                 .get(db_col)
-                .map(|s| crate::hex::parse_bytes_lenient(s))
+                .map(|s| wiretap_decode::hex::parse_bytes_lenient(s))
                 .unwrap_or_default()
         } else if !data_byte_cols.is_empty() {
             data_byte_cols
@@ -1203,7 +1203,7 @@ fn parse_frame_id_data(s: &str) -> Option<(u32, Option<Vec<u8>>)> {
     let data_part = &s[hash_pos + 1..];
 
     let frame_id = u32::from_str_radix(id_part, 16).ok()?;
-    let bytes = crate::hex::parse_bytes_lenient(data_part);
+    let bytes = wiretap_decode::hex::parse_bytes_lenient(data_part);
     Some((frame_id, Some(bytes)))
 }
 
