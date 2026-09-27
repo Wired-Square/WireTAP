@@ -160,22 +160,27 @@ impl ModbusRtuOptions {
     /// A stream configured for this line. Both opt-ins union with whatever a
     /// catalogue declares, which is the crate's contract for them.
     pub fn stream(&self) -> wiretap_catalog::ModbusRtuStream {
-        wiretap_catalog::ModbusRtuOptions::from(self).stream()
+        self.with_catalog(None).stream()
     }
-}
 
-impl From<&ModbusRtuOptions> for wiretap_catalog::ModbusRtuOptions {
-    fn from(options: &ModbusRtuOptions) -> Self {
-        let mut rtu = Self::default();
-        rtu.device_address = options.device_address;
-        rtu.crc = if options.validate_crc {
+    /// The line's options: what `catalog` declares, with these settings on top.
+    pub fn with_catalog(
+        &self,
+        catalog: Option<&wiretap_catalog::Catalog>,
+    ) -> wiretap_catalog::ModbusRtuOptions {
+        let crc = if self.validate_crc {
             wiretap_catalog::CrcPolicy::Strict
         } else {
             wiretap_catalog::CrcPolicy::Lenient
         };
-        rtu.vendor_functions = options.vendor_functions.clone();
-        rtu.allow_broadcast = options.allow_broadcast;
-        rtu.any_function = options.any_function;
+        let mut rtu = catalog
+            .map(wiretap_catalog::Catalog::rtu_options)
+            .unwrap_or_default()
+            .with_vendor_functions(&self.vendor_functions)
+            .with_device_address(self.device_address)
+            .with_crc_policy(crc);
+        rtu.allow_broadcast |= self.allow_broadcast;
+        rtu.any_function |= self.any_function;
         rtu
     }
 }
@@ -242,6 +247,52 @@ mod tests {
             .map(|m| m.raw)
             .collect();
         assert_eq!(any, vec![request, response, vendor]);
+    }
+
+    #[test]
+    fn the_catalogues_codes_and_rules_union_under_the_pickers_settings() {
+        use wiretap_catalog::{Catalog, CrcPolicy, VendorLen, VendorLength};
+        let catalog = Catalog::parse(
+            r#"
+[meta]
+name = "line"
+[meta.modbus.function_code.0x60]
+lengths = [{ len = { count_at = 6, overhead = 9 } }]
+[meta.modbus.function_code.0x65]
+"#,
+        )
+        .unwrap();
+        let picker = ModbusRtuOptions {
+            device_address: Some(3),
+            validate_crc: false,
+            vendor_functions: vec![0x20],
+            allow_broadcast: true,
+            any_function: false,
+        };
+        let dispatch = VendorLength {
+            function: 0x60,
+            when: None,
+            len: VendorLen::Counted {
+                count_at: 6,
+                overhead: 9,
+            },
+        };
+        let manual = wiretap_catalog::ModbusRtuOptions::default()
+            .with_device_address(Some(3))
+            .with_crc_policy(CrcPolicy::Lenient)
+            .allow_broadcast();
+
+        assert_eq!(
+            picker.with_catalog(Some(&catalog)),
+            manual
+                .clone()
+                .with_vendor_functions(&[0x60, 0x65, 0x20])
+                .with_vendor_lengths(&[dispatch])
+        );
+        assert_eq!(
+            picker.with_catalog(None),
+            manual.with_vendor_functions(&[0x20])
+        );
     }
 
     /// The whole point of the type: exactly one ending is a fault, and the merge

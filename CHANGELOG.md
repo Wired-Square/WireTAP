@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **A catalogue can declare a device's vendor Modbus function codes.** A `[meta.modbus.function_code.<code>]` table names the code and, optionally, how long its messages are. A live Modbus RTU line, framing a stored byte capture and every Modbus tunnel in that catalogue then frame and decode those codes without typing them into the picker. Codes typed there still count, on top of the catalogue's.
+
 ### Changed
 
 - **A Modbus register the device rejects is read less often, not given up on.** A poll group whose reads come back as a Modbus exception keeps polling, backing off to once every 10 minutes, and goes back to its normal interval as soon as a read succeeds. *Max Consecutive Register Errors* now counts connection errors only, so a catalogue with registers your device does not implement no longer stops those groups for good.
@@ -21,6 +25,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A vendor Modbus message is framed whole.** A message whose code the Modbus spec does not define, such as Sungrow's `0x60`, was sometimes framed a byte short when its shorter form also passed the CRC. Declare the code's length in the catalogue and it is framed at that length.
 - **The Decoder's Modbus tab shows times in your time zone.** It always showed UTC, whatever the display setting, so its times disagreed with Discovery's by your UTC offset.
 - **Catalogue coverage counts a mirrored frame's multiplexed signals once.** A frame mirroring a multiplexed frame counted the copied signals as its own, inflating coverage on catalogues such as the SBR blocks; the Decoder now badges them "Inherited".
 - **The catalogue list shows each catalogue's own name.** A catalogue whose first `name =` line was not the one under `[meta]`, or that had a comment on that line, was listed under the wrong name.

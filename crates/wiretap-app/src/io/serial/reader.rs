@@ -12,14 +12,16 @@ use std::sync::{
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
-use wiretap_catalog::{RtuTap, TappedMessage};
+use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
 use wiretap_io::serial::{
     self, Access, LineSettings, SerialError, SerialEvent, SerialOptions, SerialWriter, WriteRefused,
 };
 
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::error::DevicePresence;
-use crate::io::types::{ByteEntry, EndReason, SetFramingRequest, SourceMessage, TransmitRequest};
+use crate::io::types::{
+    ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest, SourceMessage, TransmitRequest,
+};
 use crate::io::FrameMessage;
 
 // Re-export Parity for external use
@@ -71,14 +73,16 @@ enum Framer {
     Serial(SerialFramer),
     /// Stamps each message at its last byte, rather than at the read that
     /// released it.
-    Rtu(RtuTap),
+    Rtu(RtuTap, ModbusRtuOptions),
 }
 
 impl Framer {
-    fn new(encoding: FramingEncoding, line: LineSettings) -> Self {
+    fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalog>) -> Self {
         match encoding {
             FramingEncoding::Raw => Self::Unframed,
-            FramingEncoding::ModbusRtu(options) => Self::Rtu(RtuTap::new(&(&options).into(), line)),
+            FramingEncoding::ModbusRtu(options) => {
+                Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
+            }
             encoding => Self::Serial(SerialFramer::new(encoding)),
         }
     }
@@ -87,7 +91,7 @@ impl Framer {
         match self {
             Self::Unframed => Vec::new(),
             Self::Serial(framer) => stamped(framer.feed(bytes), at),
-            Self::Rtu(tap) => tap.push(bytes, at).into_iter().map(tapped).collect(),
+            Self::Rtu(tap, _) => tap.push(bytes, at).into_iter().map(tapped).collect(),
         }
     }
 
@@ -97,7 +101,7 @@ impl Framer {
         match self {
             Self::Unframed => Vec::new(),
             Self::Serial(framer) => stamped(framer.flush(), now),
-            Self::Rtu(tap) => {
+            Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
                 tap.reset();
                 let leftover = stamped(residue(trailing), now);
@@ -116,6 +120,8 @@ struct LiveLine {
     output_bus: u8,
     bus_mappings: Vec<BusMapping>,
     framer: Framer,
+    /// The session's attached catalogue, whose function codes RTU framing takes.
+    catalog: Option<Arc<Catalog>>,
     frame_id_config: Option<FrameIdConfig>,
     source_address_config: Option<FrameIdConfig>,
     min_frame_length: usize,
@@ -138,7 +144,8 @@ impl LiveLine {
             line: config.line,
             output_bus,
             bus_mappings,
-            framer: Framer::new(config.framing_encoding, config.line),
+            framer: Framer::new(config.framing_encoding, config.line, None),
+            catalog: None,
             frame_id_config: config.frame_id_config,
             source_address_config: config.source_address_config,
             min_frame_length: config.min_frame_length,
@@ -268,6 +275,7 @@ impl LiveLine {
         self.framer = Framer::new(
             framing_from_str(&req.encoding, req.modbus.as_ref()),
             self.line,
+            self.catalog.as_deref(),
         );
         let extraction = |start: Option<i32>, bytes: Option<u8>, big_endian: bool| {
             start.map(|start_byte| FrameIdConfig {
@@ -293,6 +301,19 @@ impl LiveLine {
             self.source_idx,
             req.encoding
         );
+    }
+
+    /// Rebuilds RTU framing when the session's catalogue is attached, swapped
+    /// or detached, dropping any partial message as a framing change does.
+    fn follow_catalog(&mut self, catalog: Option<Arc<Catalog>>) {
+        if catalog.as_ref().map(Arc::as_ptr) == self.catalog.as_ref().map(Arc::as_ptr) {
+            return;
+        }
+        if let Framer::Rtu(_, options) = &self.framer {
+            let encoding = FramingEncoding::ModbusRtu(options.clone());
+            self.framer = Framer::new(encoding, self.line, catalog.as_deref());
+        }
+        self.catalog = catalog;
     }
 }
 
@@ -332,6 +353,7 @@ pub async fn run_source(
     source_idx: usize,
     config: SerialSourceConfig,
     bus_mappings: Vec<BusMapping>,
+    attached_catalog: impl Fn() -> Option<Arc<Catalog>>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
@@ -398,6 +420,7 @@ pub async fn run_source(
                 if stop_flag.load(Ordering::SeqCst) {
                     break;
                 }
+                live.follow_catalog(attached_catalog());
                 while let Ok(req) = control_rx.try_recv() {
                     live.set_framing(req);
                 }
@@ -694,6 +717,45 @@ mod tests {
         let got = frames(line.read(&vendor, at(1_000_000)));
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].bytes, vendor);
+    }
+
+    /// A 0x60 of 19 bytes whose first 18 also pass their CRC: the picker's
+    /// declaration alone frames it short, the catalogue's length rule whole.
+    #[test]
+    fn an_attached_catalogue_frames_its_vendor_code_by_rule() {
+        let dispatch = rtu(&[
+            0x00, 0x60, 0x12, 0x34, 0x00, 0x01, 0x0A, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+            0x00, 0x00, 0x64,
+        ]);
+        assert_eq!(
+            rtu(&dispatch[..16]),
+            dispatch[..18],
+            "the fixture is not ambiguous"
+        );
+        let options = ModbusRtuOptions {
+            vendor_functions: vec![0x60],
+            allow_broadcast: true,
+            ..Default::default()
+        };
+        let catalog = Catalog::parse(
+            r#"
+[meta]
+name = "line"
+[meta.modbus.function_code.0x60]
+lengths = [{ len = { count_at = 6, overhead = 9 } }]
+"#,
+        )
+        .unwrap();
+        let framed_len = |line: &mut LiveLine| -> Vec<usize> {
+            let got = frames(line.read(&dispatch, at(1_000_000)));
+            got.iter().map(|f| f.bytes.len()).collect()
+        };
+
+        let mut line = live(FramingEncoding::ModbusRtu(options), false);
+        assert_eq!(framed_len(&mut line), [18]);
+
+        line.follow_catalog(Some(Arc::new(catalog)));
+        assert_eq!(framed_len(&mut line), [19]);
     }
 
     #[test]

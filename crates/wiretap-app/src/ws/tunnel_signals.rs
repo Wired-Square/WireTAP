@@ -84,7 +84,7 @@ unit = "A"
     /// response inherits its register address from the request before it.
     fn exchange(catalog: &Catalog, messages: &[&str]) -> Vec<ModbusRtuMessage> {
         let declared = catalog.frame(0x1E0).unwrap().tunnel.as_ref().unwrap();
-        let mut t = ModbusRtuStream::new(declared);
+        let mut t = catalog.tunnel_stream(declared);
         let mut out = Vec::new();
         for hex in messages {
             for chunk in hex_bytes(hex).chunks(8) {

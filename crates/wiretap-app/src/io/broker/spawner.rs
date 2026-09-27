@@ -285,7 +285,17 @@ async fn run_serial_reader(
         source_idx, config.framing_encoding, overrides.framing_encoding, config.frame_id_config
     );
 
-    run_serial_source(source_idx, config, bus_mappings, stop_flag, tx).await;
+    let session_id = session_id.to_string();
+    let attached_catalog = move || crate::ws::dispatch::attached_catalog(&session_id);
+    run_serial_source(
+        source_idx,
+        config,
+        bus_mappings,
+        attached_catalog,
+        stop_flag,
+        tx,
+    )
+    .await;
     Ok(())
 }
 

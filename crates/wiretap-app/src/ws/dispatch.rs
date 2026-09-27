@@ -193,7 +193,7 @@ pub fn detach_catalog(session_id: &str) {
     }
 }
 
-fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
+pub(crate) fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
     ATTACHED_CATALOGS
         .read()
         .ok()
@@ -266,6 +266,7 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
 /// archive row that is one whole message already.
 fn feed_tunnels(
     tunnels: Option<&SharedTunnels>,
+    catalog: &wiretap_catalog::Catalog,
     session_id: &str,
     frame: &FrameMessage,
     masked_id: u32,
@@ -297,6 +298,7 @@ fn feed_tunnels(
                     .ok()
                     .and_then(|m| m.get(session_id).cloned())
                     .unwrap_or(fallback)
+                    .with_catalog(Some(catalog))
                     .stream()
             })
             .interpret(&frame.bytes)
@@ -311,7 +313,7 @@ fn feed_tunnels(
     };
     active
         .entry((frame.bus, masked_id))
-        .or_insert_with(|| wiretap_catalog::ModbusRtuStream::new(declared))
+        .or_insert_with(|| catalog.tunnel_stream(declared))
         .push(&frame.bytes)
 }
 
@@ -358,7 +360,7 @@ fn encode_decoded_batch(
     if tunnels.is_some() {
         for (i, f) in frames.iter().enumerate() {
             let masked_id = mask.map_or(f.frame_id, |m| f.frame_id & m);
-            for msg in feed_tunnels(tunnels, session_id, f, masked_id) {
+            for msg in feed_tunnels(tunnels, catalog, session_id, f, masked_id) {
                 if completed.len() == MAX_RENDERED_TUNNEL_MESSAGES {
                     completed.pop_front();
                 }
@@ -1086,6 +1088,60 @@ mod tests {
         }
     }
 
+    fn bare() -> wiretap_catalog::Catalog {
+        wiretap_catalog::Catalog::parse("[meta]\nname = \"bare\"\n").expect("catalogue parses")
+    }
+
+    /// A 0x60 of 19 bytes whose first 18 also pass their CRC.
+    fn dispatch_short_by_one() -> Vec<u8> {
+        let msg = rtu(&[
+            0x00, 0x60, 0x12, 0x34, 0x00, 0x01, 0x0A, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+            0x00, 0x00, 0x64,
+        ]);
+        assert_eq!(rtu(&msg[..16]), msg[..18], "the fixture is not ambiguous");
+        msg
+    }
+
+    fn tunnel_catalogue(function_code: &str) -> wiretap_catalog::Catalog {
+        wiretap_catalog::Catalog::parse(&format!(
+            r#"
+[meta]
+name = "tunnel"
+{function_code}
+[frame.can."0x1E0"]
+length = 8
+[frame.can."0x1E0".tunnel]
+protocol = "modbus_rtu"
+vendor_functions = [0x60]
+allow_broadcast = true
+"#
+        ))
+        .expect("catalogue parses")
+    }
+
+    /// The tunnel's own table declares 0x60, which only a CRC search can frame
+    /// and which stops a byte short; the catalogue's length rule frames it whole.
+    #[test]
+    fn a_tunnel_frames_a_vendor_code_by_its_catalogue_rule() {
+        let msg = dispatch_short_by_one();
+        let framed_by = |catalog: wiretap_catalog::Catalog| -> Vec<usize> {
+            let session = "tunnel-catalogue-rule";
+            attach_catalog(session, None, catalog.clone());
+            let tunnels = tunnel_decoders(session);
+            let lengths = msg
+                .chunks(8)
+                .map(|chunk| framed("can", 0x1E0, chunk.to_vec()))
+                .flat_map(|f| feed_tunnels(tunnels.as_ref(), &catalog, session, &f, 0x1E0))
+                .map(|m| m.raw.len())
+                .collect();
+            detach_catalog(session);
+            lengths
+        };
+        assert_eq!(framed_by(tunnel_catalogue("")), [18]);
+        let ruled = "[meta.modbus.function_code.0x60]\nlengths = [{ len = { count_at = 6, overhead = 9 } }]";
+        assert_eq!(framed_by(tunnel_catalogue(ruled)), [19]);
+    }
+
     fn modbus_session() -> SessionTunnels {
         SessionTunnels {
             declared: HashMap::new(),
@@ -1105,14 +1161,14 @@ mod tests {
             0x01, 0x03, 0x06, 0x02, 0x2B, 0x00, 0x00, 0x00, 0x64,
         ]));
 
-        let out = feed_tunnels(Some(&tunnels), "test", &request, 0);
+        let out = feed_tunnels(Some(&tunnels), &bare(), "test", &request, 0);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].direction, wiretap_catalog::Direction::Request);
         assert_eq!(out[0].start_register, Some(0x6B));
         assert_eq!(out[0].quantity, Some(3));
         assert!(out[0].crc_valid);
 
-        let out = feed_tunnels(Some(&tunnels), "test", &response, 0);
+        let out = feed_tunnels(Some(&tunnels), &bare(), "test", &response, 0);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].direction, wiretap_catalog::Direction::Response);
         // Carried over from the request: a read response has no address of its own.
@@ -1150,21 +1206,24 @@ bit_length = 16
         let vendor = archive_frame(rtu(&[0x02, 0x65, 0x03, 0x00, 0x2E, 0x00, 0x0E]));
         let broadcast = archive_frame(rtu(&[0x00, 0x60, 0x00, 0x00, 0x00, 0x05]));
 
-        assert_eq!(feed_tunnels(Some(&tunnels), "test", &request, 0).len(), 1);
-        let out = feed_tunnels(Some(&tunnels), "test", &response, 0);
+        assert_eq!(
+            feed_tunnels(Some(&tunnels), &catalog, "test", &request, 0).len(),
+            1
+        );
+        let out = feed_tunnels(Some(&tunnels), &catalog, "test", &response, 0);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].start_register, Some(7815));
         let decoded = tunnel_signals::decode_message(&out[0], &catalog);
         assert!(decoded.signals.iter().any(|s| s.name == "First" && s.value == 0x1234 as f64));
         assert_eq!(decoded.transaction["frame"], "block");
 
-        let out = feed_tunnels(Some(&tunnels), "test", &vendor, 0);
+        let out = feed_tunnels(Some(&tunnels), &catalog, "test", &vendor, 0);
         assert_eq!(out.len(), 1, "a vendor code frames without being declared");
         let decoded = tunnel_signals::decode_message(&out[0], &catalog);
         assert_eq!(decoded.transaction["register"], serde_json::Value::Null);
         assert!(!decoded.transaction["data"].as_array().unwrap().is_empty());
 
-        assert_eq!(feed_tunnels(Some(&tunnels), "test", &broadcast, 0).len(), 1, "a broadcast is a message");
+        assert_eq!(feed_tunnels(Some(&tunnels), &catalog, "test", &broadcast, 0).len(), 1, "a broadcast is a message");
     }
 
     /// A message whose CRC disagrees is still reported, flagged — that flag is
@@ -1175,7 +1234,7 @@ bit_length = 16
         let mut bytes = rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]);
         *bytes.last_mut().expect("crc appended") ^= 0xFF;
 
-        let out = feed_tunnels(Some(&tunnels), "test", &serial_frame(bytes), 0);
+        let out = feed_tunnels(Some(&tunnels), &bare(), "test", &serial_frame(bytes), 0);
         assert_eq!(out.len(), 1);
         assert!(!out[0].crc_valid);
     }
@@ -1190,7 +1249,7 @@ bit_length = 16
             serial: None,
         });
         let frame = serial_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
-        assert!(feed_tunnels(Some(&tunnels), "test", &frame, 0).is_empty());
+        assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &frame, 0).is_empty());
     }
 
     /// Serial bytes that are not a whole RTU message yield nothing rather than
@@ -1199,7 +1258,27 @@ bit_length = 16
     fn a_frame_that_is_not_a_whole_message_yields_nothing() {
         let tunnels = Arc::new(modbus_session());
         for bytes in [vec![0x01, 0x03], vec![0x01, 0x03, 0x00, 0x6B, 0x00]] {
-            assert!(feed_tunnels(Some(&tunnels), "test", &serial_frame(bytes), 0).is_empty());
+            assert!(
+                feed_tunnels(Some(&tunnels), &bare(), "test", &serial_frame(bytes), 0).is_empty()
+            );
         }
+    }
+
+    /// `interpret` refuses a code nothing declares, so a catalogue's code has to
+    /// reach it too or the framed message never reaches the Modbus tab.
+    #[test]
+    fn a_framed_serial_port_interprets_the_catalogues_vendor_codes() {
+        let tunnels = Arc::new(modbus_session());
+        let vendor = serial_frame(rtu(&[0x01, 0x60, 0x00, 0x01, 0x0A]));
+        assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &vendor, 0).is_empty());
+        let catalog = wiretap_catalog::Catalog::parse(
+            "[meta]\nname = \"x\"\n[meta.modbus.function_code.0x60]\n",
+        )
+        .expect("catalogue parses");
+        let tunnels = Arc::new(modbus_session());
+        assert_eq!(
+            feed_tunnels(Some(&tunnels), &catalog, "test", &vendor, 0).len(),
+            1
+        );
     }
 }

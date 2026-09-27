@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use wiretap_catalog::{ModbusRtuMessage, ModbusRtuStream};
+use wiretap_catalog::{Catalog, ModbusRtuMessage, ModbusRtuStream};
 
 use crate::io::types::ModbusRtuOptions;
 
@@ -404,6 +404,11 @@ pub struct SerialFramer {
 impl SerialFramer {
     /// Create a new framer with the specified encoding
     pub fn new(encoding: FramingEncoding) -> Self {
+        Self::with_catalog(encoding, None)
+    }
+
+    /// Modbus RTU framing takes `catalog`'s declared function codes too.
+    pub fn with_catalog(encoding: FramingEncoding, catalog: Option<&Catalog>) -> Self {
         let framer: Box<dyn FramerImpl + Send> = match &encoding {
             FramingEncoding::Delimiter {
                 delimiter,
@@ -416,7 +421,7 @@ impl SerialFramer {
             )),
             FramingEncoding::Slip => Box::new(SlipFramer::new()),
             FramingEncoding::ModbusRtu(opts) => Box::new(ModbusRtuFramer {
-                tunnel: opts.stream(),
+                tunnel: opts.with_catalog(catalog).stream(),
             }),
             FramingEncoding::Raw => Box::new(RawFramer::new()),
         };

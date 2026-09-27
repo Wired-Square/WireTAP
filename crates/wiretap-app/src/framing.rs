@@ -172,7 +172,9 @@ mod desktop {
             return Err("No bytes in capture".to_string());
         }
 
-        let (frame_messages, filtered_messages) = frame_messages(&bytes, &config)?;
+        let catalog = crate::ws::dispatch::attached_catalog(&session_id);
+        let (frame_messages, filtered_messages) =
+            frame_messages(&bytes, &config, catalog.as_deref())?;
 
         let frame_count = frame_messages.len();
         let filtered_count = filtered_messages.len();
@@ -221,6 +223,7 @@ mod desktop {
     fn frame_messages(
         bytes: &[capture_store::TimestampedByte],
         config: &BackendFramingConfig,
+        catalog: Option<&wiretap_catalog::Catalog>,
     ) -> Result<(Vec<FrameMessage>, Vec<FrameMessage>), String> {
         // Build default framing encoding from config
         let default_encoding = build_encoding(&config.framing)?;
@@ -247,7 +250,7 @@ mod desktop {
                 None => default_encoding.clone(),
             };
 
-            let mut framer = SerialFramer::new(encoding);
+            let mut framer = SerialFramer::with_catalog(encoding, catalog);
             let mut released = Vec::new();
             for (original_idx, byte) in bus_bytes.iter() {
                 released.extend(framer.feed(&[byte.byte]).into_iter().map(|f| (f, *original_idx)));
@@ -362,7 +365,7 @@ mod desktop {
         }
 
         fn stamps(bytes: &[TimestampedByte], config: &BackendFramingConfig) -> Vec<u64> {
-            let (passed, _) = frame_messages(bytes, config).unwrap();
+            let (passed, _) = frame_messages(bytes, config, None).unwrap();
             passed.iter().map(|m| m.timestamp_us).collect()
         }
 
