@@ -475,15 +475,15 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         if (!bytesCaptureId) return;
         // Clear payload results so framing results are shown
         toolboxStore.setSerialPayloadResults(null);
-        // Scored against whatever this session is framing with, so what the tool
-        // reports is what the framer would actually do.
+        // Scored against whatever this session is framing with, its catalogue
+        // included, so what the tool reports is what the framer would actually do.
         await toolboxStore.runSerialFramingAnalysis(bytesCaptureId, {
           device_address: serialStore.framingConfig?.deviceAddress,
           validate_crc: serialStore.framingConfig?.validateCrc,
           vendor_functions: serialStore.framingConfig?.vendorFunctions,
           allow_broadcast: serialStore.framingConfig?.allowBroadcast,
           any_function: serialStore.framingConfig?.anyFunction,
-        });
+        }, uiStore.ioProfile ?? undefined);
         return;
       }
 

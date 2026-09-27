@@ -277,7 +277,8 @@ interface DiscoveryToolboxState {
 
   runSerialFramingAnalysis: (
     bytesCaptureId: string,
-    modbus?: ModbusRtuOptions
+    modbus?: ModbusRtuOptions,
+    sessionId?: string
   ) => Promise<SerialFramingResult>;
 
   runSerialPayloadAnalysis: (
@@ -682,15 +683,16 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     return changesResults;
   },
 
-  runSerialFramingAnalysis: async (bytesCaptureId, modbus) => {
+  runSerialFramingAnalysis: async (bytesCaptureId, modbus, sessionId) => {
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     // Rust reads the bytes out of the capture store itself, so nothing is
     // copied to the frontend to be analysed.
-    const framingResult = await detectSerialFraming(bytesCaptureId, modbus);
+    const framingResult = await detectSerialFraming(bytesCaptureId, modbus, sessionId);
     const ranked = framingResult.candidates.map((c) => `${c.mode}=${c.confidence} (${c.estimatedFrameCount} frames)`);
     tlog.info(`[discoveryToolboxStore] Serial framing over ${framingResult.byteCount} bytes: ${ranked.join(', ')}; `
-      + `unframed codes [${framingResult.unframedFunctions.map(byteToHex).join(' ')}], ${framingResult.unframedBroadcasts} broadcasts`);
+      + `unframed codes [${framingResult.unframedFunctions.map(byteToHex).join(' ')}], ${framingResult.unframedBroadcasts} broadcasts, `
+      + `rejected codes [${framingResult.rejectedFunctions.map(byteToHex).join(' ')}]`);
     const serialFramingResults: SerialFramingResult = {
       tool: 'serial-framing',
       framingResult,

@@ -9,6 +9,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A catalogue can declare a device's vendor Modbus function codes.** A `[meta.modbus.function_code.<code>]` table names the code and, optionally, how long its messages are. A live Modbus RTU line, framing a stored byte capture and every Modbus tunnel in that catalogue then frame and decode those codes without typing them into the picker. Codes typed there still count, on top of the catalogue's.
 - **The Decoder's Modbus tab shows coil values.** A coil or discrete input read, and a coil write, now lists its states as 1s and 0s from the first coil's address instead of raw bytes. A single-coil write with a value other than on or off, and a coil read whose request was not seen, show their bytes as before.
 - **A vendor Modbus message's request or response label is marked "guessed".** Its side is inferred from the alternation on the line, so the label can be the wrong way round.
+- **Serial Framing analysis frames with the attached catalogue, and names the codes it rejects.** Run from Discovery, it now reads Modbus RTU with the vendor function codes and lengths the session's catalogue declares, as the live line does. A declared code whose messages do not fit its length rule is listed as rejected; check that code's rule in the catalogue.
 
 ### Changed
 
