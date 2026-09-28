@@ -6,28 +6,17 @@
 // Protocol reference: https://github.com/collin80/GVRET
 
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::mpsc;
-use wiretap_io::can::gvret::{open as open_gvret, GvretOptions, Link};
+use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
 use wiretap_io::serial::LineSettings;
 
-use super::common::{
-    absorb_num_buses_reply, handshake_failed, GvretDeviceInfo, NumBusesOutcome, Stream,
-};
+use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, serve, PortOutage, PORT_REOPEN};
-use crate::io::error::IoError;
+use crate::io::can_task::{can_options, link_lost, serve, PortOutage, PORT_REOPEN, PROBE_TIMEOUT};
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
-use wiretap_protocol::gvret;
-
-/// A probe may wait longer than a streaming reader: it is a deliberate user
-/// action against a device that may still be booting, and nothing streams until
-/// it answers.
-const PROBE_NUMBUSES_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ============================================================================
 // Configuration
@@ -60,101 +49,14 @@ fn gvret_usb_device(port: &str) -> String {
     format!("gvret_usb({})", port)
 }
 
-/// Ask a connected device how many buses it has.
-///
-/// The serial counterpart of the TCP query — same outcomes, and the same reason
-/// for collecting into `pending`: a device already streaming interleaves frames
-/// with the reply, and dropping them would lose traffic the session is meant to
-/// capture.
-fn query_num_buses(
-    port: &mut dyn serialport::SerialPort,
-    decoder: &mut gvret::DeviceDecoder,
-    pending: &mut Vec<crate::io::FrameMessage>,
-    timeout: Duration,
-) -> NumBusesOutcome {
-    if let Err(e) = port.write_all(&gvret::REQ_NUM_BUSES) {
-        return NumBusesOutcome::Failed(e.to_string());
-    }
-    let _ = port.flush();
-
-    let deadline = std::time::Instant::now() + timeout;
-    let mut read_buf = [0u8; 2048];
-    while std::time::Instant::now() < deadline {
-        match port.read(&mut read_buf) {
-            // An idle port reports its own read timeout, below — so a zero-length
-            // read here is a real end of stream, not the quiet case.
-            Ok(0) => return NumBusesOutcome::Closed,
-            Ok(n) => {
-                if let Some(count) = absorb_num_buses_reply(decoder, &read_buf[..n], pending) {
-                    return NumBusesOutcome::Answered(count);
-                }
-            }
-            // The port's own timeout paces this loop; nothing arrived this round.
-            Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
-            Err(e) => return NumBusesOutcome::Failed(e.to_string()),
-        }
-    }
-    NumBusesOutcome::Silent
-}
-
-/// Probe a GVRET USB device to discover its capabilities
-///
-/// This function opens the serial port, queries the number of available buses,
-/// and returns device information. The connection is closed after probing.
-///
-/// Returns `IoError` for typed error handling. Use `.map_err(String::from)` if
-/// you need a String error for backwards compatibility.
-pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, IoError> {
-    tlog!(
-        "[probe_gvret_usb] Probing GVRET device at {} (baud: {})",
-        port,
-        baud_rate
-    );
-
-    let device = gvret_usb_device(port);
-
-    // Open serial port
-    let mut serial_port = serialport::new(port, baud_rate)
-        .timeout(Duration::from_millis(500))
-        .open()
-        .map_err(|e| IoError::connection(&device, e.to_string()))?;
-
-    tlog!("[probe_gvret_usb] Opened serial port {}", port);
-
-    // Clear any pending data
-    let _ = serial_port.clear(serialport::ClearBuffer::All);
-
-    // Enter binary mode
-    serial_port
-        .write_all(&gvret::SYNC)
-        .map_err(|e| IoError::protocol(&device, format!("enable binary mode: {}", e)))?;
-    let _ = serial_port.flush();
-
-    // Wait for device to process
-    std::thread::sleep(Duration::from_millis(100));
-
-    let mut decoder = gvret::DeviceDecoder::new();
-    match query_num_buses(
-        &mut *serial_port,
-        &mut decoder,
-        &mut Vec::new(),
-        PROBE_NUMBUSES_TIMEOUT,
-    ) {
-        NumBusesOutcome::Answered(bus_count) => {
-            tlog!(
-                "[probe_gvret_usb] SUCCESS: Device at {} has {} buses available",
-                port,
-                bus_count
-            );
-            Ok(GvretDeviceInfo { bus_count })
-        }
-        NumBusesOutcome::Failed(e) => Err(IoError::read(&device, e)),
-        // A probe reports what it can rather than refusing — see the TCP probe.
-        NumBusesOutcome::Closed | NumBusesOutcome::Silent => {
-            tlog!("[probe_gvret_usb] No NUMBUSES response received, defaulting to 1 bus");
-            Ok(GvretDeviceInfo { bus_count: 1 })
-        }
-    }
+/// Opens the port and asks the bus count, within [`PROBE_TIMEOUT`].
+pub async fn probe_gvret_usb(port: &str, line: LineSettings) -> Result<GvretDeviceInfo, String> {
+    let link = Link::Serial {
+        path: port.to_string(),
+        line,
+    };
+    probed_bus_count(probe(link, PROBE_TIMEOUT).await)
+        .map_err(|e| handshake_failed(&gvret_usb_device(port), e))
 }
 
 // ============================================================================

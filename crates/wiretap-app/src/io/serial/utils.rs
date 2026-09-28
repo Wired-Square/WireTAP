@@ -22,8 +22,8 @@ use crate::settings::IOProfile;
 /// failure can be told apart as "in use" (still present) vs "disconnected/reset"
 /// (gone).
 pub(crate) fn probe_serial_presence(port_name: &str) -> DevicePresence {
-    match serialport::available_ports() {
-        Ok(ports) if ports.iter().any(|p| p.port_name == port_name) => DevicePresence::Present,
+    match wiretap_io::serial::ports() {
+        Ok(ports) if ports.iter().any(|p| p.path == port_name) => DevicePresence::Present,
         Ok(_) => DevicePresence::Absent,
         Err(_) => DevicePresence::Unknown,
     }
@@ -96,15 +96,6 @@ pub fn to_serialport_parity(p: &Parity) -> SpParity {
         Parity::None => SpParity::None,
         Parity::Odd => SpParity::Odd,
         Parity::Even => SpParity::Even,
-    }
-}
-
-/// Convert a parity string ("none", "odd", "even") to serialport crate's Parity type
-pub fn parity_str_to_serialport(s: &str) -> SpParity {
-    match s.to_lowercase().as_str() {
-        "odd" => SpParity::Odd,
-        "even" => SpParity::Even,
-        _ => SpParity::None,
     }
 }
 
@@ -188,20 +179,35 @@ fn extraction(
 }
 
 /// A profile's line, from `io::device_kinds`, the one declaration the form also
-/// seeds from. Out-of-range bits read as 8N1, as they always have.
+/// seeds from.
 pub(crate) fn line_settings(profile: &IOProfile) -> LineSettings {
+    line(
+        conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
+        conn_i64(profile, "data_bits"),
+        conn_i64(profile, "stop_bits"),
+        &conn_str(profile, "parity").unwrap_or_default(),
+    )
+}
+
+/// Out-of-range bits read as 8N1, as they always have.
+pub(crate) fn line(
+    baud: u32,
+    data_bits: Option<i64>,
+    stop_bits: Option<i64>,
+    parity: &str,
+) -> LineSettings {
     LineSettings {
-        baud: conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
-        data_bits: match conn_i64(profile, "data_bits") {
+        baud,
+        data_bits: match data_bits {
             Some(bits @ 5..=7) => bits as u8,
             _ => 8,
         },
-        parity: match conn_str(profile, "parity").unwrap_or_default().as_str() {
+        parity: match parity.to_ascii_lowercase().as_str() {
             "odd" => LineParity::Odd,
             "even" => LineParity::Even,
             _ => LineParity::None,
         },
-        stop_bits: if conn_i64(profile, "stop_bits") == Some(2) { 2 } else { 1 },
+        stop_bits: if stop_bits == Some(2) { 2 } else { 1 },
     }
 }
 

@@ -36,9 +36,9 @@ pub use nusb_driver::run_source;
 // Protocol
 // ============================================================================
 //
-// The identity and the layouts the probe reads are `wiretap_protocol::gs_usb`,
-// re-exported so the probe, the Linux scan and the diagnostic CLI reach them
-// through this module rather than each importing the crate.
+// The identity and the layouts are `wiretap_protocol::gs_usb`, re-exported so
+// the Linux scan and the diagnostic CLI reach them through this module rather
+// than each importing the crate.
 
 pub use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
 
@@ -119,14 +119,14 @@ pub fn get_can_setup_command(interface: String, bitrate: u32) -> String {
 /// Implemented for Windows and macOS (Linux uses SocketCAN).
 /// Uses serial number for stable device matching across USB re-enumeration.
 #[tauri::command]
-pub fn probe_gs_usb_device(
+pub async fn probe_gs_usb_device(
     bus: u8,
     address: u8,
     serial: Option<String>,
 ) -> Result<GsUsbProbeResult, String> {
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        nusb_driver::probe_device(bus, address, serial.as_deref()).map_err(String::from)
+        nusb_driver::probe_device(bus, address, serial).await
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]

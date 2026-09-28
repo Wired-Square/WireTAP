@@ -27,6 +27,10 @@ const STOP_POLL: Duration = Duration::from_millis(50);
 #[cfg(not(target_os = "ios"))]
 pub(crate) const PORT_REOPEN: Option<Duration> = Some(Duration::from_secs(1));
 
+/// How long a probe of a USB or serial adapter may take, open included.
+#[cfg(not(target_os = "ios"))]
+pub(crate) const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// With `reopen: None` the first loss ends the session.
 pub(crate) fn can_options(listen_only: bool, reopen: Option<Duration>) -> CanOptions {
     let mut options = CanOptions::default();

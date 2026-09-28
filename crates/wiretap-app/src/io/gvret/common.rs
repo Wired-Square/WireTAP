@@ -5,18 +5,16 @@
 //
 // The wire itself is `wiretap_protocol::gvret`, shared with WireTAP-Server,
 // which speaks the device end of the same protocol. What is left here is bus
-// mapping, the enumeration policy, and the adapter from the codec's scalars to
-// `FrameMessage`.
+// mapping and the enumeration policy.
 
 use std::time::Duration;
 
-use wiretap_io::can::{CanError, CanEvent};
-use wiretap_protocol::gvret::{self, DeviceMessage};
+use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 
 use crate::io::bus_mapping::{gvret_protocols, BusMapping};
 use crate::io::can_task::{mapped_frames, open_failed};
 use crate::io::types::SourceMessage;
-use crate::io::{now_us, CanTransmitFrame, FrameMessage, TransmitResult};
+use crate::io::{CanTransmitFrame, TransmitResult};
 
 // ============================================================================
 // Constants
@@ -25,46 +23,6 @@ use crate::io::{now_us, CanTransmitFrame, FrameMessage, TransmitResult};
 /// Most CAN buses a GVRET device reports. The NUMBUSES sanity check and any
 /// bus list synthesised from a bare count share this bound.
 pub const MAX_BUSES: u8 = 5;
-
-// ============================================================================
-// Codec Adapters
-// ============================================================================
-
-/// Turn a decoded frame into a `FrameMessage`, or `None` for anything else the
-/// device said.
-///
-/// The device's own timestamp is discarded for the host clock: it counts from
-/// the connection rather than from an epoch and wraps every 71 minutes, so it
-/// cannot be compared with a frame from any other source. The cost is that
-/// inter-frame timing is limited by host scheduling rather than by the adapter.
-///
-/// GVRET has no CAN FD flag, so FD is inferred from the payload length — the
-/// only thing that distinguishes the two.
-pub fn frame_from(msg: DeviceMessage) -> Option<FrameMessage> {
-    let DeviceMessage::Frame {
-        bus,
-        arb_id,
-        extended,
-        data,
-        ..
-    } = msg
-    else {
-        return None;
-    };
-    Some(FrameMessage {
-        protocol: "can".to_string(),
-        timestamp_us: now_us(),
-        frame_id: arb_id,
-        bus,
-        dlc: data.len() as u8,
-        is_fd: data.len() > 8,
-        bytes: data,
-        is_extended: extended,
-        source_address: None,
-        incomplete: None,
-        direction: None, // Received frames don't have direction set
-    })
-}
 
 /// What to believe about a bus count a device reported.
 ///
@@ -80,32 +38,6 @@ pub fn clamp_bus_count(reported: u8) -> u8 {
     }
 }
 
-/// Feed a read into `decoder` while enumerating, appending every frame it
-/// completed to `pending` and answering with the bus count if the reply was
-/// among them.
-///
-/// Frames are kept rather than discarded: a device that is already streaming
-/// interleaves them with the reply, and dropping them would lose traffic the
-/// session is meant to capture. They stay unmapped because the enumeration is
-/// what decides the mapping — the caller maps `pending` once it has one.
-///
-/// Both transports enumerate through the decoder they go on to stream with, so
-/// a message straddling the end of the probe is not seen twice or lost.
-pub fn absorb_num_buses_reply(
-    decoder: &mut gvret::DeviceDecoder,
-    chunk: &[u8],
-    pending: &mut Vec<FrameMessage>,
-) -> Option<u8> {
-    let mut count = None;
-    for msg in decoder.feed(chunk) {
-        match msg {
-            DeviceMessage::NumBuses(n) => count = count.or(Some(clamp_bus_count(n))),
-            other => pending.extend(frame_from(other)),
-        }
-    }
-    count
-}
-
 // ============================================================================
 // Device Info Types
 // ============================================================================
@@ -115,6 +47,18 @@ pub fn absorb_num_buses_reply(
 pub struct GvretDeviceInfo {
     /// Number of CAN buses available on this device (1-5)
     pub bus_count: u8,
+}
+
+/// A probe reports what it can rather than refusing: a device that stays silent
+/// or hangs up is still worth adding as single-bus, which is what the picker has
+/// always shown. A link that never came up is a failure.
+pub fn probed_bus_count(probed: Result<DeviceInfo, CanError>) -> Result<GvretDeviceInfo, CanError> {
+    let bus_count = match probed {
+        Ok(info) => info.buses.map_or(1, clamp_bus_count),
+        Err(CanError::Closed) => 1,
+        Err(e) => return Err(e),
+    };
+    Ok(GvretDeviceInfo { bus_count })
 }
 
 /// Build the bus mappings a session actually streams, from the bus count the
@@ -334,7 +278,7 @@ pub fn validate_gvret_frame(frame: &CanTransmitFrame) -> Result<(), TransmitResu
 mod tests {
     use super::*;
     use std::time::UNIX_EPOCH;
-    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use wiretap_io::can::{CanFrame, CanRead, Direction, TransportError};
     #[test]
     fn test_validate_classic_can_too_long() {
         let frame = CanTransmitFrame {
@@ -485,48 +429,6 @@ mod tests {
             .expect_err("should fail the source");
         assert!(err.contains("connection reset by peer"), "got: {err}");
     }
-    // --- codec adapters ----------------------------------------------------
-
-    fn wire(arb: u32, extended: bool, bus: u8, data: &[u8], fd: bool) -> Vec<u8> {
-        gvret::encode_frame(0x1234, arb, extended, bus, data, fd)
-    }
-
-    #[test]
-    fn a_decoded_frame_becomes_a_frame_message() {
-        let msgs = gvret::DeviceDecoder::new().feed(&wire(0x123, false, 2, &[1, 2, 3, 4], false));
-        let f = frame_from(msgs.into_iter().next().expect("a message")).expect("a frame");
-        assert_eq!((f.frame_id, f.bus, f.dlc), (0x123, 2, 4));
-        assert_eq!(f.bytes, vec![1, 2, 3, 4]);
-        assert!(!f.is_extended && !f.is_fd);
-        assert_eq!(f.protocol, "can");
-    }
-
-    #[test]
-    fn an_extended_frame_keeps_its_id_without_the_flag_bit() {
-        let msgs = gvret::DeviceDecoder::new().feed(&wire(0x12345678, true, 0, &[0xAA], false));
-        let f = frame_from(msgs.into_iter().next().unwrap()).expect("a frame");
-        assert_eq!(f.frame_id, 0x12345678);
-        assert!(f.is_extended);
-    }
-
-    /// GVRET carries no FD flag, so the payload length is the only evidence —
-    /// and `dlc` here is the length, not the code the wire carried.
-    #[test]
-    fn fd_is_inferred_from_the_payload_length() {
-        let msgs = gvret::DeviceDecoder::new().feed(&wire(0x100, false, 0, &[0xAB; 32], true));
-        let f = frame_from(msgs.into_iter().next().unwrap()).expect("a frame");
-        assert!(f.is_fd);
-        assert_eq!(f.dlc, 32, "the length, not code 13");
-        assert_eq!(f.bytes.len(), 32);
-    }
-
-    #[test]
-    fn a_control_reply_is_not_a_frame() {
-        for msg in gvret::DeviceDecoder::new().feed(&gvret::encode_keepalive()) {
-            assert!(frame_from(msg).is_none());
-        }
-    }
-
     #[test]
     fn a_reported_bus_count_is_clamped_to_what_a_device_can_have() {
         assert_eq!(clamp_bus_count(3), 3);
@@ -534,22 +436,40 @@ mod tests {
         assert_eq!(clamp_bus_count(16), MAX_BUSES);
     }
 
-    /// Frames that arrive while the device is being enumerated are traffic the
-    /// session is meant to capture, not noise to drop on the way past.
-    #[test]
-    fn enumeration_keeps_the_frames_that_arrive_with_the_reply() {
-        let mut wire_bytes = wire(0x123, false, 0, &[1], false);
-        wire_bytes.extend(gvret::encode_num_buses(2));
-        wire_bytes.extend(wire(0x124, false, 0, &[2], false));
+    fn probed(buses: Option<u8>) -> Result<DeviceInfo, CanError> {
+        let mut info = DeviceInfo::default();
+        info.buses = buses;
+        Ok(info)
+    }
 
-        let mut decoder = gvret::DeviceDecoder::new();
-        let mut pending = Vec::new();
-        assert_eq!(
-            absorb_num_buses_reply(&mut decoder, &wire_bytes, &mut pending),
-            Some(2)
-        );
-        assert_eq!(pending.len(), 2, "both frames, either side of the reply");
-        assert_eq!(pending[1].frame_id, 0x124);
+    fn bus_count(probed: Result<DeviceInfo, CanError>) -> Option<u8> {
+        probed_bus_count(probed).ok().map(|info| info.bus_count)
+    }
+
+    #[test]
+    fn a_probe_that_heard_a_count_reports_it_clamped() {
+        assert_eq!(bus_count(probed(Some(3))), Some(3));
+        assert_eq!(bus_count(probed(Some(0))), Some(MAX_BUSES));
+    }
+
+    #[test]
+    fn a_silent_or_departed_device_probes_as_one_bus() {
+        assert_eq!(bus_count(probed(None)), Some(1));
+        assert_eq!(bus_count(Err(CanError::Closed)), Some(1));
+    }
+
+    #[test]
+    fn a_link_that_never_came_up_is_a_failed_probe() {
+        let unreachable = CanError::Connect(TransportError::ConnectTimeout {
+            addr: "10.0.0.9:23".parse().unwrap(),
+            after: Duration::from_secs(1),
+        });
+        assert!(matches!(
+            probed_bus_count(Err(unreachable)),
+            Err(CanError::Connect(_))
+        ));
+        let reset = CanError::Read(std::io::Error::other("connection reset"));
+        assert!(probed_bus_count(Err(reset)).is_err());
     }
 
     // --- a source on wiretap_io --------------------------------------------

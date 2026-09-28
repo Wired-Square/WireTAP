@@ -14,7 +14,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
 use wiretap_io::serial::{
-    self, Access, LineSettings, SerialError, SerialEvent, SerialOptions, SerialWriter, WriteRefused,
+    self, ports, Access, LineSettings, PortInfo, PortKind, SerialError, SerialEvent,
+    SerialOptions, SerialWriter, WriteRefused,
 };
 
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
@@ -444,7 +445,7 @@ pub async fn run_source(
 /// The tty (terminal) devices block on open waiting for carrier detect.
 #[tauri::command]
 pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
-    let ports = serialport::available_ports().map_err(|e| format!("Failed to enumerate ports: {}", e))?;
+    let ports = ports().map_err(|e| format!("Failed to enumerate ports: {}", e))?;
 
     Ok(ports
         .into_iter()
@@ -452,44 +453,37 @@ pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
         .filter(|_p| {
             #[cfg(target_os = "macos")]
             {
-                !_p.port_name.starts_with("/dev/tty.")
+                !_p.path.starts_with("/dev/tty.")
             }
             #[cfg(not(target_os = "macos"))]
             {
                 true
             }
         })
-        .map(|p| {
-            let (port_type, manufacturer, product, serial_number, vid, pid) = match p.port_type {
-                serialport::SerialPortType::UsbPort(info) => (
-                    "USB".to_string(),
-                    info.manufacturer,
-                    info.product,
-                    info.serial_number,
-                    Some(info.vid),
-                    Some(info.pid),
-                ),
-                serialport::SerialPortType::BluetoothPort => {
-                    ("Bluetooth".to_string(), None, None, None, None, None)
-                }
-                serialport::SerialPortType::PciPort => {
-                    ("PCI".to_string(), None, None, None, None, None)
-                }
-                serialport::SerialPortType::Unknown => {
-                    ("Unknown".to_string(), None, None, None, None, None)
-                }
-            };
-            SerialPortInfo {
-                port_name: p.port_name,
-                port_type,
-                manufacturer,
-                product,
-                serial_number,
-                vid,
-                pid,
-            }
-        })
+        .map(serial_port_info)
         .collect())
+}
+
+fn serial_port_info(port: PortInfo) -> SerialPortInfo {
+    let (port_type, usb) = match port.kind {
+        PortKind::Usb(usb) => ("USB", Some(usb)),
+        PortKind::Bluetooth => ("Bluetooth", None),
+        PortKind::Pci => ("PCI", None),
+        _ => ("Unknown", None),
+    };
+    let (manufacturer, product, serial_number, vid, pid) = match usb {
+        Some(usb) => (usb.manufacturer, usb.product, usb.serial, Some(usb.vid), Some(usb.pid)),
+        None => (None, None, None, None, None),
+    };
+    SerialPortInfo {
+        port_name: port.path,
+        port_type: port_type.to_string(),
+        manufacturer,
+        product,
+        serial_number,
+        vid,
+        pid,
+    }
 }
 #[cfg(test)]
 mod tests {

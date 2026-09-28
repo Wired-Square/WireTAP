@@ -135,7 +135,7 @@ async fn main() {
                     std::process::exit(1);
                 }
             };
-            commands::cmd_probe(bus, addr, serial.as_deref())
+            commands::cmd_probe(bus, addr, serial.as_deref()).await
         }
 
         Commands::Topology { device, serial } => {

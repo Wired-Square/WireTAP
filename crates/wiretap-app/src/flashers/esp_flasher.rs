@@ -31,8 +31,9 @@ use espflash::flasher::{
     Flasher,
 };
 use espflash::target::{Chip, ProgressCallbacks};
-use serialport::{SerialPortType, UsbPortInfo};
+use serialport::UsbPortInfo;
 use tauri::AppHandle;
+use wiretap_io::serial::{ports, PortKind};
 
 use super::{
     emit_progress,
@@ -359,21 +360,25 @@ fn open_flasher(port: &str, options: &EspFlashOptions) -> Result<Flasher, String
 }
 
 fn lookup_usb_port_info(port: &str) -> UsbPortInfo {
-    if let Ok(ports) = serialport::available_ports() {
-        for info in ports {
-            if info.port_name == port {
-                if let SerialPortType::UsbPort(usb) = info.port_type {
-                    return usb;
-                }
-            }
-        }
-    }
-    UsbPortInfo {
-        vid: 0,
-        pid: 0,
-        serial_number: None,
-        manufacturer: None,
-        product: None,
+    let usb = ports().unwrap_or_default().into_iter().find_map(|info| match info.kind {
+        PortKind::Usb(usb) if info.path == port => Some(usb),
+        _ => None,
+    });
+    match usb {
+        Some(usb) => UsbPortInfo {
+            vid: usb.vid,
+            pid: usb.pid,
+            serial_number: usb.serial,
+            manufacturer: usb.manufacturer,
+            product: usb.product,
+        },
+        None => UsbPortInfo {
+            vid: 0,
+            pid: 0,
+            serial_number: None,
+            manufacturer: None,
+            product: None,
+        },
     }
 }
 

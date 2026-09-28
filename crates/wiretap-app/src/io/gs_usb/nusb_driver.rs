@@ -3,50 +3,21 @@
 // gs_usb on Windows and macOS: the passive probe and device list here, and the
 // session's reader on wiretap-io's CAN task.
 
-use nusb::transfer::{ControlIn, ControlType, Recipient};
-use nusb::{Interface, MaybeFuture};
+use std::io;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
 
 use tokio::sync::mpsc;
 use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
-use wiretap_io::can::{CanError, CanEvent, CanOptions};
+use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
 
-use super::{can_feature, Breq, DeviceConfig, GsUsbDeviceInfo, GsUsbProbeResult, PIDS, VID};
+use super::{GsUsbDeviceInfo, GsUsbProbeResult};
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, mapped_frames, open_failed, serve};
+use crate::io::can_task::{
+    can_options, link_lost, mapped_frames, open_failed, serve, PROBE_TIMEOUT,
+};
 use crate::io::error::IoError;
 use crate::io::types::SourceMessage;
-
-/// Timeout for USB control transfers
-const CONTROL_TIMEOUT: Duration = Duration::from_millis(1000);
-
-// ============================================================================
-// Device Matching
-// ============================================================================
-
-/// Check if a USB device matches by serial number (preferred) or bus:address (fallback).
-/// Returns true if:
-/// - serial is Some and matches the device's serial number, OR
-/// - serial is None and bus:address matches
-pub fn device_matches(dev: &nusb::DeviceInfo, serial: Option<&str>, bus: u8, address: u8) -> bool {
-    // Must be a gs_usb device
-    if dev.vendor_id() != VID || !PIDS.contains(&dev.product_id()) {
-        return false;
-    }
-
-    // Prefer serial number matching when available
-    if let Some(target_serial) = serial {
-        if let Some(dev_serial) = dev.serial_number() {
-            return dev_serial == target_serial;
-        }
-    }
-
-    // Fall back to bus:address matching
-    let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-    dev_bus == bus && dev.device_address() == address
-}
 
 // ============================================================================
 // Device Enumeration
@@ -68,101 +39,40 @@ pub fn list_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
         .collect())
 }
 
-/// Probe a specific gs_usb device to get its capabilities
-pub fn probe_device(bus: u8, address: u8, serial: Option<&str>) -> Result<GsUsbProbeResult, IoError> {
+/// Reads a device's channels, versions and clock without starting a channel.
+pub async fn probe_device(
+    bus: u8,
+    address: u8,
+    serial: Option<String>,
+) -> Result<GsUsbProbeResult, String> {
     let device = format!("gs_usb({}:{})", bus, address);
-
-    // Find the device using blocking .wait()
-    // Prefer serial number matching (stable across re-enumeration) over bus:address
-    let device_info = nusb::list_devices()
-        .wait()
-        .map_err(|e| IoError::other(&device, format!("list USB devices: {}", e)))?
-        .find(|dev| device_matches(dev, serial, bus, address))
-        .ok_or_else(|| IoError::not_found(&device))?;
-
-    // Open the device (also returns MaybeFuture)
-    let dev_handle = device_info
-        .open()
-        .wait()
-        .map_err(|e| IoError::connection(&device, e.to_string()))?;
-
-    // Claim interface 0 (also returns MaybeFuture)
-    let interface = dev_handle
-        .claim_interface(0)
-        .wait()
-        .map_err(|_| IoError::busy(&device))?;
-
-    // Query device config (blocking via wait)
-    let config = get_device_config_sync(&interface)
-        .map_err(|e| IoError::protocol(&device, e))?;
-
-    // Query BT_CONST to get feature flags and clock frequency
-    let (can_clock, supports_fd) = get_bt_const_sync(&interface)
-        .map(|(feature, fclk)| {
-            let fd_supported = feature & can_feature::FD != 0;
-            (Some(fclk), Some(fd_supported))
-        })
-        .unwrap_or((None, None));
-
-    // icount is 0-indexed (number of interfaces - 1), so add 1 to get count
-    Ok(GsUsbProbeResult {
-        success: true,
-        channel_count: Some(config.icount + 1),
-        sw_version: Some(config.sw_version),
-        hw_version: Some(config.hw_version),
-        can_clock,
-        supports_fd,
-        error: None,
-    })
-}
-
-/// Get bit timing constants (feature flags and clock) via USB control transfer (sync version)
-fn get_bt_const_sync(interface: &Interface) -> Result<(u32, u32), String> {
-    let data = interface
-        .control_in(ControlIn {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::BtConst as u8,
-            value: 0, // channel 0
-            index: 0,
-            length: 40,
-        }, CONTROL_TIMEOUT)
-        .wait()
-        .map_err(|e| format!("BT_CONST query failed: {:?}", e))?;
-
-    if data.len() >= 8 {
-        let feature = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        let fclk = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-        Ok((feature, fclk))
-    } else {
-        Err(format!(
-            "Incomplete BT_CONST response: got {} bytes, expected at least 8",
-            data.len()
-        ))
+    let usb = GsUsbDevice {
+        serial,
+        bus,
+        address,
+        product: String::new(),
+    };
+    match gsusb::probe(&usb, PROBE_TIMEOUT).await {
+        Ok(info) => Ok(probe_result(info)),
+        Err(CanError::Open { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
+            Err(IoError::not_found(&device).to_string())
+        }
+        Err(e) => Err(open_failed(&device, e)),
     }
 }
 
-/// Get device configuration via USB control transfer (sync version)
-fn get_device_config_sync(interface: &Interface) -> Result<DeviceConfig, String> {
-    let data = interface
-        .control_in(ControlIn {
-            control_type: ControlType::Vendor,
-            recipient: Recipient::Interface,
-            request: Breq::DeviceConfig as u8,
-            value: 1,
-            index: 0,
-            length: DeviceConfig::SIZE as u16,
-        }, CONTROL_TIMEOUT)
-        .wait()
-        .map_err(|e| format!("Control transfer failed: {:?}", e))?;
-
-    DeviceConfig::from_bytes(&data).ok_or_else(|| {
-        format!(
-            "Incomplete response: got {} bytes, expected {}",
-            data.len(),
-            DeviceConfig::SIZE
-        )
-    })
+/// `DeviceInfo` carries the versions as decimal text; a failed `BT_CONST` leaves
+/// no clock, and then FD is unknown rather than absent.
+fn probe_result(info: DeviceInfo) -> GsUsbProbeResult {
+    GsUsbProbeResult {
+        success: true,
+        channel_count: info.buses,
+        sw_version: info.firmware.and_then(|v| v.parse().ok()),
+        hw_version: info.hardware.and_then(|v| v.parse().ok()),
+        can_clock: info.clock_hz,
+        supports_fd: info.clock_hz.map(|_| info.fd),
+        error: None,
+    }
 }
 
 // ============================================================================
@@ -283,8 +193,8 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::UNIX_EPOCH;
-    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use std::time::{Duration, UNIX_EPOCH};
+    use wiretap_io::can::{CanFrame, CanRead, Direction};
 
     use crate::io::can_task::can_frame;
     use crate::io::types::EndReason;
@@ -307,6 +217,32 @@ mod tests {
             at: UNIX_EPOCH + Duration::from_micros(1_000),
             device_us: Some(1_000),
         }
+    }
+
+    fn probed(clock_hz: Option<u32>) -> DeviceInfo {
+        let mut info = DeviceInfo::default();
+        info.buses = Some(2);
+        info.fd = true;
+        info.firmware = Some("2".into());
+        info.hardware = Some("1".into());
+        info.clock_hz = clock_hz;
+        info
+    }
+
+    #[test]
+    fn a_probe_reports_the_channels_versions_and_clock() {
+        let result = probe_result(probed(Some(80_000_000)));
+        assert!(result.success);
+        assert_eq!(result.channel_count, Some(2));
+        assert_eq!((result.sw_version, result.hw_version), (Some(2), Some(1)));
+        assert_eq!(result.can_clock, Some(80_000_000));
+        assert_eq!(result.supports_fd, Some(true));
+    }
+
+    #[test]
+    fn without_bt_const_fd_is_unknown() {
+        let result = probe_result(probed(None));
+        assert_eq!((result.can_clock, result.supports_fd), (None, None));
     }
 
     #[test]

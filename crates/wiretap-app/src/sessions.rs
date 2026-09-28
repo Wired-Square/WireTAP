@@ -35,6 +35,8 @@ use crate::{
 use crate::io::device_kinds::{self, conn_f64, conn_i64, conn_str, req_str};
 use crate::io::traits::supported_protocols_for_kind;
 use crate::io::probe_gvret_usb;
+#[cfg(not(target_os = "ios"))]
+use crate::io::serial::utils::line_settings;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{
@@ -1770,11 +1772,7 @@ pub async fn probe_gvret_device(
             let port = conn_i64(profile, "port").unwrap_or_default() as u16;
             let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
 
-            // user_message(), not String::from — the latter renders Display, which for
-            // a DNS failure drops the "check your network or VPN" half of the message.
-            probe_gvret_tcp(host, port, timeout_sec)
-                .await
-                .map_err(|e| e.user_message())
+            probe_gvret_tcp(host, port, timeout_sec).await
         }
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
@@ -1783,15 +1781,7 @@ pub async fn probe_gvret_device(
                 .get("port")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            let baud_rate = conn_i64(profile, "baud_rate").unwrap_or_default() as u32;
-
-            // Run blocking serial probe in a dedicated thread
-            let port_owned = port.to_string();
-            tokio::task::spawn_blocking(move || {
-                probe_gvret_usb(&port_owned, baud_rate).map_err(String::from)
-            })
-                .await
-                .map_err(|e| format!("Probe task failed: {}", e))?
+            probe_gvret_usb(port, line_settings(profile)).await
         }
         #[cfg(target_os = "ios")]
         "gvret_usb" => {
@@ -1851,7 +1841,7 @@ pub async fn probe_device(
     profile_id: String,
 ) -> Result<DeviceProbeResult, String> {
     #[cfg(not(target_os = "ios"))]
-    use crate::io::slcan::reader::probe_slcan_device;
+    use crate::io::slcan::reader::probe_slcan;
 
     // Capture IDs — metadata already in memory, no profile lookup needed
     if capture_store::is_known_capture(&profile_id) {
@@ -1935,7 +1925,7 @@ pub async fn probe_device(
                     primary_info: None,
                     secondary_info: None,
                     supports_fd: None,
-                    error: Some(e.user_message()),
+                    error: Some(e),
                 }),
             }
         }
@@ -1945,13 +1935,8 @@ pub async fn probe_device(
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            let baud_rate = profile.connection.get("baud_rate")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(115200) as u32;
-
-            let port_owned = port.to_string();
-            match tokio::task::spawn_blocking(move || probe_gvret_usb(&port_owned, baud_rate)).await {
-                Ok(Ok(info)) => Ok(DeviceProbeResult {
+            match probe_gvret_usb(port, line_settings(profile)).await {
+                Ok(info) => Ok(DeviceProbeResult {
                     success: true,
                     source_type: "gvret".to_string(),
                     is_multi_bus: true,
@@ -1961,16 +1946,6 @@ pub async fn probe_device(
                     supports_fd: None,
                     error: None,
                 }),
-                Ok(Err(e)) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "gvret".to_string(),
-                    is_multi_bus: true,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(e.to_string()),
-                }),
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
                     source_type: "gvret".to_string(),
@@ -1979,7 +1954,7 @@ pub async fn probe_device(
                     primary_info: None,
                     secondary_info: None,
                     supports_fd: None,
-                    error: Some(format!("Probe task failed: {}", e)),
+                    error: Some(e),
                 }),
             }
         }
@@ -2002,16 +1977,8 @@ pub async fn probe_device(
         "slcan" => {
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required for slcan".to_string())?
-                .to_string();
-            let baud_rate = conn_i64(profile, "baud_rate").unwrap_or_default() as u32;
-            let data_bits = conn_i64(profile, "data_bits").map(|v| v as u8);
-            let stop_bits = conn_i64(profile, "stop_bits").map(|v| v as u8);
-            let parity = conn_str(profile, "parity");
-
-            let result = tokio::task::spawn_blocking(move || {
-                probe_slcan_device(port, baud_rate, data_bits, stop_bits, parity)
-            }).await.map_err(|e| format!("Probe task failed: {}", e))?;
+                .ok_or_else(|| "Serial port is required for slcan".to_string())?;
+            let result = probe_slcan(port, line_settings(profile)).await;
 
             Ok(DeviceProbeResult {
                 success: result.success,
@@ -2020,7 +1987,7 @@ pub async fn probe_device(
                 bus_count: if result.success { 1 } else { 0 },
                 primary_info: result.version,
                 secondary_info: result.hardware_version,
-                supports_fd: None,
+                supports_fd: result.supports_fd,
                 error: result.error,
             })
         }
@@ -2054,7 +2021,7 @@ pub async fn probe_device(
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            match probe_gs_usb_device(bus, address, serial) {
+            match probe_gs_usb_device(bus, address, serial).await {
                 Ok(info) => Ok(DeviceProbeResult {
                     success: true,
                     source_type: "gs_usb".to_string(),
@@ -2121,9 +2088,10 @@ pub async fn probe_device(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required".to_string())?;
 
-            // Try to check if port exists
-            let available_ports = serialport::available_ports().unwrap_or_default();
-            let port_exists = available_ports.iter().any(|p| p.port_name == port);
+            let port_exists = wiretap_io::serial::ports()
+                .unwrap_or_default()
+                .iter()
+                .any(|p| p.path == port);
 
             if port_exists {
                 Ok(DeviceProbeResult {

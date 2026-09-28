@@ -11,23 +11,20 @@
 //   RTR:      r<ID:3hex><DLC:1hex>\r / R<ID:8hex><DLC:1hex>\r
 
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
 use std::sync::{atomic::AtomicBool, Arc};
-use std::time::Duration;
 
 use tokio::sync::mpsc;
-use wiretap_io::can::slcan::{open as open_slcan, SlcanOptions};
-use wiretap_io::can::{CanError, CanEvent};
+use wiretap_io::can::slcan::{open as open_slcan, probe, SlcanOptions};
+use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use wiretap_io::serial::LineSettings;
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
     can_options, link_lost, mapped_frames, open_failed, serve, PortOutage, PORT_REOPEN,
+    PROBE_TIMEOUT,
 };
-use crate::io::error::IoError;
-use crate::io::serial::utils::{self as serial_utils, probe_serial_presence};
+use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
-use wiretap_protocol::slcan;
 
 // ============================================================================
 // Types and Configuration
@@ -110,233 +107,35 @@ pub struct SlcanProbeResult {
     pub error: Option<String>,
 }
 
-/// Probe an slcan device to check if it's responding and get version info.
-///
-/// This opens the port briefly, sends version query commands, and closes it.
-/// The slcan protocol defines:
-/// - V: Firmware version
-/// - v: Hardware version
-/// - N: Serial number
-///
-/// CANable devices typically respond to V with something like "V1013\r"
-///
-/// Optional serial framing parameters (defaults: 8N1):
-/// - data_bits: 5, 6, 7, or 8 (default: 8)
-/// - stop_bits: 1 or 2 (default: 1)
-/// - parity: "none", "odd", "even" (default: "none")
-#[tauri::command]
-pub fn probe_slcan_device(
-    port: String,
-    baud_rate: u32,
-    data_bits: Option<u8>,
-    stop_bits: Option<u8>,
-    parity: Option<String>,
-) -> SlcanProbeResult {
-    // Convert serial framing parameters with defaults
-    let data_bits = serial_utils::to_serialport_data_bits(data_bits.unwrap_or(8));
-    let stop_bits = serial_utils::to_serialport_stop_bits(stop_bits.unwrap_or(1));
-    let parity =
-        serial_utils::parity_str_to_serialport(&parity.unwrap_or_else(|| "none".to_string()));
+/// Opens the port, asks `V`, `v` and `N`, and closes it, within [`PROBE_TIMEOUT`].
+pub async fn probe_slcan(port: &str, line: LineSettings) -> SlcanProbeResult {
+    probe_result(
+        &format!("slcan({})", port),
+        probe(port, line, PROBE_TIMEOUT).await,
+    )
+}
 
-    let device = format!("slcan({})", port);
-
-    // Open the port with a short timeout
-    let mut serial_port = match serialport::new(&port, baud_rate)
-        .data_bits(data_bits)
-        .stop_bits(stop_bits)
-        .parity(parity)
-        .timeout(Duration::from_millis(500))
-        .open()
-    {
-        Ok(p) => p,
-        Err(e) => {
-            return SlcanProbeResult {
-                success: false,
-                version: None,
-                hardware_version: None,
-                serial_number: None,
-                supports_fd: None,
-                error: Some(IoError::connection(&device, e.to_string()).to_string()),
-            };
-        }
-    };
-
-    // Wait for USB device to be ready
-    std::thread::sleep(Duration::from_millis(200));
-
-    // Clear any pending data
-    let _ = serial_port.clear(serialport::ClearBuffer::All);
-
-    // Close any existing channel first (in case device is in open state)
-    let _ = serial_port.write_all(slcan::CLOSE.as_bytes());
-    let _ = serial_port.flush();
-    std::thread::sleep(Duration::from_millis(50));
-
-    // Clear again after close
-    let _ = serial_port.clear(serialport::ClearBuffer::All);
-
-    let mut version: Option<String> = None;
-    let mut hardware_version: Option<String> = None;
-    let mut serial_number: Option<String> = None;
-    let mut is_elmue_firmware = false;
-    let mut got_any_response = false;
-
-    // Firmware version. Two shapes of answer, and the extended one is also the
-    // only evidence a device speaks CAN FD — SLCAN has no capability query.
-    if let Some(response) = send_and_read_all(&mut serial_port, slcan::QUERY_VERSION.as_bytes()) {
-        got_any_response = true;
-        if let Some(reply) = meaningful(&response) {
-            let v = slcan::parse_version(reply);
-            is_elmue_firmware = v.elmue;
-            version = v.firmware;
-            hardware_version = match (v.board, v.mcu) {
-                (Some(board), Some(mcu)) => Some(format!("{} {}", board, mcu)),
-                (board, mcu) => board.or(mcu),
-            };
-        }
-    }
-
-    // Hardware version, for devices that answer it — skipped when the extended
-    // V reply already said.
-    if hardware_version.is_none() {
-        if let Some(response) = send_and_read(&mut serial_port, slcan::QUERY_HW_VERSION.as_bytes())
-        {
-            got_any_response = true;
-            hardware_version = meaningful(&response).map(|r| strip_echo(r, 'v'));
-        }
-    }
-
-    // Serial number, likewise optional.
-    if let Some(response) = send_and_read(&mut serial_port, slcan::QUERY_SERIAL.as_bytes()) {
-        got_any_response = true;
-        serial_number = meaningful(&response).map(|r| strip_echo(r, 'N'));
-    }
-
-    // Detect CAN FD support from firmware identification.
-    // The Elmue CANable 2.5 firmware (identified by extended V response with "Firmware:" field)
-    // supports CAN FD on STM32G4xx MCUs. Standard slcan firmware does not support FD.
-    let supports_fd = if got_any_response {
-        Some(is_elmue_firmware)
-    } else {
-        None
-    };
-
-    // Close the port
-    drop(serial_port);
-
-    if got_any_response {
-        SlcanProbeResult {
+fn probe_result(device: &str, probed: Result<DeviceInfo, CanError>) -> SlcanProbeResult {
+    match probed {
+        Ok(info) => SlcanProbeResult {
             success: true,
-            version,
-            hardware_version,
-            serial_number,
-            supports_fd,
+            version: info.firmware,
+            hardware_version: info.hardware,
+            serial_number: info.serial,
+            supports_fd: Some(info.fd),
             error: None,
-        }
-    } else {
-        SlcanProbeResult {
+        },
+        Err(e) => SlcanProbeResult {
             success: false,
             version: None,
             hardware_version: None,
             serial_number: None,
             supports_fd: None,
-            error: Some("No response from device".to_string()),
-        }
-    }
-}
-
-/// A reply worth reading: neither empty nor the device's bell.
-fn meaningful(response: &str) -> Option<&str> {
-    let t = response.trim();
-    (!t.is_empty() && t.as_bytes() != [slcan::BELL]).then_some(t)
-}
-
-/// Drop the command letter a device echoes back before its answer.
-fn strip_echo(reply: &str, cmd: char) -> String {
-    reply.strip_prefix(cmd).unwrap_or(reply).to_string()
-}
-
-/// Send a command and read the full response (larger buffer, longer wait).
-/// Used for V command which may return extended multi-line responses from Elmue firmware.
-fn send_and_read_all(port: &mut Box<dyn serialport::SerialPort>, cmd: &[u8]) -> Option<String> {
-    if port.write_all(cmd).is_err() {
-        return None;
-    }
-    let _ = port.flush();
-
-    // Longer wait for extended responses
-    std::thread::sleep(Duration::from_millis(200));
-
-    let mut buf = [0u8; 512];
-    let mut response = String::new();
-
-    // Read until timeout — collect everything the device sends
-    for _ in 0..10 {
-        match port.read(&mut buf) {
-            Ok(n) if n > 0 => {
-                for &b in &buf[..n] {
-                    if b == slcan::BELL {
-                        return Some("\x07".to_string());
-                    }
-                    if b.is_ascii() && (b >= 0x20 || b == b'\r' || b == b'\n') {
-                        response.push(b as char);
-                    }
-                }
-            }
-            _ => break,
-        }
-    }
-
-    if response.is_empty() {
-        None
-    } else {
-        Some(response)
-    }
-}
-
-/// Send a command and read the response
-fn send_and_read(port: &mut Box<dyn serialport::SerialPort>, cmd: &[u8]) -> Option<String> {
-    // Send command
-    if port.write_all(cmd).is_err() {
-        return None;
-    }
-    let _ = port.flush();
-
-    // Wait for response
-    std::thread::sleep(Duration::from_millis(100));
-
-    // Read response
-    let mut buf = [0u8; 64];
-    let mut response = String::new();
-
-    // Try to read with a few attempts
-    for _ in 0..3 {
-        match port.read(&mut buf) {
-            Ok(n) if n > 0 => {
-                // Filter out non-printable characters except CR/LF
-                for &b in &buf[..n] {
-                    if b == slcan::BELL {
-                        // Bell character indicates error
-                        return Some("\x07".to_string());
-                    }
-                    if b.is_ascii() && (b >= 0x20 || b == b'\r' || b == b'\n') {
-                        response.push(b as char);
-                    }
-                }
-                if response.contains('\r') || response.contains('\n') {
-                    break;
-                }
-            }
-            Ok(_) => break,
-            Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => break,
-            Err(_) => break,
-        }
-    }
-
-    if response.is_empty() {
-        None
-    } else {
-        Some(response)
+            error: Some(match e {
+                CanError::Handshake(_) => "No response from device".to_string(),
+                other => open_failed(device, other),
+            }),
+        },
     }
 }
 
@@ -429,8 +228,8 @@ mod tests {
     use super::*;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
-    use std::time::UNIX_EPOCH;
-    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use std::time::{Duration, UNIX_EPOCH};
+    use wiretap_io::can::{CanFrame, CanRead, Direction};
     use wiretap_io::serial::Parity;
 
     fn mapping(enabled: bool, output_bus: u8) -> BusMapping {
@@ -530,17 +329,19 @@ mod tests {
         assert_eq!(source(lost(CanError::Closed)).len(), 1, "a new outage");
     }
 
+    const LINE_8N1: LineSettings = LineSettings {
+        baud: 115_200,
+        data_bits: 8,
+        parity: Parity::None,
+        stop_bits: 1,
+    };
+
     async fn first_message(bitrate: u32) -> SourceMessage {
         let (tx, mut rx) = mpsc::channel(8);
         run_source(
             3,
             "/nonexistent/wiretap-slcan".to_string(),
-            LineSettings {
-                baud: 115_200,
-                data_bits: 8,
-                parity: Parity::None,
-                stop_bits: 1,
-            },
+            LINE_8N1,
             bitrate,
             false,
             None,
@@ -576,15 +377,39 @@ mod tests {
     }
 
     #[test]
-    fn a_bell_is_not_a_reply() {
-        assert_eq!(meaningful("V1013\r"), Some("V1013"));
-        assert_eq!(meaningful("\x07"), None);
-        assert_eq!(meaningful("  \r\n"), None);
+    fn a_device_that_answered_reports_what_it_said() {
+        let mut info = DeviceInfo::default();
+        info.firmware = Some("1013".into());
+        info.hardware = Some("CANable2 STM32G431".into());
+        info.serial = Some("0012".into());
+        info.fd = true;
+        let result = probe_result("slcan(p)", Ok(info));
+        assert!(result.success);
+        assert_eq!(result.version.as_deref(), Some("1013"));
+        assert_eq!(
+            result.hardware_version.as_deref(),
+            Some("CANable2 STM32G431")
+        );
+        assert_eq!(result.serial_number.as_deref(), Some("0012"));
+        assert_eq!(result.supports_fd, Some(true));
     }
 
     #[test]
-    fn an_echoed_command_letter_is_dropped() {
-        assert_eq!(strip_echo("N0012", 'N'), "0012");
-        assert_eq!(strip_echo("0012", 'N'), "0012");
+    fn silence_is_no_response() {
+        let result = probe_result(
+            "slcan(p)",
+            Err(CanError::Handshake("no answer to V, v or N")),
+        );
+        assert!(!result.success);
+        assert_eq!(result.error.as_deref(), Some("No response from device"));
+        assert_eq!(result.supports_fd, None);
+    }
+
+    #[tokio::test]
+    async fn a_port_that_will_not_open_fails_the_probe_and_is_named() {
+        let result = probe_slcan("/nonexistent/wiretap-slcan", LINE_8N1).await;
+        assert!(!result.success);
+        let error = result.error.expect("an error");
+        assert!(error.contains("/nonexistent/wiretap-slcan"), "got: {error}");
     }
 }

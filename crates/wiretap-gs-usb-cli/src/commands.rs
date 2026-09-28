@@ -1,10 +1,9 @@
 // Subcommand implementations for gs_usb_cli.
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
 use wiretap_io::can::{CanEvent, CanFrame, CanOptions, CanTask, Direction};
-use wiretap_lib::io::gs_usb::nusb_driver::probe_device;
 
 use crate::usb_diag;
 
@@ -35,21 +34,21 @@ pub fn cmd_list() -> Result<(), String> {
 // probe
 // ============================================================================
 
-pub fn cmd_probe(bus: u8, address: u8, serial: Option<&str>) -> Result<(), String> {
-    let result = probe_device(bus, address, serial).map_err(|e| e.to_string())?;
+pub async fn cmd_probe(bus: u8, address: u8, serial: Option<&str>) -> Result<(), String> {
+    let info = gsusb::probe(&usb_device(bus, address, serial), Duration::from_secs(2))
+        .await
+        .map_err(|e| e.to_string())?;
     println!("Probe result for {}:{}", bus, address);
-    println!("  Channels: {}", result.channel_count.unwrap_or(0));
-    println!("  SW version: {}", result.sw_version.unwrap_or(0));
-    println!("  HW version: {}", result.hw_version.unwrap_or(0));
-    if let Some(clock) = result.can_clock {
+    println!("  Channels: {}", info.buses.unwrap_or(0));
+    println!("  SW version: {}", info.firmware.as_deref().unwrap_or("0"));
+    println!("  HW version: {}", info.hardware.as_deref().unwrap_or("0"));
+    if let Some(clock) = info.clock_hz {
         println!(
             "  CAN clock: {} Hz ({:.1} MHz)",
             clock,
             clock as f64 / 1_000_000.0
         );
-    }
-    if let Some(fd) = result.supports_fd {
-        println!("  FD support: {}", fd);
+        println!("  FD support: {}", info.fd);
     }
     Ok(())
 }
@@ -81,6 +80,15 @@ pub fn cmd_topology(bus: u8, address: u8, serial: Option<&str>) -> Result<(), St
 // Opening a channel
 // ============================================================================
 
+fn usb_device(bus: u8, address: u8, serial: Option<&str>) -> GsUsbDevice {
+    GsUsbDevice {
+        serial: serial.map(str::to_owned),
+        bus,
+        address,
+        product: String::new(),
+    }
+}
+
 fn channel_options(
     bus: u8,
     address: u8,
@@ -89,13 +97,7 @@ fn channel_options(
     channel: u8,
     can_clock: Option<u32>,
 ) -> GsUsbOptions {
-    let device = GsUsbDevice {
-        serial: serial.map(str::to_owned),
-        bus,
-        address,
-        product: String::new(),
-    };
-    let mut gs = GsUsbOptions::new(device, bitrate);
+    let mut gs = GsUsbOptions::new(usb_device(bus, address, serial), bitrate);
     gs.channel = channel;
     gs.clock_hz = can_clock;
     gs

@@ -138,9 +138,8 @@ fn platform_list_serial_ports() -> Result<Vec<SerialPortInfoCompat>, String> {
 }
 
 /// Probe slcan device - not supported on iOS
-/// Named with platform_ prefix to avoid macro name collision with io::slcan::reader::probe_slcan_device
 #[tauri::command(rename_all = "snake_case")]
-fn platform_probe_slcan_device(
+async fn platform_probe_slcan_device(
     port: String,
     baud_rate: u32,
     data_bits: Option<u8>,
@@ -149,7 +148,13 @@ fn platform_probe_slcan_device(
 ) -> SlcanProbeResultCompat {
     #[cfg(not(target_os = "ios"))]
     {
-        let result = io::slcan::reader::probe_slcan_device(port, baud_rate, data_bits, stop_bits, parity);
+        let line = io::serial::utils::line(
+            baud_rate,
+            data_bits.map(i64::from),
+            stop_bits.map(i64::from),
+            parity.as_deref().unwrap_or_default(),
+        );
+        let result = io::slcan::reader::probe_slcan(&port, line).await;
         SlcanProbeResultCompat {
             success: result.success,
             version: result.version,
