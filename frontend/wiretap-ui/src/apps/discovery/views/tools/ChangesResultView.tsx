@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/tools/ChangesResultView.tsx
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download, X } from "lucide-react";
 import { iconSm, iconXs, iconLg, flexRowGap2 } from "../../../../styles/spacing";
@@ -17,10 +17,11 @@ import { Button, IconButton } from "../../../../components/Button";
 import { Badge, type BadgeStyleProps, type BadgeTone } from "../../../../components/Badge";
 import { Card } from "../../../../components/Card";
 
-// Helper to build a set of byte indices that are part of multi-byte patterns
+// A text run is a reading of the bytes, not a numeric field, so the roles under it stay visible.
 function getBytesInMultiBytePatterns(patterns: MultiBytePattern[]): Set<number> {
   const bytes = new Set<number>();
   for (const pattern of patterns) {
+    if (pattern.pattern === 'text') continue;
     for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
       bytes.add(i);
     }
@@ -688,47 +689,20 @@ type ByteVisualizationProps = {
 };
 
 function ByteVisualization({ byteStats, multiBytePatterns, sampleCount }: ByteVisualizationProps) {
-  // Build a map of byte index -> pattern for quick lookup
-  const patternByStartByte = new Map<number, MultiBytePattern>();
-  const bytesInPatterns = new Set<number>();
-
-  for (const pattern of multiBytePatterns) {
-    patternByStartByte.set(pattern.startByte, pattern);
-    for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
-      bytesInPatterns.add(i);
-    }
-  }
-
-  // Build visualization elements in byte order
-  const elements: React.ReactNode[] = [];
-  let i = 0;
-
-  while (i < byteStats.length) {
-    const byte = byteStats[i];
-    const pattern = patternByStartByte.get(byte.byteIndex);
-
-    if (pattern) {
-      // Render multi-byte pattern chip
-      elements.push(
-        <MultiByteChip key={`pattern-${pattern.startByte}`} pattern={pattern} />
-      );
-      // Skip the bytes covered by this pattern
-      i += pattern.length;
-    } else if (bytesInPatterns.has(byte.byteIndex)) {
-      // This byte is part of a pattern but not the start - skip it
-      i++;
-    } else {
-      // Render single byte chip
-      elements.push(
-        <ByteChip key={`byte-${byte.byteIndex}`} byte={byte} sampleCount={sampleCount} />
-      );
-      i++;
-    }
-  }
+  const patternByStartByte = new Map(multiBytePatterns.map((p) => [p.startByte, p]));
+  const bytesInPatterns = getBytesInMultiBytePatterns(multiBytePatterns);
 
   return (
     <div className="flex flex-wrap gap-1">
-      {elements}
+      {byteStats.map((byte) => {
+        const pattern = patternByStartByte.get(byte.byteIndex);
+        return (
+          <Fragment key={byte.byteIndex}>
+            {pattern && <MultiByteChip pattern={pattern} />}
+            {!bytesInPatterns.has(byte.byteIndex) && <ByteChip byte={byte} sampleCount={sampleCount} />}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
