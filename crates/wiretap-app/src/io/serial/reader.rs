@@ -69,7 +69,7 @@ fn tapped(tapped: TappedMessage) -> (SerialFrame, u64) {
 
 enum Framer {
     Unframed,
-    Serial(SerialFramer),
+    Serial(SerialFramer, LineSettings),
     /// Stamps each message at its last byte, rather than at the read that
     /// released it.
     Rtu(RtuTap, ModbusRtuOptions),
@@ -81,14 +81,26 @@ impl Framer {
             FramingEncoding::ModbusRtu(options) => {
                 Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
             }
-            encoding => SerialFramer::new(encoding).map_or(Self::Unframed, Self::Serial),
+            encoding => SerialFramer::new(encoding)
+                .map_or(Self::Unframed, |framer| Self::Serial(framer, line)),
         }
     }
 
     fn feed(&mut self, bytes: &[u8], at: SystemTime) -> Vec<(SerialFrame, u64)> {
         match self {
             Self::Unframed => Vec::new(),
-            Self::Serial(framer) => stamped(framer.feed(bytes), at),
+            Self::Serial(framer, line) => {
+                let frames = framer.feed(bytes);
+                let fed = framer.bytes_fed();
+                let at_us = micros(at);
+                frames
+                    .into_iter()
+                    .map(|f| {
+                        let behind = line.wire_time(fed - f.end_offset).as_micros() as u64;
+                        (f, at_us.saturating_sub(behind))
+                    })
+                    .collect()
+            }
             Self::Rtu(tap, _) => tap.push(bytes, at).into_iter().map(tapped).collect(),
         }
     }
@@ -98,7 +110,7 @@ impl Framer {
     fn finish(&mut self, now: SystemTime) -> Vec<(SerialFrame, u64)> {
         match self {
             Self::Unframed => Vec::new(),
-            Self::Serial(framer) => stamped(framer.flush(), now),
+            Self::Serial(framer, _) => stamped(framer.flush(), now),
             Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
                 let leftover = stamped(residue(trailing, tap.bytes_fed()), now);
@@ -692,6 +704,19 @@ mod tests {
         assert_eq!(
             got.iter().map(|f| f.timestamp_us).collect::<Vec<_>>(),
             [1_000_000 - 7_291, 1_000_000]
+        );
+    }
+
+    #[test]
+    fn slip_frames_in_one_read_are_stamped_at_their_own_last_byte() {
+        let mut line = live(FramingEncoding::Slip, false);
+
+        let got = frames(line.read(&[1, 2, 0xC0, 3, 4, 0xC0], at(1_000_000)));
+
+        // The second frame's 3 bytes follow the first's END: 3 × 10 bits at 9600 baud.
+        assert_eq!(
+            got.iter().map(|f| f.timestamp_us).collect::<Vec<_>>(),
+            [1_000_000 - 3_125, 1_000_000]
         );
     }
 

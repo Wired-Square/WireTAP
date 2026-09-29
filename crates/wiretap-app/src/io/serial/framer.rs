@@ -165,6 +165,14 @@ impl SerialFramer {
         }
     }
 
+    pub fn bytes_fed(&self) -> u64 {
+        match self {
+            Self::Delimiter(framer) => framer.bytes_fed(),
+            Self::Slip(decoder) => decoder.bytes_fed(),
+            Self::Rtu(stream) => stream.bytes_fed(),
+        }
+    }
+
     /// Flush at end of stream. Modbus RTU can still recover whole messages from
     /// what it holds, so this returns those first and the residue last; the
     /// other encodings only ever have a residue.
