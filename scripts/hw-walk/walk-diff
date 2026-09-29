@@ -342,7 +342,7 @@ def score(ref, wt, direction="opposite"):
             **{k: pair_examples(v) for k, v in mismatches.items()},
             "direction": pair_examples(direction_mismatches),
         },
-        "pass": not failures,
+        "pass": bool(ref) and not failures,
     }
 
 

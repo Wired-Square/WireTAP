@@ -91,6 +91,11 @@ class WalkDiff(unittest.TestCase):
         self.assert_only(report)
         self.assertEqual(report["gap_error_us"]["median"], 0)
 
+    def test_an_empty_reference_fails(self):
+        code, report = self.run_diff([], [])
+        self.assertEqual(code, 1)
+        self.assertFalse(report["pass"])
+
     def test_a_drop_is_counted_and_fails(self):
         ref = cangen_log(50)
         wt = [frame_json(line) for i, line in enumerate(ref) if i != 20]
