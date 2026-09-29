@@ -50,6 +50,8 @@ pub async fn discover_checksums_in_capture_cmd(
 /// of the fields the frontend sends.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DiscoveryFrame {
+    #[serde(default)]
+    pub protocol: Option<String>,
     pub frame_id: u32,
     pub bytes: Vec<u8>,
     #[serde(default)]

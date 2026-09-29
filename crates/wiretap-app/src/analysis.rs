@@ -4,7 +4,7 @@
 // (`capture_id`) or a WireTAP backend (`profile_id`):
 //
 //   - frame_inventory   — per-frame-id rollup (count, first/last, dlc)
-//   - byte_profile      — per-byte static/counter/sensor roles for one frame
+//   - byte_profile      — per-byte roles, patterns and mux cases for one frame
 //   - checksum_scan     — what explains each frame id, if anything
 //   - catalog_coverage  — diff a catalog against a source + confidence rollup
 //
@@ -16,6 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 use tauri::AppHandle;
+use wiretap_analysis::{profile_bytes, ByteProfile};
 use wiretap_catalog::model::Confidence;
 
 use wiretap_decode::frame_id::format_frame_id;
@@ -41,71 +42,29 @@ pub fn resolve(
     }
 }
 
-// ── Result types ─────────────────────────────────────────────────────────────
-
+/// One frame's byte profile, as the Changes view and the MCP tools report it.
 #[derive(Debug, Clone, Serialize)]
-pub struct ByteStat {
-    pub index: usize,
-    pub distinct: usize,
-    pub min: u8,
-    pub max: u8,
-    pub changes: usize,
-    /// "static" (never changes), "counter" (dominant fixed step) or "sensor".
-    pub role: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ByteProfile {
+#[serde(rename_all = "camelCase")]
+pub struct FrameByteProfile {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
     pub frame_id: u32,
+    pub is_extended: bool,
     pub frame_id_hex: String,
-    pub sampled: usize,
-    pub max_len: usize,
-    pub bytes: Vec<ByteStat>,
+    #[serde(flatten)]
+    pub profile: ByteProfile,
 }
 
-// ── Pure byte-role analysis ──────────────────────────────────────────────────
-
-/// Classify each byte position across a set of payloads into static / counter /
-/// sensor, with distinct/min/max/change counts. Pure and headless.
-pub fn compute_byte_profile(payloads: &[Vec<u8>]) -> (usize, Vec<ByteStat>) {
-    let max_len = payloads.iter().map(|p| p.len()).max().unwrap_or(0);
-    let mut bytes = Vec::with_capacity(max_len);
-
-    for index in 0..max_len {
-        // Values at this position, in order, from payloads long enough to have it.
-        let values: Vec<u8> = payloads.iter().filter_map(|p| p.get(index).copied()).collect();
-        if values.is_empty() {
-            continue;
+impl FrameByteProfile {
+    pub fn new(protocol: Option<&str>, frame_id: u32, is_extended: bool, payloads: &[Vec<u8>]) -> Self {
+        Self {
+            protocol: protocol.map(str::to_owned),
+            frame_id,
+            is_extended,
+            frame_id_hex: format_frame_id(frame_id, is_extended),
+            profile: profile_bytes(payloads),
         }
-
-        let distinct: HashSet<u8> = values.iter().copied().collect();
-        let min = *values.iter().min().unwrap();
-        let max = *values.iter().max().unwrap();
-
-        // Transition deltas (wrapping) to detect counters and count changes.
-        let mut deltas: HashMap<u8, usize> = HashMap::new();
-        for w in values.windows(2) {
-            *deltas.entry(w[1].wrapping_sub(w[0])).or_default() += 1;
-        }
-        let transitions = values.len().saturating_sub(1);
-        let changes: usize = deltas.iter().filter(|(d, _)| **d != 0).map(|(_, c)| c).sum();
-
-        let role = if changes == 0 {
-            "static"
-        } else {
-            // A counter has one dominant non-zero step covering most transitions.
-            let modal = deltas.iter().filter(|(d, _)| **d != 0).map(|(_, c)| *c).max().unwrap_or(0);
-            if transitions > 0 && (modal as f64 / transitions as f64) >= 0.8 {
-                "counter"
-            } else {
-                "sensor"
-            }
-        };
-
-        bytes.push(ByteStat { index, distinct: distinct.len(), min, max, changes, role: role.into() });
     }
-
-    (max_len, bytes)
 }
 
 /// Parse an RFC3339 timestamp into epoch microseconds (capture timeline). Also
@@ -150,7 +109,16 @@ pub async fn query_frame_inventory(
     frame_inventory(&app, &src, start_time, end_time).await
 }
 
-/// `protocol` is the identity's other half; `None` matches any.
+/// How a capture is sampled. Byte roles read consecutive pairs and want the most
+/// recent contiguous run; a checksum scan wants spread across the recording.
+#[derive(Clone, Copy)]
+pub enum Sampling {
+    Spread,
+    Recent,
+}
+
+/// Up to `sample_limit` payloads, oldest first. `protocol` is the identity's other
+/// half; `None` matches any.
 async fn fetch_payloads(
     app: &AppHandle,
     src: &QuerySource,
@@ -158,17 +126,25 @@ async fn fetch_payloads(
     frame_id: u32,
     is_extended: Option<bool>,
     sample_limit: u32,
+    sampling: Sampling,
 ) -> Result<Vec<Vec<u8>>, String> {
-    match src {
+    match (src, sampling) {
         // No protocol and no stride: a backend profile reads one protocol, and a
         // modulo window over a multi-month archive is a full scan where the
         // tail query is an index seek. A capture is bounded and local, which is
         // what makes striding it affordable.
-        QuerySource::Backend(pid) => {
+        (QuerySource::Backend(pid), _) => {
             crate::dbquery::db_fetch_frame_payloads(app, pid, frame_id, is_extended, sample_limit)
                 .await
         }
-        QuerySource::Capture(cid) => crate::capture_db::sample_frame_payloads(
+        (QuerySource::Capture(cid), Sampling::Spread) => crate::capture_db::sample_frame_payloads(
+            cid,
+            protocol,
+            frame_id,
+            is_extended,
+            sample_limit,
+        ),
+        (QuerySource::Capture(cid), Sampling::Recent) => crate::capture_db::tail_frame_payloads(
             cid,
             protocol,
             frame_id,
@@ -185,16 +161,11 @@ pub async fn byte_profile(
     frame_id: u32,
     is_extended: Option<bool>,
     sample_limit: u32,
-) -> Result<ByteProfile, String> {
-    let payloads = fetch_payloads(app, src, protocol, frame_id, is_extended, sample_limit).await?;
-    let (max_len, bytes) = compute_byte_profile(&payloads);
-    Ok(ByteProfile {
-        frame_id,
-        frame_id_hex: format_frame_id(frame_id, is_extended.unwrap_or(false)),
-        sampled: payloads.len(),
-        max_len,
-        bytes,
-    })
+) -> Result<FrameByteProfile, String> {
+    let payloads =
+        fetch_payloads(app, src, protocol, frame_id, is_extended, sample_limit, Sampling::Recent)
+            .await?;
+    Ok(FrameByteProfile::new(protocol, frame_id, is_extended.unwrap_or(false), &payloads))
 }
 
 /// Which frames a scan covers.
@@ -218,6 +189,29 @@ impl ScanFilter {
     }
 }
 
+/// The inventory rows `filter` selects, each with the `is_extended` to fetch it by.
+///
+/// A frame id is almost never both standard and extended, and filtering on
+/// `is_extended` takes the payload query off its covering index. Pay for it only
+/// where the inventory says the pair is genuinely ambiguous.
+fn selected_rows<'a>(
+    inventory: &'a [InventoryRow],
+    filter: &ScanFilter,
+) -> Vec<(&'a InventoryRow, Option<bool>)> {
+    let mut seen: HashMap<(&str, u32), usize> = HashMap::new();
+    for row in inventory {
+        *seen.entry((row.protocol.as_str(), row.frame_id)).or_default() += 1;
+    }
+    inventory
+        .iter()
+        .filter(|row| filter.matches(&row.protocol, row.frame_id))
+        .map(|row| {
+            let ambiguous = seen[&(row.protocol.as_str(), row.frame_id)] > 1;
+            (row, ambiguous.then_some(row.is_extended))
+        })
+        .collect()
+}
+
 /// Scan a whole source for checksums, frame id by frame id.
 ///
 /// The one implementation behind both doors — Discovery's Checksum Discovery
@@ -235,14 +229,6 @@ pub async fn checksum_scan(
 ) -> Result<wiretap_analysis::ChecksumScanResult, String> {
     let inventory = frame_inventory(app, src, None, None).await?;
 
-    // A frame id is almost never both standard and extended, and filtering on
-    // `is_extended` takes the payload query off its covering index. Pay for it
-    // only where the inventory says the pair is genuinely ambiguous.
-    let mut seen: HashMap<(&str, u32), usize> = HashMap::new();
-    for row in &inventory {
-        *seen.entry((row.protocol.as_str(), row.frame_id)).or_default() += 1;
-    }
-
     let mut result = wiretap_analysis::ChecksumScanResult {
         findings: Vec::new(),
         frame_count: 0,
@@ -255,18 +241,15 @@ pub async fn checksum_scan(
     // memory floor but cost the fan-out, which on a 60-id bus is most of the run.
     let mut chunk: Vec<(wiretap_analysis::FrameKey, Vec<Vec<u8>>)> = Vec::new();
 
-    for row in &inventory {
-        if !filter.matches(&row.protocol, row.frame_id) {
-            continue;
-        }
-        let ambiguous = seen[&(row.protocol.as_str(), row.frame_id)] > 1;
+    for (row, is_extended) in selected_rows(&inventory, filter) {
         let payloads = fetch_payloads(
             app,
             src,
             Some(&row.protocol),
             row.frame_id,
-            ambiguous.then_some(row.is_extended),
+            is_extended,
             sample_limit,
+            Sampling::Spread,
         )
         .await?;
         chunk.push((
@@ -283,6 +266,47 @@ pub async fn checksum_scan(
     }
 
     Ok(result)
+}
+
+/// Byte profiles for the frames `filter` selects, at most `max_frames` of them.
+pub struct ByteProfiles {
+    pub frames: Vec<FrameByteProfile>,
+    /// Selected frames past `max_frames`, not profiled.
+    pub skipped_frames: usize,
+}
+
+/// Profile each frame of a source over its most recent `sample_limit` payloads.
+/// The one implementation behind Discovery's Changes view and the MCP
+/// `get_discovery_analysis`, so the two describe a capture alike.
+pub async fn byte_profiles(
+    app: &AppHandle,
+    src: &QuerySource,
+    filter: &ScanFilter,
+    sample_limit: u32,
+    max_frames: usize,
+) -> Result<ByteProfiles, String> {
+    let inventory = frame_inventory(app, src, None, None).await?;
+    let rows = selected_rows(&inventory, filter);
+    let mut frames = Vec::with_capacity(rows.len().min(max_frames));
+    for &(row, is_extended) in rows.iter().take(max_frames) {
+        let payloads = fetch_payloads(
+            app,
+            src,
+            Some(&row.protocol),
+            row.frame_id,
+            is_extended,
+            sample_limit,
+            Sampling::Recent,
+        )
+        .await?;
+        frames.push(FrameByteProfile::new(
+            Some(&row.protocol),
+            row.frame_id,
+            row.is_extended,
+            &payloads,
+        ));
+    }
+    Ok(ByteProfiles { skipped_frames: rows.len().saturating_sub(max_frames), frames })
 }
 
 /// Frame ids fetched before a batch is analysed. Bounds resident payloads while
@@ -336,7 +360,7 @@ pub struct PresentFrame {
     pub last_us: i64,
     pub signals: Vec<SignalCoverage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub byte_roles: Option<Vec<ByteStat>>,
+    pub byte_roles: Option<ByteProfile>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -490,10 +514,11 @@ pub async fn catalog_coverage(
                         // sampled and returns nothing.
                         Some(data.top.is_extended),
                         sample_limit,
+                        Sampling::Recent,
                     )
                     .await
                     .unwrap_or_default();
-                    Some(compute_byte_profile(&payloads).1)
+                    Some(profile_bytes(&payloads))
                 } else {
                     None
                 };

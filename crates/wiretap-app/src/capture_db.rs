@@ -863,17 +863,17 @@ pub fn sample_frame_payloads(
     sample_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, sample_limit)
 }
 
-fn sample_frame_payloads_with_conn(
-    conn: &Connection,
+type Bindings = Vec<Box<dyn rusqlite::types::ToSql>>;
+
+/// The `WHERE` clause and its bindings for one frame's rows in a capture.
+fn frame_filter(
     capture_id: &str,
     protocol: Option<&str>,
     frame_id: u32,
     is_extended: Option<bool>,
-    sample_limit: u32,
-) -> Result<Vec<Vec<u8>>, String> {
+) -> (String, Bindings) {
     let mut filter = String::from("capture_id = ?1 AND frame_id = ?2");
-    let mut bind: Vec<Box<dyn rusqlite::types::ToSql>> =
-        vec![Box::new(capture_id.to_string()), Box::new(frame_id as i64)];
+    let mut bind: Bindings = vec![Box::new(capture_id.to_string()), Box::new(frame_id as i64)];
     if let Some(p) = protocol {
         filter.push_str(&format!(" AND protocol = ?{}", bind.len() + 1));
         bind.push(Box::new(p.to_string()));
@@ -882,6 +882,18 @@ fn sample_frame_payloads_with_conn(
         filter.push_str(&format!(" AND is_extended = ?{}", bind.len() + 1));
         bind.push(Box::new(ext as i32));
     }
+    (filter, bind)
+}
+
+fn sample_frame_payloads_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    protocol: Option<&str>,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    sample_limit: u32,
+) -> Result<Vec<Vec<u8>>, String> {
+    let (filter, bind) = frame_filter(capture_id, protocol, frame_id, is_extended);
 
     let mut stmt = conn
         .prepare_cached(&format!("SELECT rowid FROM frames WHERE {filter} ORDER BY rowid"))
@@ -908,6 +920,41 @@ fn sample_frame_payloads_with_conn(
         "SELECT payload FROM frames WHERE rowid IN (SELECT value FROM json_each(?1)) ORDER BY rowid",
         &[&json],
     )
+}
+
+/// The most recent `limit` payloads for one frame, oldest first and contiguous —
+/// what byte roles read, where [`sample_frame_payloads`]' stride would multiply a
+/// counter's step.
+pub fn tail_frame_payloads(
+    capture_id: &str,
+    protocol: Option<&str>,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    limit: u32,
+) -> Result<Vec<Vec<u8>>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    tail_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, limit)
+}
+
+fn tail_frame_payloads_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    protocol: Option<&str>,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    limit: u32,
+) -> Result<Vec<Vec<u8>>, String> {
+    let (filter, mut bind) = frame_filter(capture_id, protocol, frame_id, is_extended);
+    let sql = format!(
+        "SELECT payload FROM frames WHERE {filter} ORDER BY rowid DESC LIMIT ?{}",
+        bind.len() + 1
+    );
+    bind.push(Box::new(limit.max(1) as i64));
+    let refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|b| b.as_ref()).collect();
+    let mut payloads = query_payloads_with_conn(conn, &sql, &refs)?;
+    payloads.reverse();
+    Ok(payloads)
 }
 
 /// Find the offset (row count) for a given timestamp, optionally filtered by frame IDs.
@@ -2169,6 +2216,37 @@ mod tests {
 
         assert_eq!(all.len(), 40);
         assert_eq!(all.iter().map(|p| p[0]).collect::<Vec<u8>>(), (0..40u8).collect::<Vec<u8>>());
+    }
+
+    /// Byte roles read consecutive pairs, so the tail must be the newest run in
+    /// capture order: a stride multiplies a counter's step, and newest-first flips
+    /// every direction.
+    #[test]
+    fn the_tail_is_the_newest_run_oldest_first() {
+        let conn = can_capture_of(100);
+
+        let tail = tail_frame_payloads_with_conn(&conn, "c1", Some("can"), 256, None, 10).unwrap();
+
+        assert_eq!(tail.iter().map(|p| p[0]).collect::<Vec<u8>>(), (90..100u8).collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn the_tail_past_the_population_is_everything_in_order() {
+        let conn = can_capture_of(40);
+
+        let tail = tail_frame_payloads_with_conn(&conn, "c1", Some("can"), 256, None, 500).unwrap();
+
+        assert_eq!(tail.iter().map(|p| p[0]).collect::<Vec<u8>>(), (0..40u8).collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn the_tail_does_not_cross_protocols() {
+        let conn = multi_protocol_capture();
+
+        let modbus =
+            tail_frame_payloads_with_conn(&conn, "c1", Some("modbus"), 256, None, 100).unwrap();
+
+        assert_eq!(modbus, vec![vec![0xBB]]);
     }
 
     /// The inventory is what decides which groups the scan reads, so it has to

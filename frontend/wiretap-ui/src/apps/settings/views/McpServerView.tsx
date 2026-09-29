@@ -353,7 +353,7 @@ export default function McpServerView() {
           </Button>
         </div>
         <p className={helpText}>
-          Tier 2 tools (discovery analysis, decoded signals, live frame map) need the
+          Tier 2 tools (decoded signals, live frame map) need the
           WireTAP window open on the relevant view.
         </p>
       </div>

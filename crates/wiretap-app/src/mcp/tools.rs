@@ -78,8 +78,8 @@ impl WireTapTools {
                  human-controllable row), replay captures, and read/write Modbus. \
                  attach_source surfaces a session in a source-aware tab (discovery, \
                  decoder, transmit, query, or dashboard) so the human sees what the agent is \
-                 working on. Tier 2 tools (discovery analysis, decoded signals, live \
-                 frame map) require the WireTAP window to be open, as do the DOM tools: \
+                 working on. Tier 2 tools (decoded signals, live frame map) require \
+                 the WireTAP window to be open, as do the DOM tools: \
                  query and wait_for read the window, and with UI control click, type and \
                  press drive it without needing focus.",
             )
@@ -335,6 +335,17 @@ impl WireTapTools {
 static SCAN_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 use std::sync::atomic::Ordering as AtomicOrdering;
 
+/// Bounds an unfiltered `get_discovery_analysis` response.
+const DISCOVERY_ANALYSIS_MAX_FRAMES: usize = 64;
+
+/// A `"protocol:id"` frame key, as Discovery writes it.
+fn parse_frame_key(key: &str) -> Result<(&str, u32), String> {
+    key.split_once(':')
+        .and_then(|(protocol, id)| Some((protocol, id.parse().ok()?)))
+        .filter(|(protocol, _)| !protocol.is_empty())
+        .ok_or_else(|| format!("Bad frame key '{key}' — expected protocol:id, e.g. \"can:256\""))
+}
+
 /// Forward a Tier 2 request to the frontend over the bridge and wrap the result.
 async fn bridge_call(method: &str, params: impl serde::Serialize) -> Result<CallToolResult, McpError> {
     let value = serde_json::to_value(params).map_err(|e| err(e.to_string()))?;
@@ -535,15 +546,44 @@ impl WireTapTools {
             .and_then(ok_json)
     }
 
-    // ── Tier 2: frontend bridge ──────────────────────────────────────────────
-
-    #[tool(description = "Get per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux) for live discovery frames. Requires the WireTAP Discovery view to be open.")]
+    #[tool(description = "Per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux cases) of a session's frame capture, each frame over its most recent 5000 payloads. Headless — no view needed. Without frame_ids the first 64 frames are profiled and the rest counted in skippedFrames.")]
     async fn get_discovery_analysis(
         &self,
-        Parameters(p): Parameters<DiscoveryAnalysisParams>,
+        Parameters(p): Parameters<SessionAnalysisParams>,
     ) -> Result<CallToolResult, McpError> {
-        bridge_call("discovery.analysis", p).await
+        let capture_id = crate::capture_store::get_session_frame_capture_id(&p.session_id)
+            .ok_or_else(|| {
+                err(format!(
+                    "Session '{}' has no frame capture to analyse — use list_sessions, or list_captures and frame_byte_profile",
+                    p.session_id
+                ))
+            })?;
+        let groups = p
+            .frame_ids
+            .unwrap_or_default()
+            .iter()
+            .map(|key| parse_frame_key(key).map(|(protocol, id)| ProtocolFrames::ids(protocol, vec![id])))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
+        let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
+        let profiles = crate::analysis::byte_profiles(
+            &self.app,
+            &QuerySource::Capture(capture_id.clone()),
+            &crate::analysis::ScanFilter::Selection(FrameSelection::from_groups(groups)),
+            crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT,
+            max_frames,
+        )
+        .await
+        .map_err(err)?;
+        ok_json(json!({
+            "captureId": capture_id,
+            "frameCount": profiles.frames.len(),
+            "skippedFrames": profiles.skipped_frames,
+            "frames": profiles.frames,
+        }))
     }
+
+    // ── Tier 2: frontend bridge ──────────────────────────────────────────────
 
     #[tool(description = "Get the latest decoded signals (name, value, unit) for the loaded catalog. Requires the WireTAP Decoder view to be open.")]
     async fn get_decoded_signals(
@@ -575,7 +615,7 @@ impl WireTapTools {
         ok_json(json!({ "frames": rows.len(), "inventory": rows }))
     }
 
-    #[tool(description = "Per-byte analysis of one frame id over sampled payloads: distinct values, min/max, change count and role (static/counter/sensor). Headless equivalent of the Discovery byte analysis. Source is capture_id or profile_id.")]
+    #[tool(description = "Byte profile of one frame id over its most recent sample_limit payloads: per-byte statistics and role (static/counter/sensor/value/unknown), multi-byte patterns (counter16/sensor16/sensor32/text) and mux cases. Headless; the same profile Discovery's Payload Changes shows. Source is capture_id or profile_id.")]
     async fn frame_byte_profile(
         &self,
         Parameters(p): Parameters<ByteProfileParams>,
@@ -620,7 +660,7 @@ impl WireTapTools {
         ok_json(result)
     }
 
-    #[tool(description = "Diff a decoder catalog against a data source (capture_id or profile_id): present/missing catalog frames, uncatalogued data frame ids, and a high/medium/low/unset signal confidence rollup. Set include_byte_roles=true to also sample per-byte static/varying roles for each present frame (heavier — one sampling query per frame).")]
+    #[tool(description = "Diff a decoder catalog against a data source (capture_id or profile_id): present/missing catalog frames, uncatalogued data frame ids, and a high/medium/low/unset signal confidence rollup. Set include_byte_roles=true to also attach each present frame's byte profile, as frame_byte_profile reports it (heavier — one sampling query per frame).")]
     async fn catalog_coverage(
         &self,
         Parameters(p): Parameters<CatalogCoverageParams>,
@@ -1455,10 +1495,19 @@ fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOSt
 
 #[cfg(test)]
 mod tests {
-    use super::{modbus_write_json, scan_status};
+    use super::{modbus_write_json, parse_frame_key, scan_status};
     use crate::io::IOState;
     use std::time::Duration;
     use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
+
+    #[test]
+    fn a_frame_key_is_protocol_and_decimal_id() {
+        assert_eq!(parse_frame_key("can:256"), Ok(("can", 256)));
+        assert_eq!(parse_frame_key("modbus_rtu:288"), Ok(("modbus_rtu", 288)));
+        assert!(parse_frame_key("256").is_err());
+        assert!(parse_frame_key(":256").is_err());
+        assert!(parse_frame_key("can:0x100").is_err());
+    }
 
     #[test]
     fn a_refused_write_reads_as_not_sent() {

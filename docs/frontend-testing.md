@@ -64,11 +64,10 @@ Two patterns worth copying rather than inventing:
 There is a **reverse RPC channel, Rust → frontend**
 ([src/services/mcpBridge.ts](../frontend/wiretap-ui/src/services/mcpBridge.ts)), so an agent or
 script driving the MCP server can ask the running frontend what it computed.
-It exposes exactly four methods:
+It exposes exactly three methods:
 
 | Method | MCP tool | Use |
 |---|---|---|
-| `discovery.analysis` | `get_discovery_analysis` | read back Discovery's analysis |
 | `decoder.signals` | `get_decoded_signals` | read back decoded signals |
 | `live.frameMap` | `get_live_frame_map` | read back the live frame map |
 | `ui.openPanel` | `open_app` | drive: open a panel |

@@ -93,6 +93,17 @@ pub struct ReadCatalogParams {
     pub name: String,
 }
 
+/// Byte analysis of a session's capture.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SessionAnalysisParams {
+    /// The session whose frame capture to analyse (from `list_sessions`).
+    pub session_id: String,
+    /// Optional: restrict to specific frame keys (e.g. `"can:256"`). Without it
+    /// the first 64 frames are profiled and the rest counted in `skippedFrames`.
+    #[serde(default)]
+    pub frame_ids: Option<Vec<String>>,
+}
+
 // ── Tier 2 (frontend bridge) ─────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
@@ -617,8 +628,8 @@ pub struct CatalogCoverageParams {
     pub profile_id: Option<String>,
     /// Catalog filename or display name (as listed by `list_catalogs`).
     pub catalog: String,
-    /// Attach per-byte static/varying roles for each present frame (default false
-    /// — this samples payloads per frame, which is heavy on a large archive).
+    /// Attach each present frame's byte profile (default false — this samples
+    /// payloads per frame, which is heavy on a large archive).
     #[serde(default)]
     pub include_byte_roles: bool,
     /// Payloads to sample per frame when byte roles are enabled (default 2000).

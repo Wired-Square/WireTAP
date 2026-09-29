@@ -1,6 +1,7 @@
 #[macro_use]
 pub(crate) mod logging;
 mod analysis;
+mod byte_roles;
 mod app_registry;
 mod ble_provision;
 mod capture_db;
@@ -1372,6 +1373,8 @@ pub fn run() {
             checksums::detect_checksum_cmd,
             checksum_discovery::discover_checksums_cmd,
             checksum_discovery::discover_checksums_in_capture_cmd,
+            byte_roles::profile_bytes_cmd,
+            byte_roles::serial_structure_cmd,
             // Transmit API
             transmit::get_transmit_capable_profiles,
             transmit::get_profile_usage,

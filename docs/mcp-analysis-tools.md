@@ -7,7 +7,7 @@ that back the Query app, against **either** a SQLite capture **or** a WireTAP
 backend profile, and a catalog-coverage diff on top.
 
 Implementation: [crates/wiretap-app/src/analysis.rs](../crates/wiretap-app/src/analysis.rs)
-(orchestration + the pure byte-role classifier), the backend/sqlite query paths in
+(orchestration; the byte-role classifier is `wiretap_analysis::profile_bytes`), the backend/sqlite query paths in
 [crates/wiretap-app/src/dbquery.rs](../crates/wiretap-app/src/dbquery.rs) and
 [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs), wired as MCP tools in
 [crates/wiretap-app/src/mcp/tools.rs](../crates/wiretap-app/src/mcp/tools.rs).
@@ -64,9 +64,9 @@ Every analysis tool takes **exactly one** of:
 Backend time bounds are RFC3339 strings (`start_time` / `end_time`); for captures
 they are converted to the capture's microsecond timeline automatically.
 
-These are **headless** — unlike `get_decoded_signals` / `get_discovery_analysis` /
-`get_live_frame_map` (which bridge to an open Decoder/Discovery view), they read the
-data store directly, so no window need be open.
+These are **headless** — unlike `get_decoded_signals` / `get_live_frame_map` (which
+bridge to an open Decoder/Discovery view), they read the data store directly, so no
+window need be open.
 
 ## Tools
 
@@ -85,18 +85,41 @@ is still its plain hex (`0x120` is unit 1, function `0x20`). Without time bounds
 a backend answers from its hourly rollup, which is why it is cheap there.
 
 ### `frame_byte_profile`
-For one `frame_id`, classifies each payload byte over sampled frames:
-`distinct`, `min`, `max`, `changes`, and a `role` of:
+For one `frame_id`, profiles its most recent `sample_limit` payloads (default 5000),
+oldest first — see [Sampling](#sampling). The result is
+`{ frameId, isExtended, frameIdHex, protocol?, sampleCount, minLen, maxLen, identical,
+analysedFrom, columns, patterns, endianness, mux }`, the same profile Discovery's
+Payload Changes shows:
 
-- `static` — never changes,
-- `counter` — one dominant fixed step (≥80 % of transitions),
-- `sensor` — otherwise varying.
+- `columns` — one per byte from `analysedFrom` (0, or past a mux selector) to `maxLen`:
+  `position`, `distinctValues`, `min`, `max`, `constantValue`, `changes`,
+  `transitions`, `entropyBits`, `sampleCount` (past `minLen`, fewer payloads reach a
+  byte), and a `role`:
+  - `static` (`value`) — one value,
+  - `counter` (`direction`, `step`, `rollover`, `looping`) — one step covers ≥80 % of
+    transitions, or it cycles a small range,
+  - `sensor` (`trend`: increasing / decreasing / mixed, `strength`, `rollover`) — ≥60 %
+    of its moves go one way, or it oscillates actively,
+  - `value` — two values, or at least 10 % of samples distinct,
+  - `unknown` — varies, but fits none of those;
+- `patterns` — adjacent bytes read together: `counter16`, `sensor16`, `sensor32`,
+  `text`, with `start`, `len`, `endianness`, `range`, `sampleText`;
+- `mux` — when byte 0 (or bytes 0–1) selects a case: the `detection` and each case's
+  own `columns` and `patterns`. The top-level `columns` still cover every payload.
 
-This is the headless Rust equivalent of the frontend Discovery byte analysis
-(`compute_byte_profile`). `sample_limit` (default 5000) bounds the work — see
-[Sampling](#sampling) for which frames it picks. Optional `protocol` restricts a
-frame id to one protocol; omit it and a mixed capture profiles every protocol's
-rows for that number together.
+This replaced a three-role classifier (`static` / `counter` / `sensor`) and its
+`bytes` array: `sensor` now narrows to trending or oscillating bytes, and what it used
+to catch besides is `value` or `unknown`. Optional `protocol` restricts a frame id to
+one protocol; omit it and a mixed capture profiles every protocol's rows for that
+number together.
+
+### `get_discovery_analysis`
+The same profile for every frame of a session's capture: `session_id` (required),
+optional `frame_ids` as Discovery's keys (`"can:256"`). Each frame reads its most
+recent 5000 payloads. Without `frame_ids` the first 64 frames of the capture's
+inventory are profiled and the rest counted in `skippedFrames`. A session with no
+frame capture is an error. Discovery's Payload Changes reads a capture through the
+same code, so the panel and an agent describe it alike.
 
 ### `frame_checksum_scan`
 Finds checksums across every frame id in the source, or the `frame_ids` you name.
@@ -142,8 +165,9 @@ Parses a `catalog` (filename or display name) and diffs it against the source:
   catalog signals (mirror/copy-inherited duplicates are excluded so each definition
   counts once).
 
-`include_byte_roles` (default **false**) additionally samples per-byte roles for each
-present frame — one sampling query per frame, so it's heavy on a big DB; enable it
+`include_byte_roles` (default **false**) additionally attaches each present frame's
+byte profile as `byte_roles`, in the `frame_byte_profile` shape without the frame
+fields — one sampling query per frame, so it's heavy on a big DB; enable it
 deliberately. `sample_limit` (default 2000) bounds that sampling.
 
 ### Exposed query engines
@@ -235,17 +259,22 @@ exposed. Changing either toggle restarts the server so the gate takes effect.
 
 ## Sampling
 
-Which frames `sample_limit` picks differs by source, and the difference is
-deliberate:
+Which frames `sample_limit` picks differs by question and by source, and the
+difference is deliberate:
 
-- **A capture** is sampled **evenly across the whole recording**. The rowids for a
-  frame id come off the covering index in order, are strided in Rust (ceiling
-  division, so the last frame is always reachable), and only the survivors read a
-  payload. A capture is bounded and local, which is what makes reading the whole
-  span affordable.
-- **A WireTAP backend** is sampled as the **most recent N**. Striding a
+- **Byte roles** (`frame_byte_profile`, `get_discovery_analysis`, `catalog_coverage`'s
+  byte roles) take the **most recent contiguous N**, oldest first. Direction, trend
+  and looping read consecutive pairs: a stride multiplies a counter's step, and a
+  stride equal to a loop's length makes a counter read as static.
+- **A checksum scan over a capture** is sampled **evenly across the whole
+  recording**. The rowids for a frame id come off the covering index in order, are
+  strided in Rust (ceiling division, so the last frame is always reachable), and
+  only the survivors read a payload. A capture is bounded and local, which is what
+  makes reading the whole span affordable.
+- **A WireTAP backend** is always sampled as the **most recent N**. Striding a
   multi-month archive means a full scan where the tail query is an index seek, so
-  it reflects current behaviour rather than the archive's beginning.
+  it reflects current behaviour rather than the archive's beginning. The gateway
+  serves them newest first; the desktop puts them back in time order.
 
 The consequence to remember: over a capture, an agent and the Discovery panel see
 the same sample; over an archive, the sample is the recent window.

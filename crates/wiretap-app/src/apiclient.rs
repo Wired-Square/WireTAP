@@ -577,7 +577,14 @@ pub async fn fetch_frame_payloads(
     let body = PayloadsParams { filter: api.filter(frame_id, is_extended, None, None), limit: Some(limit) };
     let resp: PayloadsResponse =
         send(HTTP.post(api.db_url("/payloads")).bearer_auth(&api.api_key).json(&body)).await?;
-    Ok(resp.payloads)
+    Ok(oldest_first(resp))
+}
+
+/// The gateway serves `/payloads` newest first; every reader here wants capture order.
+fn oldest_first(resp: PayloadsResponse) -> Vec<Vec<u8>> {
+    let mut payloads = resp.payloads;
+    payloads.reverse();
+    payloads
 }
 
 // ---------------------------------------------------------------------------
@@ -961,6 +968,12 @@ mod tests {
         assert_eq!(protocol_query(Protocol::Modbus, false), "&protocol=modbus");
         assert_eq!(frame_tag(Protocol::Can), "can");
         assert_eq!(frame_tag(Protocol::Modbus), "modbus_rtu");
+    }
+
+    #[test]
+    fn payloads_arrive_newest_first_and_are_read_oldest_first() {
+        let resp = PayloadsResponse { payloads: vec![vec![3], vec![2], vec![1]] };
+        assert_eq!(oldest_first(resp), vec![vec![1], vec![2], vec![3]]);
     }
 
     #[test]
