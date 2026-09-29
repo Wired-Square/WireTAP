@@ -232,6 +232,27 @@ The IO source picker offers the same range in the UI and resolves the conflict t
 same way, deliberately: the rule is one rule, so a session polls the same registers
 whether a person or an agent opened it.
 
+### Test Pattern
+
+The Test Pattern app's runs, for an agent driving both ends of a link — an
+initiator on one host and a responder on another, each through its own MCP
+server. Thin wrappers over `io_test.rs`; the wire contract is
+`wiretap_protocol::testpattern`.
+
+- **`test_pattern_start { session_id, mode, role?, duration_sec?, rate_hz?, bus?, use_fd?, use_extended? }`**
+  — gated by **control**. `mode` is `echo`, `sweep`, `throughput`, `latency`,
+  `reliability`, `loopback` or `auto`; `role` is `initiator` (default) or
+  `responder`. Defaults: 10 s, 10 Hz, bus 0, classic, 11-bit. Returns
+  `{ test_id }`. A responder runs until stopped, going back to `listening`
+  between runs, so one serves every phase of an `auto` suite.
+- **`test_pattern_state { test_id }`** — read tool. The `IOTestState` the panel
+  reads: `status` (`running` / `listening` / `completed` / `stopped` / `failed`),
+  `tx_count`, `rx_count`, `drops`, `duplicates`, `out_of_order`, `latency_us`,
+  `peer`, `remote`, `sweep` rows and `auto_results`. A run is over once `status`
+  is neither `running` nor `listening`; `completed` means it passed.
+- **`test_pattern_stop { test_id }`** — gated by **control**. Idempotent; the
+  final state stays readable.
+
 ## Writing catalogs
 
 Three tools let an agent persist decode work, gated by **two catalog-specific

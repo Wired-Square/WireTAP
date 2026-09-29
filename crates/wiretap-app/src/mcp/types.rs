@@ -217,6 +217,102 @@ pub struct ReplayIdParams {
     pub replay_id: String,
 }
 
+/// Mirrors `crate::io_test::TestMode`, for the same reason as [`ModbusRangeParam`].
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TestPatternMode {
+    Echo,
+    Sweep,
+    Throughput,
+    Latency,
+    Reliability,
+    Loopback,
+    Auto,
+}
+
+impl From<TestPatternMode> for crate::io_test::TestMode {
+    fn from(m: TestPatternMode) -> Self {
+        use crate::io_test::TestMode;
+        match m {
+            TestPatternMode::Echo => TestMode::Echo,
+            TestPatternMode::Sweep => TestMode::Sweep,
+            TestPatternMode::Throughput => TestMode::Throughput,
+            TestPatternMode::Latency => TestMode::Latency,
+            TestPatternMode::Reliability => TestMode::Reliability,
+            TestPatternMode::Loopback => TestMode::Loopback,
+            TestPatternMode::Auto => TestMode::Auto,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TestPatternRole {
+    #[default]
+    Initiator,
+    Responder,
+}
+
+fn default_test_duration() -> f64 {
+    10.0
+}
+fn default_test_rate() -> f64 {
+    10.0
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TestPatternStartParams {
+    /// Session to run the test through (must be transmit-capable).
+    pub session_id: String,
+    /// `echo`, `sweep` (every length code, the CAN FD proof), `throughput`,
+    /// `latency`, `reliability`, `loopback` (no peer: the interface answers
+    /// itself) or `auto` (echo, sweep, latency, throughput, reliability in turn).
+    pub mode: TestPatternMode,
+    /// `initiator` (default) drives the run; `responder` answers any initiator on
+    /// the bus until stopped, returning to `listening` between runs.
+    #[serde(default)]
+    pub role: TestPatternRole,
+    /// Run length in seconds (default 10). Ignored by a responder and by `auto`,
+    /// which sets its own per phase.
+    #[serde(default = "default_test_duration")]
+    pub duration_sec: f64,
+    /// Frames per second (default 10). `throughput` sends as fast as it can.
+    #[serde(default = "default_test_rate")]
+    pub rate_hz: f64,
+    /// Bus number (default 0).
+    #[serde(default)]
+    pub bus: u8,
+    /// Send CAN FD frames with BRS.
+    #[serde(default)]
+    pub use_fd: bool,
+    /// Send on 29-bit ids.
+    #[serde(default)]
+    pub use_extended: bool,
+}
+
+impl TestPatternStartParams {
+    pub fn config(&self) -> crate::io_test::TestConfig {
+        crate::io_test::TestConfig {
+            mode: self.mode.into(),
+            role: match self.role {
+                TestPatternRole::Initiator => crate::io_test::TestRole::Initiator,
+                TestPatternRole::Responder => crate::io_test::TestRole::Responder,
+            },
+            duration_sec: self.duration_sec,
+            rate_hz: self.rate_hz,
+            bus: self.bus,
+            use_fd: self.use_fd,
+            use_extended: self.use_extended,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TestIdParams {
+    /// Test ID (returned by `test_pattern_start`).
+    pub test_id: String,
+}
+
 /// One contiguous span of Modbus registers to poll.
 ///
 /// Mirrors `crate::io::ModbusRange`. Kept separate so the IO layer doesn't grow

@@ -29,6 +29,7 @@ use crate::analysis::QuerySource;
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
 static REPEAT_SEQ: AtomicU64 = AtomicU64::new(1);
+static TEST_PATTERN_SEQ: AtomicU64 = AtomicU64::new(1);
 
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -435,6 +436,14 @@ impl WireTapTools {
         Parameters(p): Parameters<SessionIdParams>,
     ) -> Result<CallToolResult, McpError> {
         ok_json(crate::io::get_playback_position(&p.session_id))
+    }
+
+    #[tool(description = "Get a Test Pattern run's state: status (running, listening, completed, stopped, failed), tx/rx counts, drops, duplicates, out_of_order, latency_us, the peer Hello found, remote counters, sweep rows per length code, and Auto phase results.")]
+    async fn test_pattern_state(
+        &self,
+        Parameters(p): Parameters<TestIdParams>,
+    ) -> Result<CallToolResult, McpError> {
+        ok_json(read_test_pattern_state(&p.test_id).map_err(err)?)
     }
 
     #[tool(description = "List configured IO profiles (id, name, kind). Connection secrets are redacted.")]
@@ -996,6 +1005,30 @@ impl WireTapTools {
     }
 
     #[tool(
+        description = "Start a Test Pattern run through a session, as the Test Pattern app does: an initiator exchanges framed test traffic with a responder on the same bus (or with the interface itself in loopback mode) and counts drops, duplicates, reordering and latency. A responder runs until test_pattern_stop. Returns { test_id }; poll test_pattern_state with it.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
+    async fn test_pattern_start(
+        &self,
+        Parameters(p): Parameters<TestPatternStartParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let test_id = start_test_pattern(p).await.map_err(err)?;
+        ok_json(json!({ "test_id": test_id }))
+    }
+
+    #[tool(
+        description = "Stop a Test Pattern run by its test_id. Its final state stays readable through test_pattern_state.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
+    async fn test_pattern_stop(
+        &self,
+        Parameters(p): Parameters<TestIdParams>,
+    ) -> Result<CallToolResult, McpError> {
+        crate::io_test::io_test_stop(p.test_id.clone()).await.map_err(err)?;
+        ok_json(json!({ "stopped": p.test_id }))
+    }
+
+    #[tool(
         description = "Live Modbus write to holding registers or coils on a session's configured device. While the session polls the device, the write goes over the poll's own connection between reads; otherwise over a short-lived connection. Returns { ok: true }, { ok: false, exception, exception_code } when the device rejects the write, or { ok: false, sent: false, refused } when it was never sent: the poll's connection is down, its write queue is full, or the poll has stopped.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
@@ -1478,6 +1511,17 @@ impl WireTapTools {
     }
 }
 
+async fn start_test_pattern(p: TestPatternStartParams) -> Result<String, String> {
+    let test_id = format!("mcp-test-{}", TEST_PATTERN_SEQ.fetch_add(1, Ordering::Relaxed));
+    let config = p.config();
+    crate::io_test::io_test_start(p.session_id, test_id, config).await
+}
+
+fn read_test_pattern_state(test_id: &str) -> Result<crate::io_test::IOTestState, String> {
+    crate::io_test::get_io_test_state(test_id.to_string())
+        .ok_or_else(|| format!("Test '{test_id}' not found"))
+}
+
 /// A sweep publishes no state until its first progress tick, so a live session
 /// without one is still connecting; with no session at all it has cleaned up.
 fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOState>) -> String {
@@ -1561,6 +1605,85 @@ mod tests {
     #[test]
     fn published_scan_status_wins() {
         assert_eq!(scan_status(Some("error".into()), Some(&IOState::Running)), "error");
+    }
+
+    mod test_pattern {
+        use super::super::{read_test_pattern_state, start_test_pattern};
+        use crate::io_test::tests::{attach, Wire};
+        use crate::io_test::{io_test_stop, IOTestState, TestMode, TestRole, TestStatus};
+        use crate::mcp::types::TestPatternStartParams;
+        use std::time::{Duration, Instant};
+
+        fn params(json: serde_json::Value) -> TestPatternStartParams {
+            serde_json::from_value(json).expect("valid params")
+        }
+
+        async fn wait_for(test_id: &str, done: impl Fn(&IOTestState) -> bool) -> IOTestState {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Ok(state) = read_test_pattern_state(test_id) {
+                    if done(&state) {
+                        return state;
+                    }
+                }
+                assert!(Instant::now() < deadline, "'{test_id}' never settled");
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+
+        #[test]
+        fn only_the_session_and_mode_are_required() {
+            let config = params(serde_json::json!({ "session_id": "s", "mode": "sweep" })).config();
+            assert_eq!(config.mode, TestMode::Sweep);
+            assert!(matches!(config.role, TestRole::Initiator));
+            assert_eq!((config.duration_sec, config.rate_hz, config.bus), (10.0, 10.0, 0));
+            assert!(!config.use_fd && !config.use_extended);
+        }
+
+        #[test]
+        fn an_unknown_mode_is_refused() {
+            let bad = serde_json::json!({ "session_id": "s", "mode": "ping" });
+            assert!(serde_json::from_value::<TestPatternStartParams>(bad).is_err());
+        }
+
+        #[test]
+        fn an_unknown_test_is_an_error() {
+            assert!(read_test_pattern_state("mcp-test-none").is_err());
+        }
+
+        #[tokio::test]
+        async fn a_loopback_run_completes_through_the_wrappers() {
+            attach("mcp_tp_loopback", Wire::Loopback);
+            let test_id = start_test_pattern(params(serde_json::json!({
+                "session_id": "mcp_tp_loopback",
+                "mode": "loopback",
+                "duration_sec": 1.0,
+                "rate_hz": 100.0,
+            })))
+            .await
+            .unwrap();
+
+            let state = wait_for(&test_id, |s| s.status != TestStatus::Running).await;
+            assert_eq!(state.status, TestStatus::Completed, "errors: {:?}", state.errors);
+            assert!(state.tx_count > 0);
+            assert_eq!(state.rx_count, state.tx_count);
+            assert_eq!((state.drops, state.duplicates, state.out_of_order), (0, 0, 0));
+        }
+
+        #[tokio::test]
+        async fn a_responder_listens_until_stopped() {
+            let test_id = start_test_pattern(params(serde_json::json!({
+                "session_id": "mcp_tp_responder",
+                "mode": "echo",
+                "role": "responder",
+            })))
+            .await
+            .unwrap();
+
+            wait_for(&test_id, |s| s.status == TestStatus::Listening).await;
+            io_test_stop(test_id.clone()).await.unwrap();
+            wait_for(&test_id, |s| s.status == TestStatus::Stopped).await;
+        }
     }
 
     #[test]

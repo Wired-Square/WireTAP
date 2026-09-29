@@ -1248,11 +1248,11 @@ async fn run_responder(
 // rather than against an echo of itself.
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// What answers a transmit on a test session.
-    enum Wire {
+    pub(crate) enum Wire {
         /// Hands the frame straight back, as a Virtual Device's loopback does.
         Loopback,
         /// The crate's reply side: a peer on the far end of the bus.
@@ -1268,7 +1268,7 @@ mod tests {
     static WIRE: Lazy<StdMutex<HashMap<String, Wire>>> =
         Lazy::new(|| StdMutex::new(HashMap::new()));
 
-    fn attach(session_id: &str, wire: Wire) {
+    pub(crate) fn attach(session_id: &str, wire: Wire) {
         WIRE.lock().unwrap().insert(session_id.to_string(), wire);
     }
 
