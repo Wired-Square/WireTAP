@@ -53,7 +53,7 @@ pub(crate) fn frame_message(read: CanRead) -> FrameMessage {
             .map_or(0, |d| d.as_micros() as u64),
         frame_id: frame.arb_id,
         bus: frame.bus,
-        dlc: frame.data.len() as u8,
+        dlc: frame.data.len() as u16,
         is_fd: frame.fd,
         is_extended: frame.extended,
         bytes: frame.data,

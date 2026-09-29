@@ -1078,7 +1078,7 @@ mod tests {
             timestamp_us: 0,
             frame_id,
             bus: 2,
-            dlc: bytes.len() as u8,
+            dlc: bytes.len() as u16,
             bytes,
             is_extended: false,
             is_fd: false,

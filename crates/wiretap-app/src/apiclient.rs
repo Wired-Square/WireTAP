@@ -519,13 +519,12 @@ pub async fn signal_backend(profile: &IOProfile, pid: i32, terminate: bool) -> R
 /// `max_dlc` is a CAN length code or a Modbus message length (up to 256). A
 /// gateway before 0.1.4 serves no `max_len`, and the archive stores a classic
 /// frame's code clamped to 8, so a CAN code above 8 can only be FD.
-fn inventory_max_len(entry: &InventoryEntry, protocol: Protocol) -> u8 {
-    let len = entry.max_len.unwrap_or_else(|| match protocol {
+fn inventory_max_len(entry: &InventoryEntry, protocol: Protocol) -> u16 {
+    entry.max_len.unwrap_or_else(|| match protocol {
         Protocol::Can => wiretap_protocol::dlc_to_len(entry.max_dlc as u8, true) as u16,
         Protocol::Modbus => entry.max_dlc,
         Protocol::Serial => unreachable!("archive_protocol refuses serial"),
-    });
-    len.min(u8::MAX as u16) as u8
+    })
 }
 
 /// Every entry is the profile's protocol — the gateway groups one protocol at
@@ -991,7 +990,7 @@ mod tests {
             assert_eq!(inventory_max_len(&entry(code), Protocol::Can), len);
         }
         assert_eq!(inventory_max_len(&entry(15), Protocol::Modbus), 15);
-        assert_eq!(inventory_max_len(&entry(256), Protocol::Modbus), 255);
+        assert_eq!(inventory_max_len(&entry(256), Protocol::Modbus), 256);
     }
 
     #[test]

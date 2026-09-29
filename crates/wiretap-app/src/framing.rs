@@ -331,7 +331,7 @@ mod desktop {
             let extract = |cfg: &Option<FrameIdConfig>| cfg.as_ref()?.extract(&frame_bytes);
             let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
             let source_address = extract(&config.source_address_config).map(|v| v as u16);
-            let dlc = frame_bytes.len() as u8;
+            let dlc = frame_bytes.len() as u16;
 
             FrameMessage {
                 protocol: "serial".to_string(),

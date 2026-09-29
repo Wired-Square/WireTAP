@@ -263,7 +263,7 @@ impl LiveLine {
                     timestamp_us,
                     frame_id,
                     bus: 0,
-                    dlc: frame.bytes.len() as u8,
+                    dlc: frame.bytes.len() as u16,
                     bytes: frame.bytes,
                     is_extended: false,
                     is_fd: false,
@@ -672,6 +672,22 @@ mod tests {
             line.stopped()[..],
             [SourceMessage::Ended(0, EndReason::Stopped)]
         ));
+    }
+
+    #[test]
+    fn a_frame_over_255_bytes_counts_every_byte() {
+        let mut line = live(
+            FramingEncoding::Delimiter(DelimiterOptions {
+                delimiter: vec![b'\n'],
+                max_length: 512,
+                include_delimiter: false,
+            }),
+            false,
+        );
+
+        let got = frames(line.read(&[[b'x'; 256].as_slice(), b"\n"].concat(), at(1)));
+
+        assert_eq!(usize::from(got[0].dlc), got[0].bytes.len());
     }
 
     #[test]

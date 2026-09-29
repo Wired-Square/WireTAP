@@ -1278,7 +1278,7 @@ pub(crate) mod tests {
             timestamp_us: now_us(),
             frame_id: arb_id,
             bus: 0,
-            dlc: data.len() as u8,
+            dlc: data.len() as u16,
             bytes: data,
             is_extended: extended,
             is_fd: fd,

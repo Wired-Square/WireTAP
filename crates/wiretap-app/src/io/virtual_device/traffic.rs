@@ -89,7 +89,7 @@ pub(crate) fn frame(
         timestamp_us,
         frame_id,
         bus,
-        dlc: bytes.len() as u8,
+        dlc: bytes.len() as u16,
         bytes,
         is_extended: false,
         is_fd,

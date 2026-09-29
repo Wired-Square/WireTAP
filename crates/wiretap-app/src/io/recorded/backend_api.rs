@@ -244,7 +244,7 @@ fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<Frame
         timestamp_us: row.ts_us as u64,
         frame_id: row.id,
         bus: row.bus,
-        dlc: bytes.len().min(u8::MAX as usize) as u8,
+        dlc: bytes.len() as u16,
         bytes,
         is_extended: row.extended,
         is_fd: row.is_fd,
@@ -518,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn a_modbus_message_longer_than_u8_saturates() {
+    fn a_modbus_message_over_255_bytes_counts_every_byte() {
         let frame = frame_from_row(
             ArchiveProtocol::Modbus,
             row(serde_json::json!({
@@ -528,6 +528,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(frame.protocol, "modbus_rtu");
-        assert_eq!(frame.dlc, 255);
+        assert_eq!(frame.dlc, 256);
     }
 }

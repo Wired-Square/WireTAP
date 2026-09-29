@@ -1224,7 +1224,7 @@ pub struct CaptureFrameInfo {
     /// are different frames that share a numeric id.
     pub protocol: String,
     pub frame_id: u32,
-    pub max_dlc: u8,
+    pub max_dlc: u16,
     pub bus: u8,
     pub is_extended: bool,
     pub has_dlc_mismatch: bool,

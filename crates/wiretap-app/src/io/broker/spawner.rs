@@ -437,7 +437,7 @@ async fn run_virtual_reader(
                             timestamp_us: ts,
                             frame_id,
                             bus,
-                            dlc,
+                            dlc: dlc.into(),
                             bytes: frame_data,
                             is_extended,
                             is_fd,

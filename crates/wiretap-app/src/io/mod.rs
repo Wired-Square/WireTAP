@@ -96,7 +96,7 @@ pub struct FrameMessage {
     pub timestamp_us: u64,
     pub frame_id: u32,
     pub bus: u8,
-    pub dlc: u8,
+    pub dlc: u16,
     pub bytes: Vec<u8>,
     // CAN-specific flags (ignored by other protocols)
     pub is_extended: bool,

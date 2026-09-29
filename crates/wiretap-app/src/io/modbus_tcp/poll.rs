@@ -42,7 +42,7 @@ pub fn modbus_frame(frame_id: u32, device_address: u8, bytes: Vec<u8>) -> FrameM
         timestamp_us: now_us(),
         frame_id,
         bus: device_address,
-        dlc: bytes.len() as u8,
+        dlc: bytes.len() as u16,
         bytes,
         is_extended: false,
         is_fd: false,

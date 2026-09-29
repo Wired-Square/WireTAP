@@ -318,9 +318,9 @@ fn spawn_mqtt_stream(
                                     frame_id: mqtt_frame.id,
                                     bus: mqtt_frame.bus,
                                     dlc: if mqtt_frame.dlc > 0 {
-                                        mqtt_frame.dlc
+                                        mqtt_frame.dlc.into()
                                     } else {
-                                        mqtt_frame.data.len() as u8
+                                        mqtt_frame.data.len() as u16
                                     },
                                     bytes: mqtt_frame.data,
                                     is_extended: mqtt_frame.extended,

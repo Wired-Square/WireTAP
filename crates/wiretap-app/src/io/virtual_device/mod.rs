@@ -502,7 +502,7 @@ fn spawn_loopback_handler(
                         timestamp_us: ts,
                         frame_id: tx_frame.frame_id,
                         bus: tx_frame.bus,
-                        dlc: tx_frame.data.len() as u8,
+                        dlc: tx_frame.data.len() as u16,
                         bytes: tx_frame.data,
                         is_extended: tx_frame.is_extended,
                         is_fd,

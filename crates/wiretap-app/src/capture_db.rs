@@ -346,7 +346,7 @@ fn row_to_frame(row: &rusqlite::Row) -> rusqlite::Result<FrameMessage> {
         timestamp_us: row.get::<_, i64>("timestamp_us")? as u64,
         frame_id: row.get::<_, i64>("frame_id")? as u32,
         bus: row.get::<_, i64>("bus")? as u8,
-        dlc: row.get::<_, i64>("dlc")? as u8,
+        dlc: row.get::<_, i64>("dlc")? as u16,
         bytes: payload,
         is_extended: is_extended != 0,
         is_fd: is_fd != 0,
@@ -704,7 +704,7 @@ pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String>
             Ok(CaptureFrameInfo {
                 protocol: row.get::<_, String>("protocol")?,
                 frame_id: row.get::<_, i64>("frame_id")? as u32,
-                max_dlc: row.get::<_, i64>("max_dlc")? as u8,
+                max_dlc: row.get::<_, i64>("max_dlc")? as u16,
                 bus: row.get::<_, i64>("bus")? as u8,
                 is_extended: row.get::<_, i64>("is_extended")? != 0,
                 has_dlc_mismatch: row.get::<_, i64>("has_dlc_mismatch")? != 0,
@@ -734,7 +734,7 @@ pub struct InventoryRow {
     pub count: i64,
     pub first_us: i64,
     pub last_us: i64,
-    pub max_dlc: u8,
+    pub max_dlc: u16,
 }
 
 impl InventoryRow {
@@ -745,7 +745,7 @@ impl InventoryRow {
         count: i64,
         first_us: i64,
         last_us: i64,
-        max_dlc: u8,
+        max_dlc: u16,
     ) -> Self {
         Self {
             protocol: protocol.to_string(),
@@ -808,7 +808,7 @@ fn frame_inventory_with_conn(
                 row.get::<_, i64>("cnt")?,
                 row.get::<_, i64>("first_us")?,
                 row.get::<_, i64>("last_us")?,
-                row.get::<_, i64>("max_dlc")? as u8,
+                row.get::<_, i64>("max_dlc")? as u16,
             ))
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
