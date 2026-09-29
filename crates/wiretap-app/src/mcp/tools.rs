@@ -1173,7 +1173,10 @@ impl WireTapTools {
         Parameters(p): Parameters<ModbusScanParams>,
     ) -> Result<CallToolResult, McpError> {
         let (host, port, unit_id) = self.resolve_modbus_target(&p.target)?;
-        let register_type = super::types::parse_register_type(&p.register_type).map_err(err)?;
+        let register_type = p
+            .register_type
+            .parse::<crate::io::RegisterType>()
+            .map_err(|e| err(e.to_string()))?;
         let max_chunk = register_type.catalog().max_per_read();
 
         let config = crate::io::ModbusScanConfig {
@@ -1219,7 +1222,10 @@ impl WireTapTools {
             start_unit_id: p.start_unit_id,
             end_unit_id: p.end_unit_id,
             test_register: p.test_register,
-            register_type: super::types::parse_register_type(&p.register_type).map_err(err)?,
+            register_type: p
+                .register_type
+                .parse::<crate::io::RegisterType>()
+                .map_err(|e| err(e.to_string()))?,
             inter_request_delay_ms: p.inter_request_delay_ms.unwrap_or(50),
             timeout_ms: p.timeout_ms.unwrap_or(2000),
             connect_settle_ms: 0,

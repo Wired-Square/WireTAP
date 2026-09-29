@@ -21,7 +21,7 @@ use std::sync::{
 };
 use tokio::time::{sleep, Duration};
 
-use super::poll::{modbus_frame, per_register_frames, register_type_name, FrameSink, ReadData};
+use super::poll::{modbus_frame, per_register_frames, FrameSink, ReadData};
 use super::reader::RegisterType;
 use wiretap_catalog::modbus::{
     coils_to_bytes, registers_to_bytes, AddressBlock, ExceptionCode, RangeError, ReadOutcome, RegisterSweep,
@@ -561,7 +561,7 @@ pub async fn scan_registers(
         passes,
         ..
     } = sweep.progress();
-    let type_name = register_type_name(&config.register_type);
+    let type_name = config.register_type.catalog().as_str();
 
     tlog!(
         "[ModbusScan] Register scan: {} {}-{} ({} regs, chunk={}, delay={}ms, timeout={}ms, \
@@ -733,7 +733,7 @@ pub async fn scan_unit_ids(
     }
 
     let total = (config.end_unit_id as u32) - (config.start_unit_id as u32) + 1;
-    let type_name = register_type_name(&config.register_type);
+    let type_name = config.register_type.catalog().as_str();
 
     tlog!(
         "[ModbusScan] Unit ID scan: {}-{}, FC43 + {} reg {} fallback (delay={}ms)",
@@ -774,29 +774,19 @@ pub async fn scan_unit_ids(
                     fc43_tested = true;
                     unit_found = true;
 
-                    let mut vendor = None;
-                    let mut product_code = None;
-                    let mut revision = None;
-                    for (id, value) in identification.objects {
-                        let text = String::from_utf8(value).ok();
-                        match id {
-                            0x00 => vendor = text,
-                            0x01 => product_code = text,
-                            0x02 => revision = text,
-                            _ => {}
-                        }
-                    }
-
-                    let summary = [
-                        vendor.as_deref().unwrap_or(""),
-                        product_code.as_deref().unwrap_or(""),
-                        revision.as_deref().unwrap_or(""),
-                    ]
-                    .iter()
-                    .filter(|s| !s.is_empty())
-                    .copied()
-                    .collect::<Vec<&str>>()
-                    .join(" | ");
+                    let fields = [
+                        identification.vendor(),
+                        identification.product_code(),
+                        identification.revision(),
+                    ];
+                    let summary = fields
+                        .iter()
+                        .flatten()
+                        .filter(|s| !s.is_empty())
+                        .copied()
+                        .collect::<Vec<&str>>()
+                        .join(" | ");
+                    let [vendor, product_code, revision] = fields.map(|f| f.map(str::to_owned));
 
                     found_count += 1;
                     // frame_id 0x2B = FC43, so the result table can tell an
@@ -1003,7 +993,7 @@ pub async fn probe_function_codes(
         let supported_types: Vec<String> = verdicts
             .iter()
             .filter(|(_, v)| v.supported())
-            .map(|(rt, _)| register_type_name(rt).to_string())
+            .map(|(rt, _)| rt.catalog().as_str().to_string())
             .collect();
         let responded = !supported_types.is_empty();
 
@@ -1035,7 +1025,7 @@ pub async fn probe_function_codes(
 
 #[cfg(test)]
 mod tests {
-    use super::super::fake_device::{self, device, Reply};
+    use wiretap_io::modbus::testing::{self, device, Reply};
     use super::*;
     use tokio::time::timeout;
     use wiretap_io::modbus::{ExceptionCode, TransportError};
@@ -1174,7 +1164,7 @@ mod tests {
     async fn an_exception_is_bisected_down_to_the_missing_register() {
         let device = device(|request| match request.start()..request.start() + request.count() {
             range if range.contains(&3) => Reply::Exception(0x02),
-            _ => fake_device::registers(request),
+            _ => testing::registers(request),
         })
         .await;
         let result = sweep(register_sweep(device.port, 0, 7)).await;
@@ -1192,7 +1182,7 @@ mod tests {
     async fn a_gateway_target_failure_is_silence_not_bisected() {
         let device = device(|request| match request.start()..request.start() + request.count() {
             range if range.contains(&3) => Reply::Exception(0x0B),
-            _ => fake_device::registers(request),
+            _ => testing::registers(request),
         })
         .await;
         let result = sweep(register_sweep(device.port, 0, 15)).await;
@@ -1224,7 +1214,7 @@ mod tests {
     }
 
     /// Unit 1 identifies itself; unit 2 refuses FC43 and answers a register read.
-    fn gateway(request: &fake_device::Request) -> Reply {
+    fn gateway(request: &testing::Request) -> Reply {
         match (request.unit, request.function()) {
             (1, 0x2B) => {
                 let mut pdu = vec![0x2B, 0x0E, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 4];
@@ -1232,7 +1222,7 @@ mod tests {
                 Reply::Pdu(pdu)
             }
             (_, 0x2B) => Reply::Exception(0x01),
-            _ => fake_device::registers(request),
+            _ => testing::registers(request),
         }
     }
 

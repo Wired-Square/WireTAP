@@ -18,26 +18,17 @@ use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch};
 use wiretap_io::modbus::{
-    spawn, ModbusTcp, PollEvent, PollTask, PollWriter, Poller, TaskEvent, TaskOptions,
-    TcpOptions, TransportError, UnitSource,
+    spawn, tcp_endpoint, ModbusTcp, PollEvent, PollTask, PollWriter, Poller, TaskEvent,
+    TaskOptions, TcpOptions, TransportError, UnitSource,
 };
 
-use super::reader::{PollEmitMode, PollGroup, RegisterType};
+use super::reader::{PollEmitMode, PollGroup};
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
 use crate::io::types::SourceMessage;
 use crate::io::{emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
 
 pub use wiretap_io::modbus::ReadData;
-
-pub fn register_type_name(rt: &RegisterType) -> &'static str {
-    match rt {
-        RegisterType::Holding => "holding",
-        RegisterType::Input => "input",
-        RegisterType::Coil => "coil",
-        RegisterType::Discrete => "discrete",
-    }
-}
 
 // ============================================================================
 // Frame construction
@@ -215,7 +206,7 @@ pub fn device_connection(host: &str, port: u16, unit_id: u8) -> ModbusTcp {
         unit_id,
         ..TcpOptions::default()
     };
-    ModbusTcp::new(crate::io::net::tcp_endpoint(host, port), options)
+    ModbusTcp::new(tcp_endpoint(host, port), options)
 }
 
 /// Connect, then spawn one poll task for all of a source's groups. Connecting
@@ -372,7 +363,7 @@ impl Drain {
                 recovered,
                 ..
             } => {
-                let type_name = register_type_name(&poll.register_type);
+                let type_name = poll.register_type.catalog().as_str();
                 if recovered {
                     tlog!(
                         "{} {} reg {} recovered, back to every {}ms",
@@ -401,7 +392,7 @@ impl Drain {
                 retry_in,
                 ..
             } => {
-                let type_name = register_type_name(&poll.register_type);
+                let type_name = poll.register_type.catalog().as_str();
                 tlog!(
                     "{} error reading {} at {}: Modbus exception: {} (next read in {:?})",
                     label,
@@ -422,7 +413,7 @@ impl Drain {
                 consecutive,
                 ..
             } => {
-                let type_name = register_type_name(&poll.register_type);
+                let type_name = poll.register_type.catalog().as_str();
                 tlog!(
                     "{} error reading {} at {}: IO error: {} ({}/{})",
                     label,
@@ -488,6 +479,7 @@ impl Drain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::RegisterType;
 
     fn poll(register_type: RegisterType, start: u16, count: u16, emit: PollEmitMode) -> PollGroup {
         PollGroup {
@@ -635,7 +627,7 @@ bit_length = 20
         assert!((1..10_000).all(|n| !exhausted(n, 0)));
     }
 
-    use super::super::fake_device::{self, device, Device, Reply};
+    use wiretap_io::modbus::testing::{self, device, Device, Reply};
     use tokio::time::timeout;
 
     fn holding(start: u16, count: u16) -> PollGroup {
@@ -672,7 +664,7 @@ bit_length = 20
 
     #[tokio::test]
     async fn a_read_becomes_frames_stamped_when_it_was_read_and_stop_ends_the_run() {
-        let device = device(fake_device::registers).await;
+        let device = device(testing::registers).await;
         let task = spawn_on(&device, &[holding(5, 2)]).await;
         let (sink, mut frames) = broker_sink();
         let (control, control_rx) = watch::channel(PollControl::Run);
@@ -698,7 +690,7 @@ bit_length = 20
     async fn a_group_that_keeps_losing_the_link_is_retired_at_the_limit() {
         let device = device(|request| match request.start() {
             1000 => Reply::Drop,
-            _ => fake_device::registers(request),
+            _ => testing::registers(request),
         })
         .await;
         let task = spawn_on(&device, &[holding(1000, 1)]).await;
@@ -732,7 +724,7 @@ bit_length = 20
 
     #[tokio::test]
     async fn a_write_goes_over_the_poll_s_own_connection() {
-        let device = device(fake_device::registers).await;
+        let device = device(testing::registers).await;
         let task = spawn_on(&device, &[holding(0, 1)]).await;
         let _registered = register_writer("write-session", "profile", task.writer());
 
@@ -750,7 +742,7 @@ bit_length = 20
 
     #[tokio::test]
     async fn a_writer_is_reachable_only_while_its_poll_is_registered() {
-        let device = device(fake_device::registers).await;
+        let device = device(testing::registers).await;
         let old = spawn_on(&device, &[holding(0, 1)]).await;
         let new = spawn_on(&device, &[holding(0, 1)]).await;
 

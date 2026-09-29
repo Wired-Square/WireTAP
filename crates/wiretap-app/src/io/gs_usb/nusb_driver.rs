@@ -26,17 +26,7 @@ use crate::io::types::SourceMessage;
 /// List all gs_usb devices on the system
 pub fn list_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
     let devices = gsusb::devices().map_err(|e| format!("Failed to list USB devices: {}", e))?;
-    Ok(devices
-        .into_iter()
-        .map(|dev| GsUsbDeviceInfo {
-            bus: dev.bus,
-            address: dev.address,
-            product: dev.product,
-            serial: dev.serial,
-            interface_name: None,
-            interface_up: None,
-        })
-        .collect())
+    Ok(devices.into_iter().map(GsUsbDeviceInfo::from).collect())
 }
 
 /// Reads a device's channels, versions and clock without starting a channel.

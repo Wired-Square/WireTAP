@@ -14,6 +14,7 @@
 
 use async_trait::async_trait;
 use serde::Deserialize;
+use std::str::FromStr;
 use std::time::Duration;
 use tauri::AppHandle;
 use tokio::sync::watch;
@@ -55,6 +56,26 @@ impl RegisterType {
             RegisterType::Coil => wiretap_catalog::RegisterType::Coil,
             RegisterType::Discrete => wiretap_catalog::RegisterType::Discrete,
         }
+    }
+}
+
+impl From<wiretap_catalog::RegisterType> for RegisterType {
+    fn from(rt: wiretap_catalog::RegisterType) -> Self {
+        use wiretap_catalog::RegisterType as Cat;
+        match rt {
+            Cat::Input => RegisterType::Input,
+            Cat::Holding => RegisterType::Holding,
+            Cat::Coil => RegisterType::Coil,
+            Cat::Discrete => RegisterType::Discrete,
+        }
+    }
+}
+
+impl FromStr for RegisterType {
+    type Err = wiretap_catalog::UnknownRegisterType;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<wiretap_catalog::RegisterType>().map(Self::from)
     }
 }
 
@@ -101,7 +122,7 @@ fn default_device_address() -> u8 {
 impl PollGroup {
     pub(super) fn from_item<T>(item: PollItem<T>, frame_id: u32, emit_mode: PollEmitMode) -> Self {
         Self {
-            register_type: super::map_register_type(item.register_type),
+            register_type: item.register_type.into(),
             start_register: item.start,
             count: item.count,
             interval_ms: item.interval.as_millis() as u64,

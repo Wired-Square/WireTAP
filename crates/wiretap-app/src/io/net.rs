@@ -1,6 +1,6 @@
 //! Shared host/port resolution for TCP transports.
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use crate::io::error::IoError;
@@ -56,14 +56,6 @@ pub async fn resolve_host_port(host: &str, port: u16) -> Result<SocketAddr, IoEr
     }
 }
 
-/// The `host:port` a `wiretap-io` transport resolves, with an IPv6 literal bracketed.
-pub fn tcp_endpoint(host: &str, port: u16) -> String {
-    match host.parse::<IpAddr>() {
-        Ok(ip) => SocketAddr::from((ip, port)).to_string(),
-        Err(_) => format!("{host}:{port}"),
-    }
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -71,13 +63,6 @@ pub fn tcp_endpoint(host: &str, port: u16) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn an_ipv6_host_is_bracketed_and_a_name_is_left_alone() {
-        assert_eq!(tcp_endpoint("::1", 502), "[::1]:502");
-        assert_eq!(tcp_endpoint("10.0.0.5", 502), "10.0.0.5:502");
-        assert_eq!(tcp_endpoint("plc.local", 1502), "plc.local:1502");
-    }
 
     #[tokio::test]
     async fn resolves_an_ip_literal_without_touching_dns() {

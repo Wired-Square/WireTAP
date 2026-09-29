@@ -255,7 +255,10 @@ impl ModbusRangeSpecParam {
         };
         for r in &self.ranges {
             spec.ranges.push(crate::io::ModbusRange {
-                register_type: parse_register_type(&r.register_type)?,
+                register_type: r
+                    .register_type
+                    .parse::<crate::io::RegisterType>()
+                    .map_err(|e| e.to_string())?,
                 start: r.start,
                 end: r.end,
                 interval_ms: r.interval_ms,
@@ -275,20 +278,6 @@ impl ModbusRangeSpecParam {
             spec.max_registers = v;
         }
         Ok(spec)
-    }
-}
-
-/// Parse a register-type string into the IO layer's enum.
-pub fn parse_register_type(s: &str) -> Result<crate::io::RegisterType, String> {
-    use crate::io::RegisterType;
-    match s.to_ascii_lowercase().as_str() {
-        "holding" => Ok(RegisterType::Holding),
-        "input" => Ok(RegisterType::Input),
-        "coil" => Ok(RegisterType::Coil),
-        "discrete" => Ok(RegisterType::Discrete),
-        other => Err(format!(
-            "Unknown register type '{other}' — use holding, input, coil, or discrete"
-        )),
     }
 }
 

@@ -22,9 +22,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "linux")]
-pub mod linux;
-
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 pub mod nusb_driver;
 
@@ -37,8 +34,8 @@ pub use nusb_driver::run_source;
 // ============================================================================
 //
 // The identity and the layouts are `wiretap_protocol::gs_usb`, re-exported so
-// the Linux scan and the diagnostic CLI reach them through this module rather
-// than each importing the crate.
+// the diagnostic CLI reaches them through this module rather than importing the
+// crate.
 
 pub use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
 
@@ -61,6 +58,20 @@ pub struct GsUsbDeviceInfo {
     pub interface_name: Option<String>,
     /// Whether the interface is currently up (Linux only)
     pub interface_up: Option<bool>,
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+impl From<wiretap_io::can::gsusb::GsUsbDevice> for GsUsbDeviceInfo {
+    fn from(dev: wiretap_io::can::gsusb::GsUsbDevice) -> Self {
+        Self {
+            bus: dev.bus,
+            address: dev.address,
+            product: dev.product,
+            serial: dev.serial,
+            interface_name: None,
+            interface_up: None,
+        }
+    }
 }
 
 /// Result of probing a gs_usb device
@@ -91,7 +102,16 @@ pub struct GsUsbProbeResult {
 pub fn list_gs_usb_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
     #[cfg(target_os = "linux")]
     {
-        linux::list_devices()
+        let devices = wiretap_io::can::gsusb::devices()
+            .map_err(|e| format!("Failed to list gs_usb devices: {e}"))?;
+        Ok(devices
+            .into_iter()
+            .map(|d| GsUsbDeviceInfo {
+                interface_name: d.interface,
+                interface_up: d.up,
+                ..d.device.into()
+            })
+            .collect())
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos"))]

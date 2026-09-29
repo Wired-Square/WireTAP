@@ -4,8 +4,6 @@
 // - Source: catalog-driven polling of known registers
 // - Scanner: one-shot discovery of registers and active unit IDs
 
-#[cfg(test)]
-mod fake_device;
 pub mod poll;
 pub mod ranges;
 mod reader;
@@ -78,17 +76,6 @@ pub fn session_modbus_endpoint(
     session_modbus_profile(&settings, session_id)
         .map(modbus_endpoint)
         .ok_or_else(|| format!("Session '{session_id}' has no Modbus source profile"))
-}
-
-/// Map the catalogue crate's register type onto the IO layer's enum.
-fn map_register_type(rt: wiretap_catalog::modbus::RegisterType) -> RegisterType {
-    use wiretap_catalog::modbus::RegisterType as Cat;
-    match rt {
-        Cat::Input => RegisterType::Input,
-        Cat::Holding => RegisterType::Holding,
-        Cat::Coil => RegisterType::Coil,
-        Cat::Discrete => RegisterType::Discrete,
-    }
 }
 
 /// Build Modbus poll groups from a catalogue's `[frame.modbus.*]` entries via the

@@ -166,3 +166,6 @@ git2 = { version = "0.21", default-features = false, features = ["https", "vendo
 # nusb — used by the STM32 DFU flasher (dfu-nusb). Already a dep on
 # macOS/Windows; added here for Linux parity.
 nusb = { version = "0.2", features = ["tokio"] }
+
+[dev-dependencies]
+wiretap-io = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.19.12", features = ["testing"] }

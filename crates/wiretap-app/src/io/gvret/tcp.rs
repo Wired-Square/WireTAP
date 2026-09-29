@@ -8,13 +8,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
-use wiretap_io::can::{CanError, ResolveError, TransportError};
+use wiretap_io::can::{tcp_endpoint, CanError, ResolveError, TransportError};
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{can_options, link_lost, serve};
 use crate::io::error::IoError;
-use crate::io::net::tcp_endpoint;
 use crate::io::types::SourceMessage;
 
 /// The device label both the probe and the streaming path identify themselves by.
