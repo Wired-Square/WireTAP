@@ -20,7 +20,6 @@ const SOURCE_CHANNEL_CAPACITY: usize = 1024;
 use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
 use super::can_task::can_frame;
-use super::gvret::validate_gvret_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
 use super::types::{SetFramingRequest, SourceMessage, TransmitRequest};
@@ -522,14 +521,7 @@ impl IOBroker {
         // Encode the frame based on the profile kind
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
-            "gvret_tcp" | "gvret_usb" => {
-                if let Err(result) = validate_gvret_frame(&routed_frame) {
-                    return Ok(result);
-                }
-                frame = Some(can_frame(&routed_frame));
-                Vec::new()
-            }
-            "slcan" | "socketcan" | "gs_usb" => {
+            "gvret_tcp" | "gvret_usb" | "slcan" | "socketcan" | "gs_usb" => {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }
@@ -553,17 +545,20 @@ impl IOBroker {
             }
         };
 
-        // Fire-and-forget: queue the frame into the device's transmit channel
-        // (capacity 32) and return immediately. The device write task handles
-        // the actual hardware write asynchronously. If the channel is full,
-        // that's backpressure — report it as an error.
-        //
-        // We still create a result channel so the device task can report errors,
-        // but we don't block waiting for it. Device write errors are logged by
-        // the device task.
-        let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
+        // Queue the frame into the device's transmit channel (capacity 32); a
+        // full channel is backpressure, reported as an error. The device task
+        // writes asynchronously and logs write errors, but a CAN writer answers
+        // before the write, so its refusal (a length, FD, RTR or bus the device
+        // lacks) is waited for and reported.
+        let answers_on_accept = frame.is_some();
+        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest { data, frame, result_tx })
             .map_err(|e| format!("Transmit buffer full ({})", e))?;
+        if answers_on_accept {
+            if let Ok(Err(refused)) = result_rx.recv() {
+                return Ok(TransmitResult::error(refused));
+            }
+        }
         Ok(TransmitResult::queued())
     }
 

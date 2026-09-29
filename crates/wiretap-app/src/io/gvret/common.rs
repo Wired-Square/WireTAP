@@ -14,7 +14,6 @@ use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use crate::io::bus_mapping::{gvret_protocols, BusMapping};
 use crate::io::can_task::{mapped_frames, open_failed};
 use crate::io::types::SourceMessage;
-use crate::io::{CanTransmitFrame, TransmitResult};
 
 // ============================================================================
 // Constants
@@ -237,40 +236,6 @@ impl Stream {
 }
 
 // ============================================================================
-// Frame Validation
-// ============================================================================
-
-/// Validate a CAN frame for GVRET transmission
-///
-/// Returns Ok(()) if valid, or an error TransmitResult if invalid.
-pub fn validate_gvret_frame(frame: &CanTransmitFrame) -> Result<(), TransmitResult> {
-    if frame.is_fd {
-        return Err(TransmitResult::error("GVRET cannot send CAN FD frames".into()));
-    }
-    if frame.is_rtr {
-        return Err(TransmitResult::error("GVRET cannot send remote frames".into()));
-    }
-    if frame.data.len() > 8 {
-        return Err(TransmitResult::error(format!(
-            "Classic CAN frame data too long: {} bytes (max 8)",
-            frame.data.len()
-        )));
-    }
-
-    // Validate bus number (GVRET supports buses 0-4)
-    if frame.bus > 4 {
-        return Err(TransmitResult::error(format!(
-            "Invalid bus number: {} (valid: 0-4)",
-            frame.bus
-        )));
-    }
-
-    Ok(())
-}
-
-// ============================================================================
-// Stream Helpers
-// ============================================================================
 // Tests
 // ============================================================================
 
@@ -279,69 +244,6 @@ mod tests {
     use super::*;
     use std::time::UNIX_EPOCH;
     use wiretap_io::can::{CanFrame, CanRead, Direction, TransportError};
-    #[test]
-    fn test_validate_classic_can_too_long() {
-        let frame = CanTransmitFrame {
-            frame_id: 0x123,
-            data: vec![0; 9], // 9 bytes - too long for classic CAN
-            bus: 0,
-            is_extended: false,
-            is_fd: false,
-            is_brs: false,
-            is_rtr: false,
-        };
-
-        let result = validate_gvret_frame(&frame);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn fd_and_remote_frames_are_refused_before_they_are_queued() {
-        let frame = |is_fd, is_rtr| CanTransmitFrame {
-            frame_id: 0x123,
-            data: vec![0; 8],
-            bus: 0,
-            is_extended: false,
-            is_fd,
-            is_brs: false,
-            is_rtr,
-        };
-        assert!(validate_gvret_frame(&frame(true, false)).is_err());
-        assert!(validate_gvret_frame(&frame(false, true)).is_err());
-        assert!(validate_gvret_frame(&frame(false, false)).is_ok());
-    }
-
-    #[test]
-    fn test_validate_invalid_bus() {
-        let frame = CanTransmitFrame {
-            frame_id: 0x123,
-            data: vec![0x11],
-            bus: 5, // Invalid - max is 4
-            is_extended: false,
-            is_fd: false,
-            is_brs: false,
-            is_rtr: false,
-        };
-
-        let result = validate_gvret_frame(&frame);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_validate_valid_frame() {
-        let frame = CanTransmitFrame {
-            frame_id: 0x123,
-            data: vec![0x11, 0x22, 0x33, 0x44],
-            bus: 2,
-            is_extended: false,
-            is_fd: false,
-            is_brs: false,
-            is_rtr: false,
-        };
-
-        let result = validate_gvret_frame(&frame);
-        assert!(result.is_ok());
-    }
 
     fn reconcile_mapping(device_bus: u8, enabled: bool, output_bus: u8) -> BusMapping {
         BusMapping {

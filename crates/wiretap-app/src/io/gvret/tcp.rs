@@ -347,11 +347,30 @@ mod tests {
         .expect("the device heard the transmit");
         assert_eq!(transmitted, (1, 0x321, false, vec![1, 2, 3]));
 
-        let fd = CanFrame::data(0, 0x321, false, true, false, vec![0; 12]);
-        assert_eq!(
-            answer(send(&transmit, fd)).await,
-            Err("Transmit refused: 12 bytes is too long".to_string())
-        );
+        let refusals = [
+            (
+                CanFrame::data(0, 0x321, false, true, false, vec![0; 12]),
+                "12 bytes is too long",
+            ),
+            (
+                CanFrame::data(0, 0x321, false, true, false, vec![0; 8]),
+                "CAN FD is not supported",
+            ),
+            (
+                CanFrame::remote(0, 0x321, false, 0),
+                "remote frames are not supported",
+            ),
+            (
+                CanFrame::data(2, 0x321, false, false, false, vec![1]),
+                "bus 2 is not on the device",
+            ),
+        ];
+        for (frame, reason) in refusals {
+            assert_eq!(
+                answer(send(&transmit, frame)).await,
+                Err(format!("Transmit refused: {reason}"))
+            );
+        }
 
         stop.store(true, Ordering::SeqCst);
         assert!(matches!(
@@ -487,7 +506,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_transmit_while_waiting_is_refused_and_a_stop_ends_the_wait() {
+    async fn a_transmit_while_waiting_is_answered_at_once_and_a_stop_ends_the_wait() {
         let (port, _commands) = fake_gvret(usize::MAX, true).await;
         let (stop, mut rx) = start_waiting_out(port, Duration::from_secs(60));
         let (transmit, _) = connect_and_read(&mut rx).await;
@@ -497,10 +516,7 @@ mod tests {
         ));
 
         let frame = CanFrame::data(0, 0x321, false, false, false, vec![1]);
-        assert_eq!(
-            answer(send(&transmit, frame)).await,
-            Err("Transmit refused: not connected".to_string())
-        );
+        assert_eq!(answer(send(&transmit, frame)).await, Ok(()));
         stop.store(true, Ordering::SeqCst);
         assert!(matches!(
             next(&mut rx, Duration::from_secs(2)).await,

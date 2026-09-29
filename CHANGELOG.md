@@ -57,6 +57,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Modbus scan gives up on an unreachable device within its timeout.** Connecting used to wait as long as the operating system allowed; it now counts against the scan's timeout. A unit ID scan also asks each unit over one connection, where it used to open a second for the register fallback.
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
 - **A short last page reads as the last page.** Discovery fills a short last page from the rows before it, but the pager still read "1 / 2" there with Next and Last enabled. It now reads "2 / 2" and Previous goes back a page.
+- **A GVRET transmit on a bus the device lacks is refused.** Buses were checked against a fixed limit of five rather than the count the device reports, so a frame for a bus the device does not have read as sent, though it never went out. It is now refused with the reason, as a frame that is too long, CAN FD or a remote request already was. SLCAN, SocketCAN and candleLight refusals now show in Transmit as well, where they were only logged.
 
 ## [0.12.1] - 2026-09-25
 

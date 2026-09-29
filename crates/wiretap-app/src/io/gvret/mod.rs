@@ -16,7 +16,6 @@ pub use tcp::probe_gvret_tcp;
 pub use usb::probe_gvret_usb;
 
 // Internal items used by multi_source and other drivers
-pub(crate) use common::validate_gvret_frame;
 pub(crate) use tcp::run_source as run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 pub(crate) use usb::run_source as run_gvret_usb_source;

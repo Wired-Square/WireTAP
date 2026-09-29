@@ -86,8 +86,12 @@ pub(crate) fn can_frame(frame: &CanTransmitFrame) -> CanFrame {
 fn transmit_result(sent: Result<std::io::Result<()>, SendRefused>) -> Result<(), String> {
     match sent {
         Ok(written) => written.map_err(|e| format!("Write error: {e}")),
-        Err(refused) => Err(format!("Transmit refused: {refused}")),
+        Err(refused) => Err(refusal(refused)),
     }
+}
+
+fn refusal(refused: SendRefused) -> String {
+    format!("Transmit refused: {refused}")
 }
 
 /// One `Frames` for a read, on the session's buses; none when every frame in it
@@ -224,7 +228,8 @@ pub(crate) async fn serve(
 }
 
 /// `TransmitSender` is a std channel, so its requests reach the async writer
-/// from a blocking thread, which ends once the reader has.
+/// from a blocking thread, which ends once the reader has. A request is
+/// answered once the writer accepts or refuses it, not once the device has it.
 fn forward_transmits(
     requests: std_mpsc::Receiver<TransmitRequest>,
     writer: CanWriter,
@@ -234,14 +239,23 @@ fn forward_transmits(
     tokio::task::spawn_blocking(move || loop {
         match requests.recv_timeout(Duration::from_millis(50)) {
             Ok(req) => {
-                let result = match req.frame {
-                    Some(frame) => transmit_result(runtime.block_on(writer.send(frame))),
+                let answer = match req.frame {
+                    Some(frame) => writer
+                        .submit(frame)
+                        .map(|sent| {
+                            runtime.spawn(async move {
+                                if let Err(e) = transmit_result(sent.await) {
+                                    tlog!("[can] Transmit failed: {}", e);
+                                }
+                            });
+                        })
+                        .map_err(refusal),
                     None => Err("Transmit refused: no CAN frame to send".to_string()),
                 };
-                if let Err(e) = &result {
+                if let Err(e) = &answer {
                     tlog!("[can] Transmit failed: {}", e);
                 }
-                let _ = req.result_tx.send(result);
+                let _ = req.result_tx.send(answer);
             }
             Err(std_mpsc::RecvTimeoutError::Timeout) if reader.strong_count() > 0 => {}
             Err(_) => return,
