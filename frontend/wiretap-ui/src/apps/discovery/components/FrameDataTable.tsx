@@ -83,9 +83,10 @@ export interface FrameDataTableProps {
   onContextMenu?: (frame: FrameRow, position: { x: number; y: number }) => void;
   /** Called when the header row is right-clicked */
   onHeaderContextMenu?: (position: { x: number; y: number }) => void;
-  /** Starting frame index for the current page (for tooltip display) */
+  /** Row ordinal the current window starts at; the # column counts on from it. */
   pageStartIndex?: number;
-  /** 1-based original buffer positions for each frame. When provided, used for # column instead of computed page offset. */
+  /** The store's row id for each frame, keying rows stably across refetches. Not a
+   *  position: the store is shared between captures. */
   captureIndices?: number[];
   /** Optional leading status column — renders per-row status indicator with matching header */
   renderRowStatus?: (frame: FrameRow, index: number) => ReactNode;
@@ -339,9 +340,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
           {frames.map((frame, idx, arr) => {
             const prevFrame = idx > 0 ? arr[idx - 1] : null;
             const isCurrentFrame = highlightedRowIndex != null && idx === highlightedRowIndex;
-            // Rust supplies the row's capture position; the page offset is only a
-            // fallback for callers that don't pass indices.
-            const displayIndex = captureIndices?.[idx] ?? (pageStartIndex + idx + 1);
+            const displayIndex = pageStartIndex + idx + 1;
 
             return (
               <tr

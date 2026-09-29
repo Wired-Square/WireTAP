@@ -228,6 +228,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     isLoading,
     currentPage,
     setCurrentPage,
+    pageStartIndex,
     totalPages,
     timeRange: captureTimeRange,
     navigateToTimestamp,
@@ -482,6 +483,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         useLocalTimezone={useLocalTimezone}
         frames={processedFrames}
         captureIndices={captureIndices}
+        pageStartIndex={pageStartIndex}
         formatTime={formatTime}
         showSourceAddress={hasSourceAddresses}
         sourceByteCount={srcConfig?.numBytes ?? 2}
