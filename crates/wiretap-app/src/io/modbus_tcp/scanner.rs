@@ -83,16 +83,18 @@ pub fn get_scan_state(session_id: &str) -> Option<ModbusScanState> {
     SCAN_STATES.read().ok().and_then(|s| s.get(session_id).cloned())
 }
 
-/// Wakes anything waiting on a sweep to finish. Broadcast rather than
-/// per-session: each waiter re-checks its own id, and the number of concurrent
-/// sweeps is tiny.
-static SCAN_RESULT_READY: Lazy<tokio::sync::Notify> = Lazy::new(tokio::sync::Notify::new);
+/// Hands each sweep's outcome to anything waiting on it. The outcome travels
+/// with the wakeup because a stop can clear the store before a waiter reads it.
+/// Broadcast rather than per-session: the number of concurrent sweeps is tiny.
+static SCAN_RESULT_READY: Lazy<
+    tokio::sync::broadcast::Sender<(String, Result<ScanCompletePayload, String>)>,
+> = Lazy::new(|| tokio::sync::broadcast::channel(16).0);
 
 pub fn store_scan_result(session_id: &str, outcome: Result<ScanCompletePayload, String>) {
     if let Ok(mut results) = SCAN_RESULTS.write() {
-        results.insert(session_id.to_string(), outcome);
+        results.insert(session_id.to_string(), outcome.clone());
     }
-    SCAN_RESULT_READY.notify_waiters();
+    let _ = SCAN_RESULT_READY.send((session_id.to_string(), outcome));
 }
 
 pub fn get_scan_result(session_id: &str) -> Option<Result<ScanCompletePayload, String>> {
@@ -107,23 +109,25 @@ pub async fn await_scan_result(
     session_id: &str,
     timeout: Duration,
 ) -> Option<Result<ScanCompletePayload, String>> {
-    // The loop is needed because the notification is a broadcast: a wakeup may
-    // belong to another sweep, so this one re-checks its own key and re-parks.
+    use tokio::sync::broadcast::error::RecvError;
+    // Subscribe before reading the store, or a result stored between the two is
+    // missed until the timeout.
+    let mut ready = SCAN_RESULT_READY.subscribe();
     tokio::time::timeout(timeout, async {
+        if let Some(outcome) = get_scan_result(session_id) {
+            return outcome;
+        }
         loop {
-            // Register interest *before* reading the store. `Notified` only
-            // enrols the waiter when first polled, so without `enable()` a
-            // result stored between the read and the await is a lost wakeup —
-            // which would hang until the timeout, strictly worse than the poll
-            // this replaces.
-            let notified = SCAN_RESULT_READY.notified();
-            tokio::pin!(notified);
-            notified.as_mut().enable();
-
-            if let Some(outcome) = get_scan_result(session_id) {
-                return outcome;
+            match ready.recv().await {
+                Ok((id, outcome)) if id == session_id => return outcome,
+                Ok(_) => {}
+                Err(RecvError::Lagged(_)) => {
+                    if let Some(outcome) = get_scan_result(session_id) {
+                        return outcome;
+                    }
+                }
+                Err(RecvError::Closed) => std::future::pending().await,
             }
-            notified.await;
         }
     })
     .await
@@ -139,9 +143,6 @@ pub fn clear_scan_state(session_id: &str) {
     if let Ok(mut results) = SCAN_RESULTS.write() {
         results.remove(session_id);
     }
-    // Wake anyone waiting: a sweep that errored or was destroyed without storing
-    // a result would otherwise hold its waiter until the timeout.
-    SCAN_RESULT_READY.notify_waiters();
 }
 
 // ============================================================================
@@ -1093,6 +1094,22 @@ mod tests {
         store_scan_result("await-later", Ok(payload()));
         assert!(waiter.await.unwrap().is_some(), "waiter missed the notification");
         clear_scan_state("await-later");
+    }
+
+    #[tokio::test]
+    async fn a_scan_result_survives_a_stop_before_its_waiter_reads_it() {
+        for (sid, outcome) in [
+            ("await-then-stop-ok", Ok(payload())),
+            ("await-then-stop-err", Err("Failed to connect".to_string())),
+        ] {
+            clear_scan_state(sid);
+            let waiter = tokio::spawn(await_scan_result(sid, Duration::from_millis(500)));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            store_scan_result(sid, outcome.clone());
+            clear_scan_state(sid);
+            let got = waiter.await.unwrap().expect("the waiter was never given the result");
+            assert_eq!(got.map(|p| p.found_count), outcome.map(|p| p.found_count));
+        }
     }
 
     #[tokio::test]
