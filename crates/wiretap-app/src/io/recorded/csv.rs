@@ -267,7 +267,7 @@ fn parse_csv_line_with_indices(line: &str, indices: &CsvColumnIndices) -> Option
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0);
 
-    let dlc: u8 = parts.get(indices.dlc)
+    let dlc: u16 = parts.get(indices.dlc)
         .and_then(|s| s.trim().parse().ok())
         .unwrap_or(0);
 
@@ -302,7 +302,7 @@ fn parse_csv_line_with_indices(line: &str, indices: &CsvColumnIndices) -> Option
         timestamp_us,
         frame_id,
         bus,
-        dlc: dlc.into(),
+        dlc,
         bytes,
         is_extended,
         is_fd: dlc > 8,
@@ -619,10 +619,10 @@ pub fn parse_csv_with_mapping(
         let dlc = if let Some(dlc_c) = dlc_col {
             parts
                 .get(dlc_c)
-                .and_then(|s| s.trim().parse::<u8>().ok())
-                .unwrap_or(bytes.len() as u8)
+                .and_then(|s| s.trim().parse::<u16>().ok())
+                .unwrap_or(bytes.len() as u16)
         } else {
-            bytes.len() as u8
+            bytes.len() as u16
         };
 
         let is_extended = if let Some(ext_c) = extended_col {
@@ -669,7 +669,7 @@ pub fn parse_csv_with_mapping(
             timestamp_us,
             frame_id,
             bus,
-            dlc: dlc.into(),
+            dlc,
             bytes,
             is_extended,
             is_fd: dlc > 8,
@@ -1317,4 +1317,32 @@ fn suggest_timestamp_unit(
     }
 
     TimestampUnit::Microseconds
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_row_longer_than_255_bytes_keeps_its_length() {
+        let path = std::env::temp_dir().join(format!("wiretap-csv-{}.csv", std::process::id()));
+        std::fs::write(&path, format!("1,{}\n", "AB".repeat(256))).unwrap();
+        let mappings = [
+            CsvColumnMapping { column_index: 0, role: CsvColumnRole::FrameId },
+            CsvColumnMapping { column_index: 1, role: CsvColumnRole::DataBytes },
+        ];
+
+        let parsed = parse_csv_with_mapping(
+            path.to_str().unwrap(),
+            &mappings,
+            false,
+            TimestampUnit::Microseconds,
+            false,
+            Delimiter::Comma,
+        );
+        std::fs::remove_file(&path).ok();
+
+        let frame = &parsed.unwrap().frames[0];
+        assert_eq!((frame.bytes.len(), frame.dlc), (256, 256));
+    }
 }
