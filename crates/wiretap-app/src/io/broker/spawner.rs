@@ -21,6 +21,7 @@ use crate::io::modbus_tcp::poll::{
     register_writer, run_poll_task, start_polling, FrameSink, PollControl,
 };
 use crate::io::modbus_tcp::PollGroup;
+use crate::io::virtual_device::{traffic, VirtualTrafficType};
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
@@ -336,7 +337,6 @@ async fn run_virtual_reader(
     virtual_bus_controls: VirtualBusControls,
     virtual_cmd_rx: Option<mpsc::UnboundedReceiver<VirtualBusCommand>>,
 ) -> Result<(), String> {
-    use crate::io::virtual_device::canfd_patterns;
     use std::collections::HashMap;
 
     // Parse traffic type
@@ -456,13 +456,6 @@ async fn run_virtual_reader(
         }
     });
 
-    // Pre-compute CAN-FD patterns once (shared across bus tasks via Arc)
-    let canfd_pats = if traffic_type == "canfd" {
-        Arc::new(canfd_patterns())
-    } else {
-        Arc::new(Vec::new())
-    };
-
     // Register per-bus controls in the shared map and spawn generator tasks for buses
     // that have an enabled mapping (or all buses when no mappings are configured)
     let mut gen_handles: HashMap<u8, tokio::task::JoinHandle<()>> = HashMap::new();
@@ -481,7 +474,6 @@ async fn run_virtual_reader(
             &stop_flag,
             &tx,
             &virtual_bus_controls,
-            &canfd_pats,
         );
         gen_handles.insert(iface.bus, handle);
     }
@@ -520,7 +512,6 @@ async fn run_virtual_reader(
                         &stop_flag,
                         &tx,
                         &virtual_bus_controls,
-                        &canfd_pats,
                     );
                     gen_handles.insert(bus, handle);
                     tlog!("[virtual_reader] Added bus {} at {:.0} Hz", bus, frame_rate_hz);
@@ -577,10 +568,7 @@ fn spawn_bus_generator(
     stop_flag: &Arc<AtomicBool>,
     tx: &mpsc::Sender<SourceMessage>,
     virtual_bus_controls: &VirtualBusControls,
-    canfd_pats: &Arc<Vec<(u32, Vec<u8>)>>,
 ) -> tokio::task::JoinHandle<()> {
-    use crate::io::virtual_device::{CAN_PATTERNS, MODBUS_REGISTERS};
-
     let hz = frame_rate_hz.clamp(0.1, 1000.0);
     let initial_interval_us = (1_000_000.0 / hz) as u64;
     let traffic_enabled = Arc::new(AtomicBool::new(signal_generator));
@@ -599,8 +587,11 @@ fn spawn_bus_generator(
     let tx_clone = tx.clone();
     let stop_clone = stop_flag.clone();
     let bus_mappings_clone = bus_mappings.to_vec();
-    let canfd_pats_clone = canfd_pats.clone();
-    let traffic = traffic_type.to_string();
+    let traffic = match traffic_type {
+        "canfd" => VirtualTrafficType::CanFd,
+        "modbus" => VirtualTrafficType::Modbus,
+        _ => VirtualTrafficType::Can,
+    };
 
     tokio::spawn(async move {
         let mut current_interval_us = initial_interval_us;
@@ -638,80 +629,9 @@ fn spawn_bus_generator(
                 continue;
             }
 
-            let ts = now_us();
-
-            let frame = match traffic.as_str() {
-                "canfd" => {
-                    let pattern_idx = (counter as usize) % (canfd_pats_clone.len() + 1);
-                    let (frame_id, data) = if pattern_idx < canfd_pats_clone.len() {
-                        let (id, ref pat) = canfd_pats_clone[pattern_idx];
-                        (id, pat.clone())
-                    } else {
-                        // Counter frame (0x7E0) — 64 bytes
-                        let cycle = (counter / (canfd_pats_clone.len() as u64 + 1)) + 1;
-                        let c = (cycle as u16).to_be_bytes();
-                        (0x7E0, vec![c[0], c[1]].into_iter().cycle().take(64).collect())
-                    };
-                    FrameMessage {
-                        protocol: "can".to_string(),
-                        timestamp_us: ts,
-                        frame_id,
-                        bus: output_bus,
-                        dlc: data.len() as u8,
-                        bytes: data,
-                        is_extended: false,
-                        is_fd: true,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    }
-                }
-                "modbus" => {
-                    let reg_idx = (counter as usize) % MODBUS_REGISTERS.len();
-                    let register = MODBUS_REGISTERS[reg_idx];
-                    let value = ((counter / MODBUS_REGISTERS.len() as u64) & 0xFFFF) as u16;
-                    let bytes = value.to_be_bytes().to_vec();
-                    FrameMessage {
-                        protocol: "modbus".to_string(),
-                        timestamp_us: ts,
-                        frame_id: register,
-                        bus: output_bus,
-                        dlc: bytes.len() as u8,
-                        bytes,
-                        is_extended: false,
-                        is_fd: false,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    }
-                }
-                _ => {
-                    // Classic CAN
-                    let pattern_idx = (counter as usize) % (CAN_PATTERNS.len() + 1);
-                    let (frame_id, data) = if pattern_idx < CAN_PATTERNS.len() {
-                        let (id, pat) = CAN_PATTERNS[pattern_idx];
-                        (id, pat.to_vec())
-                    } else {
-                        let cycle = (counter / (CAN_PATTERNS.len() as u64 + 1)) + 1;
-                        let c = (cycle as u16).to_be_bytes();
-                        (0x7E0, vec![c[0], c[1], c[0], c[1], c[0], c[1], c[0], c[1]])
-                    };
-                    FrameMessage {
-                        protocol: "can".to_string(),
-                        timestamp_us: ts,
-                        frame_id,
-                        bus: output_bus,
-                        dlc: data.len() as u8,
-                        bytes: data,
-                        is_extended: false,
-                        is_fd: false,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    }
-                }
+            let Some(frame) = traffic::frame(&traffic, counter, output_bus, now_us()) else {
+                break;
             };
-
             if tx_clone.send(SourceMessage::Frames(source_idx, vec![frame])).await.is_err() {
                 break;
             }

@@ -11,6 +11,8 @@
 //     [{ bus: 0, signal_generator: true, frame_rate_hz: 10.0 }, ...]
 //   If interfaces is absent, a single bus is created with defaults.
 
+pub(crate) mod traffic;
+
 use async_trait::async_trait;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -80,21 +82,6 @@ impl Default for VirtualDeviceConfig {
         }
     }
 }
-
-// CAN frame patterns — matching canfd_test.py test signal generator
-pub const CAN_PATTERNS: &[(u32, &[u8])] = &[
-    (0x100, &[0xC0, 0xFF, 0xEE, 0x42, 0xC0, 0xFF, 0xEE, 0x42]),
-    (0x200, &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]),
-    (0x300, &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
-    (0x400, &[0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55]),
-    (0x0F0, &[0xCA, 0xFE, 0xF0, 0x0D, 0xCA, 0xFE, 0xF0, 0x0D]),
-    (0x500, &[0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80]),
-    (0x600, &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-    (0x7FF, &[0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42]),
-];
-
-// Modbus register numbers to cycle through (holding registers)
-pub const MODBUS_REGISTERS: &[u32] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /// Loopback message — either a CAN frame or raw bytes
 enum LoopbackMessage {
@@ -409,29 +396,6 @@ impl IOSource for VirtualSource {
 }
 
 // ============================================================================
-// CAN-FD frame patterns — matching canfd_test.py
-// ============================================================================
-
-/// Build a 64-byte CAN-FD payload by repeating a pattern
-pub fn repeat_to_64(pattern: &[u8]) -> Vec<u8> {
-    pattern.iter().cycle().take(64).copied().collect()
-}
-
-/// Get the CAN-FD patterns (64-byte payloads)
-pub fn canfd_patterns() -> Vec<(u32, Vec<u8>)> {
-    vec![
-        (0x100, repeat_to_64(&[0xC0, 0xFF, 0xEE, 0x42])),
-        (0x200, (0u8..64).collect()),
-        (0x300, vec![0xFF; 64]),
-        (0x400, repeat_to_64(&[0xAA, 0x55])),
-        (0x0F0, repeat_to_64(&[0xCA, 0xFE, 0xF0, 0x0D])),
-        (0x500, repeat_to_64(&[0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80])),
-        (0x600, vec![0x00; 8]),   // Classic-size zeros
-        (0x7FF, vec![0x42; 48]),  // 48-byte payload
-    ]
-}
-
-// ============================================================================
 // Per-Bus Generator Task
 // ============================================================================
 
@@ -452,13 +416,6 @@ fn spawn_bus_generator(
         let mut ticker = interval(Duration::from_micros(current_interval_us));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut throttle = SignalThrottle::new();
-
-        // Pre-compute CAN-FD patterns (heap-allocated, done once)
-        let canfd_pats = if traffic_type == VirtualTrafficType::CanFd {
-            canfd_patterns()
-        } else {
-            Vec::new()
-        };
 
         let bus = iface.bus;
         let mut counter: u64 = 0;
@@ -491,108 +448,23 @@ fn spawn_bus_generator(
 
             let ts = now_us();
 
-            match traffic_type {
-                VirtualTrafficType::Can => {
-                    let pattern_idx = (counter as usize) % (CAN_PATTERNS.len() + 1);
-                    let (frame_id, data) = if pattern_idx < CAN_PATTERNS.len() {
-                        let (id, pat) = CAN_PATTERNS[pattern_idx];
-                        (id, pat.to_vec())
-                    } else {
-                        // Counter frame (0x7E0)
-                        let cycle = (counter / (CAN_PATTERNS.len() as u64 + 1)) + 1;
-                        let c = (cycle as u16).to_be_bytes();
-                        (0x7E0, vec![c[0], c[1], c[0], c[1], c[0], c[1], c[0], c[1]])
-                    };
-
-                    let frame = FrameMessage {
-                        protocol: "can".to_string(),
-                        timestamp_us: ts,
-                        frame_id,
-                        bus,
-                        dlc: data.len() as u8,
-                        bytes: data,
-                        is_extended: false,
-                        is_fd: false,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    };
-
-                    capture_store::append_frames_to_session(&session_id, vec![frame]);
-                    if throttle.should_signal("frames-ready") {
-                        signal_frames_ready(&session_id);
-                    }
+            if let Some(frame) = traffic::frame(&traffic_type, counter, bus, ts) {
+                capture_store::append_frames_to_session(&session_id, vec![frame]);
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
                 }
-                VirtualTrafficType::CanFd => {
-                    let pattern_idx = (counter as usize) % (canfd_pats.len() + 1);
-                    let (frame_id, data) = if pattern_idx < canfd_pats.len() {
-                        let (id, ref pat) = canfd_pats[pattern_idx];
-                        (id, pat.clone())
-                    } else {
-                        // Counter frame (0x7E0) — 64 bytes
-                        let cycle = (counter / (canfd_pats.len() as u64 + 1)) + 1;
-                        let c = (cycle as u16).to_be_bytes();
-                        (0x7E0, vec![c[0], c[1]].into_iter().cycle().take(64).collect())
-                    };
-
-                    let frame = FrameMessage {
-                        protocol: "can".to_string(),
-                        timestamp_us: ts,
-                        frame_id,
+            } else {
+                let entries: Vec<TimestampedByte> = traffic::serial_bytes(counter)
+                    .enumerate()
+                    .map(|(i, byte)| TimestampedByte {
+                        byte,
+                        timestamp_us: ts + i as u64,
                         bus,
-                        dlc: data.len() as u8,
-                        bytes: data,
-                        is_extended: false,
-                        is_fd: true,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    };
-
-                    capture_store::append_frames_to_session(&session_id, vec![frame]);
-                    if throttle.should_signal("frames-ready") {
-                        signal_frames_ready(&session_id);
-                    }
-                }
-                VirtualTrafficType::Modbus => {
-                    let reg_idx = (counter as usize) % MODBUS_REGISTERS.len();
-                    let register = MODBUS_REGISTERS[reg_idx];
-                    let value = ((counter / MODBUS_REGISTERS.len() as u64) & 0xFFFF) as u16;
-                    let bytes = value.to_be_bytes().to_vec();
-
-                    let frame = FrameMessage {
-                        protocol: "modbus".to_string(),
-                        timestamp_us: ts,
-                        frame_id: register,
-                        bus,
-                        dlc: bytes.len() as u8,
-                        bytes,
-                        is_extended: false,
-                        is_fd: false,
-                        source_address: None,
-                        incomplete: None,
-                        direction: Some("rx".to_string()),
-                    };
-
-                    capture_store::append_frames_to_session(&session_id, vec![frame]);
-                    if throttle.should_signal("frames-ready") {
-                        signal_frames_ready(&session_id);
-                    }
-                }
-                VirtualTrafficType::Serial => {
-                    let byte_val = (counter & 0xFF) as u8;
-                    let entries: Vec<TimestampedByte> = (0..8)
-                        .map(|i| TimestampedByte {
-                            byte: byte_val.wrapping_add(i),
-                            timestamp_us: ts + i as u64,
-                            bus,
-                        })
-                        .collect();
-
-                    capture_store::append_raw_bytes_to_session(&session_id, entries);
-                    if throttle.should_signal("bytes-ready") {
-                        signal_bytes_ready(&session_id);
-                    }
+                    })
+                    .collect();
+                capture_store::append_raw_bytes_to_session(&session_id, entries);
+                if throttle.should_signal("bytes-ready") {
+                    signal_bytes_ready(&session_id);
                 }
             }
 
