@@ -157,6 +157,37 @@ impl ModbusScanSource {
     }
 }
 
+/// Runs the sweep, parks its outcome for `await_scan_result`, and returns the
+/// stream-end reason.
+async fn sweep_and_park(job: ScanJob, cancel: &Arc<AtomicBool>, session_id: &str) -> String {
+    let sink = FrameSink::SessionCapture {
+        session_id: session_id.to_string(),
+    };
+    let outcome = match job {
+        ScanJob::Registers { config } => {
+            scan_registers(config, cancel.clone(), Some(session_id.to_string()), &sink).await
+        }
+        ScanJob::UnitIds { config } => {
+            scan_unit_ids(config, cancel.clone(), Some(session_id.to_string()), &sink).await
+        }
+    };
+
+    // Park the outcome so a caller that didn't await the sweep — an MCP client
+    // that passed wait=false, say — can still collect it afterwards.
+    store_scan_result(session_id, outcome.clone());
+    match outcome {
+        Ok(payload) => match (payload.truncated, cancel.load(Ordering::Relaxed)) {
+            (false, _) => "complete".to_string(),
+            (true, true) => "cancelled".to_string(),
+            (true, false) => "stopped".to_string(),
+        },
+        Err(e) => {
+            emit_session_error(session_id, format!("Modbus scan failed: {e}"));
+            format!("error: {e}")
+        }
+    }
+}
+
 #[async_trait]
 impl IOSource for ModbusScanSource {
     fn capabilities(&self) -> IOCapabilities {
@@ -199,34 +230,7 @@ impl IOSource for ModbusScanSource {
 
         self.handle = Some(tauri::async_runtime::spawn(async move {
             let _ended = ended;
-            let sink = FrameSink::SessionCapture { session_id: session_id.clone() };
-            let outcome = match job {
-                ScanJob::Registers { config } => {
-                    scan_registers(config, cancel.clone(), Some(session_id.clone()), &sink).await
-                }
-                ScanJob::UnitIds { config } => {
-                    scan_unit_ids(config, cancel.clone(), Some(session_id.clone()), &sink).await
-                }
-            };
-
-            let reason = match outcome {
-                Ok(payload) => {
-                    let truncated = payload.truncated;
-                    // Park the summary so a caller that didn't await the sweep —
-                    // an MCP client that passed wait=false, say — can still
-                    // collect the block/gap breakdown afterwards.
-                    store_scan_result(&session_id, payload);
-                    match (truncated, cancel.load(Ordering::Relaxed)) {
-                        (false, _) => "complete".to_string(),
-                        (true, true) => "cancelled".to_string(),
-                        (true, false) => "stopped".to_string(),
-                    }
-                }
-                Err(e) => {
-                    emit_session_error(&session_id, format!("Modbus scan failed: {e}"));
-                    format!("error: {e}")
-                }
-            };
+            let reason = sweep_and_park(job, &cancel, &session_id).await;
 
             // Release the device before announcing the end, so a follow-up sweep
             // queued off the completion event isn't rejected by the guard.
@@ -296,6 +300,38 @@ mod tests {
                 "chunk_size":10,"inter_request_delay_ms":50}}"#,
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_failed_scan_connect_wakes_the_waiter_with_its_error() {
+        use super::super::scanner::await_scan_result;
+        use std::time::{Duration, Instant};
+
+        let closed_port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let mut job = register_job();
+        job.retarget("127.0.0.1".into(), closed_port);
+        let sid = "scan-connect-refused";
+        clear_scan_state(sid);
+
+        let waiter = tokio::spawn(await_scan_result(sid, Duration::from_secs(5)));
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let started = Instant::now();
+        sweep_and_park(job, &Arc::new(AtomicBool::new(false)), sid).await;
+        let outcome = waiter.await.unwrap();
+
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "waited out the timeout"
+        );
+        let error = outcome
+            .expect("the waiter was never given the failure")
+            .unwrap_err();
+        assert!(error.contains("Failed to connect"), "{error}");
+        clear_scan_state(sid);
     }
 
     fn unit_job() -> ScanJob {

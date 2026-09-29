@@ -283,13 +283,24 @@ impl WireTapTools {
 
         let capture_id = capture_id().await;
 
-        let Some(r) = result else {
-            return ok_json(json!({
-                "session_id": sid,
-                "capture_id": capture_id,
-                "status": "scanning",
-                "note": format!("still running after {max_wait_ms}ms — poll get_modbus_scan_progress"),
-            }));
+        let r = match result {
+            Some(Ok(r)) => r,
+            Some(Err(e)) => {
+                return ok_json(json!({
+                    "session_id": sid,
+                    "capture_id": capture_id,
+                    "status": "error",
+                    "error": e,
+                }))
+            }
+            None => {
+                return ok_json(json!({
+                    "session_id": sid,
+                    "capture_id": capture_id,
+                    "status": "scanning",
+                    "note": format!("still running after {max_wait_ms}ms — poll get_modbus_scan_progress"),
+                }))
+            }
         };
 
         // Blocks are already a run-length summary, but a pathologically sparse

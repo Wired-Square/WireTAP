@@ -70,7 +70,7 @@ static SCAN_STATES: Lazy<RwLock<HashMap<String, ModbusScanState>>> =
 
 /// Terminal summaries, kept so a caller that didn't await the sweep can still
 /// collect its result. Cleared with the scan state when the session stops.
-static SCAN_RESULTS: Lazy<RwLock<HashMap<String, ScanCompletePayload>>> =
+static SCAN_RESULTS: Lazy<RwLock<HashMap<String, Result<ScanCompletePayload, String>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 fn store_scan_state(session_id: &str, state: ModbusScanState) {
@@ -88,25 +88,25 @@ pub fn get_scan_state(session_id: &str) -> Option<ModbusScanState> {
 /// sweeps is tiny.
 static SCAN_RESULT_READY: Lazy<tokio::sync::Notify> = Lazy::new(tokio::sync::Notify::new);
 
-pub fn store_scan_result(session_id: &str, payload: ScanCompletePayload) {
+pub fn store_scan_result(session_id: &str, outcome: Result<ScanCompletePayload, String>) {
     if let Ok(mut results) = SCAN_RESULTS.write() {
-        results.insert(session_id.to_string(), payload);
+        results.insert(session_id.to_string(), outcome);
     }
     SCAN_RESULT_READY.notify_waiters();
 }
 
-pub fn get_scan_result(session_id: &str) -> Option<ScanCompletePayload> {
+pub fn get_scan_result(session_id: &str) -> Option<Result<ScanCompletePayload, String>> {
     SCAN_RESULTS.read().ok().and_then(|s| s.get(session_id).cloned())
 }
 
-/// Wait for a sweep's summary, or `None` if it doesn't arrive within `timeout`.
+/// Wait for a sweep's summary or error, or `None` if neither arrives within `timeout`.
 ///
 /// For callers that can't subscribe to the session's WebSocket channel — MCP is
 /// in-process Rust, so the transport migration doesn't reach it.
 pub async fn await_scan_result(
     session_id: &str,
     timeout: Duration,
-) -> Option<ScanCompletePayload> {
+) -> Option<Result<ScanCompletePayload, String>> {
     // The loop is needed because the notification is a broadcast: a wakeup may
     // belong to another sweep, so this one re-checks its own key and re-parks.
     tokio::time::timeout(timeout, async {
@@ -120,8 +120,8 @@ pub async fn await_scan_result(
             tokio::pin!(notified);
             notified.as_mut().enable();
 
-            if let Some(payload) = get_scan_result(session_id) {
-                return payload;
+            if let Some(outcome) = get_scan_result(session_id) {
+                return outcome;
             }
             notified.await;
         }
@@ -1085,7 +1085,7 @@ mod tests {
     #[tokio::test]
     async fn a_result_already_stored_returns_without_waiting() {
         clear_scan_state("await-ready");
-        store_scan_result("await-ready", payload());
+        store_scan_result("await-ready", Ok(payload()));
         let got = await_scan_result("await-ready", Duration::from_millis(50)).await;
         assert!(got.is_some());
         clear_scan_state("await-ready");
@@ -1100,7 +1100,7 @@ mod tests {
         // Give the waiter time to park, so this exercises the wakeup rather
         // than the already-stored fast path.
         tokio::time::sleep(Duration::from_millis(20)).await;
-        store_scan_result("await-later", payload());
+        store_scan_result("await-later", Ok(payload()));
         assert!(waiter.await.unwrap().is_some(), "waiter missed the notification");
         clear_scan_state("await-later");
     }
@@ -1121,7 +1121,7 @@ mod tests {
         });
         tokio::time::sleep(Duration::from_millis(20)).await;
         // Wakes every waiter; ours must re-check, find nothing, and park again.
-        store_scan_result("await-theirs", payload());
+        store_scan_result("await-theirs", Ok(payload()));
         assert!(waiter.await.unwrap().is_none());
         clear_scan_state("await-theirs");
     }
