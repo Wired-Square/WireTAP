@@ -18,7 +18,6 @@ use crate::{
         SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, Protocol, TemporalMode,
         GvretDeviceInfo, probe_gvret_tcp,
-        ModbusTcpConfig, ModbusTcpSource,
         ModbusRangeSpec, PollGroup,
         MqttConfig, MqttSource,
         VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType,
@@ -417,13 +416,41 @@ fn create_source_config_from_profile(
         profile_kind: profile.kind.clone(),
         display_name: profile.name.clone(),
         bus_mappings,
-        // Modbus fields - populated later by create_multi_source_session
-        modbus_polls: None,
-        max_register_errors: None,
         ..SourceConfig::default()
     };
     apply_serial_overrides(&mut config, profile, serial);
     Some(config)
+}
+
+fn reader_source_config(
+    profile: &IOProfile,
+    bus_override: Option<u8>,
+    serial: SerialOverrides,
+    modbus_polls: Option<&str>,
+    max_register_errors: u32,
+) -> Result<SourceConfig, String> {
+    let mut config = create_source_config_from_profile(profile, bus_override, serial)
+        .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile.id))?;
+    attach_modbus_polls(&mut config, &parse_modbus_polls(modbus_polls)?, max_register_errors);
+    Ok(config)
+}
+
+fn parse_modbus_polls(json: Option<&str>) -> Result<Option<Vec<PollGroup>>, String> {
+    json.map(|json| {
+        serde_json::from_str(json).map_err(|e| format!("Failed to parse Modbus poll groups: {e}"))
+    })
+    .transpose()
+}
+
+fn attach_modbus_polls(
+    config: &mut SourceConfig,
+    polls: &Option<Vec<PollGroup>>,
+    max_register_errors: u32,
+) {
+    if config.profile_kind == "modbus_tcp" {
+        config.modbus_polls = polls.clone();
+        config.max_register_errors = Some(max_register_errors);
+    }
 }
 
 /// The protocol a settings string names, defaulting to classic CAN.
@@ -795,11 +822,13 @@ pub async fn create_reader_session(
     let is_realtime = is_realtime_device(&profile.kind);
     let reader: Box<dyn IOSource> = if is_realtime {
         // Use IOBroker for all real-time devices (unified path)
-        let source_config =
-            create_source_config_from_profile(&profile, bus_override, serial.unwrap_or_default())
-                .ok_or_else(|| {
-                    format!("Failed to create source config for profile '{}'", profile.id)
-                })?;
+        let source_config = reader_source_config(
+            &profile,
+            bus_override,
+            serial.unwrap_or_default(),
+            modbus_polls.as_deref(),
+            settings.modbus_max_register_errors,
+        )?;
 
         Box::new(IOBroker::single_source(
             app.clone(),
@@ -856,30 +885,6 @@ pub async fn create_reader_session(
             };
 
             Box::new(BackendApiSource::new(session_id.clone(), config, options))
-        }
-        "modbus_tcp" => {
-            let (host, port, unit_id) = crate::io::modbus_endpoint(&profile);
-
-            // Parse poll groups from frontend (catalog-derived JSON)
-            tlog!("[create_reader_session] modbus_polls JSON: {:?}", modbus_polls.as_deref().unwrap_or("None"));
-            let polls: Vec<crate::io::PollGroup> = match &modbus_polls {
-                Some(json) => serde_json::from_str(json).map_err(|e| {
-                    format!("Failed to parse Modbus poll groups: {}", e)
-                })?,
-                None => Vec::new(),
-            };
-            tlog!("[create_reader_session] Parsed {} Modbus poll groups for {}:{} unit {}", polls.len(), host, port, unit_id);
-
-            let config = ModbusTcpConfig {
-                profile_id: profile.id.clone(),
-                host,
-                port,
-                unit_id,
-                polls,
-                max_register_errors: settings.modbus_max_register_errors,
-            };
-
-            Box::new(ModbusTcpSource::new(app.clone(), session_id.clone(), config))
         }
         "mqtt" => {
             let host = profile
@@ -2357,8 +2362,6 @@ fn resolve_source_config(
         profile_kind,
         display_name,
         bus_mappings,
-        modbus_polls: None,    // Injected by create_multi_source_session
-        max_register_errors: None, // Injected by create_multi_source_session
         ..SourceConfig::default()
     };
     // A multi-source serial interface the picker left alone arrives with no
@@ -2392,16 +2395,7 @@ pub async fn create_multi_source_session(
         .await
         .map_err(|e| format!("Failed to load settings: {}", e))?;
 
-    // Parse shared Modbus poll groups (if any)
-    let parsed_polls: Option<Vec<crate::io::PollGroup>> = match &modbus_polls {
-        Some(json) => {
-            let polls: Vec<crate::io::PollGroup> = serde_json::from_str(json)
-                .map_err(|e| format!("Failed to parse Modbus poll groups: {}", e))?;
-            tlog!("[create_multi_source_session] Parsed {} shared Modbus poll groups", polls.len());
-            Some(polls)
-        }
-        None => None,
-    };
+    let parsed_polls = parse_modbus_polls(modbus_polls.as_deref())?;
 
     // Convert MultiSourceInput to SourceConfig
     let mut source_configs: Vec<SourceConfig> = Vec::with_capacity(sources.len());
@@ -2409,12 +2403,8 @@ pub async fn create_multi_source_session(
         source_configs.push(resolve_source_config(input, source_idx, &settings)?);
     }
 
-    // Inject shared Modbus polls and settings into Modbus TCP source configs
     for config in &mut source_configs {
-        if config.profile_kind == "modbus_tcp" {
-            config.modbus_polls = parsed_polls.clone();
-            config.max_register_errors = Some(settings.modbus_max_register_errors);
-        }
+        attach_modbus_polls(config, &parsed_polls, settings.modbus_max_register_errors);
     }
 
     // Validate all profiles are real-time devices supported by IOBroker
@@ -3181,5 +3171,42 @@ mod bus_mapping_tests {
     fn an_unknown_profile_is_an_error_not_a_default_session() {
         let settings = settings_with(vec![]);
         assert!(resolve_source_config(input_for("io_missing", json!([])), 0, &settings).is_err());
+    }
+}
+
+#[cfg(test)]
+mod reader_source_config_tests {
+    use super::*;
+
+    fn modbus_profile() -> IOProfile {
+        IOProfile {
+            id: "p-modbus".into(),
+            name: "modbus".into(),
+            kind: "modbus_tcp".into(),
+            connection: Default::default(),
+            preferred_catalog: None,
+            ephemeral: false,
+        }
+    }
+
+    #[test]
+    fn a_single_modbus_source_polls_what_its_caller_asked_for() {
+        let polls = r#"[{"register_type":"holding","start_register":10,"count":4,
+            "interval_ms":1000,"frame_id":10}]"#;
+        let config = reader_source_config(
+            &modbus_profile(),
+            None,
+            SerialOverrides::default(),
+            Some(polls),
+            7,
+        )
+        .unwrap();
+
+        let polls = config
+            .modbus_polls
+            .expect("the caller's polls were dropped");
+        assert_eq!(polls.len(), 1);
+        assert_eq!(polls[0].start_register, 10);
+        assert_eq!(config.max_register_errors, Some(7));
     }
 }

@@ -31,6 +31,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **MCP `open_session` on a Modbus TCP profile polls.** It reported the session running, then never connected and streamed nothing, because the registers it was asked for were dropped on the way to the device.
 - **An MCP register scan over all 65,536 addresses finishes.** Raising `max_registers` to cover the whole address space made the scan run out of memory.
 - **A vendor Modbus message is framed whole.** A message whose code the Modbus spec does not define, such as Sungrow's `0x60`, was sometimes framed a byte short when its shorter form also passed the CRC. Declare the code's length in the catalogue and it is framed at that length.
 - **The Decoder's Modbus tab shows times in your time zone.** It always showed UTC, whatever the display setting, so its times disagreed with Discovery's by your UTC offset.
