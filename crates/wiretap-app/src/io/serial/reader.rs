@@ -774,7 +774,7 @@ mod tests {
 
     #[test]
     fn slip_frames_in_one_read_are_stamped_at_their_own_last_byte() {
-        let mut line = live(FramingEncoding::Slip, false);
+        let mut line = live(FramingEncoding::default(), false);
 
         let got = frames(line.read(&[1, 2, 0xC0, 3, 4, 0xC0], at(1_000_000)));
 
@@ -873,7 +873,7 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
 
     #[test]
     fn a_read_delayed_mid_message_continues_the_last_one_at_wire_rate() {
-        let mut line = live(FramingEncoding::Slip, true);
+        let mut line = live(FramingEncoding::default(), true);
         line.read(&[1, 2, 3], at(1_000_000));
 
         let delayed = line.read(&[4, 0xC0], at(1_002_083 + 12_000));
@@ -884,7 +884,7 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
 
     #[test]
     fn a_read_after_a_message_ended_keeps_its_silence() {
-        let mut line = live(FramingEncoding::Slip, true);
+        let mut line = live(FramingEncoding::default(), true);
         line.read(&[1, 2, 0xC0], at(1_000_000));
 
         let next = line.read(&[3, 0xC0], at(1_002_083 + 5_000));
@@ -894,7 +894,7 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
 
     #[test]
     fn a_read_after_a_silence_past_the_latency_window_keeps_its_own_back_dating() {
-        let mut line = live(FramingEncoding::Slip, true);
+        let mut line = live(FramingEncoding::default(), true);
         line.read(&[1, 2, 3], at(1_000_000));
 
         let after_silence = line.read(&[4, 5], at(1_100_000));

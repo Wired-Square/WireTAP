@@ -95,7 +95,9 @@ mod desktop {
     /// Build framing encoding from mode and options
     fn build_encoding(cfg: &InterfaceFramingConfig) -> Result<FramingEncoding, String> {
         match cfg.mode.as_str() {
-            "slip" => Ok(FramingEncoding::Slip),
+            "slip" => Ok(FramingEncoding::Slip {
+                max_frame_len: cfg.max_length.unwrap_or(1024),
+            }),
             "modbus_rtu" => Ok(FramingEncoding::ModbusRtu(
                 cfg.modbus.clone().unwrap_or_default(),
             )),

@@ -23,8 +23,8 @@ use crate::io::types::ModbusRtuOptions;
 pub enum FramingEncoding {
     /// Delimiter-based framing
     Delimiter(DelimiterOptions),
-    /// SLIP framing (RFC 1055)
-    Slip,
+    /// SLIP framing (RFC 1055); a frame outgrowing `max_frame_len` is abandoned
+    Slip { max_frame_len: usize },
     /// Modbus RTU framing
     ModbusRtu(ModbusRtuOptions),
     /// Raw mode - no framing, emit bytes as read
@@ -33,7 +33,7 @@ pub enum FramingEncoding {
 
 impl Default for FramingEncoding {
     fn default() -> Self {
-        FramingEncoding::Slip
+        FramingEncoding::Slip { max_frame_len: 1024 }
     }
 }
 
@@ -151,7 +151,9 @@ impl SerialFramer {
     pub fn with_catalog(encoding: FramingEncoding, catalog: Option<&Catalog>) -> Option<Self> {
         Some(match encoding {
             FramingEncoding::Delimiter(options) => Self::Delimiter(DelimiterFramer::new(options)),
-            FramingEncoding::Slip => Self::Slip(SlipDecoder::new()),
+            FramingEncoding::Slip { max_frame_len } => {
+                Self::Slip(SlipDecoder::with_max_frame_len(max_frame_len))
+            }
             FramingEncoding::ModbusRtu(opts) => Self::Rtu(opts.with_catalog(catalog).stream()),
             FramingEncoding::Raw => return None,
         })
@@ -160,7 +162,17 @@ impl SerialFramer {
     pub fn feed(&mut self, data: &[u8]) -> Vec<SerialFrame> {
         match self {
             Self::Delimiter(framer) => framer.feed(data).into_iter().map(complete).collect(),
-            Self::Slip(decoder) => decoder.feed(data).into_iter().map(complete).collect(),
+            Self::Slip(decoder) => {
+                let abandoned = decoder.abandoned_frames();
+                let frames = decoder.feed(data).into_iter().map(complete).collect();
+                if decoder.abandoned_frames() > abandoned {
+                    tlog!(
+                        "[serial] SLIP frame outgrew the frame cap without an END ({} abandoned)",
+                        decoder.abandoned_frames()
+                    );
+                }
+                frames
+            }
             Self::Rtu(stream) => stream.push_bytes(data).into_iter().map(rtu_frame).collect(),
         }
     }
@@ -203,7 +215,7 @@ mod tests {
 
     #[test]
     fn a_flushed_residue_is_incomplete() {
-        let mut framer = SerialFramer::new(FramingEncoding::Slip).unwrap();
+        let mut framer = SerialFramer::new(FramingEncoding::default()).unwrap();
         assert!(framer.feed(&[0x01, 0x02, 0x03]).is_empty());
 
         let flushed = framer.flush();

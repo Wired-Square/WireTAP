@@ -86,7 +86,7 @@ pub struct SerialSourceConfig {
 /// [`parse_profile_for_source`] (anything that isn't a real framer → `Raw`).
 pub fn framing_from_str(encoding: &str, modbus: Option<&ModbusRtuOptions>) -> FramingEncoding {
     match encoding {
-        "slip" => FramingEncoding::Slip,
+        "slip" => FramingEncoding::default(),
         "modbus_rtu" => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
         "delimiter" => FramingEncoding::Delimiter(DelimiterOptions {
             delimiter: vec![0x0A],
@@ -175,8 +175,12 @@ pub fn parse_profile_for_source(
         overrides.emit_raw_bytes,
     );
 
+    let max_frame_len = overrides
+        .max_frame_length
+        .or_else(|| conn_i64(profile, "max_frame_length").map(|n| n as usize))
+        .unwrap_or(1024);
     let framing_encoding = match framing_encoding_str.as_str() {
-        "slip" => FramingEncoding::Slip,
+        "slip" => FramingEncoding::Slip { max_frame_len },
         // Session override first, then the profile, then the default — the
         // picker's "Validate CRC" tick had no way through before and did nothing.
         "modbus_rtu" => FramingEncoding::ModbusRtu(ModbusRtuOptions {
@@ -207,14 +211,10 @@ pub fn parse_profile_for_source(
                 .clone()
                 .or_else(|| conn_u8_list(profile, "delimiter"))
                 .unwrap_or_else(|| vec![0x0A]); // Default to newline
-            let max_length = overrides
-                .max_frame_length
-                .or_else(|| conn_i64(profile, "max_frame_length").map(|n| n as usize))
-                .unwrap_or(1024);
             let include_delimiter = conn_bool(profile, "include_delimiter").unwrap_or(false);
             FramingEncoding::Delimiter(DelimiterOptions {
                 delimiter,
-                max_length,
+                max_length: max_frame_len,
                 include_delimiter,
             })
         }
@@ -258,6 +258,7 @@ pub fn parse_profile_for_source(
 
 #[cfg(test)]
 mod tests {
+    use super::super::framer::SerialFramer;
     use super::*;
 
     #[test]
@@ -268,6 +269,15 @@ mod tests {
             parse_line(19200, Some(7), Some(2), Some("Even")).unwrap().to_string(),
             "19200 7E2"
         );
+    }
+
+    #[test]
+    fn a_slip_line_without_end_stops_growing_at_the_frame_cap() {
+        let mut framer = SerialFramer::new(framing_from_str("slip", None)).unwrap();
+        framer.feed(&[0x55; 4096]);
+        let released = framer.feed(&[wiretap_protocol::slip::END]);
+        let longest = released.iter().map(|f| f.bytes.len()).max();
+        assert!(longest.is_none_or(|len| len <= 1024), "released a {longest:?}-byte frame");
     }
 
     #[test]
