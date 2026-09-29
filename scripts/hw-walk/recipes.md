@@ -54,6 +54,12 @@ scripts/hw-walk/walk-diff $TEST.log $TEST.json            # add --json for the n
 interface, and `ignore` when a third node talks as well. `--bus N` scores one
 bus of a multi-channel device.
 
+A `wiretap-can-cli dump` log scores as it is: its `#` is classic, so an FD
+frame that arrives as `#` is an `fd` mismatch. Add `--lenient-fd` only when
+the WireTAP side is the app's own candump export, which writes every frame as
+`#`; it leaves FD, BRS, ESI and RTR unknown on those lines. The MCP JSON needs
+no flag.
+
 ## Traffic per test
 
 `cangen -I i -L i -D i` gives incrementing ids, lengths and data, so `walk-diff`

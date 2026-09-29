@@ -3,12 +3,17 @@
 
     walk-diff walk.log capture.json            # text report
     walk-diff walk.log capture.json --json     # the same, as JSON
-    walk-diff walk.log export.log --bus 1      # WireTAP candump export, bus 1 only
+    walk-diff walk.log dump.log                # `wiretap-can-cli dump` output
+    walk-diff walk.log export.log --lenient-fd # the app's candump export
 
 Either file may be a candump log or JSON: MCP `get_capture_frames` pages (one
-response, a list of them, or one per line) or the app's JSON export. WireTAP's
-candump export carries no FD, BRS, RTR or direction, so prefer the JSON. Exits 1 on
-any drop, duplicate, reorder, unexpected frame, flag or direction mismatch.
+response, a list of them, or one per line) or the app's JSON export. A candump
+`#` line is classic and `##<f>` is FD with BRS in bit 0 and ESI in bit 1. The
+app's candump export writes every frame as `#`, so score it with `--lenient-fd`,
+which leaves FD, BRS, ESI and RTR unknown on its plain `#` lines; it carries no
+direction either, so prefer the JSON. A JSON flag is compared only when both sides
+carry it. Exits 1 on any drop, duplicate, reorder, unexpected frame, flag or
+direction mismatch.
 
 Absolute times are never compared, because the hosts' clocks are not synced;
 only the gaps between consecutive frames are.
@@ -40,6 +45,7 @@ class Frame:
     data: bytes
     fd: Optional[bool] = None
     brs: Optional[bool] = None
+    esi: Optional[bool] = None
     rtr: Optional[bool] = None
     direction: Optional[str] = None
     bus: Optional[int] = None
@@ -61,10 +67,10 @@ def parse_candump_frame(text):
     extended = len(ident) == 8 or frame_id > 0x7FF
     if rest.startswith("#"):
         flags = int(rest[1], 16)
-        return frame_id, extended, bytes.fromhex(rest[2:]), True, bool(flags & 1), False
+        return frame_id, extended, bytes.fromhex(rest[2:]), True, bool(flags & 1), bool(flags & 2), False
     if rest.upper().startswith("R"):
-        return frame_id, extended, b"", False, False, True
-    return frame_id, extended, bytes.fromhex(rest.split("_")[0]), False, False, False
+        return frame_id, extended, b"", False, False, False, True
+    return frame_id, extended, bytes.fromhex(rest.split("_")[0]), False, False, False, False
 
 
 def parse_candump(text):
@@ -75,7 +81,7 @@ def parse_candump(text):
         m = CANDUMP_LINE.match(line.strip())
         if not m:
             raise ValueError(f"line {n}: not a candump -L line: {line!r}")
-        frame_id, extended, data, fd, brs, rtr = parse_candump_frame(m["frame"])
+        frame_id, extended, data, fd, brs, esi, rtr = parse_candump_frame(m["frame"])
         bus = re.search(r"(\d+)$", m["iface"])
         frames.append(
             Frame(
@@ -85,6 +91,7 @@ def parse_candump(text):
                 data=data,
                 fd=fd,
                 brs=brs,
+                esi=esi,
                 rtr=rtr,
                 direction={"T": "tx", "R": "rx"}.get(m["dir"]),
                 bus=int(bus[1]) if bus else None,
@@ -115,6 +122,7 @@ def frame_from_json(f):
         data=data,
         fd=bool(f.get("is_fd", False)),
         brs=f.get("is_brs"),
+        esi=f.get("is_esi"),
         rtr=f.get("is_rtr"),
         # A received FrameMessage omits its direction; the app's JSON export has none.
         direction=f.get("direction") or ("rx" if "protocol" in f else None),
@@ -134,19 +142,16 @@ def parse_json(text):
     ]
 
 
-def load(path, reference):
+def load(path, lenient_fd=False):
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     if text.lstrip()[:1] in ("{", "["):
         return parse_json(text)
     frames = parse_candump(text)
-    if not reference:
-        # WireTAP's candump export writes every frame as a plain `#`.
+    if lenient_fd:
         for f in frames:
             if not f.fd:
-                f.fd = f.brs = None
-            if not f.rtr:
-                f.rtr = None
+                f.fd = f.brs = f.esi = f.rtr = None
     return frames
 
 
@@ -275,11 +280,11 @@ def score(ref, wt, direction="opposite"):
             reordered.append(wi)
         highest = max(highest, ri)
 
-    mismatches = {k: [] for k in ("extended", "fd", "brs", "rtr", "length", "data")}
+    mismatches = {k: [] for k in ("extended", "fd", "brs", "esi", "rtr", "length", "data")}
     direction_mismatches = []
     for ri, wi in pairs:
         r, w = ref[ri], wt[wi]
-        for flag in ("extended", "fd", "brs", "rtr"):
+        for flag in ("extended", "fd", "brs", "esi", "rtr"):
             a, b = getattr(r, flag), getattr(w, flag)
             if a is not None and b is not None and a != b:
                 mismatches[flag].append((ri, wi))
@@ -384,10 +389,17 @@ def main(argv=None):
         "reference's T is WireTAP's rx. same: both read one interface. ignore: a third "
         "node talks too",
     )
+    parser.add_argument(
+        "--lenient-fd",
+        action="store_true",
+        help="the WireTAP side is the app's candump export, which writes every frame as "
+        "`#`: leave FD, BRS, ESI and RTR unknown on its `#` lines. Not for the MCP JSON "
+        "or `wiretap-can-cli dump`, whose `#` means classic",
+    )
     args = parser.parse_args(argv)
 
-    ref = load(args.reference, reference=True)
-    wt = [f for f in load(args.wiretap, reference=False) if args.bus is None or f.bus == args.bus]
+    ref = load(args.reference)
+    wt = [f for f in load(args.wiretap, args.lenient_fd) if args.bus is None or f.bus == args.bus]
     report = score(ref, wt, args.direction)
     print(json.dumps(report, indent=2) if args.json else render(report))
     return 0 if report["pass"] else 1

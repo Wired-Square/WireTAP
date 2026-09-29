@@ -60,6 +60,17 @@ class WalkDiff(unittest.TestCase):
                 code = walk_diff.main([ref_path, wt_path, "--json", *args])
         return code, json.loads(out.getvalue())
 
+    def run_candump(self, ref_lines, wt_lines, *args):
+        with tempfile.TemporaryDirectory() as tmp:
+            ref_path, wt_path = os.path.join(tmp, "walk.log"), os.path.join(tmp, "dump.log")
+            for path, lines in ((ref_path, ref_lines), (wt_path, wt_lines)):
+                with open(path, "w") as fh:
+                    fh.write("\n".join(lines) + "\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = walk_diff.main([ref_path, wt_path, "--json", *args])
+        return code, json.loads(out.getvalue())
+
     def assert_only(self, report, **expected):
         counts = {
             "drops": report["drops"],
@@ -175,20 +186,27 @@ class WalkDiff(unittest.TestCase):
             "(1.5) can0 123#DEAD R\n(2.000001) can1 456##3" + "00" * 12 + "\n(3.0) can0 00000123#"
         )
         self.assertEqual((plain.ts_us, plain.direction, plain.fd), (1_500_000, "rx", False))
-        self.assertEqual((fd.fd, fd.brs, len(fd.data), fd.bus), (True, True, 12, 1))
+        self.assertEqual((plain.fd, plain.brs, plain.esi), (False, False, False))
+        self.assertEqual((fd.fd, fd.brs, fd.esi, len(fd.data), fd.bus), (True, True, True, 12, 1))
         self.assertTrue(ext.extended)
         self.assertIsNone(ext.direction)
 
-    def test_wiretaps_candump_export_leaves_fd_unknown(self):
-        ref = cangen_log(20, fd=True)
-        export = [line.replace("##1", "#").removesuffix(" T") for line in ref]
-        with tempfile.TemporaryDirectory() as tmp:
-            ref_path, wt_path = os.path.join(tmp, "walk.log"), os.path.join(tmp, "export.log")
-            for path, lines in ((ref_path, ref), (wt_path, export)):
-                with open(path, "w") as fh:
-                    fh.write("\n".join(lines))
-            with contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(walk_diff.main([ref_path, wt_path]), 0)
+    def test_lenient_fd_leaves_the_apps_candump_export_flags_unknown(self):
+        ref = cangen_log(20, fd=True) + ["(1.100000) can0 123#R T"]
+        export = [line.replace("##1", "#").replace("#R", "#").removesuffix(" T") for line in ref]
+        code, _ = self.run_candump(ref, export, "--lenient-fd")
+        self.assertEqual(code, 0)
+
+    def test_fd_brs_frames_received_as_classic_candump_lines_fail(self):
+        ref = [line.replace("##1", "##5") for line in cangen_log(16, fd=True)]
+        classic = [line.replace("##5", "#").removesuffix(" T") + " R" for line in ref]
+        code, report = self.run_candump(ref, classic)
+        self.assertEqual(code, 1)
+        self.assertEqual(report["mismatches"]["fd"], 16)
+        self.assertEqual(report["mismatches"]["brs"], 16)
+        code, report = self.run_candump(ref, classic, "--lenient-fd")
+        self.assertEqual(code, 0)
+        self.assert_only(report)
 
     def test_bus_filter_keeps_one_bus(self):
         ref = cangen_log(10)
