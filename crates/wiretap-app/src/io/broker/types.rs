@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::modbus_tcp::PollGroup;
 use crate::io::types::{ControlSender, TransmitSender};
+use crate::io::Protocol;
 
 /// The serial settings a session may override on one source, as the picker sends
 /// them. Every field is optional: absent means "whatever the device profile says".
@@ -76,6 +77,15 @@ pub struct SourceConfig {
     /// Modbus max consecutive register errors before stopping (0 = never stop)
     #[serde(default)]
     pub max_register_errors: Option<u32>,
+}
+
+impl SourceConfig {
+    /// A virtual device's buses all carry its traffic type, so a serial one
+    /// generates raw bytes where the others generate frames.
+    pub(super) fn is_virtual_serial(&self) -> bool {
+        self.profile_kind == "virtual"
+            && self.bus_mappings.iter().any(|m| m.protocol == Protocol::Serial)
+    }
 }
 
 /// Transmit routing info: maps output bus to source and device bus

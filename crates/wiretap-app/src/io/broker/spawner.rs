@@ -30,7 +30,7 @@ use crate::io::serial::utils::line_settings;
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::run_slcan_source;
 use crate::io::framelink::reader::run_source as run_framelink_source;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::types::{ByteEntry, EndReason, SourceMessage, TransmitRequest};
 use crate::settings::IOProfile;
 use super::{VirtualBusCommand, VirtualBusControl, VirtualBusControls};
 
@@ -339,12 +339,7 @@ async fn run_virtual_reader(
 ) -> Result<(), String> {
     use std::collections::HashMap;
 
-    // Parse traffic type
-    let traffic_type = match conn_str(profile, "traffic_type").as_deref() {
-        Some("canfd") => "canfd",
-        Some("modbus") => "modbus",
-        _ => "can",
-    };
+    let traffic = VirtualTrafficType::from_setting(conn_str(profile, "traffic_type").as_deref());
 
     // Parse per-bus interface configs from connection.interfaces array.
     // Falls back to legacy bus_count / frame_rate_hz / signal_generator fields.
@@ -467,7 +462,7 @@ async fn run_virtual_reader(
             iface.bus,
             iface.signal_generator,
             iface.frame_rate_hz,
-            traffic_type,
+            traffic.clone(),
             source_idx,
             &bus_mappings,
             &stop_flag,
@@ -496,16 +491,11 @@ async fn run_virtual_reader(
                         tlog!("[virtual_reader] Bus {} has no enabled mapping, skipping add", bus);
                         continue;
                     }
-                    let tt_str = match tt.as_str() {
-                        "canfd" => "canfd",
-                        "modbus" => "modbus",
-                        _ => "can",
-                    };
                     let handle = spawn_bus_generator(
                         bus,
                         true,
                         frame_rate_hz,
-                        tt_str,
+                        VirtualTrafficType::from_setting(Some(&tt)),
                         source_idx,
                         &bus_mappings,
                         &stop_flag,
@@ -561,7 +551,7 @@ fn spawn_bus_generator(
     bus: u8,
     signal_generator: bool,
     frame_rate_hz: f64,
-    traffic_type: &str,
+    traffic: VirtualTrafficType,
     source_idx: usize,
     bus_mappings: &[BusMapping],
     stop_flag: &Arc<AtomicBool>,
@@ -586,11 +576,6 @@ fn spawn_bus_generator(
     let tx_clone = tx.clone();
     let stop_clone = stop_flag.clone();
     let bus_mappings_clone = bus_mappings.to_vec();
-    let traffic = match traffic_type {
-        "canfd" => VirtualTrafficType::CanFd,
-        "modbus" => VirtualTrafficType::Modbus,
-        _ => VirtualTrafficType::Can,
-    };
 
     tokio::spawn(async move {
         let mut current_interval_us = initial_interval_us;
@@ -628,8 +613,17 @@ fn spawn_bus_generator(
                 continue;
             }
 
-            let frame = traffic::frame(&traffic, counter, output_bus, now_us());
-            if tx_clone.send(SourceMessage::Frames(source_idx, vec![frame])).await.is_err() {
+            let timestamp_us = now_us();
+            let message = match traffic::frame(&traffic, counter, output_bus, timestamp_us) {
+                Some(frame) => SourceMessage::Frames(source_idx, vec![frame]),
+                None => SourceMessage::Bytes(
+                    source_idx,
+                    traffic::serial_bytes(counter)
+                        .map(|byte| ByteEntry { byte, timestamp_us, bus: output_bus })
+                        .collect(),
+                ),
+            };
+            if tx_clone.send(message).await.is_err() {
                 break;
             }
 
@@ -867,5 +861,35 @@ mod tests {
             BURST,
             progress.generated.load(Ordering::Relaxed),
         );
+    }
+
+    #[tokio::test]
+    async fn a_serial_virtual_device_generates_bytes_not_frames() {
+        let mut profile = loopback_profile();
+        profile.connection.insert("traffic_type".into(), "serial".into());
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, mut rx) = mpsc::channel(64);
+        let reader = tokio::spawn({
+            let stop = stop.clone();
+            async move { run_virtual_reader(0, &profile, Vec::new(), stop, tx, Default::default(), None).await }
+        });
+
+        let generated = loop {
+            match rx.recv().await.expect("the reader is running") {
+                SourceMessage::Connected(..) | SourceMessage::TransmitReady(..) => continue,
+                msg => break msg,
+            }
+        };
+        stop.store(true, Ordering::Relaxed);
+        reader.await.expect("the reader task").expect("the reader ends cleanly");
+
+        match generated {
+            SourceMessage::Bytes(0, entries) => {
+                let bytes: Vec<u8> = entries.iter().map(|e| e.byte).collect();
+                assert_eq!(bytes, [0, 1, 2, 3, 4, 5, 6, 7]);
+            }
+            SourceMessage::Frames(_, frames) => panic!("generated frames: {frames:?}"),
+            _ => panic!("generated neither bytes nor frames"),
+        }
     }
 }

@@ -13,4 +13,18 @@ pub enum VirtualTrafficType {
     CanFd,
     /// Modbus — synthetic register frames
     Modbus,
+    /// Serial — raw byte stream
+    Serial,
+}
+
+impl VirtualTrafficType {
+    /// The profile's `traffic_type`; anything unrecognised is classic CAN.
+    pub fn from_setting(traffic_type: Option<&str>) -> Self {
+        match traffic_type {
+            Some("canfd") => Self::CanFd,
+            Some("modbus") => Self::Modbus,
+            Some("serial") => Self::Serial,
+            _ => Self::Can,
+        }
+    }
 }

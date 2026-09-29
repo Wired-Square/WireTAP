@@ -149,9 +149,10 @@ pub struct IOBroker {
     lifecycle: SourceLifecycle,
 }
 
-/// What `sources` emit: a non-serial source always frames; a serial source
-/// frames once it has framing and streams bytes when asked to. A live
-/// `set_framing` replaces a source's config for both.
+/// What `sources` emit: a virtual device with serial traffic streams bytes, any
+/// other non-serial source frames; a serial source frames once it has framing
+/// and streams bytes when asked to. A live `set_framing` replaces a source's
+/// config for both.
 ///
 /// `sessions::apply_serial_overrides` settles both serial fields against the
 /// profile before the config reaches us, so this reads the answer rather than
@@ -162,6 +163,10 @@ fn data_streams(
 ) -> SessionDataStreams {
     let mut streams = SessionDataStreams { rx_frames: false, rx_bytes: false };
     for (idx, source) in sources.iter().enumerate() {
+        if source.is_virtual_serial() {
+            streams.rx_bytes = true;
+            continue;
+        }
         if source.profile_kind != "serial" {
             streams.rx_frames = true;
             continue;
@@ -480,7 +485,10 @@ impl IOBroker {
             data_streams: self.data_streams(),
             // The transport, not the stream: a framed serial link is still one
             // the Discovery serial view belongs on, even with no raw bytes.
-            serial_link: self.sources.iter().any(|s| s.profile_kind == "serial"),
+            serial_link: self
+                .sources
+                .iter()
+                .any(|s| s.profile_kind == "serial" || s.is_virtual_serial()),
         }
     }
 
@@ -1039,6 +1047,7 @@ impl IOSource for IOBroker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::Protocol;
 
     fn serial(framing: &str, emit_raw_bytes: bool) -> SourceConfig {
         SourceConfig {
@@ -1099,5 +1108,16 @@ mod tests {
     fn a_non_serial_source_always_frames_and_never_streams_bytes() {
         let can = SourceConfig { profile_kind: "gvret_tcp".into(), ..Default::default() };
         assert_eq!(streams(&[can], &[]), (true, false));
+    }
+
+    #[test]
+    fn a_virtual_device_streams_bytes_only_when_its_traffic_is_serial() {
+        let virtual_device = |protocol| SourceConfig {
+            profile_kind: "virtual".into(),
+            bus_mappings: vec![BusMapping::default().with_protocol(protocol)],
+            ..Default::default()
+        };
+        assert_eq!(streams(&[virtual_device(Protocol::Serial)], &[]), (false, true));
+        assert_eq!(streams(&[virtual_device(Protocol::Can)], &[]), (true, false));
     }
 }

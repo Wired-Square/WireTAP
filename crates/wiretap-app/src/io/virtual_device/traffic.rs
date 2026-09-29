@@ -59,13 +59,14 @@ fn pattern_or_counter(
     }
 }
 
-/// The frame for tick `counter` of a bus.
+/// The frame for tick `counter` of a bus; `None` for serial traffic, which is
+/// bytes.
 pub(crate) fn frame(
     traffic: &VirtualTrafficType,
     counter: u64,
     bus: u8,
     timestamp_us: u64,
-) -> FrameMessage {
+) -> Option<FrameMessage> {
     let (protocol, frame_id, bytes, is_fd) = match traffic {
         VirtualTrafficType::Can => {
             let (id, data) = pattern_or_counter(CAN_PATTERNS, counter, 8);
@@ -81,8 +82,9 @@ pub(crate) fn frame(
             let value = ((counter / len) & 0xFFFF) as u16;
             ("modbus", register, value.to_be_bytes().to_vec(), false)
         }
+        VirtualTrafficType::Serial => return None,
     };
-    FrameMessage {
+    Some(FrameMessage {
         protocol: protocol.to_string(),
         timestamp_us,
         frame_id,
@@ -94,7 +96,13 @@ pub(crate) fn frame(
         source_address: None,
         incomplete: None,
         direction: Some("rx".to_string()),
-    }
+    })
+}
+
+/// The eight serial bytes for tick `counter`, counting up from its low byte.
+pub(crate) fn serial_bytes(counter: u64) -> impl Iterator<Item = u8> {
+    let first = (counter & 0xFF) as u8;
+    (0..8).map(move |i| first.wrapping_add(i))
 }
 
 #[cfg(test)]
@@ -102,7 +110,7 @@ mod tests {
     use super::*;
 
     fn generated(traffic: VirtualTrafficType, counter: u64) -> (String, u32, Vec<u8>, bool) {
-        let f = frame(&traffic, counter, 3, 42);
+        let f = frame(&traffic, counter, 3, 42).expect("a frame");
         assert_eq!((f.bus, f.timestamp_us, f.dlc as usize), (3, 42, f.bytes.len()));
         assert!(!f.is_extended);
         assert_eq!(f.direction.as_deref(), Some("rx"));
@@ -147,5 +155,15 @@ mod tests {
         assert_eq!(at(9), modbus(9, 0));
         assert_eq!(at(13), modbus(3, 1));
         assert_eq!(at(655_365), modbus(5, 0));
+    }
+
+    #[test]
+    fn serial_traffic_is_eight_counting_bytes_and_no_frame() {
+        assert!(frame(&VirtualTrafficType::Serial, 0, 0, 0).is_none());
+        assert_eq!(serial_bytes(0).collect::<Vec<_>>(), [0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(
+            serial_bytes(0x1FC).collect::<Vec<_>>(),
+            [0xFC, 0xFD, 0xFE, 0xFF, 0x00, 0x01, 0x02, 0x03]
+        );
     }
 }
