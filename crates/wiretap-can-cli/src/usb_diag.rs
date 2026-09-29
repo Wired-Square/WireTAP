@@ -1,60 +1,54 @@
-// USB descriptor topology and endpoint discovery for gs_usb diagnostics.
-
 use nusb::descriptors::TransferType;
 use nusb::transfer::{ControlIn, ControlType, Direction, Recipient};
-use nusb::{Device, DeviceInfo, Interface, MaybeFuture};
-use wiretap_lib::io::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
+use nusb::{DeviceInfo, Interface, MaybeFuture};
+use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
+
+use crate::iface::GsUsbSelector;
 
 const CONTROL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1000);
 
-/// Discovered bulk endpoints for a gs_usb device.
-pub struct BulkEndpoints {
-    pub in_addr: u8,
-    pub out_addr: u8,
-    pub max_packet_size: usize,
+struct BulkEndpoints {
+    in_addr: u8,
+    out_addr: u8,
+    max_packet_size: usize,
 }
 
-/// Find a gs_usb device by serial (preferred) or bus:address.
-pub fn find_device(bus: u8, address: u8, serial: Option<&str>) -> Result<DeviceInfo, String> {
-    let mut devices = nusb::list_devices()
+/// USB descriptors, the gs_usb device config and `BT_CONST`, and the bulk endpoints.
+pub fn diag(selector: &GsUsbSelector) -> Result<(), String> {
+    let device_info = find_device(selector)?;
+    print_topology(&device_info)?;
+    match discover_endpoints(&device_info) {
+        Ok(eps) => {
+            println!("\nDiscovered Bulk Endpoints:");
+            println!("  IN:  0x{:02X}", eps.in_addr);
+            println!("  OUT: 0x{:02X}", eps.out_addr);
+            println!("  Max packet size: {}", eps.max_packet_size);
+        }
+        Err(e) => println!("\nEndpoint discovery failed: {}", e),
+    }
+    Ok(())
+}
+
+fn find_device(selector: &GsUsbSelector) -> Result<DeviceInfo, String> {
+    nusb::list_devices()
         .wait()
-        .map_err(|e| format!("Failed to list USB devices: {}", e))?;
-
-    devices
-        .find(|dev| {
-            if dev.vendor_id() != VID || !PIDS.contains(&dev.product_id()) {
-                return false;
-            }
-            if let Some(target_serial) = serial {
-                if let Some(dev_serial) = dev.serial_number() {
-                    return dev_serial == target_serial;
-                }
-            }
-            let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-            dev_bus == bus && dev.device_address() == address
-        })
-        .ok_or_else(|| {
-            if let Some(s) = serial {
-                format!("No gs_usb device found with serial '{}'", s)
-            } else {
-                format!("No gs_usb device found at {}:{}", bus, address)
+        .map_err(|e| format!("Failed to list USB devices: {}", e))?
+        .filter(|dev| dev.vendor_id() == VID && PIDS.contains(&dev.product_id()))
+        .find(|dev| match selector {
+            GsUsbSelector::Serial(serial) => dev.serial_number() == Some(serial.as_str()),
+            GsUsbSelector::BusAddress(bus, address) => {
+                dev.bus_id().parse::<u8>().ok() == Some(*bus) && dev.device_address() == *address
             }
         })
+        .ok_or_else(|| "No such gs_usb device".to_owned())
 }
 
-/// Discover bulk IN and OUT endpoints from USB configuration descriptors.
-/// Requires opening the device to read the active configuration.
-pub fn discover_endpoints(device_info: &DeviceInfo) -> Result<BulkEndpoints, String> {
+/// Opens the device a second time, apart from `print_topology`'s.
+fn discover_endpoints(device_info: &DeviceInfo) -> Result<BulkEndpoints, String> {
     let device = device_info
         .open()
         .wait()
         .map_err(|e| format!("Failed to open device for endpoint discovery: {}", e))?;
-
-    discover_endpoints_from_device(&device)
-}
-
-/// Discover bulk IN and OUT endpoints from an already-opened device.
-pub fn discover_endpoints_from_device(device: &Device) -> Result<BulkEndpoints, String> {
     let config = device
         .active_configuration()
         .map_err(|e| format!("Failed to get active configuration: {}", e))?;
@@ -88,8 +82,7 @@ pub fn discover_endpoints_from_device(device: &Device) -> Result<BulkEndpoints, 
     })
 }
 
-/// Print the full USB descriptor topology for a device.
-pub fn print_topology(device_info: &DeviceInfo) -> Result<(), String> {
+fn print_topology(device_info: &DeviceInfo) -> Result<(), String> {
     println!("USB Device Topology");
     println!("===================");
     println!(
@@ -118,7 +111,10 @@ pub fn print_topology(device_info: &DeviceInfo) -> Result<(), String> {
 
     // Print interface summary from DeviceInfo
     for iface in device_info.interfaces() {
-        println!("\n  Interface {} (from enumeration):", iface.interface_number());
+        println!(
+            "\n  Interface {} (from enumeration):",
+            iface.interface_number()
+        );
         println!(
             "    Class: 0x{:02X}, Subclass: 0x{:02X}, Protocol: 0x{:02X}",
             iface.class(),
@@ -145,15 +141,9 @@ pub fn print_topology(device_info: &DeviceInfo) -> Result<(), String> {
             println!("    Num interfaces: {}", config.num_interfaces());
 
             for iface_group in config.interfaces() {
-                println!(
-                    "\n    Interface {}:",
-                    iface_group.interface_number()
-                );
+                println!("\n    Interface {}:", iface_group.interface_number());
                 for alt in iface_group.alt_settings() {
-                    println!(
-                        "      Alt Setting {}:",
-                        alt.alternate_setting()
-                    );
+                    println!("      Alt Setting {}:", alt.alternate_setting());
                     println!(
                         "        Class: 0x{:02X}, Subclass: 0x{:02X}, Protocol: 0x{:02X}",
                         alt.class(),
@@ -206,7 +196,8 @@ pub fn print_topology(device_info: &DeviceInfo) -> Result<(), String> {
             print_feature_flags(feature);
             println!(
                 "    CAN clock: {} Hz ({:.1} MHz)",
-                fclk, fclk as f64 / 1_000_000.0
+                fclk,
+                fclk as f64 / 1_000_000.0
             );
             let (t1min, t1max) = (bt.nominal.tseg1_min, bt.nominal.tseg1_max);
             let (t2min, t2max) = (bt.nominal.tseg2_min, bt.nominal.tseg2_max);
@@ -238,7 +229,10 @@ fn print_feature_flags(feature: u32) {
             "PAD_PKTS_TO_MAX_PKT_SIZE",
         ),
         (can_feature::FD, "FD"),
-        (can_feature::REQ_USB_QUIRK_LPC546XX, "REQ_USB_QUIRK_LPC546XX"),
+        (
+            can_feature::REQ_USB_QUIRK_LPC546XX,
+            "REQ_USB_QUIRK_LPC546XX",
+        ),
         (can_feature::BT_CONST_EXT, "BT_CONST_EXT"),
         (can_feature::TERMINATION, "TERMINATION"),
         (can_feature::BERR_REPORTING, "BERR_REPORTING"),

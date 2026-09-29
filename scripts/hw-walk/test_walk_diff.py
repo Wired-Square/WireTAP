@@ -200,6 +200,49 @@ class WalkDiff(unittest.TestCase):
         code, _ = self.run_diff(ref, wt, "--bus", "1")
         self.assertEqual(code, 0)
 
+    def test_wiretap_can_cli_dump_lines_parse(self):
+        """Lines as `wiretap-can-cli dump --own` prints them, pinned by its candump tests."""
+        lines = [
+            "(1727000000.000042) gsusb-205933B831335010-1 123#DEADBEEF R",
+            "(1727000000.000043) gsusb-205933B831335010-1 01234567#0102 T",
+            "(1727000000.000044) gsusb-205933B831335010-1 123#R5 R",
+            "(1727000000.000045) gsusb-205933B831335010-1 123##1A5A5A5A5A5A5A5A5A5A5A5A5 R",
+            "(1727000000.000046) gsusb-205933B831335010-1 123##0AA R",
+            "(1727000000.000047) gsusb-205933B831335010-1 007# T",
+        ]
+        frames = walk_diff.parse_candump("\n".join(lines))
+        self.assertEqual(
+            [(f.frame_id, f.extended, f.fd, f.brs, f.rtr, len(f.data), f.direction, f.bus) for f in frames],
+            [
+                (0x123, False, False, False, False, 4, "rx", 1),
+                (0x1234567, True, False, False, False, 2, "tx", 1),
+                (0x123, False, False, False, True, 0, "rx", 1),
+                (0x123, False, True, True, False, 12, "rx", 1),
+                (0x123, False, True, False, False, 1, "rx", 1),
+                (0x7, False, False, False, False, 0, "tx", 1),
+            ],
+        )
+        self.assertEqual(frames[0].ts_us, 1_727_000_000_000_042)
+
+    def test_wiretap_can_cli_gen_is_scored_as_a_sequence(self):
+        """`gen -I i -L i -D i`'s frames, as can-utils' cangen sends them."""
+        lines = []
+        for i in range(100):
+            length = max(i % 9, 1)
+            data = i.to_bytes(8, "little")[:length].hex().upper()
+            lines.append(f"(1727000000.{i * 1000:06d}) socketcan-can0 {i:03X}#{data} T")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "gen.log")
+            with open(path, "w") as fh:
+                fh.write("\n".join(lines))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = walk_diff.main([path, path, "--json", "--direction", "same"])
+        report = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(report["mode"], "sequence")
+        self.assertEqual(report["matched"], 100)
+
 
 if __name__ == "__main__":
     unittest.main()

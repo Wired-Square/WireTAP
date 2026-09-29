@@ -8578,6 +8578,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wiretap-can-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hex",
+ "nusb 0.2.3",
+ "tokio",
+ "wiretap-io",
+ "wiretap-protocol",
+]
+
+[[package]]
 name = "wiretap-catalog"
 version = "0.19.12"
 source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.12#df563241ed8e5636fa16101ab57dee20afd2f2ad"
@@ -8619,18 +8631,6 @@ version = "0.19.12"
 source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.12#df563241ed8e5636fa16101ab57dee20afd2f2ad"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "wiretap-gs-usb-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "hex",
- "nusb 0.2.3",
- "tokio",
- "wiretap",
- "wiretap-io",
 ]
 
 [[package]]

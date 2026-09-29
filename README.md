@@ -63,13 +63,11 @@ To use gs_usb, flash your CANable with [candleLight firmware](https://github.com
 
 ## Tools
 
-### [gs_usb_cli](crates/wiretap-gs-usb-cli/)
+### [wiretap-can-cli](crates/wiretap-can-cli/)
 
-A diagnostic CLI for gs_usb/candleLight CAN adapters. Bypasses the WireTAP UI to give direct USB-level control for diagnosing frame loss and protocol issues. Supports device discovery, capability probing, USB topology inspection, frame receive with per-transfer diagnostics, and frame transmission.
+A can-utils work-alike for every CAN adapter WireTAP drives (gs_usb, SLCAN, SocketCAN and GVRET) on macOS, Windows and Linux. Commands: `list`, `probe`, `dump` (`candump -L` format), `send` (`cansend` syntax), `gen` (`cangen`'s deterministic modes), `pattern` (a Test Pattern responder or initiator) and `gsusb diag` (USB descriptors and `BT_CONST`).
 
-Available on macOS and Windows. On Linux, use SocketCAN tools (`candump`, `cansend`) instead.
-
-See [crates/wiretap-gs-usb-cli/README.md](crates/wiretap-gs-usb-cli/README.md) for build and usage instructions.
+See [crates/wiretap-can-cli/README.md](crates/wiretap-can-cli/README.md) for build and usage instructions.
 
 ### WireTAP Server
 
