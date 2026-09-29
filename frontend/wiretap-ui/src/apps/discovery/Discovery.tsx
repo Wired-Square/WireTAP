@@ -614,22 +614,7 @@ function DiscoveryInner() {
         setShowBusColumn(true);
       }
     },
-    onBeforeStart: (_profileId, options) => {
-      // Store serial config for TOML export
-      const hasSerialConfig = options.frameIdStartByte !== undefined
-        || options.sourceAddressStartByte !== undefined;
-      if (hasSerialConfig) {
-        setSerialConfig({
-          frame_id_start_byte: options.frameIdStartByte,
-          frame_id_bytes: options.frameIdBytes,
-          source_address_start_byte: options.sourceAddressStartByte,
-          source_address_bytes: options.sourceAddressBytes,
-          source_address_byte_order: options.sourceAddressEndianness,
-        });
-      } else {
-        setSerialConfig(null);
-      }
-    },
+    onBeforeStart: () => setSerialConfig(null),
     onBeforeMultiStart: (_profileIds, _options, _mode) => {
       setShowBusColumn(true);
     },

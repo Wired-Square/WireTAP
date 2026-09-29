@@ -86,20 +86,8 @@ export interface LoadOptions {
   endTime?: string;
   /** Maximum number of frames to read (for all sources) */
   maxFrames?: number;
-  /** Frame ID extraction: start byte position (0-indexed) - for serial sources */
-  frameIdStartByte?: number;
-  /** Frame ID extraction: number of bytes (1 or 2) - for serial sources */
-  frameIdBytes?: number;
-  /** Source address extraction: start byte position (0-indexed) - for serial sources */
-  sourceAddressStartByte?: number;
-  /** Source address extraction: number of bytes (1 or 2) - for serial sources */
-  sourceAddressBytes?: number;
-  /** Source address extraction: byte order - for serial sources */
-  sourceAddressEndianness?: "big" | "little";
   /** Bus mappings per profile (for multi-bus mode) - map from profile ID to bus mappings */
   busMappings?: Map<string, BusMapping[]>;
-  /** Bus number override for single-bus devices (0-7) */
-  busOverride?: number;
   /** Per-interface framing config (for serial profiles in multi-bus mode) - map from profile ID to framing config */
   perInterfaceFraming?: Map<string, InterfaceFramingConfig>;
   /** Catalogue path to attach to the new session (decoder picker) */
