@@ -18,6 +18,7 @@ import { openDashboard } from "../api/dashboards";
 import { parseDashboard } from "../utils/dashboards";
 import { useDashboardStore } from "../stores/dashboardStore";
 import { DOM_OPS, runDomOp } from "./domOps";
+import { apps, isPanelId } from "../apps/registry";
 
 // Bounds so a huge live buffer can't produce an enormous MCP response.
 const MAX_FRAME_IDS = 64;
@@ -117,6 +118,9 @@ function liveFrameMap(params: unknown) {
 async function uiOpenPanel(params: unknown) {
   const p = (params ?? {}) as { panelId?: string; args?: unknown };
   const panelId = p.panelId || "dashboard";
+  if (!isPanelId(panelId)) {
+    throw new Error(`Unknown app "${panelId}". Valid ids: ${apps.map((a) => a.id).join(", ")}`);
+  }
   // `args` may arrive as an object or (depending on the MCP client) a JSON string.
   let args = p.args;
   if (typeof args === "string") {
