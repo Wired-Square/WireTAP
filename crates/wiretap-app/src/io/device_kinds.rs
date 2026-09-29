@@ -422,6 +422,7 @@ pub enum ValidationCode {
     PortRequired,
     HostRequired,
     FieldRequired,
+    FieldInvalid,
 }
 
 /// A rejection: what was wrong, and which input to focus.
@@ -493,7 +494,29 @@ pub fn validate_profile(
             }
         }
     }
+    if canonical_kind(&profile.kind) == "serial" {
+        let delimiter = conn_u8_list(profile, "delimiter");
+        let max_frame_length = conn_i64(profile, "max_frame_length");
+        if let Some(field) = degenerate_framing_field(delimiter.as_deref(), max_frame_length) {
+            return Err(ProfileValidationError::new(ValidationCode::FieldInvalid, Some(field)));
+        }
+    }
     Ok(())
+}
+
+/// The serial framing field, if any, whose value would release every byte as
+/// its own frame.
+pub fn degenerate_framing_field(
+    delimiter: Option<&[u8]>,
+    max_frame_length: Option<i64>,
+) -> Option<&'static str> {
+    if delimiter.is_some_and(<[u8]>::is_empty) {
+        Some("delimiter")
+    } else if max_frame_length.is_some_and(|n| n <= 0) {
+        Some("max_frame_length")
+    } else {
+        None
+    }
 }
 
 // ── Tauri commands ───────────────────────────────────────────────────────────
@@ -720,6 +743,49 @@ mod tests {
             serde_json::Value::String(framing.to_string()),
         );
         p
+    }
+
+    #[test]
+    fn validate_rejects_an_empty_delimiter_or_a_zero_frame_length() {
+        let mut p = serial_profile("delimiter");
+        p.connection.insert("port".to_string(), "/dev/ttyUSB0".into());
+        assert!(validate_profile(&p, &[]).is_ok());
+
+        let mut empty = p.clone();
+        empty.connection.insert("delimiter".to_string(), serde_json::json!([]));
+        let err = validate_profile(&empty, &[]).unwrap_err();
+        assert_eq!(err.code, ValidationCode::FieldInvalid);
+        assert_eq!(err.field.as_deref(), Some("delimiter"));
+
+        let mut zero = p;
+        zero.connection.insert("max_frame_length".to_string(), 0.into());
+        let err = validate_profile(&zero, &[]).unwrap_err();
+        assert_eq!(err.code, ValidationCode::FieldInvalid);
+        assert_eq!(err.field.as_deref(), Some("max_frame_length"));
+    }
+
+    #[test]
+    fn a_session_framing_that_frames_every_byte_is_refused() {
+        use crate::io::serial::parse_profile_for_source;
+        use crate::io::SerialOverrides;
+
+        let mut profile = profile("serial");
+        profile.connection.insert("port".to_string(), "/dev/ttyUSB0".into());
+        let session = |framing: &str| SerialOverrides {
+            framing_encoding: Some(framing.to_string()),
+            ..Default::default()
+        };
+        assert!(parse_profile_for_source(&profile, &session("delimiter")).is_ok());
+
+        let empty = SerialOverrides { delimiter: Some(vec![]), ..session("delimiter") };
+        let err = parse_profile_for_source(&profile, &empty).unwrap_err();
+        assert!(err.contains("delimiter"), "{err}");
+
+        for framing in ["delimiter", "slip"] {
+            let zero = SerialOverrides { max_frame_length: Some(0), ..session(framing) };
+            let err = parse_profile_for_source(&profile, &zero).unwrap_err();
+            assert!(err.contains("max_frame_length"), "{framing}: {err}");
+        }
     }
 
     /// The broker decides which captures a session gets from these two answers,

@@ -285,7 +285,8 @@ mod desktop {
             let encoding = match config.per_interface.as_ref().and_then(|m| m.get(bus)) {
                 Some(interface_config) => build_encoding(interface_config)?,
                 None => default_encoding.clone(),
-            };
+            }
+            .checked()?;
 
             let Some(mut framer) = SerialFramer::with_catalog(encoding, catalog) else {
                 continue;
@@ -461,6 +462,25 @@ mod desktop {
         #[test]
         fn a_negative_start_past_the_front_reads_from_the_first_byte() {
             assert_eq!(frame_id(&[0x12, 0x34], id_config(-5, 1, true)), Some(0x12));
+        }
+
+        #[test]
+        fn a_framing_that_frames_every_byte_is_refused() {
+            let line = stamped(b"AB\nCD\n");
+            let mut empty = config("raw");
+            empty.framing.delimiter = Some(String::new());
+            let err = frame_messages(&line, &empty, None).unwrap_err();
+            assert!(err.contains("delimiter"), "{err}");
+
+            for mode in ["raw", "slip"] {
+                let mut zero = config(mode);
+                zero.per_interface = Some([(0, InterfaceFramingConfig {
+                    max_length: Some(0),
+                    ..config(mode).framing
+                })].into());
+                let err = frame_messages(&line, &zero, None).unwrap_err();
+                assert!(err.contains("max_frame_length"), "{mode}: {err}");
+            }
         }
 
         #[test]

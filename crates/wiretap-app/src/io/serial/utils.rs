@@ -244,7 +244,7 @@ pub fn parse_profile_for_source(
     Ok(SerialSourceConfig {
         port,
         line,
-        framing_encoding,
+        framing_encoding: framing_encoding.checked()?,
         frame_id_config,
         source_address_config,
         min_frame_length,

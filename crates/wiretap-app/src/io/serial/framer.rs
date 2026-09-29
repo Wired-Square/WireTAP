@@ -12,6 +12,7 @@ pub use wiretap_protocol::framing::DelimiterOptions;
 use wiretap_protocol::framing::{DelimiterFramer, Framed};
 use wiretap_protocol::slip::SlipDecoder;
 
+use crate::io::device_kinds::degenerate_framing_field;
 use crate::io::types::ModbusRtuOptions;
 
 // =============================================================================
@@ -95,6 +96,24 @@ impl FrameIdConfig {
 
     pub fn extract(&self, frame: &[u8]) -> Option<u32> {
         extract_frame_id(frame, &self.field()?)
+    }
+}
+
+impl FramingEncoding {
+    /// Refuses a framing that would release every byte as its own frame.
+    pub fn checked(self) -> Result<Self, String> {
+        let field = match &self {
+            Self::Delimiter(o) => {
+                degenerate_framing_field(Some(&o.delimiter), Some(o.max_length as i64))
+            }
+            Self::Slip { max_frame_len } => {
+                degenerate_framing_field(None, Some(*max_frame_len as i64))
+            }
+            Self::ModbusRtu(_) | Self::Raw => None,
+        };
+        field.map_or(Ok(self), |field| {
+            Err(format!("Serial framing: '{field}' would release every byte as its own frame"))
+        })
     }
 }
 
