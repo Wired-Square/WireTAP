@@ -8568,8 +8568,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
 dependencies = [
  "rayon",
  "serde",
@@ -8578,8 +8578,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8595,8 +8595,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-checksum"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
 dependencies = [
  "rayon",
  "serde",
@@ -8605,8 +8605,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -8626,25 +8626,33 @@ dependencies = [
 
 [[package]]
 name = "wiretap-io"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
 dependencies = [
  "libc",
  "nix 0.29.0",
  "nusb 0.2.3",
- "serialport",
  "socketcan",
  "thiserror 2.0.18",
  "tokio",
  "tokio-modbus",
  "wiretap-catalog",
  "wiretap-protocol",
+ "wiretap-serialport",
 ]
 
 [[package]]
 name = "wiretap-protocol"
-version = "0.19.4"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.4#1ab3358b575745cd8fcdb35f0e7cd7a23955f0e7"
+version = "0.19.7"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
+
+[[package]]
+name = "wiretap-serialport"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.19.7#b0614ed8421fd0ab15708b2439fae37707f9d17d"
+dependencies = [
+ "serialport",
+]
 
 [[package]]
 name = "wit-bindgen"
