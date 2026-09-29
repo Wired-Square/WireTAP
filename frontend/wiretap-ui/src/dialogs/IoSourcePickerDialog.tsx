@@ -1181,24 +1181,6 @@ export default function IoSourcePickerDialog({
       opts.maxFrames = timeBounds.maxFrames;
     }
 
-    // Add framing configuration for serial sources
-    if (framingConfig) {
-      opts.framingEncoding = framingConfig.encoding;
-      opts.delimiter = framingConfig.delimiter;
-      opts.maxFrameLength = framingConfig.maxFrameLength;
-      opts.emitRawBytes = framingConfig.emitRawBytes;
-      opts.modbusValidateCrc = framingConfig.validateCrc;
-      opts.modbusDeviceAddress = framingConfig.deviceAddress;
-      opts.modbusVendorFunctions = framingConfig.vendorFunctions;
-      opts.modbusAllowBroadcast = framingConfig.allowBroadcast;
-      opts.modbusAnyFunction = framingConfig.anyFunction;
-    }
-
-    // Add filter configuration for serial sources
-    if (minFrameLength > 0) {
-      opts.minFrameLength = minFrameLength;
-    }
-
     // Attach the decoder chosen in the picker
     if (selectedCatalogPath) {
       opts.catalogPath = selectedCatalogPath;
@@ -1212,7 +1194,6 @@ export default function IoSourcePickerDialog({
     }
 
     console.log("[buildLoadOptions] Built options:", opts);
-    console.log("[buildLoadOptions] framingConfig state:", framingConfig);
 
     return opts;
   };
@@ -1247,6 +1228,20 @@ export default function IoSourcePickerDialog({
     const captureId = selectedCaptureId ?? checkedSourceId;
     if (!captureId) return;
     const options = buildLoadOptions(selectedSpeed);
+    if (framingConfig) {
+      options.framingEncoding = framingConfig.encoding;
+      options.delimiter = framingConfig.delimiter;
+      options.maxFrameLength = framingConfig.maxFrameLength;
+      options.emitRawBytes = framingConfig.emitRawBytes;
+      options.modbusValidateCrc = framingConfig.validateCrc;
+      options.modbusDeviceAddress = framingConfig.deviceAddress;
+      options.modbusVendorFunctions = framingConfig.vendorFunctions;
+      options.modbusAllowBroadcast = framingConfig.allowBroadcast;
+      options.modbusAnyFunction = framingConfig.anyFunction;
+    }
+    if (minFrameLength > 0) {
+      options.minFrameLength = minFrameLength;
+    }
     // Attach capture bus mappings from shared device config map
     const captureMappings = deviceBusConfigMap.get(captureId);
     if (captureMappings && captureMappings.length > 0) {
