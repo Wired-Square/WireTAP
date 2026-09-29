@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+"""Score a WireTAP export against a `candump -L -x` reference log.
+
+    walk-diff walk.log capture.json            # text report
+    walk-diff walk.log capture.json --json     # the same, as JSON
+    walk-diff walk.log export.log --bus 1      # WireTAP candump export, bus 1 only
+
+Either file may be a candump log or JSON: MCP `get_capture_frames` pages (one
+response, a list of them, or one per line) or the app's JSON export. WireTAP's
+candump export carries no FD, BRS, RTR or direction, so prefer the JSON. Exits 1 on
+any drop, duplicate, reorder, unexpected frame, flag or direction mismatch.
+
+Absolute times are never compared, because the hosts' clocks are not synced;
+only the gaps between consecutive frames are.
+"""
+
+import argparse
+import json
+import math
+import re
+import statistics
+import sys
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from typing import Optional
+
+NEAR_WINDOW = 256
+EXAMPLES = 10
+
+CANDUMP_LINE = re.compile(
+    r"^\((?P<sec>\d+)\.(?P<frac>\d+)\)\s+(?P<iface>\S+)\s+(?P<frame>\S+)(?:\s+(?P<dir>[RT]))?\s*$"
+)
+
+
+@dataclass
+class Frame:
+    ts_us: int
+    frame_id: int
+    extended: bool
+    data: bytes
+    fd: Optional[bool] = None
+    brs: Optional[bool] = None
+    rtr: Optional[bool] = None
+    direction: Optional[str] = None
+    bus: Optional[int] = None
+
+    def key(self):
+        return (self.frame_id, self.data)
+
+    def __str__(self):
+        width = 8 if self.extended else 3
+        kind = "R" if self.rtr else ("##" if self.fd else "#")
+        return f"{self.frame_id:0{width}X}{kind}{self.data.hex().upper()}"
+
+
+def parse_candump_frame(text):
+    ident, sep, rest = text.partition("#")
+    if not sep:
+        raise ValueError(f"no '#' in {text!r}")
+    frame_id = int(ident, 16)
+    extended = len(ident) == 8 or frame_id > 0x7FF
+    if rest.startswith("#"):
+        flags = int(rest[1], 16)
+        return frame_id, extended, bytes.fromhex(rest[2:]), True, bool(flags & 1), False
+    if rest.upper().startswith("R"):
+        return frame_id, extended, b"", False, False, True
+    return frame_id, extended, bytes.fromhex(rest.split("_")[0]), False, False, False
+
+
+def parse_candump(text):
+    frames = []
+    for n, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        m = CANDUMP_LINE.match(line.strip())
+        if not m:
+            raise ValueError(f"line {n}: not a candump -L line: {line!r}")
+        frame_id, extended, data, fd, brs, rtr = parse_candump_frame(m["frame"])
+        bus = re.search(r"(\d+)$", m["iface"])
+        frames.append(
+            Frame(
+                ts_us=int(m["sec"]) * 1_000_000 + int(m["frac"].ljust(6, "0")[:6]),
+                frame_id=frame_id,
+                extended=extended,
+                data=data,
+                fd=fd,
+                brs=brs,
+                rtr=rtr,
+                direction={"T": "tx", "R": "rx"}.get(m["dir"]),
+                bus=int(bus[1]) if bus else None,
+            )
+        )
+    return frames
+
+
+def json_frames(doc):
+    if isinstance(doc, list):
+        for item in doc:
+            yield from json_frames(item)
+    elif isinstance(doc, dict):
+        if "structuredContent" in doc:
+            yield from json_frames(doc["structuredContent"])
+        elif "frames" in doc:
+            yield from json_frames(doc["frames"])
+        elif "frame_id" in doc:
+            yield doc
+
+
+def frame_from_json(f):
+    data = bytes(f["bytes"]) if "bytes" in f else bytes.fromhex("".join(f["bytes_hex"]))
+    return Frame(
+        ts_us=int(f["timestamp_us"]),
+        frame_id=int(f["frame_id"]),
+        extended=bool(f.get("is_extended", False)),
+        data=data,
+        fd=bool(f.get("is_fd", False)),
+        brs=f.get("is_brs"),
+        rtr=f.get("is_rtr"),
+        # A received FrameMessage omits its direction; the app's JSON export has none.
+        direction=f.get("direction") or ("rx" if "protocol" in f else None),
+        bus=f.get("bus"),
+    )
+
+
+def parse_json(text):
+    try:
+        docs = [json.loads(text)]
+    except json.JSONDecodeError:
+        docs = [json.loads(line) for line in text.splitlines() if line.strip()]
+    return [
+        frame_from_json(f)
+        for f in json_frames(docs)
+        if f.get("protocol", "can") in ("can", "canfd")
+    ]
+
+
+def load(path, reference):
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    if text.lstrip()[:1] in ("{", "["):
+        return parse_json(text)
+    frames = parse_candump(text)
+    if not reference:
+        # WireTAP's candump export writes every frame as a plain `#`.
+        for f in frames:
+            if not f.fd:
+                f.fd = f.brs = None
+            if not f.rtr:
+                f.rtr = None
+    return frames
+
+
+def counter_value(frame):
+    n = min(len(frame.data), 8)
+    return n, int.from_bytes(frame.data[:n], "little")
+
+
+def cangen_counter_origin(ref):
+    """The counter `cangen -D i` started from, if every frame with data carries it."""
+    carrying = [(i, *counter_value(f)) for i, f in enumerate(ref) if f.data and not f.rtr]
+    if len(carrying) < 2:
+        return None
+    k, width, value = max(carrying, key=lambda c: c[1])
+    origin = (value - k) % (1 << (8 * width))
+    if all(v == (origin + i) % (1 << (8 * n)) for i, n, v in carrying):
+        return origin, width
+    return None
+
+
+class Aligner:
+    def __init__(self, ref, sequence):
+        self.ref = ref
+        self.sequence = sequence
+        self.matched = set()
+        self.queues = defaultdict(deque)
+        for i, f in enumerate(ref):
+            self.queues[f.key()].append(i)
+
+    def by_sequence(self, f, expected):
+        origin, width = self.sequence
+        n, value = counter_value(f)
+        n = min(n, width)
+        if n == 0 or f.rtr:
+            return None
+        modulus = 1 << (8 * n)
+        delta = (value - (origin + expected)) % modulus
+        if delta >= modulus // 2:
+            delta -= modulus
+        ri = expected + delta
+        if 0 <= ri < len(self.ref) and self.ref[ri].frame_id == f.frame_id:
+            return ri
+        return None
+
+    def by_key(self, f):
+        queue = self.queues.get(f.key())
+        if queue is None:
+            return None
+        while queue and queue[0] in self.matched:
+            queue.popleft()
+        # An exhausted key is one the reference had fewer of: a duplicate.
+        return queue.popleft() if queue else -1
+
+    def near(self, f, expected):
+        for offset in range(NEAR_WINDOW):
+            for ri in (expected + offset, expected - offset - 1):
+                if (
+                    0 <= ri < len(self.ref)
+                    and ri not in self.matched
+                    and self.ref[ri].frame_id == f.frame_id
+                ):
+                    return ri
+        return None
+
+
+def align(ref, wt):
+    """Map each WireTAP frame to a reference index, or to a duplicate or nothing."""
+    sequence = cangen_counter_origin(ref)
+    aligner = Aligner(ref, sequence)
+    assigned = [None] * len(wt)
+    duplicates = set()
+    expected = 0
+    for wi, f in enumerate(wt):
+        ri = aligner.by_sequence(f, expected) if sequence else None
+        if ri is None:
+            ri = aligner.by_key(f)
+        if ri is None:
+            continue
+        if ri == -1 or ri in aligner.matched:
+            duplicates.add(wi)
+        else:
+            aligner.matched.add(ri)
+            assigned[wi] = ri
+        if ri != -1:
+            expected = ri + 1
+
+    # A frame that arrived altered (a truncated FD payload, a lost flag) has no
+    # exact match; pair it with the reference frame it stands in for.
+    unexpected = []
+    expected = 0
+    for wi, f in enumerate(wt):
+        if assigned[wi] is not None:
+            expected = assigned[wi] + 1
+            continue
+        if wi in duplicates:
+            continue
+        ri = aligner.near(f, expected)
+        if ri is None:
+            unexpected.append(wi)
+        else:
+            aligner.matched.add(ri)
+            assigned[wi] = ri
+            expected = ri + 1
+    return sequence, assigned, duplicates, unexpected
+
+
+def percentile(values, p):
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(p / 100 * len(ordered)) - 1)]
+
+
+EXPECTED_DIRECTION = {
+    "opposite": {"tx": "rx", "rx": "tx"},
+    "same": {"tx": "tx", "rx": "rx"},
+}
+
+
+def score(ref, wt, direction="opposite"):
+    sequence, assigned, duplicates, unexpected = align(ref, wt)
+    pairs = [(ri, wi) for wi, ri in enumerate(assigned) if ri is not None]
+    by_ref = {ri: wi for ri, wi in pairs}
+
+    reordered, highest = [], -1
+    for ri, wi in pairs:
+        if ri < highest:
+            reordered.append(wi)
+        highest = max(highest, ri)
+
+    mismatches = {k: [] for k in ("extended", "fd", "brs", "rtr", "length", "data")}
+    direction_mismatches = []
+    for ri, wi in pairs:
+        r, w = ref[ri], wt[wi]
+        for flag in ("extended", "fd", "brs", "rtr"):
+            a, b = getattr(r, flag), getattr(w, flag)
+            if a is not None and b is not None and a != b:
+                mismatches[flag].append((ri, wi))
+        if len(r.data) != len(w.data):
+            mismatches["length"].append((ri, wi))
+        elif r.data != w.data:
+            mismatches["data"].append((ri, wi))
+        if direction in EXPECTED_DIRECTION and r.direction and w.direction:
+            if EXPECTED_DIRECTION[direction][r.direction] != w.direction:
+                direction_mismatches.append((ri, wi))
+
+    gap_errors = [
+        abs((wt[by_ref[ri + 1]].ts_us - wt[by_ref[ri]].ts_us) - (ref[ri + 1].ts_us - ref[ri].ts_us))
+        for ri in sorted(by_ref)
+        if ri + 1 in by_ref
+    ]
+    drops = [ri for ri in range(len(ref)) if ri not in by_ref]
+
+    def ref_examples(indices):
+        return [str(ref[i]) for i in indices[:EXAMPLES]]
+
+    def wt_examples(indices):
+        return [str(wt[i]) for i in sorted(indices)[:EXAMPLES]]
+
+    def pair_examples(indices):
+        return [f"{ref[r]} -> {wt[w]}" for r, w in indices[:EXAMPLES]]
+
+    failures = (
+        drops or duplicates or reordered or unexpected or direction_mismatches
+        or any(mismatches.values())
+    )
+    return {
+        "mode": "sequence" if sequence else "multiset",
+        "reference_frames": len(ref),
+        "wiretap_frames": len(wt),
+        "matched": len(pairs),
+        "drops": len(drops),
+        "duplicates": len(duplicates),
+        "reordered": len(reordered),
+        "unexpected": len(unexpected),
+        "mismatches": {k: len(v) for k, v in mismatches.items()},
+        "direction_mismatches": len(direction_mismatches),
+        "gap_error_us": {
+            "count": len(gap_errors),
+            "median": statistics.median(gap_errors),
+            "p99": percentile(gap_errors, 99),
+        }
+        if gap_errors
+        else None,
+        "examples": {
+            "drops": ref_examples(drops),
+            "duplicates": wt_examples(duplicates),
+            "reordered": wt_examples(reordered),
+            "unexpected": wt_examples(unexpected),
+            **{k: pair_examples(v) for k, v in mismatches.items()},
+            "direction": pair_examples(direction_mismatches),
+        },
+        "pass": not failures,
+    }
+
+
+def render(report):
+    m = report["mismatches"]
+    gaps = report["gap_error_us"]
+    lines = [
+        "mode         "
+        + ("sequence (cangen -D i)" if report["mode"] == "sequence" else "multiset (id + data)"),
+        f"frames       reference {report['reference_frames']}  wiretap {report['wiretap_frames']}"
+        f"  matched {report['matched']}",
+        f"drops        {report['drops']}",
+        f"duplicates   {report['duplicates']}",
+        f"reordered    {report['reordered']}",
+        f"unexpected   {report['unexpected']}",
+        "mismatches   " + "  ".join(f"{k} {v}" for k, v in m.items()),
+        f"direction    {report['direction_mismatches']}",
+        "gap error    "
+        + (
+            f"median {gaps['median'] / 1000:.3f} ms  p99 {gaps['p99'] / 1000:.3f} ms"
+            f"  ({gaps['count']} gaps)"
+            if gaps
+            else "no consecutive pairs"
+        ),
+    ]
+    for kind, examples in report["examples"].items():
+        if examples:
+            lines.append(f"  {kind}: " + ", ".join(examples))
+    lines.append("PASS" if report["pass"] else "FAIL")
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("reference", help="candump -L -x log from the reference node")
+    parser.add_argument("wiretap", help="WireTAP export: get_capture_frames JSON or candump")
+    parser.add_argument("--json", action="store_true", help="print the report as JSON")
+    parser.add_argument("--bus", type=int, help="score only WireTAP frames on this bus")
+    parser.add_argument(
+        "--direction",
+        choices=("opposite", "same", "ignore"),
+        default="opposite",
+        help="opposite (default): the reference and WireTAP are different nodes, so the "
+        "reference's T is WireTAP's rx. same: both read one interface. ignore: a third "
+        "node talks too",
+    )
+    args = parser.parse_args(argv)
+
+    ref = load(args.reference, reference=True)
+    wt = [f for f in load(args.wiretap, reference=False) if args.bus is None or f.bus == args.bus]
+    report = score(ref, wt, args.direction)
+    print(json.dumps(report, indent=2) if args.json else render(report))
+    return 0 if report["pass"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
