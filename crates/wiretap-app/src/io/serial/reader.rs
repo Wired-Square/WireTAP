@@ -33,6 +33,11 @@ use super::utils::{framing_from_str, outage_message, probe_serial_presence, Seri
 /// How often the read loop looks at the stop flag and for a framing change.
 const POLL: Duration = Duration::from_millis(50);
 
+/// FTDI-type USB-serial adapters hold a short read for their 16 ms latency
+/// timer, so a read this late in the middle of a message is a delay, not a
+/// silence.
+const READ_LATENCY_WINDOW: Duration = Duration::from_millis(20);
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -69,7 +74,11 @@ fn tapped(tapped: TappedMessage) -> (SerialFrame, u64) {
 
 enum Framer {
     Unframed,
-    Serial(SerialFramer, LineSettings),
+    Serial {
+        framer: SerialFramer,
+        line: LineSettings,
+        mid_message: bool,
+    },
     /// Stamps each message at its last byte, rather than at the read that
     /// released it.
     Rtu(RtuTap, ModbusRtuOptions),
@@ -82,16 +91,28 @@ impl Framer {
                 Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
             }
             encoding => SerialFramer::new(encoding)
-                .map_or(Self::Unframed, |framer| Self::Serial(framer, line)),
+                .map_or(Self::Unframed, |framer| Self::Serial {
+                    framer,
+                    line,
+                    mid_message: false,
+                }),
         }
     }
 
     fn feed(&mut self, bytes: &[u8], at: SystemTime) -> Vec<(SerialFrame, u64)> {
         match self {
             Self::Unframed => Vec::new(),
-            Self::Serial(framer, line) => {
+            Self::Serial {
+                framer,
+                line,
+                mid_message,
+            } => {
                 let frames = framer.feed(bytes);
                 let fed = framer.bytes_fed();
+                *mid_message = match frames.last() {
+                    Some(last) => fed > last.end_offset,
+                    None => *mid_message || !bytes.is_empty(),
+                };
                 let at_us = micros(at);
                 frames
                     .into_iter()
@@ -105,12 +126,25 @@ impl Framer {
         }
     }
 
+    /// Only SLIP and delimited framing know it: `RtuTap` exposes no pending
+    /// message, and an unframed line has no boundaries.
+    fn mid_message(&self) -> bool {
+        matches!(self, Self::Serial { mid_message: true, .. })
+    }
+
     /// End of stream. Modbus RTU can still recover whole messages from what it
     /// holds, so this is a list, not one residue.
     fn finish(&mut self, now: SystemTime) -> Vec<(SerialFrame, u64)> {
         match self {
             Self::Unframed => Vec::new(),
-            Self::Serial(framer, _) => stamped(framer.flush(), now),
+            Self::Serial {
+                framer,
+                mid_message,
+                ..
+            } => {
+                *mid_message = false;
+                stamped(framer.flush(), now)
+            }
             Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
                 let leftover = stamped(residue(trailing, tap.bytes_fed()), now);
@@ -138,6 +172,7 @@ struct LiveLine {
     emit_raw_bytes: bool,
     /// No byte is stamped before one already handed out, as `RtuTap`'s floor.
     byte_floor_us: u64,
+    last_read_end_us: u64,
     waiting_for_device: bool,
 }
 
@@ -161,6 +196,7 @@ impl LiveLine {
             min_frame_length: config.min_frame_length,
             emit_raw_bytes: config.emit_raw_bytes,
             byte_floor_us: 0,
+            last_read_end_us: 0,
             waiting_for_device: false,
         }
     }
@@ -204,6 +240,7 @@ impl LiveLine {
     }
 
     fn read(&mut self, bytes: &[u8], at: SystemTime) -> Vec<SourceMessage> {
+        let at = self.read_end(bytes.len(), at);
         let mut messages = Vec::new();
         if self.emit_raw_bytes {
             messages.push(SourceMessage::Bytes(
@@ -214,6 +251,18 @@ impl LiveLine {
         let frames = self.framer.feed(bytes, at);
         messages.extend(self.frames(frames));
         messages
+    }
+
+    fn read_end(&mut self, len: usize, at: SystemTime) -> SystemTime {
+        let continued = self.last_read_end_us + self.line.wire_time(len as u64).as_micros() as u64;
+        let late_by = micros(at).saturating_sub(continued);
+        let delayed = (1..=READ_LATENCY_WINDOW.as_micros() as u64).contains(&late_by);
+        self.last_read_end_us = if delayed && self.framer.mid_message() {
+            continued
+        } else {
+            micros(at)
+        };
+        UNIX_EPOCH + Duration::from_micros(self.last_read_end_us)
     }
 
     fn finish(&mut self) -> Option<SourceMessage> {
@@ -808,6 +857,49 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
             [1_000_000, 1_000_500],
             "floored at the last stamp handed out"
         );
+    }
+
+    fn byte_stamps(messages: &[SourceMessage]) -> Vec<u64> {
+        messages
+            .iter()
+            .flat_map(|m| match m {
+                SourceMessage::Bytes(_, entries) => {
+                    entries.iter().map(|e| e.timestamp_us).collect()
+                }
+                _ => Vec::new(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_read_delayed_mid_message_continues_the_last_one_at_wire_rate() {
+        let mut line = live(FramingEncoding::Slip, true);
+        line.read(&[1, 2, 3], at(1_000_000));
+
+        let delayed = line.read(&[4, 0xC0], at(1_002_083 + 12_000));
+
+        assert_eq!(byte_stamps(&delayed), [1_001_042, 1_002_083]);
+        assert_eq!(frames(delayed)[0].timestamp_us, 1_002_083);
+    }
+
+    #[test]
+    fn a_read_after_a_message_ended_keeps_its_silence() {
+        let mut line = live(FramingEncoding::Slip, true);
+        line.read(&[1, 2, 0xC0], at(1_000_000));
+
+        let next = line.read(&[3, 0xC0], at(1_002_083 + 5_000));
+
+        assert_eq!(byte_stamps(&next), [1_006_042, 1_007_083]);
+    }
+
+    #[test]
+    fn a_read_after_a_silence_past_the_latency_window_keeps_its_own_back_dating() {
+        let mut line = live(FramingEncoding::Slip, true);
+        line.read(&[1, 2, 3], at(1_000_000));
+
+        let after_silence = line.read(&[4, 5], at(1_100_000));
+
+        assert_eq!(byte_stamps(&after_silence), [1_098_959, 1_100_000]);
     }
 
     #[test]
