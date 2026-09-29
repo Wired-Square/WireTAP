@@ -854,7 +854,7 @@ pub async fn create_reader_session(
                     .and_then(|v| v.as_str())
                     .unwrap_or("wiretap")
                     .to_string(),
-                protocol: crate::apiclient::ArchiveProtocol::from_connection(&profile.connection)?,
+                protocol: crate::apiclient::archive_protocol(&profile.connection)?,
             };
 
             let start_from_profile =

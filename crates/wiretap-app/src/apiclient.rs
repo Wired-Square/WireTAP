@@ -7,15 +7,22 @@
 //
 // The archive is one table with a `protocol` column and every read on the
 // gateway defaults to CAN, so a profile names the protocol it reads
-// (`ArchiveProtocol`) and this module says so on every request that is not CAN.
+// (`wiretap_gateway::Protocol`) and this module says so on every request that is
+// not CAN.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::LazyLock;
 
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
+use wiretap_gateway::{
+    ByteChangesParams, DistributionParams, Event, EventPatch, EventsResponse, FirstLastParams,
+    FrameChangesParams, FrameFilter, FrequencyParams, GapAnalysisParams, ImportResult,
+    InventoryEntry, InventoryResponse, MirrorValidationParams, MuxStatisticsParams, NewEvent,
+    PatternSearchParams, PayloadsParams, PayloadsResponse, Protocol, SignalResponse, TimeBounds,
+};
 
 use crate::capture_events::CaptureEvent;
 use crate::credentials::{self, get_credential};
@@ -83,51 +90,37 @@ pub struct RunningQueryInfo {
     pub started_at: std::time::Instant,
 }
 
-/// Which of the archive's protocols a profile reads. The gateway's own tags:
-/// `can` is its default and goes unsaid on the wire, so a CAN profile's requests
-/// are byte-for-byte what they were before the column existed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ArchiveProtocol {
-    Can,
-    Modbus,
+/// The profile's archive protocol, absent meaning CAN. There is no serial
+/// archive reader yet, so a profile naming one is refused here.
+pub fn archive_protocol(conn: &HashMap<String, Value>) -> Result<Protocol, String> {
+    match conn.get("protocol").and_then(|v| v.as_str()) {
+        None | Some("") | Some("can") => Ok(Protocol::Can),
+        Some("modbus") => Ok(Protocol::Modbus),
+        Some("serial") => Err("a WireTAP backend profile cannot read the serial archive yet".into()),
+        Some(other) => Err(format!("unknown archive protocol '{other}'")),
+    }
 }
 
-impl ArchiveProtocol {
-    /// The gateway's tag, or `None` for the default it assumes.
-    fn query_value(self) -> Option<&'static str> {
-        match self {
-            Self::Can => None,
-            Self::Modbus => Some("modbus"),
-        }
+/// The `FrameMessage.protocol` a row of this protocol becomes. A Modbus
+/// archive row is one whole RTU message, which this app calls `modbus_rtu`;
+/// `modbus` here means a register poll and would decode it as one.
+pub fn frame_tag(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Can => "can",
+        Protocol::Modbus => "modbus_rtu",
+        Protocol::Serial => unreachable!("archive_protocol refuses serial"),
     }
+}
 
-    /// The `FrameMessage.protocol` a row of this protocol becomes. A Modbus
-    /// archive row is one whole RTU message, which this app calls `modbus_rtu`;
-    /// `modbus` here means a register poll and would decode it as one.
-    pub fn frame_tag(self) -> &'static str {
-        match self {
-            Self::Can => "can",
-            Self::Modbus => "modbus_rtu",
-        }
-    }
-
-    /// `?protocol=…` for a GET, empty for CAN. `first` says whether this is the
-    /// first parameter on the URL.
-    pub fn query_suffix(self, first: bool) -> String {
-        self.query_value()
-            .map(|p| format!("{}protocol={p}", if first { "?" } else { "&" }))
-            .unwrap_or_default()
-    }
-
-    /// The profile's setting, absent meaning CAN.
-    pub fn from_connection(conn: &HashMap<String, Value>) -> Result<Self, String> {
-        match conn.get("protocol").and_then(|v| v.as_str()) {
-            None | Some("") | Some("can") => Ok(Self::Can),
-            Some("modbus") => Ok(Self::Modbus),
-            Some(other) => Err(format!("unknown archive protocol '{other}'")),
-        }
-    }
+/// `?protocol=…` for a GET, empty for CAN. `first` says whether this is the
+/// first parameter on the URL.
+pub fn protocol_query(protocol: Protocol, first: bool) -> String {
+    let name = match protocol {
+        Protocol::Can => return String::new(),
+        Protocol::Modbus => "modbus",
+        Protocol::Serial => "serial",
+    };
+    format!("{}protocol={name}", if first { "?" } else { "&" })
 }
 
 /// Resolved connection details for a wiretap profile.
@@ -136,7 +129,7 @@ pub struct ApiProfile {
     base_url: String,
     api_key: String,
     database: String,
-    pub protocol: ArchiveProtocol,
+    pub protocol: Protocol,
 }
 
 impl ApiProfile {
@@ -148,13 +141,20 @@ impl ApiProfile {
         format!("{}/v1/db/{}{}", self.base_url, self.database, path)
     }
 
-    /// A query body with the profile's protocol named when it is not the
-    /// gateway's default.
-    fn with_protocol(&self, body: Value) -> Value {
-        match self.protocol.query_value() {
-            Some(p) => merge(body, &[("protocol", json!(p))]),
-            None => body,
-        }
+    /// The gateway's default goes unsaid, so a CAN profile's requests carry
+    /// no `protocol` key, as before the column existed.
+    fn wire_protocol(&self) -> Option<Protocol> {
+        (self.protocol != Protocol::Can).then_some(self.protocol)
+    }
+
+    fn filter(
+        &self,
+        frame_id: u32,
+        is_extended: Option<bool>,
+        start_time: Option<String>,
+        end_time: Option<String>,
+    ) -> FrameFilter {
+        FrameFilter { frame_id, is_extended, start_time, end_time, protocol: self.wire_protocol() }
     }
 }
 
@@ -173,7 +173,7 @@ pub fn resolve(profile: &IOProfile) -> Result<ApiProfile, String> {
         .unwrap_or("wiretap")
         .to_string();
     let api_key = resolve_api_key(profile)?;
-    let protocol = ArchiveProtocol::from_connection(conn)?;
+    let protocol = archive_protocol(conn)?;
     Ok(ApiProfile { profile_id: profile.id.clone(), base_url, api_key, database, protocol })
 }
 
@@ -237,7 +237,7 @@ async fn get<T: DeserializeOwned>(api: &ApiProfile, path: &str) -> Result<T, Str
 async fn post_query<T: DeserializeOwned>(
     api: &ApiProfile,
     path: &str,
-    body: Value,
+    body: &impl Serialize,
     query_id: &str,
 ) -> Result<T, String> {
     API_RUNNING.lock().await.insert(
@@ -251,8 +251,7 @@ async fn post_query<T: DeserializeOwned>(
             },
         },
     );
-    let body = api.with_protocol(body);
-    let result = send(HTTP.post(api.db_url(path)).bearer_auth(&api.api_key).json(&body)).await;
+    let result = send(HTTP.post(api.db_url(path)).bearer_auth(&api.api_key).json(body)).await;
     API_RUNNING.lock().await.remove(query_id);
     result
 }
@@ -282,29 +281,6 @@ pub async fn cancel_query(query_id: &str) -> bool {
     true
 }
 
-/// Common frame-filter fields shared by most query bodies.
-fn filter_body(
-    frame_id: u32,
-    is_extended: Option<bool>,
-    start_time: &Option<String>,
-    end_time: &Option<String>,
-) -> Value {
-    json!({
-        "frame_id": frame_id,
-        "is_extended": is_extended,
-        "start_time": start_time,
-        "end_time": end_time,
-    })
-}
-
-fn merge(mut base: Value, extra: &[(&str, Value)]) -> Value {
-    let obj = base.as_object_mut().expect("object body");
-    for (k, v) in extra {
-        obj.insert((*k).to_string(), v.clone());
-    }
-    base
-}
-
 // ---------------------------------------------------------------------------
 // Query functions — signatures mirror the dbquery commands
 // ---------------------------------------------------------------------------
@@ -321,11 +297,13 @@ pub async fn byte_changes(
     query_id: String,
 ) -> Result<ByteChangeQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[("byte_index", json!(byte_index)), ("limit", json!(limit)), ("query_id", json!(query_id))],
-    );
-    post_query(&api, "/query/byte-changes", body, &query_id).await
+    let body = ByteChangesParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        byte_index,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/byte-changes", &body, &query_id).await
 }
 
 pub async fn frame_changes(
@@ -338,11 +316,12 @@ pub async fn frame_changes(
     query_id: String,
 ) -> Result<FrameChangeQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[("limit", json!(limit)), ("query_id", json!(query_id))],
-    );
-    post_query(&api, "/query/frame-changes", body, &query_id).await
+    let body = FrameChangesParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/frame-changes", &body, &query_id).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -359,18 +338,19 @@ pub async fn mirror_validation(
     compare: Option<BTreeSet<usize>>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let api = resolve(profile)?;
-    let body = json!({
-        "mirror_frame_id": mirror_frame_id,
-        "source_frame_id": source_frame_id,
-        "is_extended": is_extended,
-        "tolerance_ms": tolerance_ms,
-        "start_time": start_time,
-        "end_time": end_time,
-        "limit": limit,
-        "query_id": query_id,
-    });
+    let body = MirrorValidationParams {
+        protocol: api.wire_protocol(),
+        mirror_frame_id,
+        source_frame_id,
+        is_extended,
+        tolerance_ms,
+        start_time,
+        end_time,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
     let mut out: MirrorValidationQueryResult =
-        post_query(&api, "/query/mirror-validation", body, &query_id).await?;
+        post_query(&api, "/query/mirror-validation", &body, &query_id).await?;
 
     // The gateway compares whole payloads and has no catalogue, so narrowing to
     // the mirror's inherited bytes happens here. Note this filters *after* the
@@ -388,7 +368,7 @@ pub async fn mirror_validation(
             );
             !r.mismatch_indices.is_empty()
         });
-        out.stats.results_count = out.results.len();
+        out.stats.results_count = out.results.len() as u64;
     }
     Ok(out)
 }
@@ -407,17 +387,15 @@ pub async fn mux_statistics(
     query_id: String,
 ) -> Result<MuxStatisticsQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[
-            ("mux_selector_byte", json!(mux_selector_byte)),
-            ("include_16bit", json!(include_16bit)),
-            ("payload_length", json!(payload_length)),
-            ("limit", json!(limit)),
-            ("query_id", json!(query_id)),
-        ],
-    );
-    post_query(&api, "/query/mux-statistics", body, &query_id).await
+    let body = MuxStatisticsParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        mux_selector_byte,
+        include_16bit,
+        payload_length,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/mux-statistics", &body, &query_id).await
 }
 
 pub async fn first_last(
@@ -429,11 +407,11 @@ pub async fn first_last(
     query_id: String,
 ) -> Result<FirstLastQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[("query_id", json!(query_id))],
-    );
-    post_query(&api, "/query/first-last", body, &query_id).await
+    let body = FirstLastParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/first-last", &body, &query_id).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -448,15 +426,13 @@ pub async fn frequency(
     query_id: String,
 ) -> Result<FrequencyQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[
-            ("bucket_size_ms", json!(bucket_size_ms)),
-            ("limit", json!(limit)),
-            ("query_id", json!(query_id)),
-        ],
-    );
-    post_query(&api, "/query/frequency", body, &query_id).await
+    let body = FrequencyParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        bucket_size_ms,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/frequency", &body, &query_id).await
 }
 
 pub async fn distribution(
@@ -469,11 +445,12 @@ pub async fn distribution(
     query_id: String,
 ) -> Result<DistributionQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[("byte_index", json!(byte_index)), ("query_id", json!(query_id))],
-    );
-    post_query(&api, "/query/distribution", body, &query_id).await
+    let body = DistributionParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        byte_index,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/distribution", &body, &query_id).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -488,15 +465,13 @@ pub async fn gap_analysis(
     query_id: String,
 ) -> Result<GapAnalysisQueryResult, String> {
     let api = resolve(profile)?;
-    let body = merge(
-        filter_body(frame_id, is_extended, &start_time, &end_time),
-        &[
-            ("gap_threshold_ms", json!(gap_threshold_ms)),
-            ("limit", json!(limit)),
-            ("query_id", json!(query_id)),
-        ],
-    );
-    post_query(&api, "/query/gap-analysis", body, &query_id).await
+    let body = GapAnalysisParams {
+        filter: api.filter(frame_id, is_extended, start_time, end_time),
+        gap_threshold_ms,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/gap-analysis", &body, &query_id).await
 }
 
 pub async fn pattern_search(
@@ -509,15 +484,16 @@ pub async fn pattern_search(
     query_id: String,
 ) -> Result<PatternSearchQueryResult, String> {
     let api = resolve(profile)?;
-    let body = json!({
-        "pattern": pattern,
-        "pattern_mask": pattern_mask,
-        "start_time": start_time,
-        "end_time": end_time,
-        "limit": limit,
-        "query_id": query_id,
-    });
-    post_query(&api, "/query/pattern-search", body, &query_id).await
+    let body = PatternSearchParams {
+        protocol: api.wire_protocol(),
+        pattern,
+        pattern_mask,
+        start_time,
+        end_time,
+        limit,
+        query_id: Some(query_id.clone()),
+    };
+    post_query(&api, "/query/pattern-search", &body, &query_id).await
 }
 
 pub async fn activity(profile: &IOProfile) -> Result<DatabaseActivityResult, String> {
@@ -527,47 +503,29 @@ pub async fn activity(profile: &IOProfile) -> Result<DatabaseActivityResult, Str
 
 pub async fn signal_backend(profile: &IOProfile, pid: i32, terminate: bool) -> Result<bool, String> {
     let api = resolve(profile)?;
-    #[derive(Deserialize)]
-    struct Ok_ {
-        ok: bool,
-    }
     let url = if terminate {
         api.db_url(&format!("/activity/{pid}"))
     } else {
         api.db_url(&format!("/activity/{pid}/cancel"))
     };
     let req = if terminate { HTTP.delete(url) } else { HTTP.post(url) };
-    Ok(send::<Ok_>(req.bearer_auth(&api.api_key)).await?.ok)
+    Ok(send::<SignalResponse>(req.bearer_auth(&api.api_key)).await?.ok)
 }
 
 // ---------------------------------------------------------------------------
 // Inventory / payloads (used by analysis.rs + MCP via dbquery)
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
-struct InventoryEntry {
-    frame_id: u32,
-    is_extended: bool,
-    count: i64,
-    first_us: i64,
-    last_us: i64,
-    /// A CAN length code, or a Modbus message length (up to 256).
-    max_dlc: u16,
-    /// The payload length in bytes, served by gateways from 0.1.4.
-    #[serde(default)]
-    max_len: Option<u16>,
-}
-
-impl InventoryEntry {
-    /// An older gateway serves only the code. The archive stores a classic
-    /// frame's code clamped to 8, so a CAN code above 8 can only be FD.
-    fn max_len(&self, protocol: ArchiveProtocol) -> u8 {
-        let len = self.max_len.unwrap_or_else(|| match protocol {
-            ArchiveProtocol::Can => wiretap_protocol::dlc_to_len(self.max_dlc as u8, true) as u16,
-            ArchiveProtocol::Modbus => self.max_dlc,
-        });
-        len.min(u8::MAX as u16) as u8
-    }
+/// `max_dlc` is a CAN length code or a Modbus message length (up to 256). A
+/// gateway before 0.1.4 serves no `max_len`, and the archive stores a classic
+/// frame's code clamped to 8, so a CAN code above 8 can only be FD.
+fn inventory_max_len(entry: &InventoryEntry, protocol: Protocol) -> u8 {
+    let len = entry.max_len.unwrap_or_else(|| match protocol {
+        Protocol::Can => wiretap_protocol::dlc_to_len(entry.max_dlc as u8, true) as u16,
+        Protocol::Modbus => entry.max_dlc,
+        Protocol::Serial => unreachable!("archive_protocol refuses serial"),
+    });
+    len.min(u8::MAX as u16) as u8
 }
 
 /// Every entry is the profile's protocol — the gateway groups one protocol at
@@ -586,30 +544,24 @@ pub async fn frame_inventory(
     if let Some(e) = &end_time {
         params.push(format!("end={}", urlencoding(e)));
     }
-    if let Some(p) = api.protocol.query_value() {
-        params.push(format!("protocol={p}"));
-    }
     if !params.is_empty() {
         path.push('?');
         path.push_str(&params.join("&"));
     }
-    #[derive(Deserialize)]
-    struct Resp {
-        entries: Vec<InventoryEntry>,
-    }
-    let resp: Resp = get(&api, &path).await?;
+    path.push_str(&protocol_query(api.protocol, params.is_empty()));
+    let resp: InventoryResponse = get(&api, &path).await?;
     Ok(resp
         .entries
         .into_iter()
         .map(|e| {
             crate::capture_db::InventoryRow::new(
-                api.protocol.frame_tag(),
+                frame_tag(api.protocol),
                 e.frame_id,
                 e.is_extended,
                 e.count,
                 e.first_us,
                 e.last_us,
-                e.max_len(api.protocol),
+                inventory_max_len(&e, api.protocol),
             )
         })
         .collect())
@@ -622,16 +574,9 @@ pub async fn fetch_frame_payloads(
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
     let api = resolve(profile)?;
-    let body = api.with_protocol(json!({
-        "frame_id": frame_id,
-        "is_extended": is_extended,
-        "limit": limit,
-    }));
-    #[derive(Deserialize)]
-    struct Resp {
-        payloads: Vec<Vec<u8>>,
-    }
-    let resp: Resp = send(HTTP.post(api.db_url("/payloads")).bearer_auth(&api.api_key).json(&body)).await?;
+    let body = PayloadsParams { filter: api.filter(frame_id, is_extended, None, None), limit: Some(limit) };
+    let resp: PayloadsResponse =
+        send(HTTP.post(api.db_url("/payloads")).bearer_auth(&api.api_key).json(&body)).await?;
     Ok(resp.payloads)
 }
 
@@ -651,27 +596,12 @@ struct ImportProgress {
     done: bool,
 }
 
-#[derive(Deserialize)]
-struct ImportResp {
-    imported: u64,
-}
-
 // ---------------------------------------------------------------------------
 // Events — the archive's annotations, one per database
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
-struct WireEvent {
-    id: i64,
-    ts_us: i64,
-    duration_us: i64,
-    note: String,
-    created_at_us: i64,
-    updated_at_us: i64,
-}
-
-impl From<WireEvent> for CaptureEvent {
-    fn from(e: WireEvent) -> Self {
+impl From<Event> for CaptureEvent {
+    fn from(e: Event) -> Self {
         CaptureEvent {
             id: e.id.to_string(),
             timestamp_us: e.ts_us,
@@ -684,13 +614,9 @@ impl From<WireEvent> for CaptureEvent {
 }
 
 pub async fn events_list(app: &tauri::AppHandle, profile_id: &str) -> Result<Vec<CaptureEvent>, String> {
-    #[derive(Deserialize)]
-    struct Resp {
-        events: Vec<WireEvent>,
-    }
     let api = resolve_by_id(app, profile_id).await?;
     // The gateway's default is the oldest 1000; there is no cursor, so ask for all of them.
-    let resp: Resp = get(&api, "/events?limit=1000000").await?;
+    let resp: EventsResponse = get(&api, "/events?limit=1000000").await?;
     Ok(resp.events.into_iter().map(Into::into).collect())
 }
 
@@ -702,8 +628,8 @@ pub async fn events_add(
     note: &str,
 ) -> Result<CaptureEvent, String> {
     let api = resolve_by_id(app, profile_id).await?;
-    let body = json!({ "ts_us": timestamp_us, "duration_us": duration_us, "note": note });
-    send::<WireEvent>(HTTP.post(api.db_url("/events")).bearer_auth(&api.api_key).json(&body))
+    let body = NewEvent { ts_us: timestamp_us, duration_us, note: note.to_string() };
+    send::<Event>(HTTP.post(api.db_url("/events")).bearer_auth(&api.api_key).json(&body))
         .await
         .map(Into::into)
 }
@@ -717,8 +643,12 @@ pub async fn events_update(
     note: &str,
 ) -> Result<CaptureEvent, String> {
     let api = resolve_by_id(app, profile_id).await?;
-    let body = json!({ "ts_us": timestamp_us, "duration_us": duration_us, "note": note });
-    send::<WireEvent>(HTTP.patch(api.db_url(&format!("/events/{id}"))).bearer_auth(&api.api_key).json(&body))
+    let body = EventPatch {
+        ts_us: Some(timestamp_us),
+        duration_us: Some(duration_us),
+        note: Some(note.to_string()),
+    };
+    send::<Event>(HTTP.patch(api.db_url(&format!("/events/{id}"))).bearer_auth(&api.api_key).json(&body))
         .await
         .map(Into::into)
 }
@@ -800,7 +730,7 @@ pub async fn api_import_capture(
             .send()
             .await
             .map_err(|e| format!("import request failed: {}", describe(&e)))?;
-        imported_total += parse::<ImportResp>(resp).await?.imported;
+        imported_total += parse::<ImportResult>(resp).await?.imported;
 
         offset += frames.len();
         first = false;
@@ -966,28 +896,23 @@ pub async fn api_database_protocols(
     api_key: Option<String>,
     profile_id: Option<String>,
     database: String,
-) -> Result<Vec<ArchiveProtocol>, String> {
+) -> Result<Vec<Protocol>, String> {
     let base_url = url.trim_end_matches('/').to_string();
     let key = editor_api_key(&app, api_key, profile_id).await?;
-    #[derive(Deserialize, PartialEq)]
-    struct Bounds {
-        min_ts_us: Option<i64>,
-        max_ts_us: Option<i64>,
-    }
-    let bounds = |protocol: ArchiveProtocol| {
-        get_url::<Bounds>(
-            format!("{base_url}/v1/db/{database}/time-bounds{}", protocol.query_suffix(true)),
+    let bounds = |protocol: Protocol| {
+        get_url::<TimeBounds>(
+            format!("{base_url}/v1/db/{database}/time-bounds{}", protocol_query(protocol, true)),
             &key,
         )
     };
-    let can = bounds(ArchiveProtocol::Can).await?;
-    let modbus = bounds(ArchiveProtocol::Modbus).await?;
+    let can = bounds(Protocol::Can).await?;
+    let modbus = bounds(Protocol::Modbus).await?;
     let mut out = Vec::new();
     if can.min_ts_us.is_some() {
-        out.push(ArchiveProtocol::Can);
+        out.push(Protocol::Can);
     }
     if modbus.min_ts_us.is_some() && modbus != can {
-        out.push(ArchiveProtocol::Modbus);
+        out.push(Protocol::Modbus);
     }
     Ok(out)
 }
@@ -1012,26 +937,30 @@ mod tests {
         pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
     }
 
-    /// Absent and `can` are the gateway's default and go unsaid, so a CAN
-    /// profile's requests are what they were before the column existed.
-    #[test]
-    fn can_is_the_unsaid_default_and_modbus_is_named() {
-        assert_eq!(ArchiveProtocol::from_connection(&conn(&[])).unwrap(), ArchiveProtocol::Can);
-        assert_eq!(
-            ArchiveProtocol::from_connection(&conn(&[("protocol", json!("can"))])).unwrap(),
-            ArchiveProtocol::Can
-        );
-        assert_eq!(
-            ArchiveProtocol::from_connection(&conn(&[("protocol", json!("modbus"))])).unwrap(),
-            ArchiveProtocol::Modbus
-        );
-        assert!(ArchiveProtocol::from_connection(&conn(&[("protocol", json!("modbsu"))])).is_err());
+    fn api(protocol: Protocol) -> ApiProfile {
+        ApiProfile {
+            profile_id: "p".into(),
+            base_url: "http://g:8423".into(),
+            api_key: String::new(),
+            database: "db".into(),
+            protocol,
+        }
+    }
 
-        assert_eq!(ArchiveProtocol::Can.query_suffix(true), "");
-        assert_eq!(ArchiveProtocol::Modbus.query_suffix(true), "?protocol=modbus");
-        assert_eq!(ArchiveProtocol::Modbus.query_suffix(false), "&protocol=modbus");
-        assert_eq!(ArchiveProtocol::Can.frame_tag(), "can");
-        assert_eq!(ArchiveProtocol::Modbus.frame_tag(), "modbus_rtu");
+    #[test]
+    fn can_is_the_unsaid_default_modbus_is_named_and_serial_is_refused() {
+        assert_eq!(archive_protocol(&conn(&[])).unwrap(), Protocol::Can);
+        assert_eq!(archive_protocol(&conn(&[("protocol", json!("can"))])).unwrap(), Protocol::Can);
+        assert_eq!(archive_protocol(&conn(&[("protocol", json!("modbus"))])).unwrap(), Protocol::Modbus);
+        assert!(archive_protocol(&conn(&[("protocol", json!("modbsu"))])).is_err());
+        let serial = archive_protocol(&conn(&[("protocol", json!("serial"))])).unwrap_err();
+        assert!(serial.contains("serial"), "{serial}");
+
+        assert_eq!(protocol_query(Protocol::Can, true), "");
+        assert_eq!(protocol_query(Protocol::Modbus, true), "?protocol=modbus");
+        assert_eq!(protocol_query(Protocol::Modbus, false), "&protocol=modbus");
+        assert_eq!(frame_tag(Protocol::Can), "can");
+        assert_eq!(frame_tag(Protocol::Modbus), "modbus_rtu");
     }
 
     #[test]
@@ -1046,39 +975,58 @@ mod tests {
             max_len: None,
         };
         for (code, len) in [(8, 8), (9, 12), (15, 64)] {
-            assert_eq!(entry(code).max_len(ArchiveProtocol::Can), len);
+            assert_eq!(inventory_max_len(&entry(code), Protocol::Can), len);
         }
-        assert_eq!(entry(15).max_len(ArchiveProtocol::Modbus), 15);
-        assert_eq!(entry(256).max_len(ArchiveProtocol::Modbus), 255);
+        assert_eq!(inventory_max_len(&entry(15), Protocol::Modbus), 15);
+        assert_eq!(inventory_max_len(&entry(256), Protocol::Modbus), 255);
     }
 
     #[test]
     fn the_gateways_max_len_is_taken_over_the_code_when_served() {
-        let entry = |extra: Value| -> InventoryEntry {
-            serde_json::from_value(merge(
-                json!({ "frame_id": 0, "is_extended": false, "count": 1, "first_us": 0, "last_us": 0, "max_dlc": 9 }),
-                &[("max_len", extra)],
-            ))
+        let entry = |max_len: Value| -> InventoryEntry {
+            serde_json::from_value(json!({
+                "frame_id": 0, "is_extended": false, "count": 1, "first_us": 0, "last_us": 0,
+                "max_dlc": 9, "max_len": max_len,
+            }))
             .unwrap()
         };
-        assert_eq!(entry(json!(20)).max_len(ArchiveProtocol::Can), 20);
-        assert_eq!(entry(Value::Null).max_len(ArchiveProtocol::Can), 12);
+        assert_eq!(inventory_max_len(&entry(json!(20)), Protocol::Can), 20);
+        assert_eq!(inventory_max_len(&entry(Value::Null), Protocol::Can), 12);
     }
 
     #[test]
     fn a_query_body_names_the_protocol_only_when_it_is_not_can() {
-        let api = |protocol| ApiProfile {
-            profile_id: "p".into(),
-            base_url: "http://g:8423".into(),
-            api_key: String::new(),
-            database: "db".into(),
-            protocol,
+        let body = |protocol| {
+            serde_json::to_value(ByteChangesParams {
+                filter: api(protocol).filter(613, Some(false), Some("s".into()), None),
+                byte_index: 2,
+                limit: Some(10),
+                query_id: Some("q".into()),
+            })
+            .unwrap()
         };
-        let body = json!({ "frame_id": 613 });
-        assert_eq!(api(ArchiveProtocol::Can).with_protocol(body.clone()), body);
-        assert_eq!(
-            api(ArchiveProtocol::Modbus).with_protocol(body),
-            json!({ "frame_id": 613, "protocol": "modbus" })
-        );
+        let can = json!({
+            "frame_id": 613, "is_extended": false, "start_time": "s", "end_time": null,
+            "byte_index": 2, "limit": 10, "query_id": "q",
+        });
+        assert_eq!(body(Protocol::Can), can);
+        let mut modbus = can;
+        modbus["protocol"] = json!("modbus");
+        assert_eq!(body(Protocol::Modbus), modbus);
+
+        let pattern = |protocol| {
+            serde_json::to_value(PatternSearchParams {
+                protocol: api(protocol).wire_protocol(),
+                pattern: vec![1],
+                pattern_mask: vec![0xff],
+                start_time: None,
+                end_time: None,
+                limit: None,
+                query_id: None,
+            })
+            .unwrap()
+        };
+        assert!(pattern(Protocol::Can).get("protocol").is_none());
+        assert_eq!(pattern(Protocol::Modbus)["protocol"], "modbus");
     }
 }

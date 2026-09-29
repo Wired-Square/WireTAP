@@ -18,6 +18,14 @@ use crate::queryresults::{
     PatternSearchQueryResult, PatternSearchResult, QueryStats, compute_mux_statistics,
 };
 
+fn query_stats(rows_scanned: usize, results_count: usize, elapsed: std::time::Duration) -> QueryStats {
+    QueryStats {
+        rows_scanned: rows_scanned as u64,
+        results_count: results_count as u64,
+        execution_time_ms: elapsed.as_millis() as u64,
+    }
+}
+
 /// Query for byte changes in a specific frame within a capture.
 ///
 /// Returns timestamps where the specified byte changed value.
@@ -124,11 +132,7 @@ pub fn capture_query_byte_changes(
     );
 
     Ok(ByteChangeQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -202,21 +206,19 @@ pub fn capture_query_frame_changes(
     let rows_scanned = rows.len();
 
     for (timestamp_us, prev_payload, payload) in &rows {
-        let changed_indices: Vec<usize> = prev_payload
+        let changed_indices: Vec<u64> = prev_payload
             .iter()
             .zip(payload.iter())
             .enumerate()
             .filter(|(_, (a, b))| a != b)
-            .map(|(i, _)| i)
+            .map(|(i, _)| i as u64)
             .collect();
 
         // Also check for length differences
         let max_len = prev_payload.len().max(payload.len());
         let min_len = prev_payload.len().min(payload.len());
         let mut all_changed = changed_indices;
-        for i in min_len..max_len {
-            all_changed.push(i);
-        }
+        all_changed.extend((min_len..max_len).map(|i| i as u64));
 
         results.push(FrameChangeResult {
             timestamp_us: *timestamp_us,
@@ -236,11 +238,7 @@ pub fn capture_query_frame_changes(
     );
 
     Ok(FrameChangeQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -392,11 +390,7 @@ pub fn capture_query_mirror_validation(
     );
 
     Ok(MirrorValidationQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -480,11 +474,7 @@ pub fn capture_query_mux_statistics(
     );
 
     Ok(MuxStatisticsQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: result.cases.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, result.cases.len(), elapsed),
         results: result,
     })
 }
@@ -574,11 +564,7 @@ pub fn capture_query_first_last(
     );
 
     Ok(FirstLastQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: 1,
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, 1, elapsed),
         results: FirstLastResult {
             first_timestamp_us,
             first_payload,
@@ -685,11 +671,7 @@ pub fn capture_query_frequency(
     );
 
     Ok(FrequencyQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -785,11 +767,7 @@ pub fn capture_query_distribution(
     );
 
     Ok(DistributionQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -883,11 +861,7 @@ pub fn capture_query_gap_analysis(
     );
 
     Ok(GapAnalysisQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }
@@ -976,7 +950,7 @@ pub fn capture_query_pattern_search(
                 }
             }
             if matches {
-                match_positions.push(p);
+                match_positions.push(p as u64);
             }
         }
 
@@ -1005,11 +979,7 @@ pub fn capture_query_pattern_search(
     );
 
     Ok(PatternSearchQueryResult {
-        stats: QueryStats {
-            rows_scanned,
-            results_count: results.len(),
-            execution_time_ms: elapsed.as_millis() as u64,
-        },
+        stats: query_stats(rows_scanned, results.len(), elapsed),
         results,
     })
 }

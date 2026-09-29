@@ -10,12 +10,12 @@
 // which this app reserves for register polls.
 
 use async_trait::async_trait;
-use serde::Deserialize;
 use std::collections::VecDeque;
 use std::time::Duration;
+use wiretap_gateway::{FrameBatch, FrameBatchRow, Protocol as ArchiveProtocol};
 
 use super::base::{PlaybackControl, RecordedSourceState};
-use crate::apiclient::ArchiveProtocol;
+use crate::apiclient::{frame_tag, protocol_query};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
@@ -72,6 +72,7 @@ impl IOSource for BackendApiSource {
         match self.config.protocol {
             ArchiveProtocol::Can => caps,
             ArchiveProtocol::Modbus => caps.with_protocols(vec![Protocol::ModbusRtu]),
+            ArchiveProtocol::Serial => unreachable!("archive_protocol refuses serial"),
         }
     }
 
@@ -159,24 +160,6 @@ impl IOSource for BackendApiSource {
 // HTTP cursor fetcher
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
-struct ApiFrameRow {
-    ts_us: i64,
-    id: u32,
-    extended: bool,
-    is_fd: bool,
-    bus: u8,
-    #[allow(dead_code)]
-    dir: String,
-    data_hex: String,
-}
-
-#[derive(Deserialize)]
-struct ApiFrameBatch {
-    frames: Vec<ApiFrameRow>,
-    next_cursor: Option<String>,
-}
-
 /// Owns the HTTP cursor state for one stream (no lifetime coupling — just
 /// owned strings — unlike the DB portal, hence a separate loop is cheap).
 struct CursorFetcher {
@@ -200,7 +183,7 @@ impl CursorFetcher {
             self.base_url,
             self.database,
             self.page_size,
-            self.protocol.query_suffix(false)
+            protocol_query(self.protocol, false)
         );
         if let Some(s) = &self.start {
             url.push_str(&format!("&start={}", crate::apiclient::urlencoding(s)));
@@ -226,7 +209,7 @@ impl CursorFetcher {
             .send()
             .await
             .map_err(|e| format!("frame fetch failed: {}", crate::apiclient::describe(&e)))?;
-        let batch: ApiFrameBatch = crate::apiclient::parse(resp)
+        let batch: FrameBatch = crate::apiclient::parse(resp)
             .await
             .map_err(|e| format!("frame fetch failed: {e}"))?;
 
@@ -251,13 +234,13 @@ impl CursorFetcher {
     }
 }
 
-/// The row's `dlc` is the archive's CAN length code, so the length comes from
-/// the payload instead.
-fn frame_from_row(protocol: ArchiveProtocol, row: ApiFrameRow) -> Result<FrameMessage, String> {
+/// The row's `dlc` is the archive's CAN length code, and an older gateway serves
+/// no `len`, so the length comes from the payload instead.
+fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<FrameMessage, String> {
     let bytes =
         hex::decode(&row.data_hex).map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
     Ok(FrameMessage {
-        protocol: protocol.frame_tag().to_string(),
+        protocol: frame_tag(protocol).to_string(),
         timestamp_us: row.ts_us as u64,
         frame_id: row.id,
         bus: row.bus,
@@ -516,7 +499,7 @@ async fn run_api_stream(
 mod tests {
     use super::*;
 
-    fn row(json: serde_json::Value) -> ApiFrameRow {
+    fn row(json: serde_json::Value) -> FrameBatchRow {
         serde_json::from_value(json).unwrap()
     }
 
