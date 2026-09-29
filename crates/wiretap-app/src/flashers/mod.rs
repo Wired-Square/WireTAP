@@ -1,15 +1,10 @@
-//! Firmware flashers exposed through the Serial app.
-//!
-//! - ESP32 family: esptool-style serial bootloader (uses `espflash` crate).
-//! - STM32 DFU: USB DFU 1.1 / DfuSe (uses `dfu-nusb` + `dfu-core`).
-//! - STM32 UART: ST AN3155 system bootloader (hand-rolled over `serialport`).
+//! Firmware flashers exposed through the Serial app: ESP32 serial bootloader,
+//! STM32 USB DFU and STM32 UART (AN3155), all from `wslib-mcu-flash`.
 //!
 //! The Tauri commands here own the command surface and progress channel
-//! (`flasher-progress` event). The actual flashing happens in the
-//! `esp_flasher`, `dfu_flasher`, and `stm32_flasher` submodules. The whole
-//! module is desktop-only — `serialport` (ESP32 / STM32 UART) and `nusb`
-//! (DFU) are not available on iOS, so the module is gated at the
-//! `mod flashers;` declaration in `lib.rs`.
+//! (`flasher-progress` event). The whole module is desktop-only — the crate's
+//! serial and USB backends are not available on iOS, so the module is gated
+//! at the `mod flashers;` declaration in `lib.rs`.
 
 #![cfg(not(target_os = "ios"))]
 
@@ -17,16 +12,17 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::{AppHandle, Emitter};
-
-pub mod detect;
-pub mod dfu_flasher;
-pub mod esp_flasher;
-pub mod stm32_flasher;
+use wslib_mcu_flash::detect::Detected;
+use wslib_mcu_flash::dfu::{self, DfuDeviceInfo};
+use wslib_mcu_flash::esp::{self, EspChipInfo};
+use wslib_mcu_flash::stm32_uart::{self, parse_pin, Pin, Stm32ChipInfo, Stm32UartOptions};
+use wslib_mcu_flash::{FlashError, FlashProgress, FlashStage};
 
 pub const FLASHER_PROGRESS_EVENT: &str = "flasher-progress";
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum FlashPhase {
     Connecting,
@@ -36,6 +32,19 @@ pub enum FlashPhase {
     Done,
     Error,
     Cancelled,
+}
+
+impl From<FlashStage> for FlashPhase {
+    fn from(stage: FlashStage) -> Self {
+        match stage {
+            FlashStage::Connecting => FlashPhase::Connecting,
+            FlashStage::Erasing => FlashPhase::Erasing,
+            FlashStage::Writing => FlashPhase::Writing,
+            FlashStage::Verifying | FlashStage::Resetting | FlashStage::Booting => {
+                FlashPhase::Verifying
+            }
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Debug)]
@@ -48,14 +57,6 @@ pub struct FlasherProgress {
     pub message: Option<String>,
 }
 
-#[derive(Clone, Serialize, Debug)]
-pub struct EspChipInfo {
-    pub chip: String,
-    pub features: Vec<String>,
-    pub mac: String,
-    pub flash_size_bytes: Option<u64>,
-}
-
 /// Flasher tuning passed in from the UI. Every field is optional — `None`
 /// means "let espflash decide / leave at its default". Mirrors the knobs on
 /// the `esptool ... write-flash` command line.
@@ -64,7 +65,7 @@ pub struct EspChipInfo {
 pub struct EspFlashOptions {
     /// Forced chip type (`esp32`, `esp32s3`, …). `None` = auto-detect.
     pub chip: Option<String>,
-    /// Bootloader baud rate. `None` defaults to 460_800.
+    /// Bootloader baud rate. `None` defaults to 921_600.
     pub flash_baud: Option<u32>,
     /// Flash mode (`dio`, `qio`, `qout`, `dout`).
     pub flash_mode: Option<String>,
@@ -74,18 +75,16 @@ pub struct EspFlashOptions {
     pub flash_size: Option<String>,
 }
 
-/// Identification returned by the STM32 system bootloader on connect — the
-/// PID (12 bits, returned as a `u16`), the bootloader firmware version, and
-/// our best-effort lookup of the chip name + flash size from the PID. The
-/// readout-protection level is probed by attempting a 1-byte read at the
-/// flash base; locked chips reject it.
-#[derive(Clone, Serialize, Debug)]
-pub struct Stm32ChipInfo {
-    pub chip: String,
-    pub pid: u16,
-    pub bootloader_version: String,
-    pub flash_size_kb: Option<u32>,
-    pub rdp_level: Option<String>,
+impl EspFlashOptions {
+    fn parse(&self) -> Result<esp::EspFlashOptions, FlashError> {
+        Ok(esp::EspFlashOptions {
+            chip: esp::parse_chip(self.chip.as_deref())?,
+            flash_baud: self.flash_baud,
+            flash_mode: esp::parse_flash_mode(self.flash_mode.as_deref())?,
+            flash_freq: esp::parse_flash_freq(self.flash_freq.as_deref())?,
+            flash_size: esp::parse_flash_size(self.flash_size.as_deref())?,
+        })
+    }
 }
 
 /// Tuning knobs for the STM32 UART flasher. Pin mapping models the
@@ -108,17 +107,60 @@ pub struct Stm32FlashOptions {
     pub baud: Option<u32>,
 }
 
+impl From<&Stm32FlashOptions> for Stm32UartOptions {
+    fn from(opts: &Stm32FlashOptions) -> Self {
+        Self {
+            boot0: parse_pin(opts.boot0_pin.as_deref(), Some(Pin::Dtr)),
+            reset: parse_pin(opts.reset_pin.as_deref(), Some(Pin::Rts)),
+            boot0_invert: opts.boot0_invert.unwrap_or(false),
+            reset_invert: opts.reset_invert.unwrap_or(true),
+            baud: opts.baud.unwrap_or(stm32_uart::DEFAULT_BAUD),
+        }
+    }
+}
+
+/// Result returned to the frontend after a successful detection.
+///
+/// `extra` carries the original chip-info struct (`EspChipInfo` or
+/// `Stm32ChipInfo`) serialised as JSON, so the per-driver UI can display
+/// extra fields (MAC for ESP, RDP level for STM32) without us having to
+/// merge every variant into a single struct.
 #[derive(Clone, Serialize, Debug)]
-pub struct DfuDeviceInfo {
-    pub vid: u16,
-    pub pid: u16,
-    pub serial: String,
-    pub display_name: String,
-    /// Chip family this DFU device belongs to. The frontend keys its driver
-    /// registry off this — `"STM32 DFU"` for the STM ROM bootloader, generic
-    /// `"DFU"` for everything else (which still flashes via the same code
-    /// path but doesn't get a recognised badge).
+pub struct DetectedChip {
+    /// Driver registry id on the frontend (`"esp-uart"` | `"stm32-uart"`).
+    pub driver_id: String,
+    /// Manufacturer badge string (`"ESP32"` | `"ESP8266"` | `"STM32"`).
     pub manufacturer: String,
+    /// Friendly chip name (`"ESP32-S3"`, `"STM32F103"`, …).
+    pub chip_name: String,
+    /// Flash size in KB if known, else `None`.
+    pub flash_size_kb: Option<u32>,
+    /// Original chip-info struct so per-driver UIs can render extra fields.
+    pub extra: Value,
+}
+
+impl From<Detected> for DetectedChip {
+    fn from(detected: Detected) -> Self {
+        let (driver_id, manufacturer, extra) = match &detected {
+            Detected::Esp(info) => (
+                "esp-uart",
+                if info.chip.eq_ignore_ascii_case("esp8266") {
+                    "ESP8266"
+                } else {
+                    "ESP32"
+                },
+                serde_json::to_value(info),
+            ),
+            Detected::Stm32(info) => ("stm32-uart", "STM32", serde_json::to_value(info)),
+        };
+        DetectedChip {
+            driver_id: driver_id.to_string(),
+            manufacturer: manufacturer.to_string(),
+            chip_name: detected.chip_name(),
+            flash_size_kb: detected.flash_size_kb(),
+            extra: extra.unwrap_or(Value::Null),
+        }
+    }
 }
 
 /// Cancellation registry — flasher tasks check this flag periodically.
@@ -130,7 +172,6 @@ pub(crate) fn register_flash(flash_id: &str) {
     flags.insert(flash_id.to_string(), false);
 }
 
-#[allow(dead_code)] // used by esp_flasher / dfu_flasher loops once wired up
 pub(crate) fn is_cancelled(flash_id: &str) -> bool {
     CANCEL_FLAGS
         .lock()
@@ -163,6 +204,86 @@ fn new_flash_id(prefix: &str) -> String {
     format!("{prefix}_{:x}", nanos as u64)
 }
 
+/// Every event carries the last byte counts, because the UI takes its
+/// progress bar from whichever event arrived last.
+struct TauriSink {
+    app: AppHandle,
+    flash_id: String,
+    phase: FlashPhase,
+    bytes_done: u64,
+    bytes_total: u64,
+}
+
+impl TauriSink {
+    fn emit(&self, message: Option<&str>) {
+        emit_progress(
+            &self.app,
+            FlasherProgress {
+                flash_id: self.flash_id.clone(),
+                phase: self.phase,
+                bytes_done: self.bytes_done,
+                bytes_total: self.bytes_total,
+                message: message.map(str::to_string),
+            },
+        );
+    }
+}
+
+impl FlashProgress for TauriSink {
+    fn on_progress(&mut self, message: &str) {
+        self.emit(Some(message));
+    }
+
+    fn on_stage(&mut self, stage: FlashStage, message: &str) {
+        self.phase = stage.into();
+        self.emit(Some(message));
+    }
+
+    fn on_bytes(&mut self, done: u64, total: u64) {
+        self.bytes_done = done;
+        self.bytes_total = total;
+        self.emit(None);
+    }
+
+    fn cancelled(&self) -> bool {
+        is_cancelled(&self.flash_id)
+    }
+}
+
+async fn blocking<T, F>(f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, FlashError> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("Flasher task panicked: {e}"))?
+        .map_err(|e| e.to_string())
+}
+
+/// Runs `op` on the blocking pool under a fresh flash id, reporting through
+/// `flasher-progress`; returns the id at once.
+fn spawn_flash<F>(app: AppHandle, prefix: &str, op: F) -> String
+where
+    F: FnOnce(&mut TauriSink) -> Result<(), FlashError> + Send + 'static,
+{
+    let flash_id = new_flash_id(prefix);
+    register_flash(&flash_id);
+    let mut sink = TauriSink {
+        app: app.clone(),
+        flash_id: flash_id.clone(),
+        phase: FlashPhase::Connecting,
+        bytes_done: 0,
+        bytes_total: 0,
+    };
+    let id = flash_id.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = blocking(move || op(&mut sink)).await;
+        finalise_flash_result(&app, &id, result);
+    });
+    flash_id
+}
+
 // ============================================================================
 // Tauri commands — ESP32
 // ============================================================================
@@ -172,7 +293,8 @@ pub async fn flasher_esp_detect_chip(
     port: String,
     options: Option<EspFlashOptions>,
 ) -> Result<EspChipInfo, String> {
-    esp_flasher::detect_chip(port, options.unwrap_or_default()).await
+    let opts = options.unwrap_or_default();
+    blocking(move || esp::detect_chip(&port, &opts.parse()?)).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -183,24 +305,10 @@ pub async fn flasher_esp_flash(
     address: u32,
     options: Option<EspFlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("esp");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
     let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result = esp_flasher::flash(
-            app_clone.clone(),
-            id_clone.clone(),
-            port,
-            image_path,
-            address,
-            opts,
-        )
-        .await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    Ok(spawn_flash(app, "esp", move |sink| {
+        esp::flash(&port, image_path.as_ref(), address, &opts.parse()?, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -212,25 +320,17 @@ pub async fn flasher_esp_read_flash(
     size: Option<u32>,
     options: Option<EspFlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("esp");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
     let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result = esp_flasher::read_flash(
-            app_clone.clone(),
-            id_clone.clone(),
-            port,
-            output_path,
+    Ok(spawn_flash(app, "esp", move |sink| {
+        esp::read_flash(
+            &port,
+            output_path.as_ref(),
             offset,
             size,
-            opts,
+            &opts.parse()?,
+            sink,
         )
-        .await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -239,17 +339,10 @@ pub async fn flasher_esp_erase(
     port: String,
     options: Option<EspFlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("esp");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
     let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result =
-            esp_flasher::erase(app_clone.clone(), id_clone.clone(), port, opts).await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    Ok(spawn_flash(app, "esp", move |sink| {
+        esp::erase(&port, &opts.parse()?, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -304,7 +397,7 @@ fn finalise_flash_result(app: &AppHandle, flash_id: &str, result: Result<(), Str
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn flasher_dfu_list_devices() -> Result<Vec<DfuDeviceInfo>, String> {
-    dfu_flasher::list_devices().await
+    blocking(dfu::list_devices).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -314,22 +407,9 @@ pub async fn flasher_dfu_flash(
     image_path: String,
     address: u32,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("dfu");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let result = dfu_flasher::flash(
-            app_clone.clone(),
-            id_clone.clone(),
-            usb_serial,
-            image_path,
-            address,
-        )
-        .await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    Ok(spawn_flash(app, "dfu", move |sink| {
+        dfu::flash(&usb_serial, image_path.as_ref(), address, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -347,7 +427,8 @@ pub async fn flasher_stm32_detect_chip(
     port: String,
     options: Option<Stm32FlashOptions>,
 ) -> Result<Stm32ChipInfo, String> {
-    stm32_flasher::detect_chip(port, options.unwrap_or_default()).await
+    let opts = Stm32UartOptions::from(&options.unwrap_or_default());
+    blocking(move || stm32_uart::detect_chip(&port, &opts)).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -358,24 +439,10 @@ pub async fn flasher_stm32_flash(
     address: u32,
     options: Option<Stm32FlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("stm32");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
-    let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result = stm32_flasher::flash(
-            app_clone.clone(),
-            id_clone.clone(),
-            port,
-            image_path,
-            address,
-            opts,
-        )
-        .await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    let opts = Stm32UartOptions::from(&options.unwrap_or_default());
+    Ok(spawn_flash(app, "stm32", move |sink| {
+        stm32_uart::flash(&port, image_path.as_ref(), address, &opts, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -387,25 +454,10 @@ pub async fn flasher_stm32_read_flash(
     size: Option<u32>,
     options: Option<Stm32FlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("stm32");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
-    let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result = stm32_flasher::read_flash(
-            app_clone.clone(),
-            id_clone.clone(),
-            port,
-            output_path,
-            offset,
-            size,
-            opts,
-        )
-        .await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    let opts = Stm32UartOptions::from(&options.unwrap_or_default());
+    Ok(spawn_flash(app, "stm32", move |sink| {
+        stm32_uart::read_flash(&port, output_path.as_ref(), offset, size, &opts, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -414,17 +466,10 @@ pub async fn flasher_stm32_erase(
     port: String,
     options: Option<Stm32FlashOptions>,
 ) -> Result<String, String> {
-    let flash_id = new_flash_id("stm32");
-    register_flash(&flash_id);
-    let id_clone = flash_id.clone();
-    let app_clone = app.clone();
-    let opts = options.unwrap_or_default();
-    tauri::async_runtime::spawn(async move {
-        let result =
-            stm32_flasher::erase(app_clone.clone(), id_clone.clone(), port, opts).await;
-        finalise_flash_result(&app_clone, &id_clone, result);
-    });
-    Ok(flash_id)
+    let opts = Stm32UartOptions::from(&options.unwrap_or_default());
+    Ok(spawn_flash(app, "stm32", move |sink| {
+        stm32_uart::erase(&port, &opts, sink)
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -441,6 +486,104 @@ pub fn flasher_stm32_cancel(flash_id: String) -> Result<(), String> {
 pub async fn flasher_serial_detect(
     port: String,
     stm32_options: Option<Stm32FlashOptions>,
-) -> Result<detect::DetectedChip, String> {
-    detect::detect(port, stm32_options.unwrap_or_default()).await
+) -> Result<DetectedChip, String> {
+    let opts = Stm32UartOptions::from(&stm32_options.unwrap_or_default());
+    blocking(move || wslib_mcu_flash::detect::detect(&port, &opts))
+        .await
+        .map(DetectedChip::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn detected_esp_serialises_as_before() {
+        let detected = DetectedChip::from(Detected::Esp(EspChipInfo {
+            chip: "esp32s3".into(),
+            features: vec!["WiFi".into()],
+            mac: "aa:bb".into(),
+            flash_size_bytes: Some(8 * 1024 * 1024),
+        }));
+        assert_eq!(
+            serde_json::to_value(detected).unwrap(),
+            json!({
+                "driver_id": "esp-uart",
+                "manufacturer": "ESP32",
+                "chip_name": "ESP32-S3",
+                "flash_size_kb": 8192,
+                "extra": {
+                    "chip": "esp32s3",
+                    "features": ["WiFi"],
+                    "mac": "aa:bb",
+                    "flash_size_bytes": 8388608u64,
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn detected_esp8266_takes_its_own_badge() {
+        let detected = DetectedChip::from(Detected::Esp(EspChipInfo {
+            chip: "esp8266".into(),
+            features: vec![],
+            mac: "aa".into(),
+            flash_size_bytes: None,
+        }));
+        assert_eq!(detected.manufacturer, "ESP8266");
+        assert_eq!(detected.chip_name, "ESP8266");
+    }
+
+    #[test]
+    fn detected_stm32_serialises_as_before() {
+        let detected = DetectedChip::from(Detected::Stm32(Stm32ChipInfo {
+            chip: "STM32F1 medium-density".into(),
+            pid: 0x410,
+            bootloader_version: "2.2".into(),
+            flash_size_kb: Some(128),
+            rdp_level: Some("0".into()),
+        }));
+        assert_eq!(
+            serde_json::to_value(detected).unwrap(),
+            json!({
+                "driver_id": "stm32-uart",
+                "manufacturer": "STM32",
+                "chip_name": "STM32F1 medium-density",
+                "flash_size_kb": 128,
+                "extra": {
+                    "chip": "STM32F1 medium-density",
+                    "pid": 0x410,
+                    "bootloader_version": "2.2",
+                    "flash_size_kb": 128,
+                    "rdp_level": "0",
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn unset_stm32_options_are_stm32flash_wiring() {
+        assert_eq!(
+            Stm32UartOptions::from(&Stm32FlashOptions::default()),
+            Stm32UartOptions::default()
+        );
+    }
+
+    #[test]
+    fn resetting_reports_as_verifying() {
+        assert!(matches!(
+            FlashPhase::from(FlashStage::Resetting),
+            FlashPhase::Verifying
+        ));
+    }
+
+    #[test]
+    fn bad_esp_option_names_the_value() {
+        let opts = EspFlashOptions {
+            flash_mode: Some("spi".into()),
+            ..Default::default()
+        };
+        assert!(opts.parse().unwrap_err().to_string().contains("spi"));
+    }
 }

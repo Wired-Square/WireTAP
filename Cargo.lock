@@ -8519,19 +8519,14 @@ dependencies = [
  "async-trait",
  "can-dbc",
  "chrono",
- "dfu-core 0.10.0",
- "dfu-nusb",
  "dirs 5.0.1",
- "espflash",
  "framelink",
  "futures",
  "git2",
  "hex",
- "ihex",
  "keepawake",
  "keyring",
  "notify",
- "nusb 0.1.14",
  "nusb 0.2.3",
  "once_cell",
  "reqwest 0.12.28",
@@ -8565,6 +8560,7 @@ dependencies = [
  "wiretap-io",
  "wiretap-protocol",
  "wslib-ai-mcp",
+ "wslib-mcu-flash",
 ]
 
 [[package]]
@@ -8839,6 +8835,21 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "wslib-mcu-flash"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Wired-Square/wslib-mcu-rs.git?tag=v0.1.0#2c6e5110bf33c37d8b9379140ab83f9810d89072"
+dependencies = [
+ "dfu-core 0.10.0",
+ "dfu-nusb",
+ "espflash",
+ "ihex",
+ "nusb 0.1.14",
+ "serde",
+ "serialport",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
