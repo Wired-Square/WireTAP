@@ -95,7 +95,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   if (profile.kind === "serial") {
     const port = c.port || s("notSet");
     const baud = c.baud_rate || "115200";
-    const framing = c.framing_mode || "raw";
+    const framing = c.framing_encoding || "raw";
 
     return (
       <div className="flex flex-wrap gap-2">
