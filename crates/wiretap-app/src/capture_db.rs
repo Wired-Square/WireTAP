@@ -15,6 +15,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Mutex;
+use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_events::CaptureEvent;
 use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, FrameSelection, TimestampedByte};
@@ -718,13 +719,6 @@ pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String>
     Ok(result)
 }
 
-/// Format a frame id as hex with the conventional padding (3 nibbles for
-/// standard ids, 8 for extended), matching the frontend's `formatFrameId`.
-pub fn hex_id(id: u32, is_extended: bool) -> String {
-    let width = if is_extended { 8 } else { 3 };
-    format!("0x{:0width$X}", id, width = width)
-}
-
 /// One frame identity in a source, with its rollup.
 ///
 /// Identity is (protocol, frame_id, is_extended): CAN `0x100` and Modbus
@@ -756,7 +750,7 @@ impl InventoryRow {
         Self {
             protocol: protocol.to_string(),
             frame_id,
-            frame_id_hex: hex_id(frame_id, is_extended),
+            frame_id_hex: format_frame_id(frame_id, is_extended),
             is_extended,
             count,
             first_us,

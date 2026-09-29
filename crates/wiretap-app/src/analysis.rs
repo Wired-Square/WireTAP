@@ -18,7 +18,9 @@ use serde::Serialize;
 use tauri::AppHandle;
 use wiretap_catalog::model::Confidence;
 
-use crate::capture_db::{hex_id, InventoryRow};
+use wiretap_decode::frame_id::format_frame_id;
+
+use crate::capture_db::InventoryRow;
 
 /// Where a query runs: a SQLite capture or a WireTAP backend profile.
 pub enum QuerySource {
@@ -188,7 +190,7 @@ pub async fn byte_profile(
     let (max_len, bytes) = compute_byte_profile(&payloads);
     Ok(ByteProfile {
         frame_id,
-        frame_id_hex: hex_id(frame_id, is_extended.unwrap_or(false)),
+        frame_id_hex: format_frame_id(frame_id, is_extended.unwrap_or(false)),
         sampled: payloads.len(),
         max_len,
         bytes,
@@ -497,7 +499,7 @@ pub async fn catalog_coverage(
                 };
                 present.push(PresentFrame {
                     frame_id: frame.frame_id,
-                    frame_id_hex: hex_id(frame.frame_id, data.top.is_extended),
+                    frame_id_hex: format_frame_id(frame.frame_id, data.top.is_extended),
                     name: frame_label(frame),
                     count: data.count,
                     first_us: data.first_us,
@@ -520,7 +522,7 @@ pub async fn catalog_coverage(
             }
             None => missing.push(MissingFrame {
                 frame_id: frame.frame_id,
-                frame_id_hex: hex_id(frame.frame_id, frame.is_extended.unwrap_or(false)),
+                frame_id_hex: format_frame_id(frame.frame_id, frame.is_extended.unwrap_or(false)),
                 name: frame_label(frame),
             }),
         }
@@ -537,11 +539,11 @@ pub async fn catalog_coverage(
         .filter(|(id, _)| !catalog_ids.contains(id))
         .map(|(id, d)| UncataloguedFrame {
             frame_id: *id,
-            frame_id_hex: hex_id(*id, d.top.is_extended),
+            frame_id_hex: format_frame_id(*id, d.top.is_extended),
             is_extended: d.top.is_extended,
             count: d.count,
             seen_as_hex: (d.top.frame_id != *id)
-                .then(|| hex_id(d.top.frame_id, d.top.is_extended)),
+                .then(|| format_frame_id(d.top.frame_id, d.top.is_extended)),
         })
         .collect();
     uncatalogued.sort_by_key(|f| f.frame_id);
