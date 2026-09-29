@@ -141,7 +141,6 @@ function DiscoveryInner() {
   const undoAcceptFraming = useDiscoverySerialStore((s) => s.undoAcceptFraming);
   const incrementBackendFrameCount = useDiscoverySerialStore((s) => s.incrementBackendFrameCount);
   const setBackendFrameCount = useDiscoverySerialStore((s) => s.setBackendFrameCount);
-  const setFramingConfig = useDiscoverySerialStore((s) => s.setFramingConfig);
 
   // ── Toolbox store ──
   const toolboxIsRunning = useDiscoveryToolboxStore((s) => s.toolbox.isRunning);
@@ -615,11 +614,10 @@ function DiscoveryInner() {
         setShowBusColumn(true);
       }
     },
-    onBeforeStart: (_profileId, options, mode) => {
+    onBeforeStart: (_profileId, options) => {
       // Store serial config for TOML export
       const hasSerialConfig = options.frameIdStartByte !== undefined
-        || options.sourceAddressStartByte !== undefined
-        || options.minFrameLength !== undefined;
+        || options.sourceAddressStartByte !== undefined;
       if (hasSerialConfig) {
         setSerialConfig({
           frame_id_start_byte: options.frameIdStartByte,
@@ -627,31 +625,9 @@ function DiscoveryInner() {
           source_address_start_byte: options.sourceAddressStartByte,
           source_address_bytes: options.sourceAddressBytes,
           source_address_byte_order: options.sourceAddressEndianness,
-          min_frame_length: options.minFrameLength,
         });
       } else {
         setSerialConfig(null);
-      }
-
-      // Sync framing config (watch mode only)
-      if (mode === "connect") {
-        if (options.framingEncoding && options.framingEncoding !== "raw") {
-          const storeFramingConfig =
-            options.framingEncoding === "slip"
-              ? { mode: "slip" as const }
-              : options.framingEncoding === "modbus_rtu"
-              ? { mode: "modbus_rtu" as const, validateCrc: true }
-              : {
-                  mode: "raw" as const,
-                  delimiter: options.delimiter
-                    ? options.delimiter.map((b: number) => b.toString(16).toUpperCase().padStart(2, "0")).join("")
-                    : "0A",
-                  maxLength: options.maxFrameLength ?? 256,
-                };
-          setFramingConfig(storeFramingConfig);
-        } else {
-          setFramingConfig(null);
-        }
       }
     },
     onBeforeMultiStart: (_profileIds, _options, _mode) => {

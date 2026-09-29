@@ -28,10 +28,8 @@ export function mergeSerialConfig(
     sourceAddressStartByte: serialConfig?.source_address_start_byte,
     sourceAddressBytes: serialConfig?.source_address_bytes,
     sourceAddressEndianness: serialConfig?.source_address_byte_order,
-    // Min frame length: dialog option takes precedence if set
-    minFrameLength: options.minFrameLength ?? serialConfig?.min_frame_length,
-    // Framing encoding: dialog option takes precedence if set
-    framingEncoding: options.framingEncoding ?? serialConfig?.encoding as ManagerLoadOptions["framingEncoding"],
+    minFrameLength: serialConfig?.min_frame_length,
+    framingEncoding: serialConfig?.encoding as ManagerLoadOptions["framingEncoding"],
   };
 }
 

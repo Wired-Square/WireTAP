@@ -57,12 +57,10 @@ const rawPort: IOProfile = {
 };
 
 const withText = (selector: string, text: string) =>
-  [...document.querySelectorAll<HTMLElement>(selector)].find((el) => el.textContent?.includes(text))!;
-const click = (selector: string, text: string) => act(async () => withText(selector, text).click());
+  [...document.querySelectorAll<HTMLElement>(selector)].find((el) => el.textContent?.includes(text));
 
 describe("IO picker capture framing", () => {
   let root: Root;
-  const onStartLoad = vi.fn();
 
   beforeEach(async () => {
     useSessionStore.getState().addKnownCaptureId(byteCapture.id);
@@ -76,7 +74,6 @@ describe("IO picker capture framing", () => {
           selectedId={byteCapture.id}
           selectedIds={[rawPort.id]}
           onSelect={() => {}}
-          onStartLoad={onStartLoad}
         />,
       ),
     );
@@ -88,14 +85,8 @@ describe("IO picker capture framing", () => {
     document.body.innerHTML = "";
   });
 
-  it("framing picked for a byte capture is not sent once a source is selected instead", async () => {
-    await click("button", "framingOptions.modeSlip");
-    await click("button", "ioSourcePicker.tabs.devices");
-    await click("[role=option]", rawPort.name);
-    await click("button", "ioSourcePicker.actions.connect");
-
-    expect(onStartLoad).toHaveBeenCalledOnce();
-    expect(onStartLoad.mock.calls[0][0]).toBe(rawPort.id);
-    expect(onStartLoad.mock.calls[0][2].framingEncoding).toBeUndefined();
+  it("the picker offers no framing for a byte capture", () => {
+    expect(withText("[role=option]", byteCapture.name)).toBeDefined();
+    expect(withText("button", "framingOptions.mode")).toBeUndefined();
   });
 });

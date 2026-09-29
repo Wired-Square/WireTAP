@@ -35,6 +35,7 @@ All notable changes to WireTAP will be documented in this file.
 - **MCP byte profiles use Discovery's five roles.** `frame_byte_profile` and `catalog_coverage`'s byte roles now report `static`, `counter`, `sensor`, `value` and `unknown`, with multi-byte patterns and mux cases, over the most recent contiguous samples. `sensor` now means a trending or oscillating byte; one that merely varies is `value` or `unknown`. The output shape has changed: see the MCP analysis tools reference.
 - **MCP `get_discovery_analysis` no longer needs the window open.** It now takes a `session_id` and profiles that session's capture, each frame over its latest 5,000 messages rather than the first 1,000 in the view. Without `frame_ids` it profiles 64 frames and reports how many it skipped. A session with no capture is an error that says so.
 - **A serial line with invalid settings fails to open with the reason.** A serial, GVRET USB or SLCAN profile, the Serial terminal and the SLCAN probe used to open a line with unknown parity, or with data or stop bits out of range, as 8N1 without a word. They now refuse it and name the setting: data bits must be 5 to 8, stop bits 1 or 2, and parity none, even or odd. A setting left out still reads as 8N1.
+- **A byte capture is framed in Discovery's Framed tab only.** The IO picker no longer offers framing or a minimum frame length for a byte capture; load the capture, then set both in Discovery's serial view.
 
 ### Fixed
 
@@ -73,7 +74,6 @@ All notable changes to WireTAP will be documented in this file.
 - **Find in Discovery highlights the match.** A match that did not start a page was highlighted a few rows below it, and one on a short last page was not highlighted at all.
 - **A short last page reads as the last page.** Discovery fills a short last page from the rows before it, but the pager still read "1 / 2" there with Next and Last enabled. It now reads "2 / 2" and Previous goes back a page.
 - **A GVRET transmit on a bus the device lacks is refused.** Buses were checked against a fixed limit of five rather than the count the device reports, so a frame for a bus the device does not have read as sent, though it never went out. It is now refused with the reason, as a frame that is too long, CAN FD or a remote request already was. SLCAN, SocketCAN and candleLight refusals now show in Transmit as well, where they were only logged.
-- **Framing picked for a byte capture stays with the capture.** Choosing framing for a byte capture in the IO picker and then connecting a device instead sent that framing to the device, overriding the framing its profile was saved with.
 
 ## [0.12.1] - 2026-09-25
 

@@ -50,7 +50,6 @@ import { SourceList } from "./io-source-picker";
 import { DecoderPicker } from "./io-source-picker";
 import type { SourceTab } from "./io-source-picker";
 import { LoadOptions } from "./io-source-picker";
-import { FramingOptions, FilterOptions } from "./io-source-picker";
 import { ActionButtons } from "./io-source-picker";
 import { LoadStatus } from "./io-source-picker";
 import DeviceBusConfig from "./io-source-picker/DeviceBusConfig";
@@ -69,7 +68,7 @@ import {
   validateProfileSelection,
 } from "./io-source-picker";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
-import type { FramingConfig, InterfaceFramingConfig } from "./io-source-picker";
+import type { InterfaceFramingConfig } from "./io-source-picker";
 import { DeviceEditor } from "./io-source-picker";
 import { useAdHocProfileStore, newAdHocProfileId } from "../stores/adHocProfileStore";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
@@ -97,22 +96,6 @@ export interface LoadOptions {
   sourceAddressBytes?: number;
   /** Source address extraction: byte order - for serial sources */
   sourceAddressEndianness?: "big" | "little";
-  /** Minimum frame length to accept - for serial sources (default: 4) */
-  minFrameLength?: number;
-  /** Framing encoding for serial sources */
-  framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
-  /** Delimiter bytes for delimiter-based framing */
-  delimiter?: number[];
-  /** Maximum frame length for delimiter-based framing */
-  maxFrameLength?: number;
-  /** Modbus RTU framing settings, when framingEncoding is "modbus_rtu" */
-  modbusValidateCrc?: boolean;
-  modbusDeviceAddress?: number;
-  modbusVendorFunctions?: number[];
-  modbusAllowBroadcast?: boolean;
-  modbusAnyFunction?: boolean;
-  /** Also emit raw bytes in addition to frames */
-  emitRawBytes?: boolean;
   /** Bus mappings per profile (for multi-bus mode) - map from profile ID to bus mappings */
   busMappings?: Map<string, BusMapping[]>;
   /** Bus number override for single-bus devices (0-7) */
@@ -159,8 +142,6 @@ type Props = {
   onSelectMultiple?: (ids: string[]) => void;
   /** Called when CSV is imported - passes the capture metadata */
   onImport?: (metadata: CaptureMetadata) => void;
-  /** Called when capture is confirmed with framing config (for applying framing to bytes capture) */
-  onCaptureFramingConfig?: (config: FramingConfig | null) => void;
   /** Current capture metadata (if any) */
   captureMetadata?: CaptureMetadata | null;
   /** Default directory for file picker */
@@ -245,7 +226,6 @@ export default function IoSourcePickerDialog({
   onSelect,
   onSelectMultiple,
   onImport,
-  onCaptureFramingConfig,
   captureMetadata: _captureMetadata, // Deprecated - dialog now fetches captures directly
   defaultDir,
   // External load state (optional - if provided, dialog uses external state)
@@ -336,11 +316,6 @@ export default function IoSourcePickerDialog({
     timezoneMode: "local",
   });
   const [selectedSpeed, setSelectedSpeed] = useState(1); // Default to 1x realtime with pacing
-
-  // Framing configuration for serial sources
-  const [framingConfig, setFramingConfig] = useState<FramingConfig | null>(null);
-  // Filter configuration for serial sources
-  const [minFrameLength, setMinFrameLength] = useState(0);
 
   // Multi-bus mode - per-profile maps for device probing and configuration
   const [deviceProbeResultMap, setDeviceProbeResultMap] = useState<Map<string, DeviceProbeResult>>(new Map());
@@ -574,7 +549,6 @@ export default function IoSourcePickerDialog({
       });
       // Speed 0 means unlimited (load mode) - not valid for Watch, so default to 1x
       setSelectedSpeed(externalLoadSpeed && externalLoadSpeed > 0 ? externalLoadSpeed : 1);
-      setFramingConfig(null);
       // If currently loading, pre-select that profile; otherwise use currently selected profile
       // Buffer IDs should NOT go into checkedReaderId — they use selectedCaptureId instead
       const initialReaderId = loadProfileId ?? selectedId;
@@ -1129,11 +1103,6 @@ export default function IoSourcePickerDialog({
         startTime: options.startTime,
         endTime: options.endTime,
         limit: options.maxFrames,
-        // Framing configuration
-        framingEncoding: options.framingEncoding,
-        delimiter: options.delimiter,
-        maxFrameLength: options.maxFrameLength,
-        emitRawBytes: options.emitRawBytes,
       });
 
       // Apply speed setting
@@ -1228,20 +1197,6 @@ export default function IoSourcePickerDialog({
     const captureId = selectedCaptureId ?? checkedSourceId;
     if (!captureId) return;
     const options = buildLoadOptions(selectedSpeed);
-    if (framingConfig) {
-      options.framingEncoding = framingConfig.encoding;
-      options.delimiter = framingConfig.delimiter;
-      options.maxFrameLength = framingConfig.maxFrameLength;
-      options.emitRawBytes = framingConfig.emitRawBytes;
-      options.modbusValidateCrc = framingConfig.validateCrc;
-      options.modbusDeviceAddress = framingConfig.deviceAddress;
-      options.modbusVendorFunctions = framingConfig.vendorFunctions;
-      options.modbusAllowBroadcast = framingConfig.allowBroadcast;
-      options.modbusAnyFunction = framingConfig.anyFunction;
-    }
-    if (minFrameLength > 0) {
-      options.minFrameLength = minFrameLength;
-    }
     // Attach capture bus mappings from shared device config map
     const captureMappings = deviceBusConfigMap.get(captureId);
     if (captureMappings && captureMappings.length > 0) {
@@ -1500,9 +1455,6 @@ export default function IoSourcePickerDialog({
     });
     setSelectedSpeed(1);
 
-    // Reset framing and filter config
-    setFramingConfig(null);
-    setMinFrameLength(0);
     setFramingConfigMap(new Map());
 
     // Reset multi-bus device probe maps
@@ -1771,18 +1723,6 @@ export default function IoSourcePickerDialog({
 
   const isCaptureSelected = isCaptureProfileId(selectedId) || selectedCaptureId !== null;
 
-  // Check if a bytes capture is selected (for framing options)
-  const selectedCapture = selectedCaptureId ? captures.find((b) => b.id === selectedCaptureId) : null;
-  const isBytesCaptureSelected = selectedCapture?.kind === "bytes" && !checkedSourceId;
-
-  // Handle OK button click for capture selection - pass framing config if configured
-  const handleCaptureOkClick = () => {
-    if (isBytesCaptureSelected && onCaptureFramingConfig) {
-      onCaptureFramingConfig(framingConfig);
-    }
-    onClose();
-  };
-
   // The source list and its options. Hoisted out of the render tree so the
   // device editor swaps in as one line rather than burying 250 lines of JSX in
   // a ternary arm.
@@ -1972,42 +1912,15 @@ export default function IoSourcePickerDialog({
         {/* Show load options when creating a new session */}
         {/* Hide when: connect mode, joining an existing session, or nothing selected */}
         {mode !== "connect" && (checkedSourceId || isMultiBusMode) && !checkedMultiSourceSession && (
-          <>
-            <LoadOptions
-              checkedSourceId={checkedSourceId}
-              checkedProfile={checkedProfile}
-              isLoading={isLoading}
-              timeBounds={timeBounds}
-              onTimeBoundsChange={handleTimeBoundsChange}
-              selectedSpeed={selectedSpeed}
-              onSpeedChange={handleSpeedChange}
-            />
-
-            {/* Only show FramingOptions/FilterOptions for bytes capture - per-interface framing is now in SingleBusConfig */}
-            {isBytesCaptureSelected && (
-              <>
-                <FramingOptions
-                  checkedProfile={checkedProfile}
-                  ioProfiles={ioProfiles}
-                  checkedSourceIds={checkedSourceIds}
-                  isLoading={isLoading}
-                  framingConfig={framingConfig}
-                  onFramingConfigChange={setFramingConfig}
-                  isBytesCaptureSelected={isBytesCaptureSelected}
-                />
-
-                <FilterOptions
-                  checkedProfile={checkedProfile}
-                  ioProfiles={ioProfiles}
-                  checkedSourceIds={checkedSourceIds}
-                  isLoading={isLoading}
-                  minFrameLength={minFrameLength}
-                  onMinFrameLengthChange={setMinFrameLength}
-                  isBytesCaptureSelected={isBytesCaptureSelected}
-                />
-              </>
-            )}
-          </>
+          <LoadOptions
+            checkedSourceId={checkedSourceId}
+            checkedProfile={checkedProfile}
+            isLoading={isLoading}
+            timeBounds={timeBounds}
+            onTimeBoundsChange={handleTimeBoundsChange}
+            selectedSpeed={selectedSpeed}
+            onSpeedChange={handleSpeedChange}
+          />
         )}
       </div>
 
@@ -2032,7 +1945,7 @@ export default function IoSourcePickerDialog({
       onConnectClick={handleConnectClick}
       onJoinClick={handleJoinClick}
       onStartClick={handleStartClick}
-      onClose={handleCaptureOkClick}
+      onClose={onClose}
       onSkip={onSkip}
       multiSelectMode={isMultiBusMode}
       multiSelectCount={checkedSourceIds.length}

@@ -3,8 +3,6 @@
 export { default as CaptureList } from "./CaptureList";
 export { default as SourceList } from "./SourceList";
 export { default as LoadOptions } from "./LoadOptions";
-export { default as FramingOptions } from "./FramingOptions";
-export { default as FilterOptions } from "./FilterOptions";
 export { default as ActionButtons } from "./ActionButtons";
 export { default as LoadStatus } from "./LoadStatus";
 export { default as DeviceBusConfig } from "./DeviceBusConfig";
@@ -13,7 +11,6 @@ export { default as DecoderPicker } from "./DecoderPicker";
 export { default as DeviceEditor } from "./DeviceEditor";
 
 export type { SourceTab } from "./types";
-export type { FramingConfig } from "./FramingOptions";
 export type { InterfaceFramingConfig } from "./SingleBusConfig";
 
 export {

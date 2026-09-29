@@ -20,11 +20,6 @@ export interface DialogLoadOptions {
   sourceAddressStartByte?: number;
   sourceAddressBytes?: number;
   sourceAddressEndianness?: "big" | "little";
-  minFrameLength?: number;
-  framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
-  delimiter?: number[];
-  maxFrameLength?: number;
-  emitRawBytes?: boolean;
   busOverride?: number;
   busMappings?: Map<string, import("../api/io").BusMapping[]>;
   perInterfaceFraming?: Map<string, import("../dialogs/io-source-picker").InterfaceFramingConfig>;

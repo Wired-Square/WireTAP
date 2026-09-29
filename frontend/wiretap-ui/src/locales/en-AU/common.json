@@ -213,7 +213,6 @@
     "vendorFunctionsLabel": "Vendor function codes",
     "vendorFunctionsPlaceholder": "0x20 0x60 0x65",
     "vendorFunctionsHint": "Codes standard Modbus does not define. Run the Serial Framing tool to find them.",
-    "captureRawBytes": "Also capture raw bytes",
     "encoding": "Encoding",
     "modeNone": "None",
     "modeSlip": "SLIP",

@@ -429,8 +429,6 @@
       "clear": "Remove decoder",
       "pickerTitle": "Select Decoder"
     },
-    "filter": "Filter",
-    "framing": "Framing",
     "options": "Options",
     "playbackSpeed": "Playback Speed",
     "loadingMaxSpeed": "Loading always runs at max speed",

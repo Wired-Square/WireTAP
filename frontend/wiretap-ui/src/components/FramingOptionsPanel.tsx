@@ -10,14 +10,11 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { hexToBytes, bytesToHex, byteToHex } from "../utils/byteUtils";
+import { byteToHex } from "../utils/byteUtils";
 import { textSecondary, textPrimary, caption, captionMuted } from "../styles";
 import { cardClass } from "./Card";
 import { Button } from "./Button";
 import { Checkbox, Input } from "./forms";
-
-// Re-export for backwards compatibility (used by other components)
-export { hexToBytes, bytesToHex };
 
 /** Framing mode/encoding type */
 export type FramingMode = "raw" | "slip" | "delimiter" | "modbus_rtu";
@@ -48,8 +45,6 @@ export interface FramingPanelConfig extends ModbusFramingSettings {
   delimiterHex?: string;
   /** Maximum frame length for delimiter-based framing */
   maxFrameLength?: number;
-  /** Also emit raw bytes (for capture mode) */
-  emitRawBytes?: boolean;
 }
 
 /** Function codes as the field shows them, and back. */
@@ -158,8 +153,6 @@ interface Props {
   onChange: (config: FramingPanelConfig | null) => void;
   /** Visual variant */
   variant?: "panel" | "card";
-  /** Show "Also capture raw bytes" toggle (for capture mode) */
-  showEmitRawBytes?: boolean;
   /** Whether the component is disabled */
   disabled?: boolean;
 }
@@ -168,7 +161,6 @@ export default function FramingOptionsPanel({
   config,
   onChange,
   variant = "panel",
-  showEmitRawBytes = false,
   disabled = false,
 }: Props) {
   const { t } = useTranslation("common");
@@ -188,17 +180,13 @@ export default function FramingOptionsPanel({
   }, [config]);
 
   const currentMode: FramingMode = config?.mode || "raw";
-  const emitRawBytes = config?.emitRawBytes ?? true;
   const validateCrc = config?.validateCrc ?? true;
 
   const handleModeChange = (mode: FramingMode) => {
     if (mode === "raw") {
       onChange(null);
     } else {
-      const newConfig: FramingPanelConfig = {
-        mode,
-        emitRawBytes: showEmitRawBytes ? emitRawBytes : undefined,
-      };
+      const newConfig: FramingPanelConfig = { mode };
       if (mode === "delimiter") {
         newConfig.delimiterHex = delimiterHex;
         newConfig.maxFrameLength = maxLength;
@@ -218,7 +206,6 @@ export default function FramingOptionsPanel({
         mode: "delimiter",
         delimiterHex: clean,
         maxFrameLength: maxLength,
-        emitRawBytes: showEmitRawBytes ? emitRawBytes : undefined,
       });
     }
   };
@@ -230,7 +217,6 @@ export default function FramingOptionsPanel({
         mode: "delimiter",
         delimiterHex,
         maxFrameLength: value,
-        emitRawBytes: showEmitRawBytes ? emitRawBytes : undefined,
       });
     }
   };
@@ -242,18 +228,8 @@ export default function FramingOptionsPanel({
     onChange({
       ...config,
       mode: "modbus_rtu",
-      emitRawBytes: showEmitRawBytes ? emitRawBytes : undefined,
       ...patch,
     });
-  };
-
-  const handleEmitRawBytesChange = (checked: boolean) => {
-    if (config && config.mode !== "raw") {
-      onChange({
-        ...config,
-        emitRawBytes: checked,
-      });
-    }
   };
 
   const modbusFields = (
@@ -312,18 +288,6 @@ export default function FramingOptionsPanel({
         {modeCard("modbus_rtu", t("framingOptions.modbusRtuTitle"), t("framingOptions.modbusRtuDescription"))}
         {currentMode === "modbus_rtu" && (
           <div className="ml-4 pl-4 border-l-2 border-accent-primary py-2">{modbusFields}</div>
-        )}
-
-        {/* Emit raw bytes toggle */}
-        {showEmitRawBytes && currentMode !== "raw" && (
-          <label className={`flex items-center gap-2 text-sm mt-3 cursor-pointer ${textSecondary}`}>
-            <Checkbox
-              checked={emitRawBytes}
-              onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
-              disabled={disabled}
-            />
-            {t("framingOptions.captureRawBytes")}
-          </label>
         )}
       </div>
     );
@@ -420,18 +384,6 @@ export default function FramingOptionsPanel({
         <div className="pl-2 border-l-2 border-accent-primary">
           {modbusFields}
         </div>
-      )}
-
-      {/* Emit raw bytes toggle (when framing is enabled) */}
-      {showEmitRawBytes && currentMode !== "raw" && (
-        <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
-          <Checkbox
-            checked={emitRawBytes}
-            onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
-            disabled={disabled}
-          />
-          <span>{t("framingOptions.captureRawBytes")}</span>
-        </label>
       )}
     </div>
   );
