@@ -412,7 +412,7 @@ pub fn tap_test_frames(session_id: &str, frames: &[FrameMessage]) {
     };
     if let Some(senders) = taps.get(session_id) {
         for frame in frames {
-            if tp::is_test_pattern_frame(frame.frame_id) {
+            if tp::is_test_pattern_frame(frame.frame_id, frame.is_extended) {
                 for (_, sender) in senders {
                     let _ = sender.send(frame.clone());
                 }
@@ -1481,7 +1481,7 @@ pub(crate) mod tests {
         };
         assert!(frame.is_extended);
         assert_eq!(Some(frame.frame_id), tp::extended_id(tp::ID_PING_REQUEST));
-        assert!(tp::is_test_pattern_frame(frame.frame_id));
+        assert!(tp::is_test_pattern_frame(frame.frame_id, frame.is_extended));
 
         // Sweep ids have no extended form: the length code is their meaning.
         let TransmitPayload::CanFrame(sweep) = config.sweep_request(9) else {

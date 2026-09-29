@@ -140,7 +140,7 @@ pub async fn respond(
             }
             continue;
         };
-        if !tp::is_test_pattern_frame(frame.arb_id) {
+        if !tp::is_test_pattern_frame(frame.arb_id, frame.extended) {
             continue;
         }
         let bound = responder.run();
