@@ -38,6 +38,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **CAN FD on gs_usb adapters keeps its flags.** A candleLight or CANable FD adapter received an FD frame of 8 bytes or fewer as classic CAN, marked longer ones with a false error-state flag, and sent FD frames without bit-rate switching. FD frames now arrive and go out as sent, with and without bit-rate switching. Classic CAN was not affected.
 - **A loopback Virtual Device keeps up with a burst of transmits.** A few hundred frames sent back to back could stall the session: only some came back, the signal generator stopped, and stopping the session hung. Every frame now comes back and the session keeps running.
 - **Byte roles over a WireTAP Backend profile read the archive in time order.** The archive serves its newest message first, which turned every counter's and sensor's direction round. It is now read oldest first.
 - **A mux frame's multi-byte patterns are listed once.** The Payload Changes report printed a mux frame's patterns at the top level and again under each case; they are now listed under their cases only.
