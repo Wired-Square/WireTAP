@@ -23,6 +23,7 @@ import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescr
 interface SerialDiscoveryViewProps {
   isStreaming?: boolean;
   displayTimeFormat?: 'delta-last' | 'delta-start' | 'timestamp' | 'human';
+  useLocalTimezone: boolean;
   isRecorded?: boolean;
   /** Whether the session emits raw bytes (from capabilities.data_streams) */
   emitsRawBytes: boolean;
@@ -39,7 +40,7 @@ interface SerialDiscoveryViewProps {
   byteCount: number;
 }
 
-export default function SerialDiscoveryView({ isStreaming = false, displayTimeFormat = 'human', isRecorded = false, emitsRawBytes, sessionFramesCaptureId, sessionFramesCount, sessionId, bytesCaptureId, byteCount }: SerialDiscoveryViewProps) {
+export default function SerialDiscoveryView({ isStreaming = false, displayTimeFormat = 'human', useLocalTimezone, isRecorded = false, emitsRawBytes, sessionFramesCaptureId, sessionFramesCount, sessionId, bytesCaptureId, byteCount }: SerialDiscoveryViewProps) {
   const [showFramingDialog, setShowFramingDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showRawBytesViewDialog, setShowRawBytesViewDialog] = useState(false);
@@ -227,7 +228,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
       {/* Tab Content */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'raw' && (
-          <ByteView viewConfig={rawBytesViewConfig} displayTimeFormat={displayTimeFormat} isStreaming={isStreaming} bytesCaptureId={bytesCaptureId} byteCount={byteCount} />
+          <ByteView viewConfig={rawBytesViewConfig} displayTimeFormat={displayTimeFormat} useLocalTimezone={useLocalTimezone} isStreaming={isStreaming} bytesCaptureId={bytesCaptureId} byteCount={byteCount} />
         )}
         {activeTab === 'framed' && (
           <FramedDataView
@@ -241,6 +242,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
             accepted={framingAccepted}
             framingMode={framingConfig?.mode}
             displayTimeFormat={displayTimeFormat}
+            useLocalTimezone={useLocalTimezone}
             isStreaming={isStreaming}
             isRecorded={isRecorded}
           />

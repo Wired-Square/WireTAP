@@ -199,12 +199,13 @@ interface FramedDataViewProps {
   accepted: boolean;
   framingMode?: string;
   displayTimeFormat?: TimeDisplayFormat;
+  useLocalTimezone?: boolean;
   isStreaming?: boolean;
   /** A stored source: its capture is complete, so it is paged rather than tailed. */
   isRecorded?: boolean;
 }
 
-export default function FramedDataView({ captureId, sessionId, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false, isRecorded = false }: FramedDataViewProps) {
+export default function FramedDataView({ captureId, sessionId, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', useLocalTimezone = false, isStreaming = false, isRecorded = false }: FramedDataViewProps) {
   const { t } = useTranslation("discovery");
   // Column visibility from UI store (shared with CAN views and ByteView)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
@@ -380,12 +381,12 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         if (timeRange.min === 0) return '0.000000s';
         return renderDeltaNode(timestampUs - timeRange.min);
       case 'timestamp':
-        return formatIsoUs(timestampUs);
+        return formatIsoUs(timestampUs, useLocalTimezone);
       case 'human':
       default:
-        return formatHumanUs(timestampUs);
+        return formatHumanUs(timestampUs, useLocalTimezone);
     }
-  }, [displayTimeFormat, timeRange.min]);
+  }, [displayTimeFormat, timeRange.min, useLocalTimezone]);
 
   // Apply ID and source extraction configs to frames for display
   // This is needed for streaming sessions where frames come directly from backend
@@ -517,11 +518,13 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         onPositionChange={navigateToTimestamp}
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={timeRange.min}
+        useLocalTimezone={useLocalTimezone}
       />
 
       {/* Frame Table */}
       <FrameDataTable
         displayTimeFormat={displayTimeFormat}
+        useLocalTimezone={useLocalTimezone}
         frames={processedFrames}
         captureIndices={captureIndices}
         formatTime={formatTime}

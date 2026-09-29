@@ -28,6 +28,7 @@ interface ByteViewProps {
   viewConfig: RawBytesViewConfig;
   autoScroll?: boolean;
   displayTimeFormat?: 'delta-last' | 'delta-start' | 'timestamp' | 'human';
+  useLocalTimezone?: boolean;
   /** Whether we're currently streaming data */
   isStreaming?: boolean;
   /** The session's byte capture and its total, as Rust pushes them (ByteCounts 0x19). */
@@ -72,7 +73,7 @@ function chunkBytesByGap(entries: SerialBytesEntry[], gapUs: number): ByteChunk[
   return chunks;
 }
 
-export default function ByteView({ viewConfig, autoScroll = true, displayTimeFormat = 'human', isStreaming = false, bytesCaptureId, byteCount }: ByteViewProps) {
+export default function ByteView({ viewConfig, autoScroll = true, displayTimeFormat = 'human', useLocalTimezone = false, isStreaming = false, bytesCaptureId, byteCount }: ByteViewProps) {
   const { t } = useTranslation("discovery");
   const containerRef = useRef<HTMLDivElement>(null);
   const wasAtBottom = useRef(true);
@@ -213,12 +214,12 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
       case 'delta-start':
         return renderDeltaNode(timestampUs - startTimeUs);
       case 'timestamp':
-        return formatIsoUs(timestampUs);
+        return formatIsoUs(timestampUs, useLocalTimezone);
       case 'human':
       default:
-        return formatHumanUs(timestampUs);
+        return formatHumanUs(timestampUs, useLocalTimezone);
     }
-  }, [displayTimeFormat, startTimeUs]);
+  }, [displayTimeFormat, startTimeUs, useLocalTimezone]);
 
   // Track if user has scrolled up
   const handleScroll = () => {
@@ -347,6 +348,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
         onPositionChange={handleTimelineScrub}
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={timeRange?.min}
+        useLocalTimezone={useLocalTimezone}
       />
 
       {/* Hex dump content */}
@@ -375,7 +377,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
                   <tr key={line.timestampUs ?? i}>
                     <td
                       className={textDataTertiary}
-                      title={line.timestampUs !== null ? formatHumanUs(line.timestampUs) : undefined}
+                      title={line.timestampUs !== null ? formatHumanUs(line.timestampUs, useLocalTimezone) : undefined}
                     >
                       {line.timestamp}
                     </td>

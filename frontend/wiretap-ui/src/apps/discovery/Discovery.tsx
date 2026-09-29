@@ -1135,6 +1135,7 @@ function DiscoveryInner() {
           <SerialDiscoveryView
             isStreaming={isStreaming}
             displayTimeFormat={displayTimeFormat}
+            useLocalTimezone={settings?.display_timezone === "local"}
             isRecorded={isRecorded}
             emitsRawBytes={capabilities?.data_streams.rx_bytes ?? false}
             // A serial reader that frames on the wire writes into the session's
