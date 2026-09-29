@@ -61,7 +61,6 @@ pub use gvret::probe_gvret_usb;
 pub use broker::{IOBroker, SerialOverrides, SourceConfig};
 pub use types::ModbusRtuOptions;
 pub use mqtt::{MqttConfig, MqttSource};
-pub use virtual_device::{VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType};
 
 // Error types
 #[allow(unused_imports)]

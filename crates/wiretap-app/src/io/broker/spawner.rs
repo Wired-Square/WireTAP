@@ -326,8 +326,8 @@ async fn run_framelink_reader(
 /// Virtual CAN source for multi-source sessions: generates synthetic frames and sends
 /// them via the merge channel (merge task handles emission).
 ///
-/// Parses the same `interfaces` array config as `VirtualSource` in virtual_device/mod.rs,
-/// spawning one generator task per bus with independent frame rates and patterns.
+/// Spawns one generator task per entry of the profile's `interfaces` array, each
+/// with its own frame rate and patterns.
 async fn run_virtual_reader(
     source_idx: usize,
     profile: &IOProfile,
@@ -628,9 +628,7 @@ fn spawn_bus_generator(
                 continue;
             }
 
-            let Some(frame) = traffic::frame(&traffic, counter, output_bus, now_us()) else {
-                break;
-            };
+            let frame = traffic::frame(&traffic, counter, output_bus, now_us());
             if tx_clone.send(SourceMessage::Frames(source_idx, vec![frame])).await.is_err() {
                 break;
             }
