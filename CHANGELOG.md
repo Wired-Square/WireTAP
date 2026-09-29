@@ -2,7 +2,7 @@
 
 All notable changes to WireTAP will be documented in this file.
 
-## [Unreleased]
+## [0.13.0] - 2026-09-29
 
 ### Added
 
