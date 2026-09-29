@@ -553,16 +553,20 @@ struct InventoryEntry {
     last_us: i64,
     /// A CAN length code, or a Modbus message length (up to 256).
     max_dlc: u16,
+    /// The payload length in bytes, served by gateways from 0.1.4.
+    #[serde(default)]
+    max_len: Option<u16>,
 }
 
 impl InventoryEntry {
-    /// The archive stores a classic frame's code clamped to 8, so a CAN code
-    /// above 8 can only be FD.
+    /// An older gateway serves only the code. The archive stores a classic
+    /// frame's code clamped to 8, so a CAN code above 8 can only be FD.
     fn max_len(&self, protocol: ArchiveProtocol) -> u8 {
-        match protocol {
-            ArchiveProtocol::Can => wiretap_protocol::dlc_to_len(self.max_dlc as u8, true) as u8,
-            ArchiveProtocol::Modbus => self.max_dlc.min(u8::MAX as u16) as u8,
-        }
+        let len = self.max_len.unwrap_or_else(|| match protocol {
+            ArchiveProtocol::Can => wiretap_protocol::dlc_to_len(self.max_dlc as u8, true) as u16,
+            ArchiveProtocol::Modbus => self.max_dlc,
+        });
+        len.min(u8::MAX as u16) as u8
     }
 }
 
@@ -635,7 +639,7 @@ pub async fn fetch_frame_payloads(
 // Capture import — push a local SQLite capture to the backend
 // ---------------------------------------------------------------------------
 
-use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_FD, ID_TX};
+use wiretap_protocol::{import, ingest::record_id_flags};
 
 const IMPORT_PAGE: usize = 50_000;
 
@@ -734,27 +738,6 @@ pub async fn events_delete(app: &tauri::AppHandle, profile_id: &str, id: &str) -
     parse::<Value>(resp).await.map(|_| ())
 }
 
-/// Encode one frame in the backend's flat import record format:
-/// `ts_us u64 LE, id_flags u32 LE, bus u8, len u8, payload`.
-fn encode_import_record(buf: &mut Vec<u8>, f: &crate::io::FrameMessage) {
-    let mut id_flags = f.frame_id & ID_ARB_MASK;
-    if f.is_extended {
-        id_flags |= ID_EXTENDED;
-    }
-    if f.is_fd {
-        id_flags |= ID_FD;
-    }
-    if f.direction.as_deref() == Some("tx") {
-        id_flags |= ID_TX;
-    }
-    let payload = if f.bytes.len() > 64 { &f.bytes[..64] } else { &f.bytes[..] };
-    buf.extend_from_slice(&(f.timestamp_us as i64).to_le_bytes());
-    buf.extend_from_slice(&id_flags.to_le_bytes());
-    buf.push(f.bus);
-    buf.push(payload.len() as u8);
-    buf.extend_from_slice(payload);
-}
-
 /// Upload a local SQLite capture's frames to a backend capture database.
 /// Pages through the capture and POSTs chunks so memory stays bounded;
 /// emits `capture-upload-progress` events for the UI.
@@ -781,9 +764,7 @@ pub async fn api_import_capture(
         return Err("Target profile is not a WireTAP backend profile".into());
     }
     let api = resolve(&profile)?;
-    if database.is_empty()
-        || !database.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-    {
+    if !wiretap_protocol::ingest::valid_database_name(&database) {
         return Err(format!("invalid database name '{database}'"));
     }
 
@@ -801,7 +782,8 @@ pub async fn api_import_capture(
         }
         let mut body = Vec::with_capacity(frames.len() * 24);
         for f in &frames {
-            encode_import_record(&mut body, f);
+            let id_flags = record_id_flags(f.frame_id, f.is_extended, f.is_fd, f.direction.as_deref() == Some("tx"));
+            import::encode_record_into(&mut body, f.timestamp_us as i64, id_flags, f.bus, &f.bytes);
         }
 
         let url = format!(
@@ -1061,12 +1043,26 @@ mod tests {
             first_us: 0,
             last_us: 0,
             max_dlc,
+            max_len: None,
         };
         for (code, len) in [(8, 8), (9, 12), (15, 64)] {
             assert_eq!(entry(code).max_len(ArchiveProtocol::Can), len);
         }
         assert_eq!(entry(15).max_len(ArchiveProtocol::Modbus), 15);
         assert_eq!(entry(256).max_len(ArchiveProtocol::Modbus), 255);
+    }
+
+    #[test]
+    fn the_gateways_max_len_is_taken_over_the_code_when_served() {
+        let entry = |extra: Value| -> InventoryEntry {
+            serde_json::from_value(merge(
+                json!({ "frame_id": 0, "is_extended": false, "count": 1, "first_us": 0, "last_us": 0, "max_dlc": 9 }),
+                &[("max_len", extra)],
+            ))
+            .unwrap()
+        };
+        assert_eq!(entry(json!(20)).max_len(ArchiveProtocol::Can), 20);
+        assert_eq!(entry(Value::Null).max_len(ArchiveProtocol::Can), 12);
     }
 
     #[test]
