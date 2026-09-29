@@ -65,6 +65,18 @@ export interface TransmitProfile {
   capabilities: WriterCapabilities;
 }
 
+/** How serial bytes are framed on the wire; the backend does the framing. */
+export type SerialFraming =
+  | { mode: "raw" }
+  | { mode: "slip" }
+  | { mode: "delimiter"; delimiter: number[] };
+
+export type SerialFramingMode = SerialFraming["mode"];
+
+export function serialFraming(mode: SerialFramingMode, delimiter: number[]): SerialFraming {
+  return mode === "delimiter" ? { mode, delimiter } : { mode };
+}
+
 /** Information about active profile usage */
 export interface ProfileUsage {
   /** ID of the session using this profile */
@@ -187,17 +199,19 @@ export async function ioTransmitCanFrame(
 }
 
 /**
- * Transmit raw serial bytes through an existing IO session.
+ * Transmit serial bytes through an existing IO session.
  * The session must be running a serial profile with transmit support.
  * @param sessionId - IO session to use for transmission
- * @param bytes - Raw bytes to transmit
+ * @param bytes - Payload to transmit, before framing
+ * @param framing - How the backend frames the payload
  * @returns Transmit result with success/error info
  */
 export async function ioTransmitSerial(
   sessionId: string,
-  bytes: number[]
+  bytes: number[],
+  framing: SerialFraming
 ): Promise<TransmitResult> {
-  return invoke("io_transmit_serial", { sessionId, bytes });
+  return invoke("io_transmit_serial", { sessionId, bytes, framing });
 }
 
 /**
@@ -241,19 +255,22 @@ export async function ioStopAllRepeats(sessionId: string): Promise<void> {
  * Start repeat transmission for serial bytes through an IO session.
  * @param sessionId - IO session to use
  * @param queueId - Unique ID for this repeat task
- * @param bytes - Serial bytes to repeat
+ * @param bytes - Payload to repeat, before framing
+ * @param framing - How the backend frames the payload
  * @param intervalMs - Interval between transmissions in milliseconds
  */
 export async function ioStartSerialRepeatTransmit(
   sessionId: string,
   queueId: string,
   bytes: number[],
+  framing: SerialFraming,
   intervalMs: number
 ): Promise<void> {
   return invoke("io_start_serial_repeat_transmit", {
     sessionId,
     queueId,
     bytes,
+    framing,
     intervalMs,
   });
 }

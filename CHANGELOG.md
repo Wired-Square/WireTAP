@@ -28,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A candleLight set to listen only refuses to start on firmware that cannot listen.** An adapter without listen-only support used to start anyway and acknowledge frames on the bus; it now fails to open with the reason, so a listen-only session never touches the bus.
 - **The gs_usb command-line tool reports frames, not USB transfers.** `receive` prints one line per frame with its direction, channel and device time, and `send` reports whether the adapter took the frame; the raw per-transfer columns and counters are gone.
 - **Probing a GVRET device over the network fails when it cannot be reached.** A host that was down or refused the connection used to be reported as a one-bus device; the probe now fails with the reason. A device that connects but does not answer still counts as one bus, now within the profile's timeout rather than after a further 5 seconds. Probing an SLCAN adapter also reports whether it supports CAN FD.
+- **A queued serial message shows its payload.** A Transmit queue row for a SLIP or delimited message used to list the bytes with the framing already applied; it now lists what you typed, flagged with its framing. What goes on the wire, and the transmit history, are unchanged.
 
 ### Fixed
 

@@ -7,8 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, RotateCcw, Send } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
-import { ioTransmitSerial } from "../../../api/transmit";
-import { applyFraming } from "../utils/slipFraming";
+import { ioTransmitSerial, serialFraming } from "../../../api/transmit";
 import {
   bgSurface,
   borderDefault,
@@ -109,16 +108,13 @@ export default function SerialTransmitView() {
   const handleSend = useCallback(async () => {
     if (!activeSession?.id || parsedBytes.length === 0) return;
 
-    // Apply framing using centralised utility
-    const bytesToSend = applyFraming(
-      parsedBytes,
-      serialEditor.framingMode,
-      serialEditor.delimiter
-    );
-
     setIsSending(true);
     try {
-      await ioTransmitSerial(activeSession.id, bytesToSend);
+      await ioTransmitSerial(
+        activeSession.id,
+        parsedBytes,
+        serialFraming(serialEditor.framingMode, serialEditor.delimiter)
+      );
     } catch (e) {
       console.error("Serial transmit failed:", e);
     } finally {

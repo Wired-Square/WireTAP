@@ -40,6 +40,25 @@ pub struct TransmitProfile {
     pub capabilities: WriterCapabilities,
 }
 
+/// How serial bytes are framed on the wire.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum SerialFraming {
+    Raw,
+    Slip,
+    Delimiter { delimiter: Vec<u8> },
+}
+
+impl SerialFraming {
+    fn frame(&self, payload: &[u8]) -> Vec<u8> {
+        match self {
+            Self::Raw => payload.to_vec(),
+            Self::Slip => wiretap_protocol::slip::encode(payload),
+            Self::Delimiter { delimiter } => [payload, delimiter].concat(),
+        }
+    }
+}
+
 /// Transmit result returned by transmission functions
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -244,13 +263,15 @@ pub async fn io_transmit_can_frame(
     Ok(result)
 }
 
-/// Transmit raw serial bytes through an IO session
+/// Transmit serial bytes through an IO session, framed as `framing` says
 #[tauri::command]
 pub async fn io_transmit_serial(
     _app: AppHandle,
     session_id: String,
     bytes: Vec<u8>,
+    framing: SerialFraming,
 ) -> Result<crate::io::TransmitResult, String> {
+    let bytes = framing.frame(&bytes);
     let result = io::transmit_serial(&session_id, &bytes).await?;
     crate::transmit_history::write_entry(
         &session_id, "serial",
@@ -514,6 +535,7 @@ pub async fn io_start_serial_repeat_transmit(
     session_id: String,
     queue_id: String,
     bytes: Vec<u8>,
+    framing: SerialFraming,
     interval_ms: u64,
 ) -> Result<(), String> {
     if interval_ms < 1 {
@@ -523,6 +545,7 @@ pub async fn io_start_serial_repeat_transmit(
     if bytes.is_empty() {
         return Err("No bytes to transmit".to_string());
     }
+    let bytes = framing.frame(&bytes);
 
     // Stop any existing repeat for this queue_id
     io_stop_repeat_transmit(queue_id.clone()).await?;
@@ -735,7 +758,31 @@ pub async fn io_stop_all_group_repeats() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_permanent_error;
+    use super::{is_permanent_error, SerialFraming};
+
+    fn framing(json: &str) -> SerialFraming {
+        serde_json::from_str(json).expect("the framing the Transmit app sends")
+    }
+
+    #[test]
+    fn raw_serial_goes_out_as_given() {
+        assert_eq!(framing(r#"{"mode":"raw"}"#).frame(&[0xC0, 1]), [0xC0, 1]);
+    }
+
+    #[test]
+    fn slip_wraps_in_end_bytes_and_escapes_them_inside() {
+        let slip = framing(r#"{"mode":"slip"}"#);
+        assert_eq!(
+            slip.frame(&[1, 0xC0, 0xDB, 2]),
+            [0xC0, 1, 0xDB, 0xDC, 0xDB, 0xDD, 2, 0xC0]
+        );
+    }
+
+    #[test]
+    fn a_delimiter_is_appended_once() {
+        let crlf = framing(r#"{"mode":"delimiter","delimiter":[13,10]}"#);
+        assert_eq!(crlf.frame(&[0x41, 0x0D]), [0x41, 0x0D, 0x0D, 0x0A]);
+    }
 
     #[test]
     fn windows_access_denied_is_permanent() {

@@ -165,7 +165,10 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
         type: "Serial",
         id: null,
         details: `[${item.serialBytes.length}] ${dataStr}${truncated}`,
-        flags: item.framingMode ? [item.framingMode.toUpperCase()] : [],
+        flags:
+          item.serialFraming && item.serialFraming.mode !== "raw"
+            ? [item.serialFraming.mode.toUpperCase()]
+            : [],
         bus: null,
       };
     }

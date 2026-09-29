@@ -6,8 +6,7 @@
 import { useCallback, useState } from "react";
 import { useTransmitStore } from "../../../../stores/transmitStore";
 import { useActiveSession } from "../../../../stores/sessionStore";
-import { ioTransmitSerial } from "../../../../api/transmit";
-import { applyFraming } from "../../utils/slipFraming";
+import { ioTransmitSerial, serialFraming } from "../../../../api/transmit";
 
 export interface UseTransmitFrameHandlersParams {
   /** Parsed serial bytes to transmit */
@@ -69,16 +68,13 @@ export function useTransmitFrameHandlers({
   const handleSendSerialBytes = useCallback(async () => {
     if (!activeSession?.id || serialBytes.length === 0) return;
 
-    // Apply framing based on editor settings
-    const bytesToSend = applyFraming(
-      serialBytes,
-      serialEditor.framingMode,
-      serialEditor.delimiter
-    );
-
     setIsSerialSending(true);
     try {
-      await ioTransmitSerial(activeSession.id, bytesToSend);
+      await ioTransmitSerial(
+        activeSession.id,
+        serialBytes,
+        serialFraming(serialEditor.framingMode, serialEditor.delimiter)
+      );
     } catch (e) {
       console.error("Serial transmit failed:", e);
     } finally {

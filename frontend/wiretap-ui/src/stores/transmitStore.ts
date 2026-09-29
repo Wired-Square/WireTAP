@@ -11,11 +11,14 @@ import {
   type TransmitResult,
   type ReplayFrame,
   type RepeatStartedEvent,
+  type SerialFraming,
+  type SerialFramingMode,
   getTransmitCapableProfiles,
   // IO session-based transmit
   ioTransmitCanFrame,
   ioStartRepeatTransmit,
   ioStartSerialRepeatTransmit,
+  serialFraming,
   ioStopRepeatTransmit,
   ioStopAllRepeats,
   // IO session group repeat
@@ -65,10 +68,10 @@ export interface TransmitQueueItem {
   type: "can" | "serial";
   /** CAN frame (if type is 'can') */
   canFrame?: CanTransmitFrame;
-  /** Serial bytes (if type is 'serial') */
+  /** Serial payload before framing (if type is 'serial') */
   serialBytes?: number[];
-  /** Framing mode for serial (if type is 'serial') */
-  framingMode?: string;
+  /** How the backend frames `serialBytes` (if type is 'serial') */
+  serialFraming?: SerialFraming;
   /** Repeat interval in milliseconds (0 = single shot) */
   repeatIntervalMs: number;
   /** Whether this item is currently repeating */
@@ -148,7 +151,7 @@ export interface SerialEditorState {
   /** Hex input string (e.g., "AABBCCDD") */
   hexInput: string;
   /** Framing mode */
-  framingMode: "raw" | "slip" | "delimiter";
+  framingMode: SerialFramingMode;
   /** Delimiter bytes (for delimiter framing) */
   delimiter: number[];
 }
@@ -546,39 +549,13 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const rawBytes = get().parseSerialBytes();
     if (rawBytes.length === 0) return;
 
-    // Apply framing to bytes (same as single-shot in SerialTransmitView)
-    let bytesToStore = [...rawBytes];
-    if (serialEditor.framingMode === "slip") {
-      // SLIP framing: END(0xC0), escape special chars, END(0xC0)
-      const SLIP_END = 0xc0;
-      const SLIP_ESC = 0xdb;
-      const SLIP_ESC_END = 0xdc;
-      const SLIP_ESC_ESC = 0xdd;
-      const framed: number[] = [SLIP_END];
-      for (const b of rawBytes) {
-        if (b === SLIP_END) {
-          framed.push(SLIP_ESC, SLIP_ESC_END);
-        } else if (b === SLIP_ESC) {
-          framed.push(SLIP_ESC, SLIP_ESC_ESC);
-        } else {
-          framed.push(b);
-        }
-      }
-      framed.push(SLIP_END);
-      bytesToStore = framed;
-    } else if (serialEditor.framingMode === "delimiter") {
-      // Append delimiter
-      bytesToStore = [...rawBytes, ...serialEditor.delimiter];
-    }
-
     const item: TransmitQueueItem = {
       id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       profileId: session.profileId,
       profileName: session.profileName,
       type: "serial",
-      serialBytes: bytesToStore,
-      framingMode:
-        serialEditor.framingMode === "raw" ? undefined : serialEditor.framingMode,
+      serialBytes: rawBytes,
+      serialFraming: serialFraming(serialEditor.framingMode, serialEditor.delimiter),
       repeatIntervalMs: queueRepeatIntervalMs,
       isRepeating: false,
       enabled: true,
@@ -681,6 +658,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
           session.id,
           queueId,
           item.serialBytes,
+          item.serialFraming ?? { mode: "raw" },
           item.repeatIntervalMs
         );
       }
