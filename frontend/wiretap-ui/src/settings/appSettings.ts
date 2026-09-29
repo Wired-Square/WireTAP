@@ -88,7 +88,6 @@ export interface SerialConnection {
   data_bits?: string;
   stop_bits?: string;
   parity?: string;
-  framing_mode?: string;
   framing_encoding?: string;
   delimiter?: string[] | string;
   max_frame_length?: number;
