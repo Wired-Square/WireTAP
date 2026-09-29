@@ -1177,7 +1177,6 @@ pub fn run() {
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::save_binary_file,
-            catalog::test_decode_frame,
             catalog::list_catalogs,
             catalog::import_catalog,
             catalog::duplicate_catalog,

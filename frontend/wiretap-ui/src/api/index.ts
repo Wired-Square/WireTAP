@@ -19,7 +19,6 @@ export {
 export {
   openCatalog,
   saveCatalog,
-  testDecodeFrame,
   listCatalogs,
   duplicateCatalog,
   renameCatalog,

@@ -1,12 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DecodedSignal {
-    pub name: String,
-    pub value: serde_json::Value,
-    pub unit: Option<String>,
-}
 
 /// Open and parse a catalog TOML file using the Python CLI
 #[tauri::command]
@@ -289,68 +281,6 @@ fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<DiffRow> {
         nln += 1;
     }
     rows
-}
-
-/// Test decode a CAN frame using the catalog
-#[tauri::command]
-pub async fn test_decode_frame(
-    catalog_path: String,
-    frame_id: String,
-    data: Vec<u8>,
-) -> Result<Vec<DecodedSignal>, String> {
-    // Create a temporary file with the frame data
-    let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join("test_frame.log");
-
-    // Format: timestamp arbitration_id data_bytes
-    let frame_line = format!("0.0 {} {}", frame_id,
-        data.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" "));
-
-    std::fs::write(&temp_file, frame_line)
-        .map_err(|e| format!("Failed to write temp frame file: {}", e))?;
-
-    let output = Command::new("wiretap")
-        .args([
-            "decode",
-            "--catalog", &catalog_path,
-            "--input", temp_file.to_str().unwrap(),
-            "--format", "jsonl",
-            "--count", "1"
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run wiretap CLI: {}", e))?;
-
-    // Clean up temp file
-    let _ = std::fs::remove_file(&temp_file);
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        // Parse JSONL output to extract decoded signals
-        if let Some(line) = stdout.lines().next() {
-            let decoded: serde_json::Value = serde_json::from_str(line)
-                .map_err(|e| format!("Failed to parse decode output: {}", e))?;
-
-            // Extract signals from decoded JSON
-            let mut signals = vec![];
-            if let Some(obj) = decoded.as_object() {
-                for (key, value) in obj.iter() {
-                    if key != "timestamp" && key != "id" && key != "data" {
-                        signals.push(DecodedSignal {
-                            name: key.clone(),
-                            value: value.clone(),
-                            unit: None, // Would need to extract from catalog
-                        });
-                    }
-                }
-            }
-            Ok(signals)
-        } else {
-            Ok(vec![])
-        }
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Decode failed: {}", stderr))
-    }
 }
 
 use tauri::{AppHandle, Manager};

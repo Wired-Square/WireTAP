@@ -225,17 +225,6 @@ export async function exportDbcWs(
 }
 
 /**
- * Test decode a frame using catalog definitions
- */
-export async function testDecodeFrame(
-  catalog: string,
-  frameId: number,
-  data: number[]
-): Promise<{ signals: Array<{ name: string; value: string; unit?: string }> }> {
-  return await invoke("test_decode_frame", { catalog, frameId, data });
-}
-
-/**
  * List all catalogs in the decoder directory.
  *
  * The directory is resolved in Rust (from settings), so callers must NOT gate
