@@ -31,6 +31,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **The IO picker shows a serial profile's saved framing.** A profile saved as SLIP read as Raw in the picker, though the session framed it as SLIP.
 - **Discovery's serial views show times in your time zone.** The Raw Bytes and Framed Bytes tabs always showed UTC, whatever the display setting.
 - **An MCP register scan that cannot connect says so at once.** It waited out the whole wait and reported the scan still running; it now returns status `error` with the reason.
 - **MCP `open_session` on a Modbus TCP profile polls.** It reported the session running, then never connected and streamed nothing, because the registers it was asked for were dropped on the way to the device.

@@ -139,6 +139,11 @@ const CATALOG_ENCODING_TO_FRAMING: Record<string, FramingEncoding> = {
   raw: "raw",
 };
 
+function savedFraming(profile: IOProfile | undefined): InterfaceFramingConfig | undefined {
+  const encoding = profile?.kind === "serial" ? profile.connection.framing_encoding : undefined;
+  return encoding ? { encoding: encoding as FramingEncoding } : undefined;
+}
+
 type Props = {
   /** Dialog mode: "streaming" shows Connect/Load, "connect" shows just Connect */
   mode?: "streaming" | "connect";
@@ -1888,7 +1893,8 @@ export default function IoSourcePickerDialog({
             const busOverride = singleBusOverrideMap.get(profileId);
             const profileForKind = ioProfiles.find((p) => p.id === profileId);
             const profileKind = profileForKind?.kind;
-            const interfaceFraming = framingConfigMap.get(profileId);
+            // Kept out of the map: the session already frames by the profile, so no override is sent.
+            const interfaceFraming = framingConfigMap.get(profileId) ?? savedFraming(profileForKind);
             return (
               <SingleBusConfig
                 probeResult={probeResult}
