@@ -11,7 +11,7 @@ Classic, 500 k (`can0` reference, `can1` WireTAP SocketCAN and responder):
 ```sh
 for i in can0 can1; do
   sudo ip link set $i down
-  sudo ip link set $i type can bitrate 500000 restart-ms 100
+  sudo ip link set $i type can bitrate 500000
   sudo ip link set $i txqueuelen 1000
   sudo ip link set $i up
 done
@@ -22,11 +22,14 @@ from the bus):
 
 ```sh
 sudo ip link set can2 down
-sudo ip link set can2 type can bitrate 500000 dbitrate 2000000 fd on restart-ms 100
+sudo ip link set can2 type can bitrate 500000 dbitrate 2000000 fd on
 sudo ip link set can2 txqueuelen 1000
 sudo ip link set can2 up
 ip -details link show can2    # the can line must show <FD>
 ```
+
+The gs_usb driver refuses `restart-ms` ("doesn't support restart from Bus
+Off"), so a bus-off is cleared with `ip link set <if> down` and then `up`.
 
 ## Recording and scoring
 
