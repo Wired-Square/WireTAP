@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act } from "react";
+import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { IOProfile } from "../hooks/useSettings";
 import type { CaptureMetadata } from "../api/capture";
@@ -59,34 +59,60 @@ const rawPort: IOProfile = {
 const withText = (selector: string, text: string) =>
   [...document.querySelectorAll<HTMLElement>(selector)].find((el) => el.textContent?.includes(text));
 
+let root: Root;
+
+async function renderPicker(props: Partial<ComponentProps<typeof IoSourcePickerDialog>>) {
+  root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () =>
+    root.render(<IoSourcePickerDialog isOpen onClose={() => {}} ioProfiles={[rawPort]} selectedId={null} onSelect={() => {}} {...props} />),
+  );
+  await act(async () => {});
+}
+
+const click = (el: HTMLElement | undefined) => act(async () => el!.click());
+const captureOption = () => withText("[role=option]", byteCapture.name);
+const rawPortOption = () => withText("[role=option]", rawPort.name);
+
+beforeEach(() => useSessionStore.getState().addKnownCaptureId(byteCapture.id));
+
+afterEach(() => {
+  act(() => root.unmount());
+  document.body.innerHTML = "";
+});
+
 describe("IO picker capture framing", () => {
-  let root: Root;
-
-  beforeEach(async () => {
-    useSessionStore.getState().addKnownCaptureId(byteCapture.id);
-    root = createRoot(document.body.appendChild(document.createElement("div")));
-    await act(async () =>
-      root.render(
-        <IoSourcePickerDialog
-          isOpen
-          onClose={() => {}}
-          ioProfiles={[rawPort]}
-          selectedId={byteCapture.id}
-          selectedIds={[rawPort.id]}
-          onSelect={() => {}}
-        />,
-      ),
-    );
-    await act(async () => {});
-  });
-
-  afterEach(() => {
-    act(() => root.unmount());
-    document.body.innerHTML = "";
-  });
+  beforeEach(() => renderPicker({ selectedId: byteCapture.id, selectedIds: [rawPort.id] }));
 
   it("the picker offers no framing for a byte capture", () => {
-    expect(withText("[role=option]", byteCapture.name)).toBeDefined();
+    expect(captureOption()).toBeDefined();
     expect(withText("button", "framingOptions.mode")).toBeUndefined();
+  });
+});
+
+describe("IO picker selection is a capture or ticked sources, never both", () => {
+  const onStartLoad = vi.fn();
+  const onStartMultiLoad = vi.fn();
+
+  beforeEach(() => {
+    onStartLoad.mockClear();
+    onStartMultiLoad.mockClear();
+  });
+
+  it("selecting a capture unticks every source", async () => {
+    await renderPicker({ selectedIds: [rawPort.id], allowMultiSelect: true, onStartLoad, onStartMultiLoad });
+    await click(withText("[role=tab]", "ioSourcePicker.tabs.captures"));
+    await click(captureOption());
+    await click(withText("button", "ioSourcePicker.actions.connect"));
+    expect(onStartMultiLoad).not.toHaveBeenCalled();
+    expect(onStartLoad).toHaveBeenCalledWith(byteCapture.id, true, expect.anything());
+  });
+
+  it("ticking a source deselects the capture", async () => {
+    await renderPicker({ selectedId: byteCapture.id, allowMultiSelect: true, onStartLoad, onStartMultiLoad });
+    await click(withText("[role=tab]", "ioSourcePicker.tabs.devices"));
+    await click(rawPortOption());
+    await click(rawPortOption());
+    await click(withText("[role=tab]", "ioSourcePicker.tabs.captures"));
+    expect(captureOption()?.getAttribute("aria-selected")).toBe("false");
   });
 });

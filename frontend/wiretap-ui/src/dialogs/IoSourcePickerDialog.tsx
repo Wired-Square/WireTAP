@@ -1393,6 +1393,7 @@ export default function IoSourcePickerDialog({
         setValidationError(null);
         // Clear single-select reader when adding to multi-bus
         setCheckedReaderId(null);
+        setSelectedCaptureId(null);
         return [...prev, readerId];
       }
     });
@@ -1698,6 +1699,8 @@ export default function IoSourcePickerDialog({
     try {
       await setActiveCapture(captureId);
       setCheckedReaderId(null);
+      setCheckedReaderIds([]);
+      setValidationError(null);
       setSelectedCaptureId(captureId);
       // Don't call onSelect here — that triggers session creation in the parent.
       // Capture sessions are only created when the user clicks Connect.
