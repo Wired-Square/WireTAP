@@ -41,6 +41,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A frame CSV export keeps every byte of a long frame.** Exporting frames to CSV gave at most 64 data columns, so a serial message longer than that lost its tail while its length column still gave the full count. The file now has as many data columns as its longest frame.
 - **Test Pattern ignores extended frames that share its standard ids.** An extended frame whose id fell in Test Pattern's 11-bit ranges, such as `0x7E5`, counted as Test Pattern traffic, and a responder echoed it back as a sweep frame. Only standard ids in those ranges, and Test Pattern's own extended ids, now count.
 - **The Data IO settings list shows a serial profile's framing.** A profile saved as SLIP, delimited or Modbus RTU was always listed as raw.
 - **CAN FD on gs_usb adapters keeps its flags.** A candleLight or CANable FD adapter received an FD frame of 8 bytes or fewer as classic CAN, marked longer ones with a false error-state flag, and sent FD frames without bit-rate switching. FD frames now arrive and go out as sent, with and without bit-rate switching. Classic CAN was not affected.

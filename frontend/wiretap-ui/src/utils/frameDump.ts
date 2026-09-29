@@ -12,13 +12,11 @@ export type ExportFormat = "csv" | "json" | "candump" | "hex" | "bin";
  * Find the smallest valid CAN FD DLC value that fits the given byte count.
  * For standard CAN (≤8 bytes), returns the exact count.
  * For CAN FD (>8 bytes), returns the smallest valid DLC (12, 16, 20, 24, 32, 48, or 64).
+ * Past 64 (a serial frame), returns the exact count.
  */
 function findSmallestFittingDlc(byteCount: number): number {
   if (byteCount <= 8) return byteCount;
-  for (const dlc of CAN_FD_DLC_VALUES) {
-    if (dlc >= byteCount) return dlc;
-  }
-  return CAN_FD_DLC_VALUES[CAN_FD_DLC_VALUES.length - 1]; // 64
+  return CAN_FD_DLC_VALUES.find((dlc) => dlc >= byteCount) ?? byteCount;
 }
 
 /**
