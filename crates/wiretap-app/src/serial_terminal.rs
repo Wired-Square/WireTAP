@@ -19,9 +19,10 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-use crate::io::serial::utils::{
-    to_serialport_data_bits, to_serialport_parity, to_serialport_stop_bits, Parity,
-};
+use serialport::{DataBits, SerialPort, StopBits};
+use wiretap_io::serial::{LineSettings, Parity};
+
+use crate::io::serial::utils::parse_line;
 
 const SERIAL_TERMINAL_DATA_EVENT: &str = "serial-terminal-data";
 
@@ -43,7 +44,7 @@ struct Terminal {
     /// Writer-only handle — separate from the reader so writes don't block on
     /// the reader's `read()` call. Backed by the same OS file descriptor via
     /// `SerialPort::try_clone`, so DTR/RTS toggles affect the live port.
-    writer: Arc<Mutex<Box<dyn serialport::SerialPort>>>,
+    writer: Arc<Mutex<Box<dyn SerialPort>>>,
     stop_flag: Arc<AtomicBool>,
 }
 
@@ -59,12 +60,26 @@ fn new_terminal_id() -> String {
     format!("term_{:x}", nanos as u64)
 }
 
-fn parse_parity(s: &str) -> Parity {
-    match s.to_ascii_lowercase().as_str() {
-        "odd" => Parity::Odd,
-        "even" => Parity::Even,
-        _ => Parity::None,
-    }
+/// The terminal keeps its own serialport handle rather than `wiretap_io::serial::open`,
+/// because the reset pulse needs RTS and DTR, which the library's task does not expose.
+fn open_port(port: &str, line: LineSettings) -> serialport::Result<Box<dyn SerialPort>> {
+    serialport::new(port, line.baud)
+        .data_bits(match line.data_bits {
+            5 => DataBits::Five,
+            6 => DataBits::Six,
+            7 => DataBits::Seven,
+            _ => DataBits::Eight,
+        })
+        .stop_bits(if line.stop_bits == 2 { StopBits::Two } else { StopBits::One })
+        .parity(match line.parity {
+            Parity::None => serialport::Parity::None,
+            Parity::Odd => serialport::Parity::Odd,
+            Parity::Even => serialport::Parity::Even,
+        })
+        // Short enough that the reader loop sees the stop flag promptly; writes
+        // go through a cloned handle, so it does not bound write latency.
+        .timeout(Duration::from_millis(10))
+        .open()
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -76,20 +91,8 @@ pub fn serial_terminal_open(
     stop_bits: Option<u8>,
     parity: Option<String>,
 ) -> Result<String, String> {
-    let data_bits = data_bits.unwrap_or(8);
-    let stop_bits = stop_bits.unwrap_or(1);
-    let parity = parse_parity(parity.as_deref().unwrap_or("none"));
-
-    // Short read timeout keeps the reader loop responsive to the stop flag
-    // without paying serialise/event overhead. Writes go through a cloned
-    // handle, so the read timeout no longer affects write latency.
-    let mut reader = serialport::new(&port, baud_rate)
-        .data_bits(to_serialport_data_bits(data_bits))
-        .stop_bits(to_serialport_stop_bits(stop_bits))
-        .parity(to_serialport_parity(&parity))
-        .timeout(Duration::from_millis(10))
-        .open()
-        .map_err(|e| format!("Failed to open {}: {}", port, e))?;
+    let line = parse_line(baud_rate, data_bits, stop_bits, parity.as_deref())?;
+    let mut reader = open_port(&port, line).map_err(|e| format!("Failed to open {}: {}", port, e))?;
 
     let writer = reader
         .try_clone()
@@ -110,19 +113,7 @@ pub fn serial_terminal_open(
         );
     }
 
-    tlog!(
-        "[serial_terminal] Opened {} (terminal_id={}, baud={}, {}{}{})",
-        port,
-        terminal_id,
-        baud_rate,
-        data_bits,
-        match parity {
-            Parity::None => "N",
-            Parity::Odd => "O",
-            Parity::Even => "E",
-        },
-        stop_bits
-    );
+    tlog!("[serial_terminal] Opened {} (terminal_id={}, {})", port, terminal_id, line);
 
     let id_for_task = terminal_id.clone();
     let app_for_task = app.clone();

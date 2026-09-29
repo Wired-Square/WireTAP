@@ -1,11 +1,8 @@
 // ui/crates/wiretap-app/src/io/serial/utils.rs
 //
 // Shared utilities for serial port readers.
-// Provides common types and conversion functions for the serialport crate.
 
-use serde::{Deserialize, Serialize};
-use serialport::{DataBits, Parity as SpParity, StopBits};
-use wiretap_io::serial::{LineSettings, Parity as LineParity, SerialError};
+use wiretap_io::serial::{LineSettings, Parity, SerialError};
 
 use super::framer::{DelimiterOptions, FrameIdConfig, FramingEncoding};
 use crate::io::types::ModbusRtuOptions;
@@ -65,56 +62,6 @@ pub(crate) fn outage_message(
         PortLoss::Other(why) => why,
     };
     format!("{port}: {why}, waiting for it to return")
-}
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/// Parity setting for serial port configuration
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Parity {
-    None,
-    Odd,
-    Even,
-}
-
-impl Default for Parity {
-    fn default() -> Self {
-        Parity::None
-    }
-}
-
-// ============================================================================
-// Conversion Functions
-// ============================================================================
-
-/// Convert our Parity enum to serialport crate's Parity type
-pub fn to_serialport_parity(p: &Parity) -> SpParity {
-    match p {
-        Parity::None => SpParity::None,
-        Parity::Odd => SpParity::Odd,
-        Parity::Even => SpParity::Even,
-    }
-}
-
-/// Convert data bits count to serialport crate's DataBits type
-pub fn to_serialport_data_bits(bits: u8) -> DataBits {
-    match bits {
-        5 => DataBits::Five,
-        6 => DataBits::Six,
-        7 => DataBits::Seven,
-        _ => DataBits::Eight,
-    }
-}
-
-/// Convert stop bits count to serialport crate's StopBits type
-pub fn to_serialport_stop_bits(bits: u8) -> StopBits {
-    match bits {
-        2 => StopBits::Two,
-        _ => StopBits::One,
-    }
 }
 
 // ============================================================================
@@ -180,47 +127,44 @@ fn extraction(
 
 /// A profile's line, from `io::device_kinds`, the one declaration the form also
 /// seeds from.
-pub(crate) fn line_settings(profile: &IOProfile) -> LineSettings {
-    line(
+pub(crate) fn line_settings(profile: &IOProfile) -> Result<LineSettings, String> {
+    let bits = |key| conn_i64(profile, key).map(|n| u8::try_from(n).unwrap_or(u8::MAX));
+    parse_line(
         conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
-        conn_i64(profile, "data_bits"),
-        conn_i64(profile, "stop_bits"),
-        &conn_str(profile, "parity").unwrap_or_default(),
+        bits("data_bits"),
+        bits("stop_bits"),
+        conn_str(profile, "parity").as_deref(),
     )
 }
 
-/// Out-of-range bits read as 8N1, as they always have.
-pub(crate) fn line(
+/// An absent field reads as 8N1's; a present one must be valid.
+pub(crate) fn parse_line(
     baud: u32,
-    data_bits: Option<i64>,
-    stop_bits: Option<i64>,
-    parity: &str,
-) -> LineSettings {
-    LineSettings {
+    data_bits: Option<u8>,
+    stop_bits: Option<u8>,
+    parity: Option<&str>,
+) -> Result<LineSettings, String> {
+    let parity = parity
+        .filter(|p| !p.is_empty())
+        .map_or(Ok(Parity::None), str::parse)
+        .map_err(|e| e.to_string())?;
+    let line = LineSettings {
         baud,
-        data_bits: match data_bits {
-            Some(bits @ 5..=7) => bits as u8,
-            _ => 8,
-        },
-        parity: match parity.to_ascii_lowercase().as_str() {
-            "odd" => LineParity::Odd,
-            "even" => LineParity::Even,
-            _ => LineParity::None,
-        },
-        stop_bits: if stop_bits == Some(2) { 2 } else { 1 },
-    }
+        data_bits: data_bits.unwrap_or(8),
+        parity,
+        stop_bits: stop_bits.unwrap_or(1),
+    };
+    line.validate().map_err(|e| e.to_string())?;
+    Ok(line)
 }
 
 /// Parse an IOProfile into a SerialSourceConfig, applying session-level overrides.
-///
-/// Returns `None` if the port is not specified in the profile.
 pub fn parse_profile_for_source(
     profile: &IOProfile,
     overrides: &SerialOverrides,
-) -> Option<SerialSourceConfig> {
-    let port = conn_str(profile, "port")?;
-
-    let line = line_settings(profile);
+) -> Result<SerialSourceConfig, String> {
+    let port = conn_str(profile, "port").ok_or("Serial port is required")?;
+    let line = line_settings(profile)?;
 
     // Session override, then profile, then the kind default — resolved by the
     // same function the broker uses to decide which captures to create, so the
@@ -297,7 +241,7 @@ pub fn parse_profile_for_source(
         .or_else(|| conn_i64(profile, "min_frame_length").map(|n| n as usize))
         .unwrap_or(0);
 
-    Some(SerialSourceConfig {
+    Ok(SerialSourceConfig {
         port,
         line,
         framing_encoding,
@@ -317,30 +261,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parity_default() {
-        assert_eq!(Parity::default(), Parity::None);
+    fn an_absent_line_field_reads_as_8n1() {
+        assert_eq!(parse_line(9600, None, None, None).unwrap().to_string(), "9600 8N1");
+        assert_eq!(parse_line(9600, None, None, Some("")).unwrap().to_string(), "9600 8N1");
+        assert_eq!(
+            parse_line(19200, Some(7), Some(2), Some("Even")).unwrap().to_string(),
+            "19200 7E2"
+        );
     }
 
     #[test]
-    fn test_to_serialport_parity() {
-        assert!(matches!(to_serialport_parity(&Parity::None), SpParity::None));
-        assert!(matches!(to_serialport_parity(&Parity::Odd), SpParity::Odd));
-        assert!(matches!(to_serialport_parity(&Parity::Even), SpParity::Even));
-    }
-
-    #[test]
-    fn test_to_serialport_data_bits() {
-        assert!(matches!(to_serialport_data_bits(5), DataBits::Five));
-        assert!(matches!(to_serialport_data_bits(6), DataBits::Six));
-        assert!(matches!(to_serialport_data_bits(7), DataBits::Seven));
-        assert!(matches!(to_serialport_data_bits(8), DataBits::Eight));
-        assert!(matches!(to_serialport_data_bits(9), DataBits::Eight)); // default
-    }
-
-    #[test]
-    fn test_to_serialport_stop_bits() {
-        assert!(matches!(to_serialport_stop_bits(1), StopBits::One));
-        assert!(matches!(to_serialport_stop_bits(2), StopBits::Two));
-        assert!(matches!(to_serialport_stop_bits(0), StopBits::One)); // default
+    fn a_present_but_invalid_line_field_is_refused() {
+        assert!(parse_line(9600, Some(9), None, None).is_err());
+        assert!(parse_line(9600, None, Some(0), None).is_err());
+        assert!(parse_line(9600, None, None, Some("mark")).is_err());
     }
 }

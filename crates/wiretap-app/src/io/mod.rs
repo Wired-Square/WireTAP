@@ -62,9 +62,6 @@ pub use broker::{IOBroker, SerialOverrides, SourceConfig};
 pub use types::ModbusRtuOptions;
 pub use mqtt::{MqttConfig, MqttSource};
 pub use virtual_device::{VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType};
-#[cfg(not(target_os = "ios"))]
-#[allow(unused_imports)]
-pub use serial::Parity;
 
 // Error types
 #[allow(unused_imports)]

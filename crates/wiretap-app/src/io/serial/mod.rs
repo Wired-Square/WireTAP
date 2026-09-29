@@ -15,8 +15,7 @@ pub(crate) mod utils;
 // Re-export framer types used by other modules
 pub use framer::{DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer};
 
-// Re-export reader types used by other modules
-pub use reader::{run_source, Parity};
+pub use reader::run_source;
 
 // Re-export profile parsing for multi-source
 pub use utils::parse_profile_for_source;

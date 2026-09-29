@@ -25,11 +25,9 @@ use crate::io::types::{
 };
 use crate::io::FrameMessage;
 
-// Re-export Parity for external use
 use super::framer::{
     residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
 };
-pub use super::utils::Parity;
 use super::utils::{framing_from_str, outage_message, probe_serial_presence, SerialSourceConfig};
 
 /// How often the read loop looks at the stop flag and for a framing change.

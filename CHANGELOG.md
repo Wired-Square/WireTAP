@@ -30,6 +30,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Probing a GVRET device over the network fails when it cannot be reached.** A host that was down or refused the connection used to be reported as a one-bus device; the probe now fails with the reason. A device that connects but does not answer still counts as one bus, now within the profile's timeout rather than after a further 5 seconds. Probing an SLCAN adapter also reports whether it supports CAN FD.
 - **A queued serial message shows its payload.** A Transmit queue row for a SLIP or delimited message used to list the bytes with the framing already applied; it now lists what you typed, flagged with its framing. What goes on the wire, and the transmit history, are unchanged.
 - **Uploading a capture refuses a database name longer than 63 characters.** The name is now checked by the gateway's own rule before anything is sent: a lowercase letter, then lowercase letters, digits or underscores. A longer name used to be sent and fail at the gateway.
+- **A serial line with invalid settings fails to open with the reason.** A serial, GVRET USB or SLCAN profile, the Serial terminal and the SLCAN probe used to open a line with unknown parity, or with data or stop bits out of range, as 8N1 without a word. They now refuse it and name the setting: data bits must be 5 to 8, stop bits 1 or 2, and parity none, even or odd. A setting left out still reads as 8N1.
 
 ### Fixed
 

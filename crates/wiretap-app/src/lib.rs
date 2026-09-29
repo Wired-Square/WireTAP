@@ -113,6 +113,19 @@ pub struct SlcanProbeResultCompat {
     pub error: Option<String>,
 }
 
+impl SlcanProbeResultCompat {
+    fn failed(error: String) -> Self {
+        Self {
+            success: false,
+            version: None,
+            hardware_version: None,
+            serial_number: None,
+            supports_fd: None,
+            error: Some(error),
+        }
+    }
+}
+
 /// List serial ports - returns empty on iOS, real list on desktop
 /// Named with platform_ prefix to avoid macro name collision with io::serial::reader::list_serial_ports
 #[tauri::command(rename_all = "snake_case")]
@@ -148,12 +161,10 @@ async fn platform_probe_slcan_device(
 ) -> SlcanProbeResultCompat {
     #[cfg(not(target_os = "ios"))]
     {
-        let line = io::serial::utils::line(
-            baud_rate,
-            data_bits.map(i64::from),
-            stop_bits.map(i64::from),
-            parity.as_deref().unwrap_or_default(),
-        );
+        let line = match io::serial::utils::parse_line(baud_rate, data_bits, stop_bits, parity.as_deref()) {
+            Ok(line) => line,
+            Err(e) => return SlcanProbeResultCompat::failed(e),
+        };
         let result = io::slcan::reader::probe_slcan(&port, line).await;
         SlcanProbeResultCompat {
             success: result.success,
@@ -167,14 +178,7 @@ async fn platform_probe_slcan_device(
     #[cfg(target_os = "ios")]
     {
         let _ = (port, baud_rate, data_bits, stop_bits, parity);
-        SlcanProbeResultCompat {
-            success: false,
-            version: None,
-            hardware_version: None,
-            serial_number: None,
-            supports_fd: None,
-            error: Some("Serial ports are not available on iOS".to_string()),
-        }
+        SlcanProbeResultCompat::failed("Serial ports are not available on iOS".to_string())
     }
 }
 

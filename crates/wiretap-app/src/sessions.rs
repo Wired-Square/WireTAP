@@ -1786,7 +1786,7 @@ pub async fn probe_gvret_device(
                 .get("port")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            probe_gvret_usb(port, line_settings(profile)).await
+            probe_gvret_usb(port, line_settings(profile)?).await
         }
         #[cfg(target_os = "ios")]
         "gvret_usb" => {
@@ -1940,7 +1940,7 @@ pub async fn probe_device(
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            match probe_gvret_usb(port, line_settings(profile)).await {
+            match probe_gvret_usb(port, line_settings(profile)?).await {
                 Ok(info) => Ok(DeviceProbeResult {
                     success: true,
                     source_type: "gvret".to_string(),
@@ -1983,7 +1983,7 @@ pub async fn probe_device(
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Serial port is required for slcan".to_string())?;
-            let result = probe_slcan(port, line_settings(profile)).await;
+            let result = probe_slcan(port, line_settings(profile)?).await;
 
             Ok(DeviceProbeResult {
                 success: result.success,

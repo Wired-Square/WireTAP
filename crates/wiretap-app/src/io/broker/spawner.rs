@@ -156,7 +156,7 @@ async fn run_gvret_usb_reader(
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
 
-    run_gvret_usb_source(source_idx, port, line_settings(profile), bus_mappings, stop_flag, tx)
+    run_gvret_usb_source(source_idx, port, line_settings(profile)?, bus_mappings, stop_flag, tx)
         .await;
     Ok(())
 }
@@ -179,7 +179,7 @@ async fn run_slcan_reader(
     run_slcan_source(
         source_idx,
         port,
-        line_settings(profile),
+        line_settings(profile)?,
         bitrate,
         silent_mode,
         data_bitrate,
@@ -273,7 +273,7 @@ async fn run_serial_reader(
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     // Fully resolved — the overrides go in, so nothing is left to re-apply here.
-    let config = parse_profile_for_source(profile, overrides).ok_or("Serial port is required")?;
+    let config = parse_profile_for_source(profile, overrides)?;
 
     // The WS decode path frames these messages a second time, and has to be told
     // the same vendor codes or it discards what the port framed.
