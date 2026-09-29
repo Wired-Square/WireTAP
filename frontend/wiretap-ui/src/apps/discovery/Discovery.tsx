@@ -1102,7 +1102,7 @@ function DiscoveryInner() {
             deviceName: poller.session.name,
             isPolling: poller.live && pollingRequested,
             onPause: pauseModbusPolling,
-            onResume: resumeModbusPolling,
+            onResume: poller.live || onScanSession ? resumeModbusPolling : resumeWithNewCapture,
           } : undefined}
           isCaptureMode={isCaptureMode}
           capturePersistent={session.capturePersistent}
