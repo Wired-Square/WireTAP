@@ -1,15 +1,6 @@
 // io/modbus_tcp/poll.rs
 //
-// The one Modbus poll loop.
-//
-// Two call sites drive Modbus polling: the standalone `ModbusTcpSource`
-// (`reader.rs`, used by the MCP/headless open path) and the broker's
-// multi-source spawner (`broker/spawner.rs`, used by the app). They ran
-// near-identical copies of the same loop, which drifted: the broker copy never
-// pointed the shared context at the poll's slave, so every register in a
-// multi-slave catalogue was silently read from the connection's `unit_id`, and
-// it reported the session's output bus rather than the device address. This
-// module is that loop, once: one `wiretap_io` poll task per source, drained
+// The one Modbus poll loop: one `wiretap_io` poll task per source, drained
 // into a `FrameSink`.
 
 use std::collections::HashMap;
@@ -120,7 +111,7 @@ pub fn per_register_frames(start: u16, device_address: u8, data: ReadData) -> Ve
 /// Where Modbus frames go — shared by the poll loop and the discovery sweeps,
 /// which both produce frames and both need the capture-plus-throttle path.
 pub enum FrameSink {
-    /// Standalone `ModbusTcpSource` / scan session: write into the session's
+    /// Scan session: write into the session's
     /// frame capture and throttle-signal the WS.
     SessionCapture { session_id: String },
     /// Broker multi-source: hand frames to the merge task.

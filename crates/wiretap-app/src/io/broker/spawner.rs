@@ -645,7 +645,6 @@ fn spawn_bus_generator(
 // ============================================================================
 
 /// Modbus TCP client source: connects to a Modbus TCP server and polls registers.
-/// Extracted from ModbusTcpSource to work within the multi-source framework.
 async fn run_modbus_tcp_client(
     session_id: &str,
     source_idx: usize,

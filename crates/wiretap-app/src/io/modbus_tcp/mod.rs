@@ -12,7 +12,7 @@ pub mod scanner;
 
 pub use ranges::{build_polls_from_ranges, ModbusRange, ModbusRangeSpec};
 pub use scan_source::{ModbusScanSource, ScanJob};
-pub use reader::{ModbusTcpConfig, ModbusTcpSource, PollEmitMode, PollGroup, RegisterType};
+pub use reader::{PollEmitMode, PollGroup, RegisterType};
 pub use scanner::{
     FcProbeConfig, FcProbeEntry, ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
 };

@@ -52,7 +52,7 @@ pub use gvret::{probe_gvret_tcp, GvretDeviceInfo};
 pub use modbus_tcp::{
     build_polls_from_catalog, build_polls_from_ranges, modbus_endpoint, session_modbus_endpoint,
     ModbusRange, ModbusRangeSpec,
-    ModbusTcpConfig, ModbusTcpSource, PollGroup, RegisterType,
+    PollGroup, RegisterType,
     ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
     FcProbeConfig, FcProbeEntry, ModbusScanSource, ScanJob,
 };
