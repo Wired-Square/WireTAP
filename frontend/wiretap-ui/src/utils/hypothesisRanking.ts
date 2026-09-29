@@ -122,7 +122,8 @@ function scoreCandidate(
     counter16: 5, counter32: 5,
     text: 3, unknown: 5,
   };
-  for (const mbp of analysis.multiBytePatterns) {
+  const patterns = analysis.muxCaseAnalyses?.flatMap((c) => c.multiBytePatterns) ?? analysis.multiBytePatterns;
+  for (const mbp of patterns) {
     const mbpEnd = mbp.startByte + mbp.length - 1;
     // Check overlap between candidate byte range and multi-byte pattern
     if (startByte <= mbpEnd && endByte >= mbp.startByte) {
@@ -153,7 +154,7 @@ function scoreCandidate(
   for (let b = startByte; b <= endByte; b++) {
     const stat = analysis.byteStats.find((s) => s.byteIndex === b);
     if (stat) {
-      totalUnique += stat.uniqueValues.size;
+      totalUnique += stat.distinctCount;
       bytesChecked++;
     }
   }

@@ -419,6 +419,7 @@ export async function discoverChecksumsInCapture(
 
 /** Frames as the scan wants them — a `FrameMessage` already satisfies this. */
 export interface DiscoveryFrame {
+  protocol?: string;
   frame_id: number;
   bytes: number[];
   is_extended?: boolean;

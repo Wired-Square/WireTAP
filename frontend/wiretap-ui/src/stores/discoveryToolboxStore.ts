@@ -37,9 +37,9 @@ export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-frami
  * Where a checksum scan reads its payloads: a capture Rust can read itself, or
  * the frames the frontend holds when nothing has written them to one.
  */
-export type ChecksumScanSource =
-  | { captureId: string; selection: ProtocolFrames[] }
-  | { frames: FrameMessage[] };
+export type ChecksumScanSource = CaptureSelection | { frames: FrameMessage[] };
+
+export type CaptureSelection = { captureId: string; selection: ProtocolFrames[] };
 
 /** The `ToolboxState` slot each tool writes its output into. */
 export type ToolResultKey =
@@ -270,10 +270,13 @@ interface DiscoveryToolboxState {
     frameInfoMap: Map<string, FrameInfo>
   ) => Promise<MessageOrderResult>;
 
+  /** `capture`, when the frames are in one, is where the byte roles read from;
+   *  `frames` still supply mirror detection. */
   runChangesAnalysis: (
     frames: FrameMessage[],
-    frameInfoMap: Map<string, FrameInfo>
-  ) => Promise<ChangesResult>;
+    frameInfoMap: Map<string, FrameInfo>,
+    capture?: CaptureSelection
+  ) => Promise<ChangesResult | null>;
 
   runSerialFramingAnalysis: (
     bytesCaptureId: string,
@@ -287,7 +290,7 @@ interface DiscoveryToolboxState {
 
   runChecksumDiscoveryAnalysis: (
     source: ChecksumScanSource
-  ) => Promise<ChecksumDiscoveryResult>;
+  ) => Promise<ChecksumDiscoveryResult | null>;
 }
 
 /**
@@ -306,6 +309,17 @@ function updateActiveScan(
   return {
     toolbox: { ...state.toolbox, [resultKeyFor(scan.scanType)]: fn(scan) },
   };
+}
+
+/** A tool's backend call failed: log it and stop showing the tool as running. */
+function failed(
+  set: (fn: (state: DiscoveryToolboxState) => Partial<DiscoveryToolboxState>) => void,
+  tool: string,
+  e: unknown
+): null {
+  tlog.info(`[discoveryToolboxStore] ${tool} failed: ${e}`);
+  set((state) => ({ toolbox: { ...state.toolbox, isRunning: false } }));
+  return null;
 }
 
 export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get) => ({
@@ -600,46 +614,42 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     return messageOrderResults;
   },
 
-  runChangesAnalysis: async (frames, frameInfoMap) => {
+  runChangesAnalysis: async (frames, frameInfoMap, capture) => {
     const { knowledge } = get();
 
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
-    const { analyzePayloadsWithMuxDetection, detectMirrorFrames } = await import('../utils/analysis/payloadAnalysis');
+    const { toPayloadAnalysisResult, detectMirrorFrames } = await import('../utils/analysis/payloadAnalysis');
+    const { profileBytes } = await import('../api/byteRoles');
 
-    // Group frames by frame ID
-    const framesByIdMap = new Map<number, number[][]>();
     const timestampedByIdMap = new Map<number, TimestampedPayload[]>();
-
     for (const f of frames) {
-      if (!framesByIdMap.has(f.frame_id)) {
-        framesByIdMap.set(f.frame_id, []);
-        timestampedByIdMap.set(f.frame_id, []);
+      let timestamped = timestampedByIdMap.get(f.frame_id);
+      if (!timestamped) {
+        timestamped = [];
+        timestampedByIdMap.set(f.frame_id, timestamped);
       }
-      framesByIdMap.get(f.frame_id)!.push(f.bytes);
-      timestampedByIdMap.get(f.frame_id)!.push({
-        timestamp: f.timestamp_us,
-        payload: f.bytes,
-      });
+      timestamped.push({ timestamp: f.timestamp_us, payload: f.bytes });
     }
 
-    // Analyze each frame ID
-    const analysisResults: PayloadAnalysisResult[] = [];
-    for (const [frameId, payloads] of framesByIdMap) {
-      const frameKnowledge = knowledge.frames.get(frameId);
-      const isBurstFrame = frameKnowledge?.isBurst ?? false;
-      const result = analyzePayloadsWithMuxDetection(payloads, frameId, isBurstFrame);
-      analysisResults.push(result);
+    let profiles;
+    try {
+      profiles = await profileBytes(capture ?? { frames });
+    } catch (e) {
+      return failed(set, 'Payload Changes', e);
     }
+    const analysisResults = profiles.map((p) =>
+      toPayloadAnalysisResult(p, knowledge.frames.get(p.frameId)?.isBurst ?? false)
+    );
 
     const mirrorGroups = detectMirrorFrames(timestampedByIdMap);
 
     const changesResults: ChangesResult = {
       tool: 'changes',
       frameCount: frames.length,
-      uniqueFrameIds: framesByIdMap.size,
+      uniqueFrameIds: analysisResults.length,
       analysisResults,
       mirrorGroups,
     };
@@ -656,17 +666,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
       }
     }
 
-    updatedKnowledge = updateKnowledgeFromPayloadAnalysis(
-      updatedKnowledge,
-      analysisResults.map((r) => ({
-        frameId: r.frameId,
-        notes: r.notes,
-        muxInfo: r.muxInfo,
-        multiBytePatterns: r.multiBytePatterns,
-        muxCaseAnalyses: r.muxCaseAnalyses,
-        inferredEndianness: r.inferredEndianness,
-      }))
-    );
+    updatedKnowledge = updateKnowledgeFromPayloadAnalysis(updatedKnowledge, analysisResults);
 
     set((state) => ({
       knowledge: updatedKnowledge,
@@ -747,14 +747,19 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     // and solving all happen in Rust.
     const { discoverChecksums, discoverChecksumsInCapture } = await import('../api/checksums');
 
-    const checksumDiscoveryResults =
-      'captureId' in source
-        ? await discoverChecksumsInCapture(
-            source.captureId,
-            source.selection,
-            toolbox.checksumDiscovery
-          )
-        : await discoverChecksums(source.frames, toolbox.checksumDiscovery);
+    let checksumDiscoveryResults;
+    try {
+      checksumDiscoveryResults =
+        'captureId' in source
+          ? await discoverChecksumsInCapture(
+              source.captureId,
+              source.selection,
+              toolbox.checksumDiscovery
+            )
+          : await discoverChecksums(source.frames, toolbox.checksumDiscovery);
+    } catch (e) {
+      return failed(set, 'Checksum discovery', e);
+    }
 
     set((state) => ({
       toolbox: {

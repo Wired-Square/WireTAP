@@ -497,8 +497,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       }
 
       // The session's capture and the selection in the shape Rust wants, shared
-      // by the checksum scan below (which reads the capture in Rust) and the
-      // paging fetch after it (which does not, until the other tools follow).
+      // by the checksum scan and the Changes byte roles (which read the capture
+      // in Rust) and the paging fetch (which Frame Order and mirrors still need).
       const { useSessionStore } = await import('./sessionStore');
       const sessionCaptureId =
         useSessionStore.getState().sessions[uiStore.ioProfile ?? '']?.capture?.id ?? null;
@@ -574,7 +574,11 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           await toolboxStore.runMessageOrderAnalysis(selectedFrameData, frameInfoMap);
           break;
         case 'changes':
-          await toolboxStore.runChangesAnalysis(selectedFrameData, frameInfoMap);
+          await toolboxStore.runChangesAnalysis(
+            selectedFrameData,
+            frameInfoMap,
+            captureMode.enabled && sessionCaptureId ? { captureId: sessionCaptureId, selection } : undefined
+          );
           break;
       }
     },

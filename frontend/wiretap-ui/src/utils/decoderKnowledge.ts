@@ -564,8 +564,8 @@ export function updateKnowledgeFromPayloadAnalysis(
         updatedFrame.mux = { ...updatedFrame.mux, caseKnowledge };
       }
 
-      // Store multi-byte patterns if detected (for non-mux frames)
-      if (result.multiBytePatterns && result.multiBytePatterns.length > 0) {
+      // A mux frame's patterns are its cases'; its top-level ones span every case.
+      if (!result.muxInfo && result.multiBytePatterns && result.multiBytePatterns.length > 0) {
         // Merge with existing patterns, avoiding duplicates by startByte
         const existingPatterns = frame.multiBytePatterns ?? [];
         const existingStartBytes = new Set(existingPatterns.map(p => p.startByte));

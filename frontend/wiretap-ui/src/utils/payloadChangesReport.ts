@@ -4,6 +4,25 @@
 import type { ChangesResult } from "../stores/discoveryStore";
 import { type ExportFormat, DARK_THEME_STYLES, PRINT_THEME_STYLES } from "./reportExport";
 import { formatFrameId } from "./frameIds";
+import type { MultiBytePattern, PayloadAnalysisResult } from "./analysis/payloadAnalysis";
+
+const byteRange = (p: MultiBytePattern) => `byte[${p.startByte}:${p.startByte + p.length - 1}]`;
+
+/**
+ * Each pattern with the label it prints under. A mux frame's come from its cases:
+ * its top-level ones span every case, so printing both would print them twice.
+ */
+function labelledPatterns(result: PayloadAnalysisResult): { label: string; pattern: MultiBytePattern }[] {
+  if (!result.muxCaseAnalyses) {
+    return result.multiBytePatterns.map((pattern) => ({ label: byteRange(pattern), pattern }));
+  }
+  return result.muxCaseAnalyses.flatMap((c) =>
+    c.multiBytePatterns.map((pattern) => ({
+      label: `case 0x${c.muxValue.toString(16).toUpperCase()} ${byteRange(pattern)}`,
+      pattern,
+    }))
+  );
+}
 
 /**
  * Generate a report for Payload Changes analysis in the specified format
@@ -114,12 +133,12 @@ function generateTextReport(results: ChangesResult): string {
       lines.push(`|   #=static  ^=counter  ~=sensor  ?=value`);
     }
 
-    // Multi-byte patterns
-    if (result.multiBytePatterns && result.multiBytePatterns.length > 0) {
+    // Multi-byte patterns; a mux frame's print in its cases' notes
+    if (!result.isMuxFrame && result.multiBytePatterns.length > 0) {
       lines.push("|");
       lines.push("|  Detected Patterns:");
       for (const pattern of result.multiBytePatterns) {
-        const range = `byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]`;
+        const range = byteRange(pattern);
         let desc = pattern.pattern;
         if (pattern.endianness) desc += ` (${pattern.endianness})`;
         if (pattern.rolloverDetected) desc += " +rollover";
@@ -256,19 +275,19 @@ function generateMarkdownReport(results: ChangesResult): string {
         } else if (stat.role === 'sensor' && stat.sensorTrend) {
           details = `Trend: ${stat.sensorTrend}`;
         } else if (stat.role === 'value') {
-          details = `${stat.uniqueValues.size} unique values`;
+          details = `${stat.distinctCount} unique values`;
         }
         lines.push(`| ${stat.byteIndex} | ${stat.role} | ${details} |`);
       }
       lines.push("");
     }
 
-    // Multi-byte patterns
-    if (result.multiBytePatterns && result.multiBytePatterns.length > 0) {
+    // Multi-byte patterns; a mux frame's are under Per-Case Analysis
+    if (!result.isMuxFrame && result.multiBytePatterns.length > 0) {
       lines.push("**Multi-Byte Patterns:**");
       lines.push("");
       for (const pattern of result.multiBytePatterns) {
-        const range = `byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]`;
+        const range = byteRange(pattern);
         let desc = `\`${pattern.pattern}\``;
         if (pattern.endianness) desc += ` (${pattern.endianness} endian)`;
         if (pattern.rolloverDetected) desc += " - rollover detected";
@@ -298,8 +317,7 @@ function generateMarkdownReport(results: ChangesResult): string {
           lines.push("");
           if (muxCase.multiBytePatterns && muxCase.multiBytePatterns.length > 0) {
             for (const pattern of muxCase.multiBytePatterns) {
-              const range = `byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]`;
-              lines.push(`- ${range}: ${pattern.pattern}` + (pattern.endianness ? ` (${pattern.endianness})` : ""));
+              lines.push(`- ${byteRange(pattern)}: ${pattern.pattern}` + (pattern.endianness ? ` (${pattern.endianness})` : ""));
             }
           }
           if (muxCase.notes && muxCase.notes.length > 0) {
@@ -492,14 +510,14 @@ ${additionalStyles}
     }
 
     // Multi-byte patterns
-    if (result.multiBytePatterns && result.multiBytePatterns.length > 0) {
+    const patterns = labelledPatterns(result);
+    if (patterns.length > 0) {
       html += `
       <h3>Detected Patterns</h3>
       <table>
         <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
 `;
-      for (const pattern of result.multiBytePatterns) {
-        const range = `byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]`;
+      for (const { label: range, pattern } of patterns) {
         let details = '';
         if (pattern.endianness) details += pattern.endianness + ' endian';
         if (pattern.rolloverDetected) details += (details ? ', ' : '') + 'rollover';
@@ -726,14 +744,14 @@ ${additionalStyles}
     }
 
     // Multi-byte patterns
-    if (result.multiBytePatterns && result.multiBytePatterns.length > 0) {
+    const patterns = labelledPatterns(result);
+    if (patterns.length > 0) {
       html += `
     <h3>Detected Patterns</h3>
     <table>
       <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
 `;
-      for (const pattern of result.multiBytePatterns) {
-        const range = `byte[${pattern.startByte}:${pattern.startByte + pattern.length - 1}]`;
+      for (const { label: range, pattern } of patterns) {
         let details = '';
         if (pattern.endianness) details += pattern.endianness + ' endian';
         if (pattern.rolloverDetected) details += (details ? ', ' : '') + 'rollover';

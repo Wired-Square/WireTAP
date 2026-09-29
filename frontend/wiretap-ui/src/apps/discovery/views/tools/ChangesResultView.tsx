@@ -6,8 +6,7 @@ import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Laye
 import { iconSm, iconXs, iconLg, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, sectionHeaderText, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import type { PayloadAnalysisResult, ByteStats, MuxCaseAnalysis, MultiBytePattern, MirrorGroup } from "../../../../utils/analysis/payloadAnalysis";
-import { formatMuxValue } from "../../../../utils/analysis/muxDetection";
+import { formatMuxValue, type PayloadAnalysisResult, type ByteStats, type MuxCaseAnalysis, type MultiBytePattern, type MirrorGroup } from "../../../../utils/analysis/payloadAnalysis";
 import { formatFrameId } from "../../../../utils/frameIds";
 import ExportAnalysisDialog from "../../../../dialogs/ExportAnalysisDialog";
 import { pickFileToSave } from "../../../../api/dialogs";
@@ -187,7 +186,7 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
 
         {/* Individual Frame Cards */}
         {sortedResults.map((result) => (
-          <FrameAnalysisCard key={result.frameId} result={result} />
+          <FrameAnalysisCard key={`${result.protocol}:${result.frameId}:${result.isExtended}`} result={result} />
         ))}
       </div>
 
@@ -429,6 +428,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
             <ByteVisualization
               byteStats={result.byteStats}
               multiBytePatterns={result.multiBytePatterns}
+              sampleCount={result.sampleCount}
             />
           </div>
 
@@ -521,6 +521,7 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
             <ByteVisualization
               byteStats={caseAnalysis.byteStats}
               multiBytePatterns={caseAnalysis.multiBytePatterns}
+              sampleCount={caseAnalysis.sampleCount}
             />
           </div>
 
@@ -548,9 +549,11 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
 
 type ByteChipProps = {
   byte: ByteStats;
+  /** The frame's or case's sample count; a byte reached by fewer is past the shortest payload. */
+  sampleCount: number;
 };
 
-function ByteChip({ byte }: ByteChipProps) {
+function ByteChip({ byte, sampleCount }: ByteChipProps) {
   const { t } = useTranslation("discovery");
   let style: BadgeStyleProps = {};
   let title = t("changes.byteTooltipUnknown", { idx: byte.byteIndex });
@@ -581,11 +584,16 @@ function ByteChip({ byte }: ByteChipProps) {
     title = t("changes.byteTooltipSensor", { idx: byte.byteIndex, trend, min: byte.min, max: byte.max, strength });
   } else if (byte.role === 'value') {
     style = { tone: 'primary' };
-    title = t("changes.byteTooltipValue", { idx: byte.byteIndex, min: byte.min, max: byte.max, count: byte.uniqueValues.size });
+    title = t("changes.byteTooltipValue", { idx: byte.byteIndex, min: byte.min, max: byte.max, count: byte.distinctCount });
+  }
+
+  const partial = byte.sampleCount < sampleCount;
+  if (partial) {
+    title += ` · ${t("changes.partialSamples", { count: byte.sampleCount, total: sampleCount })}`;
   }
 
   return (
-    <Badge size="sm" mono {...style} title={title}>
+    <Badge size="sm" mono {...style} title={title} className={partial ? "opacity-50" : ""}>
       {byte.byteIndex}
       {byte.role === 'static' && (
         <span className="ml-0.5 opacity-60">
@@ -610,6 +618,9 @@ function ByteChip({ byte }: ByteChipProps) {
       )}
       {byte.role === 'value' && (
         <span className="ml-0.5 opacity-60">~</span>
+      )}
+      {partial && (
+        <span className="ml-0.5 text-2xs">{byte.sampleCount}/{sampleCount}</span>
       )}
     </Badge>
   );
@@ -673,9 +684,10 @@ function MultiByteChip({ pattern }: MultiByteChipProps) {
 type ByteVisualizationProps = {
   byteStats: ByteStats[];
   multiBytePatterns: MultiBytePattern[];
+  sampleCount: number;
 };
 
-function ByteVisualization({ byteStats, multiBytePatterns }: ByteVisualizationProps) {
+function ByteVisualization({ byteStats, multiBytePatterns, sampleCount }: ByteVisualizationProps) {
   // Build a map of byte index -> pattern for quick lookup
   const patternByStartByte = new Map<number, MultiBytePattern>();
   const bytesInPatterns = new Set<number>();
@@ -708,7 +720,7 @@ function ByteVisualization({ byteStats, multiBytePatterns }: ByteVisualizationPr
     } else {
       // Render single byte chip
       elements.push(
-        <ByteChip key={`byte-${byte.byteIndex}`} byte={byte} />
+        <ByteChip key={`byte-${byte.byteIndex}`} byte={byte} sampleCount={sampleCount} />
       );
       i++;
     }

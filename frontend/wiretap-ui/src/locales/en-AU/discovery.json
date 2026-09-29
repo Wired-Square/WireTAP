@@ -174,7 +174,8 @@
     "byteTooltipCounterRollover": " (rollover)",
     "byteTooltipSensor": "byte[{{idx}}]: sensor {{trend}} range {{min}}–{{max}}{{strength}}",
     "byteTooltipSensorStrength": " ({{percent}}% trend)",
-    "byteTooltipValue": "byte[{{idx}}]: value range {{min}}–{{max}} ({{count}} unique)"
+    "byteTooltipValue": "byte[{{idx}}]: value range {{min}}–{{max}} ({{count}} unique)",
+    "partialSamples": "{{count}} of {{total}} samples"
   },
   "checksumDiscovery": {
     "byte": "byte {{position}}",
