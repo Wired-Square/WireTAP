@@ -415,9 +415,10 @@ async fn run_virtual_reader(
         .await;
 
     // Spawn loopback task: receives encoded frames and echoes them back via the merge channel
+    // A blocking thread, not a tokio task: `recv_timeout` never yields, and on a worker it wedged the runtime.
     let tx_loopback = tx.clone();
     let stop_flag_for_transmit = stop_flag.clone();
-    tokio::spawn(async move {
+    tokio::task::spawn_blocking(move || {
         while !stop_flag_for_transmit.load(Ordering::Relaxed) {
             match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
                 Ok(req) => {
@@ -444,9 +445,7 @@ async fn run_virtual_reader(
                             incomplete: None,
                             direction: Some("rx".to_string()),
                         };
-                        let _ = tx_loopback
-                            .send(SourceMessage::Frames(source_idx, vec![frame]))
-                            .await;
+                        let _ = tx_loopback.blocking_send(SourceMessage::Frames(source_idx, vec![frame]));
                     }
                     let _ = req.result_tx.send(Ok(()));
                 }
@@ -728,5 +727,148 @@ async fn relay_source_flags(
         };
         control.send_if_modified(|current| std::mem::replace(current, wanted) != wanted);
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::Mutex;
+
+    const BURST: usize = 500;
+    const ECHO_ID: u32 = 0x1ABC_DEF0;
+
+    #[derive(Default)]
+    struct Progress {
+        phase: Mutex<&'static str>,
+        echoed: AtomicUsize,
+        generated: AtomicUsize,
+    }
+
+    impl Progress {
+        fn enter(&self, phase: &'static str) {
+            *self.phase.lock().unwrap() = phase;
+        }
+
+        fn count(&self, msg: SourceMessage) {
+            if let SourceMessage::Frames(_, frames) = msg {
+                for frame in frames {
+                    let counter = if frame.is_extended && frame.frame_id == ECHO_ID {
+                        &self.echoed
+                    } else {
+                        &self.generated
+                    };
+                    counter.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+
+    fn loopback_profile() -> IOProfile {
+        IOProfile {
+            id: "virtual-loopback".into(),
+            name: "Virtual loopback".into(),
+            kind: "virtual".into(),
+            connection: [(
+                "interfaces".to_string(),
+                serde_json::json!([{ "bus": 0, "signal_generator": true, "frame_rate_hz": 1000.0 }]),
+            )]
+            .into(),
+            preferred_catalog: None,
+            ephemeral: true,
+        }
+    }
+
+    fn loopback_request(n: usize) -> TransmitRequest {
+        let mut data = ECHO_ID.to_le_bytes().to_vec();
+        data.extend_from_slice(&[0, 1, 0, 8]);
+        data.extend_from_slice(&(n as u64).to_le_bytes());
+        let (result_tx, _) = std_mpsc::sync_channel(1);
+        TransmitRequest { data, frame: None, result_tx }
+    }
+
+    async fn burst_and_stop(stop: Arc<AtomicBool>, progress: Arc<Progress>) {
+        let (tx, mut rx) = mpsc::channel(1024);
+        let (_cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let reader = tokio::spawn({
+            let stop = stop.clone();
+            async move {
+                run_virtual_reader(0, &loopback_profile(), Vec::new(), stop, tx, Default::default(), Some(cmd_rx)).await
+            }
+        });
+
+        progress.enter("connect");
+        let transmit = loop {
+            match rx.recv().await.expect("the reader announces its transmit channel") {
+                SourceMessage::TransmitReady(_, transmit) => break transmit,
+                msg => progress.count(msg),
+            }
+        };
+
+        progress.enter("burst");
+        for n in 0..BURST {
+            let mut request = loopback_request(n);
+            loop {
+                match transmit.try_send(request) {
+                    Ok(()) => break,
+                    Err(std_mpsc::TrySendError::Full(back)) => {
+                        request = back;
+                        while let Ok(msg) = rx.try_recv() {
+                            progress.count(msg);
+                        }
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                    Err(e) => panic!("the loopback hung up: {e}"),
+                }
+            }
+        }
+
+        progress.enter("echo");
+        while progress.echoed.load(Ordering::Relaxed) < BURST {
+            progress.count(rx.recv().await.expect("the reader is running"));
+        }
+
+        progress.enter("generator");
+        let target = progress.generated.load(Ordering::Relaxed) + 50;
+        while progress.generated.load(Ordering::Relaxed) < target {
+            progress.count(rx.recv().await.expect("the reader is running"));
+        }
+
+        progress.enter("stop");
+        stop.store(true, Ordering::Relaxed);
+        reader.await.expect("the reader task").expect("the reader ends cleanly");
+        progress.enter("done");
+    }
+
+    #[test]
+    fn a_loopback_virtual_device_keeps_its_runtime_free_under_a_transmit_burst() {
+        let stop = Arc::new(AtomicBool::new(false));
+        let progress = Arc::new(Progress::default());
+        let (done_tx, done_rx) = std_mpsc::channel();
+        std::thread::spawn({
+            let (stop, progress) = (stop.clone(), progress.clone());
+            move || {
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(1)
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                runtime.block_on(burst_and_stop(stop, progress));
+                let _ = done_tx.send(());
+            }
+        });
+
+        // A starved runtime cannot fire its own timers, so the deadline is kept off it.
+        let finished = done_rx.recv_timeout(std::time::Duration::from_secs(10));
+        stop.store(true, Ordering::Relaxed);
+        assert!(
+            finished.is_ok(),
+            "the runtime wedged in phase '{}': echoed {}/{}, generator frames {}",
+            progress.phase.lock().unwrap(),
+            progress.echoed.load(Ordering::Relaxed),
+            BURST,
+            progress.generated.load(Ordering::Relaxed),
+        );
     }
 }

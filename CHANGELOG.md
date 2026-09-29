@@ -38,6 +38,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A loopback Virtual Device keeps up with a burst of transmits.** A few hundred frames sent back to back could stall the session: only some came back, the signal generator stopped, and stopping the session hung. Every frame now comes back and the session keeps running.
 - **Byte roles over a WireTAP Backend profile read the archive in time order.** The archive serves its newest message first, which turned every counter's and sensor's direction round. It is now read oldest first.
 - **A mux frame's multi-byte patterns are listed once.** The Payload Changes report printed a mux frame's patterns at the top level and again under each case; they are now listed under their cases only.
 - **A serial frame id or source address reads the same everywhere.** Discovery's Framed tab, its ID and Source preview and the Decoder now show the id the serial line itself extracts: a start further back than the frame reads from its first byte, and a frame too short to hold the field has no id. A catalogue's little-endian frame id is now honoured on a live line, and the ID and Source fields are one or two bytes long, the widths the line can read.
