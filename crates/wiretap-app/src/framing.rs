@@ -21,6 +21,15 @@ mod ios_stub {
     ) -> Result<serde_json::Value, String> {
         Err("Framing is not available on iOS".to_string())
     }
+
+    #[tauri::command(rename_all = "snake_case")]
+    pub fn extract_serial_ids(
+        _frames: serde_json::Value,
+        _frame_id_config: serde_json::Value,
+        _source_address_config: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        Err("Framing is not available on iOS".to_string())
+    }
 }
 
 #[cfg(target_os = "ios")]
@@ -35,7 +44,7 @@ mod desktop {
     use crate::{
         capture_store,
         io::FrameMessage,
-        io::serial::{extract_frame_id, DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer},
+        io::serial::{DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer},
     };
 
     /// Per-interface framing configuration (overrides default for specific bus)
@@ -219,6 +228,30 @@ mod desktop {
         })
     }
 
+    #[derive(serde::Serialize)]
+    pub struct SerialIds {
+        pub frame_id: Option<u32>,
+        pub source_address: Option<u16>,
+    }
+
+    /// The ids each frame carries under these configs, as the reader and
+    /// re-framing would extract them.
+    #[tauri::command(rename_all = "snake_case")]
+    pub fn extract_serial_ids(
+        frames: Vec<Vec<u8>>,
+        frame_id_config: Option<FrameIdConfig>,
+        source_address_config: Option<FrameIdConfig>,
+    ) -> Vec<SerialIds> {
+        let extract = |cfg: &Option<FrameIdConfig>, bytes: &[u8]| cfg.as_ref()?.extract(bytes);
+        frames
+            .iter()
+            .map(|bytes| SerialIds {
+                frame_id: extract(&frame_id_config, bytes),
+                source_address: extract(&source_address_config, bytes).map(|v| v as u16),
+            })
+            .collect()
+    }
+
     /// Frame a byte capture, stamping each message at its last byte as a live
     /// line and the gateway archive do. Returns the messages at or above the
     /// minimum length, then those below it.
@@ -295,11 +328,7 @@ mod desktop {
             usize,
             (Vec<u8>, usize, bool, Option<bool>, u8),
         )| {
-            let extract = |cfg: &Option<FrameIdConfig>| {
-                cfg.as_ref()
-                    .and_then(FrameIdConfig::field)
-                    .and_then(|f| extract_frame_id(&frame_bytes, &f))
-            };
+            let extract = |cfg: &Option<FrameIdConfig>| cfg.as_ref()?.extract(&frame_bytes);
             let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
             let source_address = extract(&config.source_address_config).map(|v| v as u16);
             let dlc = frame_bytes.len() as u8;
@@ -387,6 +416,49 @@ mod desktop {
                 last_bytes.push(1_000 + 10 * (line.len() as u64 - 1));
             }
             assert_eq!(stamps(&stamped(&line), &config("modbus_rtu")), last_bytes);
+        }
+
+        fn id_config(start_byte: i32, num_bytes: u8, big_endian: bool) -> Option<FrameIdConfig> {
+            Some(FrameIdConfig {
+                start_byte,
+                num_bytes,
+                big_endian,
+            })
+        }
+
+        fn frame_id(frame: &[u8], config: Option<FrameIdConfig>) -> Option<u32> {
+            extract_serial_ids(vec![frame.to_vec()], config, None)[0].frame_id
+        }
+
+        #[test]
+        fn serial_ids_read_both_fields_from_each_frame() {
+            let ids = extract_serial_ids(
+                vec![vec![0x12, 0x34, 0x56], vec![0xAB, 0xCD, 0xEF]],
+                id_config(0, 2, false),
+                id_config(-1, 1, true),
+            );
+            let pairs: Vec<_> = ids.iter().map(|i| (i.frame_id, i.source_address)).collect();
+            assert_eq!(
+                pairs,
+                vec![(Some(0x3412), Some(0x56)), (Some(0xCDAB), Some(0xEF))]
+            );
+        }
+
+        #[test]
+        fn a_serial_id_the_frame_cannot_hold_is_none() {
+            assert_eq!(frame_id(&[0x12], id_config(0, 2, true)), None);
+            assert_eq!(frame_id(&[0x12], id_config(1, 1, true)), None);
+            assert_eq!(frame_id(&[0x12], None), None);
+        }
+
+        #[test]
+        fn a_serial_id_wider_than_two_bytes_is_none() {
+            assert_eq!(frame_id(&[1, 2, 3, 4], id_config(0, 4, false)), None);
+        }
+
+        #[test]
+        fn a_negative_start_past_the_front_reads_from_the_first_byte() {
+            assert_eq!(frame_id(&[0x12, 0x34], id_config(-5, 1, true)), Some(0x12));
         }
 
         #[test]

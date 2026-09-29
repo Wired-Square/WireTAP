@@ -5,7 +5,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDiscoveryStore } from '../../../../stores/discoveryStore';
-import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
+import { useDiscoverySerialStore, withSerialIds } from '../../../../stores/discoverySerialStore';
+import { tlog } from '../../../../api/settings';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
 import { useCaptureFrameView } from '../../hooks/useCaptureFrameView';
 import type { ProtocolFrames } from '../../../../utils/frameKey';
@@ -293,8 +294,6 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     }
   }, [serialConfig]);
 
-  const hasSourceAddresses = frames.some(f => f.source_address !== undefined);
-
   // Sample frames for the byte-extraction dialogs, which only render 5 preview
   // rows — the current page is a fine source for that.
   const sampleFrames = useMemo(() => frames.slice(0, 50).map(f => f.bytes), [frames]);
@@ -388,60 +387,16 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     }
   }, [displayTimeFormat, timeRange.min, useLocalTimezone]);
 
-  // Apply ID and source extraction configs to frames for display
-  // This is needed for streaming sessions where frames come directly from backend
-  // without the extraction applied
-  const processedFrames = useMemo(() => {
-    if (!idConfig && !srcConfig) {
-      return frames;
-    }
-
-    return frames.map(frame => {
-      let newFrame = { ...frame };
-
-      // Apply ID extraction if configured
-      if (idConfig) {
-        const { startByte, numBytes, endianness } = idConfig;
-        const resolvedStart = startByte >= 0 ? startByte : Math.max(0, frame.bytes.length + startByte);
-        if (resolvedStart < frame.bytes.length) {
-          let frameId = 0;
-          const endByte = Math.min(resolvedStart + numBytes, frame.bytes.length);
-          if (endianness === 'big') {
-            for (let i = resolvedStart; i < endByte; i++) {
-              frameId = (frameId << 8) | frame.bytes[i];
-            }
-          } else {
-            for (let i = resolvedStart; i < endByte; i++) {
-              frameId |= frame.bytes[i] << (8 * (i - resolvedStart));
-            }
-          }
-          newFrame.frame_id = frameId;
-        }
-      }
-
-      // Apply source extraction if configured
-      if (srcConfig) {
-        const { startByte, numBytes, endianness } = srcConfig;
-        const resolvedStart = startByte >= 0 ? startByte : Math.max(0, frame.bytes.length + startByte);
-        if (resolvedStart < frame.bytes.length) {
-          let source = 0;
-          const endByte = Math.min(resolvedStart + numBytes, frame.bytes.length);
-          if (endianness === 'big') {
-            for (let i = resolvedStart; i < endByte; i++) {
-              source = (source << 8) | frame.bytes[i];
-            }
-          } else {
-            for (let i = resolvedStart; i < endByte; i++) {
-              source |= frame.bytes[i] << (8 * (i - resolvedStart));
-            }
-          }
-          newFrame.source_address = source;
-        }
-      }
-
-      return newFrame;
-    });
+  // A reader-framed or recorded capture was framed without these configs.
+  const [processedFrames, setProcessedFrames] = useState(frames);
+  useEffect(() => {
+    let cancelled = false;
+    withSerialIds(frames, idConfig, srcConfig)
+      .then((result) => { if (!cancelled) setProcessedFrames(result); })
+      .catch((e) => tlog.info(`[FramedDataView] Serial id extraction failed: ${e}`));
+    return () => { cancelled = true; };
   }, [frames, idConfig, srcConfig]);
+  const hasSourceAddresses = processedFrames.some(f => f.source_address !== undefined);
 
   // Custom byte renderer with extraction region coloring
   const renderColoredBytes = useCallback((frame: FrameRow) => {

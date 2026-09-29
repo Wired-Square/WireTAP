@@ -1335,6 +1335,7 @@ pub fn run() {
             captures::list_orphaned_captures,
             // Backend framing
             framing::apply_framing_to_capture,
+            framing::extract_serial_ids,
             framing_detect::detect_serial_framing,
             // Serial port API (platform-aware: real on desktop, stub on iOS)
             platform_list_serial_ports,

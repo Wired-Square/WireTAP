@@ -76,6 +76,7 @@ export interface LoadOptions {
   maxFrames?: number;
   frameIdStartByte?: number;
   frameIdBytes?: number;
+  frameIdEndianness?: "big" | "little";
   sourceAddressStartByte?: number;
   sourceAddressBytes?: number;
   sourceAddressEndianness?: "big" | "little";
@@ -766,6 +767,7 @@ export function useIOSessionManager(
       minFrameLength,
       frameIdStartByte,
       frameIdBytes,
+      frameIdEndianness,
       sourceAddressStartByte,
       sourceAddressBytes,
       sourceAddressEndianness,
@@ -813,7 +815,7 @@ export function useIOSessionManager(
       // Frame ID extraction config (from catalog)
       frameIdStartByte,
       frameIdBytes,
-      frameIdBigEndian: frameIdStartByte !== undefined ? true : undefined, // Default to big endian if frame ID is configured
+      frameIdBigEndian: frameIdStartByte !== undefined ? frameIdEndianness !== "little" : undefined,
       sourceAddressStartByte,
       sourceAddressBytes,
       sourceAddressBigEndian: sourceAddressEndianness === "big",
@@ -918,7 +920,7 @@ export function useIOSessionManager(
         modbusAnyFunction: opts.modbusAnyFunction,
         frameIdStartByte: opts.frameIdStartByte,
         frameIdBytes: opts.frameIdBytes,
-        frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
+        frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
         sourceAddressStartByte: opts.sourceAddressStartByte,
         sourceAddressBytes: opts.sourceAddressBytes,
         sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
@@ -1033,7 +1035,7 @@ export function useIOSessionManager(
           modbusAnyFunction: opts.modbusAnyFunction,
           frameIdStartByte: opts.frameIdStartByte,
           frameIdBytes: opts.frameIdBytes,
-          frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
+          frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
           sourceAddressStartByte: opts.sourceAddressStartByte,
           sourceAddressBytes: opts.sourceAddressBytes,
           sourceAddressBigEndian: opts.sourceAddressEndianness === "big",

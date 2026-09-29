@@ -46,6 +46,7 @@ import { useModbusPolling } from "../../hooks/useModbusPolling";
 import { anyModbusProfile } from "../../utils/modbusProfiles";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
 import type { FrameMessage } from "../../types/frame";
+import type { SerialFrameConfig } from "../../utils/frameExport";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 import { isMessageProtocol } from "../../utils/profileTraits";
 
@@ -56,6 +57,11 @@ function modbusPollsFor(profileIds: string[]): string | null {
   const json = useDecoderStore.getState().modbusPollsJson;
   return json && anyModbusProfile(profileIds) ? json : null;
 }
+
+const SERIAL_ID_KEYS = [
+  'frame_id_start_byte', 'frame_id_bytes', 'frame_id_byte_order',
+  'source_address_start_byte', 'source_address_bytes', 'source_address_byte_order',
+] as const satisfies readonly (keyof SerialFrameConfig)[];
 
 function DecoderInner() {
   const { t } = useTranslation("decoder");
@@ -300,11 +306,6 @@ function DecoderInner() {
       ? storeState.canConfig?.frame_id_mask
       : storeState.serialConfig?.frame_id_mask;
 
-    // Get frame ID extraction config from serialConfig for frontend re-extraction
-    // This allows correct frame ID extraction even if catalog was loaded after streaming started
-    const frameIdConfig = storeState.serialConfig;
-    const hasFrameIdConfig = frameIdConfig?.frame_id_start_byte !== undefined && frameIdConfig?.frame_id_bytes !== undefined;
-
     for (const f of receivedFrames) {
       const timestamp = f.timestamp_us !== undefined ? f.timestamp_us / 1_000_000 : Date.now() / 1000;
 
@@ -314,29 +315,7 @@ function DecoderInner() {
         continue;
       }
 
-      // Extract frame ID from raw bytes using catalog config if available
-      // This allows correct frame ID even if Rust session was started without config
-      let frameId = f.frame_id;
-      if (hasFrameIdConfig && f.bytes.length > 0) {
-        const startByte = frameIdConfig.frame_id_start_byte!;
-        const numBytes = frameIdConfig.frame_id_bytes!;
-        const bigEndian = frameIdConfig.frame_id_byte_order === 'big';
-
-        // Extract frame ID from bytes
-        if (startByte >= 0 && startByte + numBytes <= f.bytes.length) {
-          let extractedId = 0;
-          if (bigEndian) {
-            for (let i = 0; i < numBytes; i++) {
-              extractedId = (extractedId << 8) | f.bytes[startByte + i];
-            }
-          } else {
-            for (let i = numBytes - 1; i >= 0; i--) {
-              extractedId = (extractedId << 8) | f.bytes[startByte + i];
-            }
-          }
-          frameId = extractedId;
-        }
-      }
+      const frameId = f.frame_id;
 
       // Check if frame ID matches the filter (if filter is set, matching IDs go to Filtered tab)
       if (idFilterSet !== null && idFilterSet.has(frameId)) {
@@ -995,16 +974,15 @@ function DecoderInner() {
       return;
     }
 
-    // Frame-id-only change (same framing): the frontend re-extracts frame IDs
-    // from the already-framed bytes, so just clear stale frames — no re-watch.
-    const frameIdConfigChanged =
-      prevConfig?.frame_id_start_byte !== serialConfig?.frame_id_start_byte ||
-      prevConfig?.frame_id_bytes !== serialConfig?.frame_id_bytes ||
-      prevConfig?.frame_id_byte_order !== serialConfig?.frame_id_byte_order ||
-      prevConfig?.frame_id_mask !== serialConfig?.frame_id_mask;
+    // Id-only change (same framing): the backend extracts the ids, so hand it
+    // the new fields in place and clear the frames keyed on the old ones.
+    const idFieldsChanged = SERIAL_ID_KEYS.some((key) => prevConfig?.[key] !== serialConfig?.[key]);
     const hasFrameIdConfig = serialConfig?.frame_id_start_byte !== undefined || serialConfig?.frame_id_bytes !== undefined;
 
-    if (frameIdConfigChanged && hasFrameIdConfig) {
+    if (idFieldsChanged && isRealtime && serialConfig?.encoding && sid) {
+      setFraming(sid, serialConfig).catch((e) => tlog.info(`[Decoder] live set-framing failed: ${e}`));
+    }
+    if ((idFieldsChanged || prevConfig?.frame_id_mask !== serialConfig?.frame_id_mask) && hasFrameIdConfig) {
       clearFrames();
       clearUnmatchedFrames();
     }

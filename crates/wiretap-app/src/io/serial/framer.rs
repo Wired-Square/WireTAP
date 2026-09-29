@@ -6,8 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use wiretap_catalog::{Catalog, ModbusRtuMessage, ModbusRtuStream};
-pub use wiretap_decode::frame_id::extract_frame_id;
-use wiretap_decode::frame_id::{FrameIdField, FrameIdWidth};
+use wiretap_decode::frame_id::{extract_frame_id, FrameIdField, FrameIdWidth};
 use wiretap_decode::Endianness;
 pub use wiretap_protocol::framing::DelimiterOptions;
 use wiretap_protocol::framing::{DelimiterFramer, Framed};
@@ -92,6 +91,10 @@ impl FrameIdConfig {
             start_byte: self.start_byte,
             width,
         })
+    }
+
+    pub fn extract(&self, frame: &[u8]) -> Option<u32> {
+        extract_frame_id(frame, &self.field()?)
     }
 }
 

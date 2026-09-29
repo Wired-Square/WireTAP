@@ -11,7 +11,7 @@
 
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer, type FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './discoveryUIStore';
-import { useDiscoverySerialStore } from './discoverySerialStore';
+import { useDiscoverySerialStore, withSerialIds } from './discoverySerialStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
 import type { CaptureFrameInfo } from '../api/capture';
 import type { FrameMessage } from '../types/frame';
@@ -359,51 +359,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           // Apply extraction configs to update frame IDs/source addresses in the actual frames
           const { frameIdExtractionConfig, sourceExtractionConfig } = serialStore;
           if (frameIdExtractionConfig || sourceExtractionConfig) {
-            const updatedFrames = mainFrames.map(frame => {
-              const newFrame = { ...frame };
-
-              // Apply ID extraction if configured
-              if (frameIdExtractionConfig) {
-                const { startByte, numBytes, endianness } = frameIdExtractionConfig;
-                const resolvedStart = startByte >= 0 ? startByte : Math.max(0, frame.bytes.length + startByte);
-                if (resolvedStart < frame.bytes.length) {
-                  let frameId = 0;
-                  const endByte = Math.min(resolvedStart + numBytes, frame.bytes.length);
-                  if (endianness === 'big') {
-                    for (let i = resolvedStart; i < endByte; i++) {
-                      frameId = (frameId << 8) | frame.bytes[i];
-                    }
-                  } else {
-                    for (let i = resolvedStart; i < endByte; i++) {
-                      frameId |= frame.bytes[i] << (8 * (i - resolvedStart));
-                    }
-                  }
-                  newFrame.frame_id = frameId;
-                }
-              }
-
-              // Apply source extraction if configured
-              if (sourceExtractionConfig) {
-                const { startByte, numBytes, endianness } = sourceExtractionConfig;
-                const resolvedStart = startByte >= 0 ? startByte : Math.max(0, frame.bytes.length + startByte);
-                if (resolvedStart < frame.bytes.length) {
-                  let source = 0;
-                  const endByte = Math.min(resolvedStart + numBytes, frame.bytes.length);
-                  if (endianness === 'big') {
-                    for (let i = resolvedStart; i < endByte; i++) {
-                      source = (source << 8) | frame.bytes[i];
-                    }
-                  } else {
-                    for (let i = resolvedStart; i < endByte; i++) {
-                      source |= frame.bytes[i] << (8 * (i - resolvedStart));
-                    }
-                  }
-                  newFrame.source_address = source;
-                }
-              }
-
-              return newFrame;
-            });
+            const updatedFrames = await withSerialIds(mainFrames, frameIdExtractionConfig, sourceExtractionConfig);
 
             // Replace frames in store with updated ones
             frameStore.setFrames(updatedFrames);

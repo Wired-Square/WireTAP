@@ -27,7 +27,7 @@ use crate::io::FrameMessage;
 
 // Re-export Parity for external use
 use super::framer::{
-    extract_frame_id, residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
+    residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
 };
 pub use super::utils::Parity;
 use super::utils::{framing_from_str, outage_message, probe_serial_presence, SerialSourceConfig};
@@ -242,12 +242,9 @@ impl LiveLine {
             .into_iter()
             .filter(|(f, _)| f.bytes.len() >= self.min_frame_length)
             .filter_map(|(frame, timestamp_us)| {
-                let extract = |cfg: Option<&FrameIdConfig>| {
-                    cfg.and_then(FrameIdConfig::field)
-                        .and_then(|f| extract_frame_id(&frame.bytes, &f))
-                };
-                let frame_id = extract(self.frame_id_config.as_ref()).unwrap_or(0);
-                let source_address = extract(self.source_address_config.as_ref()).map(|v| v as u16);
+                let extract = |cfg: &Option<FrameIdConfig>| cfg.as_ref()?.extract(&frame.bytes);
+                let frame_id = extract(&self.frame_id_config).unwrap_or(0);
+                let source_address = extract(&self.source_address_config).map(|v| v as u16);
 
                 // `frame.crc_valid` is deliberately not carried: the decode path
                 // recomputes it from these same bytes. See `framing.rs`.

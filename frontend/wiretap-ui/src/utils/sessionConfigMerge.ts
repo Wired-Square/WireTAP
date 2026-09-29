@@ -23,6 +23,7 @@ export function mergeSerialConfig(
     // Frame ID extraction from catalog
     frameIdStartByte: serialConfig?.frame_id_start_byte,
     frameIdBytes: serialConfig?.frame_id_bytes,
+    frameIdEndianness: serialConfig?.frame_id_byte_order,
     // Source address extraction from catalog
     sourceAddressStartByte: serialConfig?.source_address_start_byte,
     sourceAddressBytes: serialConfig?.source_address_bytes,

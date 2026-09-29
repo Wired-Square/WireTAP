@@ -732,6 +732,32 @@ export async function applyFramingToCapture(
   });
 }
 
+export interface SerialIds {
+  frame_id: number | null;
+  source_address: number | null;
+}
+
+export function toFrameIdConfig(
+  config: { startByte: number; numBytes: number; endianness: "big" | "little" } | null,
+): FrameIdConfig | undefined {
+  return config
+    ? { start_byte: config.startByte, num_bytes: config.numBytes, big_endian: config.endianness === "big" }
+    : undefined;
+}
+
+/** The ids each frame carries under these configs, as the serial reader extracts them. */
+export async function extractSerialIds(
+  frames: number[][],
+  frameIdConfig?: FrameIdConfig,
+  sourceAddressConfig?: FrameIdConfig,
+): Promise<SerialIds[]> {
+  return invoke("extract_serial_ids", {
+    frames,
+    frame_id_config: frameIdConfig ?? null,
+    source_address_config: sourceAddressConfig ?? null,
+  });
+}
+
 /**
  * Find the byte offset at or after the given timestamp in the active byte capture.
  * Uses binary search for O(log n) performance.

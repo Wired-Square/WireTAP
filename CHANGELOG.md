@@ -31,6 +31,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A serial frame id or source address reads the same everywhere.** Discovery's Framed tab, its ID and Source preview and the Decoder now show the id the serial line itself extracts: a start further back than the frame reads from its first byte, and a frame too short to hold the field has no id. A catalogue's little-endian frame id is now honoured on a live line, and the ID and Source fields are one or two bytes long, the widths the line can read.
 - **MCP `open_app` names an unknown app id.** It returned an internal layout error; it now says the id is unknown and lists the valid ones.
 - **The IO picker shows a serial profile's saved framing.** A profile saved as SLIP read as Raw in the picker, though the session framed it as SLIP.
 - **Discovery's serial views show times in your time zone.** The Raw Bytes and Framed Bytes tabs always showed UTC, whatever the display setting.

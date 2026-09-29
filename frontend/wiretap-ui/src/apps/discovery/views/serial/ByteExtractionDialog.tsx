@@ -3,16 +3,21 @@
 // Dialog for configuring byte extraction from serial frames.
 // Used for frame ID and source address extraction.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flexRowGap2 } from '../../../../styles/spacing';
 import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
 import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
 import { type ExtractionConfig } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
+import { extractSerialIds, toFrameIdConfig } from '../../../../api/capture';
+import { tlog } from '../../../../api/settings';
 import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault } from '../../../../styles';
 import { Button } from '../../../../components/Button';
 import { DangerButton, SecondaryButton, Checkbox, Input, Select } from '../../../../components/forms';
+
+/** The backend reads a serial id of one or two bytes. */
+const MAX_ID_BYTES = 2;
 
 interface ByteExtractionDialogProps {
   isOpen: boolean;
@@ -80,7 +85,7 @@ export default function ByteExtractionDialog({
       } else {
         setStartByte(start);
       }
-      setNumBytes(end - start + 1);
+      setNumBytes(Math.min(end - start + 1, MAX_ID_BYTES));
       setSelectionStart(null);
     }
   };
@@ -91,22 +96,20 @@ export default function ByteExtractionDialog({
     return byteIndex >= resolvedStart && byteIndex < resolvedStart + numBytes;
   };
 
-  // Extract value from bytes for preview (handles negative indices)
-  const extractValue = (bytes: number[]): string => {
-    const resolvedStart = resolveByteIndexSync(startByte, bytes.length);
-    if (resolvedStart >= bytes.length) return '-';
-    const endByte = Math.min(resolvedStart + numBytes, bytes.length);
-    let value = 0;
-    if (endianness === 'big') {
-      for (let i = resolvedStart; i < endByte; i++) {
-        value = (value << 8) | bytes[i];
-      }
-    } else {
-      for (let i = resolvedStart; i < endByte; i++) {
-        value |= bytes[i] << (8 * (i - resolvedStart));
-      }
-    }
-    return `0x${value.toString(16).toUpperCase().padStart(numBytes * 2, '0')}`;
+  const previewFrames = useMemo(() => sampleFrames.slice(0, 5), [sampleFrames]);
+  const [previewIds, setPreviewIds] = useState<(number | null)[]>([]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    extractSerialIds(previewFrames, toFrameIdConfig({ startByte, numBytes, endianness }))
+      .then((ids) => { if (!cancelled) setPreviewIds(ids.map((id) => id.frame_id)); })
+      .catch((e) => tlog.info(`[ByteExtractionDialog] Preview failed: ${e}`));
+    return () => { cancelled = true; };
+  }, [isOpen, previewFrames, startByte, numBytes, endianness]);
+
+  const previewValue = (frameIdx: number): string => {
+    const value = previewIds[frameIdx];
+    return value == null ? '-' : `0x${value.toString(16).toUpperCase().padStart(numBytes * 2, '0')}`;
   };
 
   const colorClasses = color === 'cyan'
@@ -124,7 +127,7 @@ export default function ByteExtractionDialog({
 
         {/* Sample frames with clickable bytes */}
         <div className={`space-y-2 font-mono text-sm ${bgDataView} p-3 rounded max-h-48 overflow-y-auto`}>
-          {sampleFrames.slice(0, 5).map((frame, frameIdx) => (
+          {previewFrames.map((frame, frameIdx) => (
             <div key={frameIdx} className={flexRowGap2}>
               <span className={`${textMuted} w-6 text-right`}>{frameIdx + 1}.</span>
               <div className="flex gap-1 flex-wrap">
@@ -142,7 +145,7 @@ export default function ByteExtractionDialog({
                     {byteToHex(byte)}
                   </button>
                 ))}
-                <span className={`ml-2 ${colorClasses.text}`}>{t("serial.extractValuePreview", { value: extractValue(frame) })}</span>
+                <span className={`ml-2 ${colorClasses.text}`}>{t("serial.extractValuePreview", { value: previewValue(frameIdx) })}</span>
               </div>
             </div>
           ))}
@@ -185,8 +188,6 @@ export default function ByteExtractionDialog({
             >
               <option value={1}>{t("serial.lengthBytes", { count: 1 })}</option>
               <option value={2}>{t("serial.lengthBytes", { count: 2 })}</option>
-              <option value={3}>{t("serial.lengthBytes", { count: 3 })}</option>
-              <option value={4}>{t("serial.lengthBytes", { count: 4 })}</option>
             </Select>
           </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>

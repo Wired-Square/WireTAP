@@ -10,6 +10,8 @@ import type { FrameMessage } from '../types/frame';
 import {
   applyFramingToCapture,
   deleteCapture,
+  extractSerialIds,
+  toFrameIdConfig,
   type BackendFramingConfig,
 } from '../api/capture';
 import type { PageSize } from '../utils/pageSize';
@@ -78,6 +80,28 @@ export function framedSource(
   }
   const readerFramed = session.captureId !== null;
   return { captureId: session.captureId, frameCount: readerFramed ? session.frameCount : 0, readerFramed };
+}
+
+/**
+ * The frames with the ids these configs name, extracted by the backend. A frame
+ * too short to hold its id keeps the one it came with.
+ */
+export async function withSerialIds<T extends FrameMessage>(
+  frames: T[],
+  idConfig: ByteExtractionConfig | null,
+  srcConfig: ByteExtractionConfig | null,
+): Promise<T[]> {
+  if ((!idConfig && !srcConfig) || frames.length === 0) return frames;
+  const ids = await extractSerialIds(
+    frames.map((f) => f.bytes),
+    toFrameIdConfig(idConfig),
+    toFrameIdConfig(srcConfig),
+  );
+  return frames.map((frame, i) => ({
+    ...frame,
+    frame_id: idConfig ? ids[i].frame_id ?? frame.frame_id : frame.frame_id,
+    source_address: srcConfig ? ids[i].source_address ?? undefined : frame.source_address,
+  }));
 }
 
 /** Serial view tab IDs (string to support dynamic tool output tabs) */
@@ -254,16 +278,8 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
         any_function: framingConfig.anyFunction,
       },
       min_length: minFrameLength > 0 ? minFrameLength : undefined,
-      frame_id_config: frameIdExtractionConfig ? {
-        start_byte: frameIdExtractionConfig.startByte,
-        num_bytes: frameIdExtractionConfig.numBytes,
-        big_endian: frameIdExtractionConfig.endianness === 'big',
-      } : undefined,
-      source_address_config: sourceExtractionConfig ? {
-        start_byte: sourceExtractionConfig.startByte,
-        num_bytes: sourceExtractionConfig.numBytes,
-        big_endian: sourceExtractionConfig.endianness === 'big',
-      } : undefined,
+      frame_id_config: toFrameIdConfig(frameIdExtractionConfig),
+      source_address_config: toFrameIdConfig(sourceExtractionConfig),
     };
 
     try {
@@ -342,111 +358,13 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     set({ framingAccepted: false });
   },
 
-  applyFrameIdMapping: (config) => {
-    const { framedData, framingAccepted } = get();
+  applyFrameIdMapping: (config) => set({ frameIdExtractionConfig: config }),
 
-    // Always store the config for backend framing
-    set({ frameIdExtractionConfig: config });
+  clearFrameIdMapping: () => set({ frameIdExtractionConfig: null }),
 
-    // Only update local framedData if not accepted and we have data
-    if (framingAccepted || framedData.length === 0) return;
+  applySourceMapping: (config) => set({ sourceExtractionConfig: config }),
 
-    const extractFrameId = (bytes: number[]): number => {
-      const { startByte, numBytes, endianness } = config;
-      // Resolve negative indices (e.g., -1 = last byte)
-      const resolvedStart = startByte >= 0 ? startByte : Math.max(0, bytes.length + startByte);
-      if (resolvedStart >= bytes.length) return 0;
-
-      let frameId = 0;
-      const endByte = Math.min(resolvedStart + numBytes, bytes.length);
-
-      if (endianness === 'big') {
-        for (let i = resolvedStart; i < endByte; i++) {
-          frameId = (frameId << 8) | bytes[i];
-        }
-      } else {
-        for (let i = resolvedStart; i < endByte; i++) {
-          frameId |= bytes[i] << (8 * (i - resolvedStart));
-        }
-      }
-
-      return frameId;
-    };
-
-    const updatedFramedData = framedData.map(frame => ({
-      ...frame,
-      frame_id: extractFrameId(frame.bytes),
-    }));
-    set({ framedData: updatedFramedData });
-  },
-
-  clearFrameIdMapping: () => {
-    const { framedData, framingAccepted } = get();
-
-    // Clear the stored config
-    set({ frameIdExtractionConfig: null });
-
-    if (framingAccepted || framedData.length === 0) return;
-
-    const updatedFramedData = framedData.map(frame => ({
-      ...frame,
-      frame_id: 0,
-    }));
-    set({ framedData: updatedFramedData });
-  },
-
-  applySourceMapping: (config) => {
-    const { framedData, framingAccepted } = get();
-
-    // Always store the config for backend framing
-    set({ sourceExtractionConfig: config });
-
-    // Only update local framedData if not accepted and we have data
-    if (framingAccepted || framedData.length === 0) return;
-
-    const extractSource = (bytes: number[]): number => {
-      const { startByte, numBytes, endianness } = config;
-      // Resolve negative indices (e.g., -1 = last byte)
-      const resolvedStart = startByte >= 0 ? startByte : Math.max(0, bytes.length + startByte);
-      if (resolvedStart >= bytes.length) return 0;
-
-      let source = 0;
-      const endByte = Math.min(resolvedStart + numBytes, bytes.length);
-
-      if (endianness === 'big') {
-        for (let i = resolvedStart; i < endByte; i++) {
-          source = (source << 8) | bytes[i];
-        }
-      } else {
-        for (let i = resolvedStart; i < endByte; i++) {
-          source |= bytes[i] << (8 * (i - resolvedStart));
-        }
-      }
-
-      return source;
-    };
-
-    const updatedFramedData = framedData.map(frame => ({
-      ...frame,
-      source_address: extractSource(frame.bytes),
-    }));
-    set({ framedData: updatedFramedData });
-  },
-
-  clearSourceMapping: () => {
-    const { framedData, framingAccepted } = get();
-
-    // Clear the stored config
-    set({ sourceExtractionConfig: null });
-
-    if (framingAccepted || framedData.length === 0) return;
-
-    const updatedFramedData = framedData.map(frame => ({
-      ...frame,
-      source_address: undefined,
-    }));
-    set({ framedData: updatedFramedData });
-  },
+  clearSourceMapping: () => set({ sourceExtractionConfig: null }),
 
   setRawBytesViewConfig: (config) => set({ rawBytesViewConfig: config }),
 
