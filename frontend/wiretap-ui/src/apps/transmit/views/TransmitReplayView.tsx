@@ -33,7 +33,7 @@ import { Table } from "../../../components/Table";
 // Component
 // ============================================================================
 
-export default function TransmitReplayView() {
+export default function TransmitReplayView({ useLocalTimezone }: { useLocalTimezone: boolean }) {
   const { t } = useTranslation("transmit");
   const replayProgress = useTransmitStore((s) => s.replayProgress);
   const replayLog = useTransmitStore((s) => s.replayLog);
@@ -178,6 +178,7 @@ export default function TransmitReplayView() {
                     <ReplayLogRow
                       key={entry.id}
                       entry={entry}
+                      useLocalTimezone={useLocalTimezone}
                       onRestart={canRestart ? () => restartReplay(entry.replayId) : undefined}
                     />
                   );
@@ -195,7 +196,7 @@ export default function TransmitReplayView() {
 // Row component
 // ============================================================================
 
-function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?: () => void }) {
+function ReplayLogRow({ entry, useLocalTimezone, onRestart }: { entry: ReplayLogEntry; useLocalTimezone: boolean; onRestart?: () => void }) {
   const { t, i18n } = useTranslation("transmit");
   const { kind, profileName, totalFrames, speed, loopReplay, framesSent, errorMessage, timestamp, pass } = entry;
 
@@ -233,7 +234,7 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
   return (
     <tr>
       <td>{icon}</td>
-      <td className={`font-mono ${textSecondary}`}>{formatHumanUs(timestamp * 1000)}</td>
+      <td className={`font-mono ${textSecondary}`}>{formatHumanUs(timestamp * 1000, useLocalTimezone)}</td>
       <td className={textSecondary}>
         <span className="truncate max-w-30 block">{profileName}</span>
       </td>

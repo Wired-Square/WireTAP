@@ -273,7 +273,7 @@ function TransmitInner() {
       case "history":
         return <TransmitHistoryView outputBusToSource={outputBusToSource} sessionId={effectiveSessionId} />;
       case "replay":
-        return <TransmitReplayView />;
+        return <TransmitReplayView useLocalTimezone={settings?.display_timezone === "local"} />;
       default:
         return null;
     }
