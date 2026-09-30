@@ -440,11 +440,14 @@ mod tests {
             reconcile_mapping(0, true, 7),
             reconcile_mapping(1, false, 1),
         ]);
-        let read = |bus, at_us| CanRead {
-            frame: CanFrame::data(bus, 0x100, false, false, false, vec![bus]),
-            direction: Direction::Rx,
-            at: UNIX_EPOCH + Duration::from_micros(at_us),
-            device_us: Some(at_us),
+        let read = |bus, at_us| {
+            let mut read = CanRead::new(
+                CanFrame::data(bus, 0x100, false, false, false, vec![bus]),
+                Direction::Rx,
+                UNIX_EPOCH + Duration::from_micros(at_us),
+            );
+            read.device_us = Some(at_us);
+            read
         };
         let messages = s
             .on_event(CanEvent::Read(vec![read(0, 10), read(1, 20)]))

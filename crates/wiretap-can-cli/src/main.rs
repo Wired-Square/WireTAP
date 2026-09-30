@@ -230,6 +230,9 @@ async fn dump(
                 for read in reads.iter().take(left.try_into().unwrap_or(usize::MAX)) {
                     let direction = own.then_some(read.direction);
                     let line = candump::line(read.at, &name, &read.frame, direction);
+                    if read.overflow {
+                        eprintln!("{interface}: the device dropped frames before {line}");
+                    }
                     if writeln!(out, "{line}").is_err() {
                         left = 0;
                         break;

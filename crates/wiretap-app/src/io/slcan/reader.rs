@@ -242,12 +242,11 @@ mod tests {
     }
 
     fn read(frame: CanFrame) -> CanRead {
-        CanRead {
+        CanRead::new(
             frame,
-            direction: Direction::Rx,
-            at: UNIX_EPOCH + Duration::from_micros(1_000),
-            device_us: None,
-        }
+            Direction::Rx,
+            UNIX_EPOCH + Duration::from_micros(1_000),
+        )
     }
 
     #[test]

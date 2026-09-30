@@ -101,6 +101,9 @@ pub(crate) fn mapped_frames(
     reads: Vec<CanRead>,
     mappings: &[BusMapping],
 ) -> Option<SourceMessage> {
+    if reads.iter().any(|read| read.overflow) {
+        tlog!("[can] Source {source_idx} device dropped frames");
+    }
     let frames = apply_bus_mappings_batch(reads.into_iter().map(frame_message).collect(), mappings);
     (!frames.is_empty()).then(|| SourceMessage::Frames(source_idx, frames))
 }
@@ -286,12 +289,9 @@ mod tests {
     use wiretap_io::can::Unsupported;
 
     fn read(frame: CanFrame, direction: Direction, at_us: u64) -> CanRead {
-        CanRead {
-            frame,
-            direction,
-            at: UNIX_EPOCH + Duration::from_micros(at_us),
-            device_us: Some(42),
-        }
+        let mut read = CanRead::new(frame, direction, UNIX_EPOCH + Duration::from_micros(at_us));
+        read.device_us = Some(42);
+        read
     }
 
     #[test]

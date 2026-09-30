@@ -201,12 +201,9 @@ mod tests {
     }
 
     fn read(frame: CanFrame, direction: Direction) -> CanRead {
-        CanRead {
-            frame,
-            direction,
-            at: UNIX_EPOCH + Duration::from_micros(1_000),
-            device_us: Some(1_000),
-        }
+        let mut read = CanRead::new(frame, direction, UNIX_EPOCH + Duration::from_micros(1_000));
+        read.device_us = Some(1_000);
+        read
     }
 
     fn probed(clock_hz: Option<u32>) -> DeviceInfo {

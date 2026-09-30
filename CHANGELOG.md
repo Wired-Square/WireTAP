@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **gs_usb adapters follow the Linux driver more closely.** Only the six USB ids the kernel's gs_usb driver knows are recognised, so a device on `1d50:606d` is no longer listed. A bit timing the adapter cannot do is now refused at start with the bitrate and the adapter's limits, instead of retried with looser limits, and a frame counts as CAN FD only when the adapter flags it so. When the adapter reports that it dropped frames, the log now says so.
+
 ## [0.13.0] - 2026-09-29
 
 ### Added

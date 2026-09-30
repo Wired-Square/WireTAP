@@ -37,7 +37,7 @@ pub use nusb_driver::run_source;
 // the diagnostic CLI reaches them through this module rather than importing the
 // crate.
 
-pub use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
+pub use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
 
 // ============================================================================
 // Configuration Types

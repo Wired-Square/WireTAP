@@ -1,7 +1,7 @@
 use nusb::descriptors::TransferType;
 use nusb::transfer::{ControlIn, ControlType, Direction, Recipient};
 use nusb::{DeviceInfo, Interface, MaybeFuture};
-use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, PIDS, VID};
+use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
 
 use crate::iface::GsUsbSelector;
 
@@ -33,7 +33,7 @@ fn find_device(selector: &GsUsbSelector) -> Result<DeviceInfo, String> {
     nusb::list_devices()
         .wait()
         .map_err(|e| format!("Failed to list USB devices: {}", e))?
-        .filter(|dev| dev.vendor_id() == VID && PIDS.contains(&dev.product_id()))
+        .filter(|dev| DEVICES.contains(&(dev.vendor_id(), dev.product_id())))
         .find(|dev| match selector {
             GsUsbSelector::Serial(serial) => dev.serial_number() == Some(serial.as_str()),
             GsUsbSelector::BusAddress(bus, address) => {
