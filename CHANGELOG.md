@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`wiretap-can-cli` drives PEAK adapters on macOS and Windows.** Name one as `pcan:<serial>` or `pcan:<bus:addr>`, with `/<channel>` for a multi-channel model, in `list`, `probe`, `dump`, `send`, `gen` and `pattern`. `--bitrate`, `--sample-point` and `--dbitrate` apply, and a nominal rate above 1 Mbit/s is refused. Only the classic PCAN-USB has been tried on hardware; the FD models are untested. On Linux a PEAK adapter is a SocketCAN interface, as before.
+
 ### Changed
 
 - **gs_usb adapters follow the Linux driver more closely.** Only the six USB ids the kernel's gs_usb driver knows are recognised, so a device on `1d50:606d` is no longer listed. A bit timing the adapter cannot do is now refused at start with the bitrate and the adapter's limits, instead of retried with looser limits, and a frame counts as CAN FD only when the adapter flags it so. When the adapter reports that it dropped frames, the log now says so.

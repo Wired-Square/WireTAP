@@ -10,9 +10,9 @@ clap = { version = "4", features = ["derive"] }
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
 wiretap-protocol = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.21.1" }
-# Each transport gates itself by target: gs_usb over nusb on macOS and Windows,
+# Each transport gates itself by target: gs_usb and PEAK over nusb on macOS and Windows,
 # SocketCAN and the gs_usb sysfs listing on Linux.
-wiretap-io = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.21.1", features = ["can-gvret", "can-slcan", "can-gsusb", "can-socketcan", "serial-ports"] }
+wiretap-io = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.21.1", features = ["can-gvret", "can-slcan", "can-gsusb", "can-pcan", "can-socketcan", "serial-ports"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 nusb = { version = "0.2", features = ["tokio"] }

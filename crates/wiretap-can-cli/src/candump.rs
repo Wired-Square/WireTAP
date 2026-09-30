@@ -137,6 +137,8 @@ mod tests {
             ("socketcan:can0", "socketcan-can0"),
             ("gsusb:205933B831335010/1", "gsusb-205933B831335010-1"),
             ("gsusb:0:5", "gsusb-0-5"),
+            ("pcan:0012ABCD/0", "pcan-0012ABCD-0"),
+            ("pcan:1:4/1", "pcan-1-4-1"),
             ("slcan:/dev/cu.usbmodem1101", "slcan-dev-cu.usbmodem1101"),
             ("slcan:COM3", "slcan-COM3"),
             ("gvret:[::1]:23", "gvret-1-23"),

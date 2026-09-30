@@ -21,7 +21,8 @@ use crate::iface::{BusOptions, Interface, Probed};
 /// can-utils for every WireTAP CAN transport.
 ///
 /// Interfaces: gsusb:<serial>[/<channel>], gsusb:<bus:addr>[/<channel>],
-/// slcan:<port>, socketcan:<if> (Linux), gvret:<host:port>.
+/// pcan:<serial>[/<channel>], pcan:<bus:addr>[/<channel>], slcan:<port>,
+/// socketcan:<if> (Linux), gvret:<host:port>.
 #[derive(Parser)]
 #[command(name = "wiretap-can-cli", version)]
 struct Cli {
@@ -33,7 +34,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// List gs_usb adapters, serial ports and SocketCAN interfaces
+    /// List gs_usb and PEAK adapters, serial ports and SocketCAN interfaces
     List,
     /// Ask a device what it is, without starting its channel
     Probe { interface: Interface },
@@ -318,6 +319,18 @@ fn list() -> Result<(), String> {
             device.product,
             device.serial.as_deref().unwrap_or("")
         );
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        println!("PEAK");
+        for device in wiretap_io::can::pcan::devices().map_err(|e| format!("USB: {e}"))? {
+            let selector = device
+                .serial
+                .clone()
+                .unwrap_or_else(|| format!("{}:{}", device.bus, device.address));
+            println!("  pcan:{selector:<31} {}", device.model);
+        }
     }
 
     println!("serial ports");

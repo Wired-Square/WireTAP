@@ -2,6 +2,11 @@ use std::{fmt, str::FromStr, time::Duration};
 
 use clap::Args;
 use wiretap_io::can::{gvret, slcan, CanFrame, CanOptions, CanTask, CanWriter, DeviceInfo};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use wiretap_io::can::{
+    pcan::{self, PcanDevice, PcanOptions},
+    CanError,
+};
 use wiretap_io::serial::{LineSettings, Parity};
 
 const DEFAULT_BITRATE: u32 = 500_000;
@@ -17,16 +22,48 @@ const SLCAN_LINE: LineSettings = LineSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Interface {
-    GsUsb { device: GsUsbSelector, channel: u8 },
+    GsUsb { device: UsbSelector, channel: u8 },
+    Pcan { device: UsbSelector, channel: u8 },
     Slcan { port: String },
     SocketCan { name: String },
     Gvret { endpoint: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GsUsbSelector {
+pub enum UsbSelector {
     Serial(String),
     BusAddress(u8, u8),
+}
+
+impl fmt::Display for UsbSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Serial(serial) => f.write_str(serial),
+            Self::BusAddress(bus, address) => write!(f, "{bus}:{address}"),
+        }
+    }
+}
+
+/// `<serial>[/<channel>]` or `<bus:addr>[/<channel>]`.
+fn usb_selector(rest: &str, usage: impl Fn() -> String) -> Result<(UsbSelector, u8), String> {
+    let (selector, channel) = match rest.split_once('/') {
+        Some((selector, channel)) => (
+            selector,
+            channel
+                .parse()
+                .map_err(|_| format!("'{channel}' is not a channel number"))?,
+        ),
+        None => (rest, 0),
+    };
+    let device = match selector.split_once(':') {
+        Some((bus, address)) => match (bus.parse(), address.parse()) {
+            (Ok(bus), Ok(address)) => UsbSelector::BusAddress(bus, address),
+            _ => return Err(format!("'{selector}' is not a USB bus:address")),
+        },
+        None if selector.is_empty() => return Err(usage()),
+        None => UsbSelector::Serial(selector.to_owned()),
+    };
+    Ok((device, channel))
 }
 
 impl FromStr for Interface {
@@ -36,6 +73,7 @@ impl FromStr for Interface {
         let usage = || {
             format!(
                 "'{s}' is not an interface: use gsusb:<serial>[/<channel>], gsusb:<bus:addr>[/<channel>], \
+                 pcan:<serial>[/<channel>], pcan:<bus:addr>[/<channel>], \
                  slcan:<port>, socketcan:<if> or gvret:<host:port>"
             )
         };
@@ -44,25 +82,13 @@ impl FromStr for Interface {
             return Err(usage());
         }
         match kind {
-            "gsusb" => {
-                let (selector, channel) = match rest.split_once('/') {
-                    Some((selector, channel)) => (
-                        selector,
-                        channel
-                            .parse()
-                            .map_err(|_| format!("'{channel}' is not a channel number"))?,
-                    ),
-                    None => (rest, 0),
-                };
-                let device = match selector.split_once(':') {
-                    Some((bus, address)) => match (bus.parse(), address.parse()) {
-                        (Ok(bus), Ok(address)) => GsUsbSelector::BusAddress(bus, address),
-                        _ => return Err(format!("'{selector}' is not a USB bus:address")),
-                    },
-                    None if selector.is_empty() => return Err(usage()),
-                    None => GsUsbSelector::Serial(selector.to_owned()),
-                };
-                Ok(Self::GsUsb { device, channel })
+            "gsusb" | "pcan" => {
+                let (device, channel) = usb_selector(rest, usage)?;
+                Ok(if kind == "gsusb" {
+                    Self::GsUsb { device, channel }
+                } else {
+                    Self::Pcan { device, channel }
+                })
             }
             "slcan" => Ok(Self::Slcan {
                 port: rest.to_owned(),
@@ -86,13 +112,8 @@ impl FromStr for Interface {
 impl fmt::Display for Interface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::GsUsb { device, channel } => {
-                match device {
-                    GsUsbSelector::Serial(serial) => write!(f, "gsusb:{serial}")?,
-                    GsUsbSelector::BusAddress(bus, address) => write!(f, "gsusb:{bus}:{address}")?,
-                }
-                write!(f, "/{channel}")
-            }
+            Self::GsUsb { device, channel } => write!(f, "gsusb:{device}/{channel}"),
+            Self::Pcan { device, channel } => write!(f, "pcan:{device}/{channel}"),
             Self::Slcan { port } => write!(f, "slcan:{port}"),
             Self::SocketCan { name } => write!(f, "socketcan:{name}"),
             Self::Gvret { endpoint } => write!(f, "gvret:{endpoint}"),
@@ -104,7 +125,7 @@ impl Interface {
     /// The bus number frames are sent on and read from.
     pub fn bus(&self) -> u8 {
         match self {
-            Self::GsUsb { channel, .. } => *channel,
+            Self::GsUsb { channel, .. } | Self::Pcan { channel, .. } => *channel,
             _ => 0,
         }
     }
@@ -155,6 +176,12 @@ impl BusOptions {
 enum Plan {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     GsUsb(wiretap_io::can::gsusb::GsUsbOptions),
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    Pcan {
+        device: UsbSelector,
+        channel: u8,
+        bus: BusOptions,
+    },
     Slcan(slcan::SlcanOptions),
     #[cfg(target_os = "linux")]
     SocketCan {
@@ -168,6 +195,7 @@ enum Plan {
 fn plan(interface: &Interface, bus: &BusOptions) -> Result<Plan, String> {
     match interface {
         Interface::GsUsb { device, channel } => gs_usb_plan(device, *channel, bus),
+        Interface::Pcan { device, channel } => pcan_plan(device, *channel, bus),
         Interface::Slcan { port } => {
             bus.refuse("SLCAN", &["--sample-point", "--can-clock"])?;
             Ok(Plan::Slcan(slcan::SlcanOptions {
@@ -196,7 +224,7 @@ fn tcp(endpoint: &str) -> gvret::Link {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn gs_usb_plan(device: &GsUsbSelector, channel: u8, bus: &BusOptions) -> Result<Plan, String> {
+fn gs_usb_plan(device: &UsbSelector, channel: u8, bus: &BusOptions) -> Result<Plan, String> {
     use wiretap_io::can::gsusb::GsUsbOptions;
     let mut gs = GsUsbOptions::new(usb_device(device), bus.bitrate.unwrap_or(DEFAULT_BITRATE));
     gs.channel = channel;
@@ -207,12 +235,100 @@ fn gs_usb_plan(device: &GsUsbSelector, channel: u8, bus: &BusOptions) -> Result<
 }
 
 #[cfg(target_os = "linux")]
-fn gs_usb_plan(_: &GsUsbSelector, _: u8, _: &BusOptions) -> Result<Plan, String> {
+fn gs_usb_plan(_: &UsbSelector, _: u8, _: &BusOptions) -> Result<Plan, String> {
     Err(
         "on Linux the kernel drives a gs_usb adapter as a SocketCAN interface: \
          use socketcan:<if> (list names it)"
             .to_owned(),
     )
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn pcan_plan(device: &UsbSelector, channel: u8, bus: &BusOptions) -> Result<Plan, String> {
+    bus.refuse("PEAK", &["--can-clock"])?;
+    Ok(Plan::Pcan {
+        device: device.clone(),
+        channel,
+        bus: bus.clone(),
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn pcan_plan(_: &UsbSelector, _: u8, _: &BusOptions) -> Result<Plan, String> {
+    Err(
+        "on Linux the kernel drives a PEAK adapter as a SocketCAN interface: \
+         use socketcan:<if> (list names it)"
+            .to_owned(),
+    )
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn pcan_options(device: PcanDevice, channel: u8, bus: &BusOptions) -> PcanOptions {
+    let mut pcan = PcanOptions::new(device, bus.bitrate.unwrap_or(DEFAULT_BITRATE));
+    pcan.channel = channel;
+    pcan.sample_point = bus.sample_point;
+    pcan.data = bus.dbitrate.map(|rate| (rate, None));
+    pcan
+}
+
+/// The library looks for an adapter only among its model's, and a serial names
+/// no model, so a serial is tried on every model plugged in.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn pcan_candidates(selector: &UsbSelector, found: &[PcanDevice]) -> Vec<PcanDevice> {
+    match selector {
+        UsbSelector::BusAddress(bus, address) => found
+            .iter()
+            .filter(|device| device.bus == *bus && device.address == *address)
+            .map(|device| PcanDevice {
+                serial: None,
+                ..device.clone()
+            })
+            .collect(),
+        UsbSelector::Serial(serial) => {
+            let mut models = Vec::new();
+            for device in found {
+                if !models.contains(&device.model) {
+                    models.push(device.model);
+                }
+            }
+            models
+                .into_iter()
+                .map(|model| PcanDevice {
+                    serial: Some(serial.clone()),
+                    bus: 0,
+                    address: 0,
+                    product: String::new(),
+                    model,
+                })
+                .collect()
+        }
+    }
+}
+
+/// The first candidate that is found answers; failing all, the first reason
+/// other than not finding it.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+async fn with_pcan<T, F: std::future::Future<Output = Result<T, CanError>>>(
+    selector: &UsbSelector,
+    attempt: impl Fn(PcanDevice) -> F,
+) -> Result<T, CanError> {
+    use std::io::ErrorKind::NotFound;
+    let unopened = |source| CanError::Open {
+        device: format!("pcan {selector}"),
+        source,
+    };
+    let found = pcan::devices().map_err(unopened)?;
+    let mut refused = None;
+    for device in pcan_candidates(selector, &found) {
+        match attempt(device).await {
+            Ok(answer) => return Ok(answer),
+            Err(CanError::Open { source, .. }) if source.kind() == NotFound => {}
+            Err(e) => {
+                refused.get_or_insert(e);
+            }
+        }
+    }
+    Err(refused.unwrap_or_else(|| unopened(NotFound.into())))
 }
 
 #[cfg(target_os = "linux")]
@@ -234,10 +350,10 @@ fn socketcan_plan(_: &str, _: &BusOptions) -> Result<Plan, String> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn usb_device(selector: &GsUsbSelector) -> wiretap_io::can::gsusb::GsUsbDevice {
+fn usb_device(selector: &UsbSelector) -> wiretap_io::can::gsusb::GsUsbDevice {
     let (serial, bus, address) = match selector {
-        GsUsbSelector::Serial(serial) => (Some(serial.clone()), 0, 0),
-        GsUsbSelector::BusAddress(bus, address) => (None, *bus, *address),
+        UsbSelector::Serial(serial) => (Some(serial.clone()), 0, 0),
+        UsbSelector::BusAddress(bus, address) => (None, *bus, *address),
     };
     wiretap_io::can::gsusb::GsUsbDevice {
         serial,
@@ -264,6 +380,17 @@ pub async fn open(
     let opened = match plan {
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         Plan::GsUsb(gs) => wiretap_io::can::gsusb::open(gs, options).await,
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        Plan::Pcan {
+            device,
+            channel,
+            bus,
+        } => {
+            with_pcan(&device, |found| {
+                pcan::open(pcan_options(found, channel, &bus), options.clone())
+            })
+            .await
+        }
         Plan::Slcan(sl) => slcan::open(sl, options).await,
         #[cfg(target_os = "linux")]
         Plan::SocketCan {
@@ -320,6 +447,13 @@ pub async fn probe(interface: &Interface) -> Result<Probed, String> {
         Interface::GsUsb { device, .. } => {
             wiretap_io::can::gsusb::probe(&usb_device(device), PROBE_TIMEOUT).await
         }
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        Interface::Pcan { device, .. } => {
+            with_pcan(device, |found| async move {
+                pcan::probe(&found, PROBE_TIMEOUT).await
+            })
+            .await
+        }
         Interface::Slcan { port } => slcan::probe(port, SLCAN_LINE, PROBE_TIMEOUT).await,
         Interface::Gvret { endpoint } => gvret::probe(tcp(endpoint), PROBE_TIMEOUT).await,
         #[cfg(target_os = "linux")]
@@ -348,28 +482,42 @@ mod tests {
             (
                 "gsusb:205933B831335010",
                 Interface::GsUsb {
-                    device: GsUsbSelector::Serial("205933B831335010".into()),
+                    device: UsbSelector::Serial("205933B831335010".into()),
                     channel: 0,
                 },
             ),
             (
                 "gsusb:205933B831335010/1",
                 Interface::GsUsb {
-                    device: GsUsbSelector::Serial("205933B831335010".into()),
+                    device: UsbSelector::Serial("205933B831335010".into()),
                     channel: 1,
                 },
             ),
             (
                 "gsusb:0:5",
                 Interface::GsUsb {
-                    device: GsUsbSelector::BusAddress(0, 5),
+                    device: UsbSelector::BusAddress(0, 5),
                     channel: 0,
                 },
             ),
             (
                 "gsusb:2:17/1",
                 Interface::GsUsb {
-                    device: GsUsbSelector::BusAddress(2, 17),
+                    device: UsbSelector::BusAddress(2, 17),
+                    channel: 1,
+                },
+            ),
+            (
+                "pcan:0012ABCD",
+                Interface::Pcan {
+                    device: UsbSelector::Serial("0012ABCD".into()),
+                    channel: 0,
+                },
+            ),
+            (
+                "pcan:1:4/1",
+                Interface::Pcan {
+                    device: UsbSelector::BusAddress(1, 4),
                     channel: 1,
                 },
             ),
@@ -422,7 +570,10 @@ mod tests {
             "gvret:host",
             "gvret::23",
             "gvret:host:99999",
-            "pcan:1",
+            "pcan:",
+            "pcan:/1",
+            "pcan:0:x",
+            "peak:1",
         ] {
             assert!(parse(text).is_err(), "{text}");
         }
@@ -433,6 +584,8 @@ mod tests {
         for text in [
             "gsusb:ABC/1",
             "gsusb:0:5/0",
+            "pcan:0012ABCD/0",
+            "pcan:1:4/1",
             "slcan:COM3",
             "socketcan:can0",
             "gvret:h:23",
@@ -498,10 +651,92 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn gs_usb_on_linux_points_at_socketcan() {
-        let error = plan(&parse("gsusb:ABC").unwrap(), &BusOptions::default())
-            .err()
-            .unwrap();
-        assert!(error.contains("socketcan:"), "{error}");
+    fn gs_usb_and_peak_on_linux_point_at_socketcan() {
+        for text in ["gsusb:ABC", "pcan:ABC"] {
+            let error = plan(&parse(text).unwrap(), &BusOptions::default())
+                .err()
+                .unwrap();
+            assert!(error.contains("socketcan:"), "{error}");
+        }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    mod peak {
+        use wiretap_io::can::pcan::PcanModel;
+
+        use super::*;
+
+        fn found(serial: Option<&str>, bus: u8, address: u8, model: PcanModel) -> PcanDevice {
+            PcanDevice {
+                serial: serial.map(str::to_owned),
+                bus,
+                address,
+                product: model.to_string(),
+                model,
+            }
+        }
+
+        #[test]
+        fn peak_refuses_a_can_clock_and_takes_the_rest() {
+            let pcan = parse("pcan:0012ABCD").unwrap();
+            let mut bus = BusOptions {
+                can_clock: Some(40_000_000),
+                ..BusOptions::default()
+            };
+            let error = plan(&pcan, &bus).err().unwrap();
+            assert!(error.contains("--can-clock"), "{error}");
+
+            bus.can_clock = None;
+            bus.bitrate = Some(250_000);
+            bus.dbitrate = Some(2_000_000);
+            bus.sample_point = Some(80.0);
+            bus.listen_only = true;
+            assert!(plan(&pcan, &bus).is_ok());
+        }
+
+        #[test]
+        fn the_bus_options_become_the_adapters() {
+            let device = found(None, 1, 4, PcanModel::UsbProFd);
+            let bus = BusOptions {
+                dbitrate: Some(2_000_000),
+                sample_point: Some(80.0),
+                ..BusOptions::default()
+            };
+            let options = pcan_options(device.clone(), 1, &bus);
+            assert_eq!(options.device, device);
+            assert_eq!(options.channel, 1);
+            assert_eq!(options.bitrate, DEFAULT_BITRATE);
+            assert_eq!(options.sample_point, Some(80.0));
+            assert_eq!(options.data, Some((2_000_000, None)));
+
+            let classic = pcan_options(device, 0, &BusOptions::default());
+            assert_eq!((classic.sample_point, classic.data), (None, None));
+        }
+
+        #[test]
+        fn a_bus_address_is_the_adapter_there_and_a_serial_is_asked_of_each_model() {
+            let plugged = [
+                found(None, 1, 4, PcanModel::Usb),
+                found(Some("00A1B2C3"), 1, 5, PcanModel::UsbFd),
+                found(None, 2, 6, PcanModel::Usb),
+            ];
+            assert_eq!(
+                pcan_candidates(&UsbSelector::BusAddress(1, 5), &plugged),
+                [found(None, 1, 5, PcanModel::UsbFd)]
+            );
+            assert!(pcan_candidates(&UsbSelector::BusAddress(3, 1), &plugged).is_empty());
+
+            let asked: Vec<_> = pcan_candidates(&UsbSelector::Serial("0012ABCD".into()), &plugged)
+                .into_iter()
+                .map(|device| (device.serial, device.model))
+                .collect();
+            assert_eq!(
+                asked,
+                [
+                    (Some("0012ABCD".into()), PcanModel::Usb),
+                    (Some("0012ABCD".into()), PcanModel::UsbFd),
+                ]
+            );
+        }
     }
 }

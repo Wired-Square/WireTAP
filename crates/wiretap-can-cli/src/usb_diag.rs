@@ -3,7 +3,7 @@ use nusb::transfer::{ControlIn, ControlType, Direction, Recipient};
 use nusb::{DeviceInfo, Interface, MaybeFuture};
 use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
 
-use crate::iface::GsUsbSelector;
+use crate::iface::UsbSelector;
 
 const CONTROL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1000);
 
@@ -14,7 +14,7 @@ struct BulkEndpoints {
 }
 
 /// USB descriptors, the gs_usb device config and `BT_CONST`, and the bulk endpoints.
-pub fn diag(selector: &GsUsbSelector) -> Result<(), String> {
+pub fn diag(selector: &UsbSelector) -> Result<(), String> {
     let device_info = find_device(selector)?;
     print_topology(&device_info)?;
     match discover_endpoints(&device_info) {
@@ -29,14 +29,14 @@ pub fn diag(selector: &GsUsbSelector) -> Result<(), String> {
     Ok(())
 }
 
-fn find_device(selector: &GsUsbSelector) -> Result<DeviceInfo, String> {
+fn find_device(selector: &UsbSelector) -> Result<DeviceInfo, String> {
     nusb::list_devices()
         .wait()
         .map_err(|e| format!("Failed to list USB devices: {}", e))?
         .filter(|dev| DEVICES.contains(&(dev.vendor_id(), dev.product_id())))
         .find(|dev| match selector {
-            GsUsbSelector::Serial(serial) => dev.serial_number() == Some(serial.as_str()),
-            GsUsbSelector::BusAddress(bus, address) => {
+            UsbSelector::Serial(serial) => dev.serial_number() == Some(serial.as_str()),
+            UsbSelector::BusAddress(bus, address) => {
                 dev.bus_id().parse::<u8>().ok() == Some(*bus) && dev.device_address() == *address
             }
         })

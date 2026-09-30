@@ -19,6 +19,7 @@ The binary is `target/release/wiretap-can-cli`.
 | Interface | Form | Notes |
 |-----------|------|-------|
 | gs_usb / candleLight | `gsusb:<serial>[/<channel>]`, `gsusb:<bus:addr>[/<channel>]` | macOS and Windows. On Linux the kernel driver makes it a SocketCAN interface; `list` names it |
+| PEAK | `pcan:<serial>[/<channel>]`, `pcan:<bus:addr>[/<channel>]` | macOS and Windows: the PCAN-USB, and the CAN FD models, untested. The serial is the one `probe` prints; the PCAN-USB has no USB serial string, so `list` names it by bus and address. On Linux the kernel driver makes it a SocketCAN interface |
 | SLCAN | `slcan:<port>` | `slcan:/dev/cu.usbmodem1101`, `slcan:COM3`; 115200 8N1 |
 | SocketCAN | `socketcan:<if>` | Linux only; the bit rate is set with `ip link` |
 | GVRET | `gvret:<host:port>` | over TCP; the bus rate is set on the device |
@@ -27,20 +28,20 @@ The binary is `target/release/wiretap-can-cli`.
 
 Every command takes these, and refuses one the transport cannot take:
 
-| Flag | Default | gs_usb | SLCAN | SocketCAN | GVRET |
-|------|---------|--------|-------|-----------|-------|
-| `--bitrate` | 500000 | yes | yes | checked against the interface | no |
-| `--dbitrate` | off | yes, enables CAN FD | yes, Elmue firmware | checked against the interface | no |
-| `--listen-only` | off | yes | yes | yes | yes |
-| `--sample-point` | 87.5 | yes | no | no | no |
-| `--can-clock` | device's | yes | no | no | no |
+| Flag | Default | gs_usb | PEAK | SLCAN | SocketCAN | GVRET |
+|------|---------|--------|------|-------|-----------|-------|
+| `--bitrate` | 500000 | yes | yes | yes | checked against the interface | no |
+| `--dbitrate` | off | yes, enables CAN FD | yes, FD models | yes, Elmue firmware | checked against the interface | no |
+| `--listen-only` | off | yes | yes | yes | yes | yes |
+| `--sample-point` | 87.5 | yes | yes | no | no | no |
+| `--can-clock` | device's | yes | no | no | no | no |
 
 ## Commands
 
 ### `list`
 
-gs_usb adapters, serial ports, and SocketCAN interfaces on Linux, each as an
-interface argument.
+gs_usb and PEAK adapters, serial ports, and SocketCAN interfaces on Linux, each
+as an interface argument.
 
 ```bash
 wiretap-can-cli list
@@ -53,6 +54,7 @@ the interface's configured rates.
 
 ```bash
 wiretap-can-cli probe gsusb:205933B831335010
+wiretap-can-cli probe pcan:1:4
 ```
 
 ### `dump`
@@ -67,6 +69,7 @@ host's wall clock.
 ```bash
 wiretap-can-cli dump gsusb:205933B831335010 --dbitrate 2000000 --listen-only
 wiretap-can-cli dump slcan:COM3 --own --count 1000 > walk.log
+wiretap-can-cli dump pcan:0012ABCD --bitrate 250000
 ```
 
 This is the format `scripts/hw-walk/walk-diff` scores. It is not a reference
