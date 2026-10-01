@@ -127,15 +127,9 @@ export function buildFramesToml(
   lines.push("[meta]");
   lines.push(`name = "${meta.name.replace(/"/g, '\\"')}"`);
   lines.push(`version = ${Math.max(1, meta.version)}`);
-  lines.push(`default_byte_order = "${meta.default_byte_order}"`);
   lines.push(`default_frame = "${protocol}"`);
-  lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
   lines.push("");
-
-  // Add serial config section if protocol is serial and config is provided
-  if (protocol === "serial" && serialConfig) {
-    writeSerialConfigSection(lines, serialConfig);
-  }
+  writeProtocolMetaSection(lines, protocol, meta, serialConfig);
 
   frames.forEach((f) => {
     const idStr = formatId(f.id, f.isExtended);
@@ -147,41 +141,52 @@ export function buildFramesToml(
   return lines.join("\n");
 }
 
-/**
- * Write the [frame.serial.config] section to TOML lines.
- * Only includes fields that have meaningful values.
- */
-function writeSerialConfigSection(lines: string[], config: SerialFrameConfig, meta?: ExportMeta): void {
-  // Always write [meta.serial] for serial protocol
-  lines.push("[meta.serial]");
-
-  // Add default byte order and interval from meta
-  if (meta) {
+function writeProtocolMetaSection(
+  lines: string[],
+  protocol: string,
+  meta: ExportMeta,
+  serialConfig: SerialFrameConfig = {}
+): void {
+  if (protocol === "can") {
+    lines.push("[meta.can]");
     lines.push(`default_byte_order = "${meta.default_byte_order}"`);
     lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
+    lines.push("");
+  } else if (protocol === "serial") {
+    writeSerialConfigSection(lines, serialConfig, meta);
   }
+}
+
+function headerFieldMask(startByte: number, bytes: number): string {
+  return `0x${((2 ** (bytes * 8) - 1) * 2 ** (startByte * 8)).toString(16).toUpperCase()}`;
+}
+
+function writeHeaderField(
+  lines: string[],
+  name: string,
+  startByte: number | undefined,
+  bytes: number | undefined,
+  byteOrder: "big" | "little" | undefined
+): void {
+  if (startByte === undefined || startByte < 0 || bytes === undefined) return;
+  lines.push(`[meta.serial.fields.${name}]`);
+  lines.push(`mask = ${headerFieldMask(startByte, bytes)}`);
+  if (byteOrder) {
+    lines.push(`byte_order = "${byteOrder}"`);
+  }
+}
+
+function writeSerialConfigSection(lines: string[], config: SerialFrameConfig, meta: ExportMeta): void {
+  lines.push("[meta.serial]");
+  lines.push(`byte_order = "${meta.default_byte_order}"`);
+  lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
 
   if (config.encoding) {
     lines.push(`encoding = "${config.encoding}"`);
   }
 
-  if (config.frame_id_start_byte !== undefined && config.frame_id_bytes !== undefined) {
-    lines.push(`frame_id_start_byte = ${config.frame_id_start_byte}`);
-    lines.push(`frame_id_bytes = ${config.frame_id_bytes}`);
-    if (config.frame_id_byte_order) {
-      lines.push(`frame_id_byte_order = "${config.frame_id_byte_order}"`);
-    }
-    if (config.frame_id_mask !== undefined) {
-      lines.push(`frame_id_mask = 0x${config.frame_id_mask.toString(16).toUpperCase()}`);
-    }
-  }
-
-  if (config.source_address_start_byte !== undefined && config.source_address_bytes !== undefined) {
-    lines.push(`source_address_start_byte = ${config.source_address_start_byte}`);
-    lines.push(`source_address_bytes = ${config.source_address_bytes}`);
-    if (config.source_address_byte_order) {
-      lines.push(`source_address_byte_order = "${config.source_address_byte_order}"`);
-    }
+  if (config.frame_id_mask !== undefined) {
+    lines.push(`frame_id_mask = 0x${config.frame_id_mask.toString(16).toUpperCase()}`);
   }
 
   if (config.min_frame_length !== undefined && config.min_frame_length > 0) {
@@ -191,6 +196,15 @@ function writeSerialConfigSection(lines: string[], config: SerialFrameConfig, me
   if (config.header_length !== undefined && config.header_length > 0) {
     lines.push(`header_length = ${config.header_length}`);
   }
+
+  writeHeaderField(lines, "id", config.frame_id_start_byte, config.frame_id_bytes, config.frame_id_byte_order);
+  writeHeaderField(
+    lines,
+    "source_address",
+    config.source_address_start_byte,
+    config.source_address_bytes,
+    config.source_address_byte_order
+  );
 
   // Write checksum configuration if detected.
   //
@@ -237,23 +251,7 @@ export function buildFramesTomlWithKnowledge(
   lines.push(`version = ${Math.max(1, meta.version)}`);
   lines.push(`default_frame = "${protocol}"`);
   lines.push("");
-
-  // Add protocol-specific config section with byte order and interval
-  if (protocol === "can") {
-    lines.push("[meta.can]");
-    lines.push(`default_byte_order = "${meta.default_byte_order}"`);
-    lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
-    lines.push("");
-  } else if (protocol === "serial" && serialConfig) {
-    // Serial config includes encoding and frame extraction settings
-    writeSerialConfigSection(lines, serialConfig, meta);
-  } else if (protocol === "serial") {
-    // Serial without config - just add basic meta.serial section
-    lines.push("[meta.serial]");
-    lines.push(`default_byte_order = "${meta.default_byte_order}"`);
-    lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
-    lines.push("");
-  }
+  writeProtocolMetaSection(lines, protocol, meta, serialConfig);
 
   // Frame sections
   frames.forEach((f) => {
@@ -352,8 +350,8 @@ function write1DMuxSection(
 ): void {
   lines.push(`# Multiplexed frame (selector at byte ${mux.selectorByte})`);
   lines.push(`[frame.${protocol}."${frameIdStr}".mux]`);
-  lines.push(`selector_start_bit = ${mux.selectorStartBit}`);
-  lines.push(`selector_bit_length = ${mux.selectorBitLength}`);
+  lines.push(`start_bit = ${mux.selectorStartBit}`);
+  lines.push(`bit_length = ${mux.selectorBitLength}`);
 
   // List the mux cases as a comment
   if (mux.cases.length > 0) {
@@ -405,8 +403,8 @@ function write2DMuxSection(
   // Write outer mux definition
   lines.push(`# 2D Multiplexed frame (selector at byte[0:1])`);
   lines.push(`[frame.${protocol}."${frameIdStr}".mux]`);
-  lines.push(`selector_start_bit = 0`);
-  lines.push(`selector_bit_length = 8`);
+  lines.push(`start_bit = 0`);
+  lines.push(`bit_length = 8`);
 
   const outerValues = Array.from(outerCases.keys()).sort((a, b) => a - b);
   lines.push(`# Outer mux cases (byte 0): ${outerValues.map(c => String(c)).join(', ')}`);
@@ -418,8 +416,8 @@ function write2DMuxSection(
 
     lines.push('');
     lines.push(`[frame.${protocol}."${frameIdStr}".mux."${outerStr}".mux]`);
-    lines.push(`selector_start_bit = 8`);
-    lines.push(`selector_bit_length = 8`);
+    lines.push(`start_bit = 8`);
+    lines.push(`bit_length = 8`);
     lines.push(`# Inner mux cases (byte 1): ${innerValues.map(c => String(c)).join(', ')}`);
 
     // Write each inner case with its signals
