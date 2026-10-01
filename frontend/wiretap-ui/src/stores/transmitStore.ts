@@ -710,38 +710,35 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
   },
 
-  // Called for a repeat started outside the UI (e.g. an MCP agent) through the
-  // same cadence engine the UI uses. Mirror it into the shared queue (upsert by
-  // queue_id) so it is visible and stoppable here.
+  // Every repeat start is announced by the backend, the UI's own included. A row
+  // the queue already holds keeps its fields (group, notes) and is marked
+  // repeating; an agent's arrives here for the first time and is added.
   addExternalRepeat: (ev) => {
+    const { queue_id, session_id, profile_id, profile_name, interval_ms, origin, ...canFrame } = ev;
+    const state = get();
+    const exists = state.queue.some((q) => q.id === queue_id);
     const item: TransmitQueueItem = {
-      id: ev.queue_id,
-      profileId: ev.profile_id,
-      profileName: ev.profile_name,
+      id: queue_id,
+      profileId: profile_id,
+      profileName: profile_name,
       type: "can",
-      canFrame: {
-        frame_id: ev.frame_id,
-        data: ev.data,
-        bus: ev.bus,
-        is_extended: ev.is_extended,
-        is_fd: ev.is_fd,
-        is_brs: false,
-        is_rtr: false,
-      },
-      repeatIntervalMs: ev.interval_ms,
+      canFrame,
+      repeatIntervalMs: interval_ms,
       isRepeating: true,
       enabled: true,
-      origin: ev.origin === "agent" ? "agent" : "user",
-      sessionId: ev.session_id,
+      origin: origin === "agent" ? "agent" : "user",
+      sessionId: session_id,
     };
-    const state = get();
-    const exists = state.queue.some((q) => q.id === item.id);
     set({
       queue: exists
-        ? state.queue.map((q) => (q.id === item.id ? item : q))
+        ? state.queue.map((q) =>
+            q.id === queue_id
+              ? { ...q, isRepeating: true, repeatIntervalMs: interval_ms, sessionId: session_id }
+              : q
+          )
         : [...state.queue, item],
     });
-    useSessionStore.getState().setHasQueuedMessages(ev.session_id, true);
+    useSessionStore.getState().setHasQueuedMessages(session_id, true);
   },
 
   stopAllRepeats: async () => {

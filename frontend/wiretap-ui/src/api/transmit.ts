@@ -123,19 +123,14 @@ export interface RepeatStoppedEvent {
   reason: string;
 }
 
-/** A repeat transmit started outside the Transmit UI (e.g. an MCP agent). */
-export interface RepeatStartedEvent {
+/** A repeat transmit started, by the Transmit UI or an MCP agent. */
+export interface RepeatStartedEvent extends CanTransmitFrame {
   queue_id: string;
   session_id: string;
   profile_id: string;
   profile_name: string;
-  frame_id: number;
-  data: number[];
-  bus: number;
-  is_extended: boolean;
-  is_fd: boolean;
   interval_ms: number;
-  /** Where the repeat came from, e.g. `"agent"`. */
+  /** Where the repeat came from: `"user"` or `"agent"`. */
   origin: string;
 }
 

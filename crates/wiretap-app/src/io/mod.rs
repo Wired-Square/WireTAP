@@ -80,6 +80,7 @@ use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
+use wslib_ai_mcp::rmcp::schemars::{self, JsonSchema};
 
 use crate::{capture_store, sessions};
 
@@ -139,22 +140,28 @@ pub fn now_us() -> u64 {
         .unwrap_or(0)
 }
 
-/// CAN frame for transmission
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// CAN frame for transmission. Also the MCP transmit tools' frame parameters,
+/// flattened, so the flags default when a caller leaves them out.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct CanTransmitFrame {
     /// CAN frame ID (11-bit standard or 29-bit extended)
     pub frame_id: u32,
     /// Frame data (up to 8 bytes for classic CAN, up to 64 for CAN FD)
     pub data: Vec<u8>,
     /// Bus number (0 for single-bus adapters, 0-4 for multi-bus like GVRET)
+    #[serde(default)]
     pub bus: u8,
     /// Extended (29-bit) frame ID
+    #[serde(default)]
     pub is_extended: bool,
     /// CAN FD frame
+    #[serde(default)]
     pub is_fd: bool,
     /// Bit Rate Switch (CAN FD only)
+    #[serde(default)]
     pub is_brs: bool,
     /// Remote Transmission Request
+    #[serde(default)]
     pub is_rtr: bool,
 }
 

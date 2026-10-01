@@ -964,30 +964,11 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<TransmitFrameParams>,
     ) -> Result<CallToolResult, McpError> {
-        let frame = crate::io::CanTransmitFrame {
-            frame_id: p.frame_id,
-            data: p.data,
-            bus: p.bus,
-            is_extended: p.is_extended,
-            is_fd: p.is_fd,
-            is_brs: false,
-            is_rtr: false,
-        };
-        let result = crate::io::transmit_frame(&p.session_id, &frame).await.map_err(err)?;
-        crate::transmit_history::write_entry(
-            &p.session_id,
-            "can",
-            Some(frame.frame_id as i64),
-            Some(frame.data.len() as i64),
-            &frame.data,
-            frame.bus as i64,
-            frame.is_extended,
-            frame.is_fd,
-            result.success,
-            result.error.as_deref(),
-        );
-        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-        ok_json(result)
+        ok_json(
+            crate::transmit::transmit_can(&p.session_id, &p.frame)
+                .await
+                .map_err(err)?,
+        )
     }
 
     #[tool(
@@ -998,54 +979,17 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<RepeatTransmitStartParams>,
     ) -> Result<CallToolResult, McpError> {
-        let frame = crate::io::CanTransmitFrame {
-            frame_id: p.frame_id,
-            data: p.data.clone(),
-            bus: p.bus,
-            is_extended: p.is_extended,
-            is_fd: p.is_fd,
-            is_brs: false,
-            is_rtr: false,
-        };
-        let seq = REPEAT_SEQ.fetch_add(1, Ordering::Relaxed);
-        let queue_id = format!("mcp-repeat-{seq}");
-        crate::transmit::io_start_repeat_transmit(
-            p.session_id.clone(),
+        let queue_id = format!("mcp-repeat-{}", REPEAT_SEQ.fetch_add(1, Ordering::Relaxed));
+        crate::transmit::start_repeat_transmit(
+            &self.app,
+            p.session_id,
             queue_id.clone(),
-            frame,
+            p.frame,
             p.interval_ms,
+            "agent",
         )
         .await
         .map_err(err)?;
-
-        // Surface it in the Transmit UI as an agent-originated queue row so the
-        // human and the agent share one visible, controllable queue.
-        let profile_id = crate::sessions::get_session_profile_ids(&p.session_id)
-            .into_iter()
-            .next()
-            .unwrap_or_default();
-        let profile_name = crate::settings::load_settings_sync(&self.app)
-            .ok()
-            .and_then(|s| {
-                s.io_profiles
-                    .iter()
-                    .find(|pr| pr.id == profile_id)
-                    .map(|pr| pr.name.clone())
-            })
-            .unwrap_or_else(|| profile_id.clone());
-        crate::ws::dispatch::send_repeat_started(&crate::transmit::RepeatStartedEvent {
-            queue_id: queue_id.clone(),
-            session_id: p.session_id,
-            profile_id,
-            profile_name,
-            frame_id: p.frame_id,
-            data: p.data,
-            bus: p.bus,
-            is_extended: p.is_extended,
-            is_fd: p.is_fd,
-            interval_ms: p.interval_ms,
-            origin: "agent".to_string(),
-        });
         ok_json(json!({ "queue_id": queue_id, "interval_ms": p.interval_ms }))
     }
 
@@ -1086,20 +1030,9 @@ impl WireTapTools {
             crate::capture_store::get_capture_frames_paginated(&p.capture_id, 0, cap);
 
         let replay_frames: Vec<crate::replay::ReplayFrame> = frames
-            .into_iter()
+            .iter()
             .filter(|f| f.protocol == "can" || f.protocol == "canfd")
-            .map(|f| crate::replay::ReplayFrame {
-                timestamp_us: f.timestamp_us,
-                frame: crate::io::CanTransmitFrame {
-                    frame_id: f.frame_id,
-                    data: f.bytes,
-                    bus: f.bus,
-                    is_extended: f.is_extended,
-                    is_fd: f.is_fd,
-                    is_brs: false,
-                    is_rtr: false,
-                },
-            })
+            .map(crate::replay::ReplayFrame::from)
             .collect();
 
         if replay_frames.is_empty() {

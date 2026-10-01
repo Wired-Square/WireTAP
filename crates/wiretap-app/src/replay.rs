@@ -28,6 +28,23 @@ pub struct ReplayFrame {
     pub frame: CanTransmitFrame,
 }
 
+impl From<&io::FrameMessage> for ReplayFrame {
+    fn from(f: &io::FrameMessage) -> Self {
+        ReplayFrame {
+            timestamp_us: f.timestamp_us,
+            frame: CanTransmitFrame {
+                frame_id: f.frame_id,
+                data: f.bytes.clone(),
+                bus: f.bus,
+                is_extended: f.is_extended,
+                is_fd: f.is_fd,
+                is_brs: false,
+                is_rtr: false,
+            },
+        }
+    }
+}
+
 /// Active replay task handle.
 struct ReplayTask {
     cancel_flag: std::sync::Arc<AtomicBool>,

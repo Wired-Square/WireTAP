@@ -8,6 +8,8 @@ use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use wslib_ai_mcp::rmcp;
 
+use crate::io::CanTransmitFrame;
+
 fn default_count() -> usize {
     100
 }
@@ -131,39 +133,16 @@ pub struct DecodedSignalsParams {
 pub struct TransmitFrameParams {
     /// Session ID to transmit through (must be a transmit-capable session).
     pub session_id: String,
-    /// CAN frame id (decimal).
-    pub frame_id: u32,
-    /// Payload bytes (0-8 for classic CAN, up to 64 for CAN-FD).
-    pub data: Vec<u8>,
-    /// Extended (29-bit) frame id.
-    #[serde(default)]
-    pub is_extended: bool,
-    /// Bus number (0 for single-bus adapters).
-    #[serde(default)]
-    pub bus: u8,
-    /// CAN-FD frame.
-    #[serde(default)]
-    pub is_fd: bool,
+    #[serde(flatten)]
+    pub frame: CanTransmitFrame,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RepeatTransmitStartParams {
     /// Session ID to transmit through (must be a transmit-capable session).
     pub session_id: String,
-    /// CAN frame id (decimal).
-    pub frame_id: u32,
-    /// Payload bytes (0-8 for classic CAN, up to 64 for CAN-FD).
-    pub data: Vec<u8>,
-    /// Extended (29-bit) frame id.
-    #[serde(default)]
-    pub is_extended: bool,
-    /// Bus number. A frame sent to a serial bus is framed onto that interface,
-    /// matching the one-shot `transmit_frame` behaviour.
-    #[serde(default)]
-    pub bus: u8,
-    /// CAN-FD frame.
-    #[serde(default)]
-    pub is_fd: bool,
+    #[serde(flatten)]
+    pub frame: CanTransmitFrame,
     /// Repeat interval in milliseconds (>= 1). 250 ≈ 4 Hz.
     pub interval_ms: u64,
 }
@@ -845,4 +824,59 @@ pub struct FrequencyQueryParams {
     pub end_time: Option<String>,
     #[serde(default)]
     pub limit: Option<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn transmit_params_carry_rtr_and_brs_to_the_frame() {
+        let p: TransmitFrameParams = serde_json::from_value(json!({
+            "session_id": "s", "frame_id": 256, "data": [1, 2], "is_fd": true, "is_brs": true, "is_rtr": true
+        }))
+        .expect("params parse");
+        assert_eq!(
+            (
+                p.session_id.as_str(),
+                p.frame.frame_id,
+                p.frame.data.as_slice()
+            ),
+            ("s", 256, &[1, 2][..])
+        );
+        assert!(p.frame.is_fd && p.frame.is_brs && p.frame.is_rtr);
+    }
+
+    #[test]
+    fn transmit_flags_default_off() {
+        let p: RepeatTransmitStartParams = serde_json::from_value(json!({
+            "session_id": "s", "frame_id": 1, "data": [], "interval_ms": 250
+        }))
+        .expect("params parse");
+        assert!(!p.frame.is_extended && !p.frame.is_fd && !p.frame.is_brs && !p.frame.is_rtr);
+        assert_eq!((p.frame.bus, p.interval_ms), (0, 250));
+    }
+
+    /// The schema an MCP client reads lists the flags, so an agent can ask for them.
+    #[test]
+    fn the_transmit_schema_names_the_flags() {
+        let schema =
+            serde_json::to_value(schemars::schema_for!(TransmitFrameParams)).expect("schema");
+        for key in [
+            "session_id",
+            "frame_id",
+            "data",
+            "bus",
+            "is_extended",
+            "is_fd",
+            "is_brs",
+            "is_rtr",
+        ] {
+            assert!(
+                schema["properties"].get(key).is_some(),
+                "{key} is missing from the schema"
+            );
+        }
+    }
 }

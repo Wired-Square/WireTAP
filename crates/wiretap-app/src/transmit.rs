@@ -75,22 +75,19 @@ pub struct RepeatStoppedEvent {
     pub reason: String,
 }
 
-/// Announces a repeat transmit that started outside the Transmit UI (e.g. an
-/// MCP agent), carrying everything the frontend needs to render it as a queue
-/// row so the human and the agent share one visible queue.
+/// Announces a repeat transmit that started, carrying everything the frontend
+/// needs to render it as a queue row, so a human's repeat and an agent's share
+/// one visible queue.
 #[derive(Clone, Debug, Serialize)]
 pub struct RepeatStartedEvent {
     pub queue_id: String,
     pub session_id: String,
     pub profile_id: String,
     pub profile_name: String,
-    pub frame_id: u32,
-    pub data: Vec<u8>,
-    pub bus: u8,
-    pub is_extended: bool,
-    pub is_fd: bool,
+    #[serde(flatten)]
+    pub frame: CanTransmitFrame,
     pub interval_ms: u64,
-    /// Where the repeat came from, e.g. `"agent"`.
+    /// Where the repeat came from: `"user"` or `"agent"`.
     pub origin: String,
 }
 
@@ -247,9 +244,18 @@ pub async fn io_transmit_can_frame(
     session_id: String,
     frame: CanTransmitFrame,
 ) -> Result<crate::io::TransmitResult, String> {
-    let result = io::transmit_frame(&session_id, &frame).await?;
+    transmit_can(&session_id, &frame).await
+}
+
+/// One CAN transmit, recorded in the history, for the UI and the MCP agent alike.
+pub async fn transmit_can(
+    session_id: &str,
+    frame: &CanTransmitFrame,
+) -> Result<crate::io::TransmitResult, String> {
+    let result = io::transmit_frame(session_id, frame).await?;
     crate::transmit_history::write_entry(
-        &session_id, "can",
+        session_id,
+        "can",
         Some(frame.frame_id as i64),
         Some(frame.data.len() as i64),
         &frame.data,
@@ -414,10 +420,24 @@ static IO_REPEAT_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>> 
 /// Start repeat transmission for a CAN frame through an IO session
 #[tauri::command]
 pub async fn io_start_repeat_transmit(
+    app: AppHandle,
     session_id: String,
     queue_id: String,
     frame: CanTransmitFrame,
     interval_ms: u64,
+) -> Result<(), String> {
+    start_repeat_transmit(&app, session_id, queue_id, frame, interval_ms, "user").await
+}
+
+/// Start a repeating CAN transmit and announce it as a queue row. `origin` is
+/// `"user"` or `"agent"`, so the Transmit app can badge the row.
+pub async fn start_repeat_transmit(
+    app: &AppHandle,
+    session_id: String,
+    queue_id: String,
+    frame: CanTransmitFrame,
+    interval_ms: u64,
+    origin: &str,
 ) -> Result<(), String> {
     if interval_ms < 1 {
         return Err("Interval must be at least 1ms".to_string());
@@ -425,6 +445,23 @@ pub async fn io_start_repeat_transmit(
 
     // Stop any existing repeat for this queue_id
     io_stop_repeat_transmit(queue_id.clone()).await?;
+
+    let profile_id = crate::sessions::get_session_profile_ids(&session_id)
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    let profile_name = crate::settings::profile_by_id(app, &profile_id)
+        .map(|p| p.name)
+        .unwrap_or_else(|_| profile_id.clone());
+    let started = RepeatStartedEvent {
+        queue_id: queue_id.clone(),
+        session_id: session_id.clone(),
+        profile_id,
+        profile_name,
+        frame: frame.clone(),
+        interval_ms,
+        origin: origin.to_string(),
+    };
 
     let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let cancel_flag_clone = cancel_flag.clone();
@@ -490,7 +527,10 @@ pub async fn io_start_repeat_transmit(
             handle,
         },
     );
+    drop(tasks);
 
+    // Announced once the task is stored, so a stop the row prompts finds it.
+    crate::ws::dispatch::send_repeat_started(&started);
     Ok(())
 }
 
