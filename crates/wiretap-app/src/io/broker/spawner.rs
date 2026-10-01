@@ -973,4 +973,77 @@ mod tests {
         let [frame] = echoed.as_slice() else { panic!("echoed {echoed:?}") };
         assert_eq!((frame.frame_id, frame.bus), (ECHO_ID, 3), "echoed on the output bus");
     }
+
+    #[test]
+    fn a_loopback_echo_reaches_a_merge_task_on_a_multi_worker_runtime() {
+        const SENDS: usize = 24;
+        let (done_tx, done_rx) = std_mpsc::channel();
+        let echoed = Arc::new(AtomicUsize::new(0));
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let stop = Arc::new(AtomicBool::new(false));
+        std::thread::spawn({
+            let (echoed, accepted, stop) = (echoed.clone(), accepted.clone(), stop.clone());
+            move || {
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(4)
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                runtime.block_on(async move {
+                    let mut profile = loopback_profile();
+                    profile.connection.insert(
+                        "interfaces".into(),
+                        serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+                    );
+                    let (tx, mut rx) = mpsc::channel(1024);
+                    let (transmit_tx, transmit_rx) = tokio::sync::oneshot::channel();
+                    let merge = tokio::spawn({
+                        let echoed = echoed.clone();
+                        async move {
+                            let mut transmit_tx = Some(transmit_tx);
+                            while echoed.load(Ordering::Relaxed) < SENDS {
+                                match rx.recv().await {
+                                    Some(SourceMessage::TransmitReady(_, t)) => {
+                                        let _ = transmit_tx.take().map(|slot| slot.send(t));
+                                    }
+                                    Some(SourceMessage::Frames(_, frames)) => {
+                                        echoed.fetch_add(frames.len(), Ordering::Relaxed);
+                                    }
+                                    Some(_) => {}
+                                    None => break,
+                                }
+                            }
+                        }
+                    });
+                    let reader = tokio::spawn({
+                        let stop = stop.clone();
+                        async move {
+                            run_virtual_reader(0, &profile, vec![BusMapping::default()], stop, tx, Default::default(), None).await
+                        }
+                    });
+                    let transmit = transmit_rx.await.expect("the reader offers a transmit channel");
+                    for n in 0..SENDS {
+                        if transmit.try_send(loopback_request(n)).is_ok() {
+                            accepted.fetch_add(1, Ordering::Relaxed);
+                        }
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                    }
+                    merge.await.unwrap();
+                    stop.store(true, Ordering::Relaxed);
+                    let _ = reader.await;
+                });
+                let _ = done_tx.send(());
+            }
+        });
+
+        let finished = done_rx.recv_timeout(std::time::Duration::from_secs(10));
+        stop.store(true, Ordering::Relaxed);
+        assert!(
+            finished.is_ok(),
+            "the merge task saw {}/{} echoes of {} accepted transmits",
+            echoed.load(Ordering::Relaxed),
+            SENDS,
+            accepted.load(Ordering::Relaxed),
+        );
+    }
 }
