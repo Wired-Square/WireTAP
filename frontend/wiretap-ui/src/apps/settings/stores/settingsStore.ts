@@ -9,6 +9,7 @@ import {
   setLogLevel as setLogLevelApi,
 } from '../../../api';
 import { listen } from '@tauri-apps/api/event';
+import type { DirectoryValidation } from '../../../generated/DirectoryValidation';
 import { WINDOW_EVENTS } from '../../../events/registry';
 import { getOrCreateDefaultDirs } from '../../../utils/defaultPaths';
 import {
@@ -80,11 +81,7 @@ export type {
   DefaultFrameType,
 };
 
-export interface DirectoryValidation {
-  exists: boolean;
-  writable: boolean;
-  error?: string;
-}
+export type { DirectoryValidation };
 
 export interface CatalogFile {
   name: string;

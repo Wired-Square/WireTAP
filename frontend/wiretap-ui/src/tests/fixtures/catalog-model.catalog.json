@@ -1,0 +1,74 @@
+{
+  "frames": [
+    {
+      "checksums": [
+        {
+          "algorithm": "crc_custom",
+          "byteLength": 1,
+          "calcStartByte": 0,
+          "init": 0,
+          "notes": [
+            "One of several init and xor_out pairs that fit"
+          ],
+          "polynomial": 77,
+          "reflectIn": false,
+          "reflectOut": false,
+          "startByte": -1,
+          "xorOut": 183
+        }
+      ],
+      "frameId": 257,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x101",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "name": "Reading",
+          "startBit": 0
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "name": "Catalogue model",
+    "version": 1
+  },
+  "modbus": {
+    "functionCodes": {
+      "32": {
+        "lengths": [
+          {
+            "len": {
+              "fixed": 11
+            },
+            "when": {
+              "offset": 4,
+              "value": 3
+            }
+          }
+        ]
+      },
+      "96": {
+        "lengths": [
+          {
+            "len": {
+              "countAt": 6,
+              "overhead": 9
+            }
+          }
+        ],
+        "name": "Dispatch",
+        "notes": [
+          "Broadcast by the logger"
+        ]
+      }
+    }
+  },
+  "protocol": "can"
+}

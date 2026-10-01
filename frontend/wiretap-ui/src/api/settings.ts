@@ -3,6 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings } from "../hooks/useSettings";
+import type { DirectoryValidation } from "../generated/DirectoryValidation";
 
 /**
  * Load application settings from the backend
@@ -21,7 +22,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
 /**
  * Validate that a directory exists and is writable
  */
-export async function validateDirectory(path: string): Promise<{ exists: boolean; writable: boolean; error?: string }> {
+export async function validateDirectory(path: string): Promise<DirectoryValidation> {
   return await invoke("validate_directory", { path });
 }
 

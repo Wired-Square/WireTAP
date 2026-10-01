@@ -810,6 +810,7 @@ pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DirectoryValidation {
     pub exists: bool,
     pub writable: bool,

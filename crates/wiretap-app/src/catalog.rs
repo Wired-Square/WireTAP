@@ -1049,13 +1049,14 @@ mod tests {
             publish: None,
         }
     }
-    const DISPLAY_HINTS_FIXTURE: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../frontend/wiretap-ui/src/tests/fixtures/display-hints"
-    );
+    const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures");
+
+    fn fixture(name: &str) -> String {
+        std::fs::read_to_string(format!("{FIXTURES}/{name}")).expect("fixture")
+    }
 
     fn display_hints_fixture(extension: &str) -> String {
-        std::fs::read_to_string(format!("{DISPLAY_HINTS_FIXTURE}.{extension}")).expect("fixture")
+        fixture(&format!("display-hints.{extension}"))
     }
 
     fn command(op: &str, params: serde_json::Value) -> serde_json::Value {
@@ -1069,6 +1070,18 @@ mod tests {
         let golden: serde_json::Value =
             serde_json::from_str(&display_hints_fixture("catalog.json")).expect("golden json");
         assert_eq!(served, golden);
+    }
+
+    #[test]
+    fn catalog_parse_serves_the_catalogue_model_fixture() {
+        let served = command("catalog.parse", serde_json::json!({ "content": fixture("catalog-model.toml") }));
+        let golden: serde_json::Value = serde_json::from_str(&fixture("catalog-model.catalog.json")).expect("golden json");
+        assert_eq!(served, golden);
+    }
+
+    #[test]
+    fn a_signal_format_the_crate_cannot_name_serialises_as_other() {
+        assert_eq!(serde_json::to_value(wiretap_catalog::SignalFormat::Other).unwrap(), "other");
     }
 
     #[test]

@@ -73,6 +73,14 @@ export interface FrameChecksum {
   endianness?: Endianness;
   calcStartByte: number;
   calcEndByte?: number;
+  /** A recovered CRC's parameters, or an offset sum's `offset`; absent for a named algorithm. */
+  polynomial?: number;
+  init?: number;
+  xorOut?: number;
+  reflectIn?: boolean;
+  reflectOut?: boolean;
+  offset?: number;
+  notes?: string[];
 }
 
 /** The protocol carried inside a tunnel frame's payload. */
@@ -201,6 +209,21 @@ export interface ModbusConfig {
   defaultInterval?: number;
   defaultByteOrder?: Endianness;
   defaultWordOrder?: Endianness;
+  /** Vendor function codes (`[meta.modbus.function_code.<n>]`), keyed by the code in decimal. */
+  functionCodes?: Record<string, FunctionCode>;
+}
+
+export interface FunctionCode {
+  name?: string;
+  /** Its messages' layouts, tried in order. */
+  lengths?: LengthRule[];
+  notes?: string[];
+}
+
+export interface LengthRule {
+  /** Applies only when the byte at `offset` is `value`. */
+  when?: { offset: number; value: number };
+  len: { fixed: number } | { countAt: number; overhead: number };
 }
 
 export interface Meta {

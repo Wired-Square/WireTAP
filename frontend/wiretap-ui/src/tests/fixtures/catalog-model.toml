@@ -1,0 +1,28 @@
+[meta]
+name = "Catalogue model"
+
+[meta.modbus.function_code.0x60]
+name = "Dispatch"
+notes = "Broadcast by the logger"
+lengths = [{ len = { count_at = 6, overhead = 9 } }]
+
+[meta.modbus.function_code.0x20]
+lengths = [{ when = { offset = 4, value = 0x03 }, len = { fixed = 11 } }]
+
+[frame.can.0x101]
+length = 8
+
+[[frame.can.0x101.checksum]]
+algorithm = "crc_custom"
+start_byte = -1
+polynomial = 77
+init = 0
+xor_out = 183
+reflect_in = false
+reflect_out = false
+notes = "One of several init and xor_out pairs that fit"
+
+[[frame.can.0x101.signals]]
+name = "Reading"
+start_bit = 0
+bit_length = 8
