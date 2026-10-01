@@ -1224,7 +1224,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "wiretap_catalog::edit::apply_edits re-encodes every line with LF"]
     fn saving_metadata_keeps_a_crlf_file_crlf() {
         let original = META_WITH_COMMENTS.replace('\n', "\r\n");
         assert_eq!(set_meta_version(&original), original.replace("version = 1 #", "version = 2 #"));
