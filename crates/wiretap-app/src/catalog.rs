@@ -672,6 +672,21 @@ pub async fn import_catalog(
     Ok(path.to_string_lossy().into_owned())
 }
 
+fn with_catalogue_name(content: &str, new_name: &str) -> Result<String, String> {
+    wiretap_catalog::edit::apply_edit(
+        content,
+        wiretap_catalog::edit::EditOp::SetTable {
+            path: vec!["meta".into()],
+            value: serde_json::Map::from_iter([("name".into(), new_name.into())]),
+            managed_keys: Vec::new(),
+            replace_contents: false,
+            sort_parent_numeric: false,
+            skip_if_exists: false,
+            error_if_exists: false,
+        },
+    )
+}
+
 /// Duplicate a catalog file
 #[tauri::command]
 pub async fn duplicate_catalog(
@@ -685,22 +700,9 @@ pub async fn duplicate_catalog(
         .ok_or_else(|| "Invalid source path".to_string())?;
     let dest = parent_dir.join(sanitise_catalog_filename(&new_filename)?);
 
-    // Read source content
-    let mut content = std::fs::read_to_string(&source)
+    let content = std::fs::read_to_string(&source)
         .map_err(|e| format!("Failed to read source catalog: {}", e))?;
-
-    // Update the name in the content if present
-    if let Some(start_idx) = content.find("name = ") {
-        if let Some(line_end) = content[start_idx..].find('\n') {
-            let end_idx = start_idx + line_end;
-            let updated_line = format!("name = \"{}\"", new_name);
-            content.replace_range(start_idx..end_idx, &updated_line);
-        }
-    }
-
-    // Write to destination
-    std::fs::write(&dest, content)
-        .map_err(|e| format!("Failed to write duplicated catalog: {}", e))?;
+    write_file_atomically(&dest, with_catalogue_name(&content, &new_name)?.as_bytes())?;
 
     refresh_catalog_cache(&app);
     Ok(())
@@ -720,32 +722,12 @@ pub async fn rename_catalog(
     let new_filename = sanitise_catalog_filename(&new_filename)?;
     let new_path = parent_dir.join(&new_filename);
 
-    // Read content
-    let mut content = std::fs::read_to_string(&old_path_buf)
+    let content = std::fs::read_to_string(&old_path_buf)
         .map_err(|e| format!("Failed to read catalog: {}", e))?;
-
-    // Update the name in the content if present
-    if let Some(start_idx) = content.find("name = ") {
-        if let Some(line_end) = content[start_idx..].find('\n') {
-            let end_idx = start_idx + line_end;
-            let updated_line = format!("name = \"{}\"", new_name);
-            content.replace_range(start_idx..end_idx, &updated_line);
-        }
-    }
-
-    // If filename changed, move the file
+    write_file_atomically(&new_path, with_catalogue_name(&content, &new_name)?.as_bytes())?;
     if old_path != new_path.to_string_lossy() {
-        // Write to new location
-        std::fs::write(&new_path, &content)
-            .map_err(|e| format!("Failed to write renamed catalog: {}", e))?;
-
-        // Remove old file
         std::fs::remove_file(&old_path_buf)
             .map_err(|e| format!("Failed to remove old catalog: {}", e))?;
-    } else {
-        // Just update content
-        std::fs::write(&new_path, &content)
-            .map_err(|e| format!("Failed to update catalog: {}", e))?;
     }
 
     // Carry any git provenance across to the new filename, so a rename doesn't
@@ -790,6 +772,16 @@ mod tests {
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).expect("write catalogue");
+    }
+
+    #[test]
+    fn renaming_a_catalogue_leaves_its_signal_names_alone() {
+        let catalogue = "[[frame.can.0x100.signals]]\nname = \"Voltage\"\nstart_bit = 0\nbit_length = 16\n\n[meta]\nname = \"Pack\"\nversion = 1\n";
+
+        let renamed = with_catalogue_name(catalogue, "Pack copy").expect("rename");
+
+        assert_eq!(extract_catalog_name(&renamed).as_deref(), Some("Pack copy"));
+        assert!(renamed.contains("name = \"Voltage\""), "signal renamed:\n{renamed}");
     }
 
     #[test]
