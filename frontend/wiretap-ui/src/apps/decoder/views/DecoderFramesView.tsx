@@ -1065,7 +1065,8 @@ export default function DecoderFramesView({
 
   // Track active tab - use prop if provided, otherwise local state
   const [localActiveTab, setLocalActiveTab] = useState<string>('signals');
-  const activeTab = activeTabProp ?? localActiveTab;
+  const requestedTab = activeTabProp ?? localActiveTab;
+  const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab : 'signals';
   const setActiveTab = onTabChange ?? setLocalActiveTab;
 
   // Frame ID filtering is now done at the processing level in Decoder.tsx

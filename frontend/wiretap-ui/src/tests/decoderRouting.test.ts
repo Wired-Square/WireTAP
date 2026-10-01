@@ -7,7 +7,8 @@ import {
   getFilteredFrames,
   getTunnelTransactions,
 } from "../stores/decoderStore";
-import type { DecodedFrameMsg, DecodedSignalsEntry } from "../services/wsProtocol";
+import type { DecodedFrameMsg, DecodedSignalsEntry, DecodedTunnelMessage } from "../services/wsProtocol";
+import type { ParsedCatalog } from "../utils/catalogParser";
 
 const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   frameId: 0x1a5,
@@ -21,6 +22,12 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   checksum: { extracted: 0x2a, calculated: 0x2a, valid: true },
   ...over,
 });
+
+const tunnelMessage: DecodedTunnelMessage = {
+  protocol: "modbus_rtu", direction: "response", directionBasis: "layout", device: 1, function: 4,
+  functionLabel: "0x04", payload: "registers", values: [1], coils: [], data: [], raw: [1],
+  frames: 2, crcValid: true, latencyUs: 4_000,
+};
 
 const apply = (entries: DecodedSignalsEntry[]) => useDecoderStore.getState().applyDecodedBatch(entries);
 
@@ -81,16 +88,19 @@ describe("decoderStore.applyDecodedBatch", () => {
 
   it("logs tunnel transactions with the latency Rust measured", () => {
     apply([
-      decoded({
-        tunnel: [{
-          protocol: "modbus_rtu", direction: "response", directionBasis: "layout", device: 1, function: 4,
-          functionLabel: "0x04", payload: "registers", values: [1], coils: [], data: [], raw: [1],
-          frames: 2, crcValid: true, latencyUs: 4_000,
-        }],
-      }),
+      decoded({ tunnel: [tunnelMessage] }),
     ]);
     expect(getTunnelTransactions()).toMatchObject([
       { frameId: 0x100, bus: 0, timestampUs: 2_000_000, latencyUs: 4_000 },
     ]);
+  });
+
+  it("leaves no Modbus rows behind a swap to a catalogue with no tunnel", () => {
+    apply([decoded({ tunnel: [tunnelMessage] })]);
+    useDecoderStore.getState().applyParsedCatalog(
+      { frames: new Map(), protocol: "can", modbusConfig: null, serialConfig: null, pollGroups: [] } as unknown as ParsedCatalog,
+      "plain.toml",
+    );
+    expect(getTunnelTransactions()).toEqual([]);
   });
 });

@@ -506,6 +506,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       const pollGroups = catalog.pollGroups;
       const modbusPollsJson = pollGroups.length > 0 ? JSON.stringify(pollGroups) : null;
 
+      if (!hasTunnel) _tunnelTransactions = [];
       set({
         frames: frameMap,
         selectedFrames: newSelected,

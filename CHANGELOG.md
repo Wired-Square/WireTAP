@@ -20,6 +20,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **The Decoder's Modbus tab no longer outlives a catalogue without a tunnel.** Switching to such a catalogue while the Modbus tab was open left the old exchanges on screen. The panel now returns to Signals and the old exchanges are dropped.
 - **`wiretap-can-cli` closes the adapter when it is terminated, not only on Ctrl-C.** `dump`, `gen` and a `pattern` responder stopped by SIGTERM (`timeout`, `kill`, a service manager) used to leave the adapter on the bus, still acknowledging frames. They now take it off the bus as Ctrl-C does.
 - **Changing a live CAN source's buses or settings no longer fails to reopen the adapter.** The source was restarted before the old connection had let go of the device, so a USB adapter could come back as busy and drop out of the session. The restart now waits for the old connection to close.
 - **A catalogue saved from Discovery keeps its mux selector and serial header.** A mux whose selector is not byte 0 used to decode with the selector at byte 0, and a serial catalogue's frame id and source address positions and default byte order were written under keys the decoder never read. Save the frames from Discovery again, or set the mux selector and serial header fields in the Catalogue Editor, for any catalogue saved this way.

@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import "../i18n";
 import DecoderTunnelView from "../apps/decoder/views/DecoderTunnelView";
-import type { TunnelTransaction } from "../stores/decoderStore";
+import DecoderFramesView from "../apps/decoder/views/DecoderFramesView";
+import { LRUMap } from "../utils/LRUMap";
+import type { DecodedFrame, TunnelTransaction } from "../stores/decoderStore";
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+  emit: vi.fn(async () => {}),
+}));
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -71,5 +78,40 @@ describe("DecoderTunnelView", () => {
 
   it("leaves a paired direction unmarked", () => {
     expect(render({ directionBasis: "pairing" })).not.toContain("guessed");
+  });
+});
+
+describe("DecoderFramesView's Modbus tab", () => {
+  it("shows no Modbus rows once the catalogue has no tunnel, even while the tab was active", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(
+        <DecoderFramesView
+          frames={[]}
+          selectedIds={new Set()}
+          decoded={new LRUMap<number, DecodedFrame>(1)}
+          decodedPerSource={new Map()}
+          decodedVersion={1}
+          viewMode="single"
+          displayFrameIdFormat="hex"
+          isDecoding={false}
+          showRawBytes={false}
+          onToggleRawBytes={() => {}}
+          isReady
+          playbackState="paused"
+          onPlay={() => {}}
+          onPause={() => {}}
+          activeTab="tunnel"
+          hasTunnel={false}
+          tunnelTransactions={[base]}
+        />,
+      );
+    });
+    const text = host.textContent ?? "";
+    act(() => root.unmount());
+    host.remove();
+    expect(text).not.toContain("Coils [");
   });
 });
