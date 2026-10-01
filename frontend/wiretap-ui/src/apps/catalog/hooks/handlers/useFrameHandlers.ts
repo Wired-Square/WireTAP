@@ -13,15 +13,14 @@ import {
   editNodeToml,
   deleteNodeToml,
   deleteTomlAtPath,
-  upsertSerialConfigToml,
-  upsertModbusConfigToml,
-  upsertCanConfigToml,
-  deleteCanConfigToml,
-  deleteSerialConfigToml,
-  deleteModbusConfigToml,
-  updateMetaToml,
+  metaOp,
+  deleteOp,
+  canConfigOp,
+  serialConfigOp,
+  modbusConfigOp,
 } from "../../editorOps";
-import { validateFrameWs } from "../../../../api/catalog";
+import { editCatalogOps, validateFrameWs } from "../../../../api/catalog";
+import type { EditOp } from "../../../../types/catalogEdit";
 import { protocolRegistry } from "../../protocols";
 import type { FrameEditFields } from "../../views/FrameEditView";
 import type { ProtocolType, CANConfig, SerialConfig } from "../../types";
@@ -58,7 +57,8 @@ export function useFrameHandlers({
   const nodeNotes = useCatalogEditorStore((s) => s.forms.nodeNotes);
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
   const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
-  const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
+  const parsedModbusConfig = useCatalogEditorStore((s) => s.tree.modbusConfig);
+  const parsedSerialConfig = useCatalogEditorStore((s) => s.tree.serialConfig);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
   const modbusDefaultInterval = useCatalogEditorStore((s) => s.forms.modbusDefaultInterval);
   const modbusDefaultByteOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultByteOrder);
@@ -72,7 +72,6 @@ export function useFrameHandlers({
   const metaFields = useCatalogEditorStore((s) => s.forms.meta);
   const serialHeaderFields = useCatalogEditorStore((s) => s.forms.serialHeaderFields);
   const serialHeaderLength = useCatalogEditorStore((s) => s.forms.serialHeaderLength);
-  const serialMaxFrameLength = useCatalogEditorStore((s) => s.forms.serialMaxFrameLength);
   const serialChecksum = useCatalogEditorStore((s) => s.forms.serialChecksum);
   const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
   const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
@@ -558,10 +557,8 @@ export function useFrameHandlers({
    */
   const handleSaveConfig = async (enabledConfigs: { can: boolean; serial: boolean; modbus: boolean }) => {
     try {
-      // Start with updating meta
-      let newContent = await updateMetaToml(catalogContent, metaFields);
+      const ops: EditOp[] = [metaOp(metaFields)];
 
-      // Save or delete CAN config based on enabled state
       if (enabledConfigs.can) {
         const frameIdMaskStr = canFrameIdMask.trim().replace(/^0x/i, '');
         const frameIdMaskNum = frameIdMaskStr ? parseInt(frameIdMaskStr, 16) : undefined;
@@ -576,215 +573,65 @@ export function useFrameHandlers({
                     const maskNum = parseInt(maskStr, 16);
                     return [
                       f.name.trim(),
-                      {
-                        mask: Number.isFinite(maskNum) ? maskNum : 0,
-                        shift: f.shift,
-                        format: f.format !== 'hex' ? f.format : undefined,
-                      },
+                      { mask: Number.isFinite(maskNum) ? maskNum : 0, shift: f.shift, format: f.format },
                     ];
                   })
               )
             : undefined;
 
-        newContent = await upsertCanConfigToml(newContent, {
+        ops.push(canConfigOp({
           default_endianness: canDefaultEndianness,
           default_interval: canDefaultInterval,
           default_extended: canDefaultExtended,
           default_fd: canDefaultFd,
           frame_id_mask: Number.isFinite(frameIdMaskNum) ? frameIdMaskNum : undefined,
           fields,
-        });
+        }));
       } else {
-        // Delete CAN config if disabled
-        newContent = await deleteCanConfigToml(newContent);
+        ops.push(deleteOp(["meta", "can"]));
       }
 
-      // Save or delete Serial config based on enabled state
       if (enabledConfigs.serial) {
-        // Convert header fields to TOML format (mask-based)
         const fields: Record<string, { mask: number; endianness?: "big" | "little"; format?: "hex" | "decimal" }> | undefined =
           serialHeaderFields.length > 0
             ? Object.fromEntries(
                 serialHeaderFields
                   .filter((f) => f.name.trim())
-                  .map((f) => [
-                    f.name.trim(),
-                    {
-                      mask: f.mask,
-                      endianness: f.endianness !== 'big' ? f.endianness : undefined,
-                      format: f.format !== 'hex' ? f.format : undefined,
-                    },
-                  ])
+                  .map((f) => [f.name.trim(), { mask: f.mask, endianness: f.endianness, format: f.format }])
               )
             : undefined;
 
-        newContent = await upsertSerialConfigToml(newContent, {
+        ops.push(serialConfigOp({
           encoding: serialEncoding,
           byte_order: serialByteOrder,
           header_length: serialHeaderLength,
-          max_frame_length: serialMaxFrameLength,
+          frame_id_mask: parsedSerialConfig?.frame_id_mask,
+          min_frame_length: parsedSerialConfig?.min_frame_length,
           fields,
           checksum: serialChecksum ?? undefined,
-        });
+        }));
       } else {
-        // Delete Serial config if disabled
-        newContent = await deleteSerialConfigToml(newContent);
+        ops.push(deleteOp(["meta", "serial"]));
       }
 
-      // Save or delete Modbus config based on enabled state
       if (enabledConfigs.modbus) {
-        newContent = await upsertModbusConfigToml(newContent, {
-          device_address: modbusDeviceAddress,
+        ops.push(modbusConfigOp({
+          device_address: parsedModbusConfig?.device_address,
           register_base: modbusRegisterBase,
           default_interval: modbusDefaultInterval,
           default_byte_order: modbusDefaultByteOrder,
           default_word_order: modbusDefaultWordOrder,
-        });
+        }));
       } else {
-        // Delete Modbus config if disabled
-        newContent = await deleteModbusConfigToml(newContent);
+        ops.push(deleteOp(["meta", "modbus"]));
       }
 
-      setToml(newContent);
+      setToml(await editCatalogOps(catalogContent, ops));
       closeDialog("config");
       clearValidation();
     } catch (error) {
       console.error("[handleSaveConfig] Error:", error);
       setValidation([{ field: "config", message: "Failed to save configuration" }]);
-    }
-  };
-
-  /**
-   * Remove CAN config from catalog
-   */
-  const handleRemoveCanConfig = async () => {
-    try {
-      const newContent = await deleteCanConfigToml(catalogContent);
-      setToml(newContent);
-    } catch (error) {
-      console.error("Failed to remove CAN config:", error);
-    }
-  };
-
-  /**
-   * Remove Serial config from catalog
-   */
-  const handleRemoveSerialConfig = async () => {
-    try {
-      const newContent = await deleteSerialConfigToml(catalogContent);
-      setToml(newContent);
-    } catch (error) {
-      console.error("Failed to remove Serial config:", error);
-    }
-  };
-
-  /**
-   * Remove Modbus config from catalog
-   */
-  const handleRemoveModbusConfig = async () => {
-    try {
-      const newContent = await deleteModbusConfigToml(catalogContent);
-      setToml(newContent);
-    } catch (error) {
-      console.error("Failed to remove Modbus config:", error);
-    }
-  };
-
-  // Legacy individual config handlers (kept for backwards compatibility)
-  const handleSaveSerialConfig = async () => {
-    try {
-      // Convert header fields to TOML format (mask-based)
-      const fields: Record<string, { mask: number; endianness?: "big" | "little"; format?: "hex" | "decimal" }> | undefined =
-        serialHeaderFields.length > 0
-          ? Object.fromEntries(
-              serialHeaderFields
-                .filter((f) => f.name.trim())
-                .map((f) => [
-                  f.name.trim(),
-                  {
-                    mask: f.mask,
-                    endianness: f.endianness !== 'big' ? f.endianness : undefined,
-                    format: f.format !== 'hex' ? f.format : undefined,
-                  },
-                ])
-            )
-          : undefined;
-
-      const newContent = await upsertSerialConfigToml(catalogContent, {
-        encoding: serialEncoding,
-        byte_order: serialByteOrder,
-        header_length: serialHeaderLength,
-        max_frame_length: serialMaxFrameLength,
-        fields,
-        checksum: serialChecksum ?? undefined,
-      });
-      setToml(newContent);
-      closeDialog("config");
-      clearValidation();
-    } catch (error) {
-      console.error("Failed to save serial config:", error);
-      setValidation([{ field: "meta.serial", message: "Failed to save serial configuration" }]);
-    }
-  };
-
-  const handleSaveModbusConfig = async () => {
-    try {
-      const newContent = await upsertModbusConfigToml(catalogContent, {
-        device_address: modbusDeviceAddress,
-        register_base: modbusRegisterBase,
-        default_interval: modbusDefaultInterval,
-        default_byte_order: modbusDefaultByteOrder,
-        default_word_order: modbusDefaultWordOrder,
-      });
-      setToml(newContent);
-      closeDialog("config");
-      clearValidation();
-    } catch (error) {
-      console.error("Failed to save modbus config:", error);
-      setValidation([{ field: "meta.modbus", message: "Failed to save modbus configuration" }]);
-    }
-  };
-
-  const handleSaveCanConfig = async () => {
-    try {
-      const frameIdMaskStr = canFrameIdMask.trim().replace(/^0x/i, '');
-      const frameIdMaskNum = frameIdMaskStr ? parseInt(frameIdMaskStr, 16) : undefined;
-
-      const fields: Record<string, { mask: number; shift?: number; format?: "hex" | "decimal" }> | undefined =
-        canHeaderFields.length > 0
-          ? Object.fromEntries(
-              canHeaderFields
-                .filter((f) => f.name.trim() && f.mask.trim())
-                .map((f) => {
-                  const maskStr = f.mask.trim().replace(/^0x/i, '');
-                  const maskNum = parseInt(maskStr, 16);
-                  return [
-                    f.name.trim(),
-                    {
-                      mask: Number.isFinite(maskNum) ? maskNum : 0,
-                      shift: f.shift,
-                      format: f.format !== 'hex' ? f.format : undefined,
-                    },
-                  ];
-                })
-            )
-          : undefined;
-
-      let newContent = await updateMetaToml(catalogContent, metaFields);
-      newContent = await upsertCanConfigToml(newContent, {
-        default_endianness: canDefaultEndianness,
-        default_interval: canDefaultInterval,
-        default_extended: canDefaultExtended,
-        default_fd: canDefaultFd,
-        frame_id_mask: Number.isFinite(frameIdMaskNum) ? frameIdMaskNum : undefined,
-        fields,
-      });
-      setToml(newContent);
-      closeDialog("config");
-      clearValidation();
-    } catch (error) {
-      console.error("Failed to save CAN config:", error);
-      setValidation([{ field: "meta.can", message: "Failed to save CAN configuration" }]);
     }
   };
 
@@ -817,13 +664,5 @@ export function useFrameHandlers({
 
     // Unified config operations
     handleSaveConfig,
-    handleRemoveCanConfig,
-    handleRemoveSerialConfig,
-    handleRemoveModbusConfig,
-
-    // Legacy config operations (kept for backwards compatibility)
-    handleSaveSerialConfig,
-    handleSaveModbusConfig,
-    handleSaveCanConfig,
   };
 }

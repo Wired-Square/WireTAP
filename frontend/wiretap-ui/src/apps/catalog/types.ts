@@ -178,8 +178,8 @@ export interface SerialProtocolConfig {
   byte_order?: "little" | "big";
   /** Global header length in bytes (required when header fields are defined) */
   header_length?: number;
-  /** Maximum frame length in bytes (default: 64). Safety limit for malformed framing. */
-  max_frame_length?: number;
+  /** Frames shorter than this are dropped. */
+  min_frame_length?: number;
   /** Named header fields - masks over header bytes (ID field is used for frame matching) */
   fields?: Record<string, SerialHeaderField>;
   /** Protocol-level checksum configuration (applies to all frames) */
@@ -289,6 +289,7 @@ export type TreeNode = TomlNode;
 export interface MetaFields {
   name: string;
   version: number;
+  default_frame?: ProtocolType;
   // NOTE: Protocol-specific config is in [meta.<protocol>], not here
   // - CAN: default_endianness, default_interval in [meta.can]
   // - Modbus: device_address, register_base in [meta.modbus]

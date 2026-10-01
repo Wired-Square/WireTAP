@@ -5,9 +5,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // document semantics are covered by the Rust crate's unit tests.
 vi.mock("../api/catalog", () => ({
   editCatalog: vi.fn(async () => "RESULT_TOML"),
+  editCatalogOps: vi.fn(async () => "RESULT_TOML"),
 }));
 
-import { editCatalog } from "../api/catalog";
+import { editCatalog, editCatalogOps } from "../api/catalog";
 import {
   deleteSignalToml,
   upsertSignalToml,
@@ -18,7 +19,10 @@ import {
 const mockEdit = editCatalog as unknown as ReturnType<typeof vi.fn>;
 const BASE = "[meta]\nname = \"x\"\nversion = 1\n";
 
-beforeEach(() => mockEdit.mockClear());
+beforeEach(() => {
+  mockEdit.mockClear();
+  vi.mocked(editCatalogOps).mockClear();
+});
 
 describe("deleteSignalToml", () => {
   it("emits RemoveArrayItem against the frame's signals array", async () => {
@@ -42,20 +46,21 @@ describe("deleteSignalToml", () => {
 });
 
 describe("upsertSignalToml", () => {
-  it("emits a sorted UpsertArrayItem with only non-default fields", async () => {
+  it("emits UpsertSignal for the frame or mux case that owns the signal", async () => {
     await upsertSignalToml(
       BASE,
-      ["frame", "can", "0x123", "mux", "case1"],
-      { name: "B", start_bit: 8, bit_length: 8, factor: 1, offset: 0 },
+      ["frame", "can", "0x123", "mux", "case1", "signals", "2"],
+      { name: "B", start_bit: 8, bit_length: 8, endianness: "little", notes: "two\nlines" },
       null,
     );
-    expect(mockEdit).toHaveBeenCalledWith(BASE, {
-      op: "UpsertArrayItem",
-      array_path: ["frame", "can", "0x123", "mux", "case1", "signals"],
-      value: { name: "B", start_bit: 8, bit_length: 8 }, // factor=1 / offset=0 dropped
-      index: undefined,
-      sort_keys: ["start_bit", "bit_length", "name"],
-    });
+    expect(editCatalogOps).toHaveBeenCalledWith(BASE, [
+      {
+        op: "UpsertSignal",
+        owner_path: ["frame", "can", "0x123", "mux", "case1"],
+        index: 2,
+        signal: { name: "B", start_bit: 8, bit_length: 8, byte_order: "little", notes: ["two\nlines"] },
+      },
+    ]);
   });
 });
 

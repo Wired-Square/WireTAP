@@ -158,7 +158,6 @@ export interface CatalogEditorState {
     serialByteOrder: "little" | "big";  // For Serial config - default byte order for signals
     serialHeaderFields: SerialHeaderFieldEntry[];  // For Serial config - header field masks over header bytes
     serialHeaderLength: number | undefined;  // For Serial config - global header length in bytes
-    serialMaxFrameLength: number | undefined;  // For Serial config - max frame length (default: 64)
     serialChecksum: SerialChecksumConfig | null;  // For Serial config - protocol-level checksum defaults
     modbusDeviceAddress: number;     // For new catalog dialog - stored in [meta.modbus]
     modbusRegisterBase: 0 | 1;       // For new catalog dialog - stored in [meta.modbus]
@@ -303,7 +302,6 @@ export interface CatalogEditorState {
   setSerialByteOrder: (byteOrder: "little" | "big") => void;
   setSerialHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   setSerialHeaderLength: (length: number | undefined) => void;
-  setSerialMaxFrameLength: (length: number | undefined) => void;
   setSerialChecksum: (checksum: SerialChecksumConfig | null) => void;
   setModbusDeviceAddress: (address: number) => void;
   setModbusRegisterBase: (base: 0 | 1) => void;
@@ -429,7 +427,6 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     serialByteOrder: 'big',  // Default for new catalogs - stored in [meta.serial]
     serialHeaderFields: [],  // Empty = no header fields (ID field replaces frame_id_mask)
     serialHeaderLength: undefined,  // No global header length
-    serialMaxFrameLength: undefined,  // Default: 64 in backend
     serialChecksum: null,    // No protocol-level checksum config
     modbusDeviceAddress: 1,  // Default for new catalogs
     modbusRegisterBase: 0,   // Default for new catalogs (0-based)
@@ -834,9 +831,6 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   setSerialHeaderLength: (serialHeaderLength) =>
     set((state) => ({ forms: { ...state.forms, serialHeaderLength } })),
-
-  setSerialMaxFrameLength: (serialMaxFrameLength) =>
-    set((state) => ({ forms: { ...state.forms, serialMaxFrameLength } })),
 
   setSerialChecksum: (serialChecksum) =>
     set((state) => ({ forms: { ...state.forms, serialChecksum } })),

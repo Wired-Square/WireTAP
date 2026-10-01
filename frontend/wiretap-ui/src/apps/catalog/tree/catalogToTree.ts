@@ -271,7 +271,7 @@ function toModbusConfig(cat: Catalog): ModbusProtocolConfig | undefined {
   const m = cat.modbus;
   if (!m) return undefined;
   return defined({
-    device_address: m.deviceAddress ?? 1,
+    device_address: m.deviceAddress,
     register_base: (m.registerBase ?? 0) as 0 | 1,
     default_interval: m.defaultInterval,
     default_byte_order: m.defaultByteOrder,
@@ -286,7 +286,7 @@ function toSerialConfig(cat: Catalog): SerialProtocolConfig | undefined {
     encoding: (s.encoding ?? "raw") as any,
     byte_order: s.byteOrder,
     header_length: s.headerLength,
-    max_frame_length: s.minFrameLength,
+    min_frame_length: s.minFrameLength,
     frame_id_mask: s.frameIdMask,
     fields: s.fields
       ? Object.fromEntries(
@@ -387,7 +387,7 @@ export function catalogToTree(cat: Catalog): ParsedCatalogTree {
     return a.key.localeCompare(b.key);
   });
 
-  const meta: MetaFields = { name: cat.meta.name, version: cat.meta.version };
+  const meta: MetaFields = { name: cat.meta.name, version: cat.meta.version, default_frame: cat.meta.defaultFrame };
 
   return {
     tree,

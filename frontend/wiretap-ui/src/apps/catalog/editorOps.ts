@@ -1,16 +1,16 @@
 // ui/src/apps/catalog/editorOps.ts
 //
-// Catalogue edit operations. Each function is a thin async wrapper that builds an
-// `EditOp` payload and applies it in Rust (`catalog.edit` → wiretap-catalog crate,
-// via toml_edit) so comments and formatting survive — only the targeted entry
-// changes. The semantic "which fields to write" decisions live here; the
-// comment-preserving document manipulation (sorted insertion, hex masks, key
-// preservation, rename-with-refs) lives in the crate.
+// Catalogue edit operations. Each builds an `EditOp` payload and applies it in Rust
+// (the wiretap-catalog crate, via toml_edit) so comments and formatting survive —
+// only the targeted entry changes. The typed ops (signals, mux, meta, protocol
+// configs) carry their elision rules in the crate; for the generic ones, which
+// fields to write is decided here.
 
 import type { MetaFields, ProtocolType, BaseFrameFields, ProtocolConfig, SerialConfig, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig, ChecksumAlgorithm } from "./types";
 import { tomlParse } from "./toml";
-import { editCatalog } from "../../api/catalog";
-import type { DisplayHint } from "../../types/catalogModel";
+import { editCatalog, editCatalogOps } from "../../api/catalog";
+import type { Confidence, DisplayHint } from "../../types/catalogModel";
+import type { EditOp } from "../../types/catalogEdit";
 import { protocolRegistry } from "./protocols";
 
 // ── small pure helpers (path/data shaping stays in TS) ───────────────────────
@@ -46,144 +46,67 @@ function normalizeSignalTarget(targetPath: string[], index: number | null): { ow
 
 // ── catalogue scaffolding ─────────────────────────────────────────────────────
 
-export function createMinimalCatalogToml(meta: MetaFields): string {
-  // Brand-new file: a plain template, no comments to preserve.
-  return `[meta]\nname = ${JSON.stringify(meta.name ?? "")}\nversion = ${meta.version ?? 1}\n`;
+export function metaOp(meta: MetaFields): EditOp {
+  return { op: "SetMeta", meta: { name: meta.name, version: meta.version, default_frame: meta.default_frame } };
 }
 
-export function updateMetaToml(toml: string, meta: MetaFields): Promise<string> {
-  // managed_keys = name/version only → existing [meta.can]/[meta.serial]/[meta.modbus] are preserved.
-  return editCatalog(toml, {
-    op: "SetTable",
-    path: ["meta"],
-    value: { name: meta.name, version: meta.version },
-    managed_keys: ["name", "version"],
-  });
+export function deleteOp(path: string[]): EditOp {
+  return { op: "DeleteAtPath", path };
 }
 
 // ============================================================================
-// CAN Protocol Config
+// Protocol configs ([meta.can], [meta.serial], [meta.modbus])
 // ============================================================================
 
-/** Read [meta.can] (UI form hydration; read-only, comments irrelevant). */
-export function getCanConfig(toml: string): CanProtocolConfig | null {
-  const parsed = tomlParse(toml) as any;
-  const c = parsed?.meta?.can;
-  if (!c || typeof c !== "object") return null;
-  const byteOrder = c.default_byte_order ?? c.default_endianness;
-  const defaultEndianness = byteOrder === "big" ? "big" : byteOrder === "little" ? "little" : null;
-  if (!defaultEndianness) return null;
-  const config: CanProtocolConfig = { default_endianness: defaultEndianness };
-  if (typeof c.default_interval === "number") config.default_interval = c.default_interval;
-  if (typeof c.frame_id_mask === "number") config.frame_id_mask = c.frame_id_mask;
-  if (typeof c.default_extended === "boolean") config.default_extended = c.default_extended;
-  if (typeof c.default_fd === "boolean") config.default_fd = c.default_fd;
-  return config;
+export function canConfigOp(config: CanProtocolConfig): EditOp {
+  return {
+    op: "SetCanConfig",
+    config: {
+      default_byte_order: config.default_endianness,
+      default_interval: config.default_interval,
+      default_extended: config.default_extended,
+      default_fd: config.default_fd,
+      frame_id_mask: config.frame_id_mask,
+      fields: config.fields,
+    },
+  };
 }
 
-export function upsertCanConfigToml(toml: string, config: CanProtocolConfig): Promise<string> {
-  const value: Record<string, unknown> = compact({
-    default_byte_order: config.default_endianness,
-    default_interval: config.default_interval,
-    default_extended: config.default_extended,
-    default_fd: config.default_fd,
-    frame_id_mask: config.frame_id_mask, // Rust renders mask/frame_id_mask as hex
-  });
-  if (config.fields && Object.keys(config.fields).length > 0) {
-    const fields: Record<string, unknown> = {};
-    for (const [name, field] of Object.entries(config.fields)) {
-      fields[name] = compact({
-        mask: field.mask,
-        shift: field.shift !== undefined && field.shift !== 0 ? field.shift : undefined,
-        format: field.format && field.format !== "hex" ? field.format : undefined,
-      });
-    }
-    value.fields = fields;
-  }
-  return editCatalog(toml, { op: "SetTable", path: ["meta", "can"], value, replace_contents: true });
+export function serialConfigOp(config: SerialProtocolConfig): EditOp {
+  const { checksum } = config;
+  return {
+    op: "SetSerialConfig",
+    config: {
+      encoding: config.encoding,
+      byte_order: config.byte_order,
+      frame_id_mask: config.frame_id_mask,
+      header_length: config.header_length,
+      min_frame_length: config.min_frame_length,
+      fields: config.fields,
+      checksum: checksum && {
+        algorithm: checksum.algorithm,
+        startByte: checksum.start_byte,
+        byteLength: checksum.byte_length,
+        calcStartByte: checksum.calc_start_byte,
+        calcEndByte: checksum.calc_end_byte,
+        bigEndian: checksum.big_endian,
+      },
+    },
+  };
 }
 
-export function deleteCanConfigToml(toml: string): Promise<string> {
-  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "can"] });
-}
-
-// ============================================================================
-// Serial Protocol Config
-// ============================================================================
-
-export function getSerialConfig(toml: string): SerialProtocolConfig | null {
-  const parsed = tomlParse(toml) as any;
-  const c = parsed?.meta?.serial;
-  if (!c || typeof c !== "object") return null;
-  const validEncodings = ["slip", "cobs", "raw", "length_prefixed"];
-  if (!validEncodings.includes(c.encoding)) return null;
-  const config: SerialProtocolConfig = { encoding: c.encoding };
-  if (typeof c.frame_id_mask === "number") config.frame_id_mask = c.frame_id_mask;
-  return config;
-}
-
-export function upsertSerialConfigToml(toml: string, config: SerialProtocolConfig): Promise<string> {
-  const value: Record<string, unknown> = compact({
-    encoding: config.encoding,
-    byte_order: config.byte_order,
-    header_length: config.header_length !== undefined && config.header_length > 0 ? config.header_length : undefined,
-    max_frame_length: config.max_frame_length !== undefined && config.max_frame_length > 0 ? config.max_frame_length : undefined,
-  });
-  if (config.fields && Object.keys(config.fields).length > 0) {
-    const fields: Record<string, unknown> = {};
-    for (const [name, field] of Object.entries(config.fields)) {
-      fields[name] = compact({
-        mask: field.mask,
-        endianness: field.endianness && field.endianness !== "big" ? field.endianness : undefined,
-        format: field.format && field.format !== "hex" ? field.format : undefined,
-      });
-    }
-    value.fields = fields;
-  }
-  if (config.checksum) {
-    value.checksum = compact({
-      algorithm: config.checksum.algorithm,
-      start_byte: config.checksum.start_byte,
-      byte_length: config.checksum.byte_length,
-      calc_start_byte: config.checksum.calc_start_byte,
-      calc_end_byte: config.checksum.calc_end_byte,
-      big_endian: config.checksum.big_endian ? true : undefined,
-    });
-  }
-  return editCatalog(toml, { op: "SetTable", path: ["meta", "serial"], value, replace_contents: true });
-}
-
-export function deleteSerialConfigToml(toml: string): Promise<string> {
-  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "serial"] });
-}
-
-// ============================================================================
-// Modbus Protocol Config
-// ============================================================================
-
-export function getModbusConfig(toml: string): ModbusProtocolConfig | null {
-  const parsed = tomlParse(toml) as any;
-  const c = parsed?.meta?.modbus;
-  if (!c || typeof c !== "object") return null;
-  const deviceAddress = typeof c.device_address === "number" ? c.device_address : undefined;
-  const registerBase = c.register_base === 0 || c.register_base === 1 ? (c.register_base as 0 | 1) : undefined;
-  if (registerBase === undefined) return null;
-  return { device_address: deviceAddress, register_base: registerBase };
-}
-
-export function upsertModbusConfigToml(toml: string, config: ModbusProtocolConfig): Promise<string> {
-  // The device address lives on each slave node, not here.
-  const value = compact({
-    register_base: config.register_base,
-    default_interval: config.default_interval,
-    default_byte_order: config.default_byte_order,
-    default_word_order: config.default_word_order,
-  });
-  return editCatalog(toml, { op: "SetTable", path: ["meta", "modbus"], value, replace_contents: true });
-}
-
-export function deleteModbusConfigToml(toml: string): Promise<string> {
-  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "modbus"] });
+/** `device_address` is the legacy default slave; a save passes the file's own through. */
+export function modbusConfigOp(config: ModbusProtocolConfig): EditOp {
+  return {
+    op: "SetModbusConfig",
+    config: {
+      device_address: config.device_address,
+      register_base: config.register_base,
+      default_interval: config.default_interval,
+      default_byte_order: config.default_byte_order,
+      default_word_order: config.default_word_order,
+    },
+  };
 }
 
 // ============================================================================
@@ -347,34 +270,22 @@ export interface SignalData {
   notes?: string;
 }
 
-const SIGNAL_SORT_KEYS = ["start_bit", "bit_length", "name"];
-
 export function upsertSignalToml(toml: string, targetPath: string[], signal: SignalData, index: number | null): Promise<string> {
   const { ownerPath, index: idx } = normalizeSignalTarget(targetPath, index);
-  const value = compact({
-    name: signal.name,
-    start_bit: signal.start_bit,
-    bit_length: signal.bit_length,
-    factor: signal.factor !== undefined && signal.factor !== 1 ? signal.factor : undefined,
-    offset: signal.offset !== undefined && signal.offset !== 0 ? signal.offset : undefined,
-    unit: signal.unit || undefined,
-    signed: signal.signed,
-    byte_order: signal.endianness, // TOML key is byte_order
-    min: signal.min,
-    max: signal.max,
-    format: signal.format || undefined,
-    confidence: signal.confidence || undefined,
-    enum: signal.enum,
-    display: signal.display,
-    notes: signal.notes || undefined,
-  });
-  return editCatalog(toml, {
-    op: "UpsertArrayItem",
-    array_path: [...ownerPath, "signals"],
-    value,
-    index: idx ?? undefined,
-    sort_keys: SIGNAL_SORT_KEYS,
-  });
+  const { endianness, confidence, notes, ...fields } = signal;
+  return editCatalogOps(toml, [
+    {
+      op: "UpsertSignal",
+      owner_path: ownerPath,
+      index: idx ?? undefined,
+      signal: {
+        ...fields,
+        byte_order: endianness,
+        confidence: (confidence || undefined) as Confidence | undefined,
+        notes: notes ? [notes] : undefined,
+      },
+    },
+  ]);
 }
 
 export function deleteSignalToml(toml: string, signalsParentPath: string[], index: number): Promise<string> {
@@ -399,12 +310,9 @@ export interface MuxData {
 }
 
 export function upsertMuxToml(toml: string, muxOwnerPath: string[], mux: MuxData): Promise<string> {
-  return editCatalog(toml, {
-    op: "SetTable",
-    path: [...muxOwnerPath, "mux"],
-    value: compact({ name: mux.name, start_bit: mux.start_bit, bit_length: mux.bit_length, notes: mux.notes || undefined }),
-    managed_keys: ["name", "start_bit", "bit_length", "notes"],
-  });
+  return editCatalogOps(toml, [
+    { op: "SetMux", owner_path: muxOwnerPath, mux: { ...mux, notes: mux.notes ? [mux.notes] : undefined } },
+  ]);
 }
 
 export function deleteMuxToml(toml: string, muxPath: string[]): Promise<string> {

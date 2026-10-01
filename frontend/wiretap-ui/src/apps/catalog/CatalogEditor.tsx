@@ -83,7 +83,6 @@ function CatalogEditorInner() {
   const setSerialByteOrder = useCatalogEditorStore((s) => s.setSerialByteOrder);
   const setSerialHeaderFields = useCatalogEditorStore((s) => s.setSerialHeaderFields);
   const setSerialHeaderLength = useCatalogEditorStore((s) => s.setSerialHeaderLength);
-  const setSerialMaxFrameLength = useCatalogEditorStore((s) => s.setSerialMaxFrameLength);
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
   const setAvailablePeers = useCatalogEditorStore((s) => s.setAvailablePeers);
@@ -413,14 +412,12 @@ function CatalogEditorInner() {
         } else {
           setSerialHeaderFields([]);
         }
-        // Initialize header_length, max_frame_length, and checksum from parsed config
+        // Initialize header_length and checksum from parsed config
         setSerialHeaderLength(serialConfig.header_length);
-        setSerialMaxFrameLength(serialConfig.max_frame_length);
         setSerialChecksum(serialConfig.checksum ?? null);
       } else {
         setSerialHeaderFields([]);
         setSerialHeaderLength(undefined);
-        setSerialMaxFrameLength(undefined);
         setSerialChecksum(null);
       }
       // Store modbus config from [meta.modbus] if present

@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-vi.mock("../api/catalog", () => ({ editCatalog: vi.fn(async () => "RESULT_TOML") }));
+vi.mock("../api/catalog", () => ({ editCatalogOps: vi.fn(async () => "RESULT_TOML") }));
 
-import { editCatalog } from "../api/catalog";
+import { editCatalogOps } from "../api/catalog";
 import { upsertSignalToml } from "../apps/catalog/editorOps";
 import { signalFieldsFor } from "../apps/catalog/hooks/handlers/useSignalHandlers";
 import { catalogToTree } from "../apps/catalog/tree/catalogToTree";
@@ -33,14 +33,17 @@ describe("editing a signal", () => {
 
     await upsertSignalToml("", ["frame", "can", "0x100", "mux", "1"], fields, 0);
 
-    expect(vi.mocked(editCatalog).mock.calls[0][1]).toMatchObject({
-      op: "UpsertArrayItem",
-      array_path: ["frame", "can", "0x100", "mux", "1", "signals"],
-      value: {
-        name: "Boost",
-        unit: "kPa",
-        display: { widget: "rotary", start_angle: -90, end_angle: 90 },
+    expect(vi.mocked(editCatalogOps).mock.calls[0][1]).toMatchObject([
+      {
+        op: "UpsertSignal",
+        owner_path: ["frame", "can", "0x100", "mux", "1"],
+        index: 0,
+        signal: {
+          name: "Boost",
+          unit: "kPa",
+          display: { widget: "rotary", start_angle: -90, end_angle: 90 },
+        },
       },
-    });
+    ]);
   });
 });

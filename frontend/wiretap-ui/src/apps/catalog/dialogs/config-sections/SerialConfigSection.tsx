@@ -76,8 +76,6 @@ export type SerialConfigSectionProps = {
   setHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   headerLength: number | undefined;
   setHeaderLength: (length: number | undefined) => void;
-  maxFrameLength: number | undefined;
-  setMaxFrameLength: (length: number | undefined) => void;
   checksum: SerialChecksumConfig | null;
   setChecksum: (checksum: SerialChecksumConfig | null) => void;
 };
@@ -97,8 +95,6 @@ export default function SerialConfigSection({
   setHeaderFields,
   headerLength,
   setHeaderLength,
-  maxFrameLength,
-  setMaxFrameLength,
   checksum,
   setChecksum,
 }: SerialConfigSectionProps) {
@@ -274,29 +270,6 @@ export default function SerialConfigSection({
                 Default byte order for signal decoding
               </p>
             </div>
-          </div>
-
-          {/* Max Frame Length */}
-          <div>
-            <label className={`block ${textMedium} mb-2`}>
-              Max Frame Length
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={65535}
-              value={maxFrameLength ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMaxFrameLength(val === "" ? undefined : Math.max(1, parseInt(val) || 64));
-              }}
-              size="lg"
-              className="w-24"
-              placeholder="64"
-            />
-            <p className={`mt-1 ${caption}`}>
-              Safety limit for malformed frames (default: 64 bytes)
-            </p>
           </div>
 
           {/* Header Section */}
@@ -661,7 +634,6 @@ export default function SerialConfigSection({
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-default`}>
           Encoding: {encoding.toUpperCase()} • {byteOrder === 'big' ? 'BE' : 'LE'}
-          {maxFrameLength !== undefined && ` • Max: ${maxFrameLength}B`}
           {headerLength !== undefined && headerLength > 0 && ` • Header: ${headerLength}B`}
           {headerFields.length > 0 && ` • ${headerFields.length} field(s)`}
           {hasIdField && " • ID field"}

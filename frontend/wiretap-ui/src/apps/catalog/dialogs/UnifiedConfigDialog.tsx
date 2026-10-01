@@ -55,8 +55,6 @@ export default function UnifiedConfigDialog({
   const setSerialHeaderFields = useCatalogEditorStore((s) => s.setSerialHeaderFields);
   const serialHeaderLength = useCatalogEditorStore((s) => s.forms.serialHeaderLength);
   const setSerialHeaderLength = useCatalogEditorStore((s) => s.setSerialHeaderLength);
-  const serialMaxFrameLength = useCatalogEditorStore((s) => s.forms.serialMaxFrameLength);
-  const setSerialMaxFrameLength = useCatalogEditorStore((s) => s.setSerialMaxFrameLength);
   const serialChecksum = useCatalogEditorStore((s) => s.forms.serialChecksum);
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
 
@@ -118,7 +116,6 @@ export default function UnifiedConfigDialog({
     setSerialByteOrder("big");
     setSerialHeaderFields([]);
     setSerialHeaderLength(undefined);
-    setSerialMaxFrameLength(undefined);  // Default: 64 in backend
     setSerialChecksum(null);
   };
 
@@ -228,8 +225,6 @@ export default function UnifiedConfigDialog({
             setHeaderFields={setSerialHeaderFields}
             headerLength={serialHeaderLength}
             setHeaderLength={setSerialHeaderLength}
-            maxFrameLength={serialMaxFrameLength}
-            setMaxFrameLength={setSerialMaxFrameLength}
             checksum={serialChecksum}
             setChecksum={setSerialChecksum}
           />
