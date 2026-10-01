@@ -70,7 +70,6 @@ export interface UseDiscoveryHandlersParams {
   // Local state
   pendingSpeed: PlaybackSpeed | null;
   setPendingSpeed: (speed: PlaybackSpeed | null) => void;
-  resetWatchFrameCount: () => void;
   setCaptureMetadata: (meta: CaptureMetadata | null) => void;
 
   // Manager session switching methods
@@ -174,7 +173,6 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     updateCurrentTime: params.updateCurrentTime,
     setCurrentFrameIndex: params.setCurrentFrameIndex,
     clearAll: params.clearAll,
-    resetWatchFrameCount: params.resetWatchFrameCount,
     closeSpeedChangeDialog: params.closeSpeedChangeDialog,
   });
 

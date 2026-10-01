@@ -846,30 +846,12 @@ session control: it pauses and resumes the selected Modbus session's poller and
 gates nothing. Pausing stops requests but keeps the socket; only stopping the
 session frees it.
 
-`create_modbus_scan_session` still takes `target_session_id`, `stop_target` and
-`allow_contention`, and does the whole sequence itself, in this order:
-
-1. **Resolve** the device from the target session — necessarily first, because
-   `stop_and_switch_to_capture` replaces a session's profile ids with its capture
-   id, so a stopped session can no longer name its own device.
-2. **Refuse** — `scan_holding` for a competing sweep, then
-   `endpoint_in_use_by_poller` for a competing poller. The target is excluded by
-   name: the caller has already dealt with it. Both precede any stop, so a
-   rejected sweep cannot leave the caller's session stopped for a scan that never
-   ran.
-3. **Stop** the target, freeing the socket — only when `stop_target` is set.
-4. **Create** the scan session.
-
-Keeping all four inside one command is what makes that order unloseable.
-
-**`target_session_id` and `stop_target` currently have no caller.** Discovery
-passes neither — it runs from "No source", so there is no target session to
-resolve, stop or exclude — and MCP passes `None, None, Some(true)`, naming its
-own device and opting out of the poller check because an agent has no way to
-answer a refusal. So `allow_contention` is the only one of the three that is
-live, and the retarget/stop branches are reachable capability with nobody
-exercising it. Either give them a caller or delete them; don't let this
-paragraph go on implying one exists.
+`create_modbus_scan_session` sweeps the address in the job — it never resolves
+one from, or stops, another session. Before creating the scan session it
+refuses a competing sweep (`scan_holding`) and, unless `allow_contention` is
+set, a competing poller (`endpoint_in_use_by_poller`). Discovery leaves
+contention refused; MCP passes `allow_contention: Some(true)`, because an agent
+has no way to answer a refusal.
 
 `endpoint_in_use_by_poller` counts a **paused** session as holding the device,
 not just a running one — pause stops requests and keeps the socket, so a paused
@@ -928,12 +910,8 @@ store, so two panels on one session agree and a reload comes back correct; it
 used to hold `isPolling` as optimistic React state because there was nothing to
 read.
 
-That also makes the sweep guard checkable. `endpoint_in_use_by_poller` excludes
-the caller's `target_session_id` only when `stop_target` is set; it used to do so
-unconditionally, on the caller's word. Note that "is it paused?" is *not* the
-test that earns the exemption — a paused poller keeps its socket, which is why
-`holds_socket` counts it. `resume_source_polling` carries the mirror check
-against `scan_holding`.
+`resume_source_polling` carries the sweep guard's mirror check against
+`scan_holding`.
 
 ---
 

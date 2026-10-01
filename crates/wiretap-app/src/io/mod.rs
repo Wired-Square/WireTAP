@@ -50,7 +50,7 @@ pub use recorded::{BackendApiConfig, BackendApiSource, BackendApiSourceOptions};
 pub use bus_mapping::BusMapping;
 pub use gvret::{probe_gvret_tcp, GvretDeviceInfo};
 pub use modbus_tcp::{
-    build_polls_from_catalog, build_polls_from_ranges, modbus_endpoint, session_modbus_endpoint,
+    build_polls_from_catalog, build_polls_from_ranges, modbus_endpoint,
     ModbusRange, ModbusRangeSpec,
     PollGroup, RegisterType,
     ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,

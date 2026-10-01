@@ -12,18 +12,6 @@ export const WINDOW_EVENTS = {
   // Capture events
   CAPTURE_CHANGED: 'capture:changed',
   CAPTURE_METADATA_UPDATED: 'capture:metadata-updated',
-
-  // Window lifecycle events
-  WINDOW_OPENED: 'window:opened',
-  WINDOW_CLOSING: 'window:closing',
-  WINDOW_FOCUSED: 'window:focused',
-  WINDOW_READY: 'window:ready',
-
-  // Session events
-  RESTORE_SESSION: 'restore-session',
-
-  // Frame calculator events
-  LOAD_HEX_DATA: 'calculator:load-hex',
 } as const;
 
 export interface CatalogSavedPayload {
@@ -33,21 +21,6 @@ export interface CatalogSavedPayload {
 
 export interface SettingsChangedPayload {
   settings: Record<string, unknown>;
-}
-
-export interface WindowLifecyclePayload {
-  label: string;
-  timestamp: number;
-}
-
-export interface WindowReadyPayload {
-  label: string;
-  timestamp: number;
-}
-
-export interface LoadHexDataPayload {
-  hexData: string;
-  timestamp: number;
 }
 
 export interface CaptureMetadataUpdatedPayload {

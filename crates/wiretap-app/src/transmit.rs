@@ -222,14 +222,6 @@ pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<Transmi
     Ok(profiles)
 }
 
-/// Get the current usage of a profile (if any)
-#[tauri::command]
-pub async fn get_profile_usage(
-    profile_id: String,
-) -> Result<Option<crate::profile_tracker::ProfileUsage>, String> {
-    Ok(crate::profile_tracker::get_usage(&profile_id))
-}
-
 // ============================================================================
 // IO Session-Based Transmit Commands
 // ============================================================================

@@ -46,9 +46,6 @@ export interface UseDiscoveryPlaybackHandlersParams {
   /** Atomic frames + picker clear (one store write). */
   clearAll: () => void;
 
-  // Discovery-specific: reset frame count before starting
-  resetWatchFrameCount: () => void;
-
   // Dialog controls
   closeSpeedChangeDialog: () => void;
 }
@@ -74,7 +71,6 @@ export function useDiscoveryPlaybackHandlers({
   updateCurrentTime,
   setCurrentFrameIndex,
   clearAll,
-  resetWatchFrameCount,
   closeSpeedChangeDialog,
 }: UseDiscoveryPlaybackHandlersParams) {
   // Use shared playback handlers for play/pause/stop/step consistency
@@ -95,9 +91,6 @@ export function useDiscoveryPlaybackHandlers({
     setPlaybackSpeed,
     updateCurrentTime,
     setCurrentFrameIndex,
-    onBeforeStart: () => {
-      resetWatchFrameCount();
-    },
   });
 
   // Handle speed change (overrides shared handler to match Discovery's implementation)

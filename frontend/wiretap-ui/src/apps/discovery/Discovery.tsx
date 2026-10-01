@@ -468,7 +468,6 @@ function DiscoveryInner() {
     watchUniqueFrameCount,
     watchByteCount,
     bytesCaptureId: sessionBytesCaptureId,
-    resetWatchFrameCount,
     // Session switching methods
     stopWatch,
     handleDestroy,
@@ -792,12 +791,8 @@ function DiscoveryInner() {
       default_interval: 1000,
     });
     try {
-      // No target session: the address comes from the panel, which is the whole
-      // point of running these with no source selected. `targetSessionId` and
-      // `stopTarget` stay in the API for MCP, which can sweep a device someone
-      // else already has open. Contention is still refused by name — another app
-      // polling this endpoint is a reason to stop, not to collect a half-empty
-      // register map.
+      // Contention is refused by name — another app polling this endpoint is a
+      // reason to stop, not to collect a half-empty register map.
       await createModbusScanSession(scanSessionId, job, { appName: "discovery" });
       await joinSession(scanSessionId);
       // After the session exists, not before: the record *is* the tab, so a
@@ -902,7 +897,6 @@ function DiscoveryInner() {
     // Local state
     pendingSpeed,
     setPendingSpeed,
-    resetWatchFrameCount,
     setCaptureMetadata,
 
     // Manager session switching methods

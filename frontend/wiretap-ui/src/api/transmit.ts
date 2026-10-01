@@ -77,12 +77,6 @@ export function serialFraming(mode: SerialFramingMode, delimiter: number[]): Ser
   return mode === "delimiter" ? { mode, delimiter } : { mode };
 }
 
-/** Information about active profile usage */
-export interface ProfileUsage {
-  /** ID of the session using this profile */
-  session_id: string;
-}
-
 /** Event payload for CAN transmit history (emitted during repeat transmits) */
 export interface TransmitHistoryEvent {
   /** Session ID that transmitted */
@@ -152,19 +146,6 @@ export type RepeatEvent =
  */
 export async function getTransmitCapableProfiles(): Promise<TransmitProfile[]> {
   return invoke("get_transmit_capable_profiles");
-}
-
-/**
- * Get the current usage of a profile (if any).
- * Used to check if a profile is in use by a reader or writer session
- * before attempting to connect.
- * @param profileId - Profile to check
- * @returns Usage info or null if profile is not in use
- */
-export async function getProfileUsage(
-  profileId: string
-): Promise<ProfileUsage | null> {
-  return invoke("get_profile_usage", { profileId });
 }
 
 // ============================================================================

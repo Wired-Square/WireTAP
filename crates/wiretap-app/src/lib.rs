@@ -1242,7 +1242,6 @@ pub fn run() {
             sessions::io_stop_and_switch_to_capture,
             sessions::session_stop_to_capture,
             sessions::resume_reader_session_fresh,
-            sessions::copy_capture_for_detach,
             sessions::update_reader_speed,
             sessions::set_virtual_traffic_enabled,
             sessions::set_virtual_bus_traffic_enabled,
@@ -1287,8 +1286,6 @@ pub fn run() {
             sessions::get_supported_protocols,
             sessions::generate_session_id,
             // Profile-to-session mapping API
-            sessions::get_profile_sessions,
-            sessions::get_profile_session_count,
             sessions::get_profiles_usage,
             // Signal-then-fetch query commands
             sessions::get_playback_position_cmd,
@@ -1382,7 +1379,6 @@ pub fn run() {
             frame_export::export_frame_dump,
             // Transmit API
             transmit::get_transmit_capable_profiles,
-            transmit::get_profile_usage,
             // IO session-based transmit
             transmit::io_transmit_can_frame,
             transmit::io_transmit_serial,
@@ -1401,7 +1397,6 @@ pub fn run() {
             replay::io_start_replay,
             replay::io_stop_replay,
             replay::io_stop_all_replays,
-            replay::get_replay_state,
             // Direct serial-terminal (Serial app) — desktop only
             #[cfg(not(target_os = "ios"))]
             serial_terminal::serial_terminal_open,

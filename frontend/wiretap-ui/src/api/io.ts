@@ -433,18 +433,6 @@ export async function resumeReaderSessionFresh(sessionId: string): Promise<IOSta
 }
 
 /**
- * Copy a capture for an app that is detaching from a session.
- * Creates an orphaned copy of the capture that can be used standalone.
- * Returns the new capture ID.
- */
-export async function copyCaptureForDetach(
-  captureId: string,
-  newName: string
-): Promise<string> {
-  return invoke("copy_capture_for_detach", { capture_id: captureId, new_name: newName });
-}
-
-/**
  * Enable or disable traffic generation for a virtual device session.
  * When disabled, the session stays connected but no synthetic traffic is generated.
  */
@@ -571,24 +559,6 @@ export async function reconfigureReaderSession(
  */
 export async function destroyReaderSession(sessionId: string, reset = false): Promise<void> {
   return invoke("destroy_reader_session", { session_id: sessionId, reset });
-}
-
-/**
- * Information about active profile usage.
- */
-export interface ProfileUsage {
-  /** ID of the session using this profile */
-  session_id: string;
-}
-
-/**
- * Get the current usage of a profile (if any).
- * Used to check if a profile is in use by another session before creating a new one.
- * @param profileId - Profile to check
- * @returns Usage info or null if profile is not in use
- */
-export async function getProfileUsage(profileId: string): Promise<ProfileUsage | null> {
-  return invoke("get_profile_usage", { profileId });
 }
 
 /**
@@ -741,32 +711,6 @@ export interface SourceReplacedPayload {
   state: string;
   /** Context hint for the frontend ("capture", "live", "reinitialize") */
   transition: string;
-}
-
-/**
- * Payload sent when a session's state changes.
- * Event name: session-state:{sessionId}
- */
-export interface StateChangePayload {
-  /** Previous state as a string (e.g., "stopped", "running", "error:message") */
-  previous: string;
-  /** Current state as a string */
-  current: string;
-  /** Active capture ID if streaming to a capture */
-  capture_id: string | null;
-}
-
-/**
- * Parse a state string from StateChangePayload into a IOStateType.
- */
-export function parseStateString(stateStr: string): IOStateType {
-  if (stateStr.startsWith("error:")) {
-    return "error";
-  }
-  if (stateStr === "stopped" || stateStr === "starting" || stateStr === "running" || stateStr === "paused") {
-    return stateStr;
-  }
-  return "stopped"; // fallback
 }
 
 /**
@@ -958,8 +902,6 @@ export async function unregisterSessionSubscriber(
   sessionId: string,
   subscriberId: string
 ): Promise<number> {
-  console.log(`[unregisterSessionSubscriber] session=${sessionId}, subscriber=${subscriberId}`);
-  console.log(`[unregisterSessionSubscriber] stack:`, new Error().stack);
   return invoke("unregister_session_subscriber", {
     session_id: sessionId,
     subscriber_id: subscriberId,
@@ -1079,18 +1021,6 @@ export function encodeBusMapping(m: BusMapping): RawBusMapping {
     interface_id: m.interfaceId,
     protocol: m.protocol,
   };
-}
-
-/**
- * Get all listeners for a session.
- * Useful for debugging and for the frontend to understand session state.
- * @param sessionId The session ID
- * @returns List of registered subscribers
- */
-export async function getSessionSubscribers(
-  sessionId: string
-): Promise<SubscriberInfo[]> {
-  return invoke("get_session_listener_list", { session_id: sessionId });
 }
 
 /**
@@ -1635,22 +1565,6 @@ export interface ProfileUsageInfo {
 }
 
 /**
- * Get all session IDs that are using a specific profile.
- * Used to show "(in use: sessionId)" indicator in the IO picker.
- */
-export async function getProfileSessions(profileId: string): Promise<string[]> {
-  return invoke("get_profile_sessions", { profile_id: profileId });
-}
-
-/**
- * Get the count of sessions using a specific profile.
- * Used to determine if reconfiguration should be locked (locked if >= 2).
- */
-export async function getProfileSessionCount(profileId: string): Promise<number> {
-  return invoke("get_profile_session_count", { profile_id: profileId });
-}
-
-/**
  * Get usage info for multiple profiles at once.
  * More efficient than calling getProfileSessions for each profile.
  */
@@ -1803,18 +1717,6 @@ export async function createModbusScanSession(
     profileId?: string;
     subscriberId?: string;
     appName?: string;
-    /**
-     * A live Modbus session whose device to sweep. Rust resolves the address from
-     * it, so the sweep and the name on screen cannot disagree.
-     */
-    targetSessionId?: string;
-    /**
-     * Stop that session first, freeing its socket. Most devices serve one Modbus
-     * conversation at a time, and pausing keeps the socket — only stopping frees
-     * it. Rust stops it *after* resolving the address, because stopping is what
-     * makes a session stop naming its device.
-     */
-    stopTarget?: boolean;
     /** Sweep anyway when something else is polling the device. */
     allowContention?: boolean;
   }
@@ -1825,8 +1727,6 @@ export async function createModbusScanSession(
     profile_id: options?.profileId ?? null,
     subscriber_id: options?.subscriberId ?? null,
     app_name: options?.appName ?? null,
-    target_session_id: options?.targetSessionId ?? null,
-    stop_target: options?.stopTarget ?? null,
     allow_contention: options?.allowContention ?? null,
   });
 }
@@ -1878,14 +1778,8 @@ export interface FcProbeConfig {
  * silence usually means it isn't implemented and sweeping it would burn the
  * whole timeout budget for nothing.
  */
-export async function probeModbusFunctionCodes(
-  config: FcProbeConfig,
-  targetSessionId?: string
-): Promise<FcProbeEntry[]> {
-  return invoke("modbus_probe_function_codes", {
-    config,
-    target_session_id: targetSessionId ?? null,
-  });
+export async function probeModbusFunctionCodes(config: FcProbeConfig): Promise<FcProbeEntry[]> {
+  return invoke("modbus_probe_function_codes", { config });
 }
 
 // ============================================================================
@@ -1988,13 +1882,6 @@ export async function getOrphanedCaptureIds(
   sessionId: string
 ): Promise<string[]> {
   return invoke("get_orphaned_capture_ids", { session_id: sessionId });
-}
-
-/** Fetch current replay state. */
-export async function getReplayState(
-  replayId: string
-): Promise<ReplayState | null> {
-  return invoke("get_replay_state", { replay_id: replayId });
 }
 
 export interface ReplayState {

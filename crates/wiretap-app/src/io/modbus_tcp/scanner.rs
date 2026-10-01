@@ -211,10 +211,7 @@ fn default_repeat_delay_ms() -> u64 {
 /// that only knows the original fields still deserialises.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModbusScanConfig {
-    /// Server hostname or IP. Defaulted rather than required because a caller may
-    /// name a session instead and let the command resolve the device; the command
-    /// errors when that resolution fails, so the default is a backstop, never a
-    /// silent fallback to localhost.
+    /// Server hostname or IP
     #[serde(default = "default_host")]
     pub host: String,
     /// Server port (default 502)
@@ -267,7 +264,7 @@ pub struct ModbusScanConfig {
 /// Configuration for unit ID scanning
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UnitIdScanConfig {
-    /// Server hostname or IP. See `ModbusScanConfig::host`.
+    /// Server hostname or IP
     #[serde(default = "default_host")]
     pub host: String,
     /// Server port (default 502)
@@ -292,7 +289,7 @@ pub struct UnitIdScanConfig {
 /// Configuration for the function-code probe.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FcProbeConfig {
-    /// Server hostname or IP. See `ModbusScanConfig::host`.
+    /// Server hostname or IP
     #[serde(default = "default_host")]
     pub host: String,
     #[serde(default = "default_port")]

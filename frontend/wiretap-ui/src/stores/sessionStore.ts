@@ -6,7 +6,6 @@
 
 import * as Sentry from "@sentry/react";
 import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
 import { listen, emit, type UnlistenFn } from "@tauri-apps/api/event";
 import { WINDOW_EVENTS } from "../events/registry";
 import {
@@ -460,16 +459,10 @@ export interface SessionStore {
   // ---- Selectors ----
   /** Get session by ID */
   getSession: (sessionId: string) => Session | undefined;
-  /** Get all sessions as array */
-  getAllSessions: () => Session[];
-  /** Get transmit-capable sessions */
-  getTransmitCapableSessions: () => Session[];
   /** Check if profile is in use by any session */
   isProfileInUse: (profileId: string) => boolean;
   /** Get session for a profile (if one exists) */
   getSessionForProfile: (profileId: string) => Session | undefined;
-  /** Get sessions for Transmit dropdown (connected + disconnected with queue) */
-  getTransmitDropdownSessions: () => Session[];
 
   // ---- Global App Error Dialog ----
   /** Global app error dialog state (shown for errors across the app) */
@@ -916,7 +909,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   // ---- Session Lifecycle ----
   openSession: async (profileId, profileName, subscriberId, appName, options = {}) => {
     tlog.debug(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, subscriberId=${subscriberId}`);
-    console.log(`[sessionStore:openSession] Options: ${JSON.stringify(options)}`);
 
     // Session ID can be explicitly provided (for recorded sources that need unique IDs)
     // or defaults to profile ID (for realtime sources that share sessions)
@@ -924,7 +916,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     // Step 1: Check if we already have this session in our store
     const existingSession = get().sessions[sessionId];
-    console.log(`[sessionStore:openSession] existingSession lifecycle=${existingSession?.lifecycleState}`);
     if (existingSession?.lifecycleState === "connected") {
       // Register this listener with Rust backend
       try {
@@ -963,7 +954,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const existingCaps = await getIOSessionCapabilities(sessionId);
     const existingState = await getIOSessionState(sessionId);
     const backendExists = existingCaps && existingState?.type !== "Error";
-    console.log(`[sessionStore:openSession] backendExists=${backendExists}, existingState.type=${existingState?.type}`);
 
     // Step 3: Destroy error session if exists
     if (existingCaps && existingState?.type === "Error") {
@@ -986,7 +976,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Join existing backend session using registerSessionSubscriber only
       // Don't call joinReaderSession - it increments joiner_count separately from the listener map,
       // which causes count to overshoot when React StrictMode double-mounts components
-      console.log(`[sessionStore:openSession] Backend exists, joining session ${sessionId}`);
       const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
       capabilities = regResult.capabilities;
       ioState = getStateType(regResult.state);
@@ -1011,10 +1000,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       });
     } else {
       // Create new backend session
-      console.log(`[sessionStore:openSession] Backend does not exist, creating new session`);
       // Auto-detect capture mode from profile ID (supports both legacy and new capture ID formats)
       const isCaptureMode = isCaptureProfileId(profileId) || options.useCapture;
-      console.log(`[sessionStore:openSession] isCaptureMode=${isCaptureMode}`);
 
       const createOptions: CreateIOSessionOptions = {
         sessionId,
@@ -1044,9 +1031,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       };
 
       try {
-        console.log(`[sessionStore:openSession] Calling createIOSession with options:`, JSON.stringify(createOptions));
         capabilities = await createIOSession(createOptions);
-        console.log(`[sessionStore:openSession] createIOSession succeeded`);
 
         // For capture mode, the session IS the capture — set capture ID so actions can find it
         if (isCaptureMode) {
@@ -1313,15 +1298,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   leaveSession: async (sessionId, subscriberId) => {
-    console.log(`[sessionStore:leaveSession] Called with sessionId=${sessionId}, subscriberId=${subscriberId}`);
     const eventListeners = get()._eventListeners[sessionId];
-    console.log(`[sessionStore:leaveSession] eventListeners exists=${!!eventListeners}`);
 
     try {
       // Unregister listener from Rust backend
-      console.log(`[sessionStore:leaveSession] Calling unregisterSessionSubscriber...`);
       const remaining = await unregisterSessionSubscriber(sessionId, subscriberId);
-      console.log(`[sessionStore:leaveSession] unregisterSessionSubscriber returned remaining=${remaining}`);
 
       // Log session-left event
       const session = get().sessions[sessionId];
@@ -1338,11 +1319,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (eventListeners) {
         eventListeners.callbacks.delete(subscriberId);
         eventListeners.registeredSubscribers.delete(subscriberId);
-        console.log(`[sessionStore:leaveSession] callbacks.size=${eventListeners.callbacks.size}`);
 
         // If no more local callbacks, clean up event listeners
         if (eventListeners.callbacks.size === 0) {
-          console.log(`[sessionStore:leaveSession] No more callbacks, cleaning up event listeners`);
           cleanupEventListeners(eventListeners);
 
           // NOTE: Don't call leaveReaderSession here - unregisterSessionSubscriber already
@@ -1369,9 +1348,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                   s.activeSessionId === sessionId ? null : s.activeSessionId,
               };
             });
-            console.log(
-              `[sessionStore:leaveSession] Session preserved (has queued messages)`
-            );
           } else {
             // Remove from local store only
             set((s) => {
@@ -1384,11 +1360,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                   s.activeSessionId === sessionId ? null : s.activeSessionId,
               };
             });
-            console.log(`[sessionStore:leaveSession] Session removed from store`);
           }
         } else {
           // Update listener count
-          console.log(`[sessionStore:leaveSession] Other callbacks remain, updating listener count`);
           set((s) => ({
             sessions: {
               ...s.sessions,
@@ -1400,9 +1374,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           }));
         }
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.log(`[sessionStore:leaveSession] Error: ${msg}`);
+    } catch {
       // Ignore - session may already be gone
     }
   },
@@ -1497,28 +1469,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   reinitializeSession: async (sessionId, subscriberId, appName, profileId, profileName, options) => {
-    console.log(`[sessionStore:reinitializeSession] Called with sessionId=${sessionId}, subscriberId=${subscriberId}, profileId=${profileId}, profileName=${profileName}`);
-    console.log(`[sessionStore:reinitializeSession] Options: ${JSON.stringify(options)}`);
-
     // Use Rust's atomic reinitialize check
     const result = await reinitializeSessionIfSafe(sessionId, subscriberId);
-    console.log(`[sessionStore:reinitializeSession] reinitializeSessionIfSafe result: ${JSON.stringify(result)}`);
 
     if (!result.success) {
       // Can't fully reinitialize (other listeners exist), but we can update the time range
       const existing = get().sessions[sessionId];
-      console.log(`[sessionStore:reinitializeSession] Can't reinitialize, existing session=${!!existing}`);
       if (existing) {
         // Apply time range update even when we can't reinitialize
         if (options?.startTime !== undefined || options?.endTime !== undefined) {
-          console.log(`[sessionStore:reinitializeSession] Can't reinitialize (other listeners), updating time range instead`);
           await updateReaderTimeRange(sessionId, options.startTime, options.endTime);
         }
         return existing;
       }
       // If no session exists, create one
       // Pass sessionId via options so openSession uses it instead of defaulting to profileId
-      console.log(`[sessionStore:reinitializeSession] No existing session, calling openSession`);
       return get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
     }
 
@@ -1551,10 +1516,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     // Create new session - this will update the existing entry in the store
     // Pass sessionId via options so openSession uses it instead of defaulting to profileId
-    console.log(`[sessionStore:reinitializeSession] Success, calling openSession for profileId=${profileId}, sessionId=${sessionId}`);
-    const result2 = await get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
-    console.log(`[sessionStore:reinitializeSession] openSession complete, result.id=${result2?.id}`);
-    return result2;
+    return get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
   },
 
   // ---- Session Control ----
@@ -1797,9 +1759,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   setSessionTimeRange: async (sessionId, start, end) => {
-    console.log("[sessionStore:setSessionTimeRange] sessionId:", sessionId, "start:", start, "end:", end);
     await updateReaderTimeRange(sessionId, start, end);
-    console.log("[sessionStore:setSessionTimeRange] completed");
   },
 
   seekSession: async (sessionId, timestampUs) => {
@@ -1923,14 +1883,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   // ---- Selectors ----
   getSession: (sessionId) => get().sessions[sessionId],
 
-  getAllSessions: () => Object.values(get().sessions).filter((s) => s != null),
-
-  getTransmitCapableSessions: () =>
-    Object.values(get().sessions).filter(
-      (s) =>
-        s && s.lifecycleState === "connected" && s.capabilities?.traits.tx_frames === true
-    ),
-
   isProfileInUse: (profileId) =>
     Object.values(get().sessions).some(
       (s) => s && s.profileId === profileId && s.lifecycleState === "connected"
@@ -1939,15 +1891,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   getSessionForProfile: (profileId) =>
     Object.values(get().sessions).find(
       (s) => s && s.profileId === profileId && s.lifecycleState === "connected"
-    ),
-
-  getTransmitDropdownSessions: () =>
-    Object.values(get().sessions).filter(
-      (s) =>
-        s &&
-        ((s.lifecycleState === "connected" &&
-          s.capabilities?.traits.tx_frames === true) ||
-        (s.lifecycleState === "disconnected" && s.hasQueuedMessages))
     ),
 
   // ---- Global App Error Dialog ----
@@ -2130,40 +2073,6 @@ export function useSession(sessionId: string): Session | undefined {
 export function useActiveSession(): Session | undefined {
   return useSessionStore((s) =>
     s.activeSessionId ? s.sessions[s.activeSessionId] : undefined
-  );
-}
-
-/** Get all sessions as an array */
-export function useAllSessions(): Session[] {
-  return useSessionStore(
-    useShallow((s) => Object.values(s.sessions))
-  );
-}
-
-/** Get transmit-capable sessions */
-export function useTransmitCapableSessions(): Session[] {
-  return useSessionStore(
-    useShallow((s) =>
-      Object.values(s.sessions).filter(
-        (session) =>
-          session.lifecycleState === "connected" &&
-          session.capabilities?.traits.tx_frames === true
-      )
-    )
-  );
-}
-
-/** Get sessions for Transmit dropdown */
-export function useTransmitDropdownSessions(): Session[] {
-  return useSessionStore(
-    useShallow((s) =>
-      Object.values(s.sessions).filter(
-        (session) =>
-          (session.lifecycleState === "connected" &&
-            session.capabilities?.traits.tx_frames === true) ||
-          (session.lifecycleState === "disconnected" && session.hasQueuedMessages)
-      )
-    )
   );
 }
 

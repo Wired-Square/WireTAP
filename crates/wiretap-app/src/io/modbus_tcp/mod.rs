@@ -66,18 +66,6 @@ pub fn session_modbus_profile<'a>(
         })
 }
 
-/// Resolve the Modbus device behind a session, for tools that scan "whatever this
-/// session is talking to" rather than an address the user typed.
-pub fn session_modbus_endpoint(
-    app: &tauri::AppHandle,
-    session_id: &str,
-) -> Result<(String, u16, u8), String> {
-    let settings = crate::settings::load_settings_sync(app)?;
-    session_modbus_profile(&settings, session_id)
-        .map(modbus_endpoint)
-        .ok_or_else(|| format!("Session '{session_id}' has no Modbus source profile"))
-}
-
 /// Build Modbus poll groups from a catalogue's `[frame.modbus.*]` entries via the
 /// shared `wiretap-catalog` crate (which resolves the register-from-key and
 /// signal-less-register shorthands, the `register_base` protocol address, the

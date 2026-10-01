@@ -2,14 +2,10 @@
 //
 // Time-accurate frame replay — plays back a set of captured frames to a target
 // session, preserving the original inter-frame timing scaled by a speed multiplier.
-//
-// Replay state is stored in REPLAY_STATES and fetched by the frontend via
-// get_replay_state after receiving a `replay-lifecycle` or `replay-progress` signal.
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex as StdMutex;
 use tauri::AppHandle;
 use tokio::sync::watch;
 
@@ -56,11 +52,7 @@ struct ReplayTask {
 static IO_REPLAY_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, ReplayTask>>> =
     Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
-// ============================================================================
-// Replay State (signal-then-fetch)
-// ============================================================================
-
-/// Snapshot of a replay's progress, polled by the frontend via get_replay_state.
+/// Snapshot of a replay's progress, pushed to the frontend over WS.
 #[derive(Clone, Debug, Serialize)]
 pub struct ReplayState {
     pub status: String,
@@ -71,26 +63,6 @@ pub struct ReplayState {
     pub speed: f64,
     pub loop_replay: bool,
     pub pass: usize,
-}
-
-static REPLAY_STATES: Lazy<StdMutex<HashMap<String, ReplayState>>> =
-    Lazy::new(|| StdMutex::new(HashMap::new()));
-
-pub fn store_replay_state(replay_id: &str, state: ReplayState) {
-    if let Ok(mut states) = REPLAY_STATES.lock() {
-        states.insert(replay_id.to_string(), state);
-    }
-}
-
-pub fn clear_replay_state(replay_id: &str) {
-    if let Ok(mut states) = REPLAY_STATES.lock() {
-        states.remove(replay_id);
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub fn get_replay_state(replay_id: String) -> Option<ReplayState> {
-    REPLAY_STATES.lock().ok().and_then(|s| s.get(&replay_id).cloned())
 }
 
 // Maximum inter-frame sleep to avoid hanging on large timestamp gaps (5 seconds).
@@ -128,8 +100,7 @@ impl ReplaySchedule {
 /// Frames are transmitted in order with delays derived from their original timestamps
 /// divided by `speed`. A speed of 1.0 is realtime; 2.0 is twice as fast.
 ///
-/// Progress is stored in REPLAY_STATES and signalled to the frontend via
-/// `replay-lifecycle` (start/loop/end) and `replay-progress` (periodic frame count).
+/// Progress is pushed to the frontend as `ReplayState` WS messages.
 #[tauri::command]
 pub async fn io_start_replay(
     _app: AppHandle,
@@ -170,7 +141,7 @@ pub async fn start_replay(
         let mut frames_failed: u64 = 0;
         let mut cancelled = false;
 
-        // Store initial state and notify frontend that replay has started
+        // Notify frontend that replay has started
         let initial_state = ReplayState {
             status: "running".to_string(),
             replay_id: replay_id_for_task.clone(),
@@ -181,7 +152,6 @@ pub async fn start_replay(
             loop_replay,
             pass: 1,
         };
-        store_replay_state(&replay_id_for_task, initial_state.clone());
         crate::ws::dispatch::send_replay_state(&initial_state);
 
         let mut last_progress = std::time::Instant::now();
@@ -241,9 +211,7 @@ pub async fn start_replay(
                         loop_replay,
                         pass: pass as usize,
                     };
-                    store_replay_state(&replay_id_for_task, error_state.clone());
                     crate::ws::dispatch::send_replay_state(&error_state);
-                    clear_replay_state(&replay_id_for_task);
                     return;
                 }
 
@@ -280,7 +248,6 @@ pub async fn start_replay(
                         loop_replay,
                         pass: pass as usize,
                     };
-                    store_replay_state(&replay_id_for_task, progress_state.clone());
                     crate::ws::dispatch::send_replay_state(&progress_state);
                     crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                     last_progress = std::time::Instant::now();
@@ -291,7 +258,7 @@ pub async fn start_replay(
                 break;
             }
 
-            // Store loop-restart state and notify frontend before beginning the next pass
+            // Notify frontend before beginning the next pass
             let loop_state = ReplayState {
                 status: "running".to_string(),
                 replay_id: replay_id_for_task.clone(),
@@ -302,7 +269,6 @@ pub async fn start_replay(
                 loop_replay,
                 pass: pass as usize,
             };
-            store_replay_state(&replay_id_for_task, loop_state.clone());
             crate::ws::dispatch::send_replay_state(&loop_state);
             pass += 1;
         }
@@ -312,7 +278,7 @@ pub async fn start_replay(
         // Final history update notification
         crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
 
-        // Store final state and notify frontend
+        // Notify frontend of the final state
         let final_state = ReplayState {
             status: if cancelled { "stopped" } else { "completed" }.to_string(),
             replay_id: replay_id_for_task.clone(),
@@ -323,13 +289,9 @@ pub async fn start_replay(
             loop_replay,
             pass: pass as usize,
         };
-        store_replay_state(&replay_id_for_task, final_state.clone());
         crate::ws::dispatch::send_replay_state(&final_state);
 
         // Remove from active tasks map.
-        // Keep final replay state in REPLAY_STATES so the frontend can fetch it
-        // after receiving the WS notification. State is cleared on next replay start
-        // or when io_stop_replay is called.
         let mut tasks = IO_REPLAY_TASKS.lock().await;
         tasks.remove(&replay_id_for_task);
     });

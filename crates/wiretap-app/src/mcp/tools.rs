@@ -241,13 +241,8 @@ impl WireTapTools {
             None,
             Some("mcp".to_string()),
             Some("mcp".to_string()),
-            // MCP names its own device and manages its own sessions, so it neither
-            // retargets nor stops one. It opts out of the poller check to keep the
-            // agent's behaviour exactly as it was: an agent sweeping a device that
-            // something else is polling may well be doing so deliberately, and it
-            // has no parameter to override a refusal with.
-            None,
-            None,
+            // An agent sweeping a device that something else is polling may well be
+            // doing so deliberately, and it has no parameter to override a refusal with.
             Some(true),
         )
         .await

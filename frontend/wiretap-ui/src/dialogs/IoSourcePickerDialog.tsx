@@ -24,17 +24,12 @@ import CsvFileOrderDialog from "./CsvFileOrderDialog";
 import CandumpImportReportDialog from "./CandumpImportReportDialog";
 import { WINDOW_EVENTS, type CaptureChangedPayload } from "../events/registry";
 import {
-  createIOSession,
-  startReaderSession,
-  stopReaderSession,
   destroyReaderSession,
   unregisterSessionSubscriber,
-  updateReaderSpeed,
   probeDevice,
   probedBusMappings,
   listActiveSessions,
   getProfilesUsage,
-  type StreamEndedInfo,
   type GvretDeviceInfo,
   type BusMapping,
   type ActiveSessionInfo,
@@ -138,7 +133,6 @@ type Props = {
   captureMetadata?: CaptureMetadata | null;
   /** Default directory for file picker */
   defaultDir?: string;
-  /** External load state - when provided, dialog uses external state instead of internal */
   isLoading?: boolean;
   /** Profile ID currently being loaded */
   loadProfileId?: string | null;
@@ -283,14 +277,6 @@ export default function IoSourcePickerDialog({
   const decoderUserTouchedRef = useRef(false);
   // (Buffer bus config now uses shared deviceBusConfigMap / singleBusOverrideMap via probeDevice)
 
-  // Internal load state (used when external state not provided)
-  const [internalIsLoading, setInternalIsLoading] = useState(false);
-  const [internalLoadProfileId, setInternalLoadProfileId] = useState<string | null>(null);
-  const [internalLoadFrameCount, setInternalLoadFrameCount] = useState(0);
-  const [internalLoadError, setInternalLoadError] = useState<string | null>(null);
-  const internalLoadSessionIdRef = useRef<string | null>(null);
-  const unlistenRefs = useRef<Array<() => void>>([]);
-
   // Currently checked IO reader (for single-select / non-multi-source-capable profiles)
   const [checkedSourceId, setCheckedReaderId] = useState<string | null>(null);
 
@@ -348,12 +334,10 @@ export default function IoSourcePickerDialog({
   // Profile usage info - which sessions are using each profile
   const [profileUsage, setProfileUsage] = useState<Map<string, ProfileUsageInfo>>(new Map());
 
-  // Use external state if provided, otherwise use internal state
-  const useExternalState = onStartLoad !== undefined;
-  const isLoading = useExternalState ? (externalIsLoading ?? false) : internalIsLoading;
-  const loadProfileId = useExternalState ? (externalLoadProfileId ?? null) : internalLoadProfileId;
-  const loadFrameCount = useExternalState ? (externalLoadFrameCount ?? 0) : internalLoadFrameCount;
-  const loadError = useExternalState ? (externalLoadError ?? null) : internalLoadError;
+  const isLoading = externalIsLoading ?? false;
+  const loadProfileId = externalLoadProfileId ?? null;
+  const loadFrameCount = externalLoadFrameCount ?? 0;
+  const loadError = externalLoadError ?? null;
 
   // Probe a capture and populate the shared device maps.
   // All captures go into deviceBusConfigMap (not singleBusOverrideMap) so the
@@ -454,17 +438,6 @@ export default function IoSourcePickerDialog({
   const checkedProfileSession = checkedSourceId ? getSessionForProfile(checkedSourceId) : undefined;
   const isCheckedProfileStopped = checkedProfileSession?.ioState === "stopped";
   const isCheckedProfileCapture = checkedProfileSession?.capabilities?.traits?.temporal_mode === "capture";
-
-  // DEBUG: log source picker state for capture session diagnosis
-  if (checkedSourceId && checkedProfileSession) {
-    console.log("[SourcePicker] checkedSourceId:", checkedSourceId,
-      "ioState:", checkedProfileSession.ioState,
-      "temporal_mode:", checkedProfileSession.capabilities?.traits?.temporal_mode,
-      "isLive:", isCheckedProfileLive,
-      "isStopped:", isCheckedProfileStopped,
-      "isCapture:", isCheckedProfileCapture,
-      "inActiveMultiSource:", activeMultiSourceSessions.some((s) => s.sessionId === checkedSourceId));
-  }
 
   // Find if there's a live multi-source session for the selected profiles (multi-bus mode)
   const liveMultiSourceSession = useMemo(() => {
@@ -987,136 +960,6 @@ export default function IoSourcePickerDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, checkedSourceIds, readProfiles, outputBusOffsets, profileBusesLoaded]);
 
-  // Cleanup listeners on unmount
-  useEffect(() => {
-    return () => {
-      unlistenRefs.current.forEach((unlisten) => unlisten());
-      unlistenRefs.current = [];
-    };
-  }, []);
-
-  // Handle load completion (internal state only)
-  const handleInternalLoadComplete = useCallback(
-    async (payload: StreamEndedInfo) => {
-      console.log("Load complete:", payload);
-      setInternalIsLoading(false);
-      setInternalLoadProfileId(null);
-
-      // Cleanup listeners
-      unlistenRefs.current.forEach((unlisten) => unlisten());
-      unlistenRefs.current = [];
-
-      // Destroy the load session using the tracked session ID
-      const sessionId = internalLoadSessionIdRef.current;
-      if (sessionId) {
-        try {
-          await destroyReaderSession(sessionId);
-        } catch (e) {
-          console.error("Failed to destroy load session:", e);
-        }
-        internalLoadSessionIdRef.current = null;
-      }
-
-      if (payload.capture_available && payload.count > 0) {
-        // Refresh the capture list
-        const allCaptures = await listOrphanedCaptures();
-        setCaptures(allCaptures);
-
-        // Get the specific capture that was created (if we have its ID)
-        if (payload.capture_id) {
-          const meta = allCaptures.find((b) => b.id === payload.capture_id);
-          if (meta) {
-            onImport?.(meta);
-
-            // Notify other windows that capture has changed
-            const capturePayload: CaptureChangedPayload = {
-              metadata: meta,
-              timestamp: Date.now(),
-            };
-            await emit(WINDOW_EVENTS.CAPTURE_CHANGED, capturePayload);
-          }
-        }
-      }
-    },
-    [onImport]
-  );
-
-  // Start loading from a profile (internal state mode)
-  const handleInternalStartLoad = async (profileId: string, options: LoadOptions) => {
-    setInternalLoadError(null);
-    setInternalLoadFrameCount(0);
-
-    // Generate unique session ID for this load
-    const sessionId = generateLoadSessionId();
-    internalLoadSessionIdRef.current = sessionId;
-
-    try {
-      // Set up event listeners for this session
-      const unlistenStreamEnded = await listen<void>(
-        `stream-ended:${sessionId}`,
-        async () => {
-          const { getStreamEndedInfo } = await import("../api/io");
-          const info = await getStreamEndedInfo(sessionId);
-          if (info) {
-            handleInternalLoadComplete(info);
-          }
-        }
-      );
-      const unlistenError = await listen<void>(`session-error:${sessionId}`, async () => {
-        const { getSessionError } = await import("../api/io");
-        const error = await getSessionError(sessionId);
-        if (error) {
-          setInternalLoadError(error);
-        }
-      });
-      const unlistenFrames = await listen<void>(`frames-ready:${sessionId}`, async () => {
-        // Fetch current capture count from backend
-        try {
-          const session = useSessionStore.getState().sessions[sessionId];
-          const captureId = session?.capture?.id;
-          if (captureId) {
-            const { getCaptureMetadata } = await import("../api/capture");
-            const meta = await getCaptureMetadata(captureId);
-            if (meta) {
-              setInternalLoadFrameCount(meta.count);
-            }
-          }
-        } catch {
-          // Capture may not exist yet
-        }
-      });
-
-      unlistenRefs.current = [unlistenStreamEnded, unlistenError, unlistenFrames];
-
-      // Create and start the reader session with all options
-      await createIOSession({
-        sessionId,
-        profileId,
-        speed: options.speed,
-        startTime: options.startTime,
-        endTime: options.endTime,
-        limit: options.maxFrames,
-      });
-
-      // Apply speed setting
-      if (options.speed > 0) {
-        await updateReaderSpeed(sessionId, options.speed);
-      }
-
-      await startReaderSession(sessionId);
-
-      setInternalIsLoading(true);
-      setInternalLoadProfileId(profileId);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setInternalLoadError(msg);
-      internalLoadSessionIdRef.current = null;
-      // Cleanup on error
-      unlistenRefs.current.forEach((unlisten) => unlisten());
-      unlistenRefs.current = [];
-    }
-  };
-
   // Build load options from current state
   const buildLoadOptions = (speed: number): LoadOptions => {
     const opts: LoadOptions = { speed };
@@ -1164,22 +1007,14 @@ export default function IoSourcePickerDialog({
   const handleLoadClick = () => {
     if (!checkedSourceId || !checkedProfile) return;
     const options = buildLoadOptions(0); // 0 = max speed / no limit
-    if (useExternalState) {
-      onStartLoad?.(checkedSourceId, false, options);
-    } else {
-      handleInternalStartLoad(checkedSourceId, options);
-    }
+    onStartLoad?.(checkedSourceId, false, options);
   };
 
   // Handle Watch button - uses selected speed, closes dialog
   const handleConnectClick = () => {
     if (!checkedSourceId || !checkedProfile) return;
     const options = buildLoadOptions(selectedSpeed);
-    if (useExternalState) {
-      onStartLoad?.(checkedSourceId, true, options);
-    } else {
-      handleInternalStartLoad(checkedSourceId, options);
-    }
+    onStartLoad?.(checkedSourceId, true, options);
     onClose();
   };
 
@@ -1197,11 +1032,7 @@ export default function IoSourcePickerDialog({
       busMappings.set(captureId, captureMappings);
       options.busMappings = busMappings;
     }
-    if (useExternalState) {
-      onStartLoad?.(captureId, true, options);
-    } else {
-      handleInternalStartLoad(captureId, options);
-    }
+    onStartLoad?.(captureId, true, options);
     onClose();
   };
 
@@ -1283,11 +1114,7 @@ export default function IoSourcePickerDialog({
     setCheckedReaderId(profileId);
     setCheckedReaderIds([]);
     const options = buildLoadOptions(selectedSpeed);
-    if (useExternalState) {
-      onStartLoad?.(profileId, true, options);
-    } else {
-      handleInternalStartLoad(profileId, options);
-    }
+    onStartLoad?.(profileId, true, options);
     setCreatingDevice(false);
     onClose();
   };
@@ -1342,34 +1169,12 @@ export default function IoSourcePickerDialog({
     setTimeBounds(bounds);
   }, []);
 
-  // Stop loading
-  const handleStopLoad = async () => {
-    if (useExternalState) {
-      onStopLoad?.();
-    } else {
-      const sessionId = internalLoadSessionIdRef.current;
-      if (!sessionId) return;
-      try {
-        await stopReaderSession(sessionId);
-        // The stream-ended event will handle the rest
-      } catch (e) {
-        console.error("Failed to stop load:", e);
-        // Force cleanup
-        setInternalIsLoading(false);
-        setInternalLoadProfileId(null);
-        internalLoadSessionIdRef.current = null;
-        unlistenRefs.current.forEach((unlisten) => unlisten());
-        unlistenRefs.current = [];
-      }
-    }
-  };
+  const handleStopLoad = () => onStopLoad?.();
 
   // Handle speed change
   const handleSpeedChange = (speed: number) => {
     setSelectedSpeed(speed);
-    if (useExternalState) {
-      onLoadSpeedChange?.(speed);
-    }
+    onLoadSpeedChange?.(speed);
   };
 
   // Handle toggling a multi-source-capable reader (for multi-bus mode)

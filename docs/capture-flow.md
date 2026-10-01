@@ -261,12 +261,6 @@ A sweep launched from Discovery touches one capture — its own. The tools run
 from "No source" (see [session-flow.md](session-flow.md) § Modbus discovery), so
 there is no session being scanned and nothing to stop or resume.
 
-`stop_target` is still on `create_modbus_scan_session` for callers that name a
-live session and want the device released outright, MCP among them. That path
-touches two captures: the target's is finalised by the stop, and
-`resume_session_to_live` afterwards gives it a *new* capture rather than
-reopening the finalised one.
-
 ```
 create_modbus_scan_session(session_id, job)   // creates the session STOPPED
   └─ (frontend subscribes / joins)

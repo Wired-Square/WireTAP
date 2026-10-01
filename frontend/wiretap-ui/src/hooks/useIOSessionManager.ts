@@ -243,8 +243,6 @@ export interface UseIOSessionManagerResult {
   watchByteCount: number;
   /** Capture holding this session's raw bytes, if it has one (Rust-authoritative) */
   bytesCaptureId: string | null;
-  /** Reset watch frame count */
-  resetWatchFrameCount: () => void;
   /** Whether currently watching (streaming with real-time display) */
   isWatching: boolean;
   /** Set watching state */
@@ -751,11 +749,6 @@ export function useIOSessionManager(
     }
   }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
 
-  // Frame counts are Rust-authoritative (reset by the backend when the capture
-  // resets), so this is now a no-op — kept for the manager's public interface
-  // (Discovery's playback handlers still call it).
-  const resetWatchFrameCount = useCallback(() => {}, []);
-
   // Start multi-bus session
   const startMultiBusSession = useCallback(async (
     profileIds: string[],
@@ -870,7 +863,6 @@ export function useIOSessionManager(
     // Clear frontend state before joining (fixes frame count showing stale data)
     session.markSessionSwitch(sessionId);
     onBeforeWatch?.();
-    resetWatchFrameCount();
 
     // Join the session and set up heartbeats
     await joinMultiSourceSession({
@@ -885,7 +877,7 @@ export function useIOSessionManager(
     setMultiBusProfiles(sourceProfileIds || []);
     setIsDetached(false);
     await session.rejoin(sessionId);
-  }, [appName, session, setIoProfile, setMultiBusProfiles, onBeforeWatch, resetWatchFrameCount]);
+  }, [appName, session, setIoProfile, setMultiBusProfiles, onBeforeWatch]);
 
   // ---- Session Switching Methods ----
 
@@ -956,9 +948,8 @@ export function useIOSessionManager(
       setPlaybackSpeedProp?.(opts.speed);
     }
     setIsWatching(true);
-    resetWatchFrameCount();
     streamCompletedRef.current = false;
-  }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
+  }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
 
 
   // Stop watching → switch to capture replay. Rust picks the path from the
@@ -986,9 +977,8 @@ export function useIOSessionManager(
     }
 
     setIsWatching(true);
-    resetWatchFrameCount();
     streamCompletedRef.current = false;
-  }, [session, onBeforeWatch, resetWatchFrameCount, canReturnToLive, effectiveSessionId]);
+  }, [session, onBeforeWatch, canReturnToLive, effectiveSessionId]);
 
   // Unified load method: fast ingest without rendering, auto-transitions to capture reader.
   // Handles both single and multi-source sessions.
@@ -1205,7 +1195,6 @@ export function useIOSessionManager(
 
       // Step 6: Mark as watching and reset state
       setIsWatching(true);
-      resetWatchFrameCount();
       streamCompletedRef.current = false;
     },
     [
@@ -1216,7 +1205,6 @@ export function useIOSessionManager(
       onBeforeWatch,
       setMultiBusProfiles,
       setIoProfile,
-      resetWatchFrameCount,
       streamCompletedRef,
       onSessionReconfigured,
     ]
@@ -1342,7 +1330,6 @@ export function useIOSessionManager(
     watchUniqueFrameCount,
     watchByteCount,
     bytesCaptureId,
-    resetWatchFrameCount,
     isWatching,
     setIsWatching,
 

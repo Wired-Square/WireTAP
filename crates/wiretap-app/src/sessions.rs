@@ -246,16 +246,6 @@ pub fn get_sessions_for_profile(profile_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Get the count of sessions using a specific profile.
-/// Used to determine if reconfiguration should be locked (locked if >= 2).
-pub fn get_session_count_for_profile(profile_id: &str) -> usize {
-    PROFILE_SESSIONS
-        .lock()
-        .ok()
-        .and_then(|map| map.get(profile_id).map(|s| s.len()))
-        .unwrap_or(0)
-}
-
 /// Clean up profile tracking for a destroyed session.
 /// This should be called when a session is destroyed via unregister_subscriber
 /// (auto-destroy when last subscriber leaves), since that code path doesn't
@@ -1103,14 +1093,6 @@ pub async fn session_stop_to_capture(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resume_reader_session_fresh(session_id: String) -> Result<IOState, String> {
     resume_session_fresh(&session_id).await
-}
-
-/// Copy a capture for an app that is detaching from a session.
-/// Creates an orphaned copy of the capture that can be used standalone.
-/// Returns the new capture ID.
-#[tauri::command(rename_all = "snake_case")]
-pub fn copy_capture_for_detach(capture_id: String, new_name: String) -> Result<String, String> {
-    capture_store::copy_capture(&capture_id, new_name)
 }
 
 /// Update playback speed for a reader session
@@ -2428,21 +2410,6 @@ pub async fn create_multi_source_session(
 // Profile-to-Session Mapping Commands
 // ============================================================================
 
-/// Get all session IDs that are using a specific profile.
-/// Used by the IO picker to show "(in use: sessionId)" indicator.
-#[tauri::command(rename_all = "snake_case")]
-pub fn get_profile_sessions(profile_id: String) -> Vec<String> {
-    get_sessions_for_profile(&profile_id)
-}
-
-/// Get the count of sessions using a specific profile.
-/// Used by the IO picker to determine if reconfiguration should be locked.
-/// Returns >= 2 if reconfiguration should be locked.
-#[tauri::command(rename_all = "snake_case")]
-pub fn get_profile_session_count(profile_id: String) -> usize {
-    get_session_count_for_profile(&profile_id)
-}
-
 /// Response type for profile usage query
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct ProfileUsageInfo {
@@ -2457,7 +2424,6 @@ pub struct ProfileUsageInfo {
 }
 
 /// Get usage info for multiple profiles at once.
-/// More efficient than calling get_profile_sessions for each profile.
 #[tauri::command(rename_all = "snake_case")]
 pub fn get_profiles_usage(profile_ids: Vec<String>) -> Vec<ProfileUsageInfo> {
     profile_ids
@@ -2494,7 +2460,7 @@ pub fn set_wake_settings(prevent_idle_sleep: bool, keep_display_awake: bool) {
 async fn endpoint_in_use_by_poller(
     settings: &crate::settings::AppSettings,
     endpoint: &str,
-    exclude: &[&str],
+    exclude: &str,
 ) -> Option<(String, String)> {
     for info in crate::io::list_sessions().await {
         // A paused poller still holds its socket — pause stops requests, not the
@@ -2503,7 +2469,7 @@ async fn endpoint_in_use_by_poller(
             info.state,
             crate::io::IOState::Running | crate::io::IOState::Paused
         );
-        if exclude.contains(&info.session_id.as_str()) || !holds_socket {
+        if info.session_id == exclude || !holds_socket {
             continue;
         }
         let Some(profile) = crate::io::modbus_tcp::session_modbus_profile(settings, &info.session_id)
@@ -2518,22 +2484,10 @@ async fn endpoint_in_use_by_poller(
 }
 
 /// Probe which read function codes a device answers, before sweeping anything.
-///
-/// `target_session_id` names a live Modbus session to take the address from, so
-/// the Discovery tool probes whatever the session is talking to. Only four
-/// requests per unit, so this never stops the session for them — a stop/resume
-/// cycle would cost far more than the probe does.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn modbus_probe_function_codes(
-    app: tauri::AppHandle,
-    mut config: crate::io::FcProbeConfig,
-    target_session_id: Option<String>,
+    config: crate::io::FcProbeConfig,
 ) -> Result<Vec<crate::io::FcProbeEntry>, String> {
-    if let Some(sid) = &target_session_id {
-        let (host, port, _) = crate::io::session_modbus_endpoint(&app, sid)?;
-        config.host = host;
-        config.port = port;
-    }
     // At most four requests per unit, so there is nothing worth cancelling.
     let cancel = Arc::new(AtomicBool::new(false));
     crate::io::modbus_tcp::scanner::probe_function_codes(config, cancel).await
@@ -2554,28 +2508,13 @@ pub async fn modbus_probe_function_codes(
 pub async fn create_modbus_scan_session(
     app: tauri::AppHandle,
     session_id: String,
-    mut job: crate::io::ScanJob,
+    job: crate::io::ScanJob,
     profile_id: Option<String>,
     subscriber_id: Option<String>,
     app_name: Option<String>,
-    target_session_id: Option<String>,
-    stop_target: Option<bool>,
     allow_contention: Option<bool>,
 ) -> Result<IOCapabilities, String> {
-    // Resolve, then refuse, then stop — in that order, and all inside one command.
-    //
-    // Resolution must precede the stop because stopping swaps a session's profile
-    // ids for its capture id (`replace_session_profiles` inside
-    // `stop_and_switch_to_capture`), leaving it unable to name its own device.
-    // The refusals must also precede it, or a rejected sweep would leave the
-    // caller's session stopped for a scan that never ran.
     let settings = crate::settings::load_settings_sync(&app)?;
-    if let Some(sid) = &target_session_id {
-        let (host, port, _) = crate::io::modbus_tcp::session_modbus_profile(&settings, sid)
-            .map(crate::io::modbus_endpoint)
-            .ok_or_else(|| format!("Session '{sid}' has no Modbus source profile"))?;
-        job.retarget(host, port);
-    }
 
     // A sweep opens its own connection. Devices that serve one Modbus
     // conversation at a time — the cheap stacks this feature exists for — break
@@ -2592,30 +2531,13 @@ pub async fn create_modbus_scan_session(
     }
 
     if !allow_contention.unwrap_or(false) {
-        // The target is excluded only when the caller has asked for it to be
-        // stopped, a few lines below. It used to be excluded unconditionally on
-        // the caller's word that it had "already dealt with it" — an exemption
-        // nobody paid for, and one pausing cannot earn either: a paused poller
-        // keeps its socket, which is exactly why `holds_socket` above counts it.
-        let stopping_target = stop_target.unwrap_or(false);
-        let exclude: Vec<&str> = std::iter::once(session_id.as_str())
-            .chain(target_session_id.as_deref().filter(|_| stopping_target))
-            .collect();
         if let Some((holder, name)) =
-            endpoint_in_use_by_poller(&settings, &endpoint, &exclude).await
+            endpoint_in_use_by_poller(&settings, &endpoint, &session_id).await
         {
             return Err(format!(
                 "{name} is being polled by session '{holder}' — that device may only serve one \
                  Modbus connection at a time. Stop that session, or re-run allowing contention."
             ));
-        }
-    }
-
-    if stop_target.unwrap_or(false) {
-        if let Some(sid) = &target_session_id {
-            // Stop, not pause: pause halts requests but keeps the socket, which is
-            // exactly what a single-connection device needs released.
-            session_stop_to_capture(app.clone(), sid.clone()).await?;
         }
     }
 
