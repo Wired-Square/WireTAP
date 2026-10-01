@@ -3,6 +3,8 @@
 // The desktop's side of a `wiretap_io::can` task: its reads become
 // `FrameMessage`s, and the session's transmits reach its `CanWriter`.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Weak};
 use std::time::{Duration, UNIX_EPOCH};
@@ -230,12 +232,32 @@ pub(crate) async fn serve(
     let _ = tx.send(ended).await;
 }
 
+type Sending = Pin<Box<dyn Future<Output = Result<std::io::Result<()>, SendRefused>> + Send>>;
+
+pub(crate) trait FrameWriter: Send + 'static {
+    fn submit(&self, frame: CanFrame) -> Result<Sending, SendRefused>;
+    fn send_when_ready(
+        &self,
+        frame: CanFrame,
+    ) -> impl Future<Output = Result<Sending, SendRefused>>;
+}
+
+impl FrameWriter for CanWriter {
+    fn submit(&self, frame: CanFrame) -> Result<Sending, SendRefused> {
+        Ok(Box::pin(CanWriter::submit(self, frame)?))
+    }
+
+    async fn send_when_ready(&self, frame: CanFrame) -> Result<Sending, SendRefused> {
+        Ok(Box::pin(CanWriter::send_when_ready(self, frame).await?))
+    }
+}
+
 /// `TransmitSender` is a std channel, so its requests reach the async writer
 /// from a blocking thread, which ends once the reader has. A request is
 /// answered once the writer accepts or refuses it, not once the device has it.
 fn forward_transmits(
     requests: std_mpsc::Receiver<TransmitRequest>,
-    writer: CanWriter,
+    writer: impl FrameWriter,
     reader: Weak<()>,
 ) {
     let runtime = tokio::runtime::Handle::current();
@@ -243,16 +265,22 @@ fn forward_transmits(
         match requests.recv_timeout(Duration::from_millis(50)) {
             Ok(req) => {
                 let answer = match req.frame {
-                    Some(frame) => writer
-                        .submit(frame)
-                        .map(|sent| {
-                            runtime.spawn(async move {
-                                if let Err(e) = transmit_result(sent.await) {
-                                    tlog!("[can] Transmit failed: {}", e);
-                                }
-                            });
-                        })
-                        .map_err(refusal),
+                    Some(frame) => {
+                        let admitted = if req.wait_for_room {
+                            runtime.block_on(writer.send_when_ready(frame))
+                        } else {
+                            writer.submit(frame)
+                        };
+                        admitted
+                            .map(|sent| {
+                                runtime.spawn(async move {
+                                    if let Err(e) = transmit_result(sent.await) {
+                                        tlog!("[can] Transmit failed: {}", e);
+                                    }
+                                });
+                            })
+                            .map_err(refusal)
+                    }
                     None => Err("Transmit refused: no CAN frame to send".to_string()),
                 };
                 if let Err(e) = &answer {
@@ -286,6 +314,7 @@ pub(crate) fn reopen_failed(port: &str) -> CanEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::types::{PendingTransmit, TransmitSender};
     use wiretap_io::can::Unsupported;
 
     fn read(frame: CanFrame, direction: Direction, at_us: u64) -> CanRead {
@@ -337,6 +366,77 @@ mod tests {
         let remote = can_frame(&tx);
         assert!(remote.rtr && remote.data.is_empty());
         assert_eq!(remote.dlc(), 3);
+    }
+
+    struct NarrowQueue(mpsc::Sender<CanFrame>);
+
+    impl FrameWriter for NarrowQueue {
+        fn submit(&self, frame: CanFrame) -> Result<Sending, SendRefused> {
+            self.0.try_send(frame).map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => SendRefused::QueueFull,
+                mpsc::error::TrySendError::Closed(_) => SendRefused::Stopped,
+            })?;
+            Ok(Box::pin(async { Ok(Ok(())) }))
+        }
+
+        async fn send_when_ready(&self, frame: CanFrame) -> Result<Sending, SendRefused> {
+            self.0.send(frame).await.map_err(|_| SendRefused::Stopped)?;
+            Ok(Box::pin(async { Ok(Ok(())) }))
+        }
+    }
+
+    /// A source whose device queue holds one frame, behind the session's channel.
+    fn narrow_source(reader: &Arc<()>) -> (TransmitSender, mpsc::Receiver<CanFrame>) {
+        let (device_tx, device_rx) = mpsc::channel(1);
+        let (transmit_tx, transmit_rx) = std_mpsc::sync_channel(32);
+        forward_transmits(transmit_rx, NarrowQueue(device_tx), Arc::downgrade(reader));
+        (transmit_tx, device_rx)
+    }
+
+    fn pending(tx: &TransmitSender, n: u32) -> PendingTransmit {
+        PendingTransmit {
+            tx: tx.clone(),
+            data: Vec::new(),
+            frame: Some(CanFrame::data(0, n, false, false, false, vec![n as u8])),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_replay_waits_for_room_instead_of_dropping_frames() {
+        let reader = Arc::new(());
+        let (transmit, mut device) = narrow_source(&reader);
+        let bus = tokio::spawn(async move {
+            let mut ids = Vec::new();
+            while let Some(frame) = device.recv().await {
+                ids.push(frame.arb_id);
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+            ids
+        });
+
+        for n in 0..50 {
+            let result = pending(&transmit, n).send_when_ready().await.unwrap();
+            assert!(result.success, "frame {n}: {:?}", result.error);
+        }
+        drop((transmit, reader));
+        assert_eq!(bus.await.unwrap(), (0..50).collect::<Vec<_>>());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn an_ordinary_transmit_is_refused_at_once_by_a_full_queue() {
+        let reader = Arc::new(());
+        let (transmit, _device) = narrow_source(&reader);
+        let send_now = |n| {
+            let pending = pending(&transmit, n);
+            tokio::task::spawn_blocking(move || pending.send_now())
+        };
+
+        assert!(send_now(0).await.unwrap().unwrap().success);
+        let refused = send_now(1).await.unwrap().unwrap();
+        assert_eq!(
+            refused.error.as_deref(),
+            Some("Transmit refused: send queue full")
+        );
     }
 
     #[test]

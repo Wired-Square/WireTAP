@@ -784,7 +784,7 @@ mod tests {
         data.extend_from_slice(&[0, 1, 0, 8]);
         data.extend_from_slice(&(n as u64).to_le_bytes());
         let (result_tx, _) = std_mpsc::sync_channel(1);
-        TransmitRequest { data, frame: None, result_tx }
+        TransmitRequest { data, frame: None, result_tx, wait_for_room: false }
     }
 
     async fn burst_and_stop(stop: Arc<AtomicBool>, progress: Arc<Progress>) {
@@ -923,7 +923,7 @@ mod tests {
                 SourceMessage::TransmitReady(_, transmit) => {
                     let (result_tx, _) = std_mpsc::sync_channel(1);
                     let data = b"AT+PING\r\n".to_vec();
-                    transmit.try_send(TransmitRequest { data, frame: None, result_tx }).unwrap();
+                    transmit.try_send(TransmitRequest { data, frame: None, result_tx, wait_for_room: false }).unwrap();
                 }
                 msg => break msg,
             }

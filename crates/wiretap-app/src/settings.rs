@@ -599,7 +599,7 @@ fn paths_are_stale(settings: &AppSettings, app: &AppHandle) -> bool {
 /// The one place this happens. Before it, `"gvret-tcp"` reached every consumer
 /// verbatim and each decided for itself whether to accept it — so a profile
 /// saved under the old spelling was admitted to a session by `is_realtime_device`
-/// and its reader started, then refused by `transmit_can_frame` as an
+/// and its reader started, then refused by `route_can_frame` as an
 /// "unsupported profile kind". Eleven sites spelled the alias pair out; the ones
 /// that forgot were the bug.
 ///

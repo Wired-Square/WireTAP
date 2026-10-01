@@ -294,6 +294,7 @@ mod tests {
                 data: Vec::new(),
                 frame: Some(frame),
                 result_tx,
+                wait_for_room: false,
             })
             .expect("queued");
         result

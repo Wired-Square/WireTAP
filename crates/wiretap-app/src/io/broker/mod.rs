@@ -22,7 +22,7 @@ use super::bus_mapping::BusMapping;
 use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
-use super::types::{SetFramingRequest, SourceMessage, TransmitRequest};
+use super::types::{PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -493,7 +493,7 @@ impl IOBroker {
     }
 
     /// Route a CAN frame transmit to the appropriate source based on bus number
-    fn transmit_can_frame(&self, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
+    fn route_can_frame(&self, frame: &CanTransmitFrame) -> Result<PendingTransmit, String> {
         // Read through the routes in force: a source that revised its mappings
         // once connected must be transmittable on the buses it actually has.
         let route = self.route_for_bus(frame.bus).ok_or_else(|| {
@@ -553,21 +553,7 @@ impl IOBroker {
             }
         };
 
-        // Queue the frame into the device's transmit channel (capacity 32); a
-        // full channel is backpressure, reported as an error. The device task
-        // writes asynchronously and logs write errors, but a CAN writer answers
-        // before the write, so its refusal (a length, FD, RTR or bus the device
-        // lacks) is waited for and reported.
-        let answers_on_accept = frame.is_some();
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
-        tx.try_send(TransmitRequest { data, frame, result_tx })
-            .map_err(|e| format!("Transmit buffer full ({})", e))?;
-        if answers_on_accept {
-            if let Ok(Err(refused)) = result_rx.recv() {
-                return Ok(TransmitResult::error(refused));
-            }
-        }
-        Ok(TransmitResult::queued())
+        Ok(PendingTransmit { tx, data, frame })
     }
 
     /// Route raw bytes to the first serial source
@@ -609,6 +595,7 @@ impl IOBroker {
             data,
             frame: None,
             result_tx,
+            wait_for_room: false,
         })
         .map_err(|e| format!("Serial transmit buffer full ({})", e))?;
         Ok(TransmitResult::queued())
@@ -827,9 +814,13 @@ impl IOSource for IOBroker {
 
     fn transmit(&self, payload: &TransmitPayload) -> Result<TransmitResult, String> {
         match payload {
-            TransmitPayload::CanFrame(frame) => self.transmit_can_frame(frame),
+            TransmitPayload::CanFrame(frame) => self.route_can_frame(frame)?.send_now(),
             TransmitPayload::RawBytes(bytes) => self.transmit_raw_bytes(bytes),
         }
+    }
+
+    fn pending_can_transmit(&self, frame: &CanTransmitFrame) -> Result<PendingTransmit, String> {
+        self.route_can_frame(frame)
     }
 
     fn set_framing(&self, req: SetFramingRequest) -> Result<(), String> {

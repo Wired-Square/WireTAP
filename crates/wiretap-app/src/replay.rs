@@ -9,9 +9,9 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex as StdMutex;
 use tauri::AppHandle;
+use tokio::sync::watch;
 
 use crate::io::{self, CanTransmitFrame};
 
@@ -47,7 +47,7 @@ impl From<&io::FrameMessage> for ReplayFrame {
 
 /// Active replay task handle.
 struct ReplayTask {
-    cancel_flag: std::sync::Arc<AtomicBool>,
+    cancel: watch::Sender<bool>,
     #[allow(dead_code)]
     handle: tauri::async_runtime::JoinHandle<()>,
 }
@@ -160,8 +160,7 @@ pub async fn start_replay(
     // Stop any existing replay with the same ID
     io_stop_replay(replay_id.clone()).await?;
 
-    let cancel_flag = std::sync::Arc::new(AtomicBool::new(false));
-    let cancel_flag_clone = cancel_flag.clone();
+    let (cancel, mut cancelled_rx) = watch::channel(false);
     let session_id_clone = session_id.clone();
     let replay_id_for_task = replay_id.clone();
 
@@ -192,17 +191,21 @@ pub async fn start_replay(
         'outer: loop {
             let mut schedule = ReplaySchedule::new(speed);
             for replay_frame in &frames {
-                schedule.wait_for(replay_frame.timestamp_us).await;
-                if cancel_flag_clone.load(Ordering::Relaxed) {
-                    cancelled = true;
-                    break 'outer;
-                }
-
                 let frame = &replay_frame.frame;
 
                 // Transmit the frame. Writing to SQLite per frame is safe here because
                 // the write_entry mutex lock is held only for the INSERT (~microseconds).
-                let result = io::transmit_frame(&session_id_clone, frame).await;
+                let send = async {
+                    schedule.wait_for(replay_frame.timestamp_us).await;
+                    io::transmit_frame_when_ready(&session_id_clone, frame).await
+                };
+                let result = tokio::select! {
+                    _ = cancelled_rx.wait_for(|stop| *stop) => {
+                        cancelled = true;
+                        break 'outer;
+                    }
+                    result = send => result,
+                };
 
                 // Stop on permanent device errors
                 let is_permanent = match &result {
@@ -332,7 +335,7 @@ pub async fn start_replay(
     });
 
     let mut tasks = IO_REPLAY_TASKS.lock().await;
-    tasks.insert(replay_id.clone(), ReplayTask { cancel_flag, handle });
+    tasks.insert(replay_id.clone(), ReplayTask { cancel, handle });
 
     Ok(())
 }
@@ -342,7 +345,7 @@ pub async fn start_replay(
 pub async fn io_stop_replay(replay_id: String) -> Result<(), String> {
     let mut tasks = IO_REPLAY_TASKS.lock().await;
     if let Some(task) = tasks.remove(&replay_id) {
-        task.cancel_flag.store(true, Ordering::Relaxed);
+        task.cancel.send_replace(true);
     }
     Ok(())
 }
@@ -352,7 +355,7 @@ pub async fn io_stop_replay(replay_id: String) -> Result<(), String> {
 pub async fn io_stop_all_replays() -> Result<(), String> {
     let mut tasks = IO_REPLAY_TASKS.lock().await;
     for (_, task) in tasks.drain() {
-        task.cancel_flag.store(true, Ordering::Relaxed);
+        task.cancel.send_replace(true);
     }
     Ok(())
 }

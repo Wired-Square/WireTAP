@@ -5,7 +5,7 @@
 
 use std::sync::mpsc as std_mpsc;
 
-use super::FrameMessage;
+use super::{FrameMessage, TransmitResult};
 
 // ============================================================================
 // Source Messages
@@ -100,10 +100,76 @@ pub struct TransmitRequest {
     pub frame: Option<wiretap_io::can::CanFrame>,
     /// Sync oneshot channel to send the result back
     pub result_tx: std_mpsc::SyncSender<Result<(), String>>,
+    /// Wait for room in the device's send queue instead of being refused by a full one.
+    pub wait_for_room: bool,
 }
 
 /// Sender type for transmit requests (sync-safe)
 pub type TransmitSender = std_mpsc::SyncSender<TransmitRequest>;
+
+/// A full channel holds 32 frames, which take longer than this to drain at any bit rate.
+const ROOM_POLL: std::time::Duration = std::time::Duration::from_millis(1);
+
+/// A transmit routed and encoded for its source, not yet queued.
+pub struct PendingTransmit {
+    pub tx: TransmitSender,
+    pub data: Vec<u8>,
+    pub frame: Option<wiretap_io::can::CanFrame>,
+}
+
+impl PendingTransmit {
+    fn request(self, wait_for_room: bool) -> (TransmitSender, TransmitRequest, Option<Answer>) {
+        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
+        // A CAN writer answers before the write, so its refusal (a length, FD,
+        // RTR or bus the device lacks) is worth waiting for.
+        let answer = self.frame.is_some().then_some(result_rx);
+        let request = TransmitRequest {
+            data: self.data,
+            frame: self.frame,
+            result_tx,
+            wait_for_room,
+        };
+        (self.tx, request, answer)
+    }
+
+    /// Refused at once by a full channel or device queue.
+    pub fn send_now(self) -> Result<TransmitResult, String> {
+        let (tx, request, answer) = self.request(false);
+        tx.try_send(request)
+            .map_err(|e| format!("Transmit buffer full ({})", e))?;
+        Ok(refused_or_queued(answer.and_then(|answer| answer.recv().ok())))
+    }
+
+    /// Waits for room in the channel and the device queue; dropped before it is
+    /// queued, nothing is sent.
+    pub async fn send_when_ready(self) -> Result<TransmitResult, String> {
+        let (tx, mut request, answer) = self.request(true);
+        while let Err(e) = tx.try_send(request) {
+            let std_mpsc::TrySendError::Full(unsent) = e else {
+                return Err(format!("Transmit buffer full ({})", e));
+            };
+            request = unsent;
+            tokio::time::sleep(ROOM_POLL).await;
+        }
+        let answer = match answer {
+            Some(answer) => tokio::task::spawn_blocking(move || answer.recv().ok())
+                .await
+                .ok()
+                .flatten(),
+            None => None,
+        };
+        Ok(refused_or_queued(answer))
+    }
+}
+
+type Answer = std_mpsc::Receiver<Result<(), String>>;
+
+fn refused_or_queued(answer: Option<Result<(), String>>) -> TransmitResult {
+    match answer {
+        Some(Err(refused)) => TransmitResult::error(refused),
+        _ => TransmitResult::queued(),
+    }
+}
 
 // ============================================================================
 // Control Types (live framing changes)

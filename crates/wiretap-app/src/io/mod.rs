@@ -530,6 +530,11 @@ pub trait IOSource: Send + Sync {
         Err("This device does not support transmission".to_string())
     }
 
+    /// A CAN frame routed to its source, to be queued once the session lock is released.
+    fn pending_can_transmit(&self, _frame: &CanTransmitFrame) -> Result<types::PendingTransmit, String> {
+        Err("This device does not support transmission".to_string())
+    }
+
     /// Change serial framing on a running session in place (serial broker only).
     /// Default implementation returns an error.
     fn set_framing(&self, _req: types::SetFramingRequest) -> Result<(), String> {
@@ -2844,9 +2849,11 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
     }
 }
 
-/// Transmit a payload through a session (unified)
-pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Result<TransmitResult, String> {
-    let sessions = IO_SESSIONS.lock().await;
+fn transmitting_session<'a>(
+    sessions: &'a HashMap<String, IOSession>,
+    session_id: &str,
+    payload: &TransmitPayload,
+) -> Result<&'a IOSession, String> {
     let session = sessions
         .get(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
@@ -2863,16 +2870,32 @@ pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Re
         }
         _ => {}
     }
+    Ok(session)
+}
 
+/// Transmit a payload through a session (unified)
+pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Result<TransmitResult, String> {
+    let sessions = IO_SESSIONS.lock().await;
     // Call device transmit — fire-and-forget for most devices.
     // Queues the frame into the device's transmit channel and returns
     // immediately. The lock is held only briefly for the channel send.
-    session.source.transmit(payload)
+    transmitting_session(&sessions, session_id, payload)?.source.transmit(payload)
 }
 
 /// Transmit a CAN frame through a session (convenience wrapper)
 pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
     session_transmit(session_id, &TransmitPayload::CanFrame(frame.clone())).await
+}
+
+/// [`transmit_frame`], waiting for room in the source's send queue instead of
+/// being refused by a full one. The wait holds no session lock.
+pub async fn transmit_frame_when_ready(session_id: &str, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
+    let pending = {
+        let sessions = IO_SESSIONS.lock().await;
+        let payload = TransmitPayload::CanFrame(frame.clone());
+        transmitting_session(&sessions, session_id, &payload)?.source.pending_can_transmit(frame)?
+    };
+    pending.send_when_ready().await
 }
 
 /// Transmit raw serial bytes through a session (convenience wrapper)
