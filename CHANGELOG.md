@@ -39,6 +39,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Transmit History lists its frames at the Auto page size.** The tab could show a frame count while its list stayed empty, because at Auto the list waited for a table that only appeared once the list had loaded. The tab now counts its rows first, so the table appears and fills.
 - **Editing a signal in the Catalogue Editor keeps its `display` hint.** Saving a signal from the edit dialog used to remove its `display` key, so "Add as Instruments" lost the widget it asked for. The hint is now written back with the signal. A hint written as an inline table may come back as its own table, with the same contents.
 - **"Add as Instruments" reads the `display` hint of every signal.** Hints on mux-case signals, on signals a mirrored frame inherits and on Modbus frames named rather than numbered were ignored, and those signals got an inferred widget. They now get the widget their hint names. A hint naming a widget the dashboard does not have falls back to the inferred widget instead of adding a panel that cannot draw.
+- **A gs_usb adapter no longer loses frames when sends outrun the bus.** A Test Pattern throughput run or a fast transmit could hand the adapter more frames than it could hold, and the extra frames were dropped while still counted as sent. WireTAP now keeps at most ten frames in flight and waits for each to reach the bus, so what is counted as sent is what went out.
 
 ## [0.13.0] - 2026-09-29
 
