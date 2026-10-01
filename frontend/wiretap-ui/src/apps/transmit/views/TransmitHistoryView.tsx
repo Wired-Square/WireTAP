@@ -129,10 +129,10 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
   }, [rows]);
 
   const handleExport = useCallback(async () => {
-    if (totalCount === 0) return;
+    if (!sessionId || totalCount === 0) return;
     setIsExporting(true);
     try {
-      const allRows = await transmitHistoryQuery(0, totalCount + 1);
+      const allRows = await transmitHistoryQuery(sessionId, 0, totalCount + 1);
       const headers = ["Timestamp", "Session", "Kind", "Frame ID", "DLC", "Data", "Bus", "Flags", "Success", "Error"];
       const csvRows: (string | number)[][] = allRows.map((row) => {
         const frameIdStr = row.kind === "can" && row.frame_id != null
@@ -167,7 +167,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
     } finally {
       setIsExporting(false);
     }
-  }, [totalCount, formatTimestampString]);
+  }, [sessionId, totalCount, formatTimestampString]);
 
   // Current time for timeline scrubber (midpoint of visible rows)
   const currentTimeUs = useMemo(() => {

@@ -20,24 +20,26 @@ export interface TransmitHistoryRow {
 }
 
 export async function transmitHistoryQuery(
+  sessionId: string,
   offset: number,
   limit: number
 ): Promise<TransmitHistoryRow[]> {
-  return invoke("transmit_history_query", { offset, limit });
+  return invoke("transmit_history_query", { sessionId, offset, limit });
 }
 
-export async function transmitHistoryCount(): Promise<number> {
-  return invoke("transmit_history_count");
+export async function transmitHistoryCount(sessionId: string): Promise<number> {
+  return invoke("transmit_history_count", { sessionId });
 }
 
-export async function transmitHistoryClear(): Promise<void> {
-  return invoke("transmit_history_clear");
+/** Clears the session's history and resolves to the rows left in the whole database. */
+export async function transmitHistoryClear(sessionId: string): Promise<number> {
+  return invoke("transmit_history_clear", { sessionId });
 }
 
-export async function transmitHistoryTimeRange(): Promise<[number, number] | null> {
-  return invoke("transmit_history_time_range");
+export async function transmitHistoryTimeRange(sessionId: string): Promise<[number, number] | null> {
+  return invoke("transmit_history_time_range", { sessionId });
 }
 
-export async function transmitHistoryFindOffset(timestampUs: number): Promise<number> {
-  return invoke("transmit_history_find_offset", { timestampUs });
+export async function transmitHistoryFindOffset(sessionId: string, timestampUs: number): Promise<number> {
+  return invoke("transmit_history_find_offset", { sessionId, timestampUs });
 }

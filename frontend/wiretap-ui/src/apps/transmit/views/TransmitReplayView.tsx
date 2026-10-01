@@ -5,7 +5,7 @@
 import { useMemo } from "react";
 import { Check, X, Play, StopCircle, Trash2, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useTransmitStore } from "../../../stores/transmitStore";
+import { useTransmitStore, replaysInSession } from "../../../stores/transmitStore";
 import type { ReplayLogEntry } from "../../../stores/transmitStore";
 import {
   bgSurface,
@@ -33,18 +33,31 @@ import { Table } from "../../../components/Table";
 // Component
 // ============================================================================
 
-export default function TransmitReplayView({ useLocalTimezone }: { useLocalTimezone: boolean }) {
+interface TransmitReplayViewProps {
+  useLocalTimezone: boolean;
+  sessionId: string | null | undefined;
+}
+
+export default function TransmitReplayView({ useLocalTimezone, sessionId }: TransmitReplayViewProps) {
   const { t } = useTranslation("transmit");
   const replayProgress = useTransmitStore((s) => s.replayProgress);
-  const replayLog = useTransmitStore((s) => s.replayLog);
+  const allReplayLog = useTransmitStore((s) => s.replayLog);
   const activeReplays = useTransmitStore((s) => s.activeReplays);
   const replayCache = useTransmitStore((s) => s.replayCache);
   const stopReplay = useTransmitStore((s) => s.stopReplay);
   const restartReplay = useTransmitStore((s) => s.restartReplay);
   const clearReplayLog = useTransmitStore((s) => s.clearReplayLog);
 
-  const isEmpty = replayProgress.size === 0 && replayLog.length === 0;
-  const replayEntries = useMemo(() => [...replayProgress.entries()], [replayProgress]);
+  const replayEntries = useMemo(
+    () => [...replayProgress.entries()].filter(([, info]) => sessionId && info.sessionId === sessionId),
+    [replayProgress, sessionId]
+  );
+  const replayLog = useMemo(
+    () => (sessionId ? allReplayLog.filter((e) => e.sessionId === sessionId) : []),
+    [allReplayLog, sessionId]
+  );
+  const sessionReplays = replaysInSession({ activeReplays, replayProgress }, sessionId);
+  const isEmpty = replayEntries.length === 0 && replayLog.length === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -133,23 +146,23 @@ export default function TransmitReplayView({ useLocalTimezone }: { useLocalTimez
 
             <div className="flex-1" />
 
-            {activeReplays.size > 0 && (
+            {sessionReplays.length > 0 && (
               <Button
-                onClick={() => activeReplays.forEach((id) => stopReplay(id))}
+                onClick={() => sessionReplays.forEach((id) => stopReplay(id))}
                 variant="tonal"
                 tone="danger"
                 size="sm"
                 title={t("replay.stopAllTooltip")}
               >
                 <StopCircle size={13} />
-                {activeReplays.size > 1
-                  ? t("replay.stopReplaysLabel", { count: activeReplays.size })
+                {sessionReplays.length > 1
+                  ? t("replay.stopReplaysLabel", { count: sessionReplays.length })
                   : t("replay.stopReplayLabel")}
               </Button>
             )}
 
             <Button
-              onClick={clearReplayLog}
+              onClick={() => sessionId && clearReplayLog(sessionId)}
               title={t("replay.clearLogTooltip")}
             >
               <Trash2 size={14} />

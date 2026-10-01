@@ -2000,6 +2000,7 @@ export async function getReplayState(
 export interface ReplayState {
   status: string;
   replay_id: string;
+  session_id: string;
   frames_sent: number;
   total_frames: number;
   speed: number;

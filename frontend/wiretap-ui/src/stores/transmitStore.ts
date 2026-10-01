@@ -93,6 +93,7 @@ export interface ReplayProgressInfo {
   speed: number;
   loopReplay: boolean;
   profileName: string;
+  sessionId: string;
 }
 
 /** Kind of replay log entry */
@@ -104,6 +105,8 @@ export interface ReplayLogEntry {
   id: string;
   /** Replay ID this entry relates to */
   replayId: string;
+  /** Session the replay transmits through */
+  sessionId: string;
   /** Profile/session name */
   profileName: string;
   /** Total frames in the replay */
@@ -283,11 +286,21 @@ export interface TransmitState {
   /** Add a replay lifecycle log entry */
   addReplayLogEntry: (entry: Omit<ReplayLogEntry, "id">) => void;
   /** Clear the replay log */
-  clearReplayLog: () => void;
+  /** Clear the session's replay log */
+  clearReplayLog: (sessionId: string) => void;
 
   // Error handling
   /** Clear error */
   clearError: () => void;
+}
+
+/** The session's active replay ids; none without a session. */
+export function replaysInSession(
+  state: Pick<TransmitState, "activeReplays" | "replayProgress">,
+  sessionId: string | null | undefined
+): string[] {
+  if (!sessionId) return [];
+  return [...state.activeReplays].filter((id) => state.replayProgress.get(id)?.sessionId === sessionId);
 }
 
 const DEFAULT_CAN_EDITOR: CanEditorState = {
@@ -980,10 +993,11 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         const nextCache = new Map(state.replayCache);
         nextCache.set(replayId, { sessionId, frames, speed, loop });
         const nextProgress = new Map(state.replayProgress);
-        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName });
+        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName, sessionId });
         const startedEntry: ReplayLogEntry = {
           id: `replay-start-${replayId}`,
           replayId,
+          sessionId,
           profileName,
           totalFrames: frames.length,
           speed,
@@ -1031,6 +1045,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
           speed,
           loopReplay,
           profileName: existing?.profileName ?? "",
+          sessionId: replayState.session_id,
         });
 
         if (!existing) {
@@ -1050,6 +1065,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
           const entry: ReplayLogEntry = {
             id: `replay-loop-${replayId}-${pass}-${Date.now()}`,
             replayId,
+            sessionId: existing.sessionId,
             profileName: existing.profileName,
             totalFrames,
             speed,
@@ -1086,6 +1102,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       const summaryEntry: ReplayLogEntry = {
         id: `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         replayId,
+        sessionId: info.sessionId,
         profileName: info.profileName,
         totalFrames,
         speed,
@@ -1125,10 +1142,11 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       const profileName = sessions[sessionId]?.profileName ?? "Unknown";
       set((state) => {
         const nextProgress = new Map(state.replayProgress);
-        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName });
+        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName, sessionId });
         const restartedEntry: ReplayLogEntry = {
           id: `replay-restart-${replayId}-${Date.now()}`,
           replayId,
+          sessionId,
           profileName,
           totalFrames: frames.length,
           speed,
@@ -1152,7 +1170,8 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     set((state) => ({ replayLog: [{ ...entry, id }, ...state.replayLog] }));
   },
 
-  clearReplayLog: () => set({ replayLog: [] }),
+  clearReplayLog: (sessionId) =>
+    set((state) => ({ replayLog: state.replayLog.filter((e) => e.sessionId !== sessionId) })),
 
   // Error handling
   clearError: () => set({ error: null }),

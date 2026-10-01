@@ -65,6 +65,7 @@ static IO_REPLAY_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, ReplayTask>>> =
 pub struct ReplayState {
     pub status: String,
     pub replay_id: String,
+    pub session_id: String,
     pub frames_sent: usize,
     pub total_frames: usize,
     pub speed: f64,
@@ -174,6 +175,7 @@ pub async fn start_replay(
         let initial_state = ReplayState {
             status: "running".to_string(),
             replay_id: replay_id_for_task.clone(),
+            session_id: session_id_clone.clone(),
             frames_sent: 0,
             total_frames: total_frames as usize,
             speed,
@@ -229,6 +231,7 @@ pub async fn start_replay(
                     let error_state = ReplayState {
                         status: "error".to_string(),
                         replay_id: replay_id_for_task.clone(),
+                        session_id: session_id_clone.clone(),
                         frames_sent: frames_sent as usize,
                         total_frames: total_frames as usize,
                         speed,
@@ -267,6 +270,7 @@ pub async fn start_replay(
                     let progress_state = ReplayState {
                         status: "running".to_string(),
                         replay_id: replay_id_for_task.clone(),
+                        session_id: session_id_clone.clone(),
                         frames_sent: frames_sent as usize,
                         total_frames: total_frames as usize,
                         speed,
@@ -288,6 +292,7 @@ pub async fn start_replay(
             let loop_state = ReplayState {
                 status: "running".to_string(),
                 replay_id: replay_id_for_task.clone(),
+                session_id: session_id_clone.clone(),
                 frames_sent: frames_sent as usize,
                 total_frames: total_frames as usize,
                 speed,
@@ -308,6 +313,7 @@ pub async fn start_replay(
         let final_state = ReplayState {
             status: if cancelled { "stopped" } else { "completed" }.to_string(),
             replay_id: replay_id_for_task.clone(),
+            session_id: session_id_clone.clone(),
             frames_sent: frames_sent as usize,
             total_frames: total_frames as usize,
             speed,

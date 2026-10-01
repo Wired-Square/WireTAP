@@ -6,7 +6,7 @@
 import { useEffect, useCallback, useMemo } from "react";
 import { Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useTransmitStore } from "../../stores/transmitStore";
+import { useTransmitStore, replaysInSession } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
@@ -17,6 +17,7 @@ import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
 import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
+import { useSessionHistoryCount } from "./hooks/useSessionHistoryCount";
 import {
   bgSurface,
   borderDefault,
@@ -114,8 +115,6 @@ function TransmitInner() {
   const profiles = useTransmitStore((s) => s.profiles);
   const activeTab = useTransmitStore((s) => s.activeTab);
   const queue = useTransmitStore((s) => s.queue);
-  const historyDbCount = useTransmitStore((s) => s.historyDbCount);
-  const activeReplays = useTransmitStore((s) => s.activeReplays);
   const transmitError = useTransmitStore((s) => s.error);
   const isLoading = useTransmitStore((s) => s.isLoading);
 
@@ -173,6 +172,9 @@ function TransmitInner() {
     watchFrameCount,
     watchUniqueFrameCount,
   } = manager;
+
+  const historyCount = useSessionHistoryCount(effectiveSessionId);
+  const replayCount = useTransmitStore((s) => replaysInSession(s, effectiveSessionId).length);
 
   // Session controls (for menu commands)
   const { start, stop, leave } = session;
@@ -273,7 +275,7 @@ function TransmitInner() {
       case "history":
         return <TransmitHistoryView outputBusToSource={outputBusToSource} sessionId={effectiveSessionId} />;
       case "replay":
-        return <TransmitReplayView useLocalTimezone={settings?.display_timezone === "local"} />;
+        return <TransmitReplayView useLocalTimezone={settings?.display_timezone === "local"} sessionId={effectiveSessionId} />;
       default:
         return null;
     }
@@ -369,12 +371,12 @@ function TransmitInner() {
               </Tab>
               <Tab selected={activeTab === "replay"} onClick={() => handlers.handleTabClick("replay")}>
                 {t("tabs.replay")}
-                {activeReplays.size > 0 && <TabCount tone="success">({activeReplays.size})</TabCount>}
-                {activeReplays.size > 0 && activeTab !== "replay" && <TabDot />}
+                {replayCount > 0 && <TabCount tone="success">({replayCount})</TabCount>}
+                {replayCount > 0 && activeTab !== "replay" && <TabDot />}
               </Tab>
               <Tab selected={activeTab === "history"} onClick={() => handlers.handleTabClick("history")}>
                 {t("tabs.history")}
-                {historyDbCount > 0 && <TabCount>({historyDbCount.toLocaleString()})</TabCount>}
+                {historyCount > 0 && <TabCount>({historyCount.toLocaleString()})</TabCount>}
               </Tab>
             </Tabs>
 

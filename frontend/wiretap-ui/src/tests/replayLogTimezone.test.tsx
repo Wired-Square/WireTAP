@@ -30,6 +30,7 @@ describe("Transmit replay log", () => {
       replayLog: [{
         id: "1",
         replayId: "r1",
+        sessionId: "f_slcan-1",
         kind: "started",
         profileName: "can0",
         totalFrames: 10,
@@ -40,7 +41,7 @@ describe("Transmit replay log", () => {
     });
     const host = document.createElement("div");
     root = createRoot(host);
-    act(() => root.render(<TransmitReplayView useLocalTimezone />));
+    act(() => root.render(<TransmitReplayView useLocalTimezone sessionId="f_slcan-1" />));
     expect(host.innerHTML).toContain(LOCAL_1435);
     expect(host.innerHTML).not.toContain(UTC_0435);
   });

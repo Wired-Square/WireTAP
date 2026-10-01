@@ -1,7 +1,7 @@
 // src/apps/transmit/hooks/useTransmitHistoryView.ts
 //
 // Windowed view hook for transmit history.
-// - Live: re-fetches newest rows when historyDbCount changes
+// - Live: re-fetches the session's newest rows when its count changes
 //   (driven by WS TransmitUpdated, no polling)
 // - Browse: page controls (offset/limit pagination)
 // All data stays in SQLite — frontend holds only one page of rows.
@@ -16,6 +16,7 @@ import {
   type TransmitHistoryRow,
 } from "../../../api/transmitHistory";
 import { trackAlloc } from "../../../services/memoryDiag";
+import { useSessionHistoryCount } from "./useSessionHistoryCount";
 import {
   DEFAULT_PAGE_SIZE,
   pageCount,
@@ -54,7 +55,7 @@ export function useTransmitHistoryView(
   const [isLive, setIsLive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
+  const totalCount = useSessionHistoryCount(sessionId);
   const [timeRange, setTimeRange] = useState<{ startUs: number; endUs: number } | null>(null);
 
   // Generation counter for discarding stale fetches
@@ -71,36 +72,33 @@ export function useTransmitHistoryView(
 
   // --- Fetch time range when totalCount changes ---
   useEffect(() => {
-    if (totalCount === 0) {
+    if (!sessionId || totalCount === 0) {
       setTimeRange(null);
       return;
     }
     let cancelled = false;
-    transmitHistoryTimeRange().then((range) => {
+    transmitHistoryTimeRange(sessionId).then((range) => {
       if (cancelled || !range) return;
       setTimeRange({ startUs: range[0], endUs: range[1] });
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [totalCount]);
+  }, [sessionId, totalCount]);
 
-  // --- Live mode: re-fetch when historyDbCount changes ---
-  // The WS TransmitUpdated message updates historyDbCount in the store.
-  // We subscribe to that value instead of blind polling, eliminating
-  // the 500ms invoke round-trip that leaked WebKit networking objects.
+  // --- Live mode: re-fetch when the session's count changes ---
+  // The count follows the WS TransmitUpdated signal instead of blind polling,
+  // eliminating the 500ms invoke round-trip that leaked WebKit networking objects.
   useEffect(() => {
-    if (!isLive || pageSize === null) return;
+    if (!isLive || !sessionId || pageSize === null) return;
 
+    const gen = ++generationRef.current;
     const fetchNewest = async () => {
-      const count = useTransmitStore.getState().historyDbCount;
-      const gen = ++generationRef.current;
       setIsLoading(true);
       try {
         // Offset 0 with DESC ordering gives the newest rows
-        const result = await transmitHistoryQuery(0, pageSize);
+        const result = await transmitHistoryQuery(sessionId, 0, pageSize);
         if (generationRef.current !== gen) return;
         trackAlloc("transmitHistory.fetch", result.length * 500);
         setRows(result);
-        setTotalCount(count);
       } catch {
         // Non-critical
       } finally {
@@ -109,19 +107,11 @@ export function useTransmitHistoryView(
     };
 
     fetchNewest();
-
-    return useTransmitStore.subscribe(
-      (state, prevState) => {
-        if (state.historyDbCount !== prevState.historyDbCount) {
-          fetchNewest();
-        }
-      }
-    );
-  }, [isLive, pageSize]);
+  }, [isLive, sessionId, pageSize, totalCount]);
 
   // --- Browse mode: fetch page on page change ---
   useEffect(() => {
-    if (isLive || pageSize === null) return;
+    if (isLive || !sessionId || pageSize === null) return;
 
     const gen = generationRef.current;
     let cancelled = false;
@@ -130,10 +120,9 @@ export function useTransmitHistoryView(
       setIsLoading(true);
       try {
         const offset = currentPage * pageSize;
-        const result = await transmitHistoryQuery(offset, pageSize);
+        const result = await transmitHistoryQuery(sessionId, offset, pageSize);
         if (cancelled || generationRef.current !== gen) return;
         setRows(result);
-        setTotalCount(useTransmitStore.getState().historyDbCount);
       } catch {
         // Non-critical
       } finally {
@@ -143,7 +132,7 @@ export function useTransmitHistoryView(
 
     fetchPage();
     return () => { cancelled = true; };
-  }, [isLive, currentPage, pageSize]);
+  }, [isLive, sessionId, currentPage, pageSize]);
 
   // When entering live mode, reset to page 0
   useEffect(() => {
@@ -152,35 +141,31 @@ export function useTransmitHistoryView(
 
   // --- Navigate to timestamp (for timeline scrubber) ---
   const navigateToTimestamp = useCallback(async (timestampUs: number) => {
+    if (!sessionId) return;
     setIsLive(false);
     try {
-      const offset = await transmitHistoryFindOffset(timestampUs);
+      const offset = await transmitHistoryFindOffset(sessionId, timestampUs);
       setCurrentPage(pageForOffset(offset, pageSize));
     } catch {
       // Non-critical
     }
-  }, [pageSize]);
+  }, [sessionId, pageSize]);
 
   // --- Clear ---
   const clear = useCallback(async () => {
-    await transmitHistoryClear();
+    if (!sessionId) return;
+    const remaining = await transmitHistoryClear(sessionId);
     setRows([]);
     setCurrentPage(0);
-    setTotalCount(0);
     setTimeRange(null);
-    useTransmitStore.setState({ historyDbCount: 0 });
-    // Force the live subscription effect to restart by toggling isLive.
-    // Direct setIsLive(true) is a no-op if already true (React skips identical state).
-    // The generationRef increment invalidates the existing subscription's fetches.
-    setIsLive(false);
-    // Use microtask to ensure React processes the false→true transition
-    queueMicrotask(() => setIsLive(true));
-  }, []);
+    setIsLive(true);
+    useTransmitStore.setState({ historyDbCount: remaining });
+  }, [sessionId]);
 
   const totalPages = pageCount(totalCount, pageSize);
 
   return {
-    rows,
+    rows: sessionId ? rows : [],
     totalCount,
     isLive,
     isLoading,
