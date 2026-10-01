@@ -18,6 +18,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Changing a live CAN source's buses or settings no longer fails to reopen the adapter.** The source was restarted before the old connection had let go of the device, so a USB adapter could come back as busy and drop out of the session. The restart now waits for the old connection to close.
 - **A catalogue saved from Discovery keeps its mux selector and serial header.** A mux whose selector is not byte 0 used to decode with the selector at byte 0, and a serial catalogue's frame id and source address positions and default byte order were written under keys the decoder never read. Save the frames from Discovery again, or set the mux selector and serial header fields in the Catalogue Editor, for any catalogue saved this way.
 - **Duplicating or renaming a catalogue changes only its own name.** In a catalogue with a frame or signal above `[meta]`, the first signal's name was rewritten instead. Check the signal names in any catalogue you duplicated or renamed. A renamed catalogue is now written in one step, so it can no longer be read half-written.
+- **Replay keeps to the capture's timing.** The time each send took was added to the gap after it, so a replay ran slow: a 10.7 s capture at 1 ms spacing took 24.7 s at 1×. Frames now go out at their scaled time from the start of the pass, and when the adapter falls behind, the late frames go out straight away.
 
 ## [0.13.0] - 2026-09-29
 

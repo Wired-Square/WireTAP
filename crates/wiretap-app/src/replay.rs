@@ -78,6 +78,29 @@ pub fn get_replay_state(replay_id: String) -> Option<ReplayState> {
 // Maximum inter-frame sleep to avoid hanging on large timestamp gaps (5 seconds).
 const MAX_SLEEP_US: u64 = 5_000_000;
 
+/// When each frame of one replay pass is due, measured from the pass's start so
+/// the time a send takes is not added to the gap after it.
+struct ReplaySchedule {
+    speed: f64,
+    start: tokio::time::Instant,
+    due_us: u64,
+    previous_us: Option<u64>,
+}
+
+impl ReplaySchedule {
+    fn new(speed: f64) -> Self {
+        Self { speed, start: tokio::time::Instant::now(), due_us: 0, previous_us: None }
+    }
+
+    async fn wait_for(&mut self, timestamp_us: u64) {
+        if let Some(previous_us) = self.previous_us.replace(timestamp_us) {
+            let delta_us = timestamp_us.saturating_sub(previous_us);
+            self.due_us += (((delta_us as f64) / self.speed).round() as u64).min(MAX_SLEEP_US);
+        }
+        tokio::time::sleep_until(self.start + tokio::time::Duration::from_micros(self.due_us)).await;
+    }
+}
+
 // ============================================================================
 // Tauri Commands
 // ============================================================================
@@ -148,13 +171,15 @@ pub async fn start_replay(
         let mut pass: u64 = 1;
 
         'outer: loop {
-            for i in 0..frames.len() {
+            let mut schedule = ReplaySchedule::new(speed);
+            for replay_frame in &frames {
+                schedule.wait_for(replay_frame.timestamp_us).await;
                 if cancel_flag_clone.load(Ordering::Relaxed) {
                     cancelled = true;
                     break 'outer;
                 }
 
-                let frame = &frames[i].frame;
+                let frame = &replay_frame.frame;
 
                 // Transmit the frame. Writing to SQLite per frame is safe here because
                 // the write_entry mutex lock is held only for the INSERT (~microseconds).
@@ -236,18 +261,6 @@ pub async fn start_replay(
                     crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                     last_progress = std::time::Instant::now();
                 }
-
-                // Sleep until the next frame's timestamp (scaled by speed)
-                if i + 1 < frames.len() {
-                    let next_ts = frames[i + 1].timestamp_us;
-                    let curr_ts = frames[i].timestamp_us;
-                    let delta_us = next_ts.saturating_sub(curr_ts);
-                    let sleep_us = ((delta_us as f64) / speed).round() as u64;
-                    let capped_us = sleep_us.min(MAX_SLEEP_US);
-                    if capped_us > 0 {
-                        tokio::time::sleep(tokio::time::Duration::from_micros(capped_us)).await;
-                    }
-                }
             }
 
             if !loop_replay {
@@ -319,4 +332,43 @@ pub async fn io_stop_all_replays() -> Result<(), String> {
         task.cancel_flag.store(true, Ordering::Relaxed);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use tokio::time::Instant;
+
+    fn capture(spacing_ms: u64, count: u64) -> Vec<u64> {
+        (0..count).map(|n| 1_000_000 + n * spacing_ms * 1000).collect()
+    }
+
+    async fn replay_with_send_cost(timestamps_us: &[u64], speed: f64, send_cost: Duration) -> Duration {
+        let started = Instant::now();
+        let mut schedule = ReplaySchedule::new(speed);
+        for &timestamp_us in timestamps_us {
+            schedule.wait_for(timestamp_us).await;
+            tokio::time::sleep(send_cost).await;
+        }
+        started.elapsed()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn replay_keeps_to_the_capture_schedule_when_a_send_is_slow() {
+        let elapsed = replay_with_send_cost(&capture(5, 101), 1.0, Duration::from_millis(2)).await;
+        assert_eq!(elapsed, Duration::from_millis(502), "500 ms of capture plus the last send");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn replay_scales_the_schedule_by_its_speed() {
+        let elapsed = replay_with_send_cost(&capture(10, 11), 10.0, Duration::ZERO).await;
+        assert_eq!(elapsed, Duration::from_millis(10));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn replay_caps_a_long_gap_in_the_capture() {
+        let elapsed = replay_with_send_cost(&[0, 60_000_000], 1.0, Duration::ZERO).await;
+        assert_eq!(elapsed, Duration::from_micros(MAX_SLEEP_US));
+    }
 }
