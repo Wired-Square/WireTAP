@@ -2859,6 +2859,9 @@ fn transmitting_session<'a>(
     if matches!(payload, TransmitPayload::CanFrame(f) if f.is_brs && !f.is_fd) {
         return Err("A classic CAN frame does not support bit rate switch (BRS)".to_string());
     }
+    if matches!(payload, TransmitPayload::CanFrame(f) if f.is_rtr && f.is_fd) {
+        return Err("A CAN FD frame does not support remote request (RTR)".to_string());
+    }
     let session = sessions
         .get(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
@@ -3602,6 +3605,22 @@ mod tests {
             refused.unwrap_err(),
             "A classic CAN frame does not support bit rate switch (BRS)"
         );
+    }
+
+    #[test]
+    fn a_remote_frame_on_can_fd_is_refused() {
+        let frame = CanTransmitFrame {
+            frame_id: 0x123,
+            data: vec![],
+            bus: 0,
+            is_extended: false,
+            is_fd: true,
+            is_brs: false,
+            is_rtr: true,
+        };
+        let refused = tauri::async_runtime::block_on(transmit_frame("no-such-session", &frame)).unwrap_err();
+        assert_eq!(refused, "A CAN FD frame does not support remote request (RTR)");
+        assert!(crate::transmit::is_permanent_error_pub(&refused));
     }
 
     /// The registry invariant: after a session is torn down nothing may still claim

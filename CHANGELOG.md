@@ -7,7 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Added
 
 - **`wiretap-can-cli` drives PEAK adapters on macOS and Windows.** Name one as `pcan:<serial>` or `pcan:<bus:addr>`, with `/<channel>` for a multi-channel model, in `list`, `probe`, `dump`, `send`, `gen` and `pattern`. `--bitrate`, `--sample-point` and `--dbitrate` apply, and a nominal rate above 1 Mbit/s is refused. Only the classic PCAN-USB has been tried on hardware; the FD models are untested. On Linux a PEAK adapter is a SocketCAN interface, as before.
-- **MCP transmits can ask for a remote or bit-rate-switched frame.** `transmit_frame` and `repeat_transmit_start` now take `is_rtr` and `is_brs` beside `is_extended` and `is_fd`, and an agent's repeat shows those flags in its Transmit queue row. A session whose adapter cannot send the frame refuses it with the reason, as it does from the app, and `is_brs` without `is_fd` is refused, as bit-rate switching exists only on CAN FD.
+- **MCP transmits can ask for a remote or bit-rate-switched frame.** `transmit_frame` and `repeat_transmit_start` now take `is_rtr` and `is_brs` beside `is_extended` and `is_fd`, and an agent's repeat shows those flags in its Transmit queue row. A session whose adapter cannot send the frame refuses it with the reason, as it does from the app, and `is_brs` without `is_fd` or `is_rtr` with it is refused, as bit-rate switching exists only on CAN FD and remote frames only on classic CAN.
 
 ### Changed
 
