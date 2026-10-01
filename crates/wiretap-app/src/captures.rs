@@ -566,6 +566,7 @@ pub async fn search_capture_frames(
 
 /// Response for tail-mode byte capture queries
 #[derive(Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BytesTailResponse {
     pub bytes: Vec<TimestampedByte>,
     pub total_count: usize,

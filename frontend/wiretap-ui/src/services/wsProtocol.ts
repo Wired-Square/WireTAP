@@ -4,7 +4,7 @@
 // Uses DataView for zero-copy access to ArrayBuffer messages.
 
 import type { FrameMessage } from "../types/frame";
-import type { DeviceInfoEntry, ScanProgressPayload, StreamEndedInfo } from "../api/io";
+import type { DeviceInfoPayload, ScanProgressPayload, StreamEndedInfo } from "../api/io";
 import type { ChecksumValidationResult } from "../api/checksums";
 import { trackAlloc } from "./memoryDiag";
 
@@ -418,7 +418,7 @@ export interface AdhocSignalsMsg {
 export interface ModbusScanStateMsg {
   status: string;
   progress: ScanProgressPayload | null;
-  device_info: DeviceInfoEntry[];
+  device_info: DeviceInfoPayload[];
   notes: string[];
   /** The capture this sweep is filling — the results tab's own copy of the answer. */
   capture_id: string | null;

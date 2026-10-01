@@ -1707,6 +1707,7 @@ pub async fn probe_gvret_device(
 /// Result of probing any real-time device.
 /// Provides a unified structure for all device types.
 #[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DeviceProbeResult {
     /// Whether the probe was successful (device is online and responding)
     pub success: bool,
@@ -2215,10 +2216,12 @@ pub async fn probe_device(
 
 /// Source configuration for multi-source session creation (TypeScript-friendly version)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MultiSourceInput {
     /// Profile ID for this source
     pub profile_id: String,
     /// Display name for this source (optional, defaults to profile name)
+    #[cfg_attr(test, ts(optional))]
     pub display_name: Option<String>,
     /// Bus mappings for this source
     pub bus_mappings: Vec<BusMapping>,
@@ -2412,6 +2415,7 @@ pub async fn create_multi_source_session(
 
 /// Response type for profile usage query
 #[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProfileUsageInfo {
     /// Profile ID
     pub profile_id: String,

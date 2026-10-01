@@ -6,7 +6,7 @@ import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save, Unplug, Plug } f
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
-import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type AppInstanceInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
+import { getStateType, getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type AppInstanceInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { formatWindowName } from "../../../utils/windowName";
 import { iconSm } from "../../../styles/spacing";
@@ -67,7 +67,7 @@ export default function SessionDetailPanel({
   const renderContent = () => {
     if (selectedNode.type === "session") {
       const sessionId = selectedNode.id.replace("session-", "");
-      const session = sessions.find((s) => s.sessionId === sessionId);
+      const session = sessions.find((s) => s.session_id === sessionId);
       if (!session) return <p className="text-sm text-muted">{t("detail.sessionNotFound")}</p>;
 
       return <SessionDetails session={session} profiles={profiles} openApps={openApps} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} onConnectApp={onConnectAppToSession} />;
@@ -85,7 +85,7 @@ export default function SessionDetailPanel({
       // Unconnected app node is `app::${instanceId}` (no session id in the middle).
       const parts = selectedNode.id.split("::");
       if (parts.length === 2) {
-        const instance = openApps?.find((a) => a.instanceId === parts[1]);
+        const instance = openApps?.find((a) => a.instance_id === parts[1]);
         return <UnconnectedAppDetails instance={instance} fallbackId={parts[1]} sessions={sessions} onConnectApp={onConnectAppToSession} />;
       }
       return <AppDetails nodeId={selectedNode.id} sessions={sessions} openApps={openApps} onEvict={onEvictSubscriber} />;
@@ -148,9 +148,9 @@ function SessionDetails({
   onConnectApp?: (sessionId: string, appName: string) => void;
 }) {
   const { t } = useTranslation("sessionManager");
-  const isRunning = session.state === "running";
-  const isStopped = session.state === "stopped";
-  const isPaused = session.state === "paused";
+  const isRunning = session.state.type === "Running";
+  const isStopped = session.state.type === "Stopped";
+  const isPaused = session.state.type === "Paused";
   const canPause = session.capabilities.can_pause;
 
   return (
@@ -161,7 +161,7 @@ function SessionDetails({
           {t("detail.labels.sessionId")}
         </label>
         <p className="text-sm text-primary font-mono break-all">
-          {session.sessionId}
+          {session.session_id}
         </p>
       </div>
 
@@ -176,7 +176,7 @@ function SessionDetails({
           isPaused ? "text-info" :
           "text-danger"
         }`}>
-          {session.state}
+          {getStateType(session.state)}
         </p>
       </div>
 
@@ -186,21 +186,21 @@ function SessionDetails({
           {t("detail.labels.deviceType")}
         </label>
         <p className="text-sm text-primary">
-          {session.sourceType}
+          {session.source_type}
         </p>
       </div>
 
       {/* Sources */}
-      {session.sourceProfileIds.length > 0 && (
+      {session.source_profile_ids.length > 0 && (
         <div>
           <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.sources")}
           </label>
           <div className="mt-1 space-y-1.5">
-            {session.sourceProfileIds.map((id) => {
+            {session.source_profile_ids.map((id) => {
               const profile = profiles.find((p) => p.id === id);
-              const config = session.brokerConfigs?.find((c) => c.profileId === id);
-              const enabledMappings = config?.busMappings.filter((m) => m.enabled) ?? [];
+              const config = session.broker_configs?.find((c) => c.profile_id === id);
+              const enabledMappings = config?.bus_mappings.filter((m) => m.enabled) ?? [];
               return (
                 <div key={id}>
                   <p className="text-sm text-primary">
@@ -211,19 +211,19 @@ function SessionDetails({
                     <div className="ml-2 mt-0.5 space-y-0.5">
                       {enabledMappings.map((m) => {
                         // Don't show trash if this is the last enabled mapping on the last source
-                        const totalEnabledAcrossSources = session.brokerConfigs?.reduce(
-                          (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
+                        const totalEnabledAcrossSources = session.broker_configs?.reduce(
+                          (sum, c) => sum + (c.bus_mappings.filter((b) => b.enabled).length), 0
                         ) ?? 0;
                         const canDisable = totalEnabledAcrossSources > 1;
                         return (
-                          <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-muted font-mono">
-                            <span>bus{m.deviceBus} → bus{m.outputBus}</span>
+                          <div key={`${m.device_bus}-${m.output_bus}`} className="flex items-center gap-1 text-xs text-muted font-mono">
+                            <span>bus{m.device_bus} → bus{m.output_bus}</span>
                             {canDisable && (
                               <IconButton
-                                onClick={() => onDisableBusMapping(session.sessionId, id, m.deviceBus)}
+                                onClick={() => onDisableBusMapping(session.session_id, id, m.device_bus)}
                                 tone="danger"
                                 size="xs"
-                                title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
+                                title={t("detail.signalGen.removeMapping", { bus: m.device_bus })}
                               >
                                 <Trash2 size={10} />
                               </IconButton>
@@ -246,7 +246,7 @@ function SessionDetails({
           {t("detail.labels.apps")}
         </label>
         <p className="text-sm text-primary">
-          {session.subscriberCount}
+          {session.subscriber_count}
         </p>
       </div>
 
@@ -254,13 +254,13 @@ function SessionDetails({
       <SessionDecoderPicker session={session} />
 
       {/* Buffer Info */}
-      {session.captureId && (
+      {session.capture_id && (
         <div>
           <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.buffer")}
           </label>
           <p className="text-sm text-primary">
-            {t("detail.values.framesCount", { count: session.captureFrameCount ?? 0 })}
+            {t("detail.values.framesCount", { count: session.capture_frame_count ?? 0 })}
           </p>
         </div>
       )}
@@ -270,8 +270,8 @@ function SessionDetails({
         <label className="text-xs text-muted uppercase tracking-wide">
           {t("detail.labels.streaming")}
         </label>
-        <p className={`text-sm ${session.isStreaming ? "text-success" : "text-muted"}`}>
-          {session.isStreaming ? t("detail.values.yes") : t("detail.values.no")}
+        <p className={`text-sm ${session.is_streaming ? "text-success" : "text-muted"}`}>
+          {session.is_streaming ? t("detail.values.yes") : t("detail.values.no")}
         </p>
       </div>
 
@@ -309,7 +309,7 @@ function SessionDetails({
         <div className="flex flex-wrap gap-2">
           {isStopped && (
             <Button
-              onClick={() => onStart(session.sessionId)}
+              onClick={() => onStart(session.session_id)}
               variant="tonal"
               tone="success"
               size="sm"
@@ -320,7 +320,7 @@ function SessionDetails({
           )}
           {isRunning && (
             <Button
-              onClick={() => onStop(session.sessionId)}
+              onClick={() => onStop(session.session_id)}
               variant="tonal"
               tone="warning"
               size="sm"
@@ -331,7 +331,7 @@ function SessionDetails({
           )}
           {isRunning && canPause && (
             <Button
-              onClick={() => onPause(session.sessionId)}
+              onClick={() => onPause(session.session_id)}
               variant="tonal"
               tone="primary"
               size="sm"
@@ -342,7 +342,7 @@ function SessionDetails({
           )}
           {isPaused && (
             <Button
-              onClick={() => onResume(session.sessionId)}
+              onClick={() => onResume(session.session_id)}
               variant="tonal"
               tone="success"
               size="sm"
@@ -351,9 +351,9 @@ function SessionDetails({
               {t("detail.actions.resume")}
             </Button>
           )}
-          {session.sourceType === "realtime" && (
+          {session.source_type === "realtime" && (
             <Button
-              onClick={() => onAddSource(session.sessionId)}
+              onClick={() => onAddSource(session.session_id)}
               variant="tonal"
               tone="purple"
               size="sm"
@@ -363,7 +363,7 @@ function SessionDetails({
             </Button>
           )}
           <Button
-            onClick={() => onDestroy(session.sessionId)}
+            onClick={() => onDestroy(session.session_id)}
             variant="tonal"
             tone="danger"
             size="sm"
@@ -381,8 +381,8 @@ function SessionDetails({
         const unconnected = [
           ...new Set(
             openApps
-              .filter((a) => a.sessionId == null && !connectedApps.has(a.appName.toLowerCase()))
-              .map((a) => a.appName)
+              .filter((a) => a.session_id == null && !connectedApps.has(a.app_name.toLowerCase()))
+              .map((a) => a.app_name)
           ),
         ];
         if (unconnected.length === 0) return null;
@@ -395,7 +395,7 @@ function SessionDetails({
               {unconnected.map((appName) => (
                 <Button
                   key={appName}
-                  onClick={() => onConnectApp(session.sessionId, appName)}
+                  onClick={() => onConnectApp(session.session_id, appName)}
                   variant="tonal"
                   tone="cyan"
                   size="sm"
@@ -422,7 +422,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 }) {
   const { t } = useTranslation("sessionManager");
   // Find sessions that use this profile as a source
-  const usingSessions = sessions.filter((s) => s.sourceProfileIds.includes(profile.id));
+  const usingSessions = sessions.filter((s) => s.source_profile_ids.includes(profile.id));
 
   return (
     <div className="space-y-4">
@@ -465,37 +465,37 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
       {/* Bus Mappings */}
       {usingSessions.length > 0 && usingSessions.some((s) => {
-        const config = s.brokerConfigs?.find((c) => c.profileId === profile.id);
-        return config?.busMappings.some((m) => m.enabled);
+        const config = s.broker_configs?.find((c) => c.profile_id === profile.id);
+        return config?.bus_mappings.some((m) => m.enabled);
       }) && (
         <div>
           <label className="text-xs text-muted uppercase tracking-wide">
             {t("detail.labels.busMappings")}
           </label>
           {usingSessions.map((s) => {
-            const config = s.brokerConfigs?.find((c) => c.profileId === profile.id);
-            const enabledMappings = config?.busMappings.filter((m) => m.enabled) ?? [];
+            const config = s.broker_configs?.find((c) => c.profile_id === profile.id);
+            const enabledMappings = config?.bus_mappings.filter((m) => m.enabled) ?? [];
             if (enabledMappings.length === 0) return null;
             return (
-              <div key={s.sessionId} className="mt-1">
+              <div key={s.session_id} className="mt-1">
                 {usingSessions.length > 1 && (
-                  <p className="text-xs text-muted font-mono">{s.sessionId}</p>
+                  <p className="text-xs text-muted font-mono">{s.session_id}</p>
                 )}
                 <div className="ml-2 space-y-0.5">
                   {enabledMappings.map((m) => {
-                    const totalEnabled = s.brokerConfigs?.reduce(
-                      (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
+                    const totalEnabled = s.broker_configs?.reduce(
+                      (sum, c) => sum + (c.bus_mappings.filter((b) => b.enabled).length), 0
                     ) ?? 0;
                     const canDisable = totalEnabled > 1;
                     return (
-                      <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-primary font-mono">
-                        <span>bus{m.deviceBus} → bus{m.outputBus}</span>
+                      <div key={`${m.device_bus}-${m.output_bus}`} className="flex items-center gap-1 text-xs text-primary font-mono">
+                        <span>bus{m.device_bus} → bus{m.output_bus}</span>
                         {canDisable && (
                           <IconButton
-                            onClick={() => onDisableBusMapping(s.sessionId, profile.id, m.deviceBus)}
+                            onClick={() => onDisableBusMapping(s.session_id, profile.id, m.device_bus)}
                             tone="danger"
                             size="xs"
-                            title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
+                            title={t("detail.signalGen.removeMapping", { bus: m.device_bus })}
                           >
                             <Trash2 size={10} />
                           </IconButton>
@@ -514,28 +514,28 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
       {profile.kind === "virtual" && usingSessions.length > 0 && (
         <VirtualSignalGenControls
           profile={profile}
-          sessionId={usingSessions[0].sessionId}
-          sessionState={usingSessions[0].state}
+          sessionId={usingSessions[0].session_id}
+          sessionState={getStateType(usingSessions[0].state)}
         />
       )}
 
       {/* Actions — remove from session (only if session has more than 1 source) */}
-      {usingSessions.some((s) => s.sourceProfileIds.length > 1) && (
+      {usingSessions.some((s) => s.source_profile_ids.length > 1) && (
         <div className="pt-2 border-t border-default">
           <label className="text-xs text-muted uppercase tracking-wide mb-2 block">
             {t("detail.labels.actions")}
           </label>
           {usingSessions.map((s) =>
-            s.sourceProfileIds.length > 1 ? (
+            s.source_profile_ids.length > 1 ? (
               <Button
-                key={s.sessionId}
-                onClick={() => onRemoveSource(s.sessionId, profile.id)}
+                key={s.session_id}
+                onClick={() => onRemoveSource(s.session_id, profile.id)}
                 variant="tonal"
                 tone="danger"
                 size="sm"
               >
                 <Trash2 className={iconSm} />
-                {t("detail.actions.removeFrom", { sessionId: s.sessionId })}
+                {t("detail.actions.removeFrom", { sessionId: s.session_id })}
               </Button>
             ) : null
           )}
@@ -733,7 +733,7 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
   const { t } = useTranslation("sessionManager");
   const catalogs = useCatalogList();
   const sessionCatalogPath = useSessionStore(
-    (s) => s.sessions[session.sessionId]?.catalogPath ?? null
+    (s) => s.sessions[session.session_id]?.catalogPath ?? null
   );
 
   // Convert full path to filename for dropdown value
@@ -745,14 +745,14 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
 
   const handleChange = (filename: string) => {
     if (!filename) {
-      tlog.debug(`[session-manager] Clearing session decoder for ${session.sessionId}`);
-      useSessionStore.getState().setSessionCatalogPath(session.sessionId, null);
+      tlog.debug(`[session-manager] Clearing session decoder for ${session.session_id}`);
+      useSessionStore.getState().setSessionCatalogPath(session.session_id, null);
       return;
     }
     const catalog = catalogs.find((c) => c.filename === filename);
     const path = catalog?.path ?? filename;
     tlog.debug(`[session-manager] Setting session decoder → ${path}`);
-    useSessionStore.getState().setSessionCatalogPath(session.sessionId, path);
+    useSessionStore.getState().setSessionCatalogPath(session.session_id, path);
   };
 
   return (
@@ -805,8 +805,8 @@ function UnconnectedAppDetails({
   onConnectApp?: (sessionId: string, appName: string) => void;
 }) {
   const { t } = useTranslation("sessionManager");
-  const displayId = instance?.displayId ?? fallbackId;
-  const appType = instance?.appName ?? fallbackId;
+  const displayId = instance?.display_id ?? fallbackId;
+  const appType = instance?.app_name ?? fallbackId;
   return (
     <div className="space-y-4">
       <div>
@@ -818,7 +818,7 @@ function UnconnectedAppDetails({
         </p>
       </div>
 
-      <WindowField windowLabel={instance?.windowLabel} />
+      <WindowField windowLabel={instance?.window_label} />
 
       <div>
         <label className="text-xs text-muted uppercase tracking-wide">
@@ -838,14 +838,14 @@ function UnconnectedAppDetails({
           <div className="space-y-1">
             {sessions.map((s) => (
               <Button
-                key={s.sessionId}
-                onClick={() => onConnectApp(s.sessionId, appType)}
+                key={s.session_id}
+                onClick={() => onConnectApp(s.session_id, appType)}
                 variant="tonal"
                 tone="cyan"
                 size="sm"
               >
                 <Plug className={iconSm} />
-                <span className="font-mono truncate">{s.sessionId}</span>
+                <span className="font-mono truncate">{s.session_id}</span>
               </Button>
             ))}
           </div>
@@ -879,7 +879,7 @@ function EdgeDetails({
     const match = edgeId.match(/^edge-(.+?)::(.+)$/);
     if (!match) return <p className="text-sm text-muted">{t("detail.edgeNotFound")}</p>;
     const [, sessionId, subscriberId] = match;
-    const session = sessions.find((s) => s.sessionId === sessionId);
+    const session = sessions.find((s) => s.session_id === sessionId);
     const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
 
     return (
@@ -957,20 +957,20 @@ function EdgeDetails({
   let profileId = "";
   let sessionId = "";
   for (const s of sessions) {
-    if (middle.endsWith(`-${s.sessionId}`)) {
-      sessionId = s.sessionId;
-      profileId = middle.slice(0, middle.length - s.sessionId.length - 1);
+    if (middle.endsWith(`-${s.session_id}`)) {
+      sessionId = s.session_id;
+      profileId = middle.slice(0, middle.length - s.session_id.length - 1);
       break;
     }
   }
   const deviceBus = parseInt(deviceBusStr, 10);
   const outputBus = parseInt(outputBusStr, 10);
   const profile = profiles.find((p) => p.id === profileId);
-  const session = sessions.find((s) => s.sessionId === sessionId);
+  const session = sessions.find((s) => s.session_id === sessionId);
 
   // Can we disable this mapping? Only if it's not the last enabled mapping
-  const totalEnabled = session?.brokerConfigs?.reduce(
-    (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
+  const totalEnabled = session?.broker_configs?.reduce(
+    (sum, c) => sum + (c.bus_mappings.filter((b) => b.enabled).length), 0
   ) ?? 0;
   const canDisable = totalEnabled > 1;
 
@@ -1037,9 +1037,9 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
   const sessionId = parts[1];
   const subscriberId = parts[2];
 
-  const session = sessions.find((s) => s.sessionId === sessionId);
+  const session = sessions.find((s) => s.session_id === sessionId);
   const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
-  const instance = openApps?.find((a) => a.instanceId === subscriberId);
+  const instance = openApps?.find((a) => a.instance_id === subscriberId);
 
   if (!listener) {
     return <p className="text-sm text-muted">{t("detail.appNotFound")}</p>;
@@ -1062,12 +1062,12 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
           {t("detail.labels.appId")}
         </label>
         <p className="text-sm text-primary font-mono">
-          {instance?.displayId ?? listener.subscriber_id}
+          {instance?.display_id ?? listener.subscriber_id}
         </p>
       </div>
 
       {/* Window */}
-      <WindowField windowLabel={instance?.windowLabel} />
+      <WindowField windowLabel={instance?.window_label} />
 
       {/* Session */}
       <div>

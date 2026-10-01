@@ -275,24 +275,24 @@ export function useConnectionProbe({
         return;
       }
 
-      setGvretDeviceInfo({ bus_count: result.busCount });
+      setGvretDeviceInfo({ bus_count: result.bus_count });
       setGvretState("success");
 
       const configuredCount = profile.connection.interfaces?.length || 0;
       if (configuredCount === 0) {
         const defaults: GvretInterfaceConfig[] = Array.from(
-          { length: result.busCount },
+          { length: result.bus_count },
           (_, i) => ({ device_bus: i, enabled: true, protocol: "can" as const }),
         );
         onUpdateConnectionField("interfaces", defaults);
-      } else if (configuredCount !== result.busCount) {
+      } else if (configuredCount !== result.bus_count) {
         // Keep the user's config, but say the device disagrees with it.
         setGvretError(
-          `Device reports ${result.busCount} interface(s), but ${configuredCount} configured. ` +
+          `Device reports ${result.bus_count} interface(s), but ${configuredCount} configured. ` +
             `Delete interfaces field in settings to re-probe.`,
         );
       }
-      onUpdateConnectionField("_probed_bus_count", result.busCount);
+      onUpdateConnectionField("_probed_bus_count", result.bus_count);
     } catch (e) {
       setGvretError(e instanceof Error ? e.message : String(e));
       setGvretState("error");

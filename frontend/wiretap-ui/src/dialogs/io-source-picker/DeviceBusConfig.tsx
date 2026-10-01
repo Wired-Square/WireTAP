@@ -68,7 +68,7 @@ export default function DeviceBusConfig({
   const updateBus = (deviceBus: number, patch: Partial<BusMapping>) => {
     onBusConfigChange(
       busConfig.map((mapping) =>
-        mapping.deviceBus === deviceBus ? { ...mapping, ...patch } : mapping
+        mapping.device_bus === deviceBus ? { ...mapping, ...patch } : mapping
       )
     );
   };
@@ -104,11 +104,11 @@ export default function DeviceBusConfig({
    * than none.
    */
   const protocolSelect = (mapping: BusMapping) => {
-    const options = mapping.supportedProtocols ?? [];
+    const options = mapping.supported_protocols;
     if (!showProtocol || options.length < 2) return null;
     return busSelect(
       mapping.protocol ?? options[0],
-      (value) => updateBus(mapping.deviceBus, { protocol: value as Protocol }),
+      (value) => updateBus(mapping.device_bus, { protocol: value as Protocol }),
       options.map((p) => ({ value: p, label: PROTOCOL_LABELS[p] })),
     );
   };
@@ -116,8 +116,8 @@ export default function DeviceBusConfig({
   /** The output-bus remap dropdown for one bus. */
   const outputBusSelect = (mapping: BusMapping, isDuplicate: boolean) =>
     busSelect(
-      mapping.outputBus,
-      (value) => updateBus(mapping.deviceBus, { outputBus: parseInt(value, 10) }),
+      mapping.output_bus,
+      (value) => updateBus(mapping.device_bus, { output_bus: parseInt(value, 10) }),
       Array.from({ length: OUTPUT_BUS_COUNT }, (_, i) => ({
         value: i,
         label: t("ioSourcePicker.busConfig.busLabel", { bus: i }),
@@ -171,7 +171,7 @@ export default function DeviceBusConfig({
 
   // Check for duplicate output buses (used by other sources)
   const hasDuplicates = usedOutputBuses && busConfig.some(
-    (m) => m.enabled && usedOutputBuses.has(m.outputBus)
+    (m) => m.enabled && usedOutputBuses.has(m.output_bus)
   );
 
   // Compact mode - inline display below profile button
@@ -180,23 +180,23 @@ export default function DeviceBusConfig({
       <div className={wrapperClass}>
         <div className="space-y-1">
           {busConfig.map((mapping) => {
-            const isDuplicate = usedOutputBuses && mapping.enabled && usedOutputBuses.has(mapping.outputBus);
+            const isDuplicate = usedOutputBuses && mapping.enabled && usedOutputBuses.has(mapping.output_bus);
             const protocol = mapping.enabled ? protocolSelect(mapping) : null;
             return (
               <div
-                key={mapping.deviceBus}
+                key={mapping.device_bus}
                 className="flex items-center gap-2 text-xs"
               >
                 {/* Enable/disable checkbox */}
                 <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                   <Checkbox
                     checked={mapping.enabled}
-                    onChange={() => updateBus(mapping.deviceBus, { enabled: !mapping.enabled })}
+                    onChange={() => updateBus(mapping.device_bus, { enabled: !mapping.enabled })}
                     disabled={configLocked}
                     size="sm"
                   />
                   <span className={configLocked ? "text-muted" : "text-secondary"}>
-                    {BUS_NAMES[mapping.deviceBus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.deviceBus })}
+                    {BUS_NAMES[mapping.device_bus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.device_bus })}
                   </span>
                 </label>
 
@@ -249,11 +249,11 @@ export default function DeviceBusConfig({
 
       <div className="space-y-1">
         {busConfig.map((mapping) => {
-          const isDuplicate = usedOutputBuses && mapping.enabled && usedOutputBuses.has(mapping.outputBus);
+          const isDuplicate = usedOutputBuses && mapping.enabled && usedOutputBuses.has(mapping.output_bus);
           const protocol = mapping.enabled ? protocolSelect(mapping) : null;
           return (
             <div
-              key={mapping.deviceBus}
+              key={mapping.device_bus}
               className={`flex items-center gap-3 px-2 py-1.5 rounded transition-colors ${
                 mapping.enabled
                   ? "bg-surface"
@@ -264,11 +264,11 @@ export default function DeviceBusConfig({
               <label className={`flex items-center gap-2 flex-1 min-w-0 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <Checkbox
                   checked={mapping.enabled}
-                  onChange={() => updateBus(mapping.deviceBus, { enabled: !mapping.enabled })}
+                  onChange={() => updateBus(mapping.device_bus, { enabled: !mapping.enabled })}
                   disabled={configLocked}
                 />
                 <span className={configLocked ? "text-sm font-medium text-muted" : sectionHeaderText}>
-                  {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
+                  {BUS_NAMES[mapping.device_bus] || `Bus ${mapping.device_bus}`}
                 </span>
               </label>
 

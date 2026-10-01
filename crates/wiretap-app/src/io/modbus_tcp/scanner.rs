@@ -32,6 +32,7 @@ use crate::io::SignalThrottle;
 
 /// Device identification info discovered via FC43 (Read Device Identification)
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DeviceInfoPayload {
     pub unit_id: u8,
     pub vendor: Option<String>,
@@ -210,12 +211,15 @@ fn default_repeat_delay_ms() -> u64 {
 /// Everything past `inter_request_delay_ms` has a serde default, so a caller
 /// that only knows the original fields still deserialises.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModbusScanConfig {
     /// Server hostname or IP
     #[serde(default = "default_host")]
+    #[cfg_attr(test, ts(as = "Option<String>", optional))]
     pub host: String,
     /// Server port (default 502)
     #[serde(default = "default_port")]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub port: u16,
     /// Modbus unit/slave ID (1-247)
     #[serde(default = "default_unit_id")]
@@ -234,41 +238,52 @@ pub struct ModbusScanConfig {
     /// Per-request timeout. The only thing bounding a device that answers a
     /// function code with silence rather than an exception.
     #[serde(default = "default_timeout_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub timeout_ms: u64,
     /// Pause after connecting before the first request on that socket.
     #[serde(default = "default_settle_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub connect_settle_ms: u64,
     /// Open a fresh connection per request, for stacks that serve one
     /// conversation per socket.
     #[serde(default)]
+    #[cfg_attr(test, ts(as = "Option<bool>", optional))]
     pub reconnect_per_request: bool,
     /// Give up on this register type after this many silent requests in a row.
     #[serde(default = "default_max_consecutive_timeouts")]
+    #[cfg_attr(test, ts(as = "Option<u32>", optional))]
     pub max_consecutive_timeouts: u32,
     /// Refuse a sweep wider than this.
     #[serde(default = "default_max_registers")]
+    #[cfg_attr(test, ts(as = "Option<u32>", optional))]
     pub max_registers: u32,
     /// Hard ceiling on requests issued. This, not `max_registers`, is what
     /// actually bounds how long a scan can take.
     #[serde(default = "default_max_requests")]
+    #[cfg_attr(test, ts(as = "Option<u32>", optional))]
     pub max_requests: u32,
     /// Number of passes. Two or more samples the same registers repeatedly, so
     /// the Changes tool can separate live telemetry from static configuration.
     #[serde(default = "default_repeat")]
+    #[cfg_attr(test, ts(as = "Option<u32>", optional))]
     pub repeat: u32,
     /// Gap between passes when `repeat > 1`.
     #[serde(default = "default_repeat_delay_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub repeat_delay_ms: u64,
 }
 
 /// Configuration for unit ID scanning
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct UnitIdScanConfig {
     /// Server hostname or IP
     #[serde(default = "default_host")]
+    #[cfg_attr(test, ts(as = "Option<String>", optional))]
     pub host: String,
     /// Server port (default 502)
     #[serde(default = "default_port")]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub port: u16,
     /// First unit ID to scan (default 1)
     pub start_unit_id: u8,
@@ -281,28 +296,37 @@ pub struct UnitIdScanConfig {
     /// Delay between scan requests in milliseconds
     pub inter_request_delay_ms: u64,
     #[serde(default = "default_timeout_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub timeout_ms: u64,
     #[serde(default = "default_settle_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub connect_settle_ms: u64,
 }
 
 /// Configuration for the function-code probe.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FcProbeConfig {
     /// Server hostname or IP
     #[serde(default = "default_host")]
+    #[cfg_attr(test, ts(as = "Option<String>", optional))]
     pub host: String,
     #[serde(default = "default_port")]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub port: u16,
     /// Slave addresses to try. Defaults to the common suspects.
     #[serde(default = "default_probe_units")]
+    #[cfg_attr(test, ts(as = "Option<Vec<u8>>", optional))]
     pub unit_ids: Vec<u8>,
     /// Address read on each function code. 0 is almost always safe.
     #[serde(default)]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub test_register: u16,
     #[serde(default = "default_timeout_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub timeout_ms: u64,
     #[serde(default = "default_settle_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub connect_settle_ms: u64,
 }
 
@@ -328,6 +352,7 @@ fn default_unit_id() -> u8 {
 
 /// Progress update emitted during scanning
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ScanProgressPayload {
     /// Current position in the scan range
     pub current: u32,
@@ -343,6 +368,7 @@ pub struct ScanProgressPayload {
 
 /// A contiguous run of addresses that answered, or didn't.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RegisterBlock {
     pub start: u16,
     pub end: u16,
@@ -351,6 +377,7 @@ pub struct RegisterBlock {
 
 /// Completion summary returned when scan finishes
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ScanCompletePayload {
     /// Total responding items found
     pub found_count: u32,
@@ -384,6 +411,7 @@ pub struct ScanCompletePayload {
 /// What one function code did when asked.
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "verdict", rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum FcVerdict {
     /// Values came back — the device implements this function code.
     Values { values: Vec<u16> },
@@ -403,6 +431,7 @@ impl FcVerdict {
 
 /// One slave's answers across all four read function codes.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FcProbeEntry {
     pub unit_id: u8,
     /// FC03

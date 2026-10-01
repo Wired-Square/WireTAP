@@ -174,28 +174,28 @@ export default function SourceList({
 
   // Filter active sessions to show joinable ones (running, starting, paused, or stopped)
   const joinableSessions = activeMultiSourceSessions.filter(
-    (s) => s.state === "running" || s.state === "starting" || s.state === "paused" || s.state === "stopped"
+    (s) => s.state.type === "Running" || s.state.type === "Starting" || s.state.type === "Paused" || s.state.type === "Stopped"
   );
 
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
-    const isMultiSource = session.sourceType === "realtime";
-    const isCapture = session.sourceType === "capture";
+    const isMultiSource = session.source_type === "realtime";
+    const isCapture = session.source_type === "capture";
     // Always use session ID as the primary display name
-    const displayName = session.sessionId;
-    const subtitle = `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`;
+    const displayName = session.session_id;
+    const subtitle = `${session.subscriber_count} subscriber${session.subscriber_count !== 1 ? "s" : ""}`;
 
     if (isMultiSource) {
       // Multi-source session: show sources with bus mappings
-      const sourceDetails = session.brokerConfigs
+      const sourceDetails = session.broker_configs
         ?.map((c) => {
-          const name = c.displayName || c.profileId;
-          const enabledMappings = c.busMappings.filter((m) => m.enabled);
+          const name = c.display_name || c.profile_id;
+          const enabledMappings = c.bus_mappings.filter((m) => m.enabled);
           if (enabledMappings.length === 0) {
             return name;
           }
           const mappingStr = enabledMappings
-            .map((m) => `${m.deviceBus}→${m.outputBus}`)
+            .map((m) => `${m.device_bus}→${m.output_bus}`)
             .join(", ");
           return `${name} (${mappingStr})`;
         })
@@ -204,21 +204,21 @@ export default function SourceList({
       return { displayName, subtitle, sourceDetails, icon: GitMerge, kind: "realtime" as const };
     } else if (isCapture) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
-      const storageBackend = getCaptureStorageLabel(session.sourceType);
-      const captureId = session.captureId
-        ?? (session.sourceProfileIds ?? [])[0];
+      const storageBackend = getCaptureStorageLabel(session.source_type);
+      const captureId = session.capture_id
+        ?? session.source_profile_ids[0];
       const captureName = captureId ? captureNames?.get(captureId) : undefined;
       const profileName = captureName || storageBackend;
       return { displayName, subtitle, sourceDetails: `${profileName} (${storageBackend})`, icon: Database, kind: "capture" as const };
     } else {
       // Single-source session (e.g., a WireTAP backend)
       // Look up profile via sourceProfileIds (session IDs like t_XXXXX differ from profile IDs)
-      const sourceProfileIds = session.sourceProfileIds ?? [];
+      const sourceProfileIds = session.source_profile_ids;
       const profile = sourceProfileIds.length > 0
         ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
-        : getProfileForSession(session.sessionId);
-      const profileName = profile?.name || session.sourceType;
-      const deviceKind = profile?.kind || session.sourceType;
+        : getProfileForSession(session.session_id);
+      const profileName = profile?.name || session.source_type;
+      const deviceKind = profile?.kind || session.source_type;
       return { displayName, subtitle, sourceDetails: `${profileName} (${deviceKind})`, icon: Database, kind: "recorded" as const };
     }
   };
@@ -226,7 +226,7 @@ export default function SourceList({
   // Which tab does the current single-source selection belong to? Active-session
   // selections highlight in place above the tabs and never collapse.
   const isActiveSessionSelected =
-    !!checkedSourceId && joinableSessions.some((s) => s.sessionId === checkedSourceId);
+    !!checkedSourceId && joinableSessions.some((s) => s.session_id === checkedSourceId);
   const selectionTab: SourceTab | null = isCsvSelected
     ? "captures"
     : checkedProfile
@@ -417,43 +417,43 @@ export default function SourceList({
     <div className="border-b border-default">
       <Listbox>
         {joinableSessions.map((session) => {
-          const isSelected = checkedSourceId === session.sessionId;
+          const isSelected = checkedSourceId === session.session_id;
           const info = getSessionDisplayInfo(session);
           const IconComponent = info.icon;
           const look = sourceKindColours[info.kind];
 
           return (
             <Option
-              key={session.sessionId}
+              key={session.session_id}
               selected={isSelected}
               tone={look.tone}
               mark="radio"
-              onClick={() => onSelectMultiSourceSession?.(session.sessionId)}
+              onClick={() => onSelectMultiSourceSession?.(session.session_id)}
             >
               <IconComponent className={`${iconMd} flex-shrink-0 ${look.text}`} />
               <div className="flex-1 min-w-0">
                 <div className={`${textMedium} truncate flex items-center gap-2`}>
                   <span>{info.displayName}</span>
-                  {session.state !== "stopped" && session.sourceType !== "capture" && (
+                  {session.state.type !== "Stopped" && session.source_type !== "capture" && (
                     <Radio className={`${iconXs} text-success animate-pulse`} />
                   )}
                 </div>
                 <div className={`${caption} flex items-center gap-2`}>
-                  {session.state === "stopped" ? (
+                  {session.state.type === "Stopped" ? (
                     <Badge tone="warning" size="sm">{t("ioSourcePicker.sources.stopped")}</Badge>
-                  ) : session.state === "paused" && session.sourceType === "capture" ? (
+                  ) : session.state.type === "Paused" && session.source_type === "capture" ? (
                     <Badge tone="primary" size="sm">{t("ioSourcePicker.sources.paused")}</Badge>
-                  ) : session.sourceType === "capture" ? (
+                  ) : session.source_type === "capture" ? (
                     <Badge tone="primary" size="sm">{t("ioSourcePicker.sources.playing")}</Badge>
                   ) : (
                     <Badge tone="success" size="sm">{t("ioSourcePicker.sources.live")}</Badge>
                   )}
                   <span>{info.subtitle}</span>
-                  {session.captureId && (
+                  {session.capture_id && (
                     <>
                       <span className="text-muted">·</span>
                       <span className="text-cyan">
-                        {t("ioSourcePicker.sources.framesCount", { count: session.captureFrameCount?.toLocaleString() ?? "?" })}
+                        {t("ioSourcePicker.sources.framesCount", { count: session.capture_frame_count?.toLocaleString() ?? "?" })}
                       </span>
                     </>
                   )}
@@ -578,21 +578,21 @@ function SourceButton({
         <div className={`text-xs ${isDisabled ? "text-muted" : "text-muted"}`}>
           {isDisabled && disabledReason ? (
             <span>{profile.kind} · <span className="text-muted">{disabledReason}</span></span>
-          ) : usageInfo && usageInfo.sessionCount > 0 ? (
+          ) : usageInfo && usageInfo.session_count > 0 ? (
             <span className="flex items-center gap-1.5">
               <span>{profile.kind}</span>
-              {usageInfo.configLocked && (
+              {usageInfo.config_locked && (
                 <span title={t("ioSourcePicker.sources.configLocked")}>
                   <Lock className={`${iconXs} text-amber`} />
                 </span>
               )}
-              {usageInfo.sessionIds.slice(0, 2).map((sid) => (
+              {usageInfo.session_ids.slice(0, 2).map((sid) => (
                 <Badge key={sid} tone={isRealtime ? "purple" : "success"} size="sm">
                   {sid}
                 </Badge>
               ))}
-              {usageInfo.sessionCount > 2 && (
-                <span className="text-muted">+{usageInfo.sessionCount - 2}</span>
+              {usageInfo.session_count > 2 && (
+                <span className="text-muted">+{usageInfo.session_count - 2}</span>
               )}
             </span>
           ) : (

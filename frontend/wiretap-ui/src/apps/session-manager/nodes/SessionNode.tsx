@@ -4,7 +4,7 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Handle, Position } from "@xyflow/react";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
-import type { ActiveSessionInfo } from "../../../api/io";
+import { getStateType, type ActiveSessionInfo } from "../../../api/io";
 import { iconSm, iconXs } from "../../../styles/spacing";
 import { textDataCyan, textDataDisabled, textMuted } from "../../../styles/colourTokens";
 
@@ -42,10 +42,10 @@ function SessionNode({ data, selected }: SessionNodeProps) {
   const subscriberIds = connectedSubscriberIds ?? [];
   const outputCount = subscriberIds.length;
 
-  const isRunning = session.state === "running";
-  const isStopped = session.state === "stopped";
-  const isPaused = session.state === "paused";
-  const isError = session.state === "error";
+  const isRunning = session.state.type === "Running";
+  const isStopped = session.state.type === "Stopped";
+  const isPaused = session.state.type === "Paused";
+  const isError = session.state.type === "Error";
 
   // Determine colours based on state
   const borderColour = selected
@@ -88,7 +88,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? t("node.session.states.paused")
     : isError
     ? t("node.session.states.error")
-    : session.state;
+    : getStateType(session.state);
 
   const totalOutputHandles = outputCount + 1; // connected + one empty slot
 
@@ -174,15 +174,15 @@ function SessionNode({ data, selected }: SessionNodeProps) {
             <div className="flex items-center gap-1">
               <Users className={iconXs} />
               <span>
-                {t("node.session.appsCount", { count: session.subscriberCount })}
+                {t("node.session.appsCount", { count: session.subscriber_count })}
               </span>
             </div>
-            {session.captureFrameCount !== null && session.captureFrameCount > 0 && (
+            {session.capture_frame_count !== null && session.capture_frame_count > 0 && (
               <div>
-                {t("node.session.framesBuffered", { count: session.captureFrameCount })}
+                {t("node.session.framesBuffered", { count: session.capture_frame_count })}
               </div>
             )}
-            <div className="text-2xs opacity-70">{session.sourceType === "capture" ? "sqlite" : session.sourceType}</div>
+            <div className="text-2xs opacity-70">{session.source_type === "capture" ? "sqlite" : session.source_type}</div>
           </div>
         </div>
       </div>

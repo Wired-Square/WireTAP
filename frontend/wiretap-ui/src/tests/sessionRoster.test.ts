@@ -16,19 +16,19 @@ const caps = {
 // stricter than we need here, and reconcileKnownSessions only reads a subset.
 const info = (sessionId: string, profileId = "io_x") =>
   ({
-    sessionId,
-    sourceType: "framelink",
-    state: "running",
+    session_id: sessionId,
+    source_type: "framelink",
+    state: { type: "Running" },
     capabilities: caps,
-    subscriberCount: 1,
+    subscriber_count: 1,
     subscribers: [],
-    brokerConfigs: [{ profileId, displayName: "Dev", busMappings: [] }],
-    sourceProfileIds: [profileId],
-    originProfileIds: [profileId],
-    captureId: null,
-    captureFrameCount: null,
-    isStreaming: true,
-    pausedSourceProfileIds: [],
+    broker_configs: [{ profile_id: profileId, display_name: "Dev", bus_mappings: [] }],
+    source_profile_ids: [profileId],
+    origin_profile_ids: [profileId],
+    capture_id: null,
+    capture_frame_count: null,
+    is_streaming: true,
+    paused_source_profile_ids: [],
   }) as unknown as ActiveSessionInfo;
 
 describe("reconcileKnownSessions", () => {
@@ -83,7 +83,7 @@ describe("reconcileKnownSessions", () => {
   });
 
   const withCapture = (sessionId: string, id: string, kind: "frames" | "bytes") =>
-    ({ ...info(sessionId), captureId: id, captureKind: kind }) as ActiveSessionInfo;
+    ({ ...info(sessionId), capture_id: id, capture_kind: kind }) as ActiveSessionInfo;
 
   // The roster used to report an id with no kind, so a raw serial session was adopted
   // as `kind: null` and read as frames. Kind now travels with the id.
@@ -106,7 +106,7 @@ describe("reconcileKnownSessions", () => {
   // poll switch keyed off the session-id prefix instead; `pausedSourceProfileIds`
   // is new, and replaces the switch's optimistic local copy.
   it("carries the source type and paused sources onto an adopted entry", () => {
-    const paused = { ...info("m_scan1"), pausedSourceProfileIds: ["io_x"] } as ActiveSessionInfo;
+    const paused = { ...info("m_scan1"), paused_source_profile_ids: ["io_x"] } as ActiveSessionInfo;
     const next = reconcileKnownSessions({}, [paused]);
     expect(next.m_scan1.sourceType).toBe("framelink");
     expect(next.m_scan1.pausedSourceProfileIds).toEqual(["io_x"]);
@@ -114,7 +114,7 @@ describe("reconcileKnownSessions", () => {
 
   it("rebuilds an entry when only the paused sources changed", () => {
     const owned = ownedSession({ ioState: "running", subscriberCount: 1, capabilities: caps });
-    const paused = { ...info("f_mcp1"), pausedSourceProfileIds: ["io_x"] } as ActiveSessionInfo;
+    const paused = { ...info("f_mcp1"), paused_source_profile_ids: ["io_x"] } as ActiveSessionInfo;
     const next = reconcileKnownSessions({ f_mcp1: owned }, [paused]);
     expect(next.f_mcp1).not.toBe(owned);
     expect(next.f_mcp1.pausedSourceProfileIds).toEqual(["io_x"]);

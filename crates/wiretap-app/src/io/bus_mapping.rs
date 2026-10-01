@@ -14,6 +14,7 @@ use crate::io::{FrameMessage, InterfaceTraits, Protocol};
 
 /// Configuration for mapping device buses to output buses
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BusMapping {
     /// Bus number as reported by the device (0-4)
     pub device_bus: u8,

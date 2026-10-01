@@ -5,110 +5,84 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ProtocolFrames } from "../utils/frameKey";
-import type { CaptureKind } from "./capture";
 import type { ModbusPollGroup } from "./catalog";
 import type { SerialFrameConfig } from "../utils/frameExport";
 import type { ModbusFramingSettings } from "../components/FramingOptionsPanel";
 
-// ============================================================================
-// Interface Traits
-// ============================================================================
+import type { ActiveSessionInfo } from "../generated/ActiveSessionInfo";
+import type { AppInstanceInfo } from "../generated/AppInstanceInfo";
+import type { BusMapping } from "../generated/BusMapping";
+import type { BytesTailResponse } from "../generated/BytesTailResponse";
+import type { CanTransmitFrame } from "../generated/CanTransmitFrame";
+import type { DeviceInfoPayload } from "../generated/DeviceInfoPayload";
+import type { DeviceProbeResult } from "../generated/DeviceProbeResult";
+import type { FcProbeConfig } from "../generated/FcProbeConfig";
+import type { FcProbeEntry } from "../generated/FcProbeEntry";
+import type { FcVerdict } from "../generated/FcVerdict";
+import type { GvretDeviceInfo } from "../generated/GvretDeviceInfo";
+import type { InterfaceTraits } from "../generated/InterfaceTraits";
+import type { IOCapabilities } from "../generated/IOCapabilities";
+import type { IOState } from "../generated/IOState";
+import type { ModbusRange } from "../generated/ModbusRange";
+import type { ModbusRangeSpec } from "../generated/ModbusRangeSpec";
+import type { ModbusRegisterType } from "../generated/ModbusRegisterType";
+import type { ModbusScanConfig } from "../generated/ModbusScanConfig";
+import type { MultiSourceInput } from "../generated/MultiSourceInput";
+import type { PlaybackPosition } from "../generated/PlaybackPosition";
+import type { ProfileUsageInfo } from "../generated/ProfileUsageInfo";
+import type { Protocol } from "../generated/Protocol";
+import type { RegisterSubscriberResult } from "../generated/RegisterSubscriberResult";
+import type { ReinitializeResult } from "../generated/ReinitializeResult";
+import type { ScanCompletePayload } from "../generated/ScanCompletePayload";
+import type { ScanJob } from "../generated/ScanJob";
+import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
+import type { SerialOverrides } from "../generated/SerialOverrides";
+import type { SourceInfo } from "../generated/SourceInfo";
+import type { StepResult } from "../generated/StepResult";
+import type { StreamEndedInfo } from "../generated/StreamEndedInfo";
+import type { SubscriberInfo } from "../generated/SubscriberInfo";
+import type { TemporalMode } from "../generated/TemporalMode";
+import type { TransmitResult } from "../generated/TransmitResult";
+import type { UnitIdScanConfig } from "../generated/UnitIdScanConfig";
+import type { VirtualBusState } from "../generated/VirtualBusState";
 
-/**
- * Temporal mode of an interface/session.
- * - "realtime": Live streaming from hardware (GVRET, slcan, gs_usb, SocketCAN, MQTT)
- * - "recorded": Recorded playback (WireTAP backend, CSV)
- * - "capture": Capture replay from previously captured data
- */
-export type TemporalMode = "realtime" | "recorded" | "capture";
-
-/**
- * Protocol family for frame-based communication.
- * CAN and CAN-FD are compatible (can coexist in a session).
- * Other protocols are incompatible with each other.
- */
-export type Protocol = "can" | "canfd" | "modbus" | "modbus_rtu" | "serial";
-
-/**
- * Combined interface traits for formal session/interface characterization.
- */
-export interface InterfaceTraits {
-  /** Temporal mode of the interface */
-  temporal_mode: TemporalMode;
-  /** Protocols supported by the interface */
-  protocols: Protocol[];
-  /** Whether the interface can transmit frames (CAN, Modbus, framed serial) */
-  tx_frames: boolean;
-  /** Whether the interface can transmit raw bytes (serial) */
-  tx_bytes: boolean;
-  /** Whether this source can be combined with others in a multi-source session */
-  multi_source: boolean;
-}
-
-/**
- * Declares the data streams a session produces.
- * Used by the frontend to decide which event listeners and views to set up.
- */
-export interface SessionDataStreams {
-  /** Whether this session emits framed messages (frame-message events) */
-  rx_frames: boolean;
-  /** Whether this session emits raw byte streams (serial-raw-bytes events) */
-  rx_bytes: boolean;
-}
-
-/** A single raw byte with timestamp, as emitted by serial/byte-stream sessions */
-export interface RawByteEntry {
-  byte: number;
-  timestamp_us: number;
-  bus?: number;
-}
-
-// ============================================================================
-// IO Capabilities
-// ============================================================================
-
-/**
- * IO capabilities - what an IO device type supports.
- */
-export interface IOCapabilities {
-  /** Supports pause/resume (WireTAP backend: true, GVRET: false) */
-  can_pause: boolean;
-  /** Supports time range filtering (WireTAP backend: true, GVRET: false) */
-  supports_time_range: boolean;
-  /** Supports speed control (WireTAP backend: true, GVRET: false) */
-  supports_speed_control: boolean;
-  /** Supports seeking to a specific timestamp (CaptureSource: true, others: false) */
-  supports_seek: boolean;
-  /** Supports reverse playback (CaptureSource: true, others: false) */
-  supports_reverse?: boolean;
-  /** Supports extended (29-bit) CAN IDs */
-  supports_extended_id: boolean;
-  /** Supports Remote Transmission Request frames */
-  supports_rtr: boolean;
-  /** Available bus numbers (empty = single bus) */
-  available_buses: number[];
-  /** Interface traits (temporal mode, protocols, transmit capability) */
-  traits: InterfaceTraits;
-  /** Declares which data streams this session produces */
-  data_streams: SessionDataStreams;
-  /**
-   * Whether the session's transport is a serial link — a byte stream the user
-   * can look at and frame themselves. Not the same question as
-   * `data_streams.rx_bytes`, which says whether raw bytes are on the wire right
-   * now: a framed serial link is a serial link with no raw bytes.
-   */
-  serial_link?: boolean;
-}
-
-/**
- * IO session state.
- */
-export type IOState =
-  | { type: "Stopped" }
-  | { type: "Starting" }
-  | { type: "Running" }
-  | { type: "Paused" }
-  | { type: "Error"; message: string };
+export type {
+  ActiveSessionInfo,
+  AppInstanceInfo,
+  BusMapping,
+  BytesTailResponse,
+  CanTransmitFrame,
+  DeviceInfoPayload,
+  DeviceProbeResult,
+  FcProbeConfig,
+  FcProbeEntry,
+  FcVerdict,
+  GvretDeviceInfo,
+  InterfaceTraits,
+  IOCapabilities,
+  IOState,
+  ModbusRange,
+  ModbusRangeSpec,
+  ModbusRegisterType,
+  ModbusScanConfig,
+  MultiSourceInput,
+  PlaybackPosition,
+  ProfileUsageInfo,
+  Protocol,
+  RegisterSubscriberResult,
+  ReinitializeResult,
+  ScanCompletePayload,
+  ScanJob,
+  ScanProgressPayload,
+  SourceInfo,
+  StepResult,
+  StreamEndedInfo,
+  SubscriberInfo,
+  TemporalMode,
+  TransmitResult,
+  UnitIdScanConfig,
+  VirtualBusState,
+};
 
 /**
  * Simple IO state string for easy comparisons.
@@ -226,11 +200,7 @@ export interface CreateIOSessionOptions {
   modbusPollsJson?: string;
 }
 
-/**
- * Create a new IO session.
- * Returns the capabilities of the created IO device.
- */
-/** The serial settings a source can carry, mirroring Rust's `SerialOverrides`. */
+/** The serial settings an options object carries, camelCase on the way to Rust's `SerialOverrides`. */
 interface SerialSettings {
   framingEncoding?: string;
   delimiter?: number[];
@@ -252,11 +222,11 @@ interface SerialSettings {
 
 /**
  * Rust's `SerialOverrides`, from any of the option objects that carry these
- * fields. Written once because the three send sites had already drifted —
- * `createMultiSourceSession` was omitting `min_frame_length` — and a silently
- * dropped serial setting is the bug this whole area exists to stop.
+ * fields. Written once because the send sites had already drifted — one was
+ * omitting `min_frame_length` — and a silently dropped serial setting is the
+ * bug this whole area exists to stop.
  */
-function serialPayload(source: SerialSettings): Record<string, unknown> {
+export function serialPayload(source: SerialSettings): SerialOverrides {
   return {
     framing_encoding: source.framingEncoding,
     delimiter: source.delimiter,
@@ -277,6 +247,10 @@ function serialPayload(source: SerialSettings): Record<string, unknown> {
   };
 }
 
+/**
+ * Create a new IO session.
+ * Returns the capabilities of the created IO device.
+ */
 export async function createIOSession(
   options: CreateIOSessionOptions
 ): Promise<IOCapabilities> {
@@ -443,13 +417,6 @@ export async function setVirtualTrafficEnabled(
   return invoke("set_virtual_traffic_enabled", { session_id: sessionId, enabled });
 }
 
-/** Per-bus signal generator state returned from the backend */
-export interface VirtualBusState {
-  bus: number;
-  enabled: boolean;
-  frame_rate_hz: number;
-}
-
 /**
  * Enable or disable signal generator for a specific bus on a virtual device session.
  */
@@ -601,28 +568,6 @@ export async function updateReaderDirection(
   reverse: boolean
 ): Promise<void> {
   return invoke("update_reader_direction", { session_id: sessionId, reverse });
-}
-
-/**
- * Result of a step operation in the capture.
- */
-export interface StepResult {
-  /** The new frame index after stepping */
-  frame_index: number;
-  /** The timestamp of the new frame in microseconds */
-  timestamp_us: number;
-}
-
-/**
- * Playback position - emitted with playback-time events during capture streaming.
- */
-export interface PlaybackPosition {
-  /** Current timestamp in microseconds */
-  timestamp_us: number;
-  /** Current frame index (0-based) */
-  frame_index: number;
-  /** Total frame count in capture (optional, for recorded sources) */
-  frame_count?: number;
 }
 
 /**
@@ -789,38 +734,6 @@ export async function resumeSessionToLive(
 // ============================================================================
 
 /**
- * CAN frame for transmission.
- */
-export interface CanTransmitFrame {
-  /** CAN frame ID (11-bit standard or 29-bit extended) */
-  frame_id: number;
-  /** Frame data (up to 8 bytes for classic CAN, up to 64 for CAN FD) */
-  data: number[];
-  /** Bus number (0 for single-bus adapters, 0-4 for multi-bus like GVRET) */
-  bus?: number;
-  /** Extended (29-bit) frame ID */
-  is_extended?: boolean;
-  /** CAN FD frame */
-  is_fd?: boolean;
-  /** Bit Rate Switch (CAN FD only) */
-  is_brs?: boolean;
-  /** Remote Transmission Request */
-  is_rtr?: boolean;
-}
-
-/**
- * Result of a transmit operation.
- */
-export interface TransmitResult {
-  /** Whether the transmission was successful */
-  success: boolean;
-  /** Timestamp when the frame was sent (microseconds since UNIX epoch) */
-  timestamp_us: number;
-  /** Error message if transmission failed */
-  error?: string;
-}
-
-/**
  * Transmit a CAN frame through a session.
  * The session must be running and support transmission (can_transmit capability).
  * @param sessionId The session ID
@@ -836,40 +749,6 @@ export async function sessionTransmitFrame(
 // ============================================================================
 // Listener Registration API
 // ============================================================================
-
-/**
- * Info about a registered subscriber.
- */
-export interface SubscriberInfo {
-  /** Unique instance ID for this subscriber (e.g., "discovery_1", "decoder_2") */
-  subscriber_id: string;
-  /** Human-readable app name (e.g., "discovery", "decoder") */
-  app_name: string;
-  /** Seconds since registration */
-  registered_seconds_ago: number;
-  /** Whether this subscriber is actively receiving frames */
-  is_active: boolean;
-}
-
-/**
- * Result of registering a subscriber.
- */
-export interface RegisterSubscriberResult {
-  /** Session capabilities */
-  capabilities: IOCapabilities;
-  /** Current session state */
-  state: IOState;
-  /** Active capture ID (if any) */
-  capture_id: string | null;
-  /** Capture kind ("frames" or "bytes") */
-  capture_kind: "frames" | "bytes" | null;
-  /** Total number of listeners */
-  subscriber_count: number;
-  /** Error that occurred before this subscriber registered (one-shot, cleared after return) */
-  startup_error: string | null;
-  /** Profiles the session was opened from (Rust-authoritative) */
-  origin_profile_ids: string[];
-}
 
 /**
  * Register a subscriber for a session.
@@ -956,15 +835,7 @@ export async function addSourceToSession(
   sessionId: string,
   source: MultiSourceInput
 ): Promise<IOCapabilities> {
-  return invoke("add_source_to_session_cmd", {
-    session_id: sessionId,
-    source: {
-      profile_id: source.profileId,
-      display_name: source.displayName,
-      bus_mappings: source.busMappings.map(encodeBusMapping),
-      ...serialPayload(source),
-    },
-  });
+  return invoke("add_source_to_session_cmd", { session_id: sessionId, source });
 }
 
 /**
@@ -1002,37 +873,8 @@ export async function updateSourceBusMappings(
   return invoke("update_source_bus_mappings_cmd", {
     session_id: sessionId,
     profile_id: profileId,
-    bus_mappings: busMappings.map(encodeBusMapping),
+    bus_mappings: busMappings,
   });
-}
-
-/**
- * A BusMapping on the way to Rust.
- *
- * `traits` and `supportedProtocols` are deliberately not sent — Rust derives
- * both from `protocol`, so anything we sent would be discarded, and sending a
- * stale blob only invites the two to disagree.
- */
-export function encodeBusMapping(m: BusMapping): RawBusMapping {
-  return {
-    device_bus: m.deviceBus,
-    enabled: m.enabled,
-    output_bus: m.outputBus,
-    interface_id: m.interfaceId,
-    protocol: m.protocol,
-  };
-}
-
-/**
- * Result of attempting a safe reinitialize.
- */
-export interface ReinitializeResult {
-  /** Whether the reinitialize was successful */
-  success: boolean;
-  /** Reason for failure (if success is false) */
-  reason?: string;
-  /** List of other listeners preventing reinitialize (if any) */
-  other_subscribers: string[];
 }
 
 /**
@@ -1081,42 +923,6 @@ export async function setSessionSubscriberActive(
 // ============================================================================
 
 /**
- * Information about a GVRET device, obtained by probing.
- */
-export interface GvretDeviceInfo {
-  /** Number of CAN buses available on this device (1-5) */
-  bus_count: number;
-}
-
-/**
- * Configuration for mapping device buses to output buses.
- * Used to remap or disable specific buses when capturing.
- */
-export interface BusMapping {
-  /** Bus number as reported by the device (0-4) */
-  deviceBus: number;
-  /** Whether to capture frames from this bus */
-  enabled: boolean;
-  /** Bus number to use in emitted frames (0-255) */
-  outputBus: number;
-  /** Human-readable interface identifier (e.g., "can0", "serial1") */
-  interfaceId?: string;
-  /**
-   * The protocol this bus carries. The one field of the three below that is an
-   * *input* — set it from the picker's dropdown and Rust derives the rest.
-   */
-  protocol?: Protocol;
-  /** What this bus may be set to. Rust's answer; never sent back. */
-  supportedProtocols?: Protocol[];
-  /**
-   * Traits for this specific interface. Read-only here: Rust re-derives them
-   * from `protocol` on every session create and bus-mapping update, so sending
-   * a value has no effect and a stale one is never believed.
-   */
-  traits?: InterfaceTraits;
-}
-
-/**
  * Probe a GVRET device to discover its capabilities.
  * This connects to the device, queries it, and returns device information.
  * The connection is closed after probing.
@@ -1125,29 +931,6 @@ export interface BusMapping {
  */
 export async function probeGvretDevice(profileId: string): Promise<GvretDeviceInfo> {
   return invoke("probe_gvret_device", { profile_id: profileId });
-}
-
-/**
- * Result of probing any real-time device.
- * Provides a unified structure for all device types.
- */
-export interface DeviceProbeResult {
-  /** Whether the probe was successful (device is online and responding) */
-  success: boolean;
-  /** Source type (e.g., "gvret", "slcan", "gs_usb", "socketcan") */
-  sourceType: string;
-  /** Whether this is a multi-bus device (GVRET can have multiple CAN buses) */
-  isMultiBus: boolean;
-  /** Number of buses available (1 for single-bus devices, 1-5 for GVRET) */
-  busCount: number;
-  /** Primary info line (firmware version, device name, etc.) */
-  primaryInfo: string | null;
-  /** Secondary info line (hardware version, channel count, etc.) */
-  secondaryInfo: string | null;
-  /** Whether device supports CAN FD (gs_usb devices only, null for others) */
-  supports_fd: boolean | null;
-  /** Error message if probe failed */
-  error: string | null;
 }
 
 /**
@@ -1167,50 +950,7 @@ export interface DeviceProbeResult {
  * @returns Unified device probe result
  */
 export async function probeDevice(profileId: string): Promise<DeviceProbeResult> {
-  const raw = await invoke<{
-    success: boolean;
-    source_type: string;
-    is_multi_bus: boolean;
-    bus_count: number;
-    primary_info: string | null;
-    secondary_info: string | null;
-    supports_fd: boolean | null;
-    error: string | null;
-  }>("probe_device", { profile_id: profileId });
-
-  return {
-    success: raw.success,
-    sourceType: raw.source_type,
-    isMultiBus: raw.is_multi_bus,
-    busCount: raw.bus_count,
-    primaryInfo: raw.primary_info,
-    secondaryInfo: raw.secondary_info,
-    supports_fd: raw.supports_fd,
-    error: raw.error,
-  };
-}
-
-/** A BusMapping as Rust sends it. */
-interface RawBusMapping {
-  device_bus: number;
-  enabled: boolean;
-  output_bus: number;
-  interface_id?: string;
-  protocol?: Protocol;
-  supported_protocols?: Protocol[];
-  traits?: InterfaceTraits;
-}
-
-function decodeBusMapping(m: RawBusMapping): BusMapping {
-  return {
-    deviceBus: m.device_bus,
-    enabled: m.enabled,
-    outputBus: m.output_bus,
-    interfaceId: m.interface_id,
-    protocol: m.protocol,
-    supportedProtocols: m.supported_protocols,
-    traits: m.traits,
-  };
+  return invoke("probe_device", { profile_id: profileId });
 }
 
 /**
@@ -1228,59 +968,19 @@ export function probedBusMappings(
   supportedProtocols: Protocol[] = []
 ): BusMapping[] {
   return Array.from({ length: busCount }, (_, i) => ({
-    deviceBus: i,
+    device_bus: i,
     enabled: true,
-    outputBus: outputBusOffset + i,
-    interfaceId: `can${i}`,
+    output_bus: outputBusOffset + i,
+    interface_id: `can${i}`,
     protocol: supportedProtocols[0] ?? "can",
-    supportedProtocols,
+    supported_protocols: supportedProtocols,
+    traits: null,
   }));
 }
 
 // ============================================================================
 // Multi-Source Session API
 // ============================================================================
-
-/**
- * Configuration for a single source in a multi-source session.
- * Used when combining frames from multiple devices.
- */
-export interface MultiSourceInput {
-  /** Profile ID for this source */
-  profileId: string;
-  /** Display name for this source (optional, defaults to profile name) */
-  displayName?: string;
-  /** Bus mappings for this source (device bus -> output bus) */
-  busMappings: BusMapping[];
-  /** Framing encoding for serial sources (overrides profile settings) */
-  framingEncoding?: string;
-  /** Delimiter bytes for delimiter-based framing */
-  delimiter?: number[];
-  /** Maximum frame length for delimiter-based framing */
-  maxFrameLength?: number;
-  /** Minimum frame length - frames shorter than this are discarded */
-  minFrameLength?: number;
-  /** Whether to emit raw bytes in addition to framed data */
-  emitRawBytes?: boolean;
-  /** Modbus RTU framing settings, when framingEncoding is "modbus_rtu" */
-  modbusValidateCrc?: boolean;
-  modbusDeviceAddress?: number;
-  modbusVendorFunctions?: number[];
-  modbusAllowBroadcast?: boolean;
-  modbusAnyFunction?: boolean;
-  /** Frame ID extraction: start byte position (0-indexed) */
-  frameIdStartByte?: number;
-  /** Frame ID extraction: number of bytes (1 or 2) */
-  frameIdBytes?: number;
-  /** Frame ID extraction: byte order (true = big endian) */
-  frameIdBigEndian?: boolean;
-  /** Source address extraction: start byte position (0-indexed) */
-  sourceAddressStartByte?: number;
-  /** Source address extraction: number of bytes (1 or 2) */
-  sourceAddressBytes?: number;
-  /** Source address extraction: byte order (true = big endian) */
-  sourceAddressBigEndian?: boolean;
-}
 
 /**
  * Options for creating a multi-source IO session.
@@ -1317,13 +1017,7 @@ export async function createMultiSourceSession(
 ): Promise<IOCapabilities> {
   return invoke("create_multi_source_session", {
     session_id: options.sessionId,
-    // Convert TypeScript camelCase to Rust snake_case for the sources
-    sources: options.sources.map((source) => ({
-      profile_id: source.profileId,
-      display_name: source.displayName,
-      bus_mappings: source.busMappings.map(encodeBusMapping),
-      ...serialPayload(source),
-    })),
+    sources: options.sources,
     subscriber_id: options.subscriberId,
     app_name: options.appName,
     modbus_polls: options.modbusPollsJson,
@@ -1331,98 +1025,11 @@ export async function createMultiSourceSession(
 }
 
 /**
- * Info about an active session (from backend)
- */
-export interface ActiveSessionInfo {
-  /** Session ID */
-  sessionId: string;
-  /** Source type (e.g., "gvret_tcp", "realtime") */
-  sourceType: string;
-  /** Current state */
-  state: IOStateType;
-  /** Session capabilities */
-  capabilities: IOCapabilities;
-  /** Number of listeners */
-  subscriberCount: number;
-  /** Individual subscriber details */
-  subscribers: SubscriberInfo[];
-  /** For broker sessions: the source configurations */
-  brokerConfigs: MultiSourceInput[] | null;
-  /** Profile IDs feeding this session */
-  sourceProfileIds: string[];
-  /** Profiles the session was opened from — the source's, even while it replays its capture */
-  originProfileIds: string[];
-  /** Capture ID owned by this session (if any) */
-  captureId: string | null;
-  /** Kind of the capture named by `captureId` — travels with the id so the two cannot desync */
-  captureKind: CaptureKind | null;
-  /** Frame count in the owned capture */
-  captureFrameCount: number | null;
-  /** Distinct (bus, frame_id) count in the owned capture (live streaming only) */
-  captureUniqueFrameCount: number | null;
-  /** Whether the session is actively streaming data */
-  isStreaming: boolean;
-  /** Source path of the catalogue attached for live decode (Rust-authoritative). */
-  catalogPath: string | null;
-  /** Profile IDs in this session whose polling is paused (Rust-authoritative). */
-  pausedSourceProfileIds: string[];
-}
-
-/**
  * List all active sessions.
  * Useful for discovering shareable sessions like multi-source.
  */
 export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
-  const raw: Array<{
-    session_id: string;
-    source_type: string;
-    state: IOState; // Rust sends { type: "Running" } etc, not simple string
-    capabilities: IOCapabilities;
-    subscriber_count: number;
-    subscribers: Array<{
-      subscriber_id: string;
-      app_name: string;
-      registered_seconds_ago: number;
-      is_active: boolean;
-    }>;
-    broker_configs: Array<{
-      profile_id: string;
-      display_name: string;
-      bus_mappings: RawBusMapping[];
-    }> | null;
-    source_profile_ids: string[];
-    origin_profile_ids: string[] | null;
-    capture_id: string | null;
-    capture_kind: CaptureKind | null;
-    capture_frame_count: number | null;
-    capture_unique_frame_count: number | null;
-    is_streaming: boolean;
-    catalog_path: string | null;
-    paused_source_profile_ids: string[] | null;
-  }> = await invoke("list_active_sessions");
-
-  return raw.map((s) => ({
-    sessionId: s.session_id,
-    sourceType: s.source_type,
-    state: getStateType(s.state), // Convert IOState to IOStateType
-    capabilities: s.capabilities,
-    subscriberCount: s.subscriber_count,
-    subscribers: s.subscribers ?? [],
-    brokerConfigs: s.broker_configs?.map((c) => ({
-      profileId: c.profile_id,
-      displayName: c.display_name,
-      busMappings: c.bus_mappings.map(decodeBusMapping),
-    })) ?? null,
-    sourceProfileIds: s.source_profile_ids ?? [],
-    originProfileIds: s.origin_profile_ids ?? [],
-    captureId: s.capture_id ?? null,
-    captureKind: s.capture_kind ?? null,
-    captureFrameCount: s.capture_frame_count ?? null,
-    captureUniqueFrameCount: s.capture_unique_frame_count ?? null,
-    isStreaming: s.is_streaming ?? false,
-    catalogPath: s.catalog_path ?? null,
-    pausedSourceProfileIds: s.paused_source_profile_ids ?? [],
-  }));
+  return invoke("list_active_sessions");
 }
 
 /**
@@ -1435,14 +1042,8 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
  * the bus list. See `sessions::profile_bus_mappings`.
  */
 export async function getProfileBusMappings(): Promise<Map<string, BusMapping[]>> {
-  const raw: Record<string, RawBusMapping[]> = await invoke("get_profile_bus_mappings");
-
-  return new Map(
-    Object.entries(raw).map(([profileId, mappings]) => [
-      profileId,
-      mappings.map(decodeBusMapping),
-    ]),
-  );
+  const raw: Record<string, BusMapping[]> = await invoke("get_profile_bus_mappings");
+  return new Map(Object.entries(raw));
 }
 
 /**
@@ -1460,34 +1061,12 @@ export async function getSupportedProtocols(): Promise<Map<string, Protocol[]>> 
 export function offsetBusMappings(mappings: BusMapping[], outputBusOffset: number): BusMapping[] {
   return outputBusOffset === 0
     ? mappings
-    : mappings.map((m, i) => ({ ...m, outputBus: outputBusOffset + i }));
+    : mappings.map((m, i) => ({ ...m, output_bus: outputBusOffset + i }));
 }
 
 // ============================================================================
 // Open-app registry (cross-window roster of session-aware app instances)
 // ============================================================================
-
-/**
- * A single open session-aware app instance, tracked globally by Rust across all
- * windows. `sessionId` is its current session attachment (null = open but not
- * watching a session).
- */
-export interface AppInstanceInfo {
-  /** Unique instance id == the session subscriber id (e.g. "main-1_decoder"). */
-  instanceId: string;
-  /** Cosmetic per-instance display id (e.g. "decoder_a3f9"). */
-  displayId: string;
-  /** Human-readable app name (e.g. "decoder"). */
-  appName: string;
-  /** Label of the window that owns this instance. */
-  windowLabel: string;
-  /** Current session attachment, or null when open but not watching. */
-  sessionId: string | null;
-  /** Seconds since this instance first registered. */
-  registeredSecondsAgo: number;
-  /** Whether actively receiving frames. */
-  isActive: boolean;
-}
 
 /** Register an open app instance (call on panel mount). */
 export async function registerOpenApp(
@@ -1511,25 +1090,7 @@ export async function unregisterOpenApp(instanceId: string): Promise<void> {
 
 /** List every open app instance across all windows. */
 export async function listOpenApps(): Promise<AppInstanceInfo[]> {
-  const raw: Array<{
-    instance_id: string;
-    display_id: string;
-    app_name: string;
-    window_label: string;
-    session_id: string | null;
-    registered_seconds_ago: number;
-    is_active: boolean;
-  }> = await invoke("list_open_apps");
-
-  return raw.map((a) => ({
-    instanceId: a.instance_id,
-    displayId: a.display_id,
-    appName: a.app_name,
-    windowLabel: a.window_label,
-    sessionId: a.session_id ?? null,
-    registeredSecondsAgo: a.registered_seconds_ago,
-    isActive: a.is_active,
-  }));
+  return invoke("list_open_apps");
 }
 
 /**
@@ -1550,40 +1111,9 @@ export async function generateSessionId(
 // Profile-to-Session Mapping API
 // ============================================================================
 
-/**
- * Info about which sessions are using a profile.
- */
-export interface ProfileUsageInfo {
-  /** Profile ID */
-  profileId: string;
-  /** Session IDs using this profile */
-  sessionIds: string[];
-  /** Number of sessions using this profile */
-  sessionCount: number;
-  /** Whether reconfiguration is locked (2+ sessions) */
-  configLocked: boolean;
-}
-
-/**
- * Get usage info for multiple profiles at once.
- * More efficient than calling getProfileSessions for each profile.
- */
-export async function getProfilesUsage(
-  profileIds: string[]
-): Promise<ProfileUsageInfo[]> {
-  const raw: Array<{
-    profile_id: string;
-    session_ids: string[];
-    session_count: number;
-    config_locked: boolean;
-  }> = await invoke("get_profiles_usage", { profile_ids: profileIds });
-
-  return raw.map((p) => ({
-    profileId: p.profile_id,
-    sessionIds: p.session_ids,
-    sessionCount: p.session_count,
-    configLocked: p.config_locked,
-  }));
+/** Which sessions are using each of these profiles, and whether that locks reconfiguration. */
+export async function getProfilesUsage(profileIds: string[]): Promise<ProfileUsageInfo[]> {
+  return invoke("get_profiles_usage", { profile_ids: profileIds });
 }
 
 // ============================================================================
@@ -1596,109 +1126,8 @@ export async function checkRecoveryOccurred(): Promise<boolean> {
 }
 
 // ============================================================================
-// Modbus Scanning
-// ============================================================================
-
-/** Register type for Modbus scanning. */
-export type ModbusRegisterType = 'holding' | 'input' | 'coil' | 'discrete';
-
-/**
- * Configuration for register range scanning.
- *
- * Everything below `inter_request_delay_ms` is optional and defaulted in Rust —
- * see `modbusScanDefaults.ts` for the values and the reasoning behind them.
- */
-export interface ModbusScanConfig {
-  /**
-   * Address fields are optional: the Discovery tools name a session via
-   * `targetSessionId` and let Rust resolve the device, so the two cannot drift.
-   * Supply them only when scanning a device you have no session for.
-   */
-  host?: string;
-  port?: number;
-  /** The slave to sweep. Always the caller's choice — Rust never overrides it. */
-  unit_id: number;
-  register_type: ModbusRegisterType;
-  start_register: number;
-  end_register: number;
-  chunk_size: number;
-  inter_request_delay_ms: number;
-
-  /** Per-request timeout; the only bound on a device that answers with silence. */
-  timeout_ms?: number;
-  /** Pause after connecting before the first request on that socket. */
-  connect_settle_ms?: number;
-  /** Open a fresh connection per request, for one-conversation-per-socket stacks. */
-  reconnect_per_request?: boolean;
-  /** Abandon this register type after this many silent requests in a row. */
-  max_consecutive_timeouts?: number;
-  /** Refuse a sweep wider than this many registers. */
-  max_registers?: number;
-  /** Hard ceiling on requests issued — what actually bounds the sweep's duration. */
-  max_requests?: number;
-  /** Passes over the range. 2+ lets the Changes tool separate live from static. */
-  repeat?: number;
-  /** Gap between passes. */
-  repeat_delay_ms?: number;
-}
-
-/** Configuration for unit ID scanning. */
-export interface UnitIdScanConfig {
-  /** Optional — see `ModbusScanConfig`. */
-  host?: string;
-  port?: number;
-  start_unit_id: number;
-  end_unit_id: number;
-  test_register: number;
-  register_type: ModbusRegisterType;
-  inter_request_delay_ms: number;
-  timeout_ms?: number;
-  connect_settle_ms?: number;
-}
-
-/** Progress update emitted during scanning. */
-export interface ScanProgressPayload {
-  current: number;
-  total: number;
-  found_count: number;
-  /** 1-based pass number, for a repeated scan. */
-  pass: number;
-  total_passes: number;
-}
-
-/** A contiguous run of addresses that answered, or didn't. */
-export interface RegisterBlock {
-  start: number;
-  end: number;
-  count: number;
-}
-
-/** Completion summary returned when scan finishes. */
-export interface ScanCompletePayload {
-  found_count: number;
-  total_scanned: number;
-  duration_ms: number;
-  requests: number;
-  /** Contiguous runs of responding addresses. */
-  blocks: RegisterBlock[];
-  /** Contiguous runs that did not respond. */
-  gaps: RegisterBlock[];
-  /** Diagnoses, e.g. a function code that never answered. */
-  notes: string[];
-  /** True when the sweep stopped early (cancelled or out of budget). */
-  truncated: boolean;
-  /** Unit-ID scans only. */
-  devices: DeviceInfoEntry[];
-}
-
-// ============================================================================
 // Scan sessions
 // ============================================================================
-
-/** Which sweep a scan session runs. */
-export type ScanJob =
-  | { kind: "registers"; config: ModbusScanConfig }
-  | { kind: "unit_ids"; config: UnitIdScanConfig };
 
 /**
  * Create a session that runs a Modbus discovery sweep. Needs neither an existing
@@ -1735,41 +1164,6 @@ export async function createModbusScanSession(
 // Function code probe
 // ============================================================================
 
-/** What one function code did when asked. */
-export type FcVerdict =
-  | { verdict: "values"; values: number[] }
-  | { verdict: "bits"; values: boolean[] }
-  | { verdict: "exception"; message: string }
-  | { verdict: "silent" };
-
-/** One slave's answers across all four read function codes. */
-export interface FcProbeEntry {
-  unit_id: number;
-  /** FC03 */
-  holding: FcVerdict;
-  /** FC04 */
-  input: FcVerdict;
-  /** FC01 */
-  coil: FcVerdict;
-  /** FC02 */
-  discrete: FcVerdict;
-  responded: boolean;
-  /** The register types worth sweeping on this unit. */
-  supported_types: ModbusRegisterType[];
-}
-
-export interface FcProbeConfig {
-  /** Optional — see `ModbusScanConfig`. */
-  host?: string;
-  port?: number;
-  /** Slave addresses to try. Defaults to [1, 0, 255, 2, 3] in Rust. */
-  unit_ids?: number[];
-  /** Address read on each function code (default 0). */
-  test_register?: number;
-  timeout_ms?: number;
-  connect_settle_ms?: number;
-}
-
 /**
  * Ask a device which read function codes it answers, before sweeping anything.
  *
@@ -1785,38 +1179,6 @@ export async function probeModbusFunctionCodes(config: FcProbeConfig): Promise<F
 // ============================================================================
 // Catalogue-free poll plans
 // ============================================================================
-
-/** How a poll response becomes frames (mirrors the backend `PollEmitMode`). */
-export type ModbusPollEmitMode = 'block' | 'per_register';
-
-/** One contiguous span of registers to poll. */
-export interface ModbusRange {
-  register_type: ModbusRegisterType;
-  /** Protocol-level start address (0-based). */
-  start: number;
-  /** Last address, inclusive. */
-  end: number;
-  /** Overrides the spec-level interval for this range. */
-  interval_ms?: number;
-  /** Overrides the spec-level slave address for this range. */
-  device_address?: number;
-}
-
-/**
- * A catalogue-free poll plan — the discovery answer to "I have no decoder for
- * this device". Every field but `ranges` has a backend default.
- */
-export interface ModbusRangeSpec {
-  ranges: ModbusRange[];
-  device_address?: number;
-  interval_ms?: number;
-  /** Registers per request; clamped to the protocol max for the type. */
-  block_size?: number;
-  /** Defaults to `per_register`, so per-register change analysis works. */
-  emit_mode?: ModbusPollEmitMode;
-  max_registers?: number;
-  max_groups?: number;
-}
 
 /**
  * Build Modbus poll groups from an address range instead of a catalogue. The
@@ -1840,21 +1202,11 @@ export async function getPlaybackPosition(
   return invoke("get_playback_position_cmd", { session_id: sessionId });
 }
 
-
 /** Fetch stream-ended info (survives session destruction via TTL cache). */
 export async function getStreamEndedInfo(
   sessionId: string
 ): Promise<StreamEndedInfo | null> {
   return invoke("get_stream_ended_info", { session_id: sessionId });
-}
-
-export interface StreamEndedInfo {
-  reason: string;
-  capture_available: boolean;
-  capture_id: string | null;
-  capture_kind: string | null;
-  count: number;
-  time_range: [number, number] | null;
 }
 
 /** Fetch the last session error (from post-session cache or startup errors). */
@@ -1869,12 +1221,6 @@ export async function getSessionSources(
   sessionId: string
 ): Promise<SourceInfo[]> {
   return invoke("get_session_sources", { session_id: sessionId });
-}
-
-export interface SourceInfo {
-  source_type: string;
-  address: string;
-  bus: number | null;
 }
 
 /** Fetch orphaned capture IDs from post-session cache. */
@@ -1895,13 +1241,6 @@ export interface ReplayState {
   pass: number;
 }
 
-export interface DeviceInfoEntry {
-  unit_id: number;
-  vendor: string | null;
-  product_code: string | null;
-  revision: string | null;
-}
-
 /** Fetch the most recent bytes from a capture (tail view). */
 export async function getCaptureBytesTail(
   captureId: string,
@@ -1911,9 +1250,4 @@ export async function getCaptureBytesTail(
     capture_id: captureId,
     tail_size: tailSize,
   });
-}
-
-export interface BytesTailResponse {
-  bytes: RawByteEntry[];
-  total_count: number;
 }

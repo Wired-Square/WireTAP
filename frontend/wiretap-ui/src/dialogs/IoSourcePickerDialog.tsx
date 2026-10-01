@@ -34,8 +34,6 @@ import {
   type BusMapping,
   type ActiveSessionInfo,
   type DeviceProbeResult,
-  type Protocol,
-  type TemporalMode,
   type ProfileUsageInfo,
   type FramingEncoding,
   type ModbusRangeSpec,
@@ -201,6 +199,19 @@ function declaredBusMappings(
       );
 }
 
+/** A capture's buses, one-to-one, as recorded classic CAN. */
+function captureBusMappings(buses: number[]): BusMapping[] {
+  return buses.map((bus) => ({
+    device_bus: bus,
+    enabled: true,
+    output_bus: bus,
+    interface_id: `can${bus}`,
+    protocol: "can",
+    supported_protocols: [],
+    traits: { temporal_mode: "recorded", protocols: ["can", "canfd"], tx_frames: false, tx_bytes: false, multi_source: false },
+  }));
+}
+
 export default function IoSourcePickerDialog({
   mode = "streaming",
   isOpen,
@@ -350,29 +361,16 @@ export default function IoSourcePickerDialog({
       // Use actual bus numbers from capture metadata (may be non-sequential)
       const capture = captures.find((b) => b.id === captureId);
       const busList = capture?.buses?.length ? capture.buses : [0]; // default to bus 0
-      const mappings: BusMapping[] = busList.map((bus) => ({
-        deviceBus: bus,
-        enabled: true,
-        outputBus: bus,
-        interfaceId: `can${bus}`,
-        traits: {
-          temporal_mode: "recorded" as TemporalMode,
-          protocols: ["can", "canfd"] as Protocol[],
-          tx_frames: false,
-          tx_bytes: false,
-          multi_source: false,
-        },
-      }));
-      setDeviceBusConfigMap((prev) => new Map(prev).set(captureId, mappings));
+      setDeviceBusConfigMap((prev) => new Map(prev).set(captureId, captureBusMappings(busList)));
     } catch (err) {
       console.error(`[IoSourcePickerDialog] Buffer probe failed for ${captureId}:`, err);
       setDeviceProbeResultMap((prev) => new Map(prev).set(captureId, {
         success: false,
-        sourceType: "capture",
-        isMultiBus: false,
-        busCount: 0,
-        primaryInfo: null,
-        secondaryInfo: null,
+        source_type: "capture",
+        is_multi_bus: false,
+        bus_count: 0,
+        primary_info: null,
+        secondary_info: null,
         supports_fd: null,
         error: String(err),
       }));
@@ -425,7 +423,7 @@ export default function IoSourcePickerDialog({
   // Is the checked reader an active multi-source session?
   const checkedMultiSourceSession = useMemo(() => {
     if (!checkedSourceId) return null;
-    return activeMultiSourceSessions.find((s) => s.sessionId === checkedSourceId) || null;
+    return activeMultiSourceSessions.find((s) => s.session_id === checkedSourceId) || null;
   }, [checkedSourceId, activeMultiSourceSessions]);
 
   // Is the checked selection an active session that can be joined?
@@ -444,7 +442,7 @@ export default function IoSourcePickerDialog({
     if (checkedSourceIds.length === 0) return null;
     // Find a session whose source profiles match our selection
     return activeMultiSourceSessions.find((session) => {
-      const sessionProfileIds = session.brokerConfigs?.map((c) => c.profileId) || [];
+      const sessionProfileIds = session.broker_configs?.map((c) => c.profile_id) || [];
       // Check if selected profiles are a subset of or match the session's profiles
       return checkedSourceIds.every((id) => sessionProfileIds.includes(id));
     }) || null;
@@ -481,20 +479,7 @@ export default function IoSourcePickerDialog({
               .then((result) => {
                 setDeviceProbeResultMap((prev) => new Map(prev).set(matchingCapture.id, result));
                 const busList = matchingCapture.buses.length > 0 ? matchingCapture.buses : [0];
-                const mappings: BusMapping[] = busList.map((bus) => ({
-                  deviceBus: bus,
-                  enabled: true,
-                  outputBus: bus,
-                  interfaceId: `can${bus}`,
-                  traits: {
-                    temporal_mode: "recorded" as TemporalMode,
-                    protocols: ["can", "canfd"] as Protocol[],
-                    tx_frames: false,
-                    tx_bytes: false,
-                    multi_source: false,
-                  },
-                }));
-                setDeviceBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, mappings));
+                setDeviceBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, captureBusMappings(busList)));
               })
               .catch(console.error);
           } else {
@@ -580,7 +565,7 @@ export default function IoSourcePickerDialog({
   useEffect(() => {
     if (!isOpen || tabUserPickedRef.current || hideSessions) return;
     if (activeMultiSourceSessions.length === 0) return;
-    const selectedIsSession = activeMultiSourceSessions.some((s) => s.sessionId === selectedId);
+    const selectedIsSession = activeMultiSourceSessions.some((s) => s.session_id === selectedId);
     if (selectedIsSession || !hasExplicitSelectionRef.current) {
       setActiveTab("sessions");
     }
@@ -718,7 +703,7 @@ export default function IoSourcePickerDialog({
         // - supports_time_range && !is_realtime: recorded sources like the WireTAP backend
         const joinableSessions = sessions.filter((s) =>
           s.capabilities.traits.multi_source === true ||
-          s.sourceType === "capture" ||
+          s.source_type === "capture" ||
           (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "recorded")
         );
         console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
@@ -730,7 +715,7 @@ export default function IoSourcePickerDialog({
           const usageList = await getProfilesUsage(profileIds);
           const usageMap = new Map<string, ProfileUsageInfo>();
           for (const usage of usageList) {
-            usageMap.set(usage.profileId, usage);
+            usageMap.set(usage.profile_id, usage);
           }
           setProfileUsage(usageMap);
         }
@@ -757,7 +742,7 @@ export default function IoSourcePickerDialog({
     if (hasUserExpandedRef.current) return;
 
     const captureSession = activeMultiSourceSessions.find(
-      (s) => s.sessionId === selectedId
+      (s) => s.session_id === selectedId
     );
     if (captureSession) {
       setCheckedReaderId(selectedId);
@@ -787,7 +772,7 @@ export default function IoSourcePickerDialog({
       if (!profile || !isRealtimeProfile(profile)) continue;
       offsets.set(id, next);
       // A profile that declares nothing still has a real bus count once probed.
-      next += profileBuses.get(id)?.length ?? deviceProbeResultMap.get(id)?.busCount ?? 1;
+      next += profileBuses.get(id)?.length ?? deviceProbeResultMap.get(id)?.bus_count ?? 1;
     }
     return offsets;
   }, [checkedSourceIds, readProfiles, profileBuses, deviceProbeResultMap]);
@@ -901,11 +886,11 @@ export default function IoSourcePickerDialog({
         probedProfilesRef.current.add(profileId);
         setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
           success: true,
-          sourceType: isMultiBus ? "multi" : "single",
-          isMultiBus,
-          busCount: profileBusMappings(profileId).length || 1,
-          primaryInfo: "Session active",
-          secondaryInfo: null,
+          source_type: isMultiBus ? "multi" : "single",
+          is_multi_bus: isMultiBus,
+          bus_count: profileBusMappings(profileId).length || 1,
+          primary_info: "Session active",
+          secondary_info: null,
           supports_fd: null,
           error: null,
         }));
@@ -924,8 +909,8 @@ export default function IoSourcePickerDialog({
       probeDevice(profileId)
         .then((result) => {
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, result));
-          if (result.isMultiBus) {
-            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, declaredBusMappings(profileId, outputBusOffset, profile?.kind, result.busCount)));
+          if (result.is_multi_bus) {
+            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, declaredBusMappings(profileId, outputBusOffset, profile?.kind, result.bus_count)));
           } else {
             setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
           }
@@ -934,11 +919,11 @@ export default function IoSourcePickerDialog({
           console.error(`[IoSourcePickerDialog] Probe failed for ${profileId}:`, err);
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
             success: false,
-            sourceType: isMultiBus ? "multi" : "unknown",
-            isMultiBus,
-            busCount: 0,
-            primaryInfo: null,
-            secondaryInfo: null,
+            source_type: isMultiBus ? "multi" : "unknown",
+            is_multi_bus: isMultiBus,
+            bus_count: 0,
+            primary_info: null,
+            secondary_info: null,
             supports_fd: null,
             error: String(err),
           }));
@@ -1041,8 +1026,8 @@ export default function IoSourcePickerDialog({
   const handleJoinClick = () => {
     if (onJoinSession && checkedSourceId) {
       // Check if this is a multi-source session and get source profile IDs
-      const multiSourceSession = activeMultiSourceSessions.find((s) => s.sessionId === checkedSourceId);
-      const sourceProfileIds = multiSourceSession?.brokerConfigs?.map((c) => c.profileId);
+      const multiSourceSession = activeMultiSourceSessions.find((s) => s.session_id === checkedSourceId);
+      const sourceProfileIds = multiSourceSession?.broker_configs?.map((c) => c.profile_id);
       onJoinSession(checkedSourceId, sourceProfileIds);
     }
     onClose();
@@ -1078,7 +1063,7 @@ export default function IoSourcePickerDialog({
     // Destroy the existing multi-source session first
     if (liveMultiSourceSession) {
       try {
-        await destroyReaderSession(liveMultiSourceSession.sessionId);
+        await destroyReaderSession(liveMultiSourceSession.session_id);
       } catch (e) {
         console.error("Failed to destroy existing multi-source session:", e);
         // Continue anyway - maybe it was already destroyed
@@ -1286,19 +1271,21 @@ export default function IoSourcePickerDialog({
     // Convert single-bus device overrides to BusMapping format. No traits here:
     // Rust derives them from `protocol` when the session is created, so anything
     // built client-side would be discarded.
-    for (const [profileId, outputBus] of singleBusOverrideMap.entries()) {
+    for (const [profileId, output_bus] of singleBusOverrideMap.entries()) {
       const profile = readProfiles.find(p => p.id === profileId);
       const protocol = busProtocol(profile);
 
       combinedBusMappings.set(profileId, [{
-        deviceBus: 0,
+        device_bus: 0,
         enabled: true,
-        outputBus,
+        output_bus,
         // `can0` whether or not the bus runs FD — every other producer of an
         // interface id spells it that way, and Session Manager carries this one
         // forward when a bus is re-wired.
-        interfaceId: protocol === "can" || protocol === "canfd" ? "can0" : `${protocol}0`,
+        interface_id: protocol === "can" || protocol === "canfd" ? "can0" : `${protocol}0`,
         protocol,
+        supported_protocols: [],
+        traits: null,
       }]);
     }
 
@@ -1575,7 +1562,7 @@ export default function IoSourcePickerDialog({
             const isDeviceMultiBus = isMultiBusProfile(profile);
             // Check if config is locked for this profile (in use by 2+ sessions)
             const usageInfo = profileUsage.get(profileId);
-            const configLocked = usageInfo?.configLocked ?? false;
+            const configLocked = usageInfo?.config_locked ?? false;
 
             // Collect output buses used by OTHER profiles for duplicate detection
             const usedOutputBuses = new Set<number>();
@@ -1583,7 +1570,7 @@ export default function IoSourcePickerDialog({
               if (otherId !== profileId) {
                 for (const mapping of otherConfig) {
                   if (mapping.enabled) {
-                    usedOutputBuses.add(mapping.outputBus);
+                    usedOutputBuses.add(mapping.output_bus);
                   }
                 }
               }
@@ -1595,11 +1582,11 @@ export default function IoSourcePickerDialog({
             }
 
             // Multi-bus devices - show DeviceBusConfig
-            if (isDeviceMultiBus || probeResult?.isMultiBus) {
+            if (isDeviceMultiBus || probeResult?.is_multi_bus) {
               let busConfig = deviceBusConfigMap.get(profileId);
               if (!busConfig && probeResult) {
                 const offset = outputBusOffsets.get(profileId) ?? 0;
-                busConfig = declaredBusMappings(profileId, offset, profile.kind, probeResult.busCount);
+                busConfig = declaredBusMappings(profileId, offset, profile.kind, probeResult.bus_count);
               }
               busConfig = busConfig || [];
 
@@ -1692,10 +1679,10 @@ export default function IoSourcePickerDialog({
               probeError={selectedCaptureId ? deviceProbeResultMap.get(selectedCaptureId)?.error ?? null : null}
               activeSessionCaptureMap={new Map(
                 activeMultiSourceSessions
-                  .filter((s) => s.sourceType === "capture")
+                  .filter((s) => s.source_type === "capture")
                   .flatMap((s) => {
-                    const entries: [string, string][] = [[s.sessionId, s.sessionId]];
-                    if (s.captureId) entries.push([s.captureId, s.sessionId]);
+                    const entries: [string, string][] = [[s.session_id, s.session_id]];
+                    if (s.capture_id) entries.push([s.capture_id, s.session_id]);
                     return entries;
                   })
               )}
@@ -1710,7 +1697,7 @@ export default function IoSourcePickerDialog({
           <ModbusPollConfig
             config={modbusPoll}
             onChange={setModbusPoll}
-            disabled={profileUsage.get(modbusProfile.id)?.configLocked ?? false}
+            disabled={profileUsage.get(modbusProfile.id)?.config_locked ?? false}
           />
         )}
 

@@ -229,6 +229,7 @@ impl IOSource for CaptureSource {
 /// Also emits the frame and a snapshot via events.
 /// Result of a step operation, containing both the new frame index and timestamp
 #[derive(Debug, Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StepResult {
     pub frame_index: usize,
     pub timestamp_us: i64,

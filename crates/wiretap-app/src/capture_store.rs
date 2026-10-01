@@ -24,6 +24,7 @@ use crate::io::FrameMessage;
 /// Capture kind - determines what kind of data the capture contains
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum CaptureKind {
     /// CAN frames, framed serial messages
     Frames,
@@ -53,6 +54,7 @@ impl CaptureKind {
 
 /// Timestamped byte for raw serial data
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TimestampedByte {
     /// The byte value
     pub byte: u8,

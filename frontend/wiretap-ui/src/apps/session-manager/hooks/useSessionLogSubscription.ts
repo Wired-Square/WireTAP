@@ -53,8 +53,8 @@ async function resolveProfileName(sessionId: string, profileIds: string[]): Prom
   // First try brokerConfigs (for multi-source sessions)
   try {
     const sessions = await listActiveSessions();
-    const session = sessions.find((s) => s.sessionId === sessionId);
-    const names = session?.brokerConfigs?.map((c) => c.displayName).filter(Boolean) ?? [];
+    const session = sessions.find((s) => s.session_id === sessionId);
+    const names = session?.broker_configs?.map((c) => c.display_name).filter(Boolean) ?? [];
     if (names.length > 0) return names.join(", ");
   } catch {
     // Fall through to settings lookup
@@ -243,7 +243,7 @@ export function useSessionLogSubscription(): void {
     listActiveSessions().then((sessions) => {
       if (!isCurrentInstance()) return;
       for (const session of sessions) {
-        setupPerSessionListeners(session.sessionId, perSessionListeners);
+        setupPerSessionListeners(session.session_id, perSessionListeners);
       }
     });
 
@@ -276,19 +276,19 @@ export function useSessionLogSubscription(): void {
 
         const addEntryFn = useSessionLogStore.getState().addEntry;
         for (const session of sessions) {
-          const profileName = await resolveProfileName(session.sessionId, session.sourceProfileIds);
+          const profileName = await resolveProfileName(session.session_id, session.source_profile_ids);
           const parts = [
             `State: ${session.state}`,
-            `Listeners: ${session.subscriberCount}`,
-            `Frames: ${session.captureFrameCount ?? 0}`,
+            `Listeners: ${session.subscriber_count}`,
+            `Frames: ${session.capture_frame_count ?? 0}`,
           ];
           if (session.capabilities?.supports_speed_control) {
             parts.push(`Speed: 1x`); // TODO: add speed to ActiveSessionInfo if needed
           }
           addEntryFn({
             eventType: "session-stats",
-            sessionId: session.sessionId,
-            profileId: session.sourceProfileIds[0] ?? null,
+            sessionId: session.session_id,
+            profileId: session.source_profile_ids[0] ?? null,
             profileName,
             appName: null,
             details: parts.join(", "),
@@ -322,10 +322,10 @@ async function setupPerSessionListeners(
   const getProfileInfo = async () => {
     try {
       const sessions = await listActiveSessions();
-      const session = sessions.find((s) => s.sessionId === sessionId);
+      const session = sessions.find((s) => s.session_id === sessionId);
       if (session) {
-        const profileName = await resolveProfileName(sessionId, session.sourceProfileIds);
-        return { profileId: session.sourceProfileIds[0] ?? null, profileName };
+        const profileName = await resolveProfileName(sessionId, session.source_profile_ids);
+        return { profileId: session.source_profile_ids[0] ?? null, profileName };
       }
     } catch {
       // Fall through

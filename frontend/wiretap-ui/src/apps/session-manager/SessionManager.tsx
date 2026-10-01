@@ -18,6 +18,7 @@ import {
   removeSourceFromSession,
   updateSourceBusMappings,
   type ActiveSessionInfo,
+  type BusMapping,
 } from "../../api/io";
 import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import { useProfileBusStore, profileBusMappings } from "../../stores/profileBusStore";
@@ -168,13 +169,13 @@ export default function SessionManager() {
       // its own enumeration without knowing which output buses this session has
       // already spoken for, so offset past them here.
       const usedOutputBuses = sessions
-        .find((s) => s.sessionId === addSourceSessionId)
-        ?.brokerConfigs?.flatMap((c) => c.busMappings.map((m) => m.outputBus)) ?? [];
+        .find((s) => s.session_id === addSourceSessionId)
+        ?.broker_configs?.flatMap((c) => c.bus_mappings.map((m) => m.output_bus)) ?? [];
       const offset = usedOutputBuses.length > 0 ? Math.max(...usedOutputBuses) + 1 : 0;
 
       await addSourceToSession(addSourceSessionId, {
-        profileId,
-        busMappings: profileBusMappings(profileId, offset),
+        profile_id: profileId,
+        bus_mappings: profileBusMappings(profileId, offset),
       });
       setAddSourceSessionId(null);
       await fetchSessions();
@@ -193,12 +194,12 @@ export default function SessionManager() {
   }, [fetchSessions]);
 
   const handleDisableBusMapping = useCallback(async (sessionId: string, profileId: string, deviceBus: number) => {
-    const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
+    const session = sessions.find((s) => s.session_id === sessionId);
+    const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
     if (!config) return;
 
-    const updatedMappings = config.busMappings.map((m) =>
-      m.deviceBus === deviceBus ? { ...m, enabled: false } : m
+    const updatedMappings = config.bus_mappings.map((m) =>
+      m.device_bus === deviceBus ? { ...m, enabled: false } : m
     );
 
     try {
@@ -215,13 +216,13 @@ export default function SessionManager() {
     deviceBus: number,
     outputBus: number,
   ) => {
-    const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
+    const session = sessions.find((s) => s.session_id === sessionId);
+    const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
     if (!config) return;
 
     // Re-enable the matching disabled mapping
-    const updatedMappings = config.busMappings.map((m) =>
-      m.deviceBus === deviceBus && m.outputBus === outputBus
+    const updatedMappings = config.bus_mappings.map((m) =>
+      m.device_bus === deviceBus && m.output_bus === outputBus
         ? { ...m, enabled: true }
         : m
     );
@@ -241,27 +242,29 @@ export default function SessionManager() {
     deviceBus: number,
     newOutputBus: number,
   ) => {
-    const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
+    const session = sessions.find((s) => s.session_id === sessionId);
+    const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
     if (!config) return;
 
-    // Carry the profile's interface id and traits so a CAN-FD bus wired by drag
+    // Carry the profile's interface id and protocol so a CAN-FD bus wired by drag
     // isn't validated as plain CAN.
-    const declared = profileBusMappings(profileId).find((b) => b.deviceBus === deviceBus);
-    const existing = config.busMappings.find((m) => m.deviceBus === deviceBus);
-    const mapping = {
-      deviceBus,
-      outputBus: newOutputBus,
+    const declared = profileBusMappings(profileId).find((b) => b.device_bus === deviceBus);
+    const existing = config.bus_mappings.find((m) => m.device_bus === deviceBus);
+    const mapping: BusMapping = {
+      device_bus: deviceBus,
+      output_bus: newOutputBus,
       enabled: true,
-      interfaceId: existing?.interfaceId ?? declared?.interfaceId,
-      traits: existing?.traits ?? declared?.traits,
+      interface_id: existing?.interface_id ?? declared?.interface_id ?? "",
+      protocol: existing?.protocol ?? declared?.protocol ?? "can",
+      supported_protocols: [],
+      traits: null,
     };
 
     // Replace any mapping for this device bus rather than appending — Rust's
     // apply_bus_mapping takes the first match, so a second entry is dead config.
     const updatedMappings = existing
-      ? config.busMappings.map((m) => (m.deviceBus === deviceBus ? mapping : m))
-      : [...config.busMappings, mapping];
+      ? config.bus_mappings.map((m) => (m.device_bus === deviceBus ? mapping : m))
+      : [...config.bus_mappings, mapping];
 
     try {
       await updateSourceBusMappings(sessionId, profileId, updatedMappings);
@@ -279,14 +282,14 @@ export default function SessionManager() {
 
   // Available profiles for add source dialog (realtime profiles not already in the session)
   const addSourceSession = addSourceSessionId
-    ? sessions.find((s) => s.sessionId === addSourceSessionId)
+    ? sessions.find((s) => s.session_id === addSourceSessionId)
     : null;
   const realtimeKinds = new Set(["gvret_tcp", "gvret_usb", "slcan", "gs_usb", "socketcan", "serial", "mqtt", "modbus_tcp", "framelink", "virtual"]);
   const availableProfiles = addSourceSession
     ? profiles.filter(
         (p) =>
           realtimeKinds.has(p.kind) &&
-          !addSourceSession.sourceProfileIds.includes(p.id)
+          !addSourceSession.source_profile_ids.includes(p.id)
       )
     : [];
 

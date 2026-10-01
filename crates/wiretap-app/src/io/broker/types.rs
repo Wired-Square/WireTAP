@@ -21,6 +21,7 @@ use crate::io::Protocol;
 /// on its own.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
 pub struct SerialOverrides {
     /// Framing encoding for serial sources (overrides profile settings if provided)
     pub framing_encoding: Option<String>,
@@ -58,6 +59,7 @@ pub struct SerialOverrides {
 
 /// Configuration for a single source in a multi-source session
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SourceConfig {
     /// Profile ID for this source
     pub profile_id: String,
@@ -73,6 +75,7 @@ pub struct SourceConfig {
     pub serial: SerialOverrides,
     /// Modbus poll groups (shared across all Modbus interfaces in a session)
     #[serde(default)]
+    #[cfg_attr(test, ts(type = "Array<unknown> | null"))]
     pub modbus_polls: Option<Vec<PollGroup>>,
     /// Modbus max consecutive register errors before stopping (0 = never stop)
     #[serde(default)]

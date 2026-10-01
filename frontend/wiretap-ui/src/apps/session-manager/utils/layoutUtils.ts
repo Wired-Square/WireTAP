@@ -56,17 +56,17 @@ export function buildSessionGraph(
   // Track which profiles are actively used by sessions
   const activeProfileIds = new Set<string>();
   sessions.forEach((session) => {
-    session.sourceProfileIds.forEach((id) => activeProfileIds.add(id));
+    session.source_profile_ids.forEach((id) => activeProfileIds.add(id));
   });
 
   // Build a map of profileId → lowest outputBus for sorting source nodes
   // to match the vertical order of session input handles (avoids edge crossings)
   const profileOutputBus = new Map<string, number>();
   sessions.forEach((session) => {
-    session.brokerConfigs?.forEach((config) => {
-      const firstEnabled = config.busMappings.find((m) => m.enabled);
-      if (firstEnabled && !profileOutputBus.has(config.profileId)) {
-        profileOutputBus.set(config.profileId, firstEnabled.outputBus);
+    session.broker_configs?.forEach((config) => {
+      const firstEnabled = config.bus_mappings.find((m) => m.enabled);
+      if (firstEnabled && !profileOutputBus.has(config.profile_id)) {
+        profileOutputBus.set(config.profile_id, firstEnabled.output_bus);
       }
     });
   });
@@ -75,19 +75,19 @@ export function buildSessionGraph(
   const profileDeviceBuses = new Map<string, Set<number>>();
   const profileDisabledBuses = new Map<string, Set<number>>();
   sessions.forEach((session) => {
-    session.brokerConfigs?.forEach((config) => {
-      const enabledSet = profileDeviceBuses.get(config.profileId) ?? new Set();
-      const disabledSet = profileDisabledBuses.get(config.profileId) ?? new Set();
-      for (const m of config.busMappings) {
+    session.broker_configs?.forEach((config) => {
+      const enabledSet = profileDeviceBuses.get(config.profile_id) ?? new Set();
+      const disabledSet = profileDisabledBuses.get(config.profile_id) ?? new Set();
+      for (const m of config.bus_mappings) {
         if (m.enabled) {
-          enabledSet.add(m.deviceBus);
-          disabledSet.delete(m.deviceBus);
-        } else if (!enabledSet.has(m.deviceBus)) {
-          disabledSet.add(m.deviceBus);
+          enabledSet.add(m.device_bus);
+          disabledSet.delete(m.device_bus);
+        } else if (!enabledSet.has(m.device_bus)) {
+          disabledSet.add(m.device_bus);
         }
       }
-      profileDeviceBuses.set(config.profileId, enabledSet);
-      profileDisabledBuses.set(config.profileId, disabledSet);
+      profileDeviceBuses.set(config.profile_id, enabledSet);
+      profileDisabledBuses.set(config.profile_id, disabledSet);
     });
   });
 
@@ -98,7 +98,7 @@ export function buildSessionGraph(
     const enabledSet = profileDeviceBuses.get(profile.id);
     const disabledSet = profileDisabledBuses.get(profile.id) ?? new Set<number>();
     for (const bus of profileBuses?.get(profile.id) ?? []) {
-      if (!enabledSet?.has(bus.deviceBus)) disabledSet.add(bus.deviceBus);
+      if (!enabledSet?.has(bus.device_bus)) disabledSet.add(bus.device_bus);
     }
     profileDisabledBuses.set(profile.id, disabledSet);
   });
@@ -171,11 +171,11 @@ export function buildSessionGraph(
     // two handles sharing an id — which breaks drag-to-connect targeting.
     const inputBusSet = new Set<number>();
     const disabledInputBusSet = new Set<number>();
-    session.sourceProfileIds.forEach((profileId) => {
-      const sourceConfig = session.brokerConfigs?.find((c) => c.profileId === profileId);
+    session.source_profile_ids.forEach((profileId) => {
+      const sourceConfig = session.broker_configs?.find((c) => c.profile_id === profileId);
       if (!sourceConfig) return;
-      for (const m of sourceConfig.busMappings) {
-        (m.enabled ? inputBusSet : disabledInputBusSet).add(m.outputBus);
+      for (const m of sourceConfig.bus_mappings) {
+        (m.enabled ? inputBusSet : disabledInputBusSet).add(m.output_bus);
       }
     });
     // An output bus carried by any source outranks a disabled mapping on it
@@ -188,34 +188,34 @@ export function buildSessionGraph(
 
     const nodeData: SessionNodeData = {
       session,
-      label: session.sessionId,
+      label: session.session_id,
       inputBuses: inputBuses.length > 0 ? inputBuses : undefined,
       disabledInputBuses: disabledInputBuses.length > 0 ? disabledInputBuses : undefined,
       connectedSubscriberIds: connectedAppIds.length > 0 ? connectedAppIds : undefined,
     };
 
     nodes.push({
-      id: `session-${session.sessionId}`,
+      id: `session-${session.session_id}`,
       type: "session",
       position: { x: START_X + COLUMN_SPACING, y: START_Y + index * ROW_SPACING },
       data: nodeData,
     });
 
     // Create edges from sources to session — one edge per enabled bus mapping
-    session.sourceProfileIds.forEach((profileId) => {
-      const sourceConfig = session.brokerConfigs?.find((c) => c.profileId === profileId);
-      const enabledMappings = sourceConfig?.busMappings.filter((m) => m.enabled) ?? [];
+    session.source_profile_ids.forEach((profileId) => {
+      const sourceConfig = session.broker_configs?.find((c) => c.profile_id === profileId);
+      const enabledMappings = sourceConfig?.bus_mappings.filter((m) => m.enabled) ?? [];
 
       if (enabledMappings.length === 0) {
         // Fallback: single unlabelled edge when no mappings available
         edges.push({
-          id: `edge-${profileId}-${session.sessionId}`,
+          id: `edge-${profileId}-${session.session_id}`,
           source: `source-${profileId}`,
-          target: `session-${session.sessionId}`,
+          target: `session-${session.session_id}`,
           type: "default",
-          animated: session.state === "running",
+          animated: session.state.type === "Running",
           style: {
-            stroke: session.state === "running" ? "#a855f7" : "#6b7280",
+            stroke: session.state.type === "Running" ? "#a855f7" : "#6b7280",
             strokeWidth: 2,
           },
         });
@@ -224,20 +224,20 @@ export function buildSessionGraph(
 
       for (const mapping of enabledMappings) {
         edges.push({
-          id: `edge-${profileId}-${session.sessionId}-b${mapping.deviceBus}-b${mapping.outputBus}`,
+          id: `edge-${profileId}-${session.session_id}-b${mapping.device_bus}-b${mapping.output_bus}`,
           source: `source-${profileId}`,
-          sourceHandle: `out-bus${mapping.deviceBus}`,
-          target: `session-${session.sessionId}`,
-          targetHandle: `in-bus${mapping.outputBus}`,
+          sourceHandle: `out-bus${mapping.device_bus}`,
+          target: `session-${session.session_id}`,
+          targetHandle: `in-bus${mapping.output_bus}`,
           type: "interface",
-          animated: session.state === "running",
+          animated: session.state.type === "Running",
           style: {
-            stroke: session.state === "running" ? "#a855f7" : "#6b7280",
+            stroke: session.state.type === "Running" ? "#a855f7" : "#6b7280",
             strokeWidth: 2,
           },
           data: {
-            sourceInterface: `bus${mapping.deviceBus}`,
-            targetInterface: `bus${mapping.outputBus}`,
+            sourceInterface: `bus${mapping.device_bus}`,
+            targetInterface: `bus${mapping.output_bus}`,
           } satisfies InterfaceEdgeData as InterfaceEdgeData & Record<string, unknown>,
         });
       }
@@ -250,18 +250,18 @@ export function buildSessionGraph(
       const appName = listener.app_name || listener.subscriber_id;
       // The cosmetic display id + window live in the open-app roster; match by id
       // (instance_id == subscriber_id).
-      const openApp = openApps?.find((a) => a.instanceId === listener.subscriber_id);
+      const openApp = openApps?.find((a) => a.instance_id === listener.subscriber_id);
 
       const nodeData: AppNodeData = {
-        appId: openApp?.displayId ?? listener.subscriber_id,
+        appId: openApp?.display_id ?? listener.subscriber_id,
         appName,
-        sessionId: session.sessionId,
+        sessionId: session.session_id,
         isActive: listener.is_active,
         isConnected: true,
         registeredSecondsAgo: listener.registered_seconds_ago,
       };
 
-      const nodeId = `app::${session.sessionId}::${listener.subscriber_id}`;
+      const nodeId = `app::${session.session_id}::${listener.subscriber_id}`;
 
       nodes.push({
         id: nodeId,
@@ -275,13 +275,13 @@ export function buildSessionGraph(
 
       // Edge from session output handle to app
       edges.push({
-        id: `edge-${session.sessionId}::${listener.subscriber_id}`,
-        source: `session-${session.sessionId}`,
+        id: `edge-${session.session_id}::${listener.subscriber_id}`,
+        source: `session-${session.session_id}`,
         sourceHandle: `out-${appIndex}`,
         target: nodeId,
-        animated: session.state === "running" && session.isStreaming && listener.is_active,
+        animated: session.state.type === "Running" && session.is_streaming && listener.is_active,
         style: {
-          stroke: listener.is_active && session.isStreaming ? "#22c55e" : "#6b7280",
+          stroke: listener.is_active && session.is_streaming ? "#22c55e" : "#6b7280",
           strokeWidth: 2,
         },
       });
@@ -292,7 +292,7 @@ export function buildSessionGraph(
   // windows) that aren't attached to any session. Sourced from the Rust-owned roster,
   // so a session_id of null is the authoritative "unconnected" signal.
   if (openApps) {
-    const unconnected = openApps.filter((a) => a.sessionId == null);
+    const unconnected = openApps.filter((a) => a.session_id == null);
 
     // Position below all connected apps
     const maxConnectedY = nodes
@@ -302,14 +302,14 @@ export function buildSessionGraph(
 
     unconnected.forEach((inst, i) => {
       const nodeData: AppNodeData = {
-        appId: inst.displayId,
-        appName: inst.appName,
+        appId: inst.display_id,
+        appName: inst.app_name,
         isActive: false,
         isConnected: false,
       };
 
       nodes.push({
-        id: `app::${inst.instanceId}`,
+        id: `app::${inst.instance_id}`,
         type: "app",
         position: {
           x: START_X + COLUMN_SPACING * 2,

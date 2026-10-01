@@ -83,6 +83,7 @@ fn unregister_scan(session_id: &str) {
 /// call rather than dragging a session along behind it.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ScanJob {
     Registers { config: ModbusScanConfig },
     UnitIds { config: UnitIdScanConfig },

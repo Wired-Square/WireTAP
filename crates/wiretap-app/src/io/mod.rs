@@ -116,6 +116,7 @@ pub struct FrameMessage {
 
 /// Playback position - stored and signalled via playback-position events during capture streaming
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PlaybackPosition {
     /// Current timestamp in microseconds
     pub timestamp_us: i64,
@@ -123,11 +124,13 @@ pub struct PlaybackPosition {
     pub frame_index: usize,
     /// Total frame count in capture (optional, for recorded sources)
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub frame_count: Option<usize>,
 }
 
 /// Per-bus signal generator state (returned to frontend for virtual devices)
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct VirtualBusState {
     pub bus: u8,
     pub enabled: bool,
@@ -145,6 +148,7 @@ pub fn now_us() -> u64 {
 /// CAN frame for transmission. Also the MCP transmit tools' frame parameters,
 /// flattened, so the flags default when a caller leaves them out.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CanTransmitFrame {
     /// CAN frame ID (11-bit standard or 29-bit extended)
     pub frame_id: u32,
@@ -169,6 +173,7 @@ pub struct CanTransmitFrame {
 
 /// Result of a transmit operation
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TransmitResult {
     /// Whether the transmission was successful
     pub success: bool,
@@ -225,6 +230,7 @@ pub enum TransmitPayload {
 /// Temporal mode of an interface/session
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum TemporalMode {
     /// Real-time streaming from live devices (GVRET, slcan, gs_usb, SocketCAN, MQTT)
     Realtime,
@@ -237,6 +243,7 @@ pub enum TemporalMode {
 /// Protocol family for frame-based communication
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Protocol {
     /// CAN 2.0A/2.0B (standard/extended)
     #[default]
@@ -256,6 +263,7 @@ pub enum Protocol {
 
 /// Combined interface traits for formal session/interface characterization
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct InterfaceTraits {
     /// Temporal mode of the interface
     pub temporal_mode: TemporalMode,
@@ -275,6 +283,7 @@ pub struct InterfaceTraits {
 /// declaration of what a session will emit. Used by the frontend to decide
 /// which event listeners and views to set up.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SessionDataStreams {
     /// Whether this session emits framed messages (`frame-message` events)
     pub rx_frames: bool,
@@ -284,6 +293,7 @@ pub struct SessionDataStreams {
 
 /// IO device capabilities - what this device type supports
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct IOCapabilities {
     /// Supports pause/resume (WireTAP backend: true, GVRET: false)
     pub can_pause: bool,
@@ -447,6 +457,7 @@ impl IOCapabilities {
 /// Current state of an IO session
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "message")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum IOState {
     Stopped,
     Starting,
@@ -763,6 +774,7 @@ pub struct AppInstance {
 
 /// Serializable snapshot of an app instance for the frontend roster.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct AppInstanceInfo {
     pub instance_id: String,
     pub display_id: String,
@@ -2743,6 +2755,7 @@ pub async fn session_exists(session_id: &str) -> bool {
 
 /// Info about an active session (for listing)
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ActiveSessionInfo {
     /// Session ID
     pub session_id: String,
@@ -2768,9 +2781,9 @@ pub struct ActiveSessionInfo {
     /// Capture ID owned by this session (if any)
     #[serde(default)]
     pub capture_id: Option<String>,
-    /// Kind of the capture named by `capture_id` ("frames" or "bytes")
+    /// Kind of the capture named by `capture_id`
     #[serde(default)]
-    pub capture_kind: Option<String>,
+    pub capture_kind: Option<capture_store::CaptureKind>,
     /// Frame count in the owned capture
     #[serde(default)]
     pub capture_frame_count: Option<usize>,
@@ -2815,9 +2828,7 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
     // Get capture info if this session has one of its own. Kind travels with the
     // id — picking an arbitrary owned capture and leaving the roster to assume
     // "frames" is how the two came apart.
-    let (capture_id, capture_kind) = capture_store::get_session_capture(session_id)
-        .map(|(id, kind)| (id, kind.as_str().to_string()))
-        .unzip();
+    let (capture_id, capture_kind) = capture_store::get_session_capture(session_id).unzip();
     let capture_frame_count = capture_id
         .as_ref()
         .map(|id| capture_store::get_capture_count(id));
@@ -2958,6 +2969,7 @@ pub async fn set_framing(
 
 /// Info about a registered subscriber (for TypeScript)
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SubscriberInfo {
     pub subscriber_id: String,
     /// Human-readable app name (e.g., "discovery", "decoder")
@@ -2970,6 +2982,7 @@ pub struct SubscriberInfo {
 
 /// Result of registering a subscriber
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RegisterSubscriberResult {
     /// Session capabilities
     pub capabilities: IOCapabilities,
@@ -2977,8 +2990,8 @@ pub struct RegisterSubscriberResult {
     pub state: IOState,
     /// Active capture ID (if any)
     pub capture_id: Option<String>,
-    /// Capture kind ("frames" or "bytes")
-    pub capture_kind: Option<String>,
+    /// Capture kind
+    pub capture_kind: Option<crate::capture_store::CaptureKind>,
     /// Total number of subscribers
     pub subscriber_count: usize,
     /// Error that occurred before this subscriber registered (one-shot, cleared after return)
@@ -3036,9 +3049,7 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
         // Get the session's own capture. Reporting its real kind is what lets a joining
         // app tell a raw serial link from a CAN one — Discovery keys its serial view off
         // exactly this, and used to be told "frames" or nothing at all.
-        let (capture_id, capture_kind) = crate::capture_store::get_session_capture(session_id)
-            .map(|(id, kind)| (id, kind.as_str().to_string()))
-            .unzip();
+        let (capture_id, capture_kind) = crate::capture_store::get_session_capture(session_id).unzip();
 
         let session = sessions
             .get_mut(session_id)
@@ -3489,6 +3500,7 @@ pub async fn get_session_subscribers(session_id: &str) -> Result<Vec<SubscriberI
 
 /// Result of attempting a safe reinitialize
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ReinitializeResult {
     /// Whether the reinitialize was successful
     pub success: bool,

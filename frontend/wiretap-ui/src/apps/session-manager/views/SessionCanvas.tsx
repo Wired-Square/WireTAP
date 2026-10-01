@@ -173,10 +173,10 @@ export default function SessionCanvas({
         const outputBus = parseInt(outputBusMatch[1], 10);
 
         // Check if this is re-enabling an existing disabled mapping
-        const session = sessions.find((s) => s.sessionId === sessionId);
-        const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
-        const isDisabledMapping = config?.busMappings.some(
-          (m) => m.deviceBus === deviceBus && m.outputBus === outputBus && !m.enabled
+        const session = sessions.find((s) => s.session_id === sessionId);
+        const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
+        const isDisabledMapping = config?.bus_mappings.some(
+          (m) => m.device_bus === deviceBus && m.output_bus === outputBus && !m.enabled
         );
 
         if (isDisabledMapping && onEnableBusMapping) {
@@ -193,7 +193,7 @@ export default function SessionCanvas({
         if (!onConnectAppToSession) return;
         const sessionId = source.replace(/^session-/, "");
         const instanceId = target.replace(/^app::/, "");
-        const appName = openApps?.find((a) => a.instanceId === instanceId)?.appName ?? instanceId;
+        const appName = openApps?.find((a) => a.instance_id === instanceId)?.app_name ?? instanceId;
         onConnectAppToSession(sessionId, appName);
       }
     },
@@ -218,30 +218,30 @@ export default function SessionCanvas({
         const deviceBus = parseInt(deviceBusMatch[1], 10);
         const outputBus = parseInt(outputBusMatch[1], 10);
 
-        const session = sessions.find((s) => s.sessionId === sessionId);
-        const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
+        const session = sessions.find((s) => s.session_id === sessionId);
+        const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
 
         // Two sources on one output bus merge into an indistinguishable stream,
         // and Rust's transmit routing gives the bus to whichever source was
         // added last. Refuse the drop rather than create that.
-        const takenByOther = session?.brokerConfigs?.some(
-          (c) => c.profileId !== profileId &&
-                 c.busMappings.some((m) => m.enabled && m.outputBus === outputBus)
+        const takenByOther = session?.broker_configs?.some(
+          (c) => c.profile_id !== profileId &&
+                 c.bus_mappings.some((m) => m.enabled && m.output_bus === outputBus)
         );
         if (takenByOther) return false;
 
         // Allow re-enabling disabled mappings
-        if (config?.busMappings.some((m) => m.deviceBus === deviceBus && m.outputBus === outputBus && !m.enabled)) {
+        if (config?.bus_mappings.some((m) => m.device_bus === deviceBus && m.output_bus === outputBus && !m.enabled)) {
           return true;
         }
 
         // Allow creating new mappings (bus not already mapped)
-        if (config && !config.busMappings.some((m) => m.deviceBus === deviceBus && m.outputBus === outputBus && m.enabled)) {
+        if (config && !config.bus_mappings.some((m) => m.device_bus === deviceBus && m.output_bus === outputBus && m.enabled)) {
           return true;
         }
 
         // Also allow if source is connected to this session but this specific bus combo is new
-        if (session?.sourceProfileIds.includes(profileId)) {
+        if (session?.source_profile_ids.includes(profileId)) {
           return true;
         }
 

@@ -195,11 +195,11 @@ export default function SingleBusConfig({
         <div className="flex items-center gap-2 text-xs">
           <CheckCircle2 className={`${iconXs} text-success flex-shrink-0`} />
           <span className="text-secondary">
-            {probeResult.primaryInfo || t("ioSourcePicker.singleBusConfig.online")}
+            {probeResult.primary_info || t("ioSourcePicker.singleBusConfig.online")}
           </span>
-          {probeResult.secondaryInfo && (
+          {probeResult.secondary_info && (
             <span className="text-muted">
-              ({probeResult.secondaryInfo})
+              ({probeResult.secondary_info})
             </span>
           )}
         </div>
@@ -265,11 +265,11 @@ export default function SingleBusConfig({
         <div className={flexRowGap2}>
           <CheckCircle2 className={`${iconMd} text-success`} />
           <span className={sectionHeaderText}>
-            {probeResult.primaryInfo || t("ioSourcePicker.singleBusConfig.deviceOnline")}
+            {probeResult.primary_info || t("ioSourcePicker.singleBusConfig.deviceOnline")}
           </span>
-          {probeResult.secondaryInfo && (
+          {probeResult.secondary_info && (
             <span className={caption}>
-              ({probeResult.secondaryInfo})
+              ({probeResult.secondary_info})
             </span>
           )}
         </div>

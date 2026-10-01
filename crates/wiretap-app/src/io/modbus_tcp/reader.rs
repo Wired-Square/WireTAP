@@ -20,6 +20,7 @@ use wiretap_catalog::modbus::PollItem;
 /// Register type for Modbus polling
 #[derive(Clone, Debug, serde::Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "ModbusRegisterType"))]
 pub enum RegisterType {
     Holding,
     Input,
@@ -68,6 +69,7 @@ impl FromStr for RegisterType {
 /// How a poll response becomes frames.
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum PollEmitMode {
     /// One frame per group, bytes = the whole block. Required for catalogue
     /// polls: their signals are bit offsets into the entire block.

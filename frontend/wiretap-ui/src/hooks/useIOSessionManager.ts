@@ -778,7 +778,7 @@ export function useIOSessionManager(
     const effectiveBusMappings = new Map(busMappings ?? []);
     let nextOutputBus = 0;
     for (const mappings of effectiveBusMappings.values()) {
-      for (const m of mappings) nextOutputBus = Math.max(nextOutputBus, m.outputBus + 1);
+      for (const m of mappings) nextOutputBus = Math.max(nextOutputBus, m.output_bus + 1);
     }
     for (const profileId of profileIds) {
       if (effectiveBusMappings.has(profileId)) continue;
@@ -835,9 +835,9 @@ export function useIOSessionManager(
       const profileName = findProfile(profileId)?.name ?? profileId;
       for (const mapping of mappings) {
         if (mapping.enabled) {
-          busToSource.set(mapping.outputBus, {
+          busToSource.set(mapping.output_bus, {
             profileName,
-            deviceBus: mapping.deviceBus,
+            deviceBus: mapping.device_bus,
             profileId,
           });
         }

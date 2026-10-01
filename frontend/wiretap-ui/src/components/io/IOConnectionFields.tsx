@@ -244,18 +244,20 @@ export default function IOConnectionFields({
   const deviceBusConfig = useMemo((): BusMapping[] => {
     if (!isProfileKind(profile, "gvret_tcp") && !isProfileKind(profile, "gvret_usb")) return [];
     return (profile.connection.interfaces ?? []).map((iface) => ({
-      deviceBus: iface.device_bus,
+      device_bus: iface.device_bus,
       enabled: iface.enabled,
-      outputBus: iface.device_bus, // unused when showOutputBus is false
+      output_bus: iface.device_bus, // unused when showOutputBus is false
+      interface_id: `can${iface.device_bus}`,
       protocol: iface.protocol,
-      supportedProtocols,
+      supported_protocols: supportedProtocols,
+      traits: null,
     }));
   }, [profile, supportedProtocols]);
 
   const handleDeviceBusConfigChange = useCallback(
     (config: BusMapping[]) => {
       const interfaces: GvretInterfaceConfig[] = config.map((m) => ({
-        device_bus: m.deviceBus,
+        device_bus: m.device_bus,
         enabled: m.enabled,
         // Settings is the only place a protocol is persisted; the source
         // picker's copy of this dropdown is a session-only override.

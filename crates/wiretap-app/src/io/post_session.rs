@@ -14,6 +14,7 @@ const TTL: Duration = Duration::from_secs(10);
 
 /// Stream-ended info, persisted after session destruction for late-arriving fetches.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StreamEndedInfo {
     pub reason: String,
     pub capture_available: bool,
@@ -25,6 +26,7 @@ pub struct StreamEndedInfo {
 
 /// Connected source info for a session.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SourceInfo {
     pub source_type: String,
     pub address: String,

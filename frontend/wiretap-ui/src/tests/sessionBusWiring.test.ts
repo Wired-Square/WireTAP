@@ -9,7 +9,6 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  encodeBusMapping,
   offsetBusMappings,
   probedBusMappings,
   type ActiveSessionInfo,
@@ -27,10 +26,13 @@ import type { SessionNodeData } from "../apps/session-manager/nodes/SessionNode"
 import type { IOProfile } from "../hooks/useSettings";
 
 const mapping = (deviceBus: number, outputBus: number, enabled = true): BusMapping => ({
-  deviceBus,
-  outputBus,
+  device_bus: deviceBus,
+  output_bus: outputBus,
   enabled,
-  interfaceId: `can${deviceBus}`,
+  interface_id: `can${deviceBus}`,
+  protocol: "can",
+  supported_protocols: [],
+  traits: null,
 });
 
 const profile = (id: string, name = "Dev"): IOProfile =>
@@ -42,17 +44,21 @@ const session = (
   configs: Array<{ profileId: string; busMappings: BusMapping[] }>,
 ): ActiveSessionInfo =>
   ({
-    sessionId,
-    sourceType: "gvret_tcp",
-    state: "running",
+    session_id: sessionId,
+    source_type: "gvret_tcp",
+    state: { type: "Running" },
     capabilities: {},
-    subscriberCount: 0,
+    subscriber_count: 0,
     subscribers: [],
-    brokerConfigs: configs.map((c) => ({ ...c, displayName: "Dev" })),
-    sourceProfileIds: configs.map((c) => c.profileId),
-    captureId: null,
-    captureFrameCount: null,
-    isStreaming: true,
+    broker_configs: configs.map((c) => ({
+      profile_id: c.profileId,
+      bus_mappings: c.busMappings,
+      display_name: "Dev",
+    })),
+    source_profile_ids: configs.map((c) => c.profileId),
+    capture_id: null,
+    capture_frame_count: null,
+    is_streaming: true,
   }) as unknown as ActiveSessionInfo;
 
 const sourceData = (graph: ReturnType<typeof buildSessionGraph>, profileId: string) =>
@@ -70,8 +76,8 @@ describe("offsetBusMappings", () => {
 
   it("shifts output buses without touching device buses", () => {
     const shifted = offsetBusMappings(declared, 2);
-    expect(shifted.map((m) => m.outputBus)).toEqual([2, 3]);
-    expect(shifted.map((m) => m.deviceBus)).toEqual([0, 1]);
+    expect(shifted.map((m) => m.output_bus)).toEqual([2, 3]);
+    expect(shifted.map((m) => m.device_bus)).toEqual([0, 1]);
   });
 });
 
@@ -95,7 +101,7 @@ describe("profileBusStore accessors", () => {
   });
 
   it("applies an output bus offset on read", () => {
-    expect(profileBusMappings("io_declared", 4).map((m) => m.outputBus)).toEqual([4, 5]);
+    expect(profileBusMappings("io_declared", 4).map((m) => m.output_bus)).toEqual([4, 5]);
   });
 
   it("offers no protocol options for a kind it has not heard of", () => {
@@ -108,19 +114,7 @@ describe("profileBusStore accessors", () => {
   });
 });
 
-describe("per-bus protocol → session payload", () => {
-  it("carries the picker's protocol choice, and sends no traits with it", () => {
-    // The dropdown's whole job: `protocol` is the input, and Rust derives the
-    // traits from it. Sending traits too would let the two disagree.
-    const encoded = [
-      { ...mapping(0, 0), protocol: "can" as const },
-      { ...mapping(1, 1), protocol: "canfd" as const },
-    ].map(encodeBusMapping);
-
-    expect(encoded.map((m) => m.protocol)).toEqual(["can", "canfd"]);
-    expect(encoded.every((m) => !("traits" in m) || m.traits === undefined)).toBe(true);
-  });
-
+describe("probedBusMappings", () => {
   it("seeds a probed-but-unconfigured device with the kind's options", () => {
     // A GVRET nobody has configured still needs a dropdown, so the options come
     // from the kind rather than from a mapping that does not exist yet.
@@ -128,9 +122,9 @@ describe("per-bus protocol → session payload", () => {
 
     expect(seeded).toHaveLength(2);
     expect(seeded[0].protocol).toBe("can");
-    expect(seeded[0].supportedProtocols).toEqual(["can", "canfd"]);
-    expect(seeded.map((m) => m.outputBus)).toEqual([0, 1]);
-    expect(seeded.every((m) => m.traits === undefined)).toBe(true);
+    expect(seeded[0].supported_protocols).toEqual(["can", "canfd"]);
+    expect(seeded.map((m) => m.output_bus)).toEqual([0, 1]);
+    expect(seeded.every((m) => m.traits === null)).toBe(true);
   });
 });
 
@@ -232,19 +226,5 @@ describe("busProtocol — the single-bus source's one protocol", () => {
     const unknown = { id: "io_3", name: "?", kind: undefined, connection: {} };
     expect(busProtocol(unknown as unknown as IOProfile)).toBe("can");
     expect(busProtocol(undefined)).toBe("can");
-  });
-
-  /// What the picker actually hands Rust for a single-bus source. The helper
-  /// being right is only half of it; the mapping has to carry the answer.
-  it("reaches the session payload as the bus's protocol", () => {
-    const mapping = {
-      deviceBus: 0,
-      enabled: true,
-      outputBus: 2,
-      interfaceId: "can0",
-      protocol: busProtocol(slcan({ enable_fd: true })),
-    };
-    expect(encodeBusMapping(mapping).protocol).toBe("canfd");
-    expect(encodeBusMapping(mapping).interface_id).toBe("can0");
   });
 });

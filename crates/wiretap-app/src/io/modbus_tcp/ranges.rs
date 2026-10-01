@@ -36,6 +36,7 @@ fn default_max_groups() -> u16 {
 
 /// One contiguous span of registers to poll.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModbusRange {
     pub register_type: RegisterType,
     /// Protocol-level start address (0-based).
@@ -44,31 +45,40 @@ pub struct ModbusRange {
     pub end: u16,
     /// Overrides the spec-level interval for this range.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional))]
     pub interval_ms: Option<u64>,
     /// Overrides the spec-level slave address for this range.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional))]
     pub device_address: Option<u8>,
 }
 
 /// A catalogue-free poll plan.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModbusRangeSpec {
     pub ranges: Vec<ModbusRange>,
     #[serde(default = "default_device_address")]
+    #[cfg_attr(test, ts(as = "Option<u8>", optional))]
     pub device_address: u8,
     #[serde(default = "default_interval_ms")]
+    #[cfg_attr(test, ts(as = "Option<u64>", optional))]
     pub interval_ms: u64,
     /// Registers per request. Clamped to the protocol maximum for the type.
     #[serde(default = "default_block_size")]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub block_size: u16,
     /// Discovery defaults to one frame per register so per-register change
     /// analysis works; `Block` is available for the rare case where you want
     /// the raw response shape.
     #[serde(default = "default_emit_mode")]
+    #[cfg_attr(test, ts(as = "Option<PollEmitMode>", optional))]
     pub emit_mode: PollEmitMode,
     #[serde(default = "default_max_registers")]
+    #[cfg_attr(test, ts(as = "Option<u32>", optional))]
     pub max_registers: u32,
     #[serde(default = "default_max_groups")]
+    #[cfg_attr(test, ts(as = "Option<u16>", optional))]
     pub max_groups: u16,
 }
 

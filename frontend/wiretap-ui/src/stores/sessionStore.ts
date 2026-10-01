@@ -31,6 +31,7 @@ import {
   unregisterSessionSubscriber,
   reinitializeSessionIfSafe,
   createMultiSourceSession,
+  serialPayload,
   getStateType,
   type IOCapabilities,
   type IOStateType,
@@ -2251,28 +2252,30 @@ export async function createAndStartMultiSourceSession(
         : (interfaceFraming?.emitRawBytes ?? emitRawBytes);
 
     return {
-      profileId,
-      displayName: profileNames?.get(profileId),
-      busMappings: busMappings?.get(profileId) || [],
+      profile_id: profileId,
+      display_name: profileNames?.get(profileId),
+      bus_mappings: busMappings?.get(profileId) || [],
       // Apply framing config (per-interface or session-level)
       // Serial sources will use these overrides, CAN sources will ignore them
-      framingEncoding: sourceFramingEncoding,
-      delimiter: sourceDelimiter,
-      maxFrameLength: interfaceFraming?.maxFrameLength ?? maxFrameLength,
-      minFrameLength,
-      emitRawBytes: sourceEmitRawBytes,
-      modbusValidateCrc: interfaceFraming?.validateCrc,
-      modbusDeviceAddress: interfaceFraming?.deviceAddress,
-      modbusVendorFunctions: interfaceFraming?.vendorFunctions,
-      modbusAllowBroadcast: interfaceFraming?.allowBroadcast,
-      modbusAnyFunction: interfaceFraming?.anyFunction,
-      // Frame ID extraction config (from catalog)
-      frameIdStartByte,
-      frameIdBytes,
-      frameIdBigEndian,
-      sourceAddressStartByte,
-      sourceAddressBytes,
-      sourceAddressBigEndian,
+      ...serialPayload({
+        framingEncoding: sourceFramingEncoding,
+        delimiter: sourceDelimiter,
+        maxFrameLength: interfaceFraming?.maxFrameLength ?? maxFrameLength,
+        minFrameLength,
+        emitRawBytes: sourceEmitRawBytes,
+        modbusValidateCrc: interfaceFraming?.validateCrc,
+        modbusDeviceAddress: interfaceFraming?.deviceAddress,
+        modbusVendorFunctions: interfaceFraming?.vendorFunctions,
+        modbusAllowBroadcast: interfaceFraming?.allowBroadcast,
+        modbusAnyFunction: interfaceFraming?.anyFunction,
+        // Frame ID extraction config (from catalog)
+        frameIdStartByte,
+        frameIdBytes,
+        frameIdBigEndian,
+        sourceAddressStartByte,
+        sourceAddressBytes,
+        sourceAddressBigEndian,
+      }),
     };
   });
 

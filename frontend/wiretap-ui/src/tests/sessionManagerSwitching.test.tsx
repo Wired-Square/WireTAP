@@ -46,7 +46,7 @@ vi.mock("../stores/sessionStore", async () => {
 vi.mock("../stores/profileBusStore", () => ({
   useProfileBusStore: { getState: () => ({ ensureLoaded: async () => {} }) },
   profileBusMappings: (_id: string, outputBus: number) => [
-    { deviceBus: 0, outputBus, enabled: true, interfaceId: "can0" },
+    { device_bus: 0, output_bus: outputBus, enabled: true, interface_id: "can0", protocol: "can", supported_protocols: [], traits: null },
   ],
 }));
 vi.mock("../api/io", async (importOriginal) => ({
