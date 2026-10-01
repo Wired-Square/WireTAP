@@ -19,6 +19,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A catalogue saved from Discovery keeps its mux selector and serial header.** A mux whose selector is not byte 0 used to decode with the selector at byte 0, and a serial catalogue's frame id and source address positions and default byte order were written under keys the decoder never read. Save the frames from Discovery again, or set the mux selector and serial header fields in the Catalogue Editor, for any catalogue saved this way.
 - **Duplicating or renaming a catalogue changes only its own name.** In a catalogue with a frame or signal above `[meta]`, the first signal's name was rewritten instead. Check the signal names in any catalogue you duplicated or renamed. A renamed catalogue is now written in one step, so it can no longer be read half-written.
 - **Replay keeps to the capture's timing.** The time each send took was added to the gap after it, so a replay ran slow: a 10.7 s capture at 1 ms spacing took 24.7 s at 1×. Frames now go out at their scaled time from the start of the pass, and when the adapter falls behind, the late frames go out straight away.
+- **A Test Pattern throughput run waits out a full send queue.** An unpaced run could outrun the adapter and fail within a fraction of a second on "send queue full". It now waits for the queue to drain and carries on. A queue still full after a second counts as a transmit failure, so a stalled bus still ends the run.
 
 ## [0.13.0] - 2026-09-29
 

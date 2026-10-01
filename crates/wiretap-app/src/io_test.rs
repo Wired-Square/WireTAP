@@ -44,6 +44,15 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 /// bus, and there is nothing to learn by carrying on.
 const MAX_CONSECUTIVE_FAILURES: u32 = 10;
 
+/// A send queue drains at bus speed, in milliseconds; one still full after this
+/// is not draining, and its refusals count as failures.
+const QUEUE_FULL_PATIENCE: Duration = Duration::from_secs(1);
+
+/// The device channel's "buffer full" and the CAN writer's "send queue full".
+fn is_queue_full(error: &str) -> bool {
+    error.contains("buffer full") || error.contains("send queue full")
+}
+
 /// A failing link can produce an error per transmitted frame, and every
 /// progress tick clones the list, serialises it and broadcasts it. The panel
 /// shows ten; keeping more than this buys nothing and costs the whole run.
@@ -942,6 +951,7 @@ impl<'a> Run<'a> {
         let mut sending = true;
         let mut last_progress = start;
         let mut consecutive_failures: u32 = 0;
+        let mut queue_full_since: Option<Instant> = None;
 
         loop {
             // One clock read per iteration: the throughput loop spins as fast as
@@ -973,28 +983,28 @@ impl<'a> Run<'a> {
                 };
                 let payload = config.message(msg, self.run);
 
-                match send(self.session_id, &payload).await {
+                let refused = match send(self.session_id, &payload).await {
                     Ok(result) if result.success => {
                         self.stats.tx_count += 1;
                         consecutive_failures = 0;
+                        queue_full_since = None;
+                        None
                     }
-                    Ok(result) => {
-                        consecutive_failures += 1;
-                        if let Some(err) = result.error {
-                            self.stats.error(format!("seq {}: {}", seq, err));
-                        }
+                    Ok(result) => Some(result.error.unwrap_or_default()),
+                    Err(e) => Some(e),
+                };
+                if let Some(e) = refused {
+                    // Throughput outruns the adapter by design, so a full queue
+                    // is back-pressure: retry the same seq until it drains.
+                    if matches!(config.mode, TestMode::Throughput)
+                        && is_queue_full(&e)
+                        && now - *queue_full_since.get_or_insert(now) < QUEUE_FULL_PATIENCE
+                    {
+                        tokio::time::sleep(Duration::from_micros(100)).await;
+                        continue;
                     }
-                    Err(e) => {
-                        // Buffer full is backpressure from the device channel. In
-                        // throughput mode, yield briefly and retry the same seq
-                        // rather than counting it as a fatal error.
-                        if matches!(config.mode, TestMode::Throughput) && e.contains("buffer full") {
-                            tokio::time::sleep(Duration::from_micros(100)).await;
-                            continue;
-                        }
-                        consecutive_failures += 1;
-                        self.stats.error(format!("seq {}: {}", seq, e));
-                    }
+                    consecutive_failures += 1;
+                    self.stats.error(format!("seq {}: {}", seq, e));
                 }
 
                 if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
@@ -1263,6 +1273,9 @@ pub(crate) mod tests {
         Truncating(Responder),
         /// A bus that swallows everything: frames leave and nothing comes back.
         Deaf,
+        /// A peer behind an adapter whose send queue refuses this many
+        /// throughput frames before it drains.
+        Backlogged(Responder, u32),
     }
 
     static WIRE: Lazy<StdMutex<HashMap<String, Wire>>> =
@@ -1298,14 +1311,19 @@ pub(crate) mod tests {
         let back = {
             let mut wires = WIRE.lock().ok()?;
             match wires.get_mut(session_id)? {
-                Wire::Loopback => {
-                    vec![received(tx.frame_id, tx.is_extended, tx.is_fd, tx.data.clone())]
+                Wire::Backlogged(_, refusals) if *refusals > 0 && tx.frame_id == tp::ID_THROUGHPUT_TX => {
+                    *refusals -= 1;
+                    let full = crate::io::TransmitResult::error("Transmit refused: send queue full".into());
+                    return Some(Ok(full));
                 }
-                Wire::Peer(r) => r
+                Wire::Peer(r) | Wire::Backlogged(r, _) => r
                     .on_frame(tx.frame_id, tx.is_extended, tx.is_fd, &tx.data, now_us())
                     .into_iter()
                     .map(|r| received(r.arb_id, r.extended, r.fd, r.data))
                     .collect(),
+                Wire::Loopback => {
+                    vec![received(tx.frame_id, tx.is_extended, tx.is_fd, tx.data.clone())]
+                }
                 Wire::Truncating(r) => r
                     .on_frame(tx.frame_id, tx.is_extended, tx.is_fd, &tx.data, now_us())
                     .into_iter()
@@ -1429,6 +1447,31 @@ pub(crate) mod tests {
         assert_eq!(state.drops, state.tx_count);
         assert!(state.peer.is_none(), "nothing answered Hello");
         assert_eq!(state.status, TestStatus::Failed);
+    }
+
+    #[tokio::test]
+    async fn throughput_waits_out_a_full_send_queue() {
+        let mut config = config(TestMode::Throughput, false);
+        config.duration_sec = 1.0;
+        let peer = Wire::Backlogged(Responder::new(0, 0), 200);
+        let state = run("test_throughput_backlogged", peer, &config).await;
+
+        assert!(state.tx_count > 0, "frames went out once the queue drained");
+        assert_eq!(state.status, TestStatus::Completed, "errors: {:?}", state.errors);
+    }
+
+    #[tokio::test]
+    async fn throughput_gives_up_on_a_send_queue_that_never_drains() {
+        let mut config = config(TestMode::Throughput, false);
+        config.duration_sec = 5.0;
+        let peer = Wire::Backlogged(Responder::new(0, 0), u32::MAX);
+        let started = Instant::now();
+        let state = run("test_throughput_stuck", peer, &config).await;
+
+        assert_eq!(state.tx_count, 0);
+        assert_eq!(state.status, TestStatus::Failed);
+        assert!(state.errors.iter().any(|e| e.contains("send queue full")), "{:?}", state.errors);
+        assert!(started.elapsed() < Duration::from_secs(3), "gave up before the send phase ended");
     }
 
     /// Two taps on one session are independent. Dropping every tap for the
