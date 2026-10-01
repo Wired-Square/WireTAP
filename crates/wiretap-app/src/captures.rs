@@ -53,26 +53,43 @@ pub struct PaginatedBytesResponse {
 // CSV Import Commands
 // ============================================================================
 
-/// Import a CSV file into a session-owned capture
+#[derive(Clone, serde::Serialize)]
+pub struct CandumpImportResult {
+    pub metadata: CaptureMetadata,
+    pub skipped: Vec<io::SkippedLine>,
+    pub skipped_count: usize,
+}
+
+/// Whether every file is a candump log, for the dedicated import.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn import_csv_to_capture(session_id: String, file_path: String) -> Result<CaptureMetadata, String> {
-    let filename = std::path::Path::new(&file_path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown.csv")
-        .to_string();
-
-    let frames = io::parse_csv_file(&file_path)?;
-
-    if frames.is_empty() {
-        return Err("CSV file contains no valid frames".to_string());
+pub async fn detect_candump(file_paths: Vec<String>) -> Result<bool, String> {
+    for path in &file_paths {
+        if !io::is_candump_file(path)? {
+            return Ok(false);
+        }
     }
+    Ok(!file_paths.is_empty())
+}
 
-    capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, filename);
-    capture_store::append_frames_to_session(&session_id, frames);
-    let finalized = capture_store::finalize_session_captures(&session_id);
-    finalized.into_iter().next()
-        .ok_or_else(|| "Failed to store frames in capture".to_string())
+/// Import candump logs into one session-owned capture, merged in time order.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn import_candump(session_id: String, file_paths: Vec<String>) -> Result<CandumpImportResult, String> {
+    let import = io::parse_candump_files(&file_paths)?;
+    let name = match file_paths.as_slice() {
+        [path] => extract_filename(path),
+        paths => build_batch_name(paths),
+    };
+    capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, name);
+    capture_store::append_frames_to_session(&session_id, import.frames);
+    let metadata = capture_store::finalize_session_captures(&session_id)
+        .into_iter()
+        .next()
+        .ok_or_else(|| "Failed to store frames in capture".to_string())?;
+    Ok(CandumpImportResult {
+        metadata,
+        skipped: import.skipped,
+        skipped_count: import.skipped_count,
+    })
 }
 
 /// Preview a data file: read first N rows, detect delimiter/headers, suggest column mappings

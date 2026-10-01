@@ -6,6 +6,9 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+use wiretap_protocol::candump;
+
+use super::candump::interface_bus;
 use crate::io::{FrameMessage, Protocol};
 
 // ============================================================================
@@ -181,171 +184,6 @@ pub struct CsvPreview {
     /// Detected or user-specified delimiter
     pub delimiter: Delimiter,
     pub suggested_protocol: Protocol,
-}
-
-// ============================================================================
-// Legacy column indices (for GVRET/SavvyCAN auto-detect path)
-// ============================================================================
-
-/// Column indices for CSV parsing - detected from header
-#[derive(Debug, Clone)]
-struct CsvColumnIndices {
-    timestamp: usize,
-    id: usize,
-    extended: usize,
-    dir: Option<usize>,
-    bus: usize,
-    dlc: usize,
-    data_start: usize,
-}
-
-impl Default for CsvColumnIndices {
-    fn default() -> Self {
-        // Default: Time Stamp,ID,Extended,Dir,Bus,LEN,D1,...
-        // Matches SavvyCAN/GVRET export format with Dir column
-        Self {
-            timestamp: 0,
-            id: 1,
-            extended: 2,
-            dir: Some(3),
-            bus: 4,
-            dlc: 5,
-            data_start: 6,
-        }
-    }
-}
-
-/// Parse CSV header and return column indices
-fn parse_csv_header(header: &str) -> CsvColumnIndices {
-    let parts: Vec<String> = header.split(',').map(|s| s.trim().to_lowercase()).collect();
-
-    let mut indices = CsvColumnIndices::default();
-
-    for (i, col) in parts.iter().enumerate() {
-        match col.as_str() {
-            "time stamp" | "timestamp" | "time" => indices.timestamp = i,
-            "id" => indices.id = i,
-            "extended" | "ext" => indices.extended = i,
-            "dir" | "direction" => indices.dir = Some(i),
-            "bus" => indices.bus = i,
-            "len" | "dlc" | "length" => indices.dlc = i,
-            "d1" | "data1" | "byte1" => indices.data_start = i,
-            _ => {}
-        }
-    }
-
-    indices
-}
-
-/// Parse a GVRET CSV line into a FrameMessage using detected column indices
-fn parse_csv_line_with_indices(line: &str, indices: &CsvColumnIndices) -> Option<FrameMessage> {
-    let parts: Vec<&str> = line.split(',').collect();
-
-    // Need at least enough columns for data_start
-    if parts.len() <= indices.data_start {
-        return None;
-    }
-
-    let timestamp_us: u64 = parts.get(indices.timestamp)?.trim().parse().ok()?;
-
-    // ID can be hex (with or without 0x prefix) or decimal
-    let id_str = parts.get(indices.id)?.trim();
-    let frame_id: u32 = if id_str.starts_with("0x") || id_str.starts_with("0X") {
-        u32::from_str_radix(&id_str[2..], 16).ok()?
-    } else if id_str.chars().all(|c| c.is_ascii_hexdigit()) && id_str.len() == 8 {
-        // 8-char hex without prefix (GVRET format)
-        u32::from_str_radix(id_str, 16).ok()?
-    } else {
-        // Try decimal
-        id_str.parse().ok()?
-    };
-
-    let is_extended = parts.get(indices.extended)
-        .map(|s| s.trim().eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
-    let bus: u8 = parts.get(indices.bus)
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(0);
-
-    let dlc: u16 = parts.get(indices.dlc)
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(0);
-
-    // Parse direction if present
-    let direction = indices.dir.and_then(|dir_idx| {
-        parts.get(dir_idx).map(|s| {
-            let dir = s.trim().to_lowercase();
-            if dir == "tx" { "tx".to_string() } else { "rx".to_string() }
-        })
-    });
-
-    // Parse data bytes (D1-D8)
-    let mut bytes = Vec::with_capacity(dlc as usize);
-    for i in 0..dlc as usize {
-        if let Some(byte_str) = parts.get(indices.data_start + i) {
-            let byte_str = byte_str.trim();
-            if byte_str.is_empty() {
-                break;
-            }
-            // Parse hex byte (with or without 0x)
-            let byte_val = if byte_str.starts_with("0x") || byte_str.starts_with("0X") {
-                u8::from_str_radix(&byte_str[2..], 16).unwrap_or(0)
-            } else {
-                u8::from_str_radix(byte_str, 16).unwrap_or(0)
-            };
-            bytes.push(byte_val);
-        }
-    }
-
-    Some(FrameMessage {
-        protocol: "can".to_string(),
-        timestamp_us,
-        frame_id,
-        bus,
-        dlc,
-        bytes,
-        is_extended,
-        is_fd: dlc > 8,
-        source_address: None,
-        incomplete: None,
-        direction,
-    })
-}
-
-
-/// Parse an entire CSV file and return all frames
-pub fn parse_csv_file(file_path: &str) -> Result<Vec<FrameMessage>, String> {
-    let file = File::open(file_path)
-        .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
-    let reader = BufReader::new(file);
-
-    let mut frames: Vec<FrameMessage> = Vec::new();
-    let mut line_number = 0;
-    let mut indices: Option<CsvColumnIndices> = None;
-
-    for line_result in reader.lines() {
-        line_number += 1;
-        let line = line_result.map_err(|e| format!("Failed to read line {}: {}", line_number, e))?;
-
-        // Skip empty lines
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        // Detect header and parse column indices
-        if line_number == 1 && (line.to_lowercase().contains("time") || line.to_lowercase().contains("id,")) {
-            indices = Some(parse_csv_header(&line));
-            continue;
-        }
-
-        let col_indices = indices.as_ref().cloned().unwrap_or_default();
-        if let Some(frame) = parse_csv_line_with_indices(&line, &col_indices) {
-            frames.push(frame);
-        }
-    }
-
-    Ok(frames)
 }
 
 // ============================================================================
@@ -558,15 +396,13 @@ pub fn parse_csv_with_mapping(
         let parts: Vec<&str> = split_line(&line, delimiter);
 
         // Parse frame ID and data — either from separate columns or combined FrameIdData
-        let (frame_id, frame_id_data_bytes) = if let Some(fid_col) = frame_id_data_col {
-            // Combined id#data column (candump format)
-            let combined = match parts.get(fid_col) {
-                Some(s) => s.trim(),
-                None => continue,
+        let (frame_id, id_data_frame) = if let Some(fid_col) = frame_id_data_col {
+            let Some(cell) = parts.get(fid_col) else {
+                continue;
             };
-            match parse_frame_id_data(combined) {
-                Some(result) => result,
-                None => continue,
+            match candump::parse_frame(cell.trim(), 0) {
+                Ok(frame) => (frame.arb_id, Some(frame)),
+                Err(_) => continue,
             }
         } else {
             // Separate frame ID column
@@ -615,8 +451,8 @@ pub fn parse_csv_with_mapping(
         let timestamp_us = 0u64;
 
         // Parse data bytes — FrameIdData provides bytes directly, otherwise use other columns
-        let bytes = if let Some(ref fid_bytes) = frame_id_data_bytes {
-            fid_bytes.clone()
+        let bytes = if let Some(frame) = &id_data_frame {
+            frame.data.clone()
         } else if let Some(db_col) = data_bytes_col {
             parts
                 .get(db_col)
@@ -659,29 +495,12 @@ pub fn parse_csv_with_mapping(
                 .map(|s| s.trim().eq_ignore_ascii_case("true"))
                 .unwrap_or(false)
         } else {
-            // For candump: extended if frame_id > 0x7FF
-            frame_id > 0x7FF
+            id_data_frame.as_ref().map_or(frame_id > 0x7FF, |f| f.extended)
         };
 
         let bus = bus_col
             .and_then(|c| parts.get(c))
-            .and_then(|s| {
-                let trimmed = s.trim();
-                // Try parsing as number first, then extract trailing digits from interface name (e.g., "vcan0" -> 0)
-                trimmed.parse::<u8>().ok().or_else(|| {
-                    trimmed
-                        .chars()
-                        .rev()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect::<String>()
-                        .chars()
-                        .rev()
-                        .collect::<String>()
-                        .parse::<u8>()
-                        .ok()
-                })
-            })
-            .unwrap_or(0);
+            .map_or(0, |s| interface_bus(s.trim()));
 
         let direction = direction_col.and_then(|c| parts.get(c)).map(|s| {
             if s.trim().eq_ignore_ascii_case("tx") {
@@ -700,7 +519,8 @@ pub fn parse_csv_with_mapping(
             dlc,
             bytes,
             is_extended,
-            is_fd: matches!(protocol, Protocol::Can | Protocol::CanFd) && dlc > 8,
+            is_fd: matches!(protocol, Protocol::Can | Protocol::CanFd)
+                && (dlc > 8 || id_data_frame.as_ref().is_some_and(|f| f.fd)),
             source_address: None,
             incomplete: None,
             direction,
@@ -1026,24 +846,9 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
         return CsvColumnRole::Ignore;
     }
 
-    // Combined frame ID + data (candump format: "689#DEADBEEF", "123#0102030405")
     let frame_id_data_count = non_empty
         .iter()
-        .filter(|s| {
-            if let Some(hash_pos) = s.find('#') {
-                let id_part = &s[..hash_pos];
-                let data_part = &s[hash_pos + 1..];
-                // ID: 1-8 hex chars, Data: even number of hex chars (byte pairs)
-                !id_part.is_empty()
-                    && id_part.len() <= 8
-                    && id_part.chars().all(|c| c.is_ascii_hexdigit())
-                    && !data_part.is_empty()
-                    && data_part.len() % 2 == 0
-                    && data_part.chars().all(|c| c.is_ascii_hexdigit())
-            } else {
-                false
-            }
-        })
+        .filter(|s| candump::parse_frame(s.trim(), 0).is_ok())
         .count();
     if frame_id_data_count > non_empty.len() / 2 {
         return CsvColumnRole::FrameIdData;
@@ -1220,19 +1025,6 @@ fn parse_timestamp_string(s: &str) -> Option<f64> {
         return None;
     }
     s.parse::<f64>().ok()
-}
-
-/// Parse a combined frame ID + data column (candump format): "689#DEADBEEF"
-/// Returns (frame_id, Some(data_bytes)) on success.
-fn parse_frame_id_data(s: &str) -> Option<(u32, Option<Vec<u8>>)> {
-    let s = s.trim();
-    let hash_pos = s.find('#')?;
-    let id_part = &s[..hash_pos];
-    let data_part = &s[hash_pos + 1..];
-
-    let frame_id = u32::from_str_radix(id_part, 16).ok()?;
-    let bytes = wiretap_decode::hex::parse_bytes_lenient(data_part);
-    Some((frame_id, Some(bytes)))
 }
 
 /// Analyse sample timestamp values and suggest the most likely unit.
@@ -1414,6 +1206,39 @@ mod tests {
         let frame = &parsed.frames[0];
         assert_eq!(frame.protocol, "modbus_rtu");
         assert!(!frame.is_fd, "only a CAN frame is FD");
+    }
+
+    #[test]
+    fn a_mapped_candump_cell_reads_extended_by_width_and_fd_by_its_flags() {
+        let path = temp_csv(
+            "mapped.log",
+            "(1.000000) can0 00000123#0102\n\
+             (1.000100) can1 123##1A5A5A5A5A5A5A5A5A5A5A5A5\n\
+             (1.000200) can0 7FF#R\n",
+        );
+        let preview = preview_csv_file(path.to_str().unwrap(), 20, None).unwrap();
+        assert!(preview
+            .suggested_mappings
+            .iter()
+            .any(|m| m.role == CsvColumnRole::FrameIdData));
+
+        let parsed = parse_csv_with_mapping(
+            path.to_str().unwrap(),
+            &preview.suggested_mappings,
+            false,
+            TimestampUnit::Microseconds,
+            false,
+            Delimiter::Space,
+            Protocol::Can,
+        )
+        .unwrap();
+
+        let frames: Vec<_> = parsed
+            .frames
+            .iter()
+            .map(|f| (f.frame_id, f.bus, f.is_extended, f.is_fd, f.bytes.len()))
+            .collect();
+        assert_eq!(frames, [(0x123, 0, true, false, 2), (0x123, 1, false, true, 12), (0x7FF, 0, false, false, 0)]);
     }
 
     #[test]

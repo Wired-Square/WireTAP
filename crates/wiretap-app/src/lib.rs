@@ -1303,7 +1303,8 @@ pub fn run() {
             io::webview_health_pong,
             io::check_recovery_occurred,
             // Capture / CSV Import API
-            captures::import_csv_to_capture,
+            captures::detect_candump,
+            captures::import_candump,
             captures::preview_csv,
             captures::import_csv_with_mapping,
             captures::import_csv_batch_with_mapping,

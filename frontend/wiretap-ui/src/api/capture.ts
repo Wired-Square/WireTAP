@@ -45,15 +45,28 @@ export interface CaptureMetadata {
   buses: number[];
 }
 
-/**
- * Import a CSV file into the shared capture.
- * The capture can then be used by any app (Discovery, Decoder).
- *
- * @param filePath - Full path to the CSV file
- * @returns Metadata about the imported data
- */
-export async function importCsvToCapture(sessionId: string, filePath: string): Promise<CaptureMetadata> {
-  return invoke("import_csv_to_capture", { session_id: sessionId, file_path: filePath });
+export interface SkippedLine {
+  file: string;
+  line: number;
+  code: string;
+  message: string;
+}
+
+export interface CandumpImportResult {
+  metadata: CaptureMetadata;
+  /** The first hundred of `skipped_count`. */
+  skipped: SkippedLine[];
+  skipped_count: number;
+}
+
+/** Whether every file is a candump log, which skips the column mapper. */
+export async function detectCandump(filePaths: string[]): Promise<boolean> {
+  return invoke("detect_candump", { file_paths: filePaths });
+}
+
+/** Import candump logs into one capture, merged in time order with their absolute times. */
+export async function importCandump(sessionId: string, filePaths: string[]): Promise<CandumpImportResult> {
+  return invoke("import_candump", { session_id: sessionId, file_paths: filePaths });
 }
 
 // ============================================================================
@@ -425,7 +438,7 @@ export async function findCaptureOffsetForTimestamp(
 
 /**
  * Create a reader session for the shared capture.
- * The capture must have data loaded (via importCsvToCapture).
+ * The capture must have data loaded.
  *
  * @param sessionId - Unique session ID (e.g., "discovery", "decoder")
  * @param speed - Playback speed (0 = no limit, 1 = realtime)

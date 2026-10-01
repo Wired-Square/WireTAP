@@ -417,6 +417,13 @@
     "summaryGapEntry": "  {{loc}}: seq {{from}} → {{to}} ({{dropped}} dropped)",
     "done": "Done"
   },
+  "candumpImport": {
+    "title": "Lines Skipped",
+    "summary": "Imported {{frames}} frames. {{count}} lines were not candump frames and were skipped.",
+    "more": "…and {{count}} more",
+    "line": "{{file}} line {{line}}: {{message}}",
+    "done": "Done"
+  },
   "ioSourcePicker": {
     "title": "Data Source",
     "tabs": {

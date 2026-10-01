@@ -14,10 +14,14 @@ import {
   listOrphanedCaptures,
   deleteCapture,
   setActiveCapture,
+  detectCandump,
+  importCandump,
   type CaptureMetadata,
+  type CandumpImportResult,
 } from "../api/capture";
 import { CsvColumnMapperDialog } from "./csv-column-mapper";
 import CsvFileOrderDialog from "./CsvFileOrderDialog";
+import CandumpImportReportDialog from "./CandumpImportReportDialog";
 import { WINDOW_EVENTS, type CaptureChangedPayload } from "../events/registry";
 import {
   createIOSession,
@@ -257,6 +261,7 @@ export default function IoSourcePickerDialog({
   const [csvMapperFilePaths, setCsvMapperFilePaths] = useState<string[] | null>(null);
   const [csvImportSessionId, setCsvImportSessionId] = useState<string | null>(null);
   const [showCsvMapper, setShowCsvMapper] = useState(false);
+  const [candumpReport, setCandumpReport] = useState<CandumpImportResult | null>(null);
   const [showFileOrderDialog, setShowFileOrderDialog] = useState(false);
   const [pendingFilePaths, setPendingFilePaths] = useState<string[] | null>(null);
   const [csvHasHeaderPerFile, setCsvHasHeaderPerFile] = useState<boolean[] | null>(null);
@@ -1545,7 +1550,11 @@ export default function IoSourcePickerDialog({
         return;
       }
 
-      if (filePaths.length === 1) {
+      if (await detectCandump(filePaths)) {
+        const result = await importCandump(generateLoadSessionId(), filePaths);
+        if (result.skipped_count > 0) setCandumpReport(result);
+        else await handleCsvMapperComplete(result.metadata);
+      } else if (filePaths.length === 1) {
         // Single file — go straight to column mapper
         setCsvMapperFilePath(filePaths[0]);
         setCsvMapperFilePaths(null);
@@ -1988,6 +1997,16 @@ export default function IoSourcePickerDialog({
         filePaths={pendingFilePaths}
         onConfirm={handleFileOrderConfirm}
         onCancel={handleFileOrderCancel}
+      />
+    )}
+
+    {candumpReport && (
+      <CandumpImportReportDialog
+        result={candumpReport}
+        onDone={() => {
+          setCandumpReport(null);
+          void handleCsvMapperComplete(candumpReport.metadata);
+        }}
       />
     )}
 

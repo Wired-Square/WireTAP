@@ -41,8 +41,8 @@ mod socketcan;
 // Re-export recorded sources
 pub use recorded::{step_frame, CaptureSource, StepResult, CAPTURE_SOURCE_TYPE};
 pub use recorded::{
-    parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    Delimiter, SequenceGap, TimestampUnit,
+    is_candump_file, parse_candump_files, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
+    CandumpImport, Delimiter, SequenceGap, SkippedLine, TimestampUnit,
 };
 pub use recorded::{BackendApiConfig, BackendApiSource, BackendApiSourceOptions};
 
