@@ -764,6 +764,17 @@ fn frame_batch_messages(session_id: &str, frames: &[FrameMessage]) -> Vec<(MsgTy
     messages
 }
 
+fn session_state_code(state: &IOState) -> u8 {
+    let name = match state {
+        IOState::Stopped => "stopped",
+        IOState::Starting => "starting",
+        IOState::Running => "running",
+        IOState::Paused => "paused",
+        IOState::Error(_) => "error",
+    };
+    protocol::code_of(&protocol::SESSION_STATES, name)
+}
+
 /// Send session state change.
 pub fn send_session_state(session_id: &str, current: &IOState) {
     let server = match ws_server() {
@@ -774,18 +785,11 @@ pub fn send_session_state(session_id: &str, current: &IOState) {
         Some(c) => c,
         None => return,
     };
-    let state_byte = match current {
-        IOState::Stopped => 0u8,
-        IOState::Starting => 1,
-        IOState::Running => 2,
-        IOState::Paused => 3,
-        IOState::Error(_) => 4,
-    };
     let error_msg = match current {
         IOState::Error(msg) => Some(msg.as_str()),
         _ => None,
     };
-    let payload = protocol::encode_session_state(state_byte, error_msg);
+    let payload = protocol::encode_session_state(session_state_code(current), error_msg);
     let msg = protocol::encode_message(MsgType::SessionState, channel, &payload);
     server.send_to_channel(channel, msg);
 }
@@ -800,16 +804,8 @@ pub fn send_stream_ended(session_id: &str, info: &StreamEndedInfo) {
         Some(c) => c,
         None => return,
     };
-    let reason = match info.reason.as_str() {
-        "complete" => 0u8,
-        "disconnected" => 1,
-        "error" => 2,
-        "stopped" => 3,
-        "paused" => 4,
-        _ => 0,
-    };
     let payload = protocol::encode_stream_ended(
-        reason,
+        protocol::code_of(&protocol::STREAM_END_REASONS, &info.reason),
         info.capture_available,
         info.capture_id.as_deref(),
         info.capture_kind.as_deref(),
@@ -1116,14 +1112,7 @@ pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
         Some(s) => s,
         None => return,
     };
-    let state_byte = payload.state.as_deref().map(|s| match s {
-        "stopped" => 0u8,
-        "starting" => 1,
-        "running" => 2,
-        "paused" => 3,
-        "error" => 4,
-        _ => 0,
-    });
+    let state_byte = payload.state.as_deref().map(|s| protocol::code_of(&protocol::SESSION_STATES, s));
     // "updated" (a source paused or resumed) rides the "created" code: every
     // global consumer re-fetches the roster on any lifecycle push and reads the
     // answer from there, so a third code would be one nothing branches on.
@@ -1159,13 +1148,7 @@ pub fn send_session_lifecycle_scoped(
         None => return,
     };
 
-    let state_byte: u8 = match state {
-        crate::io::IOState::Stopped => 0,
-        crate::io::IOState::Starting => 1,
-        crate::io::IOState::Running => 2,
-        crate::io::IOState::Paused => 3,
-        crate::io::IOState::Error(_) => 4,
-    };
+    let state_byte = session_state_code(state);
 
     let json_bytes = serde_json::to_vec(capabilities).unwrap_or_default();
     let json_len = json_bytes.len() as u16;

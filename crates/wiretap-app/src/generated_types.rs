@@ -40,7 +40,10 @@ impl TypeVisitor for Render {
 fn render() -> BTreeMap<PathBuf, String> {
     let mut r = Render {
         cfg: Config::new().with_large_int("number"),
-        files: BTreeMap::new(),
+        files: BTreeMap::from([(
+            PathBuf::from("wireConstants.ts"),
+            (TypeId::of::<crate::ws::protocol::MsgType>(), wire_constants()),
+        )]),
     };
     r.visit::<crate::io::GvretDeviceInfo>();
     r.visit::<crate::io::ActiveSessionInfo>();
@@ -70,6 +73,31 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
+}
+
+/// The binary WS protocol's constants, from `ws::protocol`.
+fn wire_constants() -> String {
+    use crate::ws::protocol::*;
+    fn table<V: std::fmt::LowerHex>(name: &str, entries: impl IntoIterator<Item = (&'static str, V)>, width: usize) -> String {
+        let rows: String = entries.into_iter().map(|(key, value)| format!("  {key}: 0x{value:0width$x},\n")).collect();
+        format!("export const {name} = {{\n{rows}}} as const;\n")
+    }
+    fn names(name: &str, table: &[&str]) -> String {
+        format!("export const {name} = {table:?} as const;\n")
+    }
+    [
+        HEADER.to_string(),
+        format!("export const PROTOCOL_VERSION = {PROTOCOL_VERSION};\n"),
+        format!("export const HEADER_SIZE = {HEADER_SIZE};\n"),
+        format!("export const ENVELOPE_HEADER_SIZE = {ENVELOPE_HEADER_SIZE};\n"),
+        table("MsgType", MsgType::VARIANTS.iter().map(|(k, v)| (*k, *v as u8)), 2),
+        table("FrameType", FrameType::VARIANTS.iter().map(|(k, v)| (*k, *v as u16)), 4),
+        table("IdFlags", ID_FLAGS.iter().copied(), 8),
+        table("StreamEndedFlags", STREAM_ENDED_FLAGS.iter().copied(), 2),
+        names("SESSION_STATES", &SESSION_STATES),
+        names("STREAM_END_REASONS", &STREAM_END_REASONS),
+    ]
+    .join("\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {

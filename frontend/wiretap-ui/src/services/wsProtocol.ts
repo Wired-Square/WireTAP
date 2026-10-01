@@ -7,60 +7,19 @@ import type { FrameMessage } from "../types/frame";
 import type { IOCapabilities, PlaybackPosition, StreamEndedInfo } from "../api/io";
 import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
 import { trackAlloc } from "./memoryDiag";
+import {
+  ENVELOPE_HEADER_SIZE,
+  FrameType,
+  HEADER_SIZE,
+  IdFlags,
+  MsgType,
+  PROTOCOL_VERSION,
+  SESSION_STATES,
+  STREAM_END_REASONS,
+  StreamEndedFlags,
+} from "../generated/wireConstants";
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-export const PROTOCOL_VERSION = 2;
-export const ENVELOPE_HEADER_SIZE = 15;
-export const HEADER_SIZE = 4;
-
-export const MsgType = {
-  FrameData: 0x01,
-  SessionState: 0x02,
-  StreamEnded: 0x03,
-  SessionError: 0x04,
-  PlaybackPosition: 0x05,
-  DeviceConnected: 0x06,
-  CaptureChanged: 0x07,
-  SessionLifecycle: 0x08,
-  SessionInfo: 0x09,
-  Reconfigured: 0x0a,
-  TransmitUpdated: 0x0b,
-  ReplayState: 0x0c,
-  TestPatternState: 0x0d,
-  OtaEvent: 0x0e,
-  RepeatEvent: 0x0f,
-  Subscribe: 0x10,
-  Unsubscribe: 0x11,
-  SubscribeAck: 0x12,
-  SubscribeNack: 0x13,
-  DecodedSignals: 0x14,
-  AttachToPanel: 0x15,
-  FrameCounts: 0x16,
-  OpenAppsChanged: 0x17,
-  CatalogListChanged: 0x18,
-  ByteCounts: 0x19,
-  ModbusScanState: 0x1a,
-  DecodedBacklog: 0x1b,
-  AdhocSignals: 0x1c,
-  Command: 0x20,
-  CommandResponse: 0x21,
-  BridgeRequest: 0x30,
-  BridgeResponse: 0x31,
-  Heartbeat: 0xfe,
-  Auth: 0xff,
-} as const;
-
-export const FrameType = {
-  Can: 0x0001,
-  CanFd: 0x0002,
-  Modbus: 0x0003,
-  Serial: 0x0004,
-  /** A whole Modbus RTU message; the prefix is `unit << 8 | function`. */
-  ModbusRtu: 0x0005,
-} as const;
+export { ENVELOPE_HEADER_SIZE, FrameType, HEADER_SIZE, MsgType, PROTOCOL_VERSION };
 
 // ============================================================================
 // Header
@@ -174,9 +133,9 @@ export function decodeFrameBatch(
     if (frameType === FrameType.Can || frameType === FrameType.CanFd) {
       if (len < 4) continue;
       const idFlags = view.getUint32(dataStart, true);
-      const id = idFlags & 0x1fffffff;
-      const isExtended = (idFlags & (1 << 29)) !== 0;
-      const directionTx = (idFlags & (1 << 31)) !== 0;
+      const id = idFlags & IdFlags.ID_ARB_MASK;
+      const isExtended = (idFlags & IdFlags.ID_EXTENDED) !== 0;
+      const directionTx = (idFlags & IdFlags.ID_TX) !== 0;
       const payloadLen = len - 4;
 
       frame = {
@@ -294,10 +253,8 @@ function decodeLengthPrefixedStr(
 }
 
 // Wire format: 1 byte state_type, followed by a length-prefixed error
-// message iff state_type == 4 (Error). Matches Rust encode_session_state
+// message iff the state is "error". Matches Rust encode_session_state
 // in crates/wiretap-app/src/ws/protocol.rs.
-const SESSION_STATE_NAMES = ["stopped", "starting", "running", "paused", "error"] as const;
-
 export function decodeSessionState(payload: DataView): {
   state: string;
   errorMsg?: string;
@@ -306,8 +263,8 @@ export function decodeSessionState(payload: DataView): {
     return { state: "stopped" };
   }
   const stateType = payload.getUint8(0);
-  const state = SESSION_STATE_NAMES[stateType] ?? `unknown(${stateType})`;
-  if (stateType === 4 && payload.byteLength >= 3) {
+  const state = SESSION_STATES[stateType] ?? `unknown(${stateType})`;
+  if (state === "error" && payload.byteLength >= 3) {
     const [errorMsg] = decodeLengthPrefixedStr(payload, 1);
     return { state, errorMsg };
   }
@@ -315,27 +272,26 @@ export function decodeSessionState(payload: DataView): {
 }
 
 // Wire format (matches Rust encode_stream_ended in ws/protocol.rs):
-//   reason:  u8  (0=complete, 1=disconnected, 2=error, 3=stopped, 4=paused)
-//   flags:   u8  (bit0=capture_available, bit1=has_capture_id, bit2=has_capture_kind, bit3=has_time_range)
+//   reason:  u8  (an index into STREAM_END_REASONS)
+//   flags:   u8  (StreamEndedFlags)
 //   count:   u32 LE
-//   optional: capture_id   (length-prefixed string, present if flags bit1)
-//   optional: capture_kind (length-prefixed string, present if flags bit2)
-//   optional: time_range   (two u64 LE, present if flags bit3)
-const STREAM_ENDED_REASONS = ["complete", "disconnected", "error", "stopped", "paused"] as const;
+//   optional: capture_id   (length-prefixed string, present if HAS_CAPTURE_ID)
+//   optional: capture_kind (length-prefixed string, present if HAS_CAPTURE_KIND)
+//   optional: time_range   (two u64 LE, present if HAS_TIME_RANGE)
 
 export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   let offset = 0;
 
   const reasonByte = payload.getUint8(offset);
   offset += 1;
-  const reason = STREAM_ENDED_REASONS[reasonByte] ?? `unknown(${reasonByte})`;
+  const reason = STREAM_END_REASONS[reasonByte] ?? `unknown(${reasonByte})`;
 
   const flags = payload.getUint8(offset);
   offset += 1;
-  const captureAvailable = (flags & (1 << 0)) !== 0;
-  const hasCaptureId     = (flags & (1 << 1)) !== 0;
-  const hasCaptureKind   = (flags & (1 << 2)) !== 0;
-  const hasTimeRange     = (flags & (1 << 3)) !== 0;
+  const captureAvailable = (flags & StreamEndedFlags.CAPTURE_AVAILABLE) !== 0;
+  const hasCaptureId     = (flags & StreamEndedFlags.HAS_CAPTURE_ID) !== 0;
+  const hasCaptureKind   = (flags & StreamEndedFlags.HAS_CAPTURE_KIND) !== 0;
+  const hasTimeRange     = (flags & StreamEndedFlags.HAS_TIME_RANGE) !== 0;
 
   const count = payload.getUint32(offset, true);
   offset += 4;
@@ -459,7 +415,6 @@ export function decodeTransmitUpdated(payload: DataView): { count: number } {
 }
 
 const sharedLifecycleDecoder = new TextDecoder();
-const SCOPED_STATE_MAP = ["stopped", "starting", "running", "paused", "error"] as const;
 
 /** Decode scoped SessionLifecycle payload: state (u8) + capabilities (JSON). */
 export function decodeScopedSessionLifecycle(payload: DataView): {
@@ -471,7 +426,7 @@ export function decodeScopedSessionLifecycle(payload: DataView): {
   }
 
   const stateByte = payload.getUint8(0);
-  const stateType = SCOPED_STATE_MAP[stateByte] ?? "stopped";
+  const stateType = SESSION_STATES[stateByte] ?? "stopped";
 
   const jsonLen = payload.getUint16(1, true);
   let capabilities: IOCapabilities | null = null;

@@ -5,106 +5,122 @@ use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
 pub const PROTOCOL_VERSION: u8 = 2;
 pub const HEADER_SIZE: usize = 4;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum MsgType {
-    FrameData        = 0x01,
-    SessionState     = 0x02,
-    StreamEnded      = 0x03,
-    SessionError     = 0x04,
-    PlaybackPosition = 0x05,
-    DeviceConnected  = 0x06,
-    CaptureChanged   = 0x07,
-    SessionLifecycle = 0x08,
-    SessionInfo      = 0x09,
-    Reconfigured     = 0x0A,
-    TransmitUpdated  = 0x0B,
-    ReplayState      = 0x0C,
-    TestPatternState = 0x0D,
-    OtaEvent         = 0x0E,
-    RepeatEvent      = 0x0F,
-    Subscribe        = 0x10,
-    Unsubscribe      = 0x11,
-    SubscribeAck     = 0x12,
-    SubscribeNack    = 0x13,
-    // Decoded signals pushed alongside FrameData when a catalogue is attached to
-    // the session (decode happens once, in Rust). Raw FrameData still flows for
-    // Discovery/Analysis/raw-hex/Calculator.
-    DecodedSignals   = 0x14,
-    AttachToPanel    = 0x15,
-    // Live frame counters for a streaming session, pushed on the frame cadence so
-    // the frontend renders counts straight from the backend (no TS-side counting).
-    FrameCounts      = 0x16,
-    // Cross-window open-app roster snapshot (every open session-aware app instance,
-    // across all windows). Opaque JSON; the frontend replaces its roster state.
-    OpenAppsChanged  = 0x17,
-    // Global signal: the decoder-catalogue list changed (mutation, decoder-dir
-    // change, or filesystem watcher). The frontend reconciles via list_catalogs.
-    CatalogListChanged = 0x18,
-    // Live byte total for a session's byte capture, plus that capture's id. Raw serial
-    // bytes are read from the capture, not streamed, so this is the whole byte signal.
-    ByteCounts       = 0x19,
-    // Modbus discovery sweep progress, on the scan session's own channel — the
-    // frames it finds ride the same channel, so the terminal state is ordered
-    // against StreamEnded rather than racing it on a separate transport.
-    ModbusScanState  = 0x1A,
-    // An attach's DecodedSignals for the frames already delivered, sent only to
-    // the attaching window: a u16 BE length and the attaching subscriber's id,
-    // then the batch. That subscriber replaces what it holds with it.
-    DecodedBacklog   = 0x1B,
-    // A Dashboard window's ad-hoc signal values, seen frame ids and heatmap
-    // toggle counts for a frame batch, sent only to the window that set them.
-    AdhocSignals     = 0x1C,
-    Command          = 0x20,
-    CommandResponse  = 0x21,
-    // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
-    BridgeRequest    = 0x30,
-    BridgeResponse   = 0x31,
-    Heartbeat        = 0xFE,
-    Auth             = 0xFF,
+/// Named constants as a table, for the frontend's generated copy.
+macro_rules! wire_table {
+    ($table:ident: $ty:ty = [$($name:ident),* $(,)?]) => {
+        pub const $table: &[(&str, $ty)] = &[$((stringify!($name), $name),)*];
+    };
 }
 
-impl TryFrom<u8> for MsgType {
-    type Error = ProtocolError;
+// The CAN `id_flags` word's bits that `encode_frame_batch` sets.
+wire_table!(ID_FLAGS: u32 = [ID_ARB_MASK, ID_EXTENDED, ID_TX]);
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x01 => Ok(MsgType::FrameData),
-            0x02 => Ok(MsgType::SessionState),
-            0x03 => Ok(MsgType::StreamEnded),
-            0x04 => Ok(MsgType::SessionError),
-            0x05 => Ok(MsgType::PlaybackPosition),
-            0x06 => Ok(MsgType::DeviceConnected),
-            0x07 => Ok(MsgType::CaptureChanged),
-            0x08 => Ok(MsgType::SessionLifecycle),
-            0x09 => Ok(MsgType::SessionInfo),
-            0x0A => Ok(MsgType::Reconfigured),
-            0x0B => Ok(MsgType::TransmitUpdated),
-            0x0C => Ok(MsgType::ReplayState),
-            0x0D => Ok(MsgType::TestPatternState),
-            0x0E => Ok(MsgType::OtaEvent),
-            0x0F => Ok(MsgType::RepeatEvent),
-            0x10 => Ok(MsgType::Subscribe),
-            0x11 => Ok(MsgType::Unsubscribe),
-            0x12 => Ok(MsgType::SubscribeAck),
-            0x13 => Ok(MsgType::SubscribeNack),
-            0x14 => Ok(MsgType::DecodedSignals),
-            0x15 => Ok(MsgType::AttachToPanel),
-            0x16 => Ok(MsgType::FrameCounts),
-            0x17 => Ok(MsgType::OpenAppsChanged),
-            0x18 => Ok(MsgType::CatalogListChanged),
-            0x19 => Ok(MsgType::ByteCounts),
-            0x1A => Ok(MsgType::ModbusScanState),
-            0x1B => Ok(MsgType::DecodedBacklog),
-            0x1C => Ok(MsgType::AdhocSignals),
-            0x20 => Ok(MsgType::Command),
-            0x21 => Ok(MsgType::CommandResponse),
-            0x30 => Ok(MsgType::BridgeRequest),
-            0x31 => Ok(MsgType::BridgeResponse),
-            0xFE => Ok(MsgType::Heartbeat),
-            0xFF => Ok(MsgType::Auth),
-            other => Err(ProtocolError::InvalidMsgType(other)),
+/// The state byte of `SessionState` and `SessionLifecycle` indexes this table.
+pub const SESSION_STATES: [&str; 5] = ["stopped", "starting", "running", "paused", "error"];
+
+/// The reason byte of `StreamEnded` indexes this table.
+pub const STREAM_END_REASONS: [&str; 5] = ["complete", "disconnected", "error", "stopped", "paused"];
+
+/// `name`'s byte in a code table; a name it lacks encodes as the first entry.
+pub fn code_of(table: &[&str], name: &str) -> u8 {
+    table.iter().position(|n| *n == name).unwrap_or(0) as u8
+}
+
+pub const CAPTURE_AVAILABLE: u8 = 1 << 0;
+pub const HAS_CAPTURE_ID: u8 = 1 << 1;
+pub const HAS_CAPTURE_KIND: u8 = 1 << 2;
+pub const HAS_TIME_RANGE: u8 = 1 << 3;
+wire_table!(STREAM_ENDED_FLAGS: u8 = [CAPTURE_AVAILABLE, HAS_CAPTURE_ID, HAS_CAPTURE_KIND, HAS_TIME_RANGE]);
+
+/// A wire enum: the type, its `TryFrom` and the name/value table the
+/// frontend's constants are generated from, from one list.
+macro_rules! wire_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident: $repr:ty, $error:ident {
+            $($(#[$vmeta:meta])* $variant:ident = $value:literal,)*
         }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[repr($repr)]
+        pub enum $name {
+            $($(#[$vmeta])* $variant = $value,)*
+        }
+
+        impl $name {
+            pub const VARIANTS: &[(&str, $name)] = &[$((stringify!($variant), $name::$variant),)*];
+        }
+
+        impl TryFrom<$repr> for $name {
+            type Error = ProtocolError;
+
+            fn try_from(value: $repr) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok($name::$variant),)*
+                    other => Err(ProtocolError::$error(other)),
+                }
+            }
+        }
+    };
+}
+
+wire_enum! {
+    pub enum MsgType: u8, InvalidMsgType {
+        FrameData        = 0x01,
+        SessionState     = 0x02,
+        StreamEnded      = 0x03,
+        SessionError     = 0x04,
+        PlaybackPosition = 0x05,
+        DeviceConnected  = 0x06,
+        CaptureChanged   = 0x07,
+        SessionLifecycle = 0x08,
+        SessionInfo      = 0x09,
+        Reconfigured     = 0x0A,
+        TransmitUpdated  = 0x0B,
+        ReplayState      = 0x0C,
+        TestPatternState = 0x0D,
+        OtaEvent         = 0x0E,
+        RepeatEvent      = 0x0F,
+        Subscribe        = 0x10,
+        Unsubscribe      = 0x11,
+        SubscribeAck     = 0x12,
+        SubscribeNack    = 0x13,
+        // Decoded signals pushed alongside FrameData when a catalogue is attached to
+        // the session (decode happens once, in Rust). Raw FrameData still flows for
+        // Discovery/Analysis/raw-hex/Calculator.
+        DecodedSignals   = 0x14,
+        AttachToPanel    = 0x15,
+        // Live frame counters for a streaming session, pushed on the frame cadence so
+        // the frontend renders counts straight from the backend (no TS-side counting).
+        FrameCounts      = 0x16,
+        // Cross-window open-app roster snapshot (every open session-aware app instance,
+        // across all windows). Opaque JSON; the frontend replaces its roster state.
+        OpenAppsChanged  = 0x17,
+        // Global signal: the decoder-catalogue list changed (mutation, decoder-dir
+        // change, or filesystem watcher). The frontend reconciles via list_catalogs.
+        CatalogListChanged = 0x18,
+        // Live byte total for a session's byte capture, plus that capture's id. Raw serial
+        // bytes are read from the capture, not streamed, so this is the whole byte signal.
+        ByteCounts       = 0x19,
+        // Modbus discovery sweep progress, on the scan session's own channel — the
+        // frames it finds ride the same channel, so the terminal state is ordered
+        // against StreamEnded rather than racing it on a separate transport.
+        ModbusScanState  = 0x1A,
+        // An attach's DecodedSignals for the frames already delivered, sent only to
+        // the attaching window: a u16 BE length and the attaching subscriber's id,
+        // then the batch. That subscriber replaces what it holds with it.
+        DecodedBacklog   = 0x1B,
+        // A Dashboard window's ad-hoc signal values, seen frame ids and heatmap
+        // toggle counts for a frame batch, sent only to the window that set them.
+        AdhocSignals     = 0x1C,
+        Command          = 0x20,
+        CommandResponse  = 0x21,
+        // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
+        BridgeRequest    = 0x30,
+        BridgeResponse   = 0x31,
+        Heartbeat        = 0xFE,
+        Auth             = 0xFF,
     }
 }
 
@@ -175,29 +191,14 @@ pub enum ProtocolError {
 // Frame Type Identifiers
 // ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u16)]
-pub enum FrameType {
-    Can    = 0x0001,
-    CanFd  = 0x0002,
-    Modbus = 0x0003,
-    Serial = 0x0004,
-    /// A whole Modbus RTU message; the 4-byte prefix is `unit << 8 | function`
-    ModbusRtu = 0x0005,
-}
-
-impl TryFrom<u16> for FrameType {
-    type Error = ProtocolError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            0x0001 => Ok(FrameType::Can),
-            0x0002 => Ok(FrameType::CanFd),
-            0x0003 => Ok(FrameType::Modbus),
-            0x0004 => Ok(FrameType::Serial),
-            0x0005 => Ok(FrameType::ModbusRtu),
-            other  => Err(ProtocolError::InvalidFrameType(other)),
-        }
+wire_enum! {
+    pub enum FrameType: u16, InvalidFrameType {
+        Can    = 0x0001,
+        CanFd  = 0x0002,
+        Modbus = 0x0003,
+        Serial = 0x0004,
+        /// A whole Modbus RTU message; the 4-byte prefix is `unit << 8 | function`
+        ModbusRtu = 0x0005,
     }
 }
 
@@ -376,14 +377,15 @@ fn decode_length_prefixed_str(src: &[u8], pos: &mut usize) -> Result<String, Pro
 // 0x02 — Session State
 // ----------------------------------------------------------------------------
 
-/// Encode a SessionState payload.
-///
-/// `state_type`: 0=Stopped, 1=Starting, 2=Running, 3=Paused, 4=Error.
-/// When `state_type == 4` (Error), the error message is appended as a
-/// length-prefixed UTF-8 string.
+fn is_error_state(state_type: u8) -> bool {
+    SESSION_STATES.get(usize::from(state_type)) == Some(&"error")
+}
+
+/// Encode a SessionState payload: the [`SESSION_STATES`] byte, then for an
+/// error the message as a length-prefixed UTF-8 string.
 pub fn encode_session_state(state_type: u8, error_msg: Option<&str>) -> Vec<u8> {
     let mut out = vec![state_type];
-    if state_type == 4 {
+    if is_error_state(state_type) {
         if let Some(msg) = error_msg {
             out.extend_from_slice(&encode_length_prefixed_str(msg));
         } else {
@@ -405,7 +407,7 @@ pub fn decode_session_state(payload: &[u8]) -> Result<SessionStateMsg, ProtocolE
         return Err(ProtocolError::TooShort);
     }
     let state_type = payload[0];
-    let error_msg = if state_type == 4 {
+    let error_msg = if is_error_state(state_type) {
         let mut pos = 1;
         Some(decode_length_prefixed_str(payload, &mut pos)?)
     } else {
@@ -418,11 +420,8 @@ pub fn decode_session_state(payload: &[u8]) -> Result<SessionStateMsg, ProtocolE
 // 0x03 — Stream Ended
 // ----------------------------------------------------------------------------
 
-/// Encode a StreamEnded payload.
-///
-/// `reason`: 0=complete, 1=disconnected, 2=error, 3=stopped, 4=paused.
-/// Flags byte (bit 0 = capture_available, bit 1 = has_capture_id,
-///             bit 2 = has_capture_kind, bit 3 = has_time_range).
+/// Encode a StreamEnded payload: the [`STREAM_END_REASONS`] byte, the
+/// [`STREAM_ENDED_FLAGS`] byte, the count, then what the flags say is present.
 pub fn encode_stream_ended(
     reason: u8,
     capture_available: bool,
@@ -432,10 +431,10 @@ pub fn encode_stream_ended(
     time_range: Option<(u64, u64)>,
 ) -> Vec<u8> {
     let mut flags: u8 = 0;
-    if capture_available    { flags |= 1 << 0; }
-    if capture_id.is_some() { flags |= 1 << 1; }
-    if capture_kind.is_some() { flags |= 1 << 2; }
-    if time_range.is_some()  { flags |= 1 << 3; }
+    if capture_available      { flags |= CAPTURE_AVAILABLE; }
+    if capture_id.is_some()   { flags |= HAS_CAPTURE_ID; }
+    if capture_kind.is_some() { flags |= HAS_CAPTURE_KIND; }
+    if time_range.is_some()   { flags |= HAS_TIME_RANGE; }
 
     let mut out = Vec::new();
     out.push(reason);
@@ -819,31 +818,8 @@ mod tests {
 
     #[test]
     fn all_msg_types_round_trip() {
-        let types = [
-            MsgType::FrameData,
-            MsgType::SessionState,
-            MsgType::StreamEnded,
-            MsgType::SessionError,
-            MsgType::PlaybackPosition,
-            MsgType::DeviceConnected,
-            MsgType::CaptureChanged,
-            MsgType::SessionLifecycle,
-            MsgType::SessionInfo,
-            MsgType::Reconfigured,
-            MsgType::TransmitUpdated,
-            MsgType::ReplayState,
-            MsgType::Subscribe,
-            MsgType::Unsubscribe,
-            MsgType::SubscribeAck,
-            MsgType::SubscribeNack,
-            MsgType::Heartbeat,
-            MsgType::Auth,
-        ];
-
-        for msg_type in types {
-            let raw = msg_type as u8;
-            let decoded = MsgType::try_from(raw).expect("round-trip failed");
-            assert_eq!(decoded, msg_type, "failed for {msg_type:?}");
+        for (name, msg_type) in MsgType::VARIANTS {
+            assert_eq!(MsgType::try_from(*msg_type as u8), Ok(*msg_type), "failed for {name}");
         }
     }
 
@@ -872,9 +848,8 @@ mod tests {
 
     #[test]
     fn frame_type_round_trip() {
-        for (raw, expected) in [(0x0001u16, FrameType::Can), (0x0002, FrameType::CanFd), (0x0003, FrameType::Modbus), (0x0004, FrameType::Serial), (0x0005, FrameType::ModbusRtu)] {
-            assert_eq!(FrameType::try_from(raw).unwrap(), expected);
-            assert_eq!(expected as u16, raw);
+        for (name, frame_type) in FrameType::VARIANTS {
+            assert_eq!(FrameType::try_from(*frame_type as u16), Ok(*frame_type), "failed for {name}");
         }
     }
 
