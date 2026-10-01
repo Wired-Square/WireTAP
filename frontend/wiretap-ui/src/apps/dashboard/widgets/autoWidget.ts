@@ -1,11 +1,12 @@
 // ui/src/apps/dashboard/widgets/autoWidget.ts
 //
-// Choose a widget for a signal: an explicit catalog `display` hint wins;
-// otherwise infer from the signal's metadata (enum / min-max / unit).
+// Choose a widget for a signal: a catalog `display` hint naming a known widget
+// wins; otherwise infer from the signal's metadata (enum / min-max / unit).
 
 import type { PanelType } from "../../../stores/dashboardStore";
 import type { WidgetConfig, IconStateConfig } from "./configTypes";
-import { hintWidget, type DisplayHint } from "./displayHints";
+import type { DisplayHint } from "../../../types/catalogModel";
+import { WIDGET_META } from "./widgetMeta";
 
 /** The signal facts that drive widget selection. */
 export interface SignalMeta {
@@ -51,8 +52,7 @@ function inferType(meta: SignalMeta): PanelType {
 
 /** Build per-widget config from the signal's metadata + any rich-hint keys.
  *  Returns undefined when nothing needs configuring (defaults suffice). */
-function buildConfig(type: PanelType, meta: SignalMeta, hint?: DisplayHint): WidgetConfig | undefined {
-  const h = hint && typeof hint !== "string" ? (hint as Record<string, unknown>) : {};
+function buildConfig(type: PanelType, meta: SignalMeta, h: Partial<DisplayHint>): WidgetConfig | undefined {
   switch (type) {
     case "icon-state": {
       const states = (h.states as IconStateConfig["states"]) ?? (meta.enum ? iconStateFromEnum(meta.enum).states : undefined);
@@ -78,11 +78,12 @@ function buildConfig(type: PanelType, meta: SignalMeta, hint?: DisplayHint): Wid
 }
 
 export function widgetForSignal(meta: SignalMeta, hint?: DisplayHint): AutoWidget {
-  const type = hint ? hintWidget(hint) : inferType(meta);
+  const hinted = hint && WIDGET_META[hint.widget as PanelType]?.type;
+  const type = hinted ?? inferType(meta);
   const out: AutoWidget = { type };
   if (meta.min != null) out.minValue = meta.min;
   if (meta.max != null) out.maxValue = meta.max;
-  const widgetConfig = buildConfig(type, meta, hint);
+  const widgetConfig = buildConfig(type, meta, hinted ? hint : {});
   if (widgetConfig) out.widgetConfig = widgetConfig;
   return out;
 }

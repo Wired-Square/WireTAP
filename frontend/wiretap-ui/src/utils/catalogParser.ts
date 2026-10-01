@@ -16,6 +16,7 @@ import type {
   Signal,
   Mux,
   CanConfig,
+  DisplayHint,
   SerialConfig,
   ModbusConfig,
 } from '../types/catalogModel';
@@ -98,6 +99,7 @@ export interface ResolvedSignal {
   format?: SignalFormat;
   enum?: Record<number, string>;
   confidence?: Confidence;
+  display?: DisplayHint;
   _inherited?: boolean;
   /** Modbus-specific: the signal's own register number (synthesised by the crate). */
   modbus_register?: number;
@@ -194,6 +196,7 @@ function adaptSignal(s: Signal): ResolvedSignal {
     format: s.format as SignalFormat | undefined,
     enum: s.enum as Record<number, string> | undefined,
     confidence: s.confidence as Confidence | undefined,
+    display: s.display,
     modbus_register: s.modbusRegister,
     modbus_register_count: s.modbusRegisterCount,
   };

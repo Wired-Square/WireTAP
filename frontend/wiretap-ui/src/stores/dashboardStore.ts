@@ -19,7 +19,6 @@ import { storeGet, storeSet, storeDelete } from '../api/store';
 import { WIDGET_META } from '../apps/dashboard/widgets/widgetMeta';
 import type { WidgetConfig } from '../apps/dashboard/widgets/configTypes';
 import { widgetForSignal } from '../apps/dashboard/widgets/autoWidget';
-import { parseDisplayHints, type DisplayHint } from '../apps/dashboard/widgets/displayHints';
 import type { DashboardFileContent } from '../utils/dashboards';
 
 // ─────────────────────────────────────────
@@ -249,8 +248,6 @@ interface DashboardState {
   defaultByteOrder: 'big' | 'little';
   /** Frame ID mask for catalog lookup */
   frameIdMask: number | undefined;
-  /** Per-signal display hints from the catalog, keyed "frameId:signalName". */
-  displayHints: Map<string, DisplayHint>;
 
   // ── IO Session ──
   ioProfile: string | null;
@@ -344,7 +341,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   serialConfig: null,
   defaultByteOrder: 'little',
   frameIdMask: undefined,
-  displayHints: new Map(),
 
   ioProfile: null,
   playbackSpeed: 1,
@@ -434,7 +430,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         serialConfig,
         defaultByteOrder,
         frameIdMask,
-        displayHints: parseDisplayHints(catalog.rawToml),
       });
     } catch (e) {
       tlog.info(`[dashboardStore] Failed to load catalog: ${e}`);
@@ -494,7 +489,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   addSignalsAsInstruments: (entries) => {
-    const { panels, layout, frames, displayHints } = get();
+    const { panels, layout, frames } = get();
     const newPanels = [...panels];
     const newLayout = [...layout];
 
@@ -507,8 +502,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const frame = frames.get(frameId);
       const def = frame ? findSignalDef(frame, signalName) : undefined;
       const meta = { unit: unit ?? def?.unit, min: def?.min, max: def?.max, enum: def?.enum, format: def?.format };
-      const hint = displayHints.get(makeSignalKey(frameId, signalName));
-      const widget = widgetForSignal(meta, hint);
+      const widget = widgetForSignal(meta, def?.display);
 
       const size = WIDGET_META[widget.type]?.defaultSize ?? { w: 3, h: 3 };
       if (x + size.w > 12) { x = 0; rowY += rowH; rowH = 0; }

@@ -1,0 +1,25 @@
+[
+  {
+    "signal": "256:Steering",
+    "type": "rotary",
+    "minValue": 0,
+    "maxValue": 100
+  },
+  {
+    "signal": "256:Coolant",
+    "type": "level-bar",
+    "minValue": 0,
+    "maxValue": 120,
+    "widgetConfig": {
+      "levelBar": {
+        "orientation": "vertical"
+      }
+    }
+  },
+  {
+    "signal": "256:Speed",
+    "type": "level-bar",
+    "minValue": 0,
+    "maxValue": 250
+  }
+]

@@ -1,6 +1,7 @@
 // ui/src/types/decoder.ts
 
 import type { Confidence, Endianness, SignalFormat } from "./catalog";
+import type { DisplayHint } from "./catalogModel";
 
 export type SignalDef = {
   name?: string;
@@ -17,6 +18,7 @@ export type SignalDef = {
   format?: SignalFormat;
   enum?: Record<number, string>;
   confidence?: Confidence;
+  display?: DisplayHint;
   /** True if this signal is inherited from a mirror source frame */
   _inherited?: boolean;
   /** Modbus-specific: the signal's own register number (synthesised by the catalog crate). */
