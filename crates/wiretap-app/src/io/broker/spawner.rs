@@ -13,7 +13,7 @@ use super::types::{SerialOverrides, SourceConfig};
 use crate::io::device_kinds::{
     self, conn_bool, conn_f64, conn_i64, conn_str, req_bool, req_f64, req_i64, req_str,
 };
-use crate::io::bus_mapping::BusMapping;
+use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::gvret::run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
@@ -416,6 +416,7 @@ async fn run_virtual_reader(
     let serial_echo_bus = (traffic == VirtualTrafficType::Serial).then(|| {
         bus_mappings.iter().find(|m| m.enabled).map_or(0, |m| m.output_bus)
     });
+    let echo_mappings = bus_mappings.clone();
     tokio::task::spawn_blocking(move || {
         while !stop_flag_for_transmit.load(Ordering::Relaxed) {
             match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
@@ -434,7 +435,7 @@ async fn run_virtual_reader(
                         let dlc = data[7];
                         let frame_data = data.get(8..).unwrap_or(&[]).to_vec();
                         let ts = now_us();
-                        let frame = FrameMessage {
+                        let mut frame = FrameMessage {
                             protocol: "can".to_string(),
                             timestamp_us: ts,
                             frame_id,
@@ -447,7 +448,9 @@ async fn run_virtual_reader(
                             incomplete: None,
                             direction: Some("rx".to_string()),
                         };
-                        let _ = tx_loopback.blocking_send(SourceMessage::Frames(source_idx, vec![frame]));
+                        if apply_bus_mapping(&mut frame, &echo_mappings) {
+                            let _ = tx_loopback.blocking_send(SourceMessage::Frames(source_idx, vec![frame]));
+                        }
                     }
                     let _ = req.result_tx.send(Ok(()));
                 }
@@ -940,5 +943,34 @@ mod tests {
             SourceMessage::Frames(_, frames) => panic!("echoed frames: {frames:?}"),
             _ => panic!("echoed neither bytes nor frames"),
         }
+    }
+
+    #[tokio::test]
+    async fn a_can_virtual_device_echoes_on_its_output_bus() {
+        let mut profile = loopback_profile();
+        profile.connection.insert(
+            "interfaces".into(),
+            serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+        );
+        let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }];
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, mut rx) = mpsc::channel(64);
+        let reader = tokio::spawn({
+            let stop = stop.clone();
+            async move { run_virtual_reader(0, &profile, mappings, stop, tx, Default::default(), None).await }
+        });
+
+        let echoed = loop {
+            match rx.recv().await.expect("the reader is running") {
+                SourceMessage::TransmitReady(_, transmit) => transmit.try_send(loopback_request(0)).unwrap(),
+                SourceMessage::Frames(_, frames) => break frames,
+                _ => continue,
+            }
+        };
+        stop.store(true, Ordering::Relaxed);
+        reader.await.expect("the reader task").expect("the reader ends cleanly");
+
+        let [frame] = echoed.as_slice() else { panic!("echoed {echoed:?}") };
+        assert_eq!((frame.frame_id, frame.bus), (ECHO_ID, 3), "echoed on the output bus");
     }
 }
