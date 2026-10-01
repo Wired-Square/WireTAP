@@ -181,14 +181,20 @@ pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
 /// The kind table is a *default* — what the picker offers — and it is coarser
 /// than the truth: it answers per kind, while a FrameLink RS485 port or a
 /// virtual Modbus adaptor carries a protocol its kind's list does not mention.
-/// Clamping to that list rewrote exactly those buses to CAN.
+/// Clamping to that list rewrote exactly those buses to CAN. The one exception
+/// is a GVRET bus saved as CAN FD, which runs as classic CAN: GVRET's transmit
+/// command has no FD flag.
 ///
 /// `supported_protocols` is only filled where the builder left it empty, so a
 /// mapping that knows its own narrower list (an RS485 port that cannot be
 /// talked into CAN) keeps it.
 pub fn normalise_bus_traits(mappings: &mut [BusMapping], profile_kind: &str) {
     let supported = supported_protocols_for_kind(profile_kind);
+    let gvret = matches!(super::device_kinds::canonical_kind(profile_kind), "gvret_tcp" | "gvret_usb");
     for m in mappings.iter_mut() {
+        if gvret && m.protocol == Protocol::CanFd {
+            m.protocol = Protocol::Can;
+        }
         m.traits = Some(traits_for_protocol(m.protocol));
         if m.supported_protocols.is_empty() {
             m.supported_protocols = supported.to_vec();

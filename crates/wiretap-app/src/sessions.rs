@@ -402,13 +402,14 @@ fn create_source_config_from_profile(
     }
 
     // Try to read interfaces configuration from profile (for GVRET multi-bus)
-    let bus_mappings = if let Some(mappings) = parse_interfaces_from_profile(profile, bus_override)
+    let mut bus_mappings = if let Some(mappings) = parse_interfaces_from_profile(profile, bus_override)
     {
         mappings
     } else {
         // Fall back to default single bus mapping
         create_default_bus_mapping(profile, bus_override)
     };
+    io::traits::normalise_bus_traits(&mut bus_mappings, &profile.kind);
 
     let mut config = SourceConfig {
         profile_id: profile.id.clone(),
@@ -2863,12 +2864,30 @@ mod bus_mapping_tests {
         // Undo `with_protocol`'s derivation so traits and protocol disagree.
         mappings[0].traits = Some(io::traits::traits_for_protocol(Protocol::Serial));
 
-        io::traits::normalise_bus_traits(&mut mappings, "gvret_tcp");
+        io::traits::normalise_bus_traits(&mut mappings, "slcan");
 
         let traits = mappings[0].traits.as_ref().unwrap();
         assert!(traits.protocols.contains(&Protocol::CanFd));
         assert!(!traits.protocols.contains(&Protocol::Serial));
         assert!(traits.tx_frames, "a CAN FD bus transmits frames, not bytes");
+    }
+
+    #[test]
+    fn a_gvret_bus_saved_as_can_fd_opens_as_classic_can() {
+        let saved = gvret(json!({
+            "interfaces": [{ "device_bus": 0, "enabled": true, "protocol": "canfd" }]
+        }));
+        let single = create_source_config_from_profile(&saved, None, SerialOverrides::default())
+            .unwrap()
+            .bus_mappings;
+        let mut multi = profile_bus_mappings(&saved);
+        io::traits::normalise_bus_traits(&mut multi, "gvret_tcp");
+
+        for (path, mappings) in [("single", single), ("multi", multi)] {
+            assert_eq!(mappings[0].protocol, Protocol::Can, "{path}");
+            let traits = mappings[0].traits.as_ref().unwrap();
+            assert!(!traits.protocols.contains(&Protocol::CanFd), "{path}: {traits:?}");
+        }
     }
 
     #[test]

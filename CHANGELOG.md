@@ -30,6 +30,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Transmit queue rows stay with the session they were queued on.** A source that disconnected while it had queued rows was dropped from Transmit instead of being kept for them, and renaming a capture could fail while any row was queued. Assigning an orphaned row to the current session now also sends it through that session, where before it could keep pointing at the old one.
 - **An SLCAN bitrate the adapter cannot be set to is refused at start.** A profile at a rate SLCAN has no command for, such as 33 333 bit/s, used to start as running and then sit in error. The start now fails at once with the rates SLCAN takes, and no session is left behind. Pick one of those rates in the profile.
 - **Two gs_usb profiles on one adapter are refused at start.** Each channel of a gs_usb adapter claims the adapter's one USB interface, so a second profile on the same adapter, or two of its channels in one session, showed as running and then failed. The second now fails at once and names the profile and session holding the adapter. Using several channels of one adapter at once is not yet supported.
+- **A GVRET bus saved as CAN FD no longer offers FD transmit.** GVRET sends classic CAN only, but a bus whose profile still said CAN FD kept offering FD in Transmit and then refused the send. Such a bus now opens as classic CAN.
 
 ## [0.13.0] - 2026-09-29
 
