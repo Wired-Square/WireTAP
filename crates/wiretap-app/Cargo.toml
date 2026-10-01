@@ -162,4 +162,5 @@ nusb = { version = "0.2", features = ["tokio"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }
+ts-rs = "12"
 wiretap-io = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.22.1", features = ["testing"] }

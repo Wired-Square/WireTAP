@@ -25,6 +25,8 @@ mod flashers;
 mod frame_export;
 mod framing;
 mod framing_detect;
+#[cfg(test)]
+mod generated_types;
 pub mod io;
 mod profile_tracker;
 mod sessions;

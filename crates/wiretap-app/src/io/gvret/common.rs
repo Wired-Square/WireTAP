@@ -43,6 +43,7 @@ pub fn clamp_bus_count(reported: u8) -> u8 {
 
 /// Information about a GVRET device, obtained by probing
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GvretDeviceInfo {
     /// Number of CAN buses available on this device (1-5)
     pub bus_count: u8,
