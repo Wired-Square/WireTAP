@@ -394,6 +394,15 @@ export function decodeDecodedSignals(payload: DataView): DecodedSignalsEntry[] {
   }
 }
 
+/** Decode a DecodedBacklog: the attaching subscriber's id (u16 BE length + UTF-8), then a DecodedSignals batch. */
+export function decodeDecodedBacklog(payload: DataView): { subscriber: string; decoded: DecodedSignalsEntry[] } {
+  const nameEnd = 2 + payload.getUint16(0);
+  return {
+    subscriber: decodedSignalsDecoder.decode(new Uint8Array(payload.buffer, payload.byteOffset + 2, nameEnd - 2)),
+    decoded: decodeDecodedSignals(new DataView(payload.buffer, payload.byteOffset + nameEnd, payload.byteLength - nameEnd)),
+  };
+}
+
 /** Progress of a Modbus discovery sweep, pushed on the scan session's channel. */
 export interface ModbusScanStateMsg {
   status: string;

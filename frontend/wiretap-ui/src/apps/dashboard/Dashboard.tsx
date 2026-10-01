@@ -268,7 +268,7 @@ function DashboardInner() {
   // Catalog-decoded signals from the Rust decoder (DecodedSignals stream). The
   // stream already flattens mux-case signals into `signals`, so there's no
   // separate mux handling here. Replaces the former TS catalog decode.
-  const handleDecoded = useCallback((decoded: DecodedSignalsEntry[]) => {
+  const handleDecoded = useCallback((decoded: DecodedSignalsEntry[], backlog: boolean) => {
     const store = useDashboardStore.getState();
     for (const msg of decoded) {
       if (msg.kind) continue;
@@ -281,6 +281,7 @@ function DashboardInner() {
             signalName: s.name,
             value: s.scaled,
             timestamp,
+            replace: backlog,
           });
         }
       }

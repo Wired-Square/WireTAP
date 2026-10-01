@@ -49,7 +49,8 @@ pub enum MsgType {
     // against StreamEnded rather than racing it on a separate transport.
     ModbusScanState  = 0x1A,
     // An attach's DecodedSignals for the frames already delivered, sent only to
-    // the attaching window, which replaces its Modbus rows with it.
+    // the attaching window: a u16 BE length and the attaching subscriber's id,
+    // then the batch. That subscriber replaces what it holds with it.
     DecodedBacklog   = 0x1B,
     Command          = 0x20,
     CommandResponse  = 0x21,

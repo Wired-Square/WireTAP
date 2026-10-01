@@ -770,9 +770,10 @@ pub fn clear_frame_offset(session_id: &str) {
 /// catalogue attached after frames were delivered (e.g. a capture replay that started
 /// streaming before the decoder bound its catalogue) would otherwise leave those frames
 /// undecoded. Called right after `attach_catalog`, and sent only to `conn_id`, the window
-/// that attached, as a `DecodedBacklog` it replaces its Modbus rows with — sent even when
-/// empty, so rows from the previous catalogue go too.
-pub fn redecode_delivered(session_id: &str, conn_id: usize) {
+/// that attached, as a `DecodedBacklog` for `subscriber`, the app in it that attached, to
+/// replace what it holds with — sent even when empty, so rows from the previous catalogue
+/// go too.
+pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
     let Some(catalog) = attached_catalog(session_id) else { return };
     let Some(server) = ws_server() else { return };
     let Some(channel) = server.channel_for_session(session_id) else { return };
@@ -799,7 +800,9 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize) {
     reset_tunnels(session_id);
     let tunnels = tunnel_decoders(session_id);
     let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), false);
-    server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedBacklog, channel, &decoded));
+    let Ok(name_len) = u16::try_from(subscriber.len()) else { return };
+    let payload = [&name_len.to_be_bytes(), subscriber.as_bytes(), &decoded].concat();
+    server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedBacklog, channel, &payload));
 }
 
 /// Send a batch of frames to all WebSocket subscribers for this session.
@@ -1721,7 +1724,7 @@ bit_length = 8
     }
 
     #[test]
-    fn a_joining_window_alone_receives_the_tunnel_backlog_marked_as_one() {
+    fn a_joining_window_alone_receives_the_tunnel_backlog_addressed_to_its_subscriber() {
         use crate::ws::server::outbox::{self, Recipient};
         const JOINING: usize = 7_001;
         const CHANNEL: u8 = 201;
@@ -1745,12 +1748,17 @@ bit_length = 8
 
         tauri::async_runtime::block_on(crate::catalog::dispatch_catalog_command(
             "catalog.attach",
-            serde_json::json!({ "session_id": session, "content": tunnel_catalogue_toml("") }),
+            serde_json::json!({ "session_id": session, "content": tunnel_catalogue_toml(""), "subscriber": "main_dashboard" }),
             JOINING,
         ))
         .expect("attach");
         detach_catalog(session);
 
-        assert_eq!(outbox::sent(CHANNEL, MsgType::DecodedBacklog), [Recipient::Conn(JOINING)]);
+        let sent = outbox::sent(CHANNEL, MsgType::DecodedBacklog);
+        let [(recipient, payload)] = sent.as_slice() else { panic!("one backlog, got {}", sent.len()) };
+        assert_eq!(*recipient, Recipient::Conn(JOINING));
+        assert_eq!(payload[..2], [0, 14]);
+        assert_eq!(&payload[2..16], b"main_dashboard");
+        assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&payload[16..]).is_ok_and(|d| !d.is_empty()));
     }
 }

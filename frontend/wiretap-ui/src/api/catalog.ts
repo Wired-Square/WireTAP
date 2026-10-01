@@ -207,13 +207,15 @@ export async function catalogPolls(content: string): Promise<ModbusPollGroup[]> 
  * streams them as `DecodedSignals` (consumed by Decoder/Dashboard/Modbus). Returns
  * the number of frames bound. `path`, when given, is recorded as the session's
  * authoritative decoder path and surfaced back via `ActiveSessionInfo.catalogPath`.
+ * `subscriber` alone receives the `DecodedBacklog` of what was already delivered.
  */
 export async function attachCatalog(
   sessionId: string,
   content: string,
-  path?: string,
+  path: string | undefined,
+  subscriber: string,
 ): Promise<{ attached: boolean; frames: number; catalog: Catalog }> {
-  return await wsTransport.command("catalog.attach", { session_id: sessionId, content, path });
+  return await wsTransport.command("catalog.attach", { session_id: sessionId, content, path, subscriber });
 }
 
 /** Detach a session's catalogue (the decoded stream stops). */

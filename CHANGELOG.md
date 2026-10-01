@@ -47,6 +47,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A gs_usb adapter no longer loses frames when sends outrun the bus.** A Test Pattern throughput run or a fast transmit could hand the adapter more frames than it could hold, and the extra frames were dropped while still counted as sent. WireTAP now keeps at most ten frames in flight and waits for each to reach the bus, so what is counted as sent is what went out.
 - **A fast replay no longer drops frames the adapter has no room for.** A replay faster than the bus could carry filled the adapter's send queue, and the frames it refused were recorded in History as "send queue full" and skipped, while the replay still reported success. Replay now waits for room and puts every frame on the bus, so at a high speed it runs at the bus's pace rather than the one asked for.
 - **A second window on a session no longer doubles the first window's Modbus tab.** Opening the Decoder in another window replayed every tunnelled Modbus exchange to each window already watching, so each one listed them twice. Only the window that opens it now receives the replay.
+- **The Dashboard no longer plots a session's history twice.** Loading a catalogue in the Dashboard or the Decoder added every value already received to the Dashboard's plots again, after the newest ones, so the latest reading went back in time and the statistics counted old values twice. Loading one in the Dashboard now redraws its history once, and loading one in the Decoder leaves the Dashboard alone.
 
 ## [0.13.0] - 2026-09-29
 

@@ -66,6 +66,7 @@ import {
   HEADER_SIZE,
   decodeFrameBatch,
   decodeDecodedSignals,
+  decodeDecodedBacklog,
   type DecodedSignalsEntry,
   decodeSessionState,
   decodeStreamEnded,
@@ -544,6 +545,12 @@ function invokeCallbacks<A extends unknown[]>(
   }
 }
 
+/** An attach's redecode of what was already delivered goes to the subscriber that attached, and no other. */
+export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, payload: DataView) {
+  const { subscriber, decoded } = decodeDecodedBacklog(payload);
+  callbacks.get(subscriber)?.onDecoded?.(decoded, true);
+}
+
 /** Set up Tauri event listeners for a session */
 async function setupSessionEventSubscribers(
   sessionId: string,
@@ -572,16 +579,17 @@ async function setupSessionEventSubscribers(
     );
 
     // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached.
-    // DecodedBacklog (0x1B) — an attach's redecode of what was already delivered.
-    for (const [msgType, backlog] of [[MsgType.DecodedSignals, false], [MsgType.DecodedBacklog, true]] as const) {
-      eventListeners.wsUnlistenFunctions.push(
-        wsTransport.onSessionMessage(sessionId, msgType, (payload) => {
-          const decoded = decodeDecodedSignals(payload);
-          if (decoded.length === 0 && !backlog) return;
-          invokeCallbacks(eventListeners, "onDecoded", decoded, backlog);
-        })
-      );
-    }
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.DecodedSignals, (payload) => {
+        const decoded = decodeDecodedSignals(payload);
+        if (decoded.length > 0) invokeCallbacks(eventListeners, "onDecoded", decoded, false);
+      })
+    );
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklog, (payload) =>
+        deliverDecodedBacklog(eventListeners.callbacks, payload)
+      )
+    );
 
     // SessionState (0x02) — state string + optional error decoded from binary
     eventListeners.wsUnlistenFunctions.push(

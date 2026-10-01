@@ -15,19 +15,9 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useSessionStore } from "../stores/sessionStore";
+import { subscriberIdFor } from "../utils/subscriberId";
 import { tlog } from "../api/settings";
-
-// Deterministic per-(window, app) subscriber/instance id. There is exactly one
-// instance of each session-aware app per window, so `${windowLabel}_${appName}` is
-// globally unique. It MUST match the id MainLayout registers from Dockview's panel
-// lifecycle (see registerOpenApp there) so an open panel and its session
-// attachment are the same open-app-registry entry — that lets the Session Manager
-// graph show open-but-unattached apps (even tabs Dockview hasn't mounted yet).
-function generateSubscriberId(appName: string): string {
-  return `${getCurrentWebviewWindow().label}_${appName}`;
-}
 
 // Module-level map to track sessions being reinitialized.
 // This persists across re-renders and prevents the effect from
@@ -425,7 +415,7 @@ export function useIOSession(
     abandonedSessionRef.current = leaving && leaving !== nextId ? leaving : null;
   }, []);
   // Generate a unique subscriber instance ID per hook mount (e.g., "discovery_1")
-  const subscriberIdRef = useRef<string>(generateSubscriberId(appName));
+  const subscriberIdRef = useRef<string>(subscriberIdFor(appName));
   // Track if we're currently leaving to prevent double-leave
   const isLeavingRef = useRef(false);
   // Track when session was created/joined to prevent immediate leave (click-through protection)

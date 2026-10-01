@@ -743,8 +743,8 @@ pub(crate) mod outbox {
         CHANNEL_MAP.write().unwrap().insert(session_id.to_string(), channel);
     }
 
-    /// Every message sent so far on `channel` of type `kind`, with its recipient.
-    pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<Recipient> {
+    /// Every message sent so far on `channel` of type `kind`: its recipient and payload.
+    pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<(Recipient, Vec<u8>)> {
         let mut rx = SENT.get().expect("subscribe first").lock().unwrap();
         let mut out = Vec::new();
         while let Ok(cmd) = rx.try_recv() {
@@ -754,7 +754,7 @@ pub(crate) mod outbox {
                 _ => continue,
             };
             if Header::decode(&data).is_ok_and(|h| h.channel == channel && h.msg_type == kind) {
-                out.push(recipient);
+                out.push((recipient, data[HEADER_SIZE..].to_vec()));
             }
         }
         out

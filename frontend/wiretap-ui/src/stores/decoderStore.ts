@@ -88,6 +88,7 @@ import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
 import type { HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, attachAndResolve, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
+import { subscriberIdFor } from '../utils/subscriberId';
 import { buildCatalog, type ModbusPollGroup } from '../api/catalog';
 import { frameKey } from '../utils/frameKey';
 
@@ -390,7 +391,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     try {
       // catalog.attach binds Rust decode AND returns the resolved catalogue, so
       // the model comes from the same parse.
-      get().applyParsedCatalog(await attachAndResolve(sessionId, path), path);
+      get().applyParsedCatalog(await attachAndResolve(sessionId, path, subscriberIdFor("decoder")), path);
     } catch (e) {
       // If attach fails, still load the model so the UI works without decode.
       tlog.info(`[decoderStore] catalog attach failed, loading model only: ${e}`);

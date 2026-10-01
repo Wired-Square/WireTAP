@@ -6,6 +6,7 @@ import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
 import type { Confidence } from '../types/catalog';
 import type { CanProtocolConfig, ParsedCatalog } from '../utils/catalogParser';
 import { loadCatalog as loadCatalogFromPath, attachAndResolve } from '../utils/catalogParser';
+import { subscriberIdFor } from '../utils/subscriberId';
 
 import type { SerialFrameConfig } from '../utils/frameExport';
 import {
@@ -132,6 +133,8 @@ export interface SignalValueEntry {
   signalName: string;
   value: number;
   timestamp: number;
+  /** From an attach's backlog, which replaces the signal's series rather than adding to it. */
+  replace?: boolean;
 }
 
 /** Parameters for a hypothesis candidate signal */
@@ -364,7 +367,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   loadCatalogForSession: async (sessionId: string, path: string) => {
     try {
-      get().applyParsedCatalog(await attachAndResolve(sessionId, path));
+      get().applyParsedCatalog(await attachAndResolve(sessionId, path, subscriberIdFor("dashboard")));
     } catch (e) {
       tlog.info(`[dashboardStore] catalog attach failed, loading model only: ${e}`);
       await get().loadCatalog(path);
@@ -858,13 +861,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   pushSignalValues: (entries) => {
     const { seriesBuffers } = get();
-    // Mutate in place for performance — ring buffers are never replaced, only written to
+    // Mutate in place for performance — a ring buffer is replaced only by a backlog
     const newBuffers = new Map(seriesBuffers);
     let created = false;
+    const replacing = new Set<string>();
 
-    for (const { frameId, signalName, value, timestamp } of entries) {
+    for (const { frameId, signalName, value, timestamp, replace } of entries) {
       const key = makeSignalKey(frameId, signalName);
       let series = newBuffers.get(key);
+      if (replace && !replacing.has(key)) {
+        replacing.add(key);
+        series = undefined;
+      }
       if (!series) {
         series = createTimeSeries();
         newBuffers.set(key, series);

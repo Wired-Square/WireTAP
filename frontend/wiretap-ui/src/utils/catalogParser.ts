@@ -366,8 +366,8 @@ export async function loadCatalog(path: string): Promise<ParsedCatalog> {
  * the same parse: `catalog.attach` returns the resolved Catalog, so this reads
  * the file and parses once (vs. a separate `loadCatalog` + attach).
  */
-export async function attachAndResolve(sessionId: string, path: string): Promise<ParsedCatalog> {
+export async function attachAndResolve(sessionId: string, path: string, subscriber: string): Promise<ParsedCatalog> {
   const content = await openCatalogAtPath(path);
-  const { catalog } = await attachCatalog(sessionId, content, path);
+  const { catalog } = await attachCatalog(sessionId, content, path, subscriber);
   return resolveWithPolls(catalog, content);
 }
