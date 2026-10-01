@@ -12,6 +12,10 @@ All notable changes to WireTAP will be documented in this file.
 
 - **gs_usb adapters follow the Linux driver more closely.** Only the six USB ids the kernel's gs_usb driver knows are recognised, so a device on `1d50:606d` is no longer listed. A bit timing the adapter cannot do is now refused at start with the bitrate and the adapter's limits, instead of retried with looser limits, and a frame counts as CAN FD only when the adapter flags it so. When the adapter reports that it dropped frames, the log now says so.
 
+### Fixed
+
+- **`wiretap-can-cli` closes the adapter when it is terminated, not only on Ctrl-C.** `dump`, `gen` and a `pattern` responder stopped by SIGTERM (`timeout`, `kill`, a service manager) used to leave the adapter on the bus, still acknowledging frames. They now take it off the bus as Ctrl-C does.
+
 ## [0.13.0] - 2026-09-29
 
 ### Added

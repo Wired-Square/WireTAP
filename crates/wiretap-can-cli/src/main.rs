@@ -150,7 +150,7 @@ async fn run(cli: Cli) -> Result<bool, String> {
                             let responder = answered?;
                             println!("{}", pattern::counters(&responder.sequence, responder.tx_count));
                         }
-                        _ = tokio::signal::ctrl_c() => {}
+                        _ = stop_requested() => {}
                     }
                     true
                 }
@@ -178,6 +178,22 @@ async fn run(cli: Cli) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Ctrl-C, or SIGTERM where there is one: a process killed past this skips the
+/// device's close and leaves the adapter on the bus.
+async fn stop_requested() {
+    #[cfg(unix)]
+    if let Ok(mut term) =
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+    {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+        return;
+    }
+    let _ = tokio::signal::ctrl_c().await;
+}
+
 /// Each frame waits for the device to take the last, then for the gap, as
 /// cangen's relative timing does.
 async fn generate(
@@ -188,7 +204,7 @@ async fn generate(
     let gap = Duration::from_secs_f64(args.gap_ms.max(0.0) / 1000.0);
     let count = args.count.unwrap_or(u64::MAX);
     let mut sent = 0;
-    let stopped = tokio::signal::ctrl_c();
+    let stopped = stop_requested();
     tokio::pin!(stopped);
     for frame in frames.take(count.try_into().unwrap_or(usize::MAX)) {
         tokio::select! {
@@ -219,7 +235,7 @@ async fn dump(
     let name = candump::ifname(&interface.to_string());
     let mut out = io::BufWriter::new(io::stdout().lock());
     let mut left = count.unwrap_or(u64::MAX);
-    let stopped = tokio::signal::ctrl_c();
+    let stopped = stop_requested();
     tokio::pin!(stopped);
     while left > 0 {
         let event = tokio::select! {
