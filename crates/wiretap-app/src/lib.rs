@@ -21,6 +21,7 @@ mod queryresults;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
 mod flashers;
+mod frame_export;
 mod framing;
 mod framing_detect;
 pub mod io;
@@ -1376,6 +1377,7 @@ pub fn run() {
             checksum_discovery::discover_checksums_in_capture_cmd,
             byte_roles::profile_bytes_cmd,
             byte_roles::serial_structure_cmd,
+            frame_export::export_frame_dump,
             // Transmit API
             transmit::get_transmit_capable_profiles,
             transmit::get_profile_usage,

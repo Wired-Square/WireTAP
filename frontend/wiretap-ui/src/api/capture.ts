@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { IOCapabilities } from "./io";
 import type { ProtocolFrames } from "../utils/frameKey";
 import type { Protocol } from "../utils/profileTraits";
+import type { FrameMessage } from "../types/frame";
 
 /**
  * Capture kind - determines what kind of data is stored
@@ -393,6 +394,18 @@ export async function getCaptureFramesPaginatedById(
     offset,
     limit,
   });
+}
+
+export type FrameDumpSource = { captureId: string } | { frames: FrameMessage[] };
+
+/** Write a CSV or candump export in Rust; it refuses the whole file if any frame cannot be written. */
+export async function exportFrameDump(
+  source: FrameDumpSource,
+  format: "csv" | "candump",
+  path: string,
+): Promise<number> {
+  const wire = "captureId" in source ? { capture_id: source.captureId } : source;
+  return invoke("export_frame_dump", { source: wire, format, path });
 }
 
 /**

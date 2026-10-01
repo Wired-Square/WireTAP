@@ -1,24 +1,12 @@
 // ui/src/utils/frameDump.ts
-// Frame dump export utilities for various formats
+// The exports Rust does not write: JSON frames and the raw byte formats
 
 import type { FrameMessage } from "../types/frame";
 import type { SerialBytesEntry } from "../stores/discoverySerialStore";
-import { CAN_FD_DLC_VALUES } from "../constants";
 import { buildCsv } from "./csvBuilder";
 import { formatFilenameDate } from "./timeFormat";
 
 export type ExportFormat = "csv" | "json" | "candump" | "hex" | "bin";
-
-/**
- * Find the smallest valid CAN FD DLC value that fits the given byte count.
- * For standard CAN (≤8 bytes), returns the exact count.
- * For CAN FD (>8 bytes), returns the smallest valid DLC (12, 16, 20, 24, 32, 48, or 64).
- * Past 64 (a serial frame), returns the exact count.
- */
-function findSmallestFittingDlc(byteCount: number): number {
-  if (byteCount <= 8) return byteCount;
-  return CAN_FD_DLC_VALUES.find((dlc) => dlc >= byteCount) ?? byteCount;
-}
 
 /**
  * The CSV columns are SavvyCAN's and carry no protocol, so the file name does:
@@ -26,49 +14,6 @@ function findSmallestFittingDlc(byteCount: number): number {
  */
 export function frameExportBasename(protocol: string | undefined, date: Date = new Date()): string {
   return `${formatFilenameDate(date)}-${protocol ?? "frames"}`;
-}
-
-/**
- * Export frames to CSV format
- * Format: Time Stamp,ID,Extended,Dir,Bus,LEN,D1,D2,...,Dn
- * Columns use the smallest valid CAN FD DLC that fits the largest frame
- */
-export function exportToCsv(frames: FrameMessage[]): string {
-  // Find max bytes across all frames, then round up to valid CAN FD DLC
-  const maxBytes = frames.reduce((max, f) => Math.max(max, f.dlc, f.bytes.length), 0);
-  const maxDataLen = findSmallestFittingDlc(maxBytes);
-
-  // Build header with dynamic number of data columns
-  const dataHeaders = Array.from({ length: maxDataLen }, (_, i) => `D${i + 1}`);
-  const headers = ["Time Stamp", "ID", "Extended", "Dir", "Bus", "LEN", ...dataHeaders];
-
-  const rows: (string | number)[][] = [];
-  for (const frame of frames) {
-    // Format data bytes as hex (uppercase), pad to maxDataLen columns
-    const bytes = Array.from({ length: maxDataLen }, (_, i) =>
-      i < frame.dlc && frame.bytes[i] !== undefined
-        ? frame.bytes[i].toString(16).padStart(2, "0").toUpperCase()
-        : ""
-    );
-
-    // Frame ID in hex without 0x prefix
-    const idHex = frame.frame_id.toString(16).padStart(8, "0").toUpperCase();
-
-    // Direction: Rx for received, Tx for transmitted
-    const dir = frame.direction === "tx" ? "Tx" : "Rx";
-
-    rows.push([
-      frame.timestamp_us,
-      idHex,
-      frame.is_extended ? "true" : "false",
-      dir,
-      frame.bus,
-      frame.dlc,
-      ...bytes,
-    ]);
-  }
-
-  return buildCsv(headers, rows);
 }
 
 /**
@@ -88,54 +33,6 @@ export function exportToJson(frames: FrameMessage[]): string {
   }));
 
   return JSON.stringify(exportFrames, null, 2);
-}
-
-/**
- * Export frames to candump log format
- * Format: (timestamp) interface frame_id#data
- * Example: (1234567890.123456) can0 123#DEADBEEF
- */
-export function exportToCandump(frames: FrameMessage[]): string {
-  const lines: string[] = [];
-
-  for (const frame of frames) {
-    const timestampSec = frame.timestamp_us / 1_000_000;
-    const interface_ = `can${frame.bus}`;
-
-    // Format frame ID with extended flag if needed
-    let idStr = frame.frame_id.toString(16).toUpperCase();
-    if (frame.is_extended) {
-      idStr = idStr.padStart(8, "0");
-    } else {
-      idStr = idStr.padStart(3, "0");
-    }
-
-    // Format data bytes
-    const dataHex = frame.bytes
-      .slice(0, frame.dlc)
-      .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
-      .join("");
-
-    lines.push(`(${timestampSec.toFixed(6)}) ${interface_} ${idStr}#${dataHex}`);
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Export frames to the specified format
- */
-export function exportFrames(frames: FrameMessage[], format: ExportFormat): string {
-  switch (format) {
-    case "csv":
-      return exportToCsv(frames);
-    case "json":
-      return exportToJson(frames);
-    case "candump":
-      return exportToCandump(frames);
-    default:
-      throw new Error(`Unknown export format: ${format}`);
-  }
 }
 
 /**

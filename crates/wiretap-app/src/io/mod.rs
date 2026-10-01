@@ -99,7 +99,9 @@ pub struct FrameMessage {
     pub dlc: u16,
     pub bytes: Vec<u8>,
     // CAN-specific flags (ignored by other protocols)
+    #[serde(default)]
     pub is_extended: bool,
+    #[serde(default)]
     pub is_fd: bool,
     /// Source address (for protocols like J1939, TWC that embed sender ID in frame)
     #[serde(skip_serializing_if = "Option::is_none", default)]

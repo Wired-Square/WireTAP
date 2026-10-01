@@ -46,7 +46,7 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { useEffectiveCaptureMetadata } from "../../hooks/useEffectiveCaptureMetadata";
-import { getCaptureMetadata, getCaptureMetadataById, getCaptureFramesPaginated, getCaptureFramesPaginatedFiltered, getCaptureBytesPaginated, getCaptureFrameInfo, getCaptureFramesPaginatedById, type CaptureMetadata } from "../../api/capture";
+import { getCaptureMetadata, getCaptureMetadataById, getCaptureFramesPaginatedFiltered, getCaptureBytesPaginated, getCaptureFrameInfo, getCaptureFramesPaginatedById, type CaptureMetadata } from "../../api/capture";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
@@ -945,7 +945,7 @@ function DiscoveryInner() {
     // this used to) reads a Frames capture with a byte query, which returns nothing — an
     // export that promised N bytes and wrote none.
     getCaptureBytesPaginated: (offset, limit) => getCaptureBytesPaginated(sessionBytesCaptureId ?? '', offset, limit),
-    getCaptureFramesPaginated: (offset, limit) => getCaptureFramesPaginated(activeCaptureId!, offset, limit),
+    activeCaptureId,
     getCaptureFramesPaginatedById,
     captureMetadata,
     pickFileToSave,

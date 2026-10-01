@@ -113,7 +113,7 @@ export interface UseDiscoveryHandlersParams {
 
   // API functions (for export/other features)
   getCaptureBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
-  getCaptureFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
+  activeCaptureId: string | null;
   getCaptureFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
   captureMetadata: CaptureMetadata | null;
   pickFileToSave: (options: any) => Promise<string | null>;
@@ -194,6 +194,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     frames: params.frames,
     framedData: params.framedData,
     framedCaptureId: params.framedCaptureId,
+    activeCaptureId: params.activeCaptureId,
     backendByteCount: params.backendByteCount,
     backendFrameCount: params.backendFrameCount,
     exportDataMode: params.exportDataMode,
@@ -206,7 +207,6 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     openSaveDialog: params.openSaveDialog,
     saveFrames: params.saveFrames,
     getCaptureBytesPaginated: params.getCaptureBytesPaginated,
-    getCaptureFramesPaginated: params.getCaptureFramesPaginated,
     getCaptureFramesPaginatedById: params.getCaptureFramesPaginatedById,
     pickFileToSave: params.pickFileToSave,
     saveCatalog: params.saveCatalog,
