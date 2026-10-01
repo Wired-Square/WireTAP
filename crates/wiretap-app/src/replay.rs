@@ -17,6 +17,7 @@ use crate::io::{self, CanTransmitFrame};
 
 /// A single frame with its original capture timestamp, used for time-accurate replay.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ReplayFrame {
     /// Original capture timestamp (microseconds since UNIX epoch).
     pub timestamp_us: u64,

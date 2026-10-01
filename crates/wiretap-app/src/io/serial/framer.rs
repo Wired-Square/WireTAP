@@ -57,6 +57,7 @@ pub struct SerialFrame {
 
 /// Configuration for extracting frame ID from frame bytes
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FrameIdConfig {
     /// Start byte index (negative = from end)
     pub start_byte: i32,

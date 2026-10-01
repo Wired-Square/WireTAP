@@ -69,6 +69,7 @@ static BUILTIN_REPOS: LazyLock<Vec<SavedRepo>> = LazyLock::new(|| {
 /// a shipped entry carries an empty `savedAt`, which is what the properties panel
 /// keys its date row off.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CommunityRepoView {
     #[serde(flatten)]
@@ -79,6 +80,7 @@ pub struct CommunityRepoView {
 
 /// The community list after a mutation, so callers patch state instead of re-listing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CommunityReposView {
     pub community_repos: Vec<CommunityRepoView>,

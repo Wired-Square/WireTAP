@@ -446,7 +446,7 @@ pub struct FcProbeEntry {
     /// True if any function code produced a reply.
     pub responded: bool,
     /// The register types worth sweeping on this unit.
-    pub supported_types: Vec<String>,
+    pub supported_types: Vec<RegisterType>,
 }
 
 /// Publishes progress on the scan session's WebSocket channel. `None` for
@@ -1018,10 +1018,10 @@ pub async fn probe_function_codes(
             verdicts.push((rt, verdict_for(outcome)));
         }
 
-        let supported_types: Vec<String> = verdicts
+        let supported_types: Vec<RegisterType> = verdicts
             .iter()
             .filter(|(_, v)| v.supported())
-            .map(|(rt, _)| rt.catalog().as_str().to_string())
+            .map(|(rt, _)| rt.clone())
             .collect();
         let responded = !supported_types.is_empty();
 
@@ -1040,7 +1040,7 @@ pub async fn probe_function_codes(
             "[ModbusScan] Probe unit {}: {}",
             unit_id,
             if entry.responded {
-                entry.supported_types.join(", ")
+                entry.supported_types.iter().map(|rt| rt.catalog().as_str()).collect::<Vec<_>>().join(", ")
             } else {
                 "no response".to_string()
             }

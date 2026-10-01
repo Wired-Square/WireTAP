@@ -12,6 +12,7 @@ use crate::io::FrameMessage;
 const REPORTED_SKIPS: usize = 100;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SkippedLine {
     pub file: String,
     pub line: usize,

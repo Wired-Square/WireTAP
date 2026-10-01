@@ -32,6 +32,7 @@ use super::shared;
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FrameDefDescriptor {
     pub frame_def_id: u16,
     pub name: String,
@@ -45,6 +46,7 @@ pub struct FrameDefDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SignalDefDescriptor {
     pub signal_id: u16,
     pub name: String,
@@ -57,6 +59,7 @@ pub struct SignalDefDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BridgeDescriptor {
     pub bridge_id: u16,
     pub source_interface: u8,
@@ -66,13 +69,17 @@ pub struct BridgeDescriptor {
     pub dest_interface_name: String,
     pub interface_type_name: String,
     pub enabled: bool,
+    #[cfg_attr(test, ts(type = r#""pass" | "block""#))]
     pub default_action: bridge::BridgeDefaultAction,
     pub filters: Vec<BridgeFilterDescriptor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BridgeFilterDescriptor {
+    #[cfg_attr(test, ts(type = r#""mask" | "range""#))]
     pub kind: bridge::BridgeFilterType,
+    #[cfg_attr(test, ts(type = r#""any" | "std" | "ext""#))]
     pub ide: bridge::BridgeFilterIde,
     /// Mask: `can_id`. Range: inclusive `lo`.
     pub a: u32,
@@ -81,6 +88,7 @@ pub struct BridgeFilterDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TransformerDescriptor {
     pub transformer_id: u16,
     pub name: String,
@@ -98,6 +106,7 @@ pub struct TransformerDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SignalMappingDescriptor {
     pub source_signal_id: u16,
     pub dest_signal_id: u16,
@@ -108,6 +117,7 @@ pub struct SignalMappingDescriptor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GeneratorDescriptor {
     pub generator_id: u16,
     pub name: String,
@@ -975,7 +985,8 @@ async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 #[derive(Debug, Serialize)]
-struct DeviceSignalDescriptor {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct DeviceSignalDescriptor {
     signal_id: u16,
     target_type: u8,
     target_index: u8,

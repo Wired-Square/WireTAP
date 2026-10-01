@@ -3,6 +3,9 @@
 // API wrappers for database query commands (Query app).
 
 import { invoke } from "@tauri-apps/api/core";
+import type { InventoryRow } from "../generated/InventoryRow";
+
+export type { InventoryRow };
 
 /** Result of a byte change query */
 export interface ByteChangeResult {
@@ -440,7 +443,7 @@ export interface DatabaseActivity {
   state: string | null;
   /** Current query text (truncated) */
   query: string | null;
-  /** When the query started (ISO 8601) */
+  /** When the query started, as PostgreSQL's `timestamptz::text` (not RFC 3339) */
   query_start: string | null;
   /** How long the query has been running in seconds */
   duration_secs: number | null;
@@ -469,21 +472,6 @@ export async function queryActivity(
 }
 
 // ── Frame Inventory ──
-
-/**
- * One frame id's rollup. Identity is (protocol, frame_id, is_extended): a
- * Modbus row's `frame_id` is `unit << 8 | function`, under `modbus_rtu`.
- */
-export interface InventoryRow {
-  protocol: string;
-  frame_id: number;
-  frame_id_hex: string;
-  is_extended: boolean;
-  count: number;
-  first_us: number;
-  last_us: number;
-  max_dlc: number;
-}
 
 /**
  * Per-id rollup over a backend profile or a capture — exactly one of the two.

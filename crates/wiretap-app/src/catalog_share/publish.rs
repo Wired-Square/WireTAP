@@ -44,6 +44,7 @@ const FORK_POLL_BACKOFF: &[u64] = &[500, 1000, 2000, 4000, 8000, 8000, 8000, 800
 // ── Request / result ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PublishRequest {
     /// Local catalogue filename within the decoder directory.
@@ -52,24 +53,30 @@ pub struct PublishRequest {
     pub repo_url: String,
     /// Defaults to the provenance path, else `catalogs/{filename}`.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub target_path: Option<String>,
     /// Branch to commit to. `None` — the default — pushes straight to the base branch,
     /// which is the ref this catalogue was pulled from. Naming one creates it off the
     /// base instead.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub branch: Option<String>,
     pub commit_message: String,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub pr_title: String,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub pr_body: String,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub draft: bool,
     /// Open a pull request after pushing. Off by default: the common case is pushing a
     /// decoder to a repository you own, where a branch and a PR are ceremony around a
     /// one-file change. Deliberately **not** forced when a fork is involved either —
     /// pushing to your own fork without opening a PR is a legitimate way to park work.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub open_pr: bool,
     /// Increment `[meta].version` in the committed bytes, and write the bumped file
     /// back locally once the push has succeeded.
@@ -79,17 +86,21 @@ pub struct PublishRequest {
     /// the user's decoder directory, so a caller that predates it — or any caller that
     /// is not the push dialog — must not do so by omission.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub bump_version: bool,
     /// Acknowledged secret-scan findings, so the confirm step can be explicit.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub accept_secret_findings: bool,
     /// Correlates progress events with the dialog that asked.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub request_id: String,
 }
 
 /// What publishing would do, computed without any writes.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PublishPlan {
     pub upstream: String,
@@ -140,6 +151,7 @@ pub struct PublishPlan {
     pub transmit_frame_count: usize,
     /// Set when this catalogue already has a pull request open.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub existing_pr_url: Option<String>,
 }
 
@@ -149,6 +161,7 @@ pub struct PublishPlan {
 /// [`PublishPlan`], and re-deriving would mean the `get_repo` request and the fetch
 /// that [`resolve`] does — the exact round trip this command exists to avoid.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PublishDiffRequest {
     /// Local catalogue filename in the decoder directory. The bytes are read from
@@ -170,6 +183,7 @@ pub struct PublishDiffRequest {
 /// would ship them to the frontend and straight back over the WebSocket to be diffed by
 /// the function that was one call away.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PublishDiff {
     /// The ref actually read. Echoed so the tab can label the comparison honestly when
@@ -215,6 +229,7 @@ struct Resolved {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum PublishAction {
     Created,
@@ -227,6 +242,7 @@ pub enum PublishAction {
 /// One struct rather than three fields on [`PublishResult`], so "from", "to" and
 /// "did it reach the disk" cannot be reported apart.
 #[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct VersionBump {
     pub from: u32,
@@ -238,14 +254,18 @@ pub struct VersionBump {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PublishResult {
     pub action: PublishAction,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub pr_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub pr_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub commit_url: Option<String>,
     pub head_owner: String,
     pub branch: String,
@@ -254,15 +274,19 @@ pub struct PublishResult {
     /// because the push would have changed nothing never reaches a result at all —
     /// `push_blocking` refuses the unchanged tree first.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub version_bump: Option<VersionBump>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ProgressEvent {
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "PublishProgress"))]
+pub(crate) struct ProgressEvent {
     request_id: String,
+    #[cfg_attr(test, ts(type = r#""validate" | "auth" | "fork" | "branch" | "commit" | "pr" | "done""#))]
     step: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     detail: Option<String>,
 }
 

@@ -198,6 +198,7 @@ fn refuse_unless_valid(text: &str) -> Result<(), String> {
 /// What a diff row says happened to its line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub(crate) enum DiffKind {
     Context,
     Add,
@@ -211,6 +212,7 @@ pub(crate) enum DiffKind {
 /// as happily when the string is wrong, and reports zero.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "DiffLine"))]
 pub(crate) struct DiffRow {
     pub kind: DiffKind,
     pub text: String,

@@ -10,16 +10,19 @@ use serde::{Deserialize, Serialize};
 /// A typed failure. `kind` drives UI behaviour — whether to offer Retry, deep-link
 /// to the account settings, or just show the message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ShareError {
     pub kind: ShareErrorKind,
     pub message: String,
     /// Seconds until a rate limit resets, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub retry_after_secs: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ShareErrorKind {
     /// Bad or missing token. The UI should route to account settings.

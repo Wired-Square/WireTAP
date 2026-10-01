@@ -49,8 +49,10 @@ mod desktop {
 
     /// Per-interface framing configuration (overrides default for specific bus)
     #[derive(Clone, serde::Deserialize)]
+    #[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
     pub struct InterfaceFramingConfig {
         /// Framing mode: "raw", "slip", "modbus_rtu"
+        #[cfg_attr(test, ts(type = r#""raw" | "slip" | "modbus_rtu""#))]
         pub mode: String,
         /// For raw mode: delimiter bytes as hex string (e.g., "0D0A")
         pub delimiter: Option<String>,
@@ -64,6 +66,7 @@ mod desktop {
 
     /// Configuration for backend framing
     #[derive(Clone, serde::Deserialize)]
+    #[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
     pub struct BackendFramingConfig {
         /// The default framing, in the same shape a per-interface override takes.
         /// Flattened, so the wire stays the flat keys the frontend has always sent.
@@ -81,6 +84,7 @@ mod desktop {
 
     /// Result from backend framing operation
     #[derive(Clone, serde::Serialize)]
+    #[cfg_attr(test, derive(ts_rs::TS))]
     pub struct FramingResult {
         /// Number of frames extracted
         pub frame_count: usize,
@@ -231,6 +235,7 @@ mod desktop {
     }
 
     #[derive(serde::Serialize)]
+    #[cfg_attr(test, derive(ts_rs::TS))]
     pub struct SerialIds {
         pub frame_id: Option<u32>,
         pub source_address: Option<u16>,

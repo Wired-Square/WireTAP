@@ -90,6 +90,7 @@ use crate::{capture_store, sessions};
 
 /// Parsed frame message - the main data structure emitted by all readers
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FrameMessage {
     pub protocol: String, // e.g., "can", "modbus", "serial"
     /// Host UNIX timestamp in microseconds.
@@ -105,12 +106,15 @@ pub struct FrameMessage {
     pub is_fd: bool,
     /// Source address (for protocols like J1939, TWC that embed sender ID in frame)
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(test, ts(optional))]
     pub source_address: Option<u16>,
     /// Indicates incomplete frame (e.g., no delimiter found at end of stream)
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(test, ts(optional))]
     pub incomplete: Option<bool>,
     /// Direction: "rx" for received, "tx" for transmitted
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(test, ts(type = r#""rx" | "tx""#))]
     pub direction: Option<String>,
 }
 

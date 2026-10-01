@@ -23,6 +23,7 @@ use wslib_mcu_flash::{FlashError, FlashProgress, FlashStage};
 pub const FLASHER_PROGRESS_EVENT: &str = "flasher-progress";
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FlashPhase {
     Connecting,
@@ -48,12 +49,14 @@ impl From<FlashStage> for FlashPhase {
 }
 
 #[derive(Clone, Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "FlasherProgressEvent"))]
 pub struct FlasherProgress {
     pub flash_id: String,
     pub phase: FlashPhase,
     pub bytes_done: u64,
     pub bytes_total: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub message: Option<String>,
 }
 
@@ -61,6 +64,7 @@ pub struct FlasherProgress {
 /// means "let espflash decide / leave at its default". Mirrors the knobs on
 /// the `esptool ... write-flash` command line.
 #[derive(Clone, Deserialize, Default, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
 #[serde(default)]
 pub struct EspFlashOptions {
     /// Forced chip type (`esp32`, `esp32s3`, …). `None` = auto-detect.
@@ -93,6 +97,7 @@ impl EspFlashOptions {
 /// disables drive of that line, leaving the user to enter the bootloader
 /// manually.
 #[derive(Clone, Deserialize, Default, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
 #[serde(default)]
 pub struct Stm32FlashOptions {
     /// Pin driving BOOT0. `"rts"` | `"dtr"` | `"none"`. Default `"dtr"`.
@@ -126,6 +131,7 @@ impl From<&Stm32FlashOptions> for Stm32UartOptions {
 /// extra fields (MAC for ESP, RDP level for STM32) without us having to
 /// merge every variant into a single struct.
 #[derive(Clone, Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DetectedChip {
     /// Driver registry id on the frontend (`"esp-uart"` | `"stm32-uart"`).
     pub driver_id: String,
@@ -136,6 +142,7 @@ pub struct DetectedChip {
     /// Flash size in KB if known, else `None`.
     pub flash_size_kb: Option<u32>,
     /// Original chip-info struct so per-driver UIs can render extra fields.
+    #[cfg_attr(test, ts(type = "unknown"))]
     pub extra: Value,
 }
 

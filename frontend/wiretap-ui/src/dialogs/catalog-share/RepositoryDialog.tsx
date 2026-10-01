@@ -466,10 +466,8 @@ export default function RepositoryDialog({ isOpen, onClose, onImported }: Props)
   // Saving is only meaningful once the URL parses — the backend would reject it
   // anyway, and an enabled button that always errors is worse than a disabled one.
   const parsed = browse.parseError ? null : browse.parsed;
-  // `repoId` is the backend's own identity key, so "already saved" cannot drift
-  // from what a save would actually collide with. Checked against the list on
-  // show, since that is the one Save would add to.
-  const alreadySaved = !!parsed && repos.some((r) => r.id === parsed.repoId);
+  // Checked against the list on show, since that is the one Save would add to.
+  const alreadySaved = !!parsed && repos.some((r) => r.owner === parsed.owner && r.repo === parsed.repo);
 
   const handleBrowseRepo = async (repo: ListedRepo) => {
     // Ref and directory go as arguments, not folded into a `/tree/…` URL: that

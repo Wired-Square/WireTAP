@@ -4,128 +4,34 @@
 // Uses IO session-based transmit - the session must be started first.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { CanTransmitFrame } from "../generated/CanTransmitFrame";
+import type { RepeatStartedEvent } from "../generated/RepeatStartedEvent";
+import type { RepeatStoppedEvent } from "../generated/RepeatStoppedEvent";
+import type { ReplayFrame } from "../generated/ReplayFrame";
+import type { SerialFraming } from "../generated/SerialFraming";
+import type { TransmitProfile } from "../generated/TransmitProfile";
+import type { TransmitResult } from "../generated/TransmitResult";
+import type { WriterCapabilities } from "../generated/WriterCapabilities";
+
+export type {
+  CanTransmitFrame,
+  RepeatStartedEvent,
+  RepeatStoppedEvent,
+  ReplayFrame,
+  SerialFraming,
+  TransmitProfile,
+  TransmitResult,
+  WriterCapabilities,
+};
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** CAN frame for transmission */
-export interface CanTransmitFrame {
-  /** CAN frame ID (11-bit standard or 29-bit extended) */
-  frame_id: number;
-  /** Frame data (up to 8 bytes for classic CAN, up to 64 for CAN FD) */
-  data: number[];
-  /** Bus number (0 for single-bus adapters, 0-4 for multi-bus like GVRET) */
-  bus: number;
-  /** Extended (29-bit) frame ID */
-  is_extended: boolean;
-  /** CAN FD frame */
-  is_fd: boolean;
-  /** Bit Rate Switch (CAN FD only) */
-  is_brs: boolean;
-  /** Remote Transmission Request */
-  is_rtr: boolean;
-}
-
-/** Result of a transmit operation */
-export interface TransmitResult {
-  /** Whether the transmission was successful */
-  success: boolean;
-  /** Timestamp when the frame was sent (microseconds since UNIX epoch) */
-  timestamp_us: number;
-  /** Error message if transmission failed */
-  error?: string;
-}
-
-/** Writer capabilities - what a transmit-capable profile supports */
-export interface WriterCapabilities {
-  /** Can transmit CAN frames */
-  can_transmit_can: boolean;
-  /** Can transmit serial bytes */
-  can_transmit_serial: boolean;
-  /** Supports CAN FD (64 bytes, BRS) */
-  supports_canfd: boolean;
-  /** Supports extended (29-bit) CAN IDs */
-  supports_extended_id: boolean;
-  /** Supports Remote Transmission Request frames */
-  supports_rtr: boolean;
-  /** Available bus numbers (empty = single bus, [0,1,2,3,4] = multi-bus like GVRET) */
-  available_buses: number[];
-}
-
-/** Profile info with transmit capabilities */
-export interface TransmitProfile {
-  /** Profile ID */
-  id: string;
-  /** Display name */
-  name: string;
-  /** Profile kind (slcan, gvret_tcp, socketcan, serial) */
-  kind: string;
-  /** Writer capabilities */
-  capabilities: WriterCapabilities;
-}
-
-/** How serial bytes are framed on the wire; the backend does the framing. */
-export type SerialFraming =
-  | { mode: "raw" }
-  | { mode: "slip" }
-  | { mode: "delimiter"; delimiter: number[] };
-
 export type SerialFramingMode = SerialFraming["mode"];
 
 export function serialFraming(mode: SerialFramingMode, delimiter: number[]): SerialFraming {
   return mode === "delimiter" ? { mode, delimiter } : { mode };
-}
-
-/** Event payload for CAN transmit history (emitted during repeat transmits) */
-export interface TransmitHistoryEvent {
-  /** Session ID that transmitted */
-  session_id: string;
-  /** Queue item or group ID */
-  queue_id: string;
-  /** The frame that was transmitted */
-  frame: CanTransmitFrame;
-  /** Whether transmission succeeded */
-  success: boolean;
-  /** Timestamp in microseconds */
-  timestamp_us: number;
-  /** Error message if failed */
-  error?: string;
-}
-
-/** Event payload for serial transmit history (emitted during repeat transmits) */
-export interface SerialTransmitHistoryEvent {
-  /** Session ID that transmitted */
-  session_id: string;
-  /** Queue item or group ID */
-  queue_id: string;
-  /** The bytes that were transmitted */
-  bytes: number[];
-  /** Whether transmission succeeded */
-  success: boolean;
-  /** Timestamp in microseconds */
-  timestamp_us: number;
-  /** Error message if failed */
-  error?: string;
-}
-
-/** Event payload when a repeat transmission stops due to permanent error */
-export interface RepeatStoppedEvent {
-  /** Queue item or group ID that stopped */
-  queue_id: string;
-  /** Reason for stopping */
-  reason: string;
-}
-
-/** A repeat transmit started, by the Transmit UI or an MCP agent. */
-export interface RepeatStartedEvent extends CanTransmitFrame {
-  queue_id: string;
-  session_id: string;
-  profile_id: string;
-  profile_name: string;
-  interval_ms: number;
-  /** Where the repeat came from: `"user"` or `"agent"`. */
-  origin: string;
 }
 
 /**
@@ -300,14 +206,6 @@ export async function ioStopAllGroupRepeats(): Promise<void> {
 // ============================================================================
 // Replay API
 // ============================================================================
-
-/** A single frame with its original capture timestamp for time-accurate replay. */
-export interface ReplayFrame {
-  /** Original capture timestamp in microseconds since UNIX epoch. */
-  timestamp_us: number;
-  /** The CAN frame to transmit. */
-  frame: CanTransmitFrame;
-}
 
 /**
  * Start a time-accurate replay of captured frames.

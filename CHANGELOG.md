@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **The repository dialog no longer offers to save a repository that is already saved.** Its Save button stayed enabled, and saving again replaced the saved entry with what the dialog held.
 - **Re-wiring a bus in the Session Manager keeps its protocol.** Dragging a CAN FD bus to a new mapping turned it into classic CAN. It now keeps the protocol it had.
 - **The Decoder's Modbus tab lists each exchange once.** Reloading or swapping a tunnel catalogue, or opening a Dashboard on the same session in the Decoder's window, listed every exchange already shown a second time.
 - **The Decoder's Modbus tab no longer outlives a catalogue without a tunnel.** Switching to such a catalogue while the Modbus tab was open left the old exchanges on screen. The panel now returns to Signals and the old exchanges are dropped.

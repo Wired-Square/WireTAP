@@ -50,6 +50,7 @@ pub fn git_blob_sha_of_file(path: &Path) -> Option<String> {
 /// How the local file compares with the bytes last exchanged with the remote.
 /// Computed from disk alone — no network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum LocalState {
     /// No provenance entry — a purely local catalogue.
@@ -79,6 +80,7 @@ pub enum RemoteState {
 /// single label, and the picker and the settings row must never disagree about which
 /// one it is. So the collapse happens exactly once, in [`CatalogEntry::sync_status_of`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum SyncStatus {
     /// Not tracked against any repository — a purely local catalogue.
@@ -129,6 +131,7 @@ pub struct RepoEntry {
 /// [`Registry::forget`] as soon as its last catalogue is forgotten, which would
 /// silently drop a repository the user had explicitly saved.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SavedRepo {
     /// Stable key from `CatalogSource::repo_id()` — same identity as `RepoEntry`.
@@ -140,13 +143,16 @@ pub struct SavedRepo {
     pub repo: String,
     /// Display name; falls back to `{owner}/{repo}` when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub label: Option<String>,
     /// Ref to browse and import from. **Not** the publish branch — see
     /// `PublishRequest::branch`, which names a branch to create.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub git_ref: Option<String>,
     /// Repo-relative directory holding catalogues, e.g. `catalogs`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub directory: Option<String>,
     pub saved_at: String,
 }
@@ -498,6 +504,7 @@ impl RemoteState {
 /// The cached GitHub identity. Whether a token exists lives in the keychain; this is
 /// only what we resolved it to, so the UI can show a login without a round trip.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct GitIdentity {
     pub host: String,

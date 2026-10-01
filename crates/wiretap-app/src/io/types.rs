@@ -183,21 +183,27 @@ fn refused_or_queued(answer: Option<Result<(), String>>) -> TransmitResult {
 /// because the CAN tunnel wants it too, and because `SetFramingRequest` below
 /// must stay buildable on a platform with no serial port.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(default)]
 pub struct ModbusRtuOptions {
     /// Device address filter (1-247). `None` syncs on any valid address.
+    #[cfg_attr(test, ts(optional))]
     pub device_address: Option<u8>,
     /// Whether a message has to pass its CRC to be framed. `false` is a lenient
     /// mode, not "no framing" — see `CrcPolicy::Lenient`.
+    #[cfg_attr(test, ts(optional = nullable))]
     pub validate_crc: bool,
     /// Function codes the RTU length rules do not model but this line carries.
     /// Framed by CRC search instead; empty leaves stock Modbus untouched.
+    #[cfg_attr(test, ts(optional = nullable))]
     pub vendor_functions: Vec<u8>,
     /// Whether address 0 may start a message, for a master that broadcasts.
+    #[cfg_attr(test, ts(optional = nullable))]
     pub allow_broadcast: bool,
     /// Frame every function code, declared or not. What a tap on an unknown
     /// line wants, at the cost of a fabricated message about once in 260
     /// resyncs — see `ModbusRtuStream::frame_any_function`.
+    #[cfg_attr(test, ts(optional = nullable))]
     pub any_function: bool,
 }
 

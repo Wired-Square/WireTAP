@@ -24,6 +24,7 @@ use super::{now_us, FrameMessage};
 use crate::io::CanTransmitFrame;
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProbeInterface {
     pub index: u8,
     pub iface_type: u8,
@@ -33,6 +34,7 @@ pub struct ProbeInterface {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FrameLinkProbeResult {
     pub device_id: Option<String>,
     pub board_name: Option<String>,
@@ -193,6 +195,7 @@ pub struct SignalDescriptor {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SignalReadResult {
     pub signal_id: u16,
     pub value: u64,

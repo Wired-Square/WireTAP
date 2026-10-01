@@ -67,6 +67,7 @@ pub struct TimestampedByte {
 
 /// Metadata about a capture
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CaptureMetadata {
     /// Unique capture ID (e.g., "xk9m2p", "r7f3kw")
     pub id: String,
@@ -1160,6 +1161,7 @@ pub fn get_capture_frames_paginated_filtered(
 
 /// Response from tail fetch operation
 #[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TailResponse {
     pub frames: Vec<FrameMessage>,
     /// 1-based original capture position (rowid) for each frame, parallel to `frames`.
@@ -1221,6 +1223,7 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
 
 /// Frame info extracted from a capture
 #[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CaptureFrameInfo {
     /// Frame identity is (protocol, frame_id) — CAN 0x100 and Modbus register 256
     /// are different frames that share a numeric id.

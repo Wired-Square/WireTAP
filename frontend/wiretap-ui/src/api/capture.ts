@@ -9,56 +9,55 @@ import type { ProtocolFrames } from "../utils/frameKey";
 import type { Protocol } from "../utils/profileTraits";
 import type { FrameMessage } from "../types/frame";
 
-/**
- * Capture kind - determines what kind of data is stored
- */
-export type CaptureKind = "frames" | "bytes";
+import type { BackendFramingConfig } from "../generated/BackendFramingConfig";
+import type { CandumpImportResult } from "../generated/CandumpImportResult";
+import type { CaptureFrameInfo } from "../generated/CaptureFrameInfo";
+import type { CaptureKind } from "../generated/CaptureKind";
+import type { CaptureMetadata } from "../generated/CaptureMetadata";
+import type { CsvColumnMapping } from "../generated/CsvColumnMapping";
+import type { CsvColumnRole } from "../generated/CsvColumnRole";
+import type { CsvImportResult } from "../generated/CsvImportResult";
+import type { CsvPreview } from "../generated/CsvPreview";
+import type { Delimiter } from "../generated/Delimiter";
+import type { FrameIdConfig } from "../generated/FrameIdConfig";
+import type { FramingResult } from "../generated/FramingResult";
+import type { InterfaceFramingConfig } from "../generated/InterfaceFramingConfig";
+import type { ModbusRtuOptions } from "../generated/ModbusRtuOptions";
+import type { PaginatedBytesResponse } from "../generated/PaginatedBytesResponse";
+import type { PaginatedFramesResponse } from "../generated/PaginatedFramesResponse";
+import type { SequenceGap } from "../generated/SequenceGap";
+import type { SerialIds } from "../generated/SerialIds";
+import type { SkippedLine } from "../generated/SkippedLine";
+import type { TailResponse } from "../generated/TailResponse";
+import type { TimestampedByte } from "../generated/TimestampedByte";
+import type { TimestampUnit } from "../generated/TimestampUnit";
+import type { FrameMessage as CaptureFrame } from "../generated/FrameMessage";
 
-/**
- * Metadata about a capture in the registry
- */
-export interface CaptureMetadata {
-  /** Unique capture ID (e.g., "xk9m2p", "r7f3kw") */
-  id: string;
-  /** Kind of data stored: "frames" (CAN, framed serial) or "bytes" (raw serial) */
-  kind: CaptureKind;
-  /** Display name (e.g., "GVRET 10:30am", "Serial dump") */
-  name: string;
-  /** Number of items (frames for frame captures, bytes for byte captures) */
-  count: number;
-  /** Timestamp of first item (microseconds) */
-  start_time_us: number | null;
-  /** Timestamp of last item (microseconds) */
-  end_time_us: number | null;
-  /** When the capture was created (Unix timestamp in seconds) */
-  created_at: number;
-  /** Whether this capture is actively receiving data (is the streaming target) */
-  is_streaming: boolean;
-  /**
-   * Session ID that owns this capture (null = orphaned, available for standalone use).
-   * Captures with an owning session are only accessible through that session.
-   * When a session is destroyed, the capture is orphaned.
-   */
-  owning_session_id: string | null;
-  /** Whether this capture survives app restart when 'clear captures on start' is enabled */
-  persistent: boolean;
-  /** Distinct bus numbers present in this capture's data (sorted) */
-  buses: number[];
-}
-
-export interface SkippedLine {
-  file: string;
-  line: number;
-  code: string;
-  message: string;
-}
-
-export interface CandumpImportResult {
-  metadata: CaptureMetadata;
-  /** The first hundred of `skipped_count`. */
-  skipped: SkippedLine[];
-  skipped_count: number;
-}
+export type {
+  BackendFramingConfig,
+  CandumpImportResult,
+  CaptureFrame,
+  CaptureFrameInfo,
+  CaptureKind,
+  CaptureMetadata,
+  CsvColumnMapping,
+  CsvColumnRole,
+  CsvImportResult,
+  CsvPreview,
+  Delimiter,
+  FrameIdConfig,
+  FramingResult,
+  InterfaceFramingConfig,
+  ModbusRtuOptions,
+  PaginatedBytesResponse,
+  PaginatedFramesResponse,
+  SequenceGap,
+  SerialIds,
+  SkippedLine,
+  TailResponse,
+  TimestampedByte,
+  TimestampUnit,
+};
 
 /** Whether every file is a candump log, which skips the column mapper. */
 export async function detectCandump(filePaths: string[]): Promise<boolean> {
@@ -73,92 +72,6 @@ export async function importCandump(sessionId: string, filePaths: string[]): Pro
 // ============================================================================
 // Flexible CSV Import API (column mapping)
 // ============================================================================
-
-/** A gap detected in the sequence column during CSV import */
-export interface SequenceGap {
-  /** Line number in the CSV file where the gap starts (1-based) */
-  line: number;
-  /** Sequence value before the gap */
-  from_seq: number;
-  /** Sequence value after the gap */
-  to_seq: number;
-  /** Estimated number of dropped frames */
-  dropped: number;
-  /** Filename (set for multi-file imports) */
-  filename?: string;
-}
-
-/** Result of a CSV import, including capture metadata and sequence diagnostics */
-export interface CsvImportResult {
-  metadata: CaptureMetadata;
-  sequence_gaps: SequenceGap[];
-  /** Total number of dropped frames estimated from sequence gaps */
-  total_dropped: number;
-  /** Detected sequence wraparound points (raw sequence value at each wrap) */
-  wrap_points: number[];
-}
-
-/**
- * Column delimiter for splitting lines into fields
- */
-export type Delimiter = "comma" | "tab" | "space" | "semicolon";
-
-/**
- * Column role for CSV mapping
- */
-export type CsvColumnRole =
-  | "ignore"
-  | "frame_id"
-  | "timestamp"
-  | "data_bytes"
-  | "data_byte"
-  | "dlc"
-  | "extended"
-  | "bus"
-  | "direction"
-  | "frame_id_data"
-  | "sequence";
-
-/**
- * A single column mapping: column index to role
- */
-export interface CsvColumnMapping {
-  column_index: number;
-  role: CsvColumnRole;
-}
-
-/**
- * Timestamp unit for CSV import
- */
-export type TimestampUnit =
-  | "seconds"
-  | "milliseconds"
-  | "microseconds"
-  | "nanoseconds";
-
-/**
- * Preview data from a CSV file
- */
-export interface CsvPreview {
-  /** Header strings if first row is a header */
-  headers: string[] | null;
-  /** Preview data rows (raw cell strings) */
-  rows: string[][];
-  /** Total number of data rows in the file */
-  total_rows: number;
-  /** Auto-detected column mappings */
-  suggested_mappings: CsvColumnMapping[];
-  /** Whether the first row was detected as a header */
-  has_header: boolean;
-  /** Auto-detected timestamp unit based on sample data analysis */
-  suggested_timestamp_unit: TimestampUnit;
-  /** Whether sample timestamps are all negative (suggests negate fix) */
-  has_negative_timestamps: boolean;
-  /** Detected or user-specified delimiter */
-  delimiter: Delimiter;
-  /** The protocol the file name declares, CAN when it names none */
-  suggested_protocol: Protocol;
-}
 
 /**
  * Preview a data file: reads first N rows, detects delimiter/headers, suggests column mappings.
@@ -258,40 +171,12 @@ export async function getCaptureMetadata(captureId: string): Promise<CaptureMeta
 }
 
 /**
- * A single CAN frame from the capture.
- */
-export interface CaptureFrame {
-  protocol: string;
-  timestamp_us: number;
-  frame_id: number;
-  bus: number;
-  dlc: number;
-  bytes: number[];
-  is_extended?: boolean;
-  is_fd?: boolean;
-  /** Source address (for protocols like J1939, TWC that embed sender ID in frame) */
-  source_address?: number;
-}
-
-/**
  * Get all frames from the shared capture.
  * Returns an empty array if no data is loaded.
  * WARNING: For large buffers (>100k frames), use getCaptureFramesPaginated instead.
  */
 export async function getCaptureFrames(captureId: string): Promise<CaptureFrame[]> {
   return invoke("get_capture_frames", { capture_id: captureId });
-}
-
-/**
- * Response for paginated capture frames
- */
-export interface PaginatedFramesResponse {
-  frames: CaptureFrame[];
-  total_count: number;
-  offset: number;
-  limit: number;
-  /** 1-based original capture position (rowid) for each frame, parallel to `frames`. */
-  capture_indices: number[];
 }
 
 /**
@@ -329,17 +214,6 @@ export async function getCaptureFramesPaginatedFiltered(
     limit,
     selection,
   });
-}
-
-/**
- * Response for tail capture frames
- */
-export interface TailResponse {
-  frames: CaptureFrame[];
-  /** 1-based original capture position (rowid) for each frame, parallel to `frames`. */
-  capture_indices: number[];
-  total_filtered_count: number;
-  capture_end_time_us: number | null;
 }
 
 /**
@@ -406,19 +280,6 @@ export async function exportFrameDump(
 ): Promise<number> {
   const wire = "captureId" in source ? { capture_id: source.captureId } : source;
   return invoke("export_frame_dump", { source: wire, format, path });
-}
-
-/**
- * Frame info extracted from the capture
- */
-export interface CaptureFrameInfo {
-  /** Frame identity is (protocol, frame_id) — see `utils/frameKey.ts`. */
-  protocol: string;
-  frame_id: number;
-  max_dlc: number;
-  bus: number;
-  is_extended: boolean;
-  has_dlc_mismatch: boolean;
 }
 
 /**
@@ -565,16 +426,6 @@ export async function getCaptureFramesById(captureId: string): Promise<CaptureFr
 }
 
 /**
- * Timestamped byte for raw serial data
- */
-export interface TimestampedByte {
-  byte: number;
-  timestamp_us: number;
-  /** Bus/interface number (for multi-source sessions) */
-  bus?: number;
-}
-
-/**
  * Get raw bytes from a specific byte capture by ID.
  * Throws if the capture doesn't exist or is not a byte capture.
  *
@@ -606,7 +457,7 @@ export async function setActiveCapture(captureId: string): Promise<void> {
 export async function createFrameCaptureFromFrames(
   sessionId: string,
   name: string,
-  frames: CaptureFrame[]
+  frames: FrameMessage[]
 ): Promise<CaptureMetadata> {
   return invoke("create_frame_capture_from_frames", { session_id: sessionId, name, frames });
 }
@@ -614,16 +465,6 @@ export async function createFrameCaptureFromFrames(
 // ============================================================================
 // Byte Capture API (Serial Discovery)
 // ============================================================================
-
-/**
- * Response for paginated capture bytes
- */
-export interface PaginatedBytesResponse {
-  bytes: TimestampedByte[];
-  total_count: number;
-  offset: number;
-  limit: number;
-}
 
 /**
  * Get a page of bytes from the active capture.
@@ -667,81 +508,6 @@ export async function getCaptureBytesPaginatedById(
 // ============================================================================
 
 /**
- * Configuration for frame ID extraction from frame bytes.
- */
-export interface FrameIdConfig {
-  /** Start byte index (negative = from end) */
-  start_byte: number;
-  /** Number of bytes for frame ID (1 or 2) */
-  num_bytes: number;
-  /** Whether to interpret as big-endian */
-  big_endian: boolean;
-}
-
-/**
- * Everything a Modbus RTU stream needs beyond the mode itself, mirroring Rust's
- * `ModbusRtuOptions`. `vendor_functions` unions with whatever the catalogue
- * declares; both opt-ins are off by default, which is stock Modbus.
- */
-export interface ModbusRtuOptions {
-  device_address?: number;
-  validate_crc?: boolean;
-  vendor_functions?: number[];
-  allow_broadcast?: boolean;
-  any_function?: boolean;
-}
-
-/**
- * Per-interface framing configuration (overrides default for specific bus).
- */
-export interface InterfaceFramingConfig {
-  /** Framing mode: "raw", "slip", "modbus_rtu" */
-  mode: 'raw' | 'slip' | 'modbus_rtu';
-  /** For raw mode: delimiter bytes as hex string (e.g., "0D0A") */
-  delimiter?: string;
-  /** For raw mode: max frame length before forced split */
-  max_length?: number;
-  /** For modbus_rtu mode: the RTU settings */
-  modbus?: ModbusRtuOptions;
-}
-
-/**
- * Configuration for backend framing.
- */
-export interface BackendFramingConfig {
-  /** Default framing mode: "raw", "slip", "modbus_rtu" */
-  mode: 'raw' | 'slip' | 'modbus_rtu';
-  /** For raw mode: delimiter bytes as hex string (e.g., "0D0A") */
-  delimiter?: string;
-  /** For raw mode: max frame length before forced split */
-  max_length?: number;
-  /** For modbus_rtu mode: the RTU settings */
-  modbus?: ModbusRtuOptions;
-  /** Minimum frame length to accept (frames shorter are discarded) */
-  min_length?: number;
-  /** Frame ID extraction config */
-  frame_id_config?: FrameIdConfig;
-  /** Source address extraction config */
-  source_address_config?: FrameIdConfig;
-  /** Per-interface framing overrides (bus number -> config) */
-  per_interface?: Record<number, InterfaceFramingConfig>;
-}
-
-/**
- * Result from backend framing operation.
- */
-export interface FramingResult {
-  /** Number of frames extracted */
-  frame_count: number;
-  /** ID of the new frame capture */
-  capture_id: string;
-  /** Number of frames excluded by min_length filter */
-  filtered_count: number;
-  /** ID of the filtered frames capture (frames that were too short) */
-  filtered_capture_id: string | null;
-}
-
-/**
  * Apply framing to the active byte capture.
  * If reuseCaptureId is provided and valid, that capture is cleared and reused.
  * Otherwise, a new frame capture is created.
@@ -765,11 +531,6 @@ export async function applyFramingToCapture(
     reuse_capture_id: reuseCaptureId ?? null,
     reuse_filtered_capture_id: reuseFilteredCaptureId ?? null,
   });
-}
-
-export interface SerialIds {
-  frame_id: number | null;
-  source_address: number | null;
 }
 
 export function toFrameIdConfig(

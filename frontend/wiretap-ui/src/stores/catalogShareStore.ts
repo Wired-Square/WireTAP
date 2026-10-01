@@ -440,7 +440,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
       set({
         tracked: view.catalogs,
         savedRepos: view.savedRepos,
-        favouriteRepoId: view.favouriteRepoId ?? null,
+        favouriteRepoId: view.favouriteRepoId,
         communityRepos: view.communityRepos,
         hasToken: view.hasToken,
         login: view.login ?? null,
@@ -466,7 +466,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
       const { saved, savedRepos, favouriteRepoId } = await saveCatalogRepo(input, opts);
       // The command returns the refreshed list, so there is nothing to re-list —
       // and the backend keeps owning the rules (first save becomes the favourite).
-      set({ savedRepos, favouriteRepoId: favouriteRepoId ?? null, reposError: null });
+      set({ savedRepos, favouriteRepoId, reposError: null });
       return saved;
     } catch (error) {
       set({ reposError: asShareError(error) });
@@ -477,7 +477,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
   forgetRepo: async (repoId) => {
     try {
       const { savedRepos, favouriteRepoId } = await forgetCatalogRepo(repoId);
-      set({ savedRepos, favouriteRepoId: favouriteRepoId ?? null, reposError: null });
+      set({ savedRepos, favouriteRepoId, reposError: null });
     } catch (error) {
       set({ reposError: asShareError(error) });
     }
@@ -510,7 +510,7 @@ export const useCatalogShareStore = create<CatalogShareState>((set, get) => ({
     set({ favouriteRepoId: repoId });
     try {
       const { savedRepos, favouriteRepoId } = await setFavouriteCatalogRepo(repoId);
-      set({ savedRepos, favouriteRepoId: favouriteRepoId ?? null, reposError: null });
+      set({ savedRepos, favouriteRepoId, reposError: null });
     } catch (error) {
       set({ favouriteRepoId: previous, reposError: asShareError(error) });
     }

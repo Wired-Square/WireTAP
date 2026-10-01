@@ -22,6 +22,7 @@ use crate::settings::{load_settings, IOProfile};
 
 /// Writer capabilities - what a transmit-capable profile supports
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct WriterCapabilities {
     pub can_transmit_can: bool,
     pub can_transmit_serial: bool,
@@ -33,6 +34,7 @@ pub struct WriterCapabilities {
 
 /// Profile info with transmit capabilities
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TransmitProfile {
     pub id: String,
     pub name: String,
@@ -42,6 +44,7 @@ pub struct TransmitProfile {
 
 /// How serial bytes are framed on the wire.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum SerialFraming {
     Raw,
@@ -59,17 +62,9 @@ impl SerialFraming {
     }
 }
 
-/// Transmit result returned by transmission functions
-#[allow(dead_code)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransmitResult {
-    pub success: bool,
-    pub timestamp_us: u64,
-    pub error: Option<String>,
-}
-
 /// Event payload for repeat stopped (emitted when repeat stops due to permanent error)
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RepeatStoppedEvent {
     pub queue_id: String,
     pub reason: String,
@@ -79,6 +74,7 @@ pub struct RepeatStoppedEvent {
 /// needs to render it as a queue row, so a human's repeat and an agent's share
 /// one visible queue.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RepeatStartedEvent {
     pub queue_id: String,
     pub session_id: String,

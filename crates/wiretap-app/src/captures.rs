@@ -19,6 +19,7 @@ use crate::{
 
 /// Result of a CSV import, including capture metadata and any sequence gap diagnostics.
 #[derive(Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CsvImportResult {
     pub metadata: CaptureMetadata,
     pub sequence_gaps: Vec<io::SequenceGap>,
@@ -30,6 +31,7 @@ pub struct CsvImportResult {
 
 /// Response for paginated capture frames
 #[derive(Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PaginatedFramesResponse {
     pub frames: Vec<FrameMessage>,
     pub total_count: usize,
@@ -42,6 +44,7 @@ pub struct PaginatedFramesResponse {
 
 /// Response for paginated capture bytes
 #[derive(Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PaginatedBytesResponse {
     pub bytes: Vec<TimestampedByte>,
     pub total_count: usize,
@@ -54,6 +57,7 @@ pub struct PaginatedBytesResponse {
 // ============================================================================
 
 #[derive(Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CandumpImportResult {
     pub metadata: CaptureMetadata,
     pub skipped: Vec<io::SkippedLine>,

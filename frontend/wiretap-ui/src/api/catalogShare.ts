@@ -8,43 +8,94 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { DiffLine } from "./catalog";
 
-/** What a shared URL pointed at within the repository. */
-export type SourceKind = "repo" | "directory" | "file";
+import type { CatalogSource } from "../generated/CatalogSource";
+import type { CatalogSourcesView } from "../generated/CatalogSourcesView";
+import type { CollisionPolicy } from "../generated/CollisionPolicy";
+import type { CommunityReposView } from "../generated/CommunityReposView";
+import type { CommunityRepoView } from "../generated/CommunityRepoView";
+import type { FileCommit } from "../generated/FileCommit";
+import type { GitIdentity } from "../generated/GitIdentity";
+import type { GitProgress } from "../generated/GitProgress";
+import type { ImportOutcome } from "../generated/ImportOutcome";
+import type { ImportRequest } from "../generated/ImportRequest";
+import type { ImportResult } from "../generated/ImportResult";
+import type { LocalState } from "../generated/LocalState";
+import type { PublishAction } from "../generated/PublishAction";
+import type { PublishDiff } from "../generated/PublishDiff";
+import type { PublishDiffRequest } from "../generated/PublishDiffRequest";
+import type { PublishPlan } from "../generated/PublishPlan";
+import type { PublishProgress } from "../generated/PublishProgress";
+import type { PublishRequest } from "../generated/PublishRequest";
+import type { PublishResult } from "../generated/PublishResult";
+import type { PullOutcome } from "../generated/PullOutcome";
+import type { RemoteCatalog } from "../generated/RemoteCatalog";
+import type { RemoteCatalogText } from "../generated/RemoteCatalogText";
+import type { RemoteEntry } from "../generated/RemoteEntry";
+import type { RepoBrowse } from "../generated/RepoBrowse";
+import type { RepoInfo } from "../generated/RepoInfo";
+import type { RepoStatus } from "../generated/RepoStatus";
+import type { SavedRepo } from "../generated/SavedRepo";
+import type { SavedReposView } from "../generated/SavedReposView";
+import type { SavedRepoView } from "../generated/SavedRepoView";
+import type { SaveRepoResult } from "../generated/SaveRepoResult";
+import type { SecretFinding } from "../generated/SecretFinding";
+import type { ShareError } from "../generated/ShareError";
+import type { ShareErrorKind } from "../generated/ShareErrorKind";
+import type { SourceKind } from "../generated/SourceKind";
+import type { TrackedCatalog } from "../generated/TrackedCatalog";
+import type { TrackedPr } from "../generated/TrackedPr";
+import type { UpdateCheckFailure } from "../generated/UpdateCheckFailure";
+import type { UpdateCheckResult } from "../generated/UpdateCheckResult";
+import type { VersionBump } from "../generated/VersionBump";
+import type { NewRepo as NewRepoRequest } from "../generated/NewRepo";
+import type { SyncStatus as CatalogSyncStatus } from "../generated/SyncStatus";
 
-/** A parsed repository reference. Mirrors the Rust `CatalogSource`. */
-export interface CatalogSource {
-  host: string;
-  owner: string;
-  repo: string;
-  /** Stable identity key, `gh:{owner}/{repo}`. The one definition of "same repo". */
-  repoId: string;
-  /** Branch, tag or sha. Null means "the repository default branch". */
-  reference: string | null;
-  /** Repo-relative directory or file path. */
-  path: string | null;
-  kind: SourceKind;
-  /** The ref/path split could not be determined from the URL alone. */
-  refIsAmbiguous?: boolean;
-}
+export type {
+  CatalogSource,
+  CatalogSourcesView,
+  CatalogSyncStatus,
+  CollisionPolicy,
+  CommunityReposView,
+  CommunityRepoView,
+  FileCommit,
+  GitIdentity,
+  GitProgress,
+  ImportOutcome,
+  ImportRequest,
+  ImportResult,
+  LocalState,
+  NewRepoRequest,
+  PublishAction,
+  PublishDiff,
+  PublishDiffRequest,
+  PublishPlan,
+  PublishProgress,
+  PublishRequest,
+  PublishResult,
+  PullOutcome,
+  RemoteCatalog,
+  RemoteCatalogText,
+  RemoteEntry,
+  RepoBrowse,
+  RepoInfo,
+  RepoStatus,
+  SavedRepo,
+  SavedReposView,
+  SavedRepoView,
+  SaveRepoResult,
+  SecretFinding,
+  ShareError,
+  ShareErrorKind,
+  SourceKind,
+  TrackedCatalog,
+  TrackedPr,
+  UpdateCheckFailure,
+  UpdateCheckResult,
+  VersionBump,
+};
 
-export type ShareErrorKind =
-  | "auth"
-  | "forbidden"
-  | "rateLimited"
-  | "notFound"
-  | "network"
-  | "api"
-  | "unsupportedHost"
-  | "invalid";
-
-/** A typed backend failure. `kind` decides whether to offer Retry or route to settings. */
-export interface ShareError {
-  kind: ShareErrorKind;
-  message: string;
-  retryAfterSecs?: number;
-}
+export type PublishStep = PublishProgress["step"];
 
 /** Narrow an unknown catch value to a {@link ShareError}. */
 export function asShareError(error: unknown): ShareError {
@@ -60,186 +111,9 @@ export function asShareError(error: unknown): ShareError {
   return { kind: "invalid", message: String(error) };
 }
 
-export interface RepoInfo {
-  owner: string;
-  name: string;
-  fullName: string;
-  defaultBranch: string;
-  private: boolean;
-  fork: boolean;
-  /** Whether the connected account can push — decides fork vs direct publishing. */
-  canPush: boolean;
-  allowForking: boolean;
-  htmlUrl: string;
-  description?: string;
-  parentFullName?: string;
-}
-
-/** A candidate catalogue found in the repository tree, before content is fetched. */
-export interface RemoteEntry {
-  path: string;
-  filename: string;
-  blobSha: string;
-  size: number;
-  /** A local catalogue already carries this exact provenance. */
-  alreadyTracked: boolean;
-  /** A local file of the same name exists that we did not import. */
-  nameCollides: boolean;
-}
-
-export interface RepoBrowse {
-  source: CatalogSource;
-  repo: RepoInfo;
-  gitRef: string;
-  entries: RemoteEntry[];
-  /** Candidates beyond the display cap that were dropped. */
-  dropped: number;
-  authenticated: boolean;
-}
-
-/**
- * A repository the user has chosen to keep. Independent of whether any catalogue
- * currently comes from it — the backend's `repos` list is garbage-collected, this
- * one is not.
- */
-export interface SavedRepo {
-  /** Stable key, `gh:{owner}/{repo}`. */
-  id: string;
-  /** Canonical repository URL, fed straight to `PublishRequest.repoUrl`. */
-  url: string;
-  owner: string;
-  repo: string;
-  /** Display name; falls back to `{owner}/{repo}`. */
-  label?: string;
-  /** Ref to browse and import from. NOT the publish branch. */
-  gitRef?: string;
-  /** Repo-relative directory holding catalogues, e.g. `catalogs`. */
-  directory?: string;
-  savedAt: string;
-}
-
-/**
- * A saved repository as the backend lists it: the stored entry plus where its
- * clone is. Derived per call and never persisted, so it can only be read from a
- * listing — see `git::repos_root` on why a clone path must not be stored.
- */
-export interface SavedRepoView extends SavedRepo {
-  /** Absolute path the clone occupies, or would occupy once fetched. */
-  clonePath: string;
-  /** False until the repository has been browsed at least once. */
-  cloned: boolean;
-}
-
-/**
- * The saved list after a mutation. Returned by every mutating command so callers
- * patch state instead of re-listing, which would hash every tracked catalogue.
- */
-export interface SavedReposView {
-  savedRepos: SavedRepoView[];
-  favouriteRepoId?: string;
-}
-
-/** A newly saved repository, plus the refreshed list it belongs to. */
-export interface SaveRepoResult extends SavedReposView {
-  saved: SavedRepo;
-}
-
-/**
- * Someone else's repository: browsed and imported from, never published to.
- * Either ships with WireTAP or was added by the user — `builtin` says which, and
- * a shipped entry carries an empty `savedAt` because it was never added.
- */
-export interface CommunityRepoView extends SavedRepoView {
-  builtin: boolean;
-}
-
-/** The community list after a mutation. */
-export interface CommunityReposView {
-  communityRepos: CommunityRepoView[];
-}
-
 /** What to show for a repository in a list or dropdown. */
 export function savedRepoName(repo: SavedRepo): string {
   return repo.label?.trim() || `${repo.owner}/${repo.repo}`;
-}
-
-/** Resolved metadata for one remote catalogue (needs a content fetch). */
-export interface RemoteCatalog {
-  path: string;
-  blobSha: string;
-  name: string | null;
-  valid: boolean;
-  errors: string[];
-  frameCount: number;
-  /**
-   * Frames declaring a transmit interval. Surfaced prominently: an imported
-   * catalogue can define traffic that would be written to a live bus.
-   */
-  transmitFrameCount: number;
-  protocol?: string;
-}
-
-export type CollisionPolicy = "keepBoth" | "skip" | "overwrite";
-
-export interface ImportRequest {
-  input: string;
-  gitRef: string;
-  paths: string[];
-  onCollision?: CollisionPolicy;
-}
-
-export type ImportOutcome = "imported" | "updated" | "skipped" | "failed";
-
-export interface ImportResult {
-  path: string;
-  outcome: ImportOutcome;
-  filename?: string;
-  name?: string;
-  message?: string;
-}
-
-/** Local file versus the bytes last exchanged with the remote. No network needed. */
-export type LocalState = "untracked" | "committed" | "modified" | "missing";
-
-/**
- * {@link LocalState} and its remote counterpart collapsed into the one label every list
- * shows, computed in Rust (`catalog_share::registry::SyncStatus::collapse`).
- *
- * Derived there rather than here so the catalogue picker can render it without
- * subscribing to the sharing store, and so the picker's icon and the settings badge
- * cannot drift apart. `hasLocalChanges` / `hasRemoteChanges` in `utils/catalogSync`
- * are predicates *over* this — they answer a UI question and stay in TypeScript.
- */
-export type CatalogSyncStatus =
-  | "localOnly"
-  | "inSync"
-  | "localAhead"
-  | "remoteAhead"
-  | "diverged"
-  | "missing"
-  | "unchecked";
-
-export interface TrackedCatalog {
-  id: string;
-  localFilename: string;
-  repoId: string;
-  repoLabel: string;
-  remotePath: string;
-  gitRef: string;
-  syncStatus: CatalogSyncStatus;
-  webUrl?: string;
-  prUrl?: string;
-  prNumber?: number;
-  prMerged: boolean;
-}
-
-export interface CatalogSourcesView {
-  catalogs: TrackedCatalog[];
-  savedRepos: SavedRepoView[];
-  favouriteRepoId?: string;
-  communityRepos: CommunityRepoView[];
-  hasToken: boolean;
-  login?: string;
 }
 
 /**
@@ -366,38 +240,6 @@ export async function forgetCommunityRepo(repoId: string): Promise<CommunityRepo
 
 // ── Updates ──────────────────────────────────────────────────────────────────
 
-export interface UpdateCheckFailure {
-  repoLabel: string;
-  message: string;
-}
-
-export interface UpdateCheckResult {
-  /** The refreshed projection, so no follow-up listing is needed. */
-  catalogs: TrackedCatalog[];
-  reposChecked: number;
-  updatesAvailable: number;
-  failures: UpdateCheckFailure[];
-}
-
-/** The upstream text for one tracked catalogue, alongside the local copy. */
-export interface RemoteCatalogText {
-  catalogId: string;
-  localFilename: string;
-  repoLabel: string;
-  remoteToml: string;
-  remoteBlobSha: string;
-  localToml: string;
-  /**
-   * Git blob SHA-1 of the local file as reviewed. Echoed back on apply so the
-   * backend can refuse to overwrite a file that changed in the meantime.
-   */
-  localSha?: string;
-  localState: LocalState;
-  /** Non-empty blocks applying. */
-  validationErrors: string[];
-  transmitFrameCount: number;
-}
-
 /**
  * Check tracked repositories for upstream changes.
  *
@@ -428,17 +270,6 @@ export async function applyCatalogUpdate(
   await invoke("apply_catalog_update", { catalogId, toml, expectedLocalSha });
 }
 
-/** What a pull did. Discriminated on `kind`. */
-export type PullOutcome =
-  /** Upstream holds the bytes we last exchanged; nothing to take. */
-  | { kind: "upToDate" }
-  /** The local copy was replaced, because it had no edits of its own to lose. */
-  | { kind: "applied"; filename: string }
-  /** Both sides moved. Nothing was written — open the diff review. */
-  | { kind: "needsReview" }
-  /** The file is gone from the repository. */
-  | { kind: "goneUpstream" };
-
 /**
  * Pull one catalogue: fetch its repository, and take the update when it is safe to.
  *
@@ -448,18 +279,6 @@ export type PullOutcome =
  */
 export async function pullCatalog(catalogId: string): Promise<PullOutcome> {
   return await invoke<PullOutcome>("pull_catalog", { catalogId });
-}
-
-/** Where a repository's clone is, and how far it has drifted from `origin`. */
-export interface RepoStatus {
-  repoId: string;
-  /** Absolute path to the clone — a real git repository the user can open. */
-  clonePath: string;
-  /** False when nothing has been cloned yet. */
-  cloned: boolean;
-  branch: string;
-  ahead: number;
-  behind: number;
 }
 
 /** Local status of a repository's clone. No network. */
@@ -483,27 +302,10 @@ export async function revealRepoClone(repoId: string): Promise<boolean> {
  */
 export const GIT_PROGRESS_EVENT = "catalog-git-progress";
 
-export interface GitProgress {
-  repoId: string;
-  /** `clone` is the slow first time; `fetch` and `push` are quick. */
-  phase: "clone" | "fetch" | "push";
-  receivedObjects: number;
-  totalObjects: number;
-  receivedBytes: number;
-}
-
 // ── Account ──────────────────────────────────────────────────────────────────
 
 /** The default host. Kept in one place so a future GitHub Enterprise host slots in. */
 export const GIT_HOST = "github.com";
-
-/** A validated account. The token itself never crosses the IPC boundary. */
-export interface GitIdentity {
-  host: string;
-  login: string;
-  scopes: string[];
-  validatedAt: string;
-}
 
 /** Validate a personal access token and store it in the system keychain. */
 export async function setGitToken(token: string, host = GIT_HOST): Promise<GitIdentity> {
@@ -532,136 +334,8 @@ export async function gitTokenSetupUrl(): Promise<string> {
 
 // ── Publish ──────────────────────────────────────────────────────────────────
 
-export interface PublishRequest {
-  /** Local catalogue filename within the decoder directory. */
-  filename: string;
-  repoUrl: string;
-  targetPath?: string;
-  /**
-   * Branch to commit to. Omitted — the default — pushes straight to the base
-   * branch, which is the ref this catalogue was pulled from. Naming one creates it.
-   */
-  branch?: string;
-  commitMessage: string;
-  prTitle?: string;
-  prBody?: string;
-  draft?: boolean;
-  /** Open a pull request after pushing. Off by default. */
-  openPr?: boolean;
-  /**
-   * Increment `[meta].version` in the committed bytes, and write the bumped file back
-   * locally once the push has succeeded.
-   *
-   * Omitting it means **no bump** — the backend's serde default is off, deliberately,
-   * because this is the one request field that rewrites a file in the decoder
-   * directory. The push dialog's checkbox defaults on and sends `true` explicitly.
-   */
-  bumpVersion?: boolean;
-  /** Set once the user has reviewed the secret-scan findings. */
-  acceptSecretFindings?: boolean;
-  requestId?: string;
-}
-
-/** A line that looks like it contains a credential. */
-export interface SecretFinding {
-  line: number;
-  label: string;
-  excerpt: string;
-}
-
-/** What publishing would do, computed with nothing written. */
-export interface PublishPlan {
-  upstream: string;
-  targetPath: string;
-  /** The branch that will be committed to; equals `baseBranch` for a direct push. */
-  branch: string;
-  /** The ref this catalogue was pulled from, else the repository default. */
-  baseBranch: string;
-  /**
-   * What a branch would be called if a pull request is asked for without naming one.
-   * A pure function of the filename, so it never goes stale as checkboxes move —
-   * which is why the plan carries no `willOpenPr`. Derive that locally instead.
-   */
-  suggestedBranch: string;
-  /**
-   * Every branch in the local clone, for the branch picker. Free — the clone is
-   * already open during preflight — and it replaces a `matching-refs` request.
-   * Empty when the refs could not be read; typing a new branch name still works.
-   */
-  branches: string[];
-  /** Git blob SHA of the bytes that would be committed. */
-  localBlobSha: string;
-  /**
-   * The same path's blob SHA on `baseBranch`, so "nothing to push" is answerable
-   * without asking for the file text. `null` — this push creates the file.
-   *
-   * Against `baseBranch` specifically: the plan is not re-fetched when the branch
-   * field moves, so a verdict about any other branch would go stale. Use
-   * {@link publishDiff} for the branch actually chosen.
-   */
-  baseBlobSha: string | null;
-  forkNeeded: boolean;
-  /** Content becomes public and permanent; drives the exposure warning. */
-  targetIsPublic: boolean;
-  contentBytes: number;
-  /**
-   * `[meta].version` as the parser sees it — 1 when the key is absent. A fact about
-   * the file, so the bump checkbox can name both numbers before it is ticked.
-   */
-  metaVersion: number;
-  /** Non-empty blocks publishing. */
-  validationErrors: string[];
-  secretFindings: SecretFinding[];
-  transmitFrameCount: number;
-  existingPrUrl?: string;
-}
-
-export type PublishAction = "created" | "updated" | "committed";
-
-/** What a version bump did, when one was applied. */
-export interface VersionBump {
-  from: number;
-  to: number;
-  /**
-   * False when the local file changed while the push was in flight, so the bumped
-   * bytes are upstream but not on disk — the catalogue then reads as locally ahead.
-   */
-  writtenLocally: boolean;
-}
-
-export interface PublishResult {
-  action: PublishAction;
-  prUrl?: string;
-  prNumber?: number;
-  commitUrl?: string;
-  headOwner: string;
-  branch: string;
-  reusedBranch: boolean;
-  /**
-   * Absent when no bump was asked for. A bump that was asked for but *withheld*
-   * because the push would have changed nothing never reaches a result — the
-   * unchanged tree is refused first.
-   */
-  versionBump?: VersionBump;
-}
-
 /** Tauri event name for step-by-step publish progress. */
 export const PUBLISH_PROGRESS_EVENT = "catalog-publish-progress";
-
-export type PublishStep =
-  | "validate"
-  | "auth"
-  | "fork"
-  | "branch"
-  | "commit"
-  | "pr"
-  | "done";
-
-export interface PublishProgress {
-  requestId: string;
-  step: PublishStep;
-  detail?: string;
-}
 
 /** What publishing would do — validation, secret scan, fork need, visibility. */
 export async function preflightPublish(req: PublishRequest): Promise<PublishPlan> {
@@ -671,53 +345,6 @@ export async function preflightPublish(req: PublishRequest): Promise<PublishPlan
 /** Publish: branch, commit, and (unless commit-only) open or update a pull request. */
 export async function publishCatalog(req: PublishRequest): Promise<PublishResult> {
   return await invoke<PublishResult>("publish_catalog", { req });
-}
-
-/** One commit, as much of it as a provenance line needs. */
-export interface FileCommit {
-  /** Abbreviated — shown, never resolved. */
-  sha: string;
-  author: string;
-  /** Unix seconds, UTC. Formatted here, because the frontend owns the locale. */
-  timestamp: number;
-  summary: string;
-}
-
-/** What to compare. Named explicitly so the backend does not have to re-derive it. */
-export interface PublishDiffRequest {
-  filename: string;
-  repoUrl: string;
-  targetPath: string;
-  /** The branch that would actually be committed to. */
-  branch: string;
-  /** What that branch would be created off, when it does not exist yet. */
-  baseBranch: string;
-}
-
-/**
- * What a push would change upstream, ready to render.
- *
- * Carries the rendered diff rather than the two texts: both are already in hand in
- * Rust, so returning them would ship the files here and straight back over the
- * WebSocket to be diffed by the same function.
- */
-export interface PublishDiff {
-  /** The ref actually read — it falls back to the base when `branch` is new. */
-  comparedRef: string;
-  branchExists: boolean;
-  targetPath: string;
-  /** Unified rows, upstream → local, so an `add` is what this push adds. Empty when
-   *  `identical`, which renders as a banner rather than a page of unchanged lines. */
-  lines: DiffLine[];
-  added: number;
-  removed: number;
-  /** False when this push would add the file rather than change it. */
-  exists: boolean;
-  /** Byte-identical, so the commit would be empty. */
-  identical: boolean;
-  /** Upstream moved on since this catalogue was imported. */
-  upstreamMoved: boolean;
-  lastChange: FileCommit | null;
 }
 
 /**
@@ -732,22 +359,9 @@ export async function publishDiff(req: PublishDiffRequest): Promise<PublishDiff>
   return await invoke<PublishDiff>("publish_diff", { req });
 }
 
-/** What to create a repository as. Private unless deliberately made public. */
-export interface NewRepoRequest {
-  name: string;
-  description?: string | null;
-  private: boolean;
-}
-
 /** Create a repository to publish into. */
 export async function createCatalogRepo(req: NewRepoRequest): Promise<RepoInfo> {
   return await invoke<RepoInfo>("create_catalog_repo", { req });
-}
-
-export interface TrackedPr {
-  number: number;
-  url: string;
-  merged: boolean;
 }
 
 /** Re-check a tracked catalogue's pull request — open, or merged. */

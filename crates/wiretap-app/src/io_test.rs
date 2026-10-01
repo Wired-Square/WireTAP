@@ -83,6 +83,7 @@ async fn send(
 // ============================================================================
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TestMode {
     Echo,
@@ -137,6 +138,7 @@ impl TestMode {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TestRole {
     Initiator,
@@ -158,6 +160,7 @@ impl std::fmt::Display for TestRole {
 /// after `Running` is terminal. Typed rather than a bare string because
 /// `run_auto` decides a phase passed by reading it back.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TestStatus {
     Running,
@@ -168,6 +171,7 @@ pub enum TestStatus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct TestConfig {
     pub mode: TestMode,
     pub role: TestRole,
@@ -231,6 +235,7 @@ impl TestConfig {
 /// Round-trip times over a run. Mirrors the crate's [`tp::LatencyStats`] so the
 /// frontend has a serde shape to read; the maths is the crate's.
 #[derive(Clone, Debug, Serialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LatencyStats {
     pub min_us: u64,
     pub max_us: u64,
@@ -258,6 +263,7 @@ impl From<tp::LatencyStats> for LatencyStats {
 /// What `Hello` found: proof that something is out there, and what it says it
 /// can do.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PeerInfo {
     pub fd: bool,
     pub extended: bool,
@@ -271,6 +277,7 @@ pub struct PeerInfo {
 /// every byte it did send was right — which is precisely how a length-versus-
 /// code confusion presents.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SweepRow {
     pub code: u8,
     pub expected_len: u32,
@@ -281,6 +288,7 @@ pub struct SweepRow {
 
 /// Result of a single phase in an Auto test.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct AutoPhaseResult {
     pub phase: String,
     pub passed: bool,
@@ -297,6 +305,7 @@ pub struct AutoPhaseResult {
 
 /// Remote endpoint stats received via status report frames.
 #[derive(Clone, Debug, Serialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RemoteStats {
     pub rx_count: u32,
     pub tx_count: u32,
@@ -305,6 +314,7 @@ pub struct RemoteStats {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct IOTestState {
     pub test_id: String,
     pub status: TestStatus,

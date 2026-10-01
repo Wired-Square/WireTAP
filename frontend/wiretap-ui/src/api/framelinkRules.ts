@@ -5,111 +5,37 @@
 // pool resolves device_id → host:port.
 
 import { wsTransport } from "../services/wsTransport";
+import type { BridgeDescriptor } from "../generated/BridgeDescriptor";
+import type { BridgeFilterDescriptor } from "../generated/BridgeFilterDescriptor";
+import type { DeviceSignalDescriptor } from "../generated/DeviceSignalDescriptor";
+import type { FrameDefDescriptor } from "../generated/FrameDefDescriptor";
+import type { GeneratorDescriptor } from "../generated/GeneratorDescriptor";
+import type { SignalDefDescriptor } from "../generated/SignalDefDescriptor";
+import type { SignalMappingDescriptor } from "../generated/SignalMappingDescriptor";
+import type { SignalReadResult } from "../generated/SignalReadResult";
+import type { TransformerDescriptor } from "../generated/TransformerDescriptor";
+import type { FrameLinkProbeResult as ProbeResult } from "../generated/FrameLinkProbeResult";
 
-// ============================================================================
-// Types
-// ============================================================================
+export type {
+  BridgeDescriptor,
+  BridgeFilterDescriptor,
+  DeviceSignalDescriptor,
+  FrameDefDescriptor,
+  GeneratorDescriptor,
+  ProbeResult,
+  SignalDefDescriptor,
+  SignalMappingDescriptor,
+  SignalReadResult,
+  TransformerDescriptor,
+};
 
-export interface SignalDefDescriptor {
-  signal_id: number;
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  byte_order: number;
-  value_type: number;
-  scale: number;
-  offset: number;
-}
-
-export interface FrameDefDescriptor {
-  frame_def_id: number;
-  name: string;
-  description: string | null;
-  interface_type: number;
-  interface_type_name: string;
-  can_id: number | null;
-  dlc: number | null;
-  extended: boolean | null;
-  signals: SignalDefDescriptor[];
-}
-
-export type BridgeFilterKind = 'mask' | 'range';
-export type BridgeFilterIde = 'any' | 'std' | 'ext';
-export type BridgeDefaultAction = 'pass' | 'block';
-
-export interface BridgeFilterDescriptor {
-  kind: BridgeFilterKind;
-  ide: BridgeFilterIde;
-  /** Mask: `can_id`. Range: inclusive `lo`. */
-  a: number;
-  /** Mask: `mask`. Range: inclusive `hi`. */
-  b: number;
-}
-
-export interface BridgeDescriptor {
-  bridge_id: number;
-  source_interface: number;
-  dest_interface: number;
-  interface_type: number;
-  source_interface_name: string;
-  dest_interface_name: string;
-  interface_type_name: string;
-  enabled: boolean;
-  /** "pass" = forward unmatched (denylist); "block" = drop unmatched (allowlist). */
-  default_action: BridgeDefaultAction;
-  filters: BridgeFilterDescriptor[];
-}
-
-export interface SignalMappingDescriptor {
-  source_signal_id: number;
-  dest_signal_id: number;
-  transform_type: string;
-  scale?: number;
-  offset?: number;
-  mask?: number;
-}
-
-export interface TransformerDescriptor {
-  transformer_id: number;
-  name: string;
-  description: string | null;
-  source_frame_def_id: number;
-  source_frame_def_name: string;
-  source_interface: number;
-  source_interface_name: string;
-  dest_frame_def_id: number;
-  dest_frame_def_name: string;
-  dest_interface: number;
-  dest_interface_name: string;
-  enabled: boolean;
-  mappings: SignalMappingDescriptor[];
-}
-
-export interface GeneratorDescriptor {
-  generator_id: number;
-  name: string;
-  description: string | null;
-  frame_def_id: number;
-  frame_def_name: string;
-  interface_index: number;
-  interface_name: string;
-  period_ms: number;
-  trigger_type: number;
-  trigger_type_name: string;
-  enabled: boolean;
-  mappings: SignalMappingDescriptor[];
-}
+export type BridgeFilterKind = BridgeFilterDescriptor["kind"];
+export type BridgeFilterIde = BridgeFilterDescriptor["ide"];
+export type BridgeDefaultAction = BridgeDescriptor["default_action"];
 
 // ============================================================================
 // Probe / connect
 // ============================================================================
-
-export interface ProbeResult {
-  device_id: string | null;
-  board_name: string | null;
-  board_revision: string | null;
-  interfaces: { index: number; iface_type: number; name: string }[];
-}
 
 /** Probe a FrameLink device by host:port. Returns probe result with device_id. */
 export function framelinkProbe(
@@ -320,23 +246,6 @@ export function framelinkUserSignalRemove(
 // ============================================================================
 // Device signal operations
 // ============================================================================
-
-export interface DeviceSignalDescriptor {
-  signal_id: number;
-  target_type: number;
-  target_index: number;
-  role: number;
-  quantity: number;
-  aspect: number;
-  channel: number;
-  flags: number;
-}
-
-export interface SignalReadResult {
-  signal_id: number;
-  value: number;
-  value_len: number;
-}
 
 export function framelinkDsigList(
   deviceId: string,

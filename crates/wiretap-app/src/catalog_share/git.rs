@@ -70,6 +70,7 @@ impl TreeListing {
 
 /// One commit, as much of it as a provenance line needs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FileCommit {
     /// Abbreviated to [`SHORT_SHA_LEN`] — this is shown, never resolved.
@@ -99,9 +100,11 @@ pub const PROGRESS_EVENT: &str = "catalog-git-progress";
 /// does not look like a hang.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Progress {
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "GitProgress"))]
+pub(crate) struct Progress {
     repo_id: String,
-    /// `clone` or `fetch` — a first clone is much slower and the UI says so.
+    /// `clone`, `fetch` or `push` — a first clone is much slower and the UI says so.
+    #[cfg_attr(test, ts(type = r#""clone" | "fetch" | "push""#))]
     phase: &'static str,
     received_objects: usize,
     total_objects: usize,

@@ -72,6 +72,59 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::adhoc::AdhocBatch>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
+    r.visit::<crate::captures::CandumpImportResult>();
+    r.visit::<crate::captures::CsvImportResult>();
+    r.visit::<crate::captures::PaginatedBytesResponse>();
+    r.visit::<crate::captures::PaginatedFramesResponse>();
+    r.visit::<crate::capture_store::CaptureFrameInfo>();
+    r.visit::<crate::capture_store::TailResponse>();
+    r.visit::<crate::io::CsvColumnMapping>();
+    r.visit::<crate::io::CsvPreview>();
+    r.visit::<crate::framing::BackendFramingConfig>();
+    r.visit::<crate::framing::FramingResult>();
+    r.visit::<crate::framing::SerialIds>();
+    r.visit::<crate::catalog_share::CatalogSourcesView>();
+    r.visit::<crate::catalog_share::ImportRequest>();
+    r.visit::<crate::catalog_share::ImportResult>();
+    r.visit::<crate::catalog_share::RemoteCatalog>();
+    r.visit::<crate::catalog_share::RemoteCatalogText>();
+    r.visit::<crate::catalog_share::PullOutcome>();
+    r.visit::<crate::catalog_share::RepoBrowse>();
+    r.visit::<crate::catalog_share::RepoStatus>();
+    r.visit::<crate::catalog_share::SaveRepoResult>();
+    r.visit::<crate::catalog_share::SavedReposView>();
+    r.visit::<crate::catalog_share::TrackedPr>();
+    r.visit::<crate::catalog_share::UpdateCheckResult>();
+    r.visit::<crate::catalog_share::community::CommunityReposView>();
+    r.visit::<crate::catalog_share::error::ShareError>();
+    r.visit::<crate::catalog_share::git::Progress>();
+    r.visit::<crate::catalog_share::github::NewRepo>();
+    r.visit::<crate::catalog_share::publish::ProgressEvent>();
+    r.visit::<crate::catalog_share::publish::PublishDiff>();
+    r.visit::<crate::catalog_share::publish::PublishDiffRequest>();
+    r.visit::<crate::catalog_share::publish::PublishPlan>();
+    r.visit::<crate::catalog_share::publish::PublishRequest>();
+    r.visit::<crate::catalog_share::publish::PublishResult>();
+    r.visit::<crate::catalog_share::registry::GitIdentity>();
+    r.visit::<crate::capture_db::InventoryRow>();
+    r.visit::<crate::replay::ReplayFrame>();
+    r.visit::<crate::transmit::RepeatStartedEvent>();
+    r.visit::<crate::transmit::RepeatStoppedEvent>();
+    r.visit::<crate::transmit::SerialFraming>();
+    r.visit::<crate::transmit::TransmitProfile>();
+    r.visit::<crate::io::framelink::FrameLinkProbeResult>();
+    r.visit::<crate::io::framelink::SignalReadResult>();
+    r.visit::<crate::io::framelink::rules::BridgeDescriptor>();
+    r.visit::<crate::io::framelink::rules::DeviceSignalDescriptor>();
+    r.visit::<crate::io::framelink::rules::FrameDefDescriptor>();
+    r.visit::<crate::io::framelink::rules::GeneratorDescriptor>();
+    r.visit::<crate::io::framelink::rules::TransformerDescriptor>();
+    r.visit::<crate::io_test::IOTestState>();
+    r.visit::<crate::io_test::TestConfig>();
+    r.visit::<crate::flashers::DetectedChip>();
+    r.visit::<crate::flashers::EspFlashOptions>();
+    r.visit::<crate::flashers::FlasherProgress>();
+    r.visit::<crate::flashers::Stm32FlashOptions>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -185,7 +238,7 @@ fn members<T: TS + 'static>() -> Vec<Result<Fields, String>> {
 fn declares(member: &Fields, json: &serde_json::Map<String, serde_json::Value>) -> bool {
     member.iter().all(|(name, (optional, ty))| match json.get(name) {
         None => *optional,
-        Some(value) => !ty.starts_with('"') || value.as_str() == Some(ty.trim_matches('"')),
+        Some(value) => !ty.starts_with('"') || ty.split('|').any(|lit| value.as_str() == Some(lit.trim().trim_matches('"'))),
     }) && json.keys().all(|k| member.contains_key(k))
 }
 
@@ -234,6 +287,35 @@ fn outputs_serialise_as_declared() {
         FcVerdict::Exception { message: "x".into() },
         FcVerdict::Silent,
     ]);
+    use crate::io::framelink::rules::{BridgeDescriptor, BridgeFilterDescriptor};
+    use ::framelink::protocol::bridge::{BridgeDefaultAction, BridgeFilterIde, BridgeFilterType};
+    let filter = |kind, ide| BridgeFilterDescriptor { kind, ide, a: 0, b: 0 };
+    let bridge = |default_action| BridgeDescriptor {
+        bridge_id: 0,
+        source_interface: 0,
+        dest_interface: 1,
+        interface_type: 0,
+        source_interface_name: String::new(),
+        dest_interface_name: String::new(),
+        interface_type_name: String::new(),
+        enabled: true,
+        default_action,
+        filters: vec![
+            filter(BridgeFilterType::Mask, BridgeFilterIde::Any),
+            filter(BridgeFilterType::Range, BridgeFilterIde::StdOnly),
+            filter(BridgeFilterType::Mask, BridgeFilterIde::ExtOnly),
+        ],
+    };
+    assert_serialises_as_declared(&[bridge(BridgeDefaultAction::Pass), bridge(BridgeDefaultAction::Block)]);
+    assert_serialises_as_declared(&bridge(BridgeDefaultAction::Pass).filters);
+}
+
+#[test]
+fn a_register_type_serialises_as_its_catalogue_name() {
+    use crate::io::RegisterType;
+    for rt in [RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete] {
+        assert_eq!(serde_json::to_value(&rt).unwrap(), rt.catalog().as_str());
+    }
 }
 
 fn each<'a>(json: &'a serde_json::Value, key: &str) -> impl Iterator<Item = &'a serde_json::Value> {

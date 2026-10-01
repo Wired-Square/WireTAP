@@ -17,6 +17,7 @@ const MAX_INPUT_LEN: usize = 2048;
 
 /// What the URL pointed at within the repository.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum SourceKind {
     /// The repository as a whole — scan it for catalogues.
@@ -29,6 +30,7 @@ pub enum SourceKind {
 
 /// A repository reference plus the optional ref/path the URL narrowed it to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSource {
     pub host: String,

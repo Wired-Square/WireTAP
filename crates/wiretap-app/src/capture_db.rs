@@ -736,6 +736,7 @@ pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String>
 /// standard id is not its extended namesake. This is the shape every source
 /// reports, and the one the MCP `frame_inventory` tool serialises.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct InventoryRow {
     pub protocol: String,
     pub frame_id: u32,

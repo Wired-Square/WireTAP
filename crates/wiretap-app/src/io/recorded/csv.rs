@@ -17,6 +17,7 @@ use crate::io::{FrameMessage, Protocol};
 
 /// Column delimiter for splitting lines into fields
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Delimiter {
     Comma,
@@ -87,6 +88,7 @@ pub fn detect_delimiter(lines: &[&str]) -> Delimiter {
 
 /// Column role assignment for flexible CSV import
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CsvColumnRole {
     Ignore,
@@ -109,6 +111,7 @@ pub enum CsvColumnRole {
 
 /// A gap detected in the sequence column during CSV import.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SequenceGap {
     /// Line number in the CSV file where the gap starts (1-based, after header)
     pub line: usize,
@@ -120,6 +123,7 @@ pub struct SequenceGap {
     pub dropped: u64,
     /// Filename (set by the caller for multi-file imports)
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub filename: Option<String>,
 }
 
@@ -135,6 +139,7 @@ pub struct CsvParseResult {
 
 /// A single column mapping: column index to its assigned role
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CsvColumnMapping {
     pub column_index: usize,
     pub role: CsvColumnRole,
@@ -143,6 +148,7 @@ pub struct CsvColumnMapping {
 /// Timestamp unit for CSV import — determines how raw integer timestamps
 /// are converted to microseconds.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TimestampUnit {
     Seconds,
@@ -166,6 +172,7 @@ impl TimestampUnit {
 
 /// Result of previewing a CSV file
 #[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CsvPreview {
     /// Raw header strings (if first row is a header)
     pub headers: Option<Vec<String>>,

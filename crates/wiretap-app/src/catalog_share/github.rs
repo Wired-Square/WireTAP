@@ -77,6 +77,7 @@ pub fn require_supported_host(source: &CatalogSource) -> Result<(), ShareError> 
 
 /// Subset of the repository object we act on. Frontend-facing, hence camelCase.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RepoInfo {
     pub owner: String,
@@ -90,10 +91,12 @@ pub struct RepoInfo {
     pub allow_forking: bool,
     pub html_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub description: Option<String>,
     /// `parent.full_name` for a fork, so a candidate fork can be confirmed to
     /// descend from the upstream we mean.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub parent_full_name: Option<String>,
 }
 
@@ -183,14 +186,17 @@ pub struct PullRequest {
 
 /// What to create a repository as. Also the request shape of the create command.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NewRepo {
     pub name: String,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub description: Option<String>,
     /// Defaults to private: catalogues are reverse-engineering notes, so going
     /// public should be a deliberate act.
     #[serde(default = "default_true")]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub private: bool,
 }
 

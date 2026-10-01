@@ -8,6 +8,9 @@ import type { EditOp } from "../types/catalogEdit";
 // Type-only: erased at build time, so the catalogue picker gets this field without
 // the sharing store's runtime subtree landing in every panel that mounts it.
 import type { CatalogSyncStatus } from "./catalogShare";
+import type { DiffLine } from "../generated/DiffLine";
+
+export type { DiffLine };
 
 export interface CatalogMetadata {
   name: string;
@@ -129,14 +132,6 @@ export async function editCatalogOps(content: string, ops: EditOp[]): Promise<st
 /** A new catalogue from `ops`, refused with its validation findings when it has any. */
 export async function buildCatalog(ops: EditOp[]): Promise<string> {
   return await wsTransport.command<string>("catalog.build", { ops });
-}
-
-/** One line of a {@link CatalogDiff}. */
-export interface DiffLine {
-  kind: "context" | "add" | "remove";
-  text: string;
-  oldLine: number | null;
-  newLine: number | null;
 }
 
 /** Result of {@link diffCatalog}: a dirty flag plus the unified line diff. */

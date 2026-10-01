@@ -43,6 +43,7 @@ const MAX_FRAMES: usize = 5000;
 
 /// A candidate catalogue found in a repository, before any content is fetched.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteEntry {
     pub path: String,
@@ -59,6 +60,7 @@ pub struct RemoteEntry {
 
 /// Result of pointing the app at a repository URL.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RepoBrowse {
     pub source: CatalogSource,
@@ -73,6 +75,7 @@ pub struct RepoBrowse {
 
 /// Metadata for one remote catalogue, resolved by fetching and parsing it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteCatalog {
     pub path: String,
@@ -90,6 +93,7 @@ pub struct RemoteCatalog {
     /// catalogue can define traffic that would be written to a live bus.
     pub transmit_frame_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional, as = "Option<String>"))]
     pub protocol: Option<wiretap_catalog::Protocol>,
 }
 
@@ -235,6 +239,7 @@ pub async fn resolve_remote_catalogs(
 
 /// What to do when the target filename is already taken.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CollisionPolicy {
     /// Save alongside as `name-2.toml`. The default: never silently destroy a
@@ -246,6 +251,7 @@ pub enum CollisionPolicy {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportRequest {
     /// The URL as pasted; re-parsed here so the frontend cannot smuggle in a
@@ -254,10 +260,12 @@ pub struct ImportRequest {
     pub git_ref: String,
     pub paths: Vec<String>,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub on_collision: CollisionPolicy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ImportOutcome {
     Imported,
@@ -267,15 +275,19 @@ pub enum ImportOutcome {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportResult {
     pub path: String,
     pub outcome: ImportOutcome,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub filename: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub message: Option<String>,
 }
 
@@ -481,6 +493,7 @@ fn write_import(
 
 /// A local catalogue's provenance and sync state, for the settings list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TrackedCatalog {
     pub id: String,
@@ -496,16 +509,20 @@ pub struct TrackedCatalog {
     /// drift `SyncStatus::collapse` exists to make impossible.
     pub sync_status: SyncStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub web_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub pr_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub pr_number: Option<u64>,
     pub pr_merged: bool,
 }
 
 /// Current state of a tracked catalogue's pull request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TrackedPr {
     pub number: u64,
@@ -514,6 +531,7 @@ pub struct TrackedPr {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSourcesView {
     pub catalogs: Vec<TrackedCatalog>,
@@ -525,6 +543,7 @@ pub struct CatalogSourcesView {
     /// Whether a token is stored. The token itself never leaves Rust.
     pub has_token: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub login: Option<String>,
 }
 
@@ -612,6 +631,7 @@ fn project_one(
 
 /// Outcome of checking tracked repositories for upstream changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCheckResult {
     /// The refreshed projection, so the caller needs no follow-up listing.
@@ -623,6 +643,7 @@ pub struct UpdateCheckResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCheckFailure {
     pub repo_label: String,
@@ -667,6 +688,7 @@ struct CheckOutcome {
 
 /// The remote text for one tracked catalogue, alongside the local copy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteCatalogText {
     pub catalog_id: String,
@@ -680,6 +702,7 @@ pub struct RemoteCatalogText {
     /// Git blob SHA-1 of the local file, echoed back on apply so the backend can
     /// refuse to overwrite a file that changed while it was being reviewed.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub local_sha: Option<String>,
     pub local_state: LocalState,
     /// Empty when the upstream file is a valid catalogue; applying is blocked otherwise.
@@ -1042,6 +1065,7 @@ fn install_update(
 
 /// What a pull did.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum PullOutcome {
     /// Upstream holds the bytes we last exchanged; nothing to take.
@@ -1113,6 +1137,7 @@ pub async fn pull_catalog(app: AppHandle, catalog_id: String) -> Result<PullOutc
 
 /// Where a repository's clone is, and how far it has drifted from `origin`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RepoStatus {
     pub repo_id: String,
@@ -1310,6 +1335,7 @@ pub fn forget_catalog_source(app: AppHandle, catalog_id: String) -> Result<(), S
 /// reconciles the decoder directory and hashes every tracked catalogue on disk —
 /// far too much work to answer "which repositories are saved?".
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SavedReposView {
     pub saved_repos: Vec<SavedRepoView>,
@@ -1323,6 +1349,7 @@ pub struct SavedReposView {
 /// persisted (see `git::repos_root`), and a saved repository has no clone at all
 /// until it is first browsed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SavedRepoView {
     #[serde(flatten)]
@@ -1362,6 +1389,7 @@ impl SavedReposView {
 
 /// A saved repository plus the refreshed list it now belongs to.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SaveRepoResult {
     pub saved: SavedRepo,
