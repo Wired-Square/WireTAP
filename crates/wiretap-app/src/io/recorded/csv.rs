@@ -1004,7 +1004,7 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
             return CsvColumnRole::DataBytes;
         }
         // d1, d2... or byte1, byte2... or data1, data2...
-        if h.starts_with('d') && h.len() <= 3 && h[1..].chars().all(|c| c.is_ascii_digit()) {
+        if h.starts_with('d') && h[1..].chars().all(|c| c.is_ascii_digit()) {
             return CsvColumnRole::DataByte;
         }
         if (h.starts_with("byte") || h.starts_with("data"))
@@ -1350,6 +1350,14 @@ fn suggest_timestamp_unit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_numbered_data_header_past_d99_is_a_data_byte_by_its_name() {
+        let rising = ["10", "11", "12", "13"];
+        for header in ["d99", "d100", "d255"] {
+            assert_eq!(guess_column_role(Some(header), &rising), CsvColumnRole::DataByte, "{header}");
+        }
+    }
 
     #[test]
     fn a_row_longer_than_255_bytes_keeps_its_length() {
