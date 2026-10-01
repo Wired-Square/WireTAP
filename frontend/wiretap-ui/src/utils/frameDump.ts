@@ -5,6 +5,7 @@ import type { FrameMessage } from "../types/frame";
 import type { SerialBytesEntry } from "../stores/discoverySerialStore";
 import { CAN_FD_DLC_VALUES } from "../constants";
 import { buildCsv } from "./csvBuilder";
+import { formatFilenameDate } from "./timeFormat";
 
 export type ExportFormat = "csv" | "json" | "candump" | "hex" | "bin";
 
@@ -17,6 +18,14 @@ export type ExportFormat = "csv" | "json" | "candump" | "hex" | "bin";
 function findSmallestFittingDlc(byteCount: number): number {
   if (byteCount <= 8) return byteCount;
   return CAN_FD_DLC_VALUES.find((dlc) => dlc >= byteCount) ?? byteCount;
+}
+
+/**
+ * The CSV columns are SavvyCAN's and carry no protocol, so the file name does:
+ * the CSV importer seeds its protocol from the stem's last `-` token.
+ */
+export function frameExportBasename(protocol: string | undefined, date: Date = new Date()): string {
+  return `${formatFilenameDate(date)}-${protocol ?? "frames"}`;
 }
 
 /**

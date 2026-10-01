@@ -363,6 +363,7 @@
       "space": "Space",
       "semicolon": "Semicolon"
     },
+    "protocol": "Protocol",
     "firstRowHeader": "First row is a header",
     "loadingPreview": "Loading preview...",
     "raw": "Raw",

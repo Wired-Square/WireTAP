@@ -6,6 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { IOCapabilities } from "./io";
 import type { ProtocolFrames } from "../utils/frameKey";
+import type { Protocol } from "../utils/profileTraits";
 
 /**
  * Capture kind - determines what kind of data is stored
@@ -141,6 +142,8 @@ export interface CsvPreview {
   has_negative_timestamps: boolean;
   /** Detected or user-specified delimiter */
   delimiter: Delimiter;
+  /** The protocol the file name declares, CAN when it names none */
+  suggested_protocol: Protocol;
 }
 
 /**
@@ -170,6 +173,7 @@ export async function previewCsv(
  * @param mappings - Column role assignments
  * @param skipFirstRow - Whether to skip the first row (header)
  * @param delimiter - Column delimiter
+ * @param protocol - The protocol every imported frame carries
  * @returns Capture metadata for the imported data
  */
 export async function importCsvWithMapping(
@@ -179,7 +183,8 @@ export async function importCsvWithMapping(
   skipFirstRow: boolean,
   timestampUnit: TimestampUnit,
   negateTimestamps: boolean,
-  delimiter: Delimiter
+  delimiter: Delimiter,
+  protocol: Protocol
 ): Promise<CsvImportResult> {
   return invoke("import_csv_with_mapping", {
     session_id: sessionId,
@@ -189,6 +194,7 @@ export async function importCsvWithMapping(
     timestamp_unit: timestampUnit,
     negate_timestamps: negateTimestamps,
     delimiter,
+    protocol,
   });
 }
 
@@ -202,6 +208,7 @@ export async function importCsvWithMapping(
  * @param timestampUnit - Timestamp unit for all files
  * @param negateTimestamps - Whether to negate timestamps
  * @param delimiter - Column delimiter
+ * @param protocol - The protocol every imported frame carries
  * @returns Capture metadata for the merged data
  */
 export async function importCsvBatchWithMapping(
@@ -211,7 +218,8 @@ export async function importCsvBatchWithMapping(
   skipFirstRowPerFile: boolean[],
   timestampUnit: TimestampUnit,
   negateTimestamps: boolean,
-  delimiter: Delimiter
+  delimiter: Delimiter,
+  protocol: Protocol
 ): Promise<CsvImportResult> {
   return invoke("import_csv_batch_with_mapping", {
     session_id: sessionId,
@@ -221,6 +229,7 @@ export async function importCsvBatchWithMapping(
     timestamp_unit: timestampUnit,
     negate_timestamps: negateTimestamps,
     delimiter,
+    protocol,
   });
 }
 

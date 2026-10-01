@@ -52,7 +52,7 @@ import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
 import { pickFileToSave } from "../../api/dialogs";
 import { saveCatalog } from "../../api/catalog";
-import { formatFilenameDate } from "../../utils/timeFormat";
+import { frameExportBasename } from "../../utils/frameDump";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
 import { utcToLocal } from "../../utils/timezone";
@@ -763,8 +763,7 @@ function DiscoveryInner() {
   const exportDefaultFilename = useMemo(() => {
     // Not "can": this fires only when nothing said what the frames are, and naming
     // them after a protocol nobody reported is how the badge got it wrong.
-    const protocol = exportDataMode === "bytes" ? "serial" : (protocolLabel ?? "frames");
-    return `${formatFilenameDate()}-${protocol}`;
+    return frameExportBasename(exportDataMode === "bytes" ? "serial" : protocolLabel);
   }, [exportDataMode, protocolLabel]);
 
   useModbusScanSync();

@@ -26,6 +26,9 @@ import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
 import { Select, Checkbox, SecondaryButton, PrimaryButton } from "../../components/forms";
 import { Alert } from "../../components/Alert";
+import { PROTOCOL_LABELS, type Protocol } from "../../utils/profileTraits";
+
+const IMPORT_PROTOCOLS: Protocol[] = ["can", "modbus", "modbus_rtu", "serial"];
 
 /** Format import summary as plain text for copying */
 function formatImportSummary(
@@ -94,6 +97,7 @@ export default function CsvColumnMapperDialog({
   const [mappings, setMappings] = useState<CsvColumnMapping[]>([]);
   const [hasHeader, setHasHeader] = useState(true);
   const [delimiter, setDelimiter] = useState<Delimiter>("comma");
+  const [protocol, setProtocol] = useState<Protocol>("can");
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +139,7 @@ export default function CsvColumnMapperDialog({
         setMappings(data.suggested_mappings);
         setHasHeader(data.has_header);
         setDelimiter(data.delimiter);
+        setProtocol(data.suggested_protocol);
         setTimestampUnit(data.suggested_timestamp_unit);
         setNegateTimestamps(data.has_negative_timestamps);
       })
@@ -264,12 +269,12 @@ export default function CsvColumnMapperDialog({
 
         // Build per-file header flags: use provided detection or fall back to current hasHeader for all
         const perFileHeaders = hasHeaderPerFile ?? allFilePaths.map(() => hasHeader);
-        result = await importCsvBatchWithMapping(sessionId, allFilePaths, mappings, perFileHeaders, timestampUnit, negateTimestamps, delimiter);
+        result = await importCsvBatchWithMapping(sessionId, allFilePaths, mappings, perFileHeaders, timestampUnit, negateTimestamps, delimiter, protocol);
 
         unlistenRef.current?.();
         unlistenRef.current = null;
       } else {
-        result = await importCsvWithMapping(sessionId, filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
+        result = await importCsvWithMapping(sessionId, filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, protocol);
       }
 
       setImportSummary(result);
@@ -281,7 +286,7 @@ export default function CsvColumnMapperDialog({
       unlistenRef.current?.();
       unlistenRef.current = null;
     }
-  }, [sessionId, filePath, allFilePaths, isMultiFile, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
+  }, [sessionId, filePath, allFilePaths, isMultiFile, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, protocol, onImportComplete]);
 
   // Validation
   const hasFrameId = mappings.some((m) => m.role === "frame_id" || m.role === "frame_id_data");
@@ -367,6 +372,20 @@ export default function CsvColumnMapperDialog({
               <option value="tab">{t("csvColumnMapper.delimiterOptions.tab")}</option>
               <option value="space">{t("csvColumnMapper.delimiterOptions.space")}</option>
               <option value="semicolon">{t("csvColumnMapper.delimiterOptions.semicolon")}</option>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className={`text-xs ${textSecondary} whitespace-nowrap`}>{t("csvColumnMapper.protocol")}</label>
+            <Select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value as Protocol)}
+              disabled={isLoading}
+              size="sm"
+              className="w-auto"
+            >
+              {IMPORT_PROTOCOLS.map((p) => (
+                <option key={p} value={p}>{PROTOCOL_LABELS[p]}</option>
+              ))}
             </Select>
           </div>
           <label className={`flex items-center gap-2 ${caption} cursor-pointer select-none`}>

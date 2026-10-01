@@ -6,7 +6,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::io::FrameMessage;
+use crate::io::{FrameMessage, Protocol};
 
 // ============================================================================
 // Delimiter type for flexible column splitting
@@ -180,6 +180,7 @@ pub struct CsvPreview {
     pub has_negative_timestamps: bool,
     /// Detected or user-specified delimiter
     pub delimiter: Delimiter,
+    pub suggested_protocol: Protocol,
 }
 
 // ============================================================================
@@ -351,6 +352,31 @@ pub fn parse_csv_file(file_path: &str) -> Result<Vec<FrameMessage>, String> {
 // Flexible CSV import (user-driven column mapping)
 // ============================================================================
 
+/// The SavvyCAN columns have nowhere to carry a protocol, so an export names it
+/// as the file stem's last `-` token (`20261001-1243-modbus_rtu.csv`).
+fn protocol_named_by_filename(file_path: &str) -> Protocol {
+    let stem = std::path::Path::new(file_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    match stem.rsplit('-').next().unwrap_or("").to_ascii_lowercase().as_str() {
+        "serial" => Protocol::Serial,
+        "modbus" => Protocol::Modbus,
+        "modbus_rtu" => Protocol::ModbusRtu,
+        _ => Protocol::Can,
+    }
+}
+
+/// FD is a flag on a CAN frame, not a protocol a frame carries.
+fn frame_protocol_name(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Can | Protocol::CanFd => "can",
+        Protocol::Modbus => "modbus",
+        Protocol::ModbusRtu => "modbus_rtu",
+        Protocol::Serial => "serial",
+    }
+}
+
 /// Preview a CSV file: read first N rows, detect headers, suggest column mappings.
 pub fn preview_csv_file(file_path: &str, max_rows: usize, delimiter: Option<Delimiter>) -> Result<CsvPreview, String> {
     let file = File::open(file_path)
@@ -437,6 +463,7 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize, delimiter: Option<Deli
         suggested_timestamp_unit: suggested_unit,
         has_negative_timestamps,
         delimiter: delim,
+        suggested_protocol: protocol_named_by_filename(file_path),
     })
 }
 
@@ -448,6 +475,7 @@ pub fn parse_csv_with_mapping(
     timestamp_unit: TimestampUnit,
     negate_timestamps: bool,
     delimiter: Delimiter,
+    protocol: Protocol,
 ) -> Result<CsvParseResult, String> {
     let file = File::open(file_path)
         .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
@@ -665,14 +693,14 @@ pub fn parse_csv_with_mapping(
 
         frame_line_numbers.push(line_number);
         frames.push(FrameMessage {
-            protocol: "can".to_string(),
+            protocol: frame_protocol_name(protocol).to_string(),
             timestamp_us,
             frame_id,
             bus,
             dlc,
             bytes,
             is_extended,
-            is_fd: dlc > 8,
+            is_fd: matches!(protocol, Protocol::Can | Protocol::CanFd) && dlc > 8,
             source_address: None,
             incomplete: None,
             direction,
@@ -1339,10 +1367,59 @@ mod tests {
             TimestampUnit::Microseconds,
             false,
             Delimiter::Comma,
+            Protocol::Can,
         );
         std::fs::remove_file(&path).ok();
 
         let frame = &parsed.unwrap().frames[0];
         assert_eq!((frame.bytes.len(), frame.dlc), (256, 256));
+    }
+
+    fn temp_csv(name: &str, body: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("wiretap-csv-{}-{name}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, body).unwrap();
+        path
+    }
+
+    #[test]
+    fn an_imported_row_carries_the_chosen_protocol() {
+        let path = temp_csv(
+            "rows.csv",
+            "Time Stamp,ID,Extended,Dir,Bus,LEN,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10\n\
+             100,00000103,false,Rx,0,10,01,03,00,00,00,02,C4,0B,00,00\n",
+        );
+        let preview = preview_csv_file(path.to_str().unwrap(), 20, None).unwrap();
+
+        let parsed = parse_csv_with_mapping(
+            path.to_str().unwrap(),
+            &preview.suggested_mappings,
+            true,
+            TimestampUnit::Microseconds,
+            false,
+            Delimiter::Comma,
+            Protocol::ModbusRtu,
+        )
+        .unwrap();
+
+        let frame = &parsed.frames[0];
+        assert_eq!(frame.protocol, "modbus_rtu");
+        assert!(!frame.is_fd, "only a CAN frame is FD");
+    }
+
+    #[test]
+    fn the_preview_seeds_the_protocol_from_the_file_name() {
+        let header = "Time Stamp,ID,Extended,Dir,Bus,LEN,D1\n1,00000001,false,Rx,0,1,00\n";
+        let seeded = |name: &str| {
+            let path = temp_csv(name, header);
+            preview_csv_file(path.to_str().unwrap(), 20, None).unwrap().suggested_protocol
+        };
+
+        assert_eq!(seeded("20261001-1243-serial.csv"), Protocol::Serial);
+        assert_eq!(seeded("20261001-1243-modbus_rtu.csv"), Protocol::ModbusRtu);
+        assert_eq!(seeded("pump-MODBUS.csv"), Protocol::Modbus);
+        assert_eq!(seeded("trace.csv"), Protocol::Can);
+        assert_eq!(seeded("serial-trace.csv"), Protocol::Can);
     }
 }

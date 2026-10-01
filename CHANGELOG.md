@@ -24,6 +24,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A CAN Virtual Device echoes on the bus it was sent on.** With its interface mapped to a different session bus, a frame sent to it came back on the interface's own bus number instead. It now comes back on the session bus, where its generated traffic appears.
 - **A gs_usb profile already in use is refused at start.** On macOS and Windows an adapter's USB interface has one owner, so a second session on the same profile showed as running and then failed with "could not open interface for exclusive access". It now fails at once and names the session that holds the adapter, as slcan and serial profiles do.
 - **Duplicating or renaming a catalogue no longer overwrites another one.** Choosing a file name that another catalogue already uses replaced that catalogue without a word. It is now refused, and the dialog shows the error and stays open so you can pick another name. Renaming a file by changing only its capitals no longer deletes the catalogue on macOS.
+- **A frame CSV export keeps its protocol.** An exported file is named after its protocol, and importing a CSV now offers a protocol choice, set from the file name when it names one and CAN otherwise. Serial and Modbus captures exported to CSV used to come back as CAN; re-import them and pick the protocol if the file name does not say.
 
 ## [0.13.0] - 2026-09-29
 

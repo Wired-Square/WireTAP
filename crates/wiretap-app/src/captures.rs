@@ -87,6 +87,7 @@ pub async fn preview_csv(
 }
 
 /// Import a data file with user-provided column mappings
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
 pub async fn import_csv_with_mapping(
     session_id: String,
@@ -96,6 +97,7 @@ pub async fn import_csv_with_mapping(
     timestamp_unit: io::TimestampUnit,
     negate_timestamps: bool,
     delimiter: io::Delimiter,
+    protocol: Option<io::Protocol>,
 ) -> Result<CsvImportResult, String> {
     let filename = std::path::Path::new(&file_path)
         .file_name()
@@ -103,7 +105,7 @@ pub async fn import_csv_with_mapping(
         .unwrap_or("unknown")
         .to_string();
 
-    let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter)?;
+    let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter, protocol.unwrap_or_default())?;
 
     if result.frames.is_empty() {
         return Err("File contains no valid frames with the given column mapping".to_string());
@@ -129,6 +131,7 @@ pub async fn import_csv_with_mapping(
 
 /// Import multiple data files with shared column mappings into a single capture.
 /// Files are parsed sequentially and concatenated in order.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
 pub async fn import_csv_batch_with_mapping(
     app_handle: AppHandle,
@@ -139,6 +142,7 @@ pub async fn import_csv_batch_with_mapping(
     timestamp_unit: io::TimestampUnit,
     negate_timestamps: bool,
     delimiter: io::Delimiter,
+    protocol: Option<io::Protocol>,
 ) -> Result<CsvImportResult, String> {
     if file_paths.is_empty() {
         return Err("No files provided".to_string());
@@ -178,6 +182,7 @@ pub async fn import_csv_batch_with_mapping(
 
         let result = io::parse_csv_with_mapping(
             file_path, &mappings, skip_row, timestamp_unit, negate_timestamps, delimiter,
+            protocol.unwrap_or_default(),
         )?;
 
         total_frames += result.frames.len();
