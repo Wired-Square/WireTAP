@@ -11,6 +11,12 @@ export type RegisterType = "input" | "holding" | "coil" | "discrete";
 export type SignalFormat = "ascii" | "utf8" | "hex" | "enum" | "unix_time" | "other";
 export type Confidence = "none" | "low" | "medium" | "high";
 
+/** A dashboard widget for the signal, plus its options with their keys as authored. */
+export interface DisplayHint {
+  widget: string;
+  [option: string]: unknown;
+}
+
 export interface Signal {
   name?: string;
   startBit?: number;
@@ -28,6 +34,7 @@ export interface Signal {
   /** Value→label map (the crate serialises `enum_map` as `enum`). */
   enum?: Record<string, string>;
   confidence?: Confidence;
+  display?: DisplayHint;
   /** Free-text notes (string or array in TOML; resolved to a list). */
   notes?: string[];
   /** True when inherited from a mirror/copy source. Omitted when false. */

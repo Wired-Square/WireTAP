@@ -1012,4 +1012,53 @@ mod tests {
             publish: None,
         }
     }
+    const DISPLAY_HINTS_FIXTURE: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../frontend/wiretap-ui/src/tests/fixtures/display-hints"
+    );
+
+    fn display_hints_fixture(extension: &str) -> String {
+        std::fs::read_to_string(format!("{DISPLAY_HINTS_FIXTURE}.{extension}")).expect("fixture")
+    }
+
+    fn command(op: &str, params: serde_json::Value) -> serde_json::Value {
+        tauri::async_runtime::block_on(dispatch_catalog_command(op, params)).expect(op)
+    }
+
+    #[test]
+    fn catalog_parse_serves_the_dashboard_display_hints_fixture() {
+        let toml = display_hints_fixture("toml");
+        let served = command("catalog.parse", serde_json::json!({ "content": toml }));
+        let golden: serde_json::Value =
+            serde_json::from_str(&display_hints_fixture("catalog.json")).expect("golden json");
+        assert_eq!(served, golden);
+    }
+
+    #[test]
+    fn editing_a_signal_keeps_its_display_hint() {
+        let edited = command(
+            "catalog.edit",
+            serde_json::json!({
+                "content": display_hints_fixture("toml"),
+                "op": "UpsertArrayItem",
+                "array_path": ["frame", "can", "0x100", "mux", "1", "signals"],
+                "value": {
+                    "name": "Boost",
+                    "start_bit": 56,
+                    "bit_length": 8,
+                    "unit": "kPa",
+                    "display": { "widget": "rotary", "start_angle": -90, "end_angle": 90 },
+                },
+                "index": 0,
+                "sort_keys": ["start_bit", "bit_length", "name"],
+            }),
+        );
+        let parsed = command("catalog.parse", serde_json::json!({ "content": edited }));
+        let boost = &parsed["frames"][0]["mux"]["cases"]["1"]["signals"][0];
+        assert_eq!(boost["unit"], "kPa");
+        assert_eq!(
+            boost["display"],
+            serde_json::json!({ "widget": "rotary", "start_angle": -90, "end_angle": 90 })
+        );
+    }
 }

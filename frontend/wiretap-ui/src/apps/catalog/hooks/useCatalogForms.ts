@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { FrameEditFields } from "../views/FrameEditView";
 import { createDefaultFrameFields } from "../views/frameEditUtils";
 import type { ProtocolType } from "../types";
+import type { DisplayHint } from "../../../types/catalogModel";
 
 export interface SignalFields {
   name: string;
@@ -20,6 +21,7 @@ export interface SignalFields {
   format?: string;
   confidence?: string;
   enum?: Record<string, string>;
+  display?: DisplayHint;
   notes?: string;
 }
 

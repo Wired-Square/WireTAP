@@ -1,0 +1,63 @@
+[meta]
+name = "Display hints"
+version = 1
+
+[frame.can.0x100]
+length = 8
+
+[[frame.can.0x100.signals]]
+name = "Steering"
+start_bit = 0
+bit_length = 16
+unit = "deg"
+display = "rotary"
+
+[[frame.can.0x100.signals]]
+name = "Coolant"
+start_bit = 16
+bit_length = 8
+min = 0
+max = 120
+display = { widget = "level-bar", orientation = "vertical" }
+
+[[frame.can.0x100.signals]]
+name = "Speed"
+start_bit = 24
+bit_length = 16
+min = 0
+max = 250
+
+[[frame.can.0x100.signals]]
+name = "Mood"
+start_bit = 40
+bit_length = 8
+min = 0
+max = 10
+display = "hologram"
+
+[frame.can.0x100.mux]
+name = "Page"
+start_bit = 48
+bit_length = 8
+
+[[frame.can.0x100.mux.1.signals]]
+name = "Boost"
+start_bit = 56
+bit_length = 8
+display = { widget = "rotary", start_angle = -90, end_angle = 90 }
+
+[frame.can.0x200]
+mirror_of = "0x100"
+
+[frame.modbus.battery]
+register_number = 13019
+register_type = "input"
+length = 2
+
+[[frame.modbus.battery.signals]]
+name = "SoC"
+start_bit = 0
+bit_length = 16
+min = 0
+max = 100
+display = { widget = "level-bar", orientation = "horizontal" }

@@ -10,6 +10,7 @@
 import type { MetaFields, ProtocolType, BaseFrameFields, ProtocolConfig, SerialConfig, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig, ChecksumAlgorithm } from "./types";
 import { tomlParse } from "./toml";
 import { editCatalog } from "../../api/catalog";
+import type { DisplayHint } from "../../types/catalogModel";
 import { protocolRegistry } from "./protocols";
 
 // ── small pure helpers (path/data shaping stays in TS) ───────────────────────
@@ -342,6 +343,7 @@ export interface SignalData {
   format?: string;
   confidence?: string;
   enum?: Record<string, string>;
+  display?: DisplayHint;
   notes?: string;
 }
 
@@ -363,6 +365,7 @@ export function upsertSignalToml(toml: string, targetPath: string[], signal: Sig
     format: signal.format || undefined,
     confidence: signal.confidence || undefined,
     enum: signal.enum,
+    display: signal.display,
     notes: signal.notes || undefined,
   });
   return editCatalog(toml, {

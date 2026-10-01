@@ -1,0 +1,193 @@
+{
+  "frames": [
+    {
+      "frameId": 256,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x100",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "1": {
+            "signals": [
+              {
+                "bitLength": 8,
+                "display": {
+                  "end_angle": 90,
+                  "start_angle": -90,
+                  "widget": "rotary"
+                },
+                "name": "Boost",
+                "startBit": 56
+              }
+            ]
+          }
+        },
+        "name": "Page",
+        "startBit": 48
+      },
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "display": {
+            "widget": "rotary"
+          },
+          "name": "Steering",
+          "startBit": 0,
+          "unit": "deg"
+        },
+        {
+          "bitLength": 8,
+          "display": {
+            "orientation": "vertical",
+            "widget": "level-bar"
+          },
+          "max": 120.0,
+          "min": 0.0,
+          "name": "Coolant",
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "max": 250.0,
+          "min": 0.0,
+          "name": "Speed",
+          "startBit": 24
+        },
+        {
+          "bitLength": 8,
+          "display": {
+            "widget": "hologram"
+          },
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Mood",
+          "startBit": 40
+        }
+      ]
+    },
+    {
+      "frameId": 512,
+      "inheritedFields": [
+        "length",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x200",
+      "length": 8,
+      "mirrorOf": "0x100",
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "1": {
+            "signals": [
+              {
+                "bitLength": 8,
+                "display": {
+                  "end_angle": 90,
+                  "start_angle": -90,
+                  "widget": "rotary"
+                },
+                "inherited": true,
+                "name": "Boost",
+                "startBit": 56
+              }
+            ]
+          }
+        },
+        "name": "Page",
+        "startBit": 48
+      },
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "display": {
+            "widget": "rotary"
+          },
+          "inherited": true,
+          "name": "Steering",
+          "startBit": 0,
+          "unit": "deg"
+        },
+        {
+          "bitLength": 8,
+          "display": {
+            "orientation": "vertical",
+            "widget": "level-bar"
+          },
+          "inherited": true,
+          "max": 120.0,
+          "min": 0.0,
+          "name": "Coolant",
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "inherited": true,
+          "max": 250.0,
+          "min": 0.0,
+          "name": "Speed",
+          "startBit": 24
+        },
+        {
+          "bitLength": 8,
+          "display": {
+            "widget": "hologram"
+          },
+          "inherited": true,
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Mood",
+          "startBit": 40
+        }
+      ]
+    },
+    {
+      "frameId": 13019,
+      "inheritedFields": [
+        "deviceAddress"
+      ],
+      "interval": 5000,
+      "key": "battery",
+      "length": 4,
+      "modbusDeviceAddress": 1,
+      "modbusNode": "Slave 1",
+      "modbusRegisterCount": 2,
+      "modbusRegisterType": "input",
+      "name": "battery",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 16,
+          "display": {
+            "orientation": "horizontal",
+            "widget": "level-bar"
+          },
+          "modbusRegister": 13019,
+          "modbusRegisterCount": 1,
+          "name": "SoC",
+          "signed": false,
+          "startBit": 0
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "name": "Display hints",
+    "version": 1
+  },
+  "nodes": [
+    {
+      "deviceAddress": 1,
+      "name": "Slave 1"
+    }
+  ],
+  "protocol": "can"
+}

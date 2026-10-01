@@ -24,6 +24,34 @@ export interface UseSignalHandlersParams {
   setCurrentSignalPath: (v: string[]) => void;
 }
 
+export function signalFieldsFor(signal: any): SignalFields {
+  const notesValue = signal.notes
+    ? Array.isArray(signal.notes)
+      ? signal.notes.join("\n")
+      : signal.notes
+    : undefined;
+  // Coerce start_bit and bit_length to integers to handle string values from TOML
+  const startBit = typeof signal.start_bit === "string" ? parseInt(signal.start_bit, 10) : (signal.start_bit ?? 0);
+  const bitLength = typeof signal.bit_length === "string" ? parseInt(signal.bit_length, 10) : (signal.bit_length ?? 8);
+  return {
+    name: signal.name || "",
+    start_bit: Number.isNaN(startBit) ? 0 : startBit,
+    bit_length: Number.isNaN(bitLength) ? 8 : bitLength,
+    factor: signal.factor,
+    offset: signal.offset,
+    unit: signal.unit,
+    signed: signal.signed,
+    endianness: signal.endianness || signal.byte_order, // TOML stores as byte_order
+    min: signal.min,
+    max: signal.max,
+    format: signal.format,
+    confidence: signal.confidence,
+    enum: signal.enum,
+    display: signal.display,
+    notes: notesValue,
+  };
+}
+
 export function useSignalHandlers({
   signalFields,
   currentIdForSignal,
@@ -97,30 +125,7 @@ export function useSignalHandlers({
     const parentPath = signalsParentPath || ["frame", "can", idKey];
     setCurrentSignalPath(parentPath);
     setEditingSignalIndex(signalIndex);
-    const notesValue = signal.notes
-      ? Array.isArray(signal.notes)
-        ? signal.notes.join("\n")
-        : signal.notes
-      : undefined;
-    // Coerce start_bit and bit_length to integers to handle string values from TOML
-    const startBit = typeof signal.start_bit === "string" ? parseInt(signal.start_bit, 10) : (signal.start_bit ?? 0);
-    const bitLength = typeof signal.bit_length === "string" ? parseInt(signal.bit_length, 10) : (signal.bit_length ?? 8);
-    setSignalFields({
-      name: signal.name || "",
-      start_bit: Number.isNaN(startBit) ? 0 : startBit,
-      bit_length: Number.isNaN(bitLength) ? 8 : bitLength,
-      factor: signal.factor,
-      offset: signal.offset,
-      unit: signal.unit,
-      signed: signal.signed,
-      endianness: signal.endianness || signal.byte_order, // TOML stores as byte_order
-      min: signal.min,
-      max: signal.max,
-      format: signal.format,
-      confidence: signal.confidence,
-      enum: signal.enum,
-      notes: notesValue,
-    });
+    setSignalFields(signalFieldsFor(signal));
     setEditingSignal(true);
   };
 
