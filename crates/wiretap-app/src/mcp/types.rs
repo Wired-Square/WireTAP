@@ -35,6 +35,16 @@ pub struct SessionIdParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct StopSessionParams {
+    /// Session ID (as returned by `list_sessions`).
+    pub session_id: String,
+    /// Stop the session but leave it listed, its profile held and its capture
+    /// readable. By default the session is destroyed and its profile released.
+    #[serde(default)]
+    pub keep_session: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct AttachSourceParams {
     /// Session ID (as returned by `list_sessions`).
     pub session_id: String,

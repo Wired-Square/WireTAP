@@ -1248,15 +1248,24 @@ impl WireTapTools {
     }
 
     #[tool(
-        description = "Stop (and destroy) a running IO session.",
+        description = "Stop a running IO session and destroy it, releasing its profile to be opened again. Pass keep_session: true to stop it but leave it listed, its capture still readable.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = true)
     )]
     async fn stop_session(
         &self,
-        Parameters(p): Parameters<SessionIdParams>,
+        Parameters(p): Parameters<StopSessionParams>,
     ) -> Result<CallToolResult, McpError> {
-        let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
-        ok_json(state)
+        if p.keep_session {
+            let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
+            return ok_json(json!({ "session_id": p.session_id, "state": state }));
+        }
+        if !crate::io::session_exists(&p.session_id).await {
+            return Err(err(format!("Session '{}' not found", p.session_id)));
+        }
+        crate::sessions::destroy_reader_session(p.session_id.clone(), true)
+            .await
+            .map_err(err)?;
+        ok_json(json!({ "session_id": p.session_id, "state": "destroyed" }))
     }
 
     #[tool(

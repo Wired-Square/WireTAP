@@ -255,6 +255,11 @@ The IO source picker offers the same range in the UI and resolves the conflict t
 same way, deliberately: the rule is one rule, so a session polls the same registers
 whether a person or an agent opened it.
 
+**`stop_session { session_id, keep_session? }`** stops the session and destroys
+it, releasing its profile, so nothing is left for a human to close. Pass
+`keep_session: true` to stop it but leave it listed, its capture still readable
+through the capture tools.
+
 ### Test Pattern
 
 The Test Pattern app's runs, for an agent driving both ends of a link — an
