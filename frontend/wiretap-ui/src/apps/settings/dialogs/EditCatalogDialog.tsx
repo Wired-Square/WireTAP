@@ -1,12 +1,14 @@
 // ui/src/apps/settings/dialogs/EditCatalogDialog.tsx
 import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
+import { Alert } from "../../../components/Alert";
 import { Input, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
 
 type Props = {
   isOpen: boolean;
   name: string;
   filename: string;
+  error: string | null;
   onChangeName: (value: string) => void;
   onChangeFilename: (value: string) => void;
   onCancel: () => void;
@@ -17,6 +19,7 @@ export default function EditCatalogDialog({
   isOpen,
   name,
   filename,
+  error,
   onChangeName,
   onChangeFilename,
   onCancel,
@@ -44,6 +47,8 @@ export default function EditCatalogDialog({
             placeholder={t("dialogs.editCatalog.filenamePlaceholder")}
           />
         </FormField>
+
+        {error && <Alert tone="danger">{error}</Alert>}
       </DialogBody>
       <DialogFooter>
         <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>

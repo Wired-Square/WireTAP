@@ -687,6 +687,43 @@ fn with_catalogue_name(content: &str, new_name: &str) -> Result<String, String> 
     )
 }
 
+#[cfg(unix)]
+fn is_same_file(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (std::fs::metadata(a), std::fs::metadata(b)) {
+        (Ok(a), Ok(b)) => (a.dev(), a.ino()) == (b.dev(), b.ino()),
+        _ => false,
+    }
+}
+
+#[cfg(not(unix))]
+fn is_same_file(a: &Path, b: &Path) -> bool {
+    a.parent() == b.parent()
+        && a.file_name().map(|n| n.to_string_lossy().to_lowercase())
+            == b.file_name().map(|n| n.to_string_lossy().to_lowercase())
+}
+
+/// The destination is the user's choice, so a taken name is an error rather
+/// than a quiet `next_free_catalog_filename`.
+fn refuse_existing(dest: &Path, filename: &str) -> Result<(), String> {
+    if dest.exists() {
+        return Err(format!("A catalogue file named '{filename}' already exists"));
+    }
+    Ok(())
+}
+
+fn duplicate_catalogue_file(source: &Path, new_filename: &str, new_name: &str) -> Result<(), String> {
+    let parent_dir = source.parent()
+        .ok_or_else(|| "Invalid source path".to_string())?;
+    let new_filename = sanitise_catalog_filename(new_filename)?;
+    let dest = parent_dir.join(&new_filename);
+    refuse_existing(&dest, &new_filename)?;
+
+    let content = std::fs::read_to_string(source)
+        .map_err(|e| format!("Failed to read source catalog: {}", e))?;
+    write_file_atomically(&dest, with_catalogue_name(&content, new_name)?.as_bytes())
+}
+
 /// Duplicate a catalog file
 #[tauri::command]
 pub async fn duplicate_catalog(
@@ -695,17 +732,31 @@ pub async fn duplicate_catalog(
     new_filename: String,
     new_name: String,
 ) -> Result<(), String> {
-    let source = PathBuf::from(&source_path);
-    let parent_dir = source.parent()
-        .ok_or_else(|| "Invalid source path".to_string())?;
-    let dest = parent_dir.join(sanitise_catalog_filename(&new_filename)?);
-
-    let content = std::fs::read_to_string(&source)
-        .map_err(|e| format!("Failed to read source catalog: {}", e))?;
-    write_file_atomically(&dest, with_catalogue_name(&content, &new_name)?.as_bytes())?;
-
+    duplicate_catalogue_file(Path::new(&source_path), &new_filename, &new_name)?;
     refresh_catalog_cache(&app);
     Ok(())
+}
+
+/// Returns the sanitised new filename.
+fn rename_catalogue_file(old_path: &Path, new_filename: &str, new_name: &str) -> Result<String, String> {
+    let parent_dir = old_path.parent()
+        .ok_or_else(|| "Invalid path".to_string())?;
+    let new_filename = sanitise_catalog_filename(new_filename)?;
+    let new_path = parent_dir.join(&new_filename);
+    if !is_same_file(old_path, &new_path) {
+        refuse_existing(&new_path, &new_filename)?;
+    }
+
+    let content = std::fs::read_to_string(old_path)
+        .map_err(|e| format!("Failed to read catalog: {}", e))?;
+    write_file_atomically(old_path, with_catalogue_name(&content, new_name)?.as_bytes())?;
+    // A rename, not write-new-then-delete-old: on a case-insensitive filesystem
+    // a case-only change makes both paths the same file.
+    if old_path != new_path {
+        std::fs::rename(old_path, &new_path)
+            .map_err(|e| format!("Failed to rename catalog: {}", e))?;
+    }
+    Ok(new_filename)
 }
 
 /// Rename/edit a catalog file
@@ -717,18 +768,7 @@ pub async fn rename_catalog(
     new_name: String,
 ) -> Result<(), String> {
     let old_path_buf = PathBuf::from(&old_path);
-    let parent_dir = old_path_buf.parent()
-        .ok_or_else(|| "Invalid path".to_string())?;
-    let new_filename = sanitise_catalog_filename(&new_filename)?;
-    let new_path = parent_dir.join(&new_filename);
-
-    let content = std::fs::read_to_string(&old_path_buf)
-        .map_err(|e| format!("Failed to read catalog: {}", e))?;
-    write_file_atomically(&new_path, with_catalogue_name(&content, &new_name)?.as_bytes())?;
-    if old_path != new_path.to_string_lossy() {
-        std::fs::remove_file(&old_path_buf)
-            .map_err(|e| format!("Failed to remove old catalog: {}", e))?;
-    }
+    let new_filename = rename_catalogue_file(&old_path_buf, &new_filename, &new_name)?;
 
     // Carry any git provenance across to the new filename, so a rename doesn't
     // silently detach the catalogue from the repository it came from.
@@ -782,6 +822,59 @@ mod tests {
 
         assert_eq!(extract_catalog_name(&renamed).as_deref(), Some("Pack copy"));
         assert!(renamed.contains("name = \"Voltage\""), "signal renamed:\n{renamed}");
+    }
+
+    #[test]
+    fn duplicating_onto_an_existing_file_name_is_refused() {
+        let dir = temp_dir("dup-collision");
+        write(&dir, "pack.toml", "[meta]\nname = \"Pack\"\n");
+        write(&dir, "other.toml", "[meta]\nname = \"Other\"\n");
+
+        let err = duplicate_catalogue_file(&dir.join("pack.toml"), "other", "Pack copy")
+            .expect_err("an existing file must not be overwritten");
+
+        assert!(err.contains("other.toml"), "error should name the file: {err}");
+        let other = std::fs::read_to_string(dir.join("other.toml")).unwrap();
+        assert_eq!(extract_catalog_name(&other).as_deref(), Some("Other"));
+    }
+
+    #[test]
+    fn renaming_onto_another_existing_file_name_is_refused() {
+        let dir = temp_dir("rename-collision");
+        write(&dir, "pack.toml", "[meta]\nname = \"Pack\"\n");
+        write(&dir, "other.toml", "[meta]\nname = \"Other\"\n");
+
+        let err = rename_catalogue_file(&dir.join("pack.toml"), "other.toml", "Pack")
+            .expect_err("an existing file must not be overwritten");
+
+        assert!(err.contains("other.toml"), "error should name the file: {err}");
+        assert!(dir.join("pack.toml").exists());
+        let other = std::fs::read_to_string(dir.join("other.toml")).unwrap();
+        assert_eq!(extract_catalog_name(&other).as_deref(), Some("Other"));
+    }
+
+    #[test]
+    fn renaming_only_the_display_name_keeps_the_file() {
+        let dir = temp_dir("rename-in-place");
+        write(&dir, "pack.toml", "[meta]\nname = \"Pack\"\n");
+
+        rename_catalogue_file(&dir.join("pack.toml"), "pack.toml", "Battery").expect("rename");
+
+        let body = std::fs::read_to_string(dir.join("pack.toml")).unwrap();
+        assert_eq!(extract_catalog_name(&body).as_deref(), Some("Battery"));
+    }
+
+    #[test]
+    fn renaming_only_the_case_of_the_file_name_keeps_the_file() {
+        let dir = temp_dir("rename-case");
+        write(&dir, "pack.toml", "[meta]\nname = \"Pack\"\n");
+
+        rename_catalogue_file(&dir.join("pack.toml"), "Pack.toml", "Pack").expect("rename");
+
+        let names: Vec<_> = std::fs::read_dir(&dir).unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names, ["Pack.toml"]);
     }
 
     #[test]

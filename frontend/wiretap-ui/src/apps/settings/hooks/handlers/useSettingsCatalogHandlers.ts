@@ -2,6 +2,7 @@
 // Note: Named differently from catalog editor's useCatalogHandlers to avoid confusion.
 // This handles catalog list management (duplicate, rename, delete), not editing.
 
+import { useState } from 'react';
 import {
   duplicateCatalog as duplicateCatalogApi,
   renameCatalog as renameCatalogApi,
@@ -34,10 +35,12 @@ export function useSettingsCatalogHandlers({
   const openDialog = useSettingsStore((s) => s.openDialog);
   const closeDialog = useSettingsStore((s) => s.closeDialog);
   const setDialogPayload = useSettingsStore((s) => s.setDialogPayload);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   // Open duplicate dialog
   const handleDuplicateCatalog = (catalog: CatalogFile) => {
     setDialogPayload({ catalogToDuplicate: catalog });
+    setCatalogError(null);
     initDuplicateCatalogForm(catalog.name, catalog.filename);
     openDialog('duplicateCatalog');
   };
@@ -53,7 +56,7 @@ export function useSettingsCatalogHandlers({
       setDialogPayload({ catalogToDuplicate: null });
       resetCatalogForm();
     } catch (error) {
-      console.error('Failed to duplicate catalog:', error);
+      setCatalogError(String(error));
     }
   };
 
@@ -67,6 +70,7 @@ export function useSettingsCatalogHandlers({
   // Open edit dialog
   const handleEditCatalog = (catalog: CatalogFile) => {
     setDialogPayload({ catalogToEdit: catalog });
+    setCatalogError(null);
     initEditCatalogForm(catalog.name, catalog.filename);
     openDialog('editCatalog');
   };
@@ -83,7 +87,7 @@ export function useSettingsCatalogHandlers({
       setDialogPayload({ catalogToEdit: null });
       resetCatalogForm();
     } catch (error) {
-      console.error('Failed to update catalog:', error);
+      setCatalogError(String(error));
     }
   };
 
@@ -122,6 +126,7 @@ export function useSettingsCatalogHandlers({
   };
 
   return {
+    catalogError,
     handleDuplicateCatalog,
     handleConfirmDuplicate,
     handleCancelDuplicate,

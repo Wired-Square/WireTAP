@@ -503,6 +503,7 @@ export default function Settings() {
         isOpen={dialogs.duplicateCatalog}
         name={forms.catalogName}
         filename={forms.catalogFilename}
+        error={handlers.catalogError}
         onChangeName={forms.setCatalogName}
         onChangeFilename={forms.setCatalogFilename}
         onCancel={handlers.handleCancelDuplicate}
@@ -514,6 +515,7 @@ export default function Settings() {
         isOpen={dialogs.editCatalog}
         name={forms.catalogName}
         filename={forms.catalogFilename}
+        error={handlers.catalogError}
         onChangeName={forms.setCatalogName}
         onChangeFilename={forms.setCatalogFilename}
         onCancel={handlers.handleCancelEdit}
