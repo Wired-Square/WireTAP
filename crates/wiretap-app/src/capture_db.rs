@@ -314,6 +314,16 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     Ok(())
 }
 
+#[cfg(test)]
+pub(crate) fn use_in_memory_database() {
+    let mut db = DB.lock().unwrap();
+    if db.is_none() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+        *db = Some(conn);
+    }
+}
+
 
 /// Drop every non-persistent capture's rows, then any rows left without a
 /// metadata row at all.

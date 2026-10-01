@@ -45,6 +45,7 @@ All notable changes to WireTAP will be documented in this file.
 - **"Add as Instruments" reads the `display` hint of every signal.** Hints on mux-case signals, on signals a mirrored frame inherits and on Modbus frames named rather than numbered were ignored, and those signals got an inferred widget. They now get the widget their hint names. A hint naming a widget the dashboard does not have falls back to the inferred widget instead of adding a panel that cannot draw.
 - **A gs_usb adapter no longer loses frames when sends outrun the bus.** A Test Pattern throughput run or a fast transmit could hand the adapter more frames than it could hold, and the extra frames were dropped while still counted as sent. WireTAP now keeps at most ten frames in flight and waits for each to reach the bus, so what is counted as sent is what went out.
 - **A fast replay no longer drops frames the adapter has no room for.** A replay faster than the bus could carry filled the adapter's send queue, and the frames it refused were recorded in History as "send queue full" and skipped, while the replay still reported success. Replay now waits for room and puts every frame on the bus, so at a high speed it runs at the bus's pace rather than the one asked for.
+- **A second window on a session no longer doubles the first window's Modbus tab.** Opening the Decoder in another window replayed every tunnelled Modbus exchange to each window already watching, so each one listed them twice. Only the window that opens it now receives the replay.
 
 ## [0.13.0] - 2026-09-29
 

@@ -102,6 +102,10 @@ impl WsServer {
         let _ = self.tx.send(ServerCommand::SendToChannel { channel, data });
     }
 
+    pub fn send_to_conn(&self, conn_id: usize, data: Vec<u8>) {
+        let _ = self.tx.send(ServerCommand::SendToConn { conn_id, data });
+    }
+
     /// Send a binary message to all authenticated connections (channel 0 / global).
     pub fn send_global(&self, data: Vec<u8>) {
         let _ = self.tx.send(ServerCommand::SendGlobal { data });
@@ -383,7 +387,7 @@ async fn connection_manager_task(
                     ServerCommand::ExecuteCommand { conn_id, correlation_id, op_name, params } => {
                         let cmd_tx_clone = cmd_tx.clone(); // send response back through the command channel
                         tauri::async_runtime::spawn(async move {
-                            let result = crate::ws::dispatch::dispatch_command(&op_name, &params).await;
+                            let result = crate::ws::dispatch::dispatch_command(&op_name, &params, conn_id).await;
                             let (status, payload) = match result {
                                 Ok(value) => {
                                     let json = serde_json::to_vec(&value).unwrap_or_default();
@@ -711,4 +715,48 @@ fn generate_token() -> String {
         token.push(char::from(if nibble < 10 { b'0' + nibble } else { b'a' + nibble - 10 }));
     }
     token
+}
+
+/// A server with no sockets behind it: tests read what would have been sent, and to whom.
+#[cfg(test)]
+pub(crate) mod outbox {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[derive(Debug, PartialEq)]
+    pub(crate) enum Recipient {
+        Conn(usize),
+        Channel(u8),
+    }
+
+    static SENT: OnceLock<Mutex<mpsc::UnboundedReceiver<ServerCommand>>> = OnceLock::new();
+
+    pub(crate) fn subscribe(session_id: &str, channel: u8) {
+        SENT.get_or_init(|| {
+            let (tx, rx) = mpsc::unbounded_channel();
+            assert!(
+                WS_SERVER.set(WsServer { port: 0, token: String::new(), tx }).is_ok(),
+                "no real server runs under test"
+            );
+            Mutex::new(rx)
+        });
+        CHANNEL_MAP.write().unwrap().insert(session_id.to_string(), channel);
+    }
+
+    /// Every message sent so far on `channel` of type `kind`, with its recipient.
+    pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<Recipient> {
+        let mut rx = SENT.get().expect("subscribe first").lock().unwrap();
+        let mut out = Vec::new();
+        while let Ok(cmd) = rx.try_recv() {
+            let (recipient, data) = match cmd {
+                ServerCommand::SendToConn { conn_id, data } => (Recipient::Conn(conn_id), data),
+                ServerCommand::SendToChannel { channel, data } => (Recipient::Channel(channel), data),
+                _ => continue,
+            };
+            if Header::decode(&data).is_ok_and(|h| h.channel == channel && h.msg_type == kind) {
+                out.push(recipient);
+            }
+        }
+        out
+    }
 }

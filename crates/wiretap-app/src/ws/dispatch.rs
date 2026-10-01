@@ -752,8 +752,9 @@ pub fn clear_frame_offset(session_id: &str) {
 /// re-sending the FrameData. `send_new_frames` only decodes frames *past* the offset, so a
 /// catalogue attached after frames were delivered (e.g. a capture replay that started
 /// streaming before the decoder bound its catalogue) would otherwise leave those frames
-/// undecoded. Called right after `attach_catalog`.
-pub fn redecode_delivered(session_id: &str) {
+/// undecoded. Called right after `attach_catalog`, and sent only to `conn_id`, the window
+/// that attached: tunnel exchanges are appended, so every other window would show them twice.
+pub fn redecode_delivered(session_id: &str, conn_id: usize) {
     let Some(catalog) = attached_catalog(session_id) else { return };
     let Some(server) = ws_server() else { return };
     let Some(channel) = server.channel_for_session(session_id) else { return };
@@ -779,8 +780,7 @@ pub fn redecode_delivered(session_id: &str) {
     let tunnels = tunnel_decoders(session_id);
     let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), false);
     if !decoded.is_empty() {
-        let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
-        server.send_to_channel(channel, dmsg);
+        server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedSignals, channel, &decoded));
     }
 }
 
@@ -982,6 +982,7 @@ pub fn send_transmit_updated(count: i64) {
 pub async fn dispatch_command(
     op_name: &str,
     params: &[u8],
+    conn_id: usize,
 ) -> Result<serde_json::Value, String> {
     let params: serde_json::Value = if params.is_empty() {
         serde_json::Value::Null
@@ -1000,7 +1001,7 @@ pub async fn dispatch_command(
             crate::ws::smp::dispatch(name, params).await
         }
         name if name.starts_with("catalog.") => {
-            crate::catalog::dispatch_catalog_command(name, params).await
+            crate::catalog::dispatch_catalog_command(name, params, conn_id).await
         }
         "app.startup_notices" => Ok(serde_json::json!(crate::startup_notices())),
         _ => Err(format!("Unknown command: {op_name}")),
@@ -1270,7 +1271,11 @@ mod tests {
     }
 
     fn tunnel_catalogue(function_code: &str) -> wiretap_catalog::Catalog {
-        wiretap_catalog::Catalog::parse(&format!(
+        wiretap_catalog::Catalog::parse(&tunnel_catalogue_toml(function_code)).expect("catalogue parses")
+    }
+
+    fn tunnel_catalogue_toml(function_code: &str) -> String {
+        format!(
             r#"
 [meta]
 name = "tunnel"
@@ -1282,8 +1287,7 @@ protocol = "modbus_rtu"
 vendor_functions = [0x60]
 allow_broadcast = true
 "#
-        ))
-        .expect("catalogue parses")
+        )
     }
 
     /// The tunnel's own table declares 0x60, which only a CRC search can frame
@@ -1696,5 +1700,39 @@ bit_length = 8
         let batch: Vec<serde_json::Value> = serde_json::from_slice(&decoded.1).expect("JSON array");
         assert_eq!(batch[0]["t"], 1_234_567);
         assert_eq!(batch[0]["maskedFrameId"], 0x100);
+    }
+
+    #[test]
+    fn a_joining_window_alone_receives_the_tunnel_backlog() {
+        use crate::ws::server::outbox::{self, Recipient};
+        const JOINING: usize = 7_001;
+        const CHANNEL: u8 = 201;
+        let session = "joining-window-backlog";
+        crate::capture_db::use_in_memory_database();
+        crate::capture_store::create_session_capture(
+            session,
+            crate::capture_store::CaptureKind::Frames,
+            session.to_string(),
+        );
+        let mut frames = Vec::new();
+        for (t, body) in [
+            (1_000, vec![0x01, 0x04, 0x4D, 0xE2, 0x00, 0x02]),
+            (5_000, vec![0x01, 0x04, 0x04, 0x01, 0x2C, 0x00, 0x00]),
+        ] {
+            frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
+        }
+        crate::capture_store::append_frames_to_session(session, frames);
+        outbox::subscribe(session, CHANNEL);
+        send_new_frames(session);
+
+        tauri::async_runtime::block_on(crate::catalog::dispatch_catalog_command(
+            "catalog.attach",
+            serde_json::json!({ "session_id": session, "content": tunnel_catalogue_toml("") }),
+            JOINING,
+        ))
+        .expect("attach");
+        detach_catalog(session);
+
+        assert_eq!(outbox::sent(CHANNEL, MsgType::DecodedSignals), [Recipient::Conn(JOINING)]);
     }
 }

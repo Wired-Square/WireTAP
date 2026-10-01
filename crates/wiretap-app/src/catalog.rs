@@ -31,6 +31,7 @@ pub async fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String>
 pub async fn dispatch_catalog_command(
     op_name: &str,
     params: serde_json::Value,
+    conn_id: usize,
 ) -> Result<serde_json::Value, String> {
     let req = |key: &str| -> Result<String, String> {
         params
@@ -95,7 +96,7 @@ pub async fn dispatch_catalog_command(
             crate::ws::dispatch::attach_catalog(&session_id, path, cat);
             // Decode frames already delivered before this attach (e.g. a capture replay
             // that started before the catalogue bound) so they don't show "No signals".
-            crate::ws::dispatch::redecode_delivered(&session_id);
+            crate::ws::dispatch::redecode_delivered(&session_id, conn_id);
             Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }
         // Detach a session's catalogue (decoded stream stops). Params: { session_id }.
@@ -1054,7 +1055,7 @@ mod tests {
     }
 
     fn command(op: &str, params: serde_json::Value) -> serde_json::Value {
-        tauri::async_runtime::block_on(dispatch_catalog_command(op, params)).expect(op)
+        tauri::async_runtime::block_on(dispatch_catalog_command(op, params, 0)).expect(op)
     }
 
     #[test]
@@ -1096,7 +1097,7 @@ mod tests {
     }
 
     fn try_command(op: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
-        tauri::async_runtime::block_on(dispatch_catalog_command(op, params))
+        tauri::async_runtime::block_on(dispatch_catalog_command(op, params, 0))
     }
 
     #[test]
