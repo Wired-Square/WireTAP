@@ -446,13 +446,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       />
                       {isOrphaned && activeSession && (
                         <IconButton
-                          onClick={() =>
-                            updateQueueItemSession(
-                              item.id,
-                              activeSession.profileId,
-                              activeSession.profileName
-                            )
-                          }
+                          onClick={() => updateQueueItemSession(item.id, activeSession)}
                           size="sm"
                           title={`Assign to ${activeSession.profileName}`}
                         >

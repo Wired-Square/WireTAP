@@ -31,7 +31,7 @@ import {
 } from "../api/transmit";
 import type { ReplayState } from "../api/io";
 
-import { useSessionStore } from "./sessionStore";
+import { useSessionStore, type Session } from "./sessionStore";
 import { resolveQueueItemSession } from "./transmitRowSession";
 
 import { CAN_FD_DLC_VALUES } from "../constants";
@@ -223,7 +223,7 @@ export interface TransmitState {
   /** Add current CAN frame to queue */
   addCanToQueue: () => void;
   /** Add multiple CAN frames to queue (bulk, from Discovery) */
-  addCanFramesBulk: (frames: Array<{ frame_id: number; bytes: number[]; bus: number; is_extended: boolean; dlc: number }>, profileId: string, profileName: string, intervalMs?: number, groupName?: string) => void;
+  addCanFramesBulk: (frames: Array<{ frame_id: number; bytes: number[]; bus: number; is_extended: boolean; dlc: number }>, session: QueueRowSession, intervalMs?: number, groupName?: string) => void;
   /** Add current serial bytes to queue */
   addSerialToQueue: () => void;
   /** Remove item from queue */
@@ -247,11 +247,7 @@ export interface TransmitState {
   /** Update queue item bus (CAN only) */
   updateQueueItemBus: (queueId: string, bus: number) => void;
   /** Reassign queue item to a different session */
-  updateQueueItemSession: (
-    queueId: string,
-    profileId: string,
-    profileName: string
-  ) => void;
+  updateQueueItemSession: (queueId: string, session: QueueRowSession) => void;
   /** Set group name for a queue item */
   setItemGroup: (queueId: string, groupName: string | undefined) => void;
   /** Get all unique group names in the queue */
@@ -316,6 +312,18 @@ const getActiveSession = () => {
   const { activeSessionId, sessions } = useSessionStore.getState();
   return activeSessionId ? sessions[activeSessionId] : null;
 };
+
+type QueueRowSession = Pick<Session, "id" | "profileId" | "profileName">;
+
+const rowSessionId = (item: TransmitQueueItem) =>
+  resolveQueueItemSession(item, useSessionStore.getState().sessions)?.id;
+
+function syncQueuedMarks(queue: TransmitQueueItem[], sessionIds: Iterable<string | undefined>) {
+  const { sessions, setHasQueuedMessages } = useSessionStore.getState();
+  for (const id of new Set(sessionIds)) {
+    if (id) setHasQueuedMessages(id, queue.some((q) => resolveQueueItemSession(q, sessions)?.id === id));
+  }
+}
 
 export const useTransmitStore = create<TransmitState>((set, get) => ({
   // ---- Initial State ----
@@ -508,15 +516,16 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     };
 
     set({ queue: [...state.queue, item] });
-    useSessionStore.getState().setHasQueuedMessages(session.profileId, true);
+    useSessionStore.getState().setHasQueuedMessages(session.id, true);
   },
 
-  addCanFramesBulk: (frames, profileId, profileName, intervalMs, groupName) => {
+  addCanFramesBulk: (frames, session, intervalMs, groupName) => {
     const state = get();
     const newItems: TransmitQueueItem[] = frames.map((f) => ({
       id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      profileId,
-      profileName,
+      profileId: session.profileId,
+      profileName: session.profileName,
+      sessionId: session.id,
       type: "can" as const,
       canFrame: {
         frame_id: f.frame_id,
@@ -533,7 +542,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       groupName: groupName || undefined,
     }));
     set({ queue: [...state.queue, ...newItems] });
-    useSessionStore.getState().setHasQueuedMessages(profileId, true);
+    useSessionStore.getState().setHasQueuedMessages(session.id, true);
   },
 
   addSerialToQueue: () => {
@@ -563,7 +572,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     };
 
     set({ queue: [...state.queue, item] });
-    useSessionStore.getState().setHasQueuedMessages(session.profileId, true);
+    useSessionStore.getState().setHasQueuedMessages(session.id, true);
   },
 
   removeFromQueue: (queueId) => {
@@ -576,23 +585,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     set({ queue: state.queue.filter((q) => q.id !== queueId) });
-
-    // Update hasQueuedMessages flag if no items remain for this profile
-    if (item) {
-      const remainingForProfile = get().queue.filter(
-        (q) => q.profileId === item.profileId
-      );
-      if (remainingForProfile.length === 0) {
-        useSessionStore.getState().setHasQueuedMessages(item.profileId, false);
-      }
-    }
+    if (item) syncQueuedMarks(get().queue, [rowSessionId(item)]);
   },
 
   clearQueue: async () => {
     const state = get();
-
-    // Collect unique profile IDs before clearing
-    const profileIds = new Set(state.queue.map((q) => q.profileId));
+    const sessionIds = state.queue.map(rowSessionId);
 
     // Stop all repeats
     for (const item of state.queue) {
@@ -602,12 +600,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     set({ queue: [] });
-
-    // Clear hasQueuedMessages flag for all affected profiles
-    const { setHasQueuedMessages } = useSessionStore.getState();
-    for (const profileId of profileIds) {
-      setHasQueuedMessages(profileId, false);
-    }
+    syncQueuedMarks([], sessionIds);
   },
 
   startRepeat: async (queueId) => {
@@ -748,9 +741,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         ? state.queue.map((q) => (q.id === item.id ? item : q))
         : [...state.queue, item],
     });
-    if (ev.profile_id) {
-      useSessionStore.getState().setHasQueuedMessages(ev.profile_id, true);
-    }
+    useSessionStore.getState().setHasQueuedMessages(ev.session_id, true);
   },
 
   stopAllRepeats: async () => {
@@ -810,30 +801,20 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     });
   },
 
-  updateQueueItemSession: (queueId, profileId, profileName) => {
+  updateQueueItemSession: (queueId, session) => {
     const state = get();
     const item = state.queue.find((q) => q.id === queueId);
-    const oldProfileId = item?.profileId;
+    if (!item) return;
+    const oldSessionId = rowSessionId(item);
 
     set({
       queue: state.queue.map((q) =>
-        q.id === queueId ? { ...q, profileId, profileName } : q
+        q.id === queueId
+          ? { ...q, sessionId: session.id, profileId: session.profileId, profileName: session.profileName }
+          : q
       ),
     });
-
-    // Update hasQueuedMessages flags
-    const { setHasQueuedMessages } = useSessionStore.getState();
-    setHasQueuedMessages(profileId, true);
-
-    // Check if old profile still has items
-    if (oldProfileId && oldProfileId !== profileId) {
-      const remainingForOld = state.queue.filter(
-        (q) => q.id !== queueId && q.profileId === oldProfileId
-      );
-      if (remainingForOld.length === 0) {
-        setHasQueuedMessages(oldProfileId, false);
-      }
-    }
+    syncQueuedMarks(get().queue, [oldSessionId, session.id]);
   },
 
   // Group Actions

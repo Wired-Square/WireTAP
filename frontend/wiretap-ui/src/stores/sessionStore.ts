@@ -1878,15 +1878,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   setHasQueuedMessages: (sessionId, hasQueue) => {
-    set((s) => ({
-      sessions: {
-        ...s.sessions,
-        [sessionId]: {
-          ...s.sessions[sessionId],
-          hasQueuedMessages: hasQueue,
-        },
-      },
-    }));
+    set((s) => {
+      const session = s.sessions[sessionId];
+      if (!session) return s;
+      return { sessions: { ...s.sessions, [sessionId]: { ...session, hasQueuedMessages: hasQueue } } };
+    });
   },
 
   // ---- Callbacks ----

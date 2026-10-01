@@ -118,8 +118,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
     addCanFramesBulk(
       frames,
-      transmitSession.profileId,
-      transmitSession.profileName,
+      transmitSession,
       intervalMs,
       groupName.trim() || undefined
     );

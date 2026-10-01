@@ -27,6 +27,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A frame CSV export keeps its protocol.** An exported file is named after its protocol, and importing a CSV now offers a protocol choice, set from the file name when it names one and CAN otherwise. Serial and Modbus captures exported to CSV used to come back as CAN; re-import them and pick the protocol if the file name does not say.
 - **CSV import maps data columns past `D99` by their header.** Columns `D100` and up, as in an export of frames longer than 99 bytes, were only guessed from their contents and could be taken for a sequence number. They are now data bytes like `D1` to `D99`.
 - **A gs_usb adapter leaves the bus when its session ends on an error.** A session that failed and stopped could leave the adapter on the bus, still acknowledging frames, until it was unplugged. It is now closed and taken off the bus as a normal stop does.
+- **Transmit queue rows stay with the session they were queued on.** A source that disconnected while it had queued rows was dropped from Transmit instead of being kept for them, and renaming a capture could fail while any row was queued. Assigning an orphaned row to the current session now also sends it through that session, where before it could keep pointing at the old one.
 
 ## [0.13.0] - 2026-09-29
 
