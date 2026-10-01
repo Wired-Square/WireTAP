@@ -36,6 +36,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A GVRET bus saved as CAN FD no longer offers FD transmit.** GVRET sends classic CAN only, but a bus whose profile still said CAN FD kept offering FD in Transmit and then refused the send. Such a bus now opens as classic CAN.
 - **Transmit's History and Replay tabs show only the panel's session.** Both tabs used to count and list every session's transmits, so a panel with no source showed an agent's MCP traffic climbing. They now show the session the panel is on, and nothing when it is on none. Clear removes only that session's history, and an export holds only its rows.
 - **A group repeat sends through the sessions its rows name.** With two sessions open on one profile, a group could repeat through the first of them even when its rows were queued on the second. Each row now repeats through its own session.
+- **Transmit History lists its frames at the Auto page size.** The tab could show a frame count while its list stayed empty, because at Auto the list waited for a table that only appeared once the list had loaded. The tab now counts its rows first, so the table appears and fills.
 
 ## [0.13.0] - 2026-09-29
 
