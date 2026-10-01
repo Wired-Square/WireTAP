@@ -44,6 +44,7 @@ export const MsgType = {
   ByteCounts: 0x19,
   ModbusScanState: 0x1a,
   DecodedBacklog: 0x1b,
+  AdhocSignals: 0x1c,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,
@@ -401,6 +402,16 @@ export function decodeDecodedBacklog(payload: DataView): { subscriber: string; d
     subscriber: decodedSignalsDecoder.decode(new Uint8Array(payload.buffer, payload.byteOffset + 2, nameEnd - 2)),
     decoded: decodeDecodedSignals(new DataView(payload.buffer, payload.byteOffset + nameEnd, payload.byteLength - nameEnd)),
   };
+}
+
+/** A Dashboard window's ad-hoc signals for one frame batch, decoded in Rust. */
+export interface AdhocSignalsMsg {
+  /** Masked frame ids in the batch, first seen first. */
+  frameIds: number[];
+  /** `t` is the host timestamp (µs). */
+  values: { frameId: number; t: number; name: string; value: number }[];
+  /** Bit `byte * 8 + bit`'s toggle count since the heatmap was reset. */
+  toggles: { frameId: number; counts: number[]; frames: number }[];
 }
 
 /** Progress of a Modbus discovery sweep, pushed on the scan session's channel. */

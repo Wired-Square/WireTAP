@@ -49,7 +49,7 @@ import {
   type PlaybackPosition,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
-import type { DecodedSignalsEntry } from "../services/wsProtocol";
+import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
 
 // ============================================================================
 // Local Session State Type
@@ -169,6 +169,8 @@ export interface UseIOSessionOptions {
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
   onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
+  /** Callback when the Dashboard's ad-hoc signals arrive */
+  onAdhocSignals?: (msg: AdhocSignalsMsg) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */
@@ -346,6 +348,7 @@ export function useIOSession(
     requireFrames,
     onFrames,
     onDecoded,
+    onAdhocSignals,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -428,6 +431,7 @@ export function useIOSession(
   const callbacksRef = useRef({
     onFrames,
     onDecoded,
+    onAdhocSignals,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -444,6 +448,7 @@ export function useIOSession(
     callbacksRef.current = {
       onFrames,
       onDecoded,
+      onAdhocSignals,
       onError,
       onTimeUpdate,
       onStreamEnded,
@@ -456,7 +461,7 @@ export function useIOSession(
       onSourceReplaced,
       onDestroyed,
     };
-  }, [onFrames, onDecoded, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
+  }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
 
   // ---- Sync session store → localState ----
   // The session store receives WS push messages (SessionState, SessionLifecycle,
@@ -751,6 +756,7 @@ export function useIOSession(
         registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
+          onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -1148,6 +1154,7 @@ export function useIOSession(
         registerCallbacks(targetSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
+          onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -1251,6 +1258,7 @@ export function useIOSession(
       registerCallbacks(targetSessionId, subscriberIdRef.current, {
         onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
         onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
+        onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
         onError: (error) => callbacksRef.current.onError?.(error),
         onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),

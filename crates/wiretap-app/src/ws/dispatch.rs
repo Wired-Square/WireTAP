@@ -751,6 +751,7 @@ pub fn reset_decode_state(session_id: &str) {
         }
     }
     reset_tunnels(session_id);
+    crate::adhoc::reset_toggles(session_id);
 }
 
 /// Clear frame offset for a session.
@@ -762,6 +763,7 @@ pub fn clear_frame_offset(session_id: &str) {
     if let Ok(mut locks) = DELIVERY_LOCKS.lock() {
         locks.remove(session_id);
     }
+    crate::adhoc::forget_session(session_id);
 }
 
 /// Decode the frames already delivered to this session's client (everything up to the
@@ -811,6 +813,10 @@ pub fn send_frames(session_id: &str, frames: &[FrameMessage]) {
     let Some(channel) = server.channel_for_session(session_id) else { return };
     for (kind, payload) in frame_batch_messages(session_id, frames) {
         server.send_to_channel(channel, protocol::encode_message(kind, channel, &payload));
+    }
+    let mask = attached_catalog(session_id).and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
+    for (conn_id, payload) in crate::adhoc::batch_messages(session_id, frames, mask) {
+        server.send_to_conn(conn_id, protocol::encode_message(MsgType::AdhocSignals, channel, &payload));
     }
 }
 
@@ -1021,6 +1027,7 @@ pub async fn dispatch_command(
         name if name.starts_with("smp.") => {
             crate::ws::smp::dispatch(name, params).await
         }
+        name if name.starts_with("adhoc.") => crate::adhoc::dispatch_adhoc_command(name, params, conn_id),
         name if name.starts_with("catalog.") => {
             crate::catalog::dispatch_catalog_command(name, params, conn_id).await
         }

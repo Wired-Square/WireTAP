@@ -272,8 +272,8 @@ interface DashboardState {
   // ── Raw byte tracking (flow view / heatmap) ──
   /** Frame IDs seen during the current session (for flow/heatmap frame pickers) */
   discoveredFrameIds: Set<number>;
-  /** Bit change counters for heatmap panels: key = frameId */
-  bitChangeCounts: Map<number, { counts: Uint32Array; lastBytes: Uint8Array; totalFrames: number }>;
+  /** Heatmap bit-toggle counts from Rust, by frame id; index `byte * 8 + bit`. */
+  bitChangeCounts: Map<number, { counts: number[]; totalFrames: number }>;
 
   /** Registry of hypothesis signal parameters, keyed by hyp_* signal name */
   candidateRegistry: Map<string, HypothesisParams>;
@@ -328,7 +328,7 @@ interface DashboardState {
 
   // Raw byte tracking (flow view / heatmap)
   recordFrameId: (frameId: number) => void;
-  recordBitChanges: (frameId: number, bytes: number[]) => void;
+  setBitToggles: (toggles: { frameId: number; counts: number[]; frames: number }[]) => void;
 
   // Hypothesis candidate registry
   registerHypotheses: (entries: Array<{ signalName: string; params: HypothesisParams }>) => void;
@@ -921,39 +921,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  recordBitChanges: (frameId, bytes) => {
-    const map = get().bitChangeCounts;
-    let entry = map.get(frameId);
-    if (!entry) {
-      entry = {
-        counts: new Uint32Array(64),
-        lastBytes: new Uint8Array(8),
-        totalFrames: 0,
-      };
-      // Initialise lastBytes with current frame to avoid spurious first-frame changes
-      for (let i = 0; i < Math.min(bytes.length, 8); i++) {
-        entry.lastBytes[i] = bytes[i];
-      }
-      const next = new Map(map);
-      next.set(frameId, entry);
-      set({ bitChangeCounts: next });
-      entry.totalFrames++;
-      return;
-    }
-    // XOR to find changed bits
-    const len = Math.min(bytes.length, 8);
-    for (let byteIdx = 0; byteIdx < len; byteIdx++) {
-      const diff = entry.lastBytes[byteIdx] ^ bytes[byteIdx];
-      if (diff !== 0) {
-        for (let bit = 0; bit < 8; bit++) {
-          if (diff & (1 << bit)) {
-            entry.counts[byteIdx * 8 + bit]++;
-          }
-        }
-      }
-      entry.lastBytes[byteIdx] = bytes[byteIdx];
-    }
-    entry.totalFrames++;
+  setBitToggles: (toggles) => {
+    if (toggles.length === 0) return;
+    const next = new Map(get().bitChangeCounts);
+    for (const { frameId, counts, frames } of toggles) next.set(frameId, { counts, totalFrames: frames });
+    set({ bitChangeCounts: next });
   },
 
   registerHypotheses: (entries) => {

@@ -52,6 +52,9 @@ pub enum MsgType {
     // the attaching window: a u16 BE length and the attaching subscriber's id,
     // then the batch. That subscriber replaces what it holds with it.
     DecodedBacklog   = 0x1B,
+    // A Dashboard window's ad-hoc signal values, seen frame ids and heatmap
+    // toggle counts for a frame batch, sent only to the window that set them.
+    AdhocSignals     = 0x1C,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -93,6 +96,7 @@ impl TryFrom<u8> for MsgType {
             0x19 => Ok(MsgType::ByteCounts),
             0x1A => Ok(MsgType::ModbusScanState),
             0x1B => Ok(MsgType::DecodedBacklog),
+            0x1C => Ok(MsgType::AdhocSignals),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),

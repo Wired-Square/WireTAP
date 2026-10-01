@@ -1,6 +1,6 @@
 // ui/src/apps/dashboard/Dashboard.tsx
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
@@ -31,9 +31,10 @@ import CandidateSignalsDialog from "./dialogs/CandidateSignalsDialog";
 import HypothesisExplorerDialog from "./dialogs/HypothesisExplorerDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
-import { extractBits } from "../../utils/bits";
-import type { FrameMessage } from "../../types/frame";
-import type { DecodedSignalsEntry } from "../../services/wsProtocol";
+import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../../services/wsProtocol";
+import { clearAdhocSignals, resetAdhocToggles, setAdhocSignals } from "../../api/adhoc";
+import { adhocWatch } from "./utils/adhocWatch";
+import { wsTransport } from "../../services/wsTransport";
 
 function DashboardInner() {
   const { t } = useTranslation("dashboard");
@@ -67,7 +68,6 @@ function DashboardInner() {
   // Store selectors
   const catalogPath = useDashboardStore((s) => s.catalogPath);
   const ioProfile = useDashboardStore((s) => s.ioProfile);
-  const frameIdMask = useDashboardStore((s) => s.frameIdMask);
 
   // Store actions
   const initFromSettings = useDashboardStore((s) => s.initFromSettings);
@@ -163,105 +163,14 @@ function DashboardInner() {
     }
   }, [flushPendingValues]);
 
-  // Refs for frame handling to avoid stale closures. Catalog signal decode
-  // moved to Rust (handleDecoded), so only the frame-id mask is needed here.
-  const frameIdMaskRef = useRef(frameIdMask);
-  useEffect(() => { frameIdMaskRef.current = frameIdMask; }, [frameIdMask]);
-
-  const handleFrames = useCallback((receivedFrames: FrameMessage[]) => {
-    if (!receivedFrames || receivedFrames.length === 0) return;
-
-    const mask = frameIdMaskRef.current;
+  // Ad-hoc signals, seen frame ids and heatmap counts, decoded in Rust for this window.
+  const handleAdhocSignals = useCallback((msg: AdhocSignalsMsg) => {
     const store = useDashboardStore.getState();
-
-    for (const f of receivedFrames) {
-      const timestamp = f.timestamp_us !== undefined ? f.timestamp_us / 1_000_000 : Date.now() / 1000;
-      const maskedFrameId = mask !== undefined ? (f.frame_id & mask) : f.frame_id;
-
-      // Record all seen frame IDs (for flow/heatmap frame pickers)
-      store.recordFrameId(maskedFrameId);
-
-      // Raw byte ingestion for flow/bitfield (per-byte series) and heatmap (bit-change counts)
-      for (const panel of store.panels) {
-        if (panel.targetFrameId !== maskedFrameId) continue;
-        if (panel.type === 'flow' || panel.type === 'bitfield') {
-          const count = panel.byteCount ?? 8;
-          for (let i = 0; i < Math.min(count, f.bytes.length); i++) {
-            pendingValuesRef.current.push({
-              frameId: maskedFrameId,
-              signalName: `byte[${i}]`,
-              value: f.bytes[i],
-              timestamp,
-            });
-          }
-        }
-        if (panel.type === 'heatmap') {
-          store.recordBitChanges(maskedFrameId, f.bytes);
-        }
-      }
-
-      // Candidate signal decode (byte_<offset>_<bits>b_<endian> pattern)
-      for (const panel of store.panels) {
-        if (panel.type !== 'line-chart') continue;
-        for (const sig of panel.signals) {
-          if (sig.frameId !== maskedFrameId) continue;
-          const m = /^byte_(\d+)_(\d+)b_(le|be)$/.exec(sig.signalName);
-          if (!m) continue;
-          const offset = parseInt(m[1], 10);
-          const bits = parseInt(m[2], 10);
-          const byteLen = bits / 8;
-          if (offset + byteLen > f.bytes.length) continue;
-          let value: number;
-          if (bits === 8) {
-            value = f.bytes[offset];
-          } else if (bits === 16) {
-            value = m[3] === "le"
-              ? f.bytes[offset] | (f.bytes[offset + 1] << 8)
-              : (f.bytes[offset] << 8) | f.bytes[offset + 1];
-          } else {
-            // 32-bit
-            value = m[3] === "le"
-              ? f.bytes[offset] | (f.bytes[offset + 1] << 8) | (f.bytes[offset + 2] << 16) | ((f.bytes[offset + 3] << 24) >>> 0)
-              : ((f.bytes[offset] << 24) >>> 0) | (f.bytes[offset + 1] << 16) | (f.bytes[offset + 2] << 8) | f.bytes[offset + 3];
-            value = value >>> 0; // unsigned
-          }
-          pendingValuesRef.current.push({
-            frameId: maskedFrameId,
-            signalName: sig.signalName,
-            value,
-            timestamp,
-          });
-        }
-      }
-
-      // Hypothesis signal decode (hyp_* prefix — uses candidateRegistry)
-      if (store.candidateRegistry.size > 0) {
-        for (const panel of store.panels) {
-          if (panel.type !== 'line-chart' && panel.type !== 'histogram') continue;
-          for (const sig of panel.signals) {
-            if (sig.frameId !== maskedFrameId) continue;
-            if (!sig.signalName.startsWith('hyp_')) continue;
-            const params = store.candidateRegistry.get(sig.signalName);
-            if (!params) continue;
-            if (params.startBit + params.bitLength > f.bytes.length * 8) continue;
-            const raw = extractBits(f.bytes, params.startBit, params.bitLength, params.endianness, params.signed);
-            const value = raw * params.factor + params.offset;
-            if (isFinite(value)) {
-              pendingValuesRef.current.push({
-                frameId: maskedFrameId,
-                signalName: sig.signalName,
-                value,
-                timestamp,
-              });
-            }
-          }
-        }
-      }
-
-      // Catalog-based signal decode is no longer done here — it happens once in
-      // Rust and arrives via the DecodedSignals stream (see handleDecoded).
+    for (const id of msg.frameIds) store.recordFrameId(id);
+    for (const v of msg.values) {
+      pendingValuesRef.current.push({ frameId: v.frameId, signalName: v.name, value: v.value, timestamp: v.t / 1_000_000 });
     }
-
+    store.setBitToggles(msg.toggles);
     scheduleFlush();
   }, [scheduleFlush]);
 
@@ -289,6 +198,13 @@ function DashboardInner() {
     scheduleFlush();
   }, [scheduleFlush]);
 
+  // Heatmap counts live in Rust, so a clear resets them there too.
+  const sessionIdRef = useRef<string | null>(null);
+  const clearAll = useCallback(() => {
+    clearData();
+    if (sessionIdRef.current) resetAdhocToggles(sessionIdRef.current).catch(() => {});
+  }, [clearData]);
+
   const handleError = useCallback((error: string) => {
     console.error("Dashboard stream error:", error);
   }, []);
@@ -299,12 +215,12 @@ function DashboardInner() {
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
     requireFrames: true,
-    onFrames: handleFrames,
     onDecoded: handleDecoded,
+    onAdhocSignals: handleAdhocSignals,
     onError: handleError,
     setPlaybackSpeed: setPlaybackSpeed as (speed: number) => void,
-    onBeforeWatch: clearData,
-    onBeforeMultiWatch: clearData,
+    onBeforeWatch: clearAll,
+    onBeforeMultiWatch: clearAll,
   });
 
   const {
@@ -333,6 +249,25 @@ function DashboardInner() {
   } = manager;
 
   const { sessionId, state: readerState } = session;
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+
+  // What the panels chart, registered with Rust for this window and session.
+  const panels = useDashboardStore((s) => s.panels);
+  const candidateRegistry = useDashboardStore((s) => s.candidateRegistry);
+  const watch = useMemo(() => JSON.stringify(adhocWatch(panels, candidateRegistry)), [panels, candidateRegistry]);
+  useEffect(() => {
+    if (!sessionId) return;
+    return () => { clearAdhocSignals(sessionId).catch(() => {}); };
+  }, [sessionId]);
+  useEffect(() => {
+    if (!sessionId) return;
+    const { signals, heatmaps } = JSON.parse(watch);
+    const send = () => {
+      setAdhocSignals(sessionId, signals, heatmaps).catch((e) => tlog.info(`[Dashboard] ad-hoc signals not set: ${e}`));
+    };
+    send();
+    return wsTransport.onReconnect(send);
+  }, [sessionId, watch]);
 
   // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
   // in the store yet, null when it exists with no decoder, or a string path.
@@ -428,7 +363,7 @@ function DashboardInner() {
       onStopAll: () => {
         if (isStreaming) stopWatch();
       },
-      onClear: clearData,
+      onClear: clearAll,
       onPicker: () => dialogs.ioSessionPicker.open(),
       onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
     },
@@ -593,6 +528,7 @@ function DashboardInner() {
       />
 
       <HypothesisExplorerDialog
+        sessionId={sessionId}
         isOpen={dialogs.hypothesisExplorer.isOpen}
         onClose={() => dialogs.hypothesisExplorer.close()}
       />

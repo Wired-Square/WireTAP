@@ -67,6 +67,8 @@ import {
   decodeFrameBatch,
   decodeDecodedSignals,
   decodeDecodedBacklog,
+  decodeWsJson,
+  type AdhocSignalsMsg,
   type DecodedSignalsEntry,
   decodeSessionState,
   decodeStreamEnded,
@@ -326,6 +328,8 @@ export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
   /** Decoded signals streamed from the Rust decoder (when a catalogue is attached). */
   onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
+  /** The Dashboard's ad-hoc signals, for the window that registered them. */
+  onAdhocSignals?: (msg: AdhocSignalsMsg) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
   onStreamEnded?: (payload: StreamEndedInfo) => void;
@@ -589,6 +593,12 @@ async function setupSessionEventSubscribers(
       wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklog, (payload) =>
         deliverDecodedBacklog(eventListeners.callbacks, payload)
       )
+    );
+
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.AdhocSignals, (_payload, raw) => {
+        invokeCallbacks(eventListeners, "onAdhocSignals", decodeWsJson<AdhocSignalsMsg>(raw));
+      })
     );
 
     // SessionState (0x02) — state string + optional error decoded from binary

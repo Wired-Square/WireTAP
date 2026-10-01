@@ -356,6 +356,7 @@ async fn connection_manager_task(
                     }
 
                     ServerCommand::ConnectionClosed { conn_id } => {
+                        crate::adhoc::forget_connection(conn_id);
                         if let Some(conn) = connections.remove(&conn_id) {
                             if conn.authenticated {
                                 AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
@@ -427,6 +428,7 @@ async fn connection_manager_task(
                     .collect();
 
                 for conn_id in timed_out {
+                    crate::adhoc::forget_connection(conn_id);
                     if let Some(mut conn) = connections.remove(&conn_id) {
                         if conn.authenticated {
                             AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);

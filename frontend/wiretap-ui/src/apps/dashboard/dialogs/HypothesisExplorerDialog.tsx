@@ -7,9 +7,9 @@ import { iconSm } from "../../../styles/spacing";
 import { textSecondary } from "../../../styles";
 import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
-import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
-import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnalysis";
-import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
+import { rankHypotheses, type RankedCandidate } from "../../../api/adhoc";
+import { candidateLabel, reasonText } from "../utils/hypothesisText";
+import { Alert } from "../../../components/Alert";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button } from "../../../components/Button";
 import { Badge, type BadgeTone } from "../../../components/Badge";
@@ -17,6 +17,7 @@ import { PrimaryButton, SecondaryButton, Select, Checkbox, Input } from "../../.
 import { Listbox, Option } from "../../../components/Listbox";
 
 interface Props {
+  sessionId: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -25,7 +26,7 @@ const BIT_LENGTH_OPTIONS = [8, 12, 16, 24, 32];
 
 const scoreTone = (score: number): BadgeTone => (score >= 70 ? "success" : score >= 30 ? "warning" : "neutral");
 
-export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
+export default function HypothesisExplorerDialog({ sessionId, isOpen, onClose }: Props) {
   const { t } = useTranslation("dashboard");
   const { format: formatFrameId } = useFrameIdFormat();
   const discoveredFrameIds = useDashboardStore((s) => s.discoveredFrameIds);
@@ -33,7 +34,6 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   const updatePanel = useDashboardStore((s) => s.updatePanel);
   const addSignalToPanel = useDashboardStore((s) => s.addSignalToPanel);
   const registerHypotheses = useDashboardStore((s) => s.registerHypotheses);
-  const changesResults = useDiscoveryToolboxStore((s) => s.toolbox.changesResults);
 
   // ── Step 1: Configuration state ──
   const [step, setStep] = useState<1 | 2>(1);
@@ -43,61 +43,24 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   const [endianness, setEndianness] = useState<Set<'little' | 'big'>>(new Set(['little']));
   const [byteAligned, setByteAligned] = useState(true);
   const [startBit, setStartBit] = useState("0");
-  const [endBit, setEndBit] = useState("63");
+  const [endBit, setEndBit] = useState("");
   const [signed, setSigned] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [factor, setFactor] = useState("1");
   const [offset, setOffset] = useState("0");
-  const [useAnalysisHints, setUseAnalysisHints] = useState(false);
+  const [useAnalysisHints, setUseAnalysisHints] = useState(true);
 
-  // ── Step 2: Selection state ──
+  // ── Step 2: Ranked candidates and selection ──
+  const [candidates, setCandidates] = useState<RankedCandidate[]>([]);
+  const [total, setTotal] = useState(0);
+  const [ranking, setRanking] = useState(false);
+  const [rankError, setRankError] = useState<string | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
 
   const sortedFrameIds = useMemo(
     () => Array.from(discoveredFrameIds).sort((a, b) => a - b),
     [discoveredFrameIds],
   );
-
-  // Build analysis results map for scoring
-  const analysisMap = useMemo(() => {
-    const map = new Map<number, PayloadAnalysisResult>();
-    if (changesResults?.analysisResults) {
-      for (const r of changesResults.analysisResults) {
-        map.set(r.frameId, r);
-      }
-    }
-    return map;
-  }, [changesResults]);
-
-  const hasAnalysis = analysisMap.size > 0;
-
-  // Generate candidates from current config
-  const candidates = useMemo(() => {
-    const frameIds: number[] = frameMode === 'all'
-      ? sortedFrameIds
-      : selectedFrameId ? [parseInt(selectedFrameId, 10)] : [];
-
-    if (frameIds.length === 0 || bitLengths.size === 0 || endianness.size === 0) return [];
-
-    const parsedFactor = parseFloat(factor) || 1;
-    const parsedOffset = parseFloat(offset) || 0;
-    const parsedStart = parseInt(startBit, 10) || 0;
-    const parsedEnd = parseInt(endBit, 10) || 63;
-
-    const config: HypothesisConfig = {
-      frameIds,
-      startBitMin: byteAligned ? Math.ceil(parsedStart / 8) * 8 : parsedStart,
-      startBitMax: byteAligned ? Math.floor(parsedEnd / 8) * 8 : parsedEnd,
-      bitStep: byteAligned ? 8 : 1,
-      bitLengths: Array.from(bitLengths).sort((a, b) => a - b),
-      endiannesses: Array.from(endianness),
-      signed,
-      factor: parsedFactor,
-      offset: parsedOffset,
-    };
-
-    return generateHypotheses(config, useAnalysisHints ? analysisMap : new Map());
-  }, [frameMode, selectedFrameId, sortedFrameIds, bitLengths, endianness, byteAligned, startBit, endBit, signed, factor, offset, useAnalysisHints, analysisMap]);
 
   const toggleBitLength = useCallback((bits: number) => {
     setBitLengths((prev) => {
@@ -118,14 +81,40 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   }, []);
 
   // ── Step transition ──
-  const handlePreview = useCallback(() => {
-    // Pre-select all candidates by default
-    setSelectedCandidates(new Set(candidates.map((c) => c.signalName)));
-    setStep(2);
-  }, [candidates]);
+  const handlePreview = useCallback(async () => {
+    const frameIds = frameMode === 'all'
+      ? sortedFrameIds
+      : selectedFrameId ? [parseInt(selectedFrameId, 10)] : [];
+    const parsedStart = parseInt(startBit, 10) || 0;
+    const parsedEnd = endBit.trim() === "" ? undefined : parseInt(endBit, 10);
+    setRanking(true);
+    setRankError(null);
+    try {
+      const ranked = await rankHypotheses(sessionId, {
+        frameIds,
+        startBit: byteAligned ? Math.ceil(parsedStart / 8) * 8 : parsedStart,
+        endBit: parsedEnd !== undefined && byteAligned ? Math.floor(parsedEnd / 8) * 8 : parsedEnd,
+        bitStep: byteAligned ? 8 : 1,
+        bitLengths: Array.from(bitLengths).sort((a, b) => a - b),
+        endiannesses: Array.from(endianness),
+        signed,
+        factor: parseFloat(factor) || 1,
+        offset: parseFloat(offset) || 0,
+        useProfile: useAnalysisHints,
+      });
+      setCandidates(ranked.candidates);
+      setTotal(ranked.total);
+      setSelectedCandidates(new Set(ranked.candidates.map((c) => c.name)));
+      setStep(2);
+    } catch (e) {
+      setRankError(String(e));
+    } finally {
+      setRanking(false);
+    }
+  }, [sessionId, frameMode, selectedFrameId, sortedFrameIds, bitLengths, endianness, byteAligned, startBit, endBit, signed, factor, offset, useAnalysisHints]);
 
   const handleSelectAll = useCallback(() => {
-    setSelectedCandidates(new Set(candidates.map((c) => c.signalName)));
+    setSelectedCandidates(new Set(candidates.map((c) => c.name)));
   }, [candidates]);
 
   const handleDeselectAll = useCallback(() => {
@@ -133,7 +122,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   }, []);
 
   const handleSelectTopN = useCallback((n: number) => {
-    setSelectedCandidates(new Set(candidates.slice(0, n).map((c) => c.signalName)));
+    setSelectedCandidates(new Set(candidates.slice(0, n).map((c) => c.name)));
   }, [candidates]);
 
   const toggleCandidate = useCallback((signalName: string) => {
@@ -147,12 +136,14 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
   // ── Generate panels ──
   const handleGenerate = useCallback(() => {
-    const selected = candidates.filter((c) => selectedCandidates.has(c.signalName));
+    const selected = candidates
+      .filter((c) => selectedCandidates.has(c.name))
+      .map((c) => ({ ...c, label: candidateLabel(c.params) }));
     if (selected.length === 0) return;
 
     // Register all hypothesis params
     registerHypotheses(
-      selected.map((c) => ({ signalName: c.signalName, params: c.params })),
+      selected.map((c) => ({ signalName: c.name, params: c.params })),
     );
 
     // Group candidates into panels of up to 4 signals each
@@ -171,7 +162,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
       updatePanel(panelId, { title: `Hypothesis ${frameLabel}: ${rangeLabel}` });
 
       for (const candidate of chunk) {
-        addSignalToPanel(panelId, candidate.frameId, candidate.signalName);
+        addSignalToPanel(panelId, candidate.frameId, candidate.name);
       }
     }
 
@@ -310,7 +301,6 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   <Input
                     type="number"
                     min={0}
-                    max={63}
                     step={byteAligned ? 8 : 1}
                     value={startBit}
                     onChange={(e) => setStartBit(e.target.value)}
@@ -323,7 +313,6 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   <Input
                     type="number"
                     min={0}
-                    max={63}
                     step={byteAligned ? 8 : 1}
                     value={endBit}
                     onChange={(e) => setEndBit(e.target.value)}
@@ -346,17 +335,15 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
             </label>
 
             {/* Analysis hints toggle */}
-            {hasAnalysis && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={useAnalysisHints}
-                  onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                />
-                <span className="text-xs text-secondary">
-                  {t("hypothesis.fields.useHints")}
-                </span>
-              </label>
-            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={useAnalysisHints}
+                onChange={(e) => setUseAnalysisHints(e.target.checked)}
+              />
+              <span className="text-xs text-secondary">
+                {t("hypothesis.fields.useHints")}
+              </span>
+            </label>
 
             {/* Advanced: Factor / Offset */}
             <div>
@@ -397,18 +384,12 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               )}
             </div>
 
-            {/* Candidate count preview */}
-            {canPreview && (
-              <p className="text-2xs text-muted">
-                {t("hypothesis.preview.summary", { count: candidates.length })}
-                {candidates.length >= 500 && t("hypothesis.preview.cap")}
-              </p>
-            )}
+            {rankError && <Alert tone="danger" size="sm">{rankError}</Alert>}
 
             {/* Next button */}
             <PrimaryButton
               onClick={handlePreview}
-              disabled={!canPreview || candidates.length === 0}
+              disabled={!canPreview || !sessionId || ranking}
               className="w-full"
             >
               {t("hypothesis.actions.next")}
@@ -419,6 +400,11 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
 
         {step === 2 && (
           <>
+            <p className="text-2xs text-muted">
+              {t("hypothesis.preview.summary", { count: total })}
+              {total > candidates.length && t("hypothesis.preview.cap")}
+            </p>
+
             {/* Selection controls */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button
@@ -454,22 +440,22 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
             <Listbox className="max-h-64 overflow-y-auto p-0 gap-0.5 text-xs">
               {candidates.map((c) => (
                 <Option
-                  key={c.signalName}
+                  key={c.name}
                   size="sm"
-                  selected={selectedCandidates.has(c.signalName)}
+                  selected={selectedCandidates.has(c.name)}
                   mark="check"
                   className="gap-2 px-2"
-                  onClick={() => toggleCandidate(c.signalName)}
+                  onClick={() => toggleCandidate(c.name)}
                 >
                   <span className="text-primary font-mono truncate flex-1">
-                    {c.signalName}
+                    {c.name}
                   </span>
                   {frameMode === 'all' && (
                     <span className="text-muted shrink-0 tabular-nums">
                       {formatFrameId(c.frameId)}
                     </span>
                   )}
-                  <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={c.reason}>
+                  <Badge tone={scoreTone(c.score)} size="sm" className="tabular-nums" title={reasonText(t, c.reasons)}>
                     {c.score}
                   </Badge>
                 </Option>

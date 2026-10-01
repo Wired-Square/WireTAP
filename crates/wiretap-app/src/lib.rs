@@ -1,5 +1,6 @@
 #[macro_use]
 pub(crate) mod logging;
+mod adhoc;
 mod analysis;
 mod byte_roles;
 mod app_registry;
@@ -1377,6 +1378,7 @@ pub fn run() {
             checksum_discovery::discover_checksums_in_capture_cmd,
             byte_roles::profile_bytes_cmd,
             byte_roles::serial_structure_cmd,
+            adhoc::rank_hypotheses,
             frame_export::export_frame_dump,
             // Transmit API
             transmit::get_transmit_capable_profiles,

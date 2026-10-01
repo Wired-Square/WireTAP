@@ -81,7 +81,7 @@
       "bitRange": "Bit Range",
       "byteAligned": "Byte-aligned only",
       "startBit": "Start bit",
-      "endBit": "End bit",
+      "endBit": "End bit (blank: whole payload)",
       "rangeTo": "to",
       "signed": "Signed interpretation",
       "useHints": "Rank using analysis hints",
@@ -106,6 +106,15 @@
       "selectionSummary_other": "{{count}} selected → {{panels}} panels",
       "generate_one": "Generate {{count}} Signal",
       "generate_other": "Generate {{count}} Signals"
+    },
+    "reasons": {
+      "role": "{{role}} byte",
+      "highVariance": "high variance",
+      "strongTrend": "strong trend",
+      "endiannessAgrees": "byte order agrees",
+      "endiannessMixed": "mixed byte order",
+      "noProfile": "no analysis data",
+      "none": "low interest"
     }
   },
   "candidates": {

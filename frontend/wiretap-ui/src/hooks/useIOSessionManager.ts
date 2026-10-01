@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
-import type { DecodedSignalsEntry } from "../services/wsProtocol";
+import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
 import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
 import { tlog } from "../api/settings";
 import {
@@ -132,6 +132,8 @@ export interface UseIOSessionManagerOptions {
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
   onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
+  /** Callback when the Dashboard's ad-hoc signals arrive */
+  onAdhocSignals?: (msg: AdhocSignalsMsg) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */
@@ -325,6 +327,7 @@ export function useIOSessionManager(
     requireFrames,
     onFrames: onFramesProp,
     onDecoded,
+    onAdhocSignals,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -601,6 +604,7 @@ export function useIOSessionManager(
     requireFrames,
     onFrames: handleFrames,
     onDecoded,
+    onAdhocSignals,
     onError,
     onTimeUpdate,
     onStreamEnded: handleStreamEndedWithIngest,
