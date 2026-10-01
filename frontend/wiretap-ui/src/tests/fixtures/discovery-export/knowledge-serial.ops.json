@@ -1,0 +1,85 @@
+[
+  {
+    "op": "SetMeta",
+    "meta": {
+      "name": "serial export",
+      "version": 2,
+      "default_frame": "serial"
+    }
+  },
+  {
+    "op": "SetSerialConfig",
+    "config": {
+      "encoding": "slip",
+      "byte_order": "little",
+      "frame_id_mask": 65280,
+      "min_frame_length": 4,
+      "header_length": 3,
+      "fields": {
+        "id": {
+          "mask": 16776960,
+          "endianness": "little"
+        },
+        "source_address": {
+          "mask": 255
+        }
+      },
+      "checksum": {
+        "algorithm": "xor",
+        "startByte": -1,
+        "byteLength": 1,
+        "calcStartByte": 0,
+        "calcEndByte": -1,
+        "bigEndian": false
+      }
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "serial",
+    "key": "0x10",
+    "frame": {
+      "length": 8,
+      "notes": [
+        "status"
+      ],
+      "interval_ms": 250
+    }
+  },
+  {
+    "op": "UpsertSignal",
+    "owner_path": [
+      "frame",
+      "serial",
+      "0x10"
+    ],
+    "signal": {
+      "name": "data_3",
+      "start_bit": 24,
+      "bit_length": 32,
+      "format": "hex"
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "serial",
+    "key": "0x11",
+    "frame": {
+      "length": 6
+    }
+  },
+  {
+    "op": "UpsertSignal",
+    "owner_path": [
+      "frame",
+      "serial",
+      "0x11"
+    ],
+    "signal": {
+      "name": "data_3",
+      "start_bit": 24,
+      "bit_length": 16,
+      "format": "hex"
+    }
+  }
+]

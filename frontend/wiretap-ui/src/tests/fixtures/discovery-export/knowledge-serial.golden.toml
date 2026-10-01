@@ -1,0 +1,46 @@
+[meta]
+name = "serial export"
+version = 2
+default_frame = "serial"
+
+[meta.serial]
+byte_order = "little"
+default_interval = 100
+encoding = "slip"
+frame_id_mask = 0xFF00
+min_frame_length = 4
+header_length = 3
+[meta.serial.fields.id]
+mask = 0xFFFF00
+byte_order = "little"
+[meta.serial.fields.source_address]
+mask = 0xFF
+
+# Checksum configuration (detected from analysis)
+[meta.serial.checksum]
+algorithm = "xor"
+start_byte = -1
+byte_length = 1
+calc_start_byte = 0
+calc_end_byte = -1
+big_endian = false
+
+[frame.serial."0x10"]
+length = 8
+notes = "status"
+interval = 250
+
+[[frame.serial."0x10".signals]]
+name = "data_3"
+start_bit = 24
+bit_length = 32
+format = "hex"
+
+[frame.serial."0x11"]
+length = 6
+
+[[frame.serial."0x11".signals]]
+name = "data_3"
+start_bit = 24
+bit_length = 16
+format = "hex"

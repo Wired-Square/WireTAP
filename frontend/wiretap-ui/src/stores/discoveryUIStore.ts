@@ -5,7 +5,10 @@
 
 import { create } from 'zustand';
 import { saveCatalog } from '../api';
-import { buildFramesTomlWithKnowledge, buildModbusDiscoveryToml, type ExportFrameWithKnowledge, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
+import { buildCatalog } from '../api/catalog';
+import type { EditOp } from '../types/catalogEdit';
+import { withAppError } from '../utils/appError';
+import { knowledgeCatalogOps, modbusCatalogOps, type ExportFrameWithKnowledge, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
 import { parseFrameKey } from '../utils/frameKey';
 import { normalizeMeta } from '../utils/catalogMeta';
@@ -195,6 +198,12 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const filename = safeFilename.endsWith('.toml') ? safeFilename : `${safeFilename}.toml`;
     const baseDir = decoderDir.replace(/[\\/]+$/, '');
     const path = `${baseDir}/${filename}`;
+    const saveBuilt = async (ops: () => EditOp[]) => {
+      const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
+        await saveCatalog(path, await buildCatalog(ops()));
+      });
+      if (saved) set({ showSaveDialog: false });
+    };
 
     const selectedFramesList: ExportFrameWithKnowledge[] = Array.from(frameInfoMap.entries())
       .filter(([fk]) => selectedFrames.has(fk))
@@ -232,18 +241,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
         frameId: f.id,
         dlc: f.len,
       }));
-
-      const content = buildModbusDiscoveryToml(
-        registers,
-        normalizedMeta,
-        {
-          ...modbusExportConfig,
-          default_interval: defaultInterval,
-        },
-      );
-
-      await saveCatalog(path, content);
-      set({ showSaveDialog: false });
+      await saveBuilt(() => modbusCatalogOps(registers, normalizedMeta, { ...modbusExportConfig, default_interval: defaultInterval }));
       return;
     }
 
@@ -265,15 +263,12 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
       }
     }
 
-    const content = buildFramesTomlWithKnowledge(
+    await saveBuilt(() => knowledgeCatalogOps(
       selectedFramesList,
       normalizedMeta,
       (id: number, isExtended?: boolean) => formatFrameId(id, saveFrameIdFormat, isExtended),
       detectedProtocol === 'serial' ? enrichedSerialConfig ?? undefined : undefined
-    );
-
-    await saveCatalog(path, content);
-    set({ showSaveDialog: false });
+    ));
   },
 
   // Selection sets

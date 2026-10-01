@@ -1,0 +1,17 @@
+[meta]
+name = "Discovery \"export\""
+version = 2
+default_frame = "can"
+
+[meta.can]
+default_byte_order = "big"
+default_interval = 100
+
+[frame.can."0x100"]
+length = 8
+
+[frame.can."0x7FF"]
+length = 2
+
+[frame.can."0x18FF0001"]
+length = 8

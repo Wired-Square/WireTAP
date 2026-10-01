@@ -127,6 +127,18 @@ pub async fn dispatch_catalog_command(
             let next = wiretap_catalog::edit::apply_edit(&text, op)?;
             Ok(serde_json::Value::String(next))
         }
+        // Params: { content, ops }. All or nothing; returns the new TOML text.
+        "catalog.edits" => {
+            let next = wiretap_catalog::edit::apply_edits(&content()?, &edit_ops(&params)?)?;
+            Ok(serde_json::Value::String(next))
+        }
+        // A new catalogue from `ops` alone, refused with its findings unless it validates.
+        // Params: { ops }.
+        "catalog.build" => {
+            let text = wiretap_catalog::edit::apply_edits("", &edit_ops(&params)?)?;
+            refuse_unless_valid(&text)?;
+            Ok(serde_json::Value::String(text))
+        }
         // Upgrade a catalogue's text to the current schema (comment-preserving).
         // Returns { changed, toml, summary }. The editor loads the result as the
         // working buffer while keeping the on-disk text as the diff baseline, so a
@@ -158,6 +170,26 @@ pub async fn dispatch_catalog_command(
         }
         _ => Err(format!("Unknown catalog op: {op_name}")),
     }
+}
+
+fn edit_ops(params: &serde_json::Value) -> Result<Vec<wiretap_catalog::edit::EditOp>, String> {
+    let ops = params.get("ops").cloned().ok_or("missing 'ops' param")?;
+    serde_json::from_value(ops).map_err(|e| format!("invalid edit op: {e}"))
+}
+
+fn refuse_unless_valid(text: &str) -> Result<(), String> {
+    let findings = wiretap_catalog::validate::validate(text);
+    if findings.is_empty() {
+        return Ok(());
+    }
+    let lines: Vec<String> = findings
+        .iter()
+        .map(|f| format!("{}: {}", f.field, f.message))
+        .collect();
+    Err(format!(
+        "The catalogue did not validate, so it was not saved:\n{}",
+        lines.join("\n")
+    ))
 }
 
 /// What a diff row says happened to its line.
@@ -1037,20 +1069,21 @@ mod tests {
     #[test]
     fn editing_a_signal_keeps_its_display_hint() {
         let edited = command(
-            "catalog.edit",
+            "catalog.edits",
             serde_json::json!({
                 "content": display_hints_fixture("toml"),
-                "op": "UpsertArrayItem",
-                "array_path": ["frame", "can", "0x100", "mux", "1", "signals"],
-                "value": {
-                    "name": "Boost",
-                    "start_bit": 56,
-                    "bit_length": 8,
-                    "unit": "kPa",
-                    "display": { "widget": "rotary", "start_angle": -90, "end_angle": 90 },
-                },
-                "index": 0,
-                "sort_keys": ["start_bit", "bit_length", "name"],
+                "ops": [{
+                    "op": "UpsertSignal",
+                    "owner_path": ["frame", "can", "0x100", "mux", "1"],
+                    "index": 0,
+                    "signal": {
+                        "name": "Boost",
+                        "start_bit": 56,
+                        "bit_length": 8,
+                        "unit": "kPa",
+                        "display": { "widget": "rotary", "start_angle": -90, "end_angle": 90 },
+                    },
+                }],
             }),
         );
         let parsed = command("catalog.parse", serde_json::json!({ "content": edited }));
@@ -1060,5 +1093,110 @@ mod tests {
             boost["display"],
             serde_json::json!({ "widget": "rotary", "start_angle": -90, "end_angle": 90 })
         );
+    }
+
+    fn try_command(op: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
+        tauri::async_runtime::block_on(dispatch_catalog_command(op, params))
+    }
+
+    #[test]
+    fn catalog_edits_applies_its_ops_in_order() {
+        let edited = command(
+            "catalog.edits",
+            serde_json::json!({
+                "content": "[meta]\nname = \"d\"\nversion = 1\n",
+                "ops": [
+                    { "op": "SetFrame", "protocol": "can", "key": "0x100", "frame": { "length": 8 } },
+                    {
+                        "op": "UpsertSignal",
+                        "owner_path": ["frame", "can", "0x100"],
+                        "signal": { "name": "rpm", "start_bit": 0, "bit_length": 16 },
+                    },
+                ],
+            }),
+        );
+        let parsed = command("catalog.parse", serde_json::json!({ "content": edited }));
+        assert_eq!(parsed["frames"][0]["signals"][0]["name"], "rpm");
+    }
+
+    #[test]
+    fn catalog_build_refuses_a_catalogue_that_does_not_validate() {
+        let refused = try_command(
+            "catalog.build",
+            serde_json::json!({
+                "ops": [
+                    { "op": "SetMeta", "meta": { "name": "d", "version": 1 } },
+                    { "op": "SetFrame", "protocol": "can", "key": "0x100", "frame": { "length": 8 } },
+                    { "op": "SetTable", "path": ["frame", "can", "0x100", "mux"], "value": { "start_bit": 0, "bit_length": 8 } },
+                ],
+            }),
+        )
+        .expect_err("an unnamed mux is refused");
+        assert!(refused.contains("frame.can.0x100.mux"), "{refused}");
+    }
+
+    const DISCOVERY_EXPORTS: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../frontend/wiretap-ui/src/tests/fixtures/discovery-export"
+    );
+
+    fn discovery_export(file: &str) -> String {
+        std::fs::read_to_string(format!("{DISCOVERY_EXPORTS}/{file}")).expect("fixture")
+    }
+
+    fn parsed(toml: serde_json::Value) -> serde_json::Value {
+        command("catalog.parse", serde_json::json!({ "content": toml }))
+    }
+
+    fn built_export(name: &str) -> serde_json::Value {
+        let ops: serde_json::Value =
+            serde_json::from_str(&discovery_export(&format!("{name}.ops.json"))).expect("ops");
+        parsed(command("catalog.build", serde_json::json!({ "ops": ops })))
+    }
+
+    /// What the TypeScript writers never wrote: mux names, which `validate` requires, and
+    /// signal confidence, which they wrote as a comment. Signals are compared by position.
+    fn without_new_keys(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Object(map) => {
+                map.remove("confidence");
+                if let Some(mux) = map.get_mut("mux").and_then(|m| m.as_object_mut()) {
+                    mux.remove("name");
+                }
+                if let Some(signals) = map.get_mut("signals").and_then(|s| s.as_array_mut()) {
+                    signals.sort_by_key(|s| s["startBit"].as_u64());
+                }
+                map.values_mut().for_each(without_new_keys);
+            }
+            serde_json::Value::Array(items) => items.iter_mut().for_each(without_new_keys),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn each_discovery_export_builds_the_catalogue_its_typescript_writer_did() {
+        for name in ["knowledge-can", "knowledge-serial", "plain-can", "modbus"] {
+            let mut ours = built_export(name);
+            let golden = discovery_export(&format!("{name}.golden.toml"));
+            let mut theirs = parsed(golden.into());
+            without_new_keys(&mut ours);
+            without_new_keys(&mut theirs);
+            assert_eq!(ours, theirs, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_discovery_export_names_its_mux_selectors_and_keeps_signal_confidence() {
+        let catalogue = built_export("knowledge-can");
+        let frames = catalogue["frames"].as_array().unwrap();
+        let frame = |id: u64| frames.iter().find(|f| f["frameId"] == id).unwrap();
+
+        assert_eq!(frame(0x200)["mux"]["name"], "selector_0");
+        assert_eq!(frame(0x300)["mux"]["name"], "selector_0");
+        let inner = &frame(0x300)["mux"]["cases"]["1"]["mux"];
+        assert_eq!(inner["name"], "selector_1");
+        let signals = frame(0x100)["signals"].as_array().unwrap();
+        let rpm = signals.iter().find(|s| s["name"] == "rpm").unwrap();
+        assert_eq!(rpm["confidence"], "high");
     }
 }

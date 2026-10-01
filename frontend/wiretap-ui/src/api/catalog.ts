@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { wsTransport } from "../services/wsTransport";
 import type { Catalog } from "../types/catalogModel";
+import type { EditOp } from "../types/catalogEdit";
 // Type-only: erased at build time, so the catalogue picker gets this field without
 // the sharing store's runtime subtree landing in every panel that mounts it.
 import type { CatalogSyncStatus } from "./catalogShare";
@@ -118,6 +119,16 @@ export async function validateChecksumWs(checksum: object): Promise<ValidationEr
  */
 export async function editCatalog(content: string, op: Record<string, unknown>): Promise<string> {
   return await wsTransport.command<string>("catalog.edit", { content, ...op });
+}
+
+/** Apply typed edit ops in one pass, all or nothing, and return the new TOML. */
+export async function editCatalogOps(content: string, ops: EditOp[]): Promise<string> {
+  return await wsTransport.command<string>("catalog.edits", { content, ops });
+}
+
+/** A new catalogue from `ops`, refused with its validation findings when it has any. */
+export async function buildCatalog(ops: EditOp[]): Promise<string> {
+  return await wsTransport.command<string>("catalog.build", { ops });
 }
 
 /** One line of a {@link CatalogDiff}. */

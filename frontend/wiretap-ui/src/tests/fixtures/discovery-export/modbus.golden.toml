@@ -1,0 +1,25 @@
+[meta]
+name = "SH10RT scan"
+version = 2
+default_frame = "modbus"
+default_interval = 1000
+
+[meta.modbus]
+device_address = 3
+register_base = 0
+default_interval = 1000
+
+[frame.modbus."5000"]
+register_number = 5000
+register_type = "input"
+length = 2
+
+[frame.modbus."5002"]
+register_number = 5002
+register_type = "input"
+length = 1
+
+[frame.modbus."13000"]
+register_number = 13000
+register_type = "input"
+length = 1

@@ -1,0 +1,48 @@
+[
+  {
+    "op": "SetMeta",
+    "meta": {
+      "name": "SH10RT scan",
+      "version": 2,
+      "default_frame": "modbus"
+    }
+  },
+  {
+    "op": "SetModbusConfig",
+    "config": {
+      "device_address": 3,
+      "register_base": 0,
+      "default_interval": 1000
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "modbus",
+    "key": "5000",
+    "frame": {
+      "register_number": 5000,
+      "register_type": "input",
+      "length": 2
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "modbus",
+    "key": "5002",
+    "frame": {
+      "register_number": 5002,
+      "register_type": "input",
+      "length": 1
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "modbus",
+    "key": "13000",
+    "frame": {
+      "register_number": 13000,
+      "register_type": "input",
+      "length": 1
+    }
+  }
+]

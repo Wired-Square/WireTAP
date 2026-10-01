@@ -78,7 +78,8 @@ export function getFilteredFrames(): FilteredFrame[] { return _filteredFrames; }
 export function getTunnelTransactions(): TunnelTransaction[] { return _tunnelTransactions; }
 
 import { saveCatalog } from '../api';
-import { buildFramesToml, type SerialFrameConfig } from '../utils/frameExport';
+import { framesCatalogOps, type SerialFrameConfig } from '../utils/frameExport';
+import { withAppError } from '../utils/appError';
 import { formatFrameId } from '../utils/frameIds';
 import type { FrameDetail, SignalDef } from '../types/decoder';
 import type { DecodedMirrorVerdict, DecodedSignalsEntry, DecodedTunnelMessage } from '../services/wsProtocol';
@@ -87,7 +88,7 @@ import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
 import type { HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, attachAndResolve, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
-import { type ModbusPollGroup } from '../api/catalog';
+import { buildCatalog, type ModbusPollGroup } from '../api/catalog';
 import { frameKey } from '../utils/frameKey';
 
 
@@ -889,20 +890,20 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       .map(([, f]) => f)
       .sort((a, b) => a.id - b.id);
 
-    const content = buildFramesToml(
-      selectedFramesList,
-      {
-        name: saveMetadata.name,
-        version: Math.max(1, saveMetadata.version),
-        default_byte_order: saveMetadata.default_byte_order,
-        default_frame: 'can',
-        default_interval: Math.max(0, saveMetadata.default_interval),
-      },
-      (id, isExt) => formatFrameId(id, saveFrameIdFormat, isExt)
-    );
-
-    await saveCatalog(path, content);
-    set({ showSaveDialog: false });
+    const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
+      const ops = framesCatalogOps(
+        selectedFramesList,
+        {
+          name: saveMetadata.name,
+          version: saveMetadata.version,
+          default_byte_order: saveMetadata.default_byte_order,
+          default_interval: saveMetadata.default_interval,
+        },
+        (id, isExt) => formatFrameId(id, saveFrameIdFormat, isExt)
+      );
+      await saveCatalog(path, await buildCatalog(ops));
+    });
+    if (saved) set({ showSaveDialog: false });
   },
 
   // Selection set actions

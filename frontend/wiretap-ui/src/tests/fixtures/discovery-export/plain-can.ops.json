@@ -1,0 +1,41 @@
+[
+  {
+    "op": "SetMeta",
+    "meta": {
+      "name": "Discovery \"export\"",
+      "version": 2,
+      "default_frame": "can"
+    }
+  },
+  {
+    "op": "SetCanConfig",
+    "config": {
+      "default_byte_order": "big",
+      "default_interval": 100
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "can",
+    "key": "0x100",
+    "frame": {
+      "length": 8
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "can",
+    "key": "0x7FF",
+    "frame": {
+      "length": 2
+    }
+  },
+  {
+    "op": "SetFrame",
+    "protocol": "can",
+    "key": "0x18FF0001",
+    "frame": {
+      "length": 8
+    }
+  }
+]

@@ -4,18 +4,17 @@ import {
   type FrameKnowledge,
   type SignalKnowledge,
   type MuxKnowledge,
-  type MuxCaseKnowledge,
   createDefaultSignalsForFrame,
-  createDefaultHexSignal,
 } from './decoderKnowledge';
 import type { MultiBytePattern } from './analysis/payloadAnalysis';
+import type { EditOp, HeaderField, SerialConfigFields } from '../types/catalogEdit';
+import type { Endianness, Protocol } from '../types/catalogModel';
 
 export type ExportMeta = {
   name: string;
   version: number;
   default_byte_order: "little" | "big";
   default_interval: number;
-  default_frame?: string;
 };
 
 /**
@@ -97,582 +96,172 @@ export type ExportFrameWithKnowledge = ExportFrame & {
   knowledge?: FrameKnowledge;
 };
 
-/**
- * Determine the protocol type from a list of frames.
- * Returns the protocol from the first frame, or "can" as default.
- */
-function detectProtocol(frames: ExportFrame[]): string {
-  for (const f of frames) {
-    if (f.protocol) {
-      return f.protocol;
-    }
-  }
-  return "can";
+function catalogProtocol(frames: ExportFrame[]): Protocol {
+  const protocol = frames.find((f) => f.protocol)?.protocol ?? 'can';
+  if (protocol === 'can' || protocol === 'serial' || protocol === 'modbus') return protocol;
+  throw new Error(`${protocol} frames cannot be saved as a catalogue`);
 }
 
-/**
- * Build TOML content for a set of frames (basic version without knowledge).
- * `formatId` should return the id string as it should appear in TOML (hex or decimal).
- * Protocol is auto-detected from frames, falling back to "can".
- * For serial protocol, optionally include a [frame.serial.config] section.
- */
-export function buildFramesToml(
+function setMeta(meta: ExportMeta, protocol: Protocol): EditOp {
+  return { op: 'SetMeta', meta: { name: meta.name, version: Math.max(1, meta.version), default_frame: protocol } };
+}
+
+function headerFieldMask(startByte: number, bytes: number): number {
+  return (2 ** (bytes * 8) - 1) * 2 ** (startByte * 8);
+}
+
+function serialConfigFields(config: SerialFrameConfig, meta: ExportMeta): SerialConfigFields {
+  const fields: Record<string, HeaderField> = {};
+  const addField = (name: string, startByte?: number, bytes?: number, endianness?: Endianness) => {
+    if (startByte === undefined || startByte < 0 || bytes === undefined) return;
+    fields[name] = { mask: headerFieldMask(startByte, bytes), endianness };
+  };
+  addField('id', config.frame_id_start_byte, config.frame_id_bytes, config.frame_id_byte_order);
+  addField('source_address', config.source_address_start_byte, config.source_address_bytes, config.source_address_byte_order);
+  const { checksum } = config;
+  return {
+    encoding: config.encoding,
+    byte_order: meta.default_byte_order,
+    frame_id_mask: config.frame_id_mask,
+    min_frame_length: config.min_frame_length,
+    header_length: config.header_length,
+    fields,
+    checksum: checksum && {
+      algorithm: checksum.algorithm,
+      startByte: checksum.start_byte,
+      byteLength: checksum.byte_length,
+      calcStartByte: checksum.calc_start_byte,
+      calcEndByte: checksum.calc_end_byte,
+      bigEndian: checksum.big_endian,
+    },
+  };
+}
+
+function headOps(protocol: Protocol, meta: ExportMeta, serialConfig: SerialFrameConfig = {}): EditOp[] {
+  const ops = [setMeta(meta, protocol)];
+  if (protocol === 'can') {
+    ops.push({
+      op: 'SetCanConfig',
+      config: { default_byte_order: meta.default_byte_order, default_interval: Math.max(0, meta.default_interval) },
+    });
+  } else if (protocol === 'serial') {
+    ops.push({ op: 'SetSerialConfig', config: serialConfigFields(serialConfig, meta) });
+  }
+  return ops;
+}
+
+/** A catalogue declaring each frame's id and length. `formatId` spells a frame's key. */
+export function framesCatalogOps(
   frames: ExportFrame[],
   meta: ExportMeta,
   formatId: (id: number, isExtended?: boolean) => string,
-  serialConfig?: SerialFrameConfig
-): string {
-  const protocol = detectProtocol(frames);
-  const lines: string[] = [];
-  lines.push("[meta]");
-  lines.push(`name = "${meta.name.replace(/"/g, '\\"')}"`);
-  lines.push(`version = ${Math.max(1, meta.version)}`);
-  lines.push(`default_frame = "${protocol}"`);
-  lines.push("");
-  writeProtocolMetaSection(lines, protocol, meta, serialConfig);
-
-  frames.forEach((f) => {
-    const idStr = formatId(f.id, f.isExtended);
-    lines.push(`[frame.${protocol}."${idStr}"]`);
-    lines.push(`length = ${f.len}`);
-    lines.push("");
-  });
-
-  return lines.join("\n");
+): EditOp[] {
+  const protocol = catalogProtocol(frames);
+  return [
+    ...headOps(protocol, meta),
+    ...frames.map((f): EditOp => ({
+      op: 'SetFrame',
+      protocol,
+      key: formatId(f.id, f.isExtended),
+      frame: { length: f.len },
+    })),
+  ];
 }
 
-function writeProtocolMetaSection(
-  lines: string[],
-  protocol: string,
-  meta: ExportMeta,
-  serialConfig: SerialFrameConfig = {}
-): void {
-  if (protocol === "can") {
-    lines.push("[meta.can]");
-    lines.push(`default_byte_order = "${meta.default_byte_order}"`);
-    lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
-    lines.push("");
-  } else if (protocol === "serial") {
-    writeSerialConfigSection(lines, serialConfig, meta);
-  }
+/** Known signals first, then pattern signals, then hex for every byte still unclaimed. */
+function signalsWithFill(
+  frameLength: number,
+  signals: SignalKnowledge[] = [],
+  patterns: MultiBytePattern[] | undefined,
+  defaultByteOrder: Endianness,
+  mux?: MuxKnowledge,
+  serialConfig?: SerialFrameConfig,
+): SignalKnowledge[] {
+  return [
+    ...signals,
+    ...createDefaultSignalsForFrame(frameLength, mux, signals, patterns, defaultByteOrder, serialConfig),
+  ];
 }
 
-function headerFieldMask(startByte: number, bytes: number): string {
-  return `0x${((2 ** (bytes * 8) - 1) * 2 ** (startByte * 8)).toString(16).toUpperCase()}`;
+function sanitizeSignalName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
 }
 
-function writeHeaderField(
-  lines: string[],
-  name: string,
-  startByte: number | undefined,
-  bytes: number | undefined,
-  byteOrder: "big" | "little" | undefined
-): void {
-  if (startByte === undefined || startByte < 0 || bytes === undefined) return;
-  lines.push(`[meta.serial.fields.${name}]`);
-  lines.push(`mask = ${headerFieldMask(startByte, bytes)}`);
-  if (byteOrder) {
-    lines.push(`byte_order = "${byteOrder}"`);
-  }
+function signalOps(owner: string[], signals: SignalKnowledge[]): EditOp[] {
+  if (signals.length === 0) return [{ op: 'SetTable', path: owner, value: {} }];
+  return signals.map((s) => ({
+    op: 'UpsertSignal',
+    owner_path: owner,
+    signal: {
+      name: sanitizeSignalName(s.name),
+      start_bit: s.startBit,
+      bit_length: s.bitLength,
+      format: s.format,
+      byte_order: s.endianness,
+      confidence: s.source === 'default' ? undefined : s.confidence,
+    },
+  }));
 }
 
-function writeSerialConfigSection(lines: string[], config: SerialFrameConfig, meta: ExportMeta): void {
-  lines.push("[meta.serial]");
-  lines.push(`byte_order = "${meta.default_byte_order}"`);
-  lines.push(`default_interval = ${Math.max(0, meta.default_interval)}`);
+function setMux(owner: string[], name: string, startBit: number, bitLength: number): EditOp {
+  return { op: 'SetMux', owner_path: owner, mux: { name, start_bit: startBit, bit_length: bitLength } };
+}
 
-  if (config.encoding) {
-    lines.push(`encoding = "${config.encoding}"`);
+/** A two-byte mux nests: byte 0 selects the outer case, byte 1 the inner one. */
+function muxOps(owner: string[], mux: MuxKnowledge, frameLength: number, defaultByteOrder: Endianness): EditOp[] {
+  const caseOps = (casePath: string[], caseValue: number) => {
+    const known = mux.caseKnowledge?.get(caseValue);
+    return signalOps(casePath, signalsWithFill(frameLength, known?.signals, known?.multiBytePatterns, defaultByteOrder, mux));
+  };
+
+  if (!mux.isTwoByte) {
+    return [
+      setMux(owner, `selector_${mux.selectorByte}`, mux.selectorStartBit, mux.selectorBitLength),
+      ...mux.cases.flatMap((c) => caseOps([...owner, 'mux', String(c)], c)),
+    ];
   }
 
-  if (config.frame_id_mask !== undefined) {
-    lines.push(`frame_id_mask = 0x${config.frame_id_mask.toString(16).toUpperCase()}`);
+  const innerByOuter = new Map<number, number[]>();
+  for (const caseValue of mux.cases) {
+    const outer = (caseValue >> 8) & 0xff;
+    innerByOuter.set(outer, [...(innerByOuter.get(outer) ?? []), caseValue & 0xff]);
   }
-
-  if (config.min_frame_length !== undefined && config.min_frame_length > 0) {
-    lines.push(`min_frame_length = ${config.min_frame_length}`);
+  const ops = [setMux(owner, 'selector_0', 0, 8)];
+  for (const outer of [...innerByOuter.keys()].sort((a, b) => a - b)) {
+    const outerPath = [...owner, 'mux', String(outer)];
+    ops.push(setMux(outerPath, 'selector_1', 8, 8));
+    for (const inner of innerByOuter.get(outer)!.sort((a, b) => a - b)) {
+      ops.push(...caseOps([...outerPath, 'mux', String(inner)], (outer << 8) | inner));
+    }
   }
-
-  if (config.header_length !== undefined && config.header_length > 0) {
-    lines.push(`header_length = ${config.header_length}`);
-  }
-
-  writeHeaderField(lines, "id", config.frame_id_start_byte, config.frame_id_bytes, config.frame_id_byte_order);
-  writeHeaderField(
-    lines,
-    "source_address",
-    config.source_address_start_byte,
-    config.source_address_bytes,
-    config.source_address_byte_order
-  );
-
-  // Write checksum configuration if detected.
-  //
-  // A `[meta.serial.checksum]` sub-table, which is what the catalogue parser
-  // reads (`get(section, "checksum")` in wiretap-catalog's parse.rs). These used
-  // to be written as flat `checksum_*` keys directly under `[meta.serial]`, so
-  // nothing WireTAP exported here was ever read back.
-  //
-  // Keep this table last in the section: anything appended after it lands *inside*
-  // the sub-table.
-  if (config.checksum) {
-    lines.push("");
-    lines.push("# Checksum configuration (detected from analysis)");
-    lines.push("[meta.serial.checksum]");
-    lines.push(`algorithm = "${config.checksum.algorithm}"`);
-    lines.push(`start_byte = ${config.checksum.start_byte}`);
-    lines.push(`byte_length = ${config.checksum.byte_length}`);
-    lines.push(`calc_start_byte = ${config.checksum.calc_start_byte}`);
-    lines.push(`calc_end_byte = ${config.checksum.calc_end_byte}`);
-    lines.push(`big_endian = ${config.checksum.big_endian === true}`);
-  }
-
-  lines.push("");
+  return ops;
 }
 
 /**
- * Build TOML content for frames with decoder knowledge (notes, signals, mux).
- * `formatId` should return the id string as it should appear in TOML (hex or decimal).
- * Protocol is auto-detected from frames, falling back to "can".
- * For serial protocol, optionally include a [frame.serial.config] section.
+ * A catalogue from what Discovery learnt about each frame: notes, interval, signals
+ * or a mux, with hex signals over every byte nothing else claims.
  */
-export function buildFramesTomlWithKnowledge(
+export function knowledgeCatalogOps(
   frames: ExportFrameWithKnowledge[],
   meta: ExportMeta,
   formatId: (id: number, isExtended?: boolean) => string,
-  serialConfig?: SerialFrameConfig
-): string {
-  const protocol = detectProtocol(frames);
-  const lines: string[] = [];
-
-  // [meta] section
-  lines.push("[meta]");
-  lines.push(`name = "${meta.name.replace(/"/g, '\\"')}"`);
-  lines.push(`version = ${Math.max(1, meta.version)}`);
-  lines.push(`default_frame = "${protocol}"`);
-  lines.push("");
-  writeProtocolMetaSection(lines, protocol, meta, serialConfig);
-
-  // Frame sections
-  frames.forEach((f) => {
-    const idStr = formatId(f.id, f.isExtended);
-    const knowledge = f.knowledge;
-
-    // Frame header
-    lines.push(`[frame.${protocol}."${idStr}"]`);
-    lines.push(`length = ${f.len}`);
-
-    // Add notes field if present
-    if (knowledge?.notes && knowledge.notes.length > 0) {
-      if (knowledge.notes.length === 1) {
-        // Single note: write as string
-        const escaped = knowledge.notes[0].replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        lines.push(`notes = "${escaped}"`);
-      } else {
-        // Multiple notes: write as array
-        lines.push(`notes = [`);
-        for (const note of knowledge.notes) {
-          const escaped = note.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-          lines.push(`    "${escaped}",`);
-        }
-        lines.push(`]`);
-      }
-    }
-
-    // Add interval if known and different from default
-    if (knowledge?.intervalMs !== undefined && knowledge.intervalMs !== meta.default_interval) {
-      lines.push(`interval = ${knowledge.intervalMs}`);
-    }
-
-    // Add mux configuration if present
-    if (knowledge?.mux) {
-      lines.push("");
-      writeMuxSection(lines, knowledge.mux, idStr, f.len, meta.default_byte_order, protocol);
-      // For mux frames, signals are written inside each case section, not at frame level
-    } else {
-      // Non-mux frames: add signals at frame level (including default hex signals for unclaimed bytes)
-      const existingSignals = knowledge?.signals ?? [];
-      const defaultSignals = createDefaultSignalsForFrame(
-        f.len,
-        knowledge?.mux,
-        existingSignals,
-        knowledge?.multiBytePatterns,
-        meta.default_byte_order,
-        serialConfig  // Pass serial config to exclude ID/source/checksum bytes
-      );
-      const allSignals = [...existingSignals, ...defaultSignals];
-
-      if (allSignals.length > 0) {
-        lines.push("");
-        for (const signal of allSignals) {
-          writeSignalSection(lines, signal, idStr, protocol);
-        }
-      }
-    }
-
-    lines.push("");
-  });
-
-  return lines.join("\n");
-}
-
-/**
- * Write a mux section to TOML lines.
- * For 2D muxes (byte[0:1]), creates nested mux structure.
- */
-function writeMuxSection(
-  lines: string[],
-  mux: MuxKnowledge,
-  frameIdStr: string,
-  frameLength: number,
-  defaultEndianness: 'little' | 'big',
-  protocol: string
-): void {
-  if (mux.isTwoByte) {
-    // 2D mux: byte[0] is outer selector, byte[1] is inner selector
-    write2DMuxSection(lines, mux, frameIdStr, frameLength, defaultEndianness, protocol);
-  } else {
-    // 1D mux: single byte selector
-    write1DMuxSection(lines, mux, frameIdStr, frameLength, defaultEndianness, protocol);
-  }
-}
-
-/**
- * Write a 1D mux section (single byte selector)
- */
-function write1DMuxSection(
-  lines: string[],
-  mux: MuxKnowledge,
-  frameIdStr: string,
-  frameLength: number,
-  defaultEndianness: 'little' | 'big',
-  protocol: string
-): void {
-  lines.push(`# Multiplexed frame (selector at byte ${mux.selectorByte})`);
-  lines.push(`[frame.${protocol}."${frameIdStr}".mux]`);
-  lines.push(`start_bit = ${mux.selectorStartBit}`);
-  lines.push(`bit_length = ${mux.selectorBitLength}`);
-
-  // List the mux cases as a comment
-  if (mux.cases.length > 0) {
-    lines.push(`# Mux cases: ${mux.cases.map(c => `0x${c.toString(16).toUpperCase()}`).join(', ')}`);
-  }
-
-  // Write each mux case with its signals
-  for (const caseValue of mux.cases) {
-    const caseKnowledge = mux.caseKnowledge?.get(caseValue);
-    writeMuxCaseSection(
-      lines,
-      frameIdStr,
-      caseValue,
-      caseKnowledge,
-      mux,
-      frameLength,
-      defaultEndianness,
-      protocol
-    );
-  }
-}
-
-/**
- * Write a 2D mux section (two-byte selector: byte[0] outer, byte[1] inner)
- * Structure:
- *   [frame.{protocol}."ID".mux] - outer mux (byte 0)
- *   [frame.{protocol}."ID".mux."OUTER".mux] - inner mux definition (byte 1)
- *   [[frame.{protocol}."ID".mux."OUTER".mux."INNER".signals]] - signals
- */
-function write2DMuxSection(
-  lines: string[],
-  mux: MuxKnowledge,
-  frameIdStr: string,
-  frameLength: number,
-  defaultEndianness: 'little' | 'big',
-  protocol: string
-): void {
-  // Group cases by outer value (high byte for 16-bit mux values)
-  const outerCases = new Map<number, number[]>();
-  for (const caseValue of mux.cases) {
-    const outerValue = (caseValue >> 8) & 0xFF;  // Byte 0
-    const innerValue = caseValue & 0xFF;          // Byte 1
-    if (!outerCases.has(outerValue)) {
-      outerCases.set(outerValue, []);
-    }
-    outerCases.get(outerValue)!.push(innerValue);
-  }
-
-  // Write outer mux definition
-  lines.push(`# 2D Multiplexed frame (selector at byte[0:1])`);
-  lines.push(`[frame.${protocol}."${frameIdStr}".mux]`);
-  lines.push(`start_bit = 0`);
-  lines.push(`bit_length = 8`);
-
-  const outerValues = Array.from(outerCases.keys()).sort((a, b) => a - b);
-  lines.push(`# Outer mux cases (byte 0): ${outerValues.map(c => String(c)).join(', ')}`);
-
-  // Write each outer case with its inner mux
-  for (const outerValue of outerValues) {
-    const innerValues = outerCases.get(outerValue)!.sort((a, b) => a - b);
-    const outerStr = String(outerValue);
-
-    lines.push('');
-    lines.push(`[frame.${protocol}."${frameIdStr}".mux."${outerStr}".mux]`);
-    lines.push(`start_bit = 8`);
-    lines.push(`bit_length = 8`);
-    lines.push(`# Inner mux cases (byte 1): ${innerValues.map(c => String(c)).join(', ')}`);
-
-    // Write each inner case with its signals
-    for (const innerValue of innerValues) {
-      const fullCaseValue = (outerValue << 8) | innerValue;
-      const caseKnowledge = mux.caseKnowledge?.get(fullCaseValue);
-      const innerStr = String(innerValue);
-
-      // Generate signals for this case
-      const signals = generateMuxCaseSignals(
-        caseKnowledge,
-        mux,
-        frameLength,
-        defaultEndianness
-      );
-
-      // Write signals for this inner case
-      for (const signal of signals) {
-        write2DMuxCaseSignalSection(lines, signal, frameIdStr, outerStr, innerStr, protocol);
-      }
-    }
-  }
-}
-
-/**
- * Write a signal section for a 2D mux case
- */
-function write2DMuxCaseSignalSection(
-  lines: string[],
-  signal: SignalKnowledge,
-  frameIdStr: string,
-  outerCaseStr: string,
-  innerCaseStr: string,
-  protocol: string
-): void {
-  const signalName = sanitizeSignalName(signal.name);
-  lines.push(`[[frame.${protocol}."${frameIdStr}".mux."${outerCaseStr}".mux."${innerCaseStr}".signals]]`);
-  lines.push(`name = "${signalName}"`);
-  lines.push(`start_bit = ${signal.startBit}`);
-  lines.push(`bit_length = ${signal.bitLength}`);
-
-  if (signal.format) {
-    lines.push(`format = "${signal.format}"`);
-  }
-
-  if (signal.endianness) {
-    lines.push(`byte_order = "${signal.endianness}"`);
-  }
-
-  if (signal.source !== 'default') {
-    lines.push(`# Source: ${signal.source}, confidence: ${signal.confidence}`);
-  }
-}
-
-/**
- * Write a single mux case section with its signals.
- * Format: [frame.{protocol}."ID".mux."CASE_VALUE"] with [[...signals]] arrays
- */
-function writeMuxCaseSection(
-  lines: string[],
-  frameIdStr: string,
-  caseValue: number,
-  caseKnowledge: MuxCaseKnowledge | undefined,
-  mux: MuxKnowledge,
-  frameLength: number,
-  defaultEndianness: 'little' | 'big',
-  protocol: string
-): void {
-  // Case values are quoted strings in the TOML path
-  const caseStr = String(caseValue);
-  lines.push('');
-  lines.push(`[frame.${protocol}."${frameIdStr}".mux."${caseStr}"]`);
-
-  // Generate signals for this case
-  const signals = generateMuxCaseSignals(
-    caseKnowledge,
-    mux,
-    frameLength,
-    defaultEndianness
-  );
-
-  // Write signals for this case using array of tables syntax
-  for (const signal of signals) {
-    writeMuxCaseSignalSection(lines, signal, frameIdStr, caseStr, protocol);
-  }
-}
-
-/**
- * Generate signals for a mux case, including defaults for unclaimed bytes
- */
-function generateMuxCaseSignals(
-  caseKnowledge: MuxCaseKnowledge | undefined,
-  mux: MuxKnowledge,
-  frameLength: number,
-  defaultEndianness: 'little' | 'big'
-): SignalKnowledge[] {
-  const claimedBytes = new Set<number>();
-  const generatedSignals: SignalKnowledge[] = [];
-
-  // Mux selector claims bytes
-  if (mux.isTwoByte) {
-    claimedBytes.add(0);
-    claimedBytes.add(1);
-  } else {
-    claimedBytes.add(mux.selectorByte);
-  }
-
-  // Add existing signals from case knowledge
-  const existingSignals = caseKnowledge?.signals ?? [];
-  for (const signal of existingSignals) {
-    generatedSignals.push(signal);
-    const startByte = Math.floor(signal.startBit / 8);
-    const endByte = Math.ceil((signal.startBit + signal.bitLength) / 8);
-    for (let i = startByte; i < endByte; i++) {
-      claimedBytes.add(i);
-    }
-  }
-
-  // Generate signals from multi-byte patterns
-  const patterns = caseKnowledge?.multiBytePatterns ?? [];
-  for (const pattern of patterns) {
-    // Skip if any bytes are already claimed
-    let anyByteClaimed = false;
-    for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
-      if (claimedBytes.has(i)) {
-        anyByteClaimed = true;
-        break;
-      }
-    }
-    if (anyByteClaimed) continue;
-
-    const signal: SignalKnowledge = {
-      name: generatePatternSignalName(pattern),
-      startBit: pattern.startByte * 8,
-      bitLength: pattern.length * 8,
-      source: 'payload-analysis',
-      confidence: pattern.correlatedRollover ? 'high' : 'medium',
-    };
-
-    if (pattern.endianness && pattern.endianness !== defaultEndianness) {
-      signal.endianness = pattern.endianness;
-    }
-
-    generatedSignals.push(signal);
-    for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
-      claimedBytes.add(i);
-    }
-  }
-
-  // Fill unclaimed bytes with default hex signals
-  let rangeStart: number | null = null;
-  for (let i = 0; i <= frameLength; i++) {
-    if (i < frameLength && !claimedBytes.has(i)) {
-      if (rangeStart === null) {
-        rangeStart = i;
-      }
-    } else {
-      if (rangeStart !== null) {
-        const byteLength = i - rangeStart;
-        generatedSignals.push(createDefaultHexSignal(rangeStart, byteLength));
-        rangeStart = null;
-      }
-    }
-  }
-
-  return generatedSignals;
-}
-
-/**
- * Generate a signal name from a multi-byte pattern
- */
-function generatePatternSignalName(pattern: MultiBytePattern): string {
-  const byteRange = `${pattern.startByte}_${pattern.startByte + pattern.length - 1}`;
-
-  switch (pattern.pattern) {
-    case 'counter16':
-    case 'counter32':
-      return `counter_${byteRange}`;
-    case 'sensor16':
-      return `sensor_${byteRange}`;
-    case 'value16':
-    case 'value32':
-      return `value_${byteRange}`;
-    default:
-      return `data_${byteRange}`;
-  }
-}
-
-/**
- * Write a signal section for a mux case
- */
-function writeMuxCaseSignalSection(
-  lines: string[],
-  signal: SignalKnowledge,
-  frameIdStr: string,
-  caseStr: string,
-  protocol: string
-): void {
-  const signalName = sanitizeSignalName(signal.name);
-  lines.push(`[[frame.${protocol}."${frameIdStr}".mux."${caseStr}".signals]]`);
-  lines.push(`name = "${signalName}"`);
-  lines.push(`start_bit = ${signal.startBit}`);
-  lines.push(`bit_length = ${signal.bitLength}`);
-
-  if (signal.format) {
-    lines.push(`format = "${signal.format}"`);
-  }
-
-  if (signal.endianness) {
-    lines.push(`byte_order = "${signal.endianness}"`);
-  }
-
-  if (signal.source !== 'default') {
-    lines.push(`# Source: ${signal.source}, confidence: ${signal.confidence}`);
-  }
-}
-
-/**
- * Write a signal section to TOML lines (using array of tables syntax)
- */
-function writeSignalSection(
-  lines: string[],
-  signal: SignalKnowledge,
-  frameIdStr: string,
-  protocol: string
-): void {
-  const signalName = sanitizeSignalName(signal.name);
-  // Use [[...]] array of tables syntax with plural "signals"
-  lines.push(`[[frame.${protocol}."${frameIdStr}".signals]]`);
-  lines.push(`name = "${signalName}"`);
-  lines.push(`start_bit = ${signal.startBit}`);
-  lines.push(`bit_length = ${signal.bitLength}`);
-
-  // Add format if specified (default is "number")
-  if (signal.format) {
-    lines.push(`format = "${signal.format}"`);
-  }
-
-  // Add byte_order if specified (overrides default)
-  if (signal.endianness) {
-    lines.push(`byte_order = "${signal.endianness}"`);
-  }
-
-  // Add comment about source and confidence if not default
-  if (signal.source !== 'default') {
-    lines.push(`# Source: ${signal.source}, confidence: ${signal.confidence}`);
-  }
-}
-
-/**
- * Sanitize signal name for use in TOML
- */
-function sanitizeSignalName(name: string): string {
-  // Replace spaces and special characters with underscores
-  return name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
+  serialConfig?: SerialFrameConfig,
+): EditOp[] {
+  const protocol = catalogProtocol(frames);
+  return [
+    ...headOps(protocol, meta, serialConfig),
+    ...frames.flatMap((f) => {
+      const key = formatId(f.id, f.isExtended);
+      const owner = ['frame', protocol, key];
+      const k = f.knowledge;
+      const interval = k?.intervalMs !== meta.default_interval ? k?.intervalMs : undefined;
+      const frame: EditOp = { op: 'SetFrame', protocol, key, frame: { length: f.len, notes: k?.notes, interval_ms: interval } };
+      const body = k?.mux
+        ? muxOps(owner, k.mux, f.len, meta.default_byte_order)
+        : signalOps(owner, signalsWithFill(f.len, k?.signals, k?.multiBytePatterns, meta.default_byte_order, undefined, serialConfig));
+      return [frame, ...body];
+    }),
+  ];
 }
 
 // ============================================================================
@@ -686,50 +275,35 @@ export type ModbusExportConfig = {
   default_interval: number;
 };
 
-/**
- * Build a TOML catalog from discovered Modbus registers.
- *
- * Each discovered register (frame_id) becomes a [frame.modbus."N"] section.
- * The register_type and register_number are set from the scan configuration.
- */
-export function buildModbusDiscoveryToml(
+/** A catalogue with one frame per discovered register, typed by the scan. */
+export function modbusCatalogOps(
   registers: Array<{ frameId: number; dlc: number }>,
   meta: ExportMeta,
-  modbusConfig: ModbusExportConfig,
-): string {
-  const lines: string[] = [];
-
-  // [meta] section
-  lines.push('[meta]');
-  lines.push(`name = "${meta.name}"`);
-  lines.push(`version = ${meta.version}`);
-  lines.push('default_frame = "modbus"');
-  lines.push(`default_interval = ${modbusConfig.default_interval}`);
-  lines.push('');
-
-  // [meta.modbus] section
-  lines.push('[meta.modbus]');
-  lines.push(`device_address = ${modbusConfig.device_address}`);
-  lines.push(`register_base = ${modbusConfig.register_base}`);
-  lines.push(`default_interval = ${modbusConfig.default_interval}`);
-  lines.push('');
-
-  // Sort registers by frameId
-  const sorted = [...registers].sort((a, b) => a.frameId - b.frameId);
-
-  for (const reg of sorted) {
-    const regType = modbusConfig.register_type;
-    const isCoilType = regType === 'coil' || regType === 'discrete';
-    // For holding/input registers: dlc is 2 bytes per register, so length = dlc / 2
-    // For coils/discrete: length is 1 (single bit)
-    const length = isCoilType ? 1 : Math.max(1, Math.floor(reg.dlc / 2));
-
-    lines.push(`[frame.modbus."${reg.frameId}"]`);
-    lines.push(`register_number = ${reg.frameId}`);
-    lines.push(`register_type = "${regType}"`);
-    lines.push(`length = ${length}`);
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  config: ModbusExportConfig,
+): EditOp[] {
+  const isBitType = config.register_type === 'coil' || config.register_type === 'discrete';
+  return [
+    setMeta(meta, 'modbus'),
+    {
+      op: 'SetModbusConfig',
+      config: {
+        device_address: config.device_address,
+        register_base: config.register_base,
+        default_interval: config.default_interval,
+      },
+    },
+    ...[...registers]
+      .sort((a, b) => a.frameId - b.frameId)
+      .map((reg): EditOp => ({
+        op: 'SetFrame',
+        protocol: 'modbus',
+        key: String(reg.frameId),
+        frame: {
+          register_number: reg.frameId,
+          register_type: config.register_type,
+          // Two bytes per register; a coil or discrete input is one bit.
+          length: isBitType ? 1 : Math.max(1, Math.floor(reg.dlc / 2)),
+        },
+      })),
+  ];
 }
