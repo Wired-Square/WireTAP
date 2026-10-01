@@ -12,17 +12,6 @@ use serde_json::{json, Value};
 
 static SID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-fn generate_session_id(kind: &str) -> String {
-    let prefix = if kind.starts_with("modbus") {
-        "m"
-    } else if kind == "serial" {
-        "b"
-    } else {
-        "f"
-    };
-    format!("{prefix}_mcp{}", SID_COUNTER.fetch_add(1, Ordering::Relaxed))
-}
-
 /// Touch the MCP subscriber every 10s so the heartbeat watchdog doesn't reap a
 /// headless session. Self-terminates once the session is gone.
 fn spawn_keepalive(session_id: String) {
@@ -123,7 +112,14 @@ pub async fn open(
         None
     };
 
-    let sid = session_id.unwrap_or_else(|| generate_session_id(&profile.kind));
+    // The app's prefix rule, with a suffix that marks the session as an agent's.
+    let sid = session_id.unwrap_or_else(|| {
+        format!(
+            "{}_mcp{}",
+            crate::sessions::session_id_prefix([profile], None),
+            SID_COUNTER.fetch_add(1, Ordering::Relaxed)
+        )
+    });
     let capabilities = crate::sessions::create_reader_session(
         app.clone(),
         sid.clone(),

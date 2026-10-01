@@ -18,6 +18,10 @@
 // reimplementing capture ownership and the WebSocket channel lookup, and the
 // results would be invisible until something forced a refresh.
 
+/// What a generated scan session id starts with; the Discovery panel mints its
+/// own ids with the same prefix.
+pub const MODBUS_SCAN_SESSION_PREFIX: &str = "m_scan";
+
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
 use serde::Deserialize;

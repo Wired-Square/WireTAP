@@ -227,7 +227,11 @@ impl WireTapTools {
         max_wait_ms: u64,
     ) -> Result<CallToolResult, McpError> {
         let sid = session_id.unwrap_or_else(|| {
-            format!("m_scan{}", SCAN_COUNTER.fetch_add(1, AtomicOrdering::Relaxed))
+            format!(
+                "{}{}",
+                crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SESSION_PREFIX,
+                SCAN_COUNTER.fetch_add(1, AtomicOrdering::Relaxed)
+            )
         });
 
         crate::sessions::create_modbus_scan_session(

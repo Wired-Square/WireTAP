@@ -29,9 +29,9 @@ export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";
  * `sourceType` is the authoritative answer and comes off the session roster. The
  * id prefix stays as the fallback for one reason: Discovery mints a scan session
  * id and joins it before the roster reconcile lands, so `sourceType` is undefined
- * for a beat — and during that beat the switch would un-latch. Note that the
- * prefix is *not* shared with Rust: `mcp/tools.rs` formats `"m_scan{}"` of its
- * own accord, so the two agree by convention.
+ * for a beat — and during that beat the switch would un-latch. The prefix is
+ * Rust's `MODBUS_SCAN_SESSION_PREFIX` (`io/modbus_tcp/scan_source.rs`), which
+ * the MCP scan tools mint ids with; this copy agrees with it by convention.
  */
 export function isModbusScanSession(sessionId: string, sourceType?: string): boolean {
   return sourceType !== undefined

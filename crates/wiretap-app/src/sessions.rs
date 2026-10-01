@@ -322,31 +322,43 @@ pub async fn generate_session_id(
     let settings = settings::load_settings(app.clone())
         .await
         .map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profiles = profile_ids
+        .iter()
+        .filter_map(|id| settings.profile(id).ok());
+    Ok(format!(
+        "{}_{}",
+        session_id_prefix(profiles, emit_raw_bytes),
+        random_hex6()
+    ))
+}
+
+/// The session-id prefix for the profiles a session is opened from — the rule
+/// `generate_session_id` documents, shared with the MCP open.
+pub(crate) fn session_id_prefix<'a>(
+    profiles: impl IntoIterator<Item = &'a IOProfile>,
+    emit_raw_bytes: Option<bool>,
+) -> &'static str {
     let mut protocol: Option<&str> = None;
     let mut emits_bytes = false;
-    for id in &profile_ids {
-        if let Some(p) = settings.io_profiles.iter().find(|p| &p.id == id) {
-            let proto = protocol_for_kind(&p.kind);
-            if proto == "serial" {
-                emits_bytes |=
-                    device_kinds::resolve_serial_framing(p, None, emit_raw_bytes).1;
-            }
-            if proto == "modbus" {
-                protocol = Some("modbus");
-                break;
-            }
-            if protocol.is_none() {
-                protocol = Some(proto);
-            }
+    for p in profiles {
+        let proto = protocol_for_kind(&p.kind);
+        if proto == "serial" {
+            emits_bytes |= device_kinds::resolve_serial_framing(p, None, emit_raw_bytes).1;
+        }
+        if proto == "modbus" {
+            protocol = Some("modbus");
+            break;
+        }
+        if protocol.is_none() {
+            protocol = Some(proto);
         }
     }
-    let prefix = match protocol {
+    match protocol {
         Some("modbus") => "m",
         Some("serial") if emits_bytes => "b",
         Some("can") | Some("serial") => "f",
         _ => "s",
-    };
-    Ok(format!("{}_{}", prefix, random_hex6()))
+    }
 }
 
 /// Check if a profile kind is a real-time device that can use IOBroker.
