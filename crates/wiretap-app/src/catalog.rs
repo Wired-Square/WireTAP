@@ -555,6 +555,23 @@ pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
     Ok(refresh_catalog_cache(&app))
 }
 
+/// The catalogue a caller named, by filename, display name or bare filename
+/// without its `.toml`.
+pub async fn find_catalog(app: &AppHandle, name: &str) -> Result<CatalogFile, String> {
+    let catalogs = list_catalogs(app.clone()).await?;
+    catalog_named(&catalogs, name)
+        .cloned()
+        .ok_or_else(|| format!("Catalog '{name}' not found — use list_catalogs"))
+}
+
+fn catalog_named<'a>(catalogs: &'a [CatalogFile], name: &str) -> Option<&'a CatalogFile> {
+    let want = name.trim();
+    let with_suffix = format!("{want}.toml");
+    catalogs
+        .iter()
+        .find(|c| c.filename == want || c.name == want || c.filename == with_suffix)
+}
+
 /// `[meta].name` alone, so a catalogue that fails validation still shows its name.
 fn extract_catalog_name(content: &str) -> Option<String> {
     #[derive(Deserialize)]
@@ -875,6 +892,26 @@ mod tests {
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .collect();
         assert_eq!(names, ["Pack.toml"]);
+    }
+
+    #[test]
+    fn a_catalogue_is_found_by_filename_display_name_or_bare_name() {
+        let catalogs = [CatalogFile {
+            name: "Sungrow SHx".into(),
+            filename: "sungrow_shx.toml".into(),
+            path: "/decoders/sungrow_shx.toml".into(),
+            sync_status: SyncStatus::LocalOnly,
+            tracked_repo_count: 0,
+        }];
+        for spelling in [
+            "sungrow_shx.toml",
+            "Sungrow SHx",
+            "sungrow_shx",
+            " sungrow_shx ",
+        ] {
+            assert!(catalog_named(&catalogs, spelling).is_some(), "{spelling:?}");
+        }
+        assert!(catalog_named(&catalogs, "sungrow").is_none());
     }
 
     #[test]

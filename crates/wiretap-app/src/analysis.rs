@@ -463,13 +463,9 @@ pub async fn catalog_coverage(
     start_time: Option<String>,
     end_time: Option<String>,
 ) -> Result<CoverageReport, String> {
-    // 1. Load + parse the catalog (reuse the MCP catalog resolution).
-    let catalogs = crate::catalog::list_catalogs(app.clone()).await?;
-    let entry = catalogs
-        .iter()
-        .find(|c| c.filename == catalog_name || c.name == catalog_name)
-        .ok_or_else(|| format!("Catalog '{}' not found — use list_catalogs", catalog_name))?;
-    let toml = crate::catalog::open_catalog(entry.path.clone()).await?;
+    // 1. Load + parse the catalog.
+    let entry = crate::catalog::find_catalog(app, catalog_name).await?;
+    let toml = crate::catalog::open_catalog(entry.path).await?;
     let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| e.to_string())?;
 
     // 2. Inventory the data source, keyed the way the catalogue is keyed.

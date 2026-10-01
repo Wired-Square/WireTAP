@@ -625,13 +625,15 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ReadCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let catalogs = crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?;
-        let cat = catalogs
-            .iter()
-            .find(|c| c.filename == p.name || c.name == p.name)
-            .ok_or_else(|| err(format!("Catalog '{}' not found — use list_catalogs", p.name)))?;
-        let toml = crate::catalog::open_catalog(cat.path.clone()).await.map_err(err)?;
-        ok_json(json!({ "name": cat.name, "filename": cat.filename, "path": cat.path, "toml": toml }))
+        let cat = crate::catalog::find_catalog(&self.app, &p.name)
+            .await
+            .map_err(err)?;
+        let toml = crate::catalog::open_catalog(cat.path.clone())
+            .await
+            .map_err(err)?;
+        ok_json(
+            json!({ "name": cat.name, "filename": cat.filename, "path": cat.path, "toml": toml }),
+        )
     }
 
     #[tool(description = "Validate catalog TOML without writing it. Returns { valid, errors: [{field, message}] } — a dry run for create_catalog/update_catalog.")]
@@ -1445,30 +1447,23 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         // Resolve the catalogue first: binding a name that doesn't resolve would
         // leave the profile in a state where every open fails.
-        let resolved = match p.catalog.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(want) => {
-                let catalogs = crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?;
-                let cat = catalogs
-                    .iter()
-                    .find(|c| {
-                        c.filename == want || c.name == want || c.filename == format!("{want}.toml")
-                    })
-                    .ok_or_else(|| {
-                        err(format!(
-                            "Catalog '{want}' not found — create it first with create_catalog"
-                        ))
-                    })?;
-                Some(cat.filename.clone())
-            }
+        let resolved = match p
+            .catalog
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            Some(want) => Some(
+                crate::catalog::find_catalog(&self.app, want)
+                    .await
+                    .map_err(err)?
+                    .filename,
+            ),
             None => None,
         };
 
         let mut settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
-        let profile = settings
-            .io_profiles
-            .iter_mut()
-            .find(|prof| prof.id == p.profile_id)
-            .ok_or_else(|| err(format!("Profile '{}' not found", p.profile_id)))?;
+        let profile = settings.profile_mut(&p.profile_id).map_err(err)?;
         profile.preferred_catalog = resolved.clone();
         let name = profile.name.clone();
 
@@ -1496,15 +1491,9 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<UpdateCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        // Resolve an existing catalog by filename or display name.
-        let catalogs = crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?;
-        let want = p.filename.trim();
-        let cat = catalogs
-            .iter()
-            .find(|c| c.filename == want || c.name == want || c.filename == format!("{want}.toml"))
-            .ok_or_else(|| {
-                err(format!("Catalog '{want}' not found — use create_catalog for a new file"))
-            })?;
+        let cat = crate::catalog::find_catalog(&self.app, &p.filename)
+            .await
+            .map_err(err)?;
         validate_or_reject(&p.content)?;
         crate::catalog::save_catalog(self.app.clone(), cat.path.clone(), p.content).await.map_err(err)?;
         ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
