@@ -377,9 +377,10 @@ fn decode_tail(
         if wanted.is_some_and(|id| id != masked) {
             continue;
         }
-        let Some(mut entry) = crate::ws::dispatch::decode_entry(catalog, f, None, &[]) else {
+        let Some(entry) = crate::ws::dispatch::decode_entry(catalog, f, None, &[]) else {
             continue;
         };
+        let mut entry = serde_json::to_value(entry).expect("a decoded entry serialises");
         let object = entry
             .as_object_mut()
             .expect("decode_entry builds an object");

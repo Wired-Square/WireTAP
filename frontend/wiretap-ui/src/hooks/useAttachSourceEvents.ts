@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { listActiveSessions } from "../api/io";
 import { useSessionStore } from "../stores/sessionStore";
 import { wsTransport } from "../services/wsTransport";
-import { MsgType, decodeWsJson } from "../services/wsProtocol";
+import { MsgType, decodeWsJson, type AttachToPanelMsg } from "../services/wsProtocol";
 import { openPanel } from "../utils/windowCommunication";
 import { sessionAwarePanelIds } from "../apps/registry";
 
@@ -17,15 +17,13 @@ export function useAttachSourceEvents(): void {
   useEffect(
     () =>
       wsTransport.onGlobalMessage(MsgType.AttachToPanel, (_payload, raw) => {
-        let panel: string;
-        let sessionId: string;
+        let msg: AttachToPanelMsg;
         try {
-          const msg = decodeWsJson<{ panel?: string; session_id?: string }>(raw);
-          panel = msg.panel ?? "";
-          sessionId = msg.session_id ?? "";
+          msg = decodeWsJson<AttachToPanelMsg>(raw);
         } catch {
           return;
         }
+        const { panel, session_id: sessionId } = msg;
         if (!sessionId || !sessionAwarePanelIds.has(panel)) return;
 
         const store = useSessionStore.getState();

@@ -49,6 +49,7 @@ pub struct DeviceInfoPayload {
 /// Frames are not carried here — they reach the UI through the session's
 /// capture like any other frames.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "ModbusScanStateMsg"))]
 pub struct ModbusScanState {
     pub status: String,
     pub progress: Option<ScanProgressPayload>,

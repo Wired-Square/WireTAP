@@ -70,6 +70,7 @@ impl SignalRef {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 struct BitToggles {
     /// Per bit, `byte * 8 + bit`, over the longest payload seen.
@@ -159,9 +160,11 @@ impl Watch {
     }
 }
 
+/// A Dashboard window's ad-hoc signals for one frame batch.
 #[derive(Debug, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "AdhocSignalsMsg"))]
 #[serde(rename_all = "camelCase")]
-struct AdhocBatch {
+pub(crate) struct AdhocBatch {
     /// Masked ids in first-seen order.
     frame_ids: Vec<u32>,
     values: Vec<AdhocValue>,
@@ -169,6 +172,7 @@ struct AdhocBatch {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 struct AdhocValue {
     frame_id: u32,
@@ -178,6 +182,7 @@ struct AdhocValue {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 struct HeatmapCounts {
     frame_id: u32,

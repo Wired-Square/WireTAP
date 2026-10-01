@@ -65,6 +65,10 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
     r.visit::<crate::sessions::ProfileUsageInfo>();
+    r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
+    r.visit::<crate::adhoc::AdhocBatch>();
+    r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
+    r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -157,16 +161,19 @@ fn declares(member: &Fields, json: &serde_json::Map<String, serde_json::Value>) 
     }) && json.keys().all(|k| member.contains_key(k))
 }
 
-fn assert_serialises_as_declared<T: TS + serde::Serialize + 'static>(values: &[T]) {
+fn assert_declared<T: TS + 'static>(json: &serde_json::Value) {
     let members = members::<T>();
+    let declared = match json {
+        serde_json::Value::String(s) => members.contains(&Err(format!("\"{s}\""))),
+        serde_json::Value::Object(o) => members.iter().flatten().any(|m| declares(m, o)),
+        other => panic!("unexpected {other}"),
+    };
+    assert!(declared, "{} does not declare {json}", T::name(&Config::new()));
+}
+
+fn assert_serialises_as_declared<T: TS + serde::Serialize + 'static>(values: &[T]) {
     for value in values {
-        let json = serde_json::to_value(value).unwrap();
-        let declared = match &json {
-            serde_json::Value::String(s) => members.contains(&Err(format!("\"{s}\""))),
-            serde_json::Value::Object(o) => members.iter().flatten().any(|m| declares(m, o)),
-            other => panic!("unexpected {other}"),
-        };
-        assert!(declared, "{} does not declare {json}", T::name(&Config::new()));
+        assert_declared::<T>(&serde_json::to_value(value).unwrap());
     }
 }
 
@@ -199,6 +206,66 @@ fn outputs_serialise_as_declared() {
         FcVerdict::Exception { message: "x".into() },
         FcVerdict::Silent,
     ]);
+}
+
+fn each<'a>(json: &'a serde_json::Value, key: &str) -> impl Iterator<Item = &'a serde_json::Value> {
+    json.get(key).and_then(|v| v.as_array()).into_iter().flatten()
+}
+
+#[test]
+fn decoded_signals_entries_serialise_as_declared() {
+    use crate::ws::decoded::*;
+    use crate::ws::tunnel_signals::*;
+    for line in include_str!("ws/decoded-golden.jsonl").lines() {
+        let json: serde_json::Value = serde_json::from_str(line).unwrap();
+        let entries = json.as_array().cloned().unwrap_or_else(|| vec![json]);
+        for entry in &entries {
+            if entry.get("kind").is_some() {
+                assert_declared::<UnroutedFrameMsg>(entry);
+                continue;
+            }
+            assert_declared::<DecodedFrameMsg>(entry);
+            each(entry, "signals").for_each(assert_declared::<DecodedSignalValue>);
+            each(entry, "selectors").for_each(assert_declared::<DecodedMuxSelector>);
+            each(entry, "headerFields").for_each(assert_declared::<DecodedHeaderField>);
+            each(entry, "tunnel").for_each(assert_declared::<DecodedTunnelMessage>);
+            entry.get("mirror").into_iter().for_each(assert_declared::<DecodedMirrorVerdict>);
+            entry.get("checksum").into_iter().for_each(assert_declared::<ChecksumVerdict>);
+        }
+    }
+    assert_serialises_as_declared(&[UnroutedKind::Unmatched, UnroutedKind::Short]);
+    assert_serialises_as_declared(&[TunnelDirection::Request, TunnelDirection::Response]);
+    assert_serialises_as_declared(&[TunnelPayload::Registers, TunnelPayload::Coils, TunnelPayload::None, TunnelPayload::Opaque]);
+    assert_serialises_as_declared(&[TunnelDirectionBasis::Layout, TunnelDirectionBasis::Pairing, TunnelDirectionBasis::Alternation]);
+    assert_serialises_as_declared(&[TunnelProtocol::ModbusRtu]);
+}
+
+#[test]
+fn ws_json_bodies_serialise_as_declared() {
+    use serde_json::json;
+    let session = "generated-types-adhoc";
+    let signals = json!([{ "frameId": 1, "name": "byte[0]" }]);
+    crate::adhoc::dispatch_adhoc_command("adhoc.set", json!({ "session_id": session, "signals": signals, "heatmaps": [1] }), 1).unwrap();
+    let frame: crate::io::FrameMessage = serde_json::from_value(json!({
+        "protocol": "can", "timestamp_us": 5, "frame_id": 1, "bus": 0, "dlc": 1, "bytes": [7],
+    }))
+    .unwrap();
+    let [(_, payload)] = crate::adhoc::batch_messages(session, &[frame], None).try_into().unwrap();
+    crate::adhoc::forget_session(session);
+    let batch: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+    assert_declared::<crate::adhoc::AdhocBatch>(&batch);
+    assert!(!batch["values"].as_array().unwrap().is_empty() && !batch["toggles"].as_array().unwrap().is_empty());
+
+    use crate::io::modbus_tcp::scanner::ModbusScanState;
+    let state = |capture_id: Option<&str>| ModbusScanState {
+        status: "running".into(),
+        progress: None,
+        device_info: vec![],
+        notes: vec!["x".into()],
+        capture_id: capture_id.map(Into::into),
+    };
+    assert_serialises_as_declared(&[state(None), state(Some("c"))]);
+    assert_serialises_as_declared(&[crate::ws::dispatch::AttachToPanelMsg { panel: "decoder", session_id: "s" }]);
 }
 
 #[test]

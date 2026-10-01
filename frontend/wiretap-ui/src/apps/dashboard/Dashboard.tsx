@@ -180,11 +180,11 @@ function DashboardInner() {
   const handleDecoded = useCallback((decoded: DecodedSignalsEntry[], backlog: boolean) => {
     const store = useDashboardStore.getState();
     for (const msg of decoded) {
-      if (msg.kind) continue;
+      if ("kind" in msg) continue;
       const timestamp = msg.t / 1_000_000;
       store.recordFrameId(msg.maskedFrameId);
       for (const s of msg.signals) {
-        if (Number.isFinite(s.scaled)) {
+        if (s.scaled !== null) {
           pendingValuesRef.current.push({
             frameId: msg.maskedFrameId,
             signalName: s.name,

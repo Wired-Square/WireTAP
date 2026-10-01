@@ -4,8 +4,8 @@
 // Uses DataView for zero-copy access to ArrayBuffer messages.
 
 import type { FrameMessage } from "../types/frame";
-import type { DeviceInfoPayload, ScanProgressPayload, StreamEndedInfo } from "../api/io";
-import type { ChecksumValidationResult } from "../api/checksums";
+import type { IOCapabilities, PlaybackPosition, StreamEndedInfo } from "../api/io";
+import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
 import { trackAlloc } from "./memoryDiag";
 
 // ============================================================================
@@ -236,142 +236,12 @@ export function decodeFrameBatch(
 // a UTF-8 JSON array, one entry per frame: decoded, or why it was not.
 // ============================================================================
 
-export interface DecodedSignalValue {
-  name: string;
-  /** Raw integer value (pre-scale). */
-  value: number;
-  /** Scaled numeric value (raw × factor + offset), or raw for enum/text. */
-  scaled: number;
-  /** Display string (hex digits, enum label, decoded text, timestamp, number). */
-  display: string;
-  unit?: string | null;
-  /** Selector value of this signal's mux, when it came from a mux case. */
-  muxValue?: number | null;
-  /** Declared signal format (enum/hex/ascii/utf8/unix_time), if any. */
-  format?: string | null;
-  /** On a mirror frame, whether the bytes this signal covers differed from the
-   *  source; absent where they were not compared. */
-  mirrorMismatch?: boolean;
-}
-
-export interface DecodedMuxSelector {
-  name?: string | null;
-  value: number;
-  matchedCase?: string | null;
-  startBit: number;
-  bitLength: number;
-}
-
-export interface DecodedHeaderField {
-  name: string;
-  value: number;
-  display: string;
-  /** "hex" | "decimal". */
-  format: string;
-}
-
-/**
- * Live `mirror_of` verdict, computed in Rust
- * (`wiretap_catalog::mirror::MirrorTracker`). Present only on frames the
- * catalogue declares as mirrors, so an absent field means "not a mirror" rather
- * than "no verdict yet".
- */
-export interface DecodedMirrorVerdict {
-  /** Catalogue frame id this mirror is compared against. */
-  sourceFrameId: number;
-  /** true = match, false = mismatch, null = no comparison has run yet. */
-  isValid: boolean | null;
-  /** Gap between the two most recent samples (ms). */
-  timeDeltaMs: number;
-  /** Inherited byte indices that differed at the last comparison. */
-  mismatchedByteIndices: number[];
-}
-
-/**
- * One Modbus RTU message recovered in Rust
- * (`wiretap_catalog::modbus_rtu_stream`) — from a tunnel frame, or from a serial
- * port the reader already framed. A tunnelled message may span several CAN
- * frames; it rides the frame that completed it, so `t` on the parent entry is
- * when the exchange became readable.
- */
-export interface DecodedTunnelMessage {
-  protocol: 'modbus_rtu';
-  direction: 'request' | 'response';
-  /** Modbus slave address. */
-  device: number;
-  function: number;
-  functionLabel: string;
-  /** Start register. Null when a read response had no request to inherit from. */
-  register?: number | null;
-  quantity?: number | null;
-  /** Which of `values` and `coils` holds the message's values, if either. */
-  payload: 'registers' | 'coils' | 'none' | 'opaque';
-  /** What sided the message: `alternation` is a guess from the line's
-   *  request/response rhythm, made for a vendor code. */
-  directionBasis: 'layout' | 'pairing' | 'alternation';
-  /** Register values. Empty unless `payload` is `registers` — reading coil bytes
-   *  as `u16`s is how they get mangled. */
-  values: number[];
-  /** Coil or discrete states. Empty unless `payload` is `coils`. */
-  coils: boolean[];
-  /** The body between the header and the CRC. The only route to the payload of
-   *  a function code nothing models. */
-  data: number[];
-  exception?: number | null;
-  exceptionLabel?: string | null;
-  /** Catalogue register frame the values decoded through, if one matched. */
-  frame?: string | null;
-  /** The reassembled message, CRC included. */
-  raw: number[];
-  /** How many CAN frames the message spanned. */
-  frames: number;
-  /**
-   * Whether the trailing CRC matches the body. Only ever false when the source
-   * is not requiring a valid CRC-16, where the message boundary came from the
-   * Modbus length rules alone — so the message may have been guessed.
-   */
-  crcValid: boolean;
-  /** µs since the request this response answers, when that request was seen. */
-  latencyUs?: number;
-}
-
-export interface DecodedFrameMsg {
-  kind?: undefined;
-  frameId: number;
-  /** `frameId` under the catalogue's `frame_id_mask` — the catalogue frame it decoded as. */
-  maskedFrameId: number;
-  bus: number;
-  /** Host timestamp (µs). */
-  t: number;
-  signals: DecodedSignalValue[];
-  selectors: DecodedMuxSelector[];
-  /** Header fields from the CAN id / serial header bytes. */
-  headerFields: DecodedHeaderField[];
-  /** Source address resolved from a CAN header field, if any. */
-  sourceAddress?: number | null;
-  /** Raw payload of the frame this decode came from (for per-mux byte rows). */
-  bytes: number[];
-  /** Mirror comparison verdict; absent when this frame is not a mirror. */
-  mirror?: DecodedMirrorVerdict;
-  /** Tunnel messages this frame completed; absent on non-tunnel frames. */
-  tunnel?: DecodedTunnelMessage[];
-  /** The serial catalogue's checksum over `bytes`; absent when it declares none. */
-  checksum?: ChecksumValidationResult;
-}
-
-/** A frame the catalogue did not decode: no frame for its id, or shorter than
- *  its serial `min_frame_length`. */
-export interface UnroutedFrameMsg {
-  kind: "unmatched" | "short";
-  frameId: number;
-  bus: number;
-  t: number;
-  bytes: number[];
-  protocol: string;
-  sourceAddress?: number;
-}
-
-export type DecodedSignalsEntry = DecodedFrameMsg | UnroutedFrameMsg;
+export type { DecodedFrameMsg } from "../generated/DecodedFrameMsg";
+export type { DecodedMirrorVerdict } from "../generated/DecodedMirrorVerdict";
+export type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
+export type { DecodedSignalValue } from "../generated/DecodedSignalValue";
+export type { DecodedTunnelMessage } from "../generated/DecodedTunnelMessage";
+export type { UnroutedFrameMsg } from "../generated/UnroutedFrameMsg";
 
 const wsJsonDecoder = new TextDecoder();
 
@@ -404,25 +274,9 @@ export function decodeDecodedBacklog(payload: DataView): { subscriber: string; d
   };
 }
 
-/** A Dashboard window's ad-hoc signals for one frame batch, decoded in Rust. */
-export interface AdhocSignalsMsg {
-  /** Masked frame ids in the batch, first seen first. */
-  frameIds: number[];
-  /** `t` is the host timestamp (µs). */
-  values: { frameId: number; t: number; name: string; value: number }[];
-  /** Bit `byte * 8 + bit`'s toggle count since the heatmap was reset. */
-  toggles: { frameId: number; counts: number[]; frames: number }[];
-}
-
-/** Progress of a Modbus discovery sweep, pushed on the scan session's channel. */
-export interface ModbusScanStateMsg {
-  status: string;
-  progress: ScanProgressPayload | null;
-  device_info: DeviceInfoPayload[];
-  notes: string[];
-  /** The capture this sweep is filling — the results tab's own copy of the answer. */
-  capture_id: string | null;
-}
+export type { AdhocSignalsMsg } from "../generated/AdhocSignalsMsg";
+export type { AttachToPanelMsg } from "../generated/AttachToPanelMsg";
+export type { ModbusScanStateMsg } from "../generated/ModbusScanStateMsg";
 
 // ============================================================================
 // Non-frame message decoders
@@ -525,11 +379,7 @@ export function decodeSessionError(payload: Uint8Array): string {
   return new TextDecoder().decode(payload);
 }
 
-export function decodePlaybackPosition(payload: DataView): {
-  timestamp_us: number;
-  frame_index: number;
-  frame_count: number;
-} {
+export function decodePlaybackPosition(payload: DataView): PlaybackPosition {
   const timestamp_us = Number(payload.getBigUint64(0, true));
   const frame_index = payload.getUint32(8, true);
   const frame_count = payload.getUint32(12, true);
@@ -614,7 +464,7 @@ const SCOPED_STATE_MAP = ["stopped", "starting", "running", "paused", "error"] a
 /** Decode scoped SessionLifecycle payload: state (u8) + capabilities (JSON). */
 export function decodeScopedSessionLifecycle(payload: DataView): {
   stateType: string;
-  capabilities: unknown | null;
+  capabilities: IOCapabilities | null;
 } {
   if (payload.byteLength < 3) {
     return { stateType: "stopped", capabilities: null };
@@ -624,7 +474,7 @@ export function decodeScopedSessionLifecycle(payload: DataView): {
   const stateType = SCOPED_STATE_MAP[stateByte] ?? "stopped";
 
   const jsonLen = payload.getUint16(1, true);
-  let capabilities: unknown | null = null;
+  let capabilities: IOCapabilities | null = null;
   if (jsonLen > 0 && 3 + jsonLen <= payload.byteLength) {
     const jsonBytes = new Uint8Array(payload.buffer, payload.byteOffset + 3, jsonLen);
     try {

@@ -35,7 +35,7 @@ function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFr
     bytes: msg.bytes,
     timestamp,
     sourceAddress: msg.sourceAddress ?? undefined,
-    protocol: msg.kind ? msg.protocol : undefined,
+    protocol: "kind" in msg ? msg.protocol : undefined,
   };
 }
 
@@ -632,7 +632,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
     for (const msg of entries) {
       const timestamp = msg.t / 1_000_000;
-      if (msg.kind === 'short' || msg.bytes.length < minLength) {
+      if (("kind" in msg && msg.kind === 'short') || msg.bytes.length < minLength) {
         filtered.push({ ...unroutedFrame(msg, timestamp), reason: 'too_short' });
         continue;
       }
@@ -640,7 +640,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         filtered.push({ ...unroutedFrame(msg, timestamp), reason: 'id_filter' });
         continue;
       }
-      if (msg.kind) {
+      if ("kind" in msg) {
         unmatched.push(unroutedFrame(msg, timestamp));
         continue;
       }

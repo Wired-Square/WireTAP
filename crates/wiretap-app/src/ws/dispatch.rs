@@ -10,7 +10,11 @@ use crate::io::{FrameMessage, IOState, PlaybackPosition};
 use crate::transmit::{RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
 use crate::ws::server::ws_server;
-use crate::ws::tunnel_signals;
+use crate::ws::decoded::{
+    ChecksumVerdict, DecodedFrameMsg, DecodedHeaderField, DecodedMirrorVerdict, DecodedMuxSelector,
+    DecodedSignalValue, DecodedSignalsEntry, UnroutedFrameMsg, UnroutedKind,
+};
+use crate::ws::tunnel_signals::{self, DecodedTunnelMessage};
 
 // ============================================================================
 // Frame offset tracking
@@ -256,20 +260,14 @@ pub fn attached_catalog_path(session_id: &str) -> Option<String> {
 }
 
 /// Result of running a frame batch through the session's mirror tracker: the
-/// batch-final verdict per mirror, keyed by **masked** frame id and pre-encoded
-/// so a mirror seen many times in the batch is serialised once.
+/// batch-final verdict per mirror, keyed by **masked** frame id.
 struct MirrorVerdicts {
     tracker: SharedMirrorTracker,
-    by_masked_id: HashMap<u32, EncodedVerdict>,
-}
-
-pub(crate) struct EncodedVerdict {
-    verdict: wiretap_catalog::MirrorVerdict,
-    json: serde_json::Value,
+    by_masked_id: HashMap<u32, wiretap_catalog::MirrorVerdict>,
 }
 
 impl MirrorVerdicts {
-    fn get(&self, raw_frame_id: u32) -> Option<&EncodedVerdict> {
+    fn get(&self, raw_frame_id: u32) -> Option<&wiretap_catalog::MirrorVerdict> {
         if self.by_masked_id.is_empty() {
             return None;
         }
@@ -293,13 +291,7 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
             let seconds = f.timestamp_us as f64 / 1_000_000.0;
             tracker.observe(f.frame_id, &f.bytes, seconds);
         }
-        tracker
-            .verdicts()
-            .filter_map(|(id, verdict)| {
-                let json = serde_json::to_value(&verdict).ok()?;
-                Some((id, EncodedVerdict { verdict, json }))
-            })
-            .collect()
+        tracker.verdicts().collect()
     };
     Some(MirrorVerdicts {
         tracker: shared,
@@ -371,21 +363,6 @@ fn feed_tunnels(
         .push(&frame.bytes)
 }
 
-/// One decoded signal in the `DecodedSignals` wire shape. The frontend's
-/// `DecodedSignalValue` is parsed straight from this, so tunnelled registers and
-/// ordinary ones must go through the same function or the two drift.
-fn signal_json(s: &wiretap_catalog::decode::Decoded) -> serde_json::Value {
-    serde_json::json!({
-        "name": s.name,
-        "value": s.value,
-        "scaled": s.scaled,
-        "display": s.display,
-        "unit": s.unit,
-        "muxValue": s.mux_value,
-        "format": s.format,
-    })
-}
-
 /// How many reassembled tunnel messages one batch will render. Mirrors the
 /// frontend's `MAX_TUNNEL_TRANSACTIONS`, which is all it keeps — and a backlog
 /// redecode can complete tens of thousands, each ~1 KB of JSON, so without this
@@ -407,7 +384,6 @@ fn encode_decoded_batch(
     tunnels: Option<&SharedTunnels>,
     with_unrouted: bool,
 ) -> Vec<u8> {
-    let mut out: Vec<serde_json::Value> = Vec::new();
     let mask = wiretap_catalog::decode::frame_id_mask(catalog);
 
     // Tunnels first, over the whole batch: a payload is a slice of a byte
@@ -429,20 +405,20 @@ fn encode_decoded_batch(
         }
     }
 
-    for (i, f) in frames.iter().enumerate() {
-        let tunnel_messages: Vec<_> = {
-            let mut taken = Vec::new();
-            while completed.front().is_some_and(|(idx, _)| *idx == i) {
-                taken.push(completed.pop_front().expect("front checked").1);
-            }
-            taken
-        };
+    let mut per_frame: Vec<Vec<TunnelMessage>> = frames.iter().map(|_| Vec::new()).collect();
+    for (i, message) in completed {
+        per_frame[i].push(message);
+    }
+
+    let mut out = Vec::new();
+    for (f, tunnel_messages) in frames.iter().zip(&per_frame) {
         let entry = if tunnel_messages.is_empty() && below_min_length(catalog, f) {
-            with_unrouted.then(|| unrouted_entry("short", f))
+            with_unrouted.then(|| unrouted_entry(UnroutedKind::Short, f))
         } else {
             let verdict = verdicts.and_then(|v| v.get(f.frame_id));
-            decode_entry(catalog, f, verdict, &tunnel_messages)
-                .or_else(|| with_unrouted.then(|| unrouted_entry("unmatched", f)))
+            decode_entry(catalog, f, verdict, tunnel_messages)
+                .map(DecodedSignalsEntry::Decoded)
+                .or_else(|| with_unrouted.then(|| unrouted_entry(UnroutedKind::Unmatched, f)))
         };
         out.extend(entry);
     }
@@ -461,31 +437,27 @@ fn below_min_length(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> boo
         .is_some_and(|min| f.bytes.len() < min as usize)
 }
 
-/// A frame the catalogue did not decode, with `kind` saying why.
-fn unrouted_entry(kind: &str, f: &FrameMessage) -> serde_json::Value {
-    let mut entry = serde_json::json!({
-        "kind": kind,
-        "frameId": f.frame_id,
-        "bus": f.bus,
-        "t": f.timestamp_us,
-        "bytes": f.bytes,
-        "protocol": f.protocol,
-    });
-    if let Some(source_address) = f.source_address {
-        entry["sourceAddress"] = source_address.into();
-    }
-    entry
+fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'_> {
+    DecodedSignalsEntry::Unrouted(UnroutedFrameMsg {
+        bus: f.bus,
+        bytes: &f.bytes,
+        frame_id: f.frame_id,
+        kind,
+        protocol: &f.protocol,
+        source_address: f.source_address,
+        t: f.timestamp_us,
+    })
 }
 
 /// One frame's entry in the `DecodedSignals` payload, or `None` when the
 /// catalogue says nothing about it. Shared by the live stream and the MCP
 /// `get_decoded_signals` tool, so both describe a frame alike.
-pub(crate) fn decode_entry(
-    catalog: &wiretap_catalog::Catalog,
-    f: &FrameMessage,
-    verdict: Option<&EncodedVerdict>,
-    tunnel_messages: &[TunnelMessage],
-) -> Option<serde_json::Value> {
+pub(crate) fn decode_entry<'a>(
+    catalog: &'a wiretap_catalog::Catalog,
+    f: &'a FrameMessage,
+    verdict: Option<&'a wiretap_catalog::MirrorVerdict>,
+    tunnel_messages: &'a [TunnelMessage],
+) -> Option<DecodedFrameMsg<'a>> {
     // decode_by_id applies frame_id_mask, looks up the frame, decodes
     // signals/mux, and extracts header fields (CAN id / serial bytes).
     // Defaulted, not skipped, when the catalogue has no frame for this id:
@@ -504,89 +476,47 @@ pub(crate) fn decode_entry(
     let masked_id =
         wiretap_catalog::decode::frame_id_mask(catalog).map_or(f.frame_id, |m| f.frame_id & m);
     let mismatches = verdict.zip(catalog.frame(masked_id)).map_or_else(Vec::new, |(v, frame)| {
-        mirror_mismatches(&v.verdict, frame, &decoded.selectors)
+        mirror_mismatches(v, frame, &decoded.selectors)
     });
     let mut signals: Vec<_> = decoded
         .signals
-        .iter()
+        .into_iter()
         .enumerate()
-        .map(|(i, s)| {
-            let mut json = signal_json(s);
-            if let Some(mismatch) = mismatches.get(i).copied().flatten() {
-                json["mirrorMismatch"] = mismatch.into();
-            }
-            json
-        })
-        .collect();
-    let selectors: Vec<_> = decoded
-        .selectors
-        .iter()
-        .map(|s| {
-            serde_json::json!({
-                "name": s.name,
-                "value": s.value,
-                "matchedCase": s.matched_case,
-                "startBit": s.start_bit,
-                "bitLength": s.bit_length,
-            })
+        .map(|(i, s)| DecodedSignalValue {
+            mirror_mismatch: mismatches.get(i).copied().flatten(),
+            ..s.into()
         })
         .collect();
     // Messages this frame completed. They belong to the frame that finished
     // them, not the one that started them, so the UI's timestamp is when the
     // exchange was actually readable.
-    let mut transactions: Vec<serde_json::Value> = Vec::new();
-    for (msg, latency_us) in tunnel_messages {
-        let decoded = tunnel_signals::decode_message(msg, catalog);
-        signals.extend(decoded.signals.iter().map(signal_json));
-        let mut transaction = decoded.transaction;
-        if let Some(latency_us) = latency_us {
-            transaction["latencyUs"] = (*latency_us).into();
-        }
-        transactions.push(transaction);
-    }
-    let header_fields: Vec<_> = decoded
-        .header_fields
+    let tunnel: Vec<_> = tunnel_messages
         .iter()
-        .map(|h| {
-            serde_json::json!({
-                "name": h.name,
-                "value": h.value,
-                "display": h.display,
-                "format": h.format,
-            })
+        .map(|(msg, latency_us)| {
+            let decoded = tunnel_signals::decode_message(msg, catalog);
+            signals.extend(decoded.signals.into_iter().map(DecodedSignalValue::from));
+            DecodedTunnelMessage { latency_us: *latency_us, ..decoded.transaction }
         })
         .collect();
-    let mut entry = serde_json::json!({
-        "frameId": f.frame_id,
-        "maskedFrameId": masked_id,
-        "bus": f.bus,
-        "t": f.timestamp_us,
-        "signals": signals,
-        "selectors": selectors,
-        "headerFields": header_fields,
-        "sourceAddress": decoded.source_address,
-        // Raw payload this decode came from, so the frontend can show a
-        // hex/ASCII byte row per mux group (each mux occurrence has its own
-        // payload; a single per-frame rawBytes would be last-writer-wins).
-        "bytes": f.bytes,
-    });
-    // Only mirrors carry this key, so the frontend can treat its absence as
-    // "not a mirror" rather than "no verdict yet".
-    if let Some(verdict) = verdict {
-        entry["mirror"] = verdict.json.clone();
-    }
-    if !transactions.is_empty() {
-        entry["tunnel"] = serde_json::Value::Array(transactions);
-    }
-    if let Some(checksum) = catalog
-        .serial
-        .as_ref()
-        .and_then(|s| s.checksum.as_ref())
-        .and_then(|c| crate::checksums::validate_serial_checksum(c, &f.bytes))
-    {
-        entry["checksum"] = serde_json::json!(checksum);
-    }
-    Some(entry)
+    Some(DecodedFrameMsg {
+        bus: f.bus,
+        bytes: &f.bytes,
+        checksum: catalog
+            .serial
+            .as_ref()
+            .and_then(|s| s.checksum.as_ref())
+            .and_then(|c| crate::checksums::validate_serial_checksum(c, &f.bytes))
+            .map(ChecksumVerdict::from),
+        frame_id: f.frame_id,
+        header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
+        masked_frame_id: masked_id,
+        mirror: verdict.map(DecodedMirrorVerdict::from),
+        selectors: decoded.selectors.into_iter().map(DecodedMuxSelector::from).collect(),
+        signals,
+        source_address: decoded.source_address,
+        t: f.timestamp_us,
+        tunnel: (!tunnel.is_empty()).then_some(tunnel),
+    })
 }
 
 /// Each decoded signal's mirror verdict, index-aligned with the decode: whether
@@ -1135,18 +1065,21 @@ pub fn send_repeat_stopped(event: &RepeatStoppedEvent) {
     send_repeat_event(&RepeatEventPayload::Stopped(event));
 }
 
+#[derive(serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct AttachToPanelMsg<'a> {
+    pub panel: &'a str,
+    pub session_id: &'a str,
+}
+
 /// Ask the frontend to surface a session in a source-aware tab (open/focus the
-/// panel and point it at the session). Payload is JSON `{ "panel": …, "session_id": … }`.
+/// panel and point it at the session).
 pub fn send_attach_to_panel(panel: &str, session_id: &str) {
     let server = match ws_server() {
         Some(s) => s,
         None => return,
     };
-    let payload =
-        match serde_json::to_vec(&serde_json::json!({ "panel": panel, "session_id": session_id })) {
-            Ok(p) => p,
-            Err(_) => return,
-        };
+    let Ok(payload) = serde_json::to_vec(&AttachToPanelMsg { panel, session_id }) else { return };
     let msg = protocol::encode_message(MsgType::AttachToPanel, 0, &payload);
     server.send_global(msg);
 }
@@ -1410,13 +1343,13 @@ bit_length = 16
         assert_eq!(out[0].start_register, Some(7815));
         let decoded = tunnel_signals::decode_message(&out[0], &catalog);
         assert!(decoded.signals.iter().any(|s| s.name == "First" && s.value == 0x1234 as f64));
-        assert_eq!(decoded.transaction["frame"], "block");
+        assert_eq!(decoded.transaction.frame, Some("block"));
 
         let out = feed_tunnels(Some(&tunnels), &catalog, "test", &vendor, 0);
         assert_eq!(out.len(), 1, "a vendor code frames without being declared");
         let decoded = tunnel_signals::decode_message(&out[0], &catalog);
-        assert_eq!(decoded.transaction["register"], serde_json::Value::Null);
-        assert!(!decoded.transaction["data"].as_array().unwrap().is_empty());
+        assert_eq!(decoded.transaction.register, None);
+        assert!(!decoded.transaction.data.is_empty());
 
         assert_eq!(feed_tunnels(Some(&tunnels), &catalog, "test", &broadcast, 0).len(), 1, "a broadcast is a message");
     }
@@ -1613,11 +1546,10 @@ bit_length = 8
             tracker.observe(0x005, &mirror, f64::from(k) + 0.01);
         }
         let (_, verdict) = tracker.verdicts().next().expect("0x005 is tracked");
-        let json = serde_json::to_value(&verdict).expect("verdict serialises");
-        let verdict = EncodedVerdict { verdict, json };
-        let entry = decode_entry(&catalog, &can(0x005, 0, mirror.to_vec()), Some(&verdict), &[])
-            .expect("mirror decodes");
-        entry["signals"]
+        let frame = can(0x005, 0, mirror.to_vec());
+        let entry = decode_entry(&catalog, &frame, Some(&verdict), &[]).expect("mirror decodes");
+        serde_json::to_value(entry.signals)
+            .expect("signals serialise")
             .as_array()
             .expect("signals")
             .iter()
@@ -1769,6 +1701,106 @@ bit_length = 8
         assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&payload[16..]).is_ok_and(|d| !d.is_empty()));
     }
 
+    const HEADERED: &str = r#"
+[meta]
+name = "headered"
+[meta.can]
+frame_id_mask = 0x1FFFFF00
+[meta.can.fields]
+pgn = { mask = 0x1FFFFF00, format = "hex" }
+source_address = { mask = 0x000000FF, format = "decimal" }
+[frame.can.0x18EF0000]
+length = 8
+[[frame.can.0x18EF0000.signals]]
+name = "Mode"
+start_bit = 0
+bit_length = 8
+format = "enum"
+enum = { 1 = "run", 2 = "stop" }
+[[frame.can.0x18EF0000.signals]]
+name = "Volts"
+start_bit = 8
+bit_length = 16
+factor = 0.1
+unit = "V"
+[[frame.can.0x18EF0000.signals]]
+name = "Huge"
+start_bit = 0
+bit_length = 64
+factor = 1e10
+"#;
+
+    fn golden_mirror_entry<R>(read: impl FnOnce(&DecodedFrameMsg) -> R) -> R {
+        let catalog = wiretap_catalog::Catalog::parse(MIRRORED_MUX).expect("catalogue parses");
+        let source = [0x10, 0x20, 0x01, 0x40, 0x50, 0, 0, 0];
+        let mirror = [0x10, 0x21, 0x01, 0x41, 0x50, 0, 0, 0];
+        let mut tracker = wiretap_catalog::MirrorTracker::new(&catalog);
+        for k in 0..3 {
+            tracker.observe(0x705, &source, f64::from(k));
+            tracker.observe(0x005, &mirror, f64::from(k) + 0.01);
+        }
+        let (_, verdict) = tracker.verdicts().next().expect("0x005 is tracked");
+        let frame = can(0x005, 3, mirror.to_vec());
+        read(&decode_entry(&catalog, &frame, Some(&verdict), &[]).expect("mirror decodes"))
+    }
+
+    /// `DecodedSignals` bytes for every entry shape: header fields and a source
+    /// address, a mux and a mirror verdict, a tunnel message with its latency,
+    /// a checksum, and the unmatched and short entries.
+    fn golden_batches() -> Vec<String> {
+        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let unmatched = FrameMessage { source_address: Some(0x42), ..can(0x18EE0042, 7, vec![9]) };
+        let headered_batch =
+            encode_decoded_batch("golden", &[can(0x18EF0042, 5, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), unmatched], &headered, None, None, true);
+
+        let mirror_entry = golden_mirror_entry(|entry| serde_json::to_vec(entry).unwrap());
+
+        let tunnelled = tunnel_catalogue("");
+        let session = "golden-tunnel";
+        attach_catalog(session, None, tunnelled.clone());
+        let tunnels = tunnel_decoders(session);
+        let mut frames = Vec::new();
+        for (t, body) in [
+            (1_000, vec![0x01, 0x04, 0x4D, 0xE2, 0x00, 0x02]),
+            (5_000, vec![0x01, 0x04, 0x04, 0x01, 0x2C, 0x00, 0x00]),
+            (6_000, vec![0x01, 0x81, 0x02]),
+        ] {
+            frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
+        }
+        let tunnel_batch = encode_decoded_batch(session, &frames, &tunnelled, None, tunnels.as_ref(), true);
+        detach_catalog(session);
+
+        let serial = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let serial_batch = encode_decoded_batch(
+            "golden",
+            &[framed("serial", 1, vec![0x01, 0x02, 0x03, 0x00]), framed("serial", 1, vec![0x01])],
+            &serial,
+            None,
+            None,
+            true,
+        );
+
+        [headered_batch, mirror_entry, tunnel_batch, serial_batch]
+            .into_iter()
+            .map(|bytes| String::from_utf8(bytes).unwrap())
+            .collect()
+    }
+
+    /// Captured from the `json!` builders these structs replaced.
+    const GOLDEN: &str = include_str!("decoded-golden.jsonl");
+
+    #[test]
+    fn decoded_signals_bytes_are_unchanged() {
+        assert_eq!(golden_batches(), GOLDEN.lines().collect::<Vec<_>>());
+    }
+
+    /// MCP's `get_decoded_signals` reads `decode_entry` as a JSON value.
+    #[test]
+    fn decode_entry_reads_as_the_same_json_value() {
+        let value = golden_mirror_entry(|entry| serde_json::to_value(entry).unwrap());
+        assert_eq!(value.to_string(), GOLDEN.lines().nth(1).unwrap());
+    }
+
     #[test]
     fn an_out_of_range_signal_sends_a_null_scaled_value() {
         let catalog = wiretap_catalog::Catalog::parse(
@@ -1789,7 +1821,7 @@ factor = 1e10
         .expect("catalogue parses");
 
         let decoded = wiretap_catalog::decode::decode_by_id(&catalog, 0x104, &[0xFF; 8]).expect("decodes");
-        let json = signal_json(&decoded.signals[0]);
+        let json = serde_json::to_value(DecodedSignalValue::from(decoded.signals[0].clone())).unwrap();
 
         assert_eq!(json["scaled"], serde_json::Value::Null);
         assert_eq!(json["display"], "(out of range)");

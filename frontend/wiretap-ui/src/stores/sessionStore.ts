@@ -767,7 +767,7 @@ async function setupSessionEventSubscribers(
 
         const updates: Partial<Session> = { ioState: stateType as Session["ioState"] };
         if (capabilities) {
-          updates.capabilities = capabilities as IOCapabilities;
+          updates.capabilities = capabilities;
         }
 
         const isNowRunning = stateType === "running" || stateType === "starting";
@@ -797,14 +797,14 @@ async function setupSessionEventSubscribers(
           };
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onResuming", { new_capture_id: "", orphaned_capture_id: null });
-        } else if (isNowStopped && (capabilities as IOCapabilities | null)?.traits.temporal_mode === "capture") {
+        } else if (isNowStopped && capabilities?.traits.temporal_mode === "capture") {
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onSwitchedToCapture", {
             capture_id: prevSession?.capture?.id ?? null,
             capture_count: prevSession?.capture?.count ?? 0,
             capture_kind: prevSession?.capture?.kind ?? null,
             time_range: null,
-            capabilities: capabilities as IOCapabilities,
+            capabilities,
           });
           // Refresh capture fields from backend — after a live→capture transition
           // (e.g. stopAndSwitchToCapture), StreamEnded may not have landed yet or
@@ -850,7 +850,7 @@ async function setupSessionEventSubscribers(
             invokeCallbacks(eventListeners, "onSourceReplaced", {
               previous_source_type: "",
               new_source_type: "",
-              capabilities: capabilities as IOCapabilities,
+              capabilities,
               state: stateType,
               transition: "",
             });

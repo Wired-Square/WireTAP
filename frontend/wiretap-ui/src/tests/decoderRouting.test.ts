@@ -15,10 +15,11 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   maskedFrameId: 0x100,
   bus: 0,
   t: 2_000_000,
-  signals: [{ name: "Level", value: 7, scaled: 7, display: "7", mirrorMismatch: true }],
+  signals: [{ name: "Level", value: 7, scaled: 7, display: "7", unit: null, format: null, muxValue: null, mirrorMismatch: true }],
   selectors: [],
   headerFields: [],
   bytes: [7, 0, 0, 0],
+  sourceAddress: null,
   checksum: { extracted: 0x2a, calculated: 0x2a, valid: true },
   ...over,
 });
@@ -26,7 +27,8 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
 const tunnelMessage: DecodedTunnelMessage = {
   protocol: "modbus_rtu", direction: "response", directionBasis: "layout", device: 1, function: 4,
   functionLabel: "0x04", payload: "registers", values: [1], coils: [], data: [], raw: [1],
-  frames: 2, crcValid: true, latencyUs: 4_000,
+  frames: 2, crcValid: true, latencyUs: 4_000, register: null, quantity: null, exception: null,
+  exceptionLabel: null, frame: null,
 };
 
 const apply = (entries: DecodedSignalsEntry[]) => useDecoderStore.getState().applyDecodedBatch(entries);
