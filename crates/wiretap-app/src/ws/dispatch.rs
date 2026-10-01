@@ -1768,4 +1768,30 @@ bit_length = 8
         assert_eq!(&payload[2..16], b"main_dashboard");
         assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&payload[16..]).is_ok_and(|d| !d.is_empty()));
     }
+
+    #[test]
+    fn an_out_of_range_signal_sends_a_null_scaled_value() {
+        let catalog = wiretap_catalog::Catalog::parse(
+            r#"
+[meta]
+name = "huge"
+
+[frame.can.0x104]
+length = 8
+
+[[frame.can.0x104.signals]]
+name = "Huge"
+start_bit = 0
+bit_length = 64
+factor = 1e10
+"#,
+        )
+        .expect("catalogue parses");
+
+        let decoded = wiretap_catalog::decode::decode_by_id(&catalog, 0x104, &[0xFF; 8]).expect("decodes");
+        let json = signal_json(&decoded.signals[0]);
+
+        assert_eq!(json["scaled"], serde_json::Value::Null);
+        assert_eq!(json["display"], "(out of range)");
+    }
 }

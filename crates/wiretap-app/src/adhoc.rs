@@ -17,11 +17,6 @@ use wiretap_decode::{Endianness, PayloadField, ScaledField};
 
 use crate::io::FrameMessage;
 
-/// `raw × factor + offset` is scaled in `Decimal`, which panics past ~7.9e28. A
-/// 64-bit raw (~1.8e19) times this stays under 1.9e28, with room for the offset.
-const MAX_FACTOR: f64 = 1e9;
-const MAX_OFFSET: f64 = 1e15;
-
 /// The most candidates the explorer lists, best first across every frame.
 const MAX_CANDIDATES: usize = 500;
 
@@ -54,10 +49,6 @@ fn hypothesis_name(frame_id: u32, field: &PayloadField) -> String {
     format!("hyp_{frame_id:X}_b{}_{}{order}{sign}", field.start_bit, field.bit_length)
 }
 
-fn scale_in_range(field: &ScaledField) -> bool {
-    field.factor.abs() <= MAX_FACTOR && field.offset.abs() <= MAX_OFFSET
-}
-
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 /// One charted signal, as the Dashboard names it. `params` is a `hyp_*` name's
@@ -72,10 +63,9 @@ pub struct SignalRef {
 
 impl SignalRef {
     fn field(&self) -> Option<ScaledField> {
-        let field = self.params.or_else(|| {
+        self.params.or_else(|| {
             parse_byte_name(&self.name).map(|field| ScaledField { field, factor: 1.0, offset: 0.0 })
-        })?;
-        scale_in_range(&field).then_some(field)
+        })
     }
 }
 
@@ -337,10 +327,8 @@ impl RankRequest {
 }
 
 /// Every frame's candidates merged best first, ties in frame then start-bit
-/// order, scaled as asked within `Decimal`'s range and capped.
+/// order, scaled as asked and capped.
 fn merge_ranked(per_frame: Vec<(u32, Vec<Candidate>)>, factor: f64, offset: f64) -> RankedHypotheses {
-    let factor = factor.clamp(-MAX_FACTOR, MAX_FACTOR);
-    let offset = offset.clamp(-MAX_OFFSET, MAX_OFFSET);
     let mut all: Vec<(u32, Candidate)> = per_frame
         .into_iter()
         .flat_map(|(id, candidates)| candidates.into_iter().map(move |c| (id, c)))
@@ -512,21 +500,20 @@ mod tests {
     }
 
     #[test]
-    fn a_hypothesis_needs_its_saved_params_and_a_scale_decimal_can_hold() {
-        let params = |factor: f64| json!({ "startBit": 0, "bitLength": 8, "endianness": "little", "signed": false, "factor": factor, "offset": 0.0 });
+    fn a_hypothesis_needs_its_saved_params() {
         assert!(signal(1, "hyp_1_b0_8le", None).field().is_none());
-        assert!(signal(1, "hyp_1_b0_8le", Some(params(MAX_FACTOR))).field().is_some());
-        assert!(signal(1, "hyp_1_b0_8le", Some(params(MAX_FACTOR * 10.0))).field().is_none());
     }
 
     #[test]
-    fn the_scale_bounds_never_overflow_decimal() {
-        for (signed, bytes) in [(false, [0xFF; 8]), (true, [0x00, 0, 0, 0, 0, 0, 0, 0x80])] {
-            for (factor, offset) in [(MAX_FACTOR, MAX_OFFSET), (-MAX_FACTOR, -MAX_OFFSET)] {
-                let field = PayloadField { start_bit: 0, bit_length: 64, endianness: Endianness::Little, signed };
-                assert!(ScaledField { field, factor, offset }.decode(&bytes).is_some());
-            }
-        }
+    fn a_field_scaled_past_decimals_range_registers_and_charts_nothing() {
+        let mut watch = Watch::default();
+        let huge = json!({ "startBit": 0, "bitLength": 64, "endianness": "little", "signed": false, "factor": 1e30, "offset": 0.0 });
+        assert_eq!(watch.set(&[signal(1, "hyp_1_b0_64le", Some(huge)), signal(1, "byte[0]", None)], &[]), 2);
+
+        let batch = watch.batch(&[frame(1, 0, vec![0xFF; 8])], None);
+
+        let values: Vec<_> = batch.values.iter().map(|v| (v.name.as_str(), v.value)).collect();
+        assert_eq!(values, vec![("byte[0]", 255.0)]);
     }
 
     #[test]
@@ -632,11 +619,13 @@ mod tests {
     }
 
     #[test]
-    fn ranking_ties_keep_frame_order_and_clamp_the_scale() {
-        let ranked = merge_ranked(vec![(2, vec![candidate(8, 50)]), (1, vec![candidate(8, 50), candidate(0, 50)])], 1e12, -1e20);
+    fn ranking_ties_keep_frame_order_and_pass_any_scale_through() {
+        let ranked = merge_ranked(vec![(2, vec![candidate(8, 50)]), (1, vec![candidate(8, 50), candidate(0, 50)])], 1e30, -1e30);
         let order: Vec<_> = ranked.candidates.iter().map(|c| (c.frame_id, c.params.field.start_bit)).collect();
         assert_eq!(order, vec![(1, 0), (2, 8), (1, 8)]);
-        assert_eq!((ranked.candidates[0].params.factor, ranked.candidates[0].params.offset), (MAX_FACTOR, -MAX_OFFSET));
+        let params = ranked.candidates[0].params;
+        assert_eq!((params.factor, params.offset), (1e30, -1e30));
+        assert_eq!(params.decode(&[0xFF]), None);
     }
 
     #[test]
