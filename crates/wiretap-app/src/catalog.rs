@@ -1200,4 +1200,31 @@ mod tests {
         let rpm = signals.iter().find(|s| s["name"] == "rpm").unwrap();
         assert_eq!(rpm["confidence"], "high");
     }
+
+    fn set_meta_version(original: &str) -> serde_json::Value {
+        command(
+            "catalog.edits",
+            serde_json::json!({
+                "content": original,
+                "ops": [{ "op": "SetMeta", "meta": { "name": "pack", "version": 2 } }],
+            }),
+        )
+    }
+
+    const META_WITH_COMMENTS: &str = "# Pack catalogue\n[meta]\n# Bumped on every release\nversion = 1 # keep in step\nname = \"pack\"\n\n[frame.can.\"0x100\"]\nlength = 8\n";
+
+    #[test]
+    fn saving_metadata_keeps_the_comments_around_the_value_it_sets() {
+        assert_eq!(
+            set_meta_version(META_WITH_COMMENTS),
+            META_WITH_COMMENTS.replace("version = 1 #", "version = 2 #")
+        );
+    }
+
+    #[test]
+    #[ignore = "wiretap_catalog::edit::apply_edits re-encodes every line with LF"]
+    fn saving_metadata_keeps_a_crlf_file_crlf() {
+        let original = META_WITH_COMMENTS.replace('\n', "\r\n");
+        assert_eq!(set_meta_version(&original), original.replace("version = 1 #", "version = 2 #"));
+    }
 }
