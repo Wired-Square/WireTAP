@@ -297,8 +297,9 @@ interface DecoderState {
   clearDecoded: () => void;
 
   // Actions - Decoding
-  /** Route one DecodedSignals batch into the decoded map, Unmatched and Filtered. */
-  applyDecodedBatch: (entries: DecodedSignalsEntry[]) => void;
+  /** Route one DecodedSignals batch into the decoded map, Unmatched and Filtered.
+   *  An attach's `backlog` replaces the Modbus rows rather than adding to them. */
+  applyDecodedBatch: (entries: DecodedSignalsEntry[], backlog?: boolean) => void;
   clearUnmatchedFrames: () => void;
   clearFilteredFrames: () => void;
   setIoProfile: (profile: string | null) => void;
@@ -610,8 +611,12 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   // against the catalogue — decoded, unmatched or short — so this only applies
   // the panel's own length and id filters and merges: signals by muxValue:name so each
   // mux case persists, plus header fields, source address and mux selectors.
-  applyDecodedBatch: (entries) => {
-    if (entries.length === 0) return;
+  applyDecodedBatch: (entries, backlog = false) => {
+    if (backlog) _tunnelTransactions = [];
+    if (entries.length === 0) {
+      if (backlog) set({ decodedVersion: get().decodedVersion + 1 });
+      return;
+    }
 
     const { frameIdFilterSet, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorValidation } = get();
     const minLength = serialConfig?.min_frame_length ?? 0;

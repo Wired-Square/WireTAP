@@ -178,7 +178,7 @@ export interface UseIOSessionOptions {
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
-  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */
@@ -760,7 +760,7 @@ export function useIOSession(
         tlog.debug(`[useIOSession:${appName}] calling registerCallbacks...`);
         registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-          onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
+          onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -1157,7 +1157,7 @@ export function useIOSession(
         // Re-register callbacks after reinitialize
         registerCallbacks(targetSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-          onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
+          onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -1260,7 +1260,7 @@ export function useIOSession(
       // Re-register callbacks
       registerCallbacks(targetSessionId, subscriberIdRef.current, {
         onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-        onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
+        onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
         onError: (error) => callbacksRef.current.onError?.(error),
         onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),

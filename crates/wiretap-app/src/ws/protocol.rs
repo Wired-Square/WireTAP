@@ -48,6 +48,9 @@ pub enum MsgType {
     // frames it finds ride the same channel, so the terminal state is ordered
     // against StreamEnded rather than racing it on a separate transport.
     ModbusScanState  = 0x1A,
+    // An attach's DecodedSignals for the frames already delivered, sent only to
+    // the attaching window, which replaces its Modbus rows with it.
+    DecodedBacklog   = 0x1B,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -88,6 +91,7 @@ impl TryFrom<u8> for MsgType {
             0x18 => Ok(MsgType::CatalogListChanged),
             0x19 => Ok(MsgType::ByteCounts),
             0x1A => Ok(MsgType::ModbusScanState),
+            0x1B => Ok(MsgType::DecodedBacklog),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),

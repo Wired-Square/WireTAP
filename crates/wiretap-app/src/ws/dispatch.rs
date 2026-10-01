@@ -20,6 +20,18 @@ use crate::ws::tunnel_signals;
 static FRAME_OFFSETS: Lazy<RwLock<HashMap<String, usize>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// Held from reading a session's offset to sending what it covers: a live batch
+/// straddling an attach's backlog, which replaces Modbus rows, would be lost or doubled.
+static DELIVERY_LOCKS: Lazy<Mutex<HashMap<String, Arc<Mutex<()>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn delivery_lock(session_id: &str) -> Arc<Mutex<()>> {
+    DELIVERY_LOCKS
+        .lock()
+        .map(|mut locks| locks.entry(session_id.to_string()).or_default().clone())
+        .unwrap_or_default()
+}
+
 /// Catalogues attached to sessions for live decode. When a session has one,
 /// [`send_new_frames`] also decodes the batch (once, in Rust) and pushes a
 /// `DecodedSignals` message — raw `FrameData` still flows for the apps that
@@ -642,6 +654,8 @@ pub fn send_new_frames(session_id: &str) {
         None => return,
     };
 
+    let lock = delivery_lock(session_id);
+    let _delivering = lock.lock();
     let offset = FRAME_OFFSETS
         .read()
         .ok()
@@ -745,6 +759,9 @@ pub fn clear_frame_offset(session_id: &str) {
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {
         offsets.remove(session_id);
     }
+    if let Ok(mut locks) = DELIVERY_LOCKS.lock() {
+        locks.remove(session_id);
+    }
 }
 
 /// Decode the frames already delivered to this session's client (everything up to the
@@ -753,7 +770,8 @@ pub fn clear_frame_offset(session_id: &str) {
 /// catalogue attached after frames were delivered (e.g. a capture replay that started
 /// streaming before the decoder bound its catalogue) would otherwise leave those frames
 /// undecoded. Called right after `attach_catalog`, and sent only to `conn_id`, the window
-/// that attached: tunnel exchanges are appended, so every other window would show them twice.
+/// that attached, as a `DecodedBacklog` it replaces its Modbus rows with — sent even when
+/// empty, so rows from the previous catalogue go too.
 pub fn redecode_delivered(session_id: &str, conn_id: usize) {
     let Some(catalog) = attached_catalog(session_id) else { return };
     let Some(server) = ws_server() else { return };
@@ -761,6 +779,8 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize) {
     let Some(capture_id) = crate::capture_store::get_session_frame_capture_id(session_id) else {
         return;
     };
+    let lock = delivery_lock(session_id);
+    let _delivering = lock.lock();
     let offset = FRAME_OFFSETS
         .read()
         .ok()
@@ -779,9 +799,7 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize) {
     reset_tunnels(session_id);
     let tunnels = tunnel_decoders(session_id);
     let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), false);
-    if !decoded.is_empty() {
-        server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedSignals, channel, &decoded));
-    }
+    server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedBacklog, channel, &decoded));
 }
 
 /// Send a batch of frames to all WebSocket subscribers for this session.
@@ -1703,7 +1721,7 @@ bit_length = 8
     }
 
     #[test]
-    fn a_joining_window_alone_receives_the_tunnel_backlog() {
+    fn a_joining_window_alone_receives_the_tunnel_backlog_marked_as_one() {
         use crate::ws::server::outbox::{self, Recipient};
         const JOINING: usize = 7_001;
         const CHANNEL: u8 = 201;
@@ -1733,6 +1751,6 @@ bit_length = 8
         .expect("attach");
         detach_catalog(session);
 
-        assert_eq!(outbox::sent(CHANNEL, MsgType::DecodedSignals), [Recipient::Conn(JOINING)]);
+        assert_eq!(outbox::sent(CHANNEL, MsgType::DecodedBacklog), [Recipient::Conn(JOINING)]);
     }
 }

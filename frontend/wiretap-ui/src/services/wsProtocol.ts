@@ -43,6 +43,7 @@ export const MsgType = {
   CatalogListChanged: 0x18,
   ByteCounts: 0x19,
   ModbusScanState: 0x1a,
+  DecodedBacklog: 0x1b,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,

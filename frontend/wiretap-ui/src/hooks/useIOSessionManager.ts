@@ -131,7 +131,7 @@ export interface UseIOSessionManagerOptions {
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
-  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */

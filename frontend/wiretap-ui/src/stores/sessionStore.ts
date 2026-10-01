@@ -324,7 +324,7 @@ export type SessionReconfiguredPayload = Record<string, never>;
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
   /** Decoded signals streamed from the Rust decoder (when a catalogue is attached). */
-  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[], backlog: boolean) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
   onStreamEnded?: (payload: StreamEndedInfo) => void;
@@ -531,15 +531,15 @@ function emptyCapture(id: string | null = null, owningSessionId: string | null =
   };
 }
 
-function invokeCallbacks<T>(
+function invokeCallbacks<A extends unknown[]>(
   eventListeners: SessionEventSubscribers,
   eventType: keyof SessionCallbacks,
-  payload: T
+  ...args: A
 ) {
   for (const [, callbacks] of eventListeners.callbacks.entries()) {
-    const cb = callbacks[eventType] as ((arg: T) => void) | undefined;
+    const cb = callbacks[eventType] as ((...a: A) => void) | undefined;
     if (cb) {
-      cb(payload);
+      cb(...args);
     }
   }
 }
@@ -571,15 +571,17 @@ async function setupSessionEventSubscribers(
       })
     );
 
-    // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.DecodedSignals, (payload) => {
-        const decoded = decodeDecodedSignals(payload);
-        if (decoded.length > 0) {
-          invokeCallbacks(eventListeners, "onDecoded", decoded);
-        }
-      })
-    );
+    // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached.
+    // DecodedBacklog (0x1B) — an attach's redecode of what was already delivered.
+    for (const [msgType, backlog] of [[MsgType.DecodedSignals, false], [MsgType.DecodedBacklog, true]] as const) {
+      eventListeners.wsUnlistenFunctions.push(
+        wsTransport.onSessionMessage(sessionId, msgType, (payload) => {
+          const decoded = decodeDecodedSignals(payload);
+          if (decoded.length === 0 && !backlog) return;
+          invokeCallbacks(eventListeners, "onDecoded", decoded, backlog);
+        })
+      );
+    }
 
     // SessionState (0x02) — state string + optional error decoded from binary
     eventListeners.wsUnlistenFunctions.push(

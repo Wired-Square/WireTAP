@@ -232,7 +232,13 @@ function DecoderInner() {
     store.applyDecodedBatch(entries);
   }, []);
 
-  const handleDecoded = useCallback((entries: DecodedSignalsEntry[]) => {
+  const handleDecoded = useCallback((entries: DecodedSignalsEntry[], backlog: boolean) => {
+    if (backlog) {
+      // Pending entries arrived first: the backlog covers their Modbus rows, not their Unmatched ones.
+      flushPendingEntries();
+      useDecoderStore.getState().applyDecodedBatch(entries, true);
+      return;
+    }
     for (const entry of entries) pendingEntriesRef.current.push(entry);
     if (!flushScheduledRef.current) {
       flushScheduledRef.current = true;

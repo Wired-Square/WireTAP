@@ -95,6 +95,18 @@ describe("decoderStore.applyDecodedBatch", () => {
     ]);
   });
 
+  it("replaces the Modbus rows with an attach's backlog rather than adding to them", () => {
+    apply([decoded({ tunnel: [tunnelMessage] }), { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can" }]);
+    const backlog = [decoded({ tunnel: [tunnelMessage] })];
+    useDecoderStore.getState().applyDecodedBatch(backlog, true);
+    useDecoderStore.getState().applyDecodedBatch(backlog, true);
+    expect(getTunnelTransactions()).toHaveLength(1);
+    expect(getUnmatchedFrames()).toHaveLength(1);
+
+    useDecoderStore.getState().applyDecodedBatch([], true);
+    expect(getTunnelTransactions()).toEqual([]);
+  });
+
   it("leaves no Modbus rows behind a swap to a catalogue with no tunnel", () => {
     apply([decoded({ tunnel: [tunnelMessage] })]);
     useDecoderStore.getState().applyParsedCatalog(
