@@ -12,6 +12,9 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
+use crate::io::device_kinds::conn_str;
+use crate::settings::IOProfile;
+
 /// Information about active profile usage
 #[derive(Clone, Debug, Serialize)]
 pub struct ProfileUsage {
@@ -122,6 +125,49 @@ pub fn can_use_profile(profile_id: &str, profile_kind: &str) -> Result<(), Strin
     Ok(())
 }
 
+/// A gs_usb adapter, by its serial number or else its USB bus and address.
+fn gs_usb_adapter(profile: &IOProfile) -> Option<String> {
+    if profile.kind != "gs_usb" {
+        return None;
+    }
+    let at = || {
+        let field = |key| profile.connection.get(key).and_then(|v| v.as_i64().or_else(|| v.as_str()?.trim().parse().ok()));
+        Some(format!("{}:{}", field("bus")?, field("address")?))
+    };
+    conn_str(profile, "serial").or_else(at)
+}
+
+/// Refuse a gs_usb profile whose adapter another live session holds, or another
+/// of the profiles opening with it (`joining`) is on. Every channel claims the
+/// adapter's one USB interface, and macOS gives that interface one owner.
+pub fn can_use_adapter(profile_id: &str, profiles: &[IOProfile], joining: &[&str]) -> Result<(), String> {
+    let find = |id: &str| profiles.iter().find(|p| p.id == id);
+    let Some(adapter) = find(profile_id).and_then(gs_usb_adapter) else {
+        return Ok(());
+    };
+    let on_adapter = |id: &str| id != profile_id && find(id).and_then(gs_usb_adapter).as_ref() == Some(&adapter);
+    let name = |id: &str| find(id).map_or(id.to_string(), |p| p.name.clone());
+
+    if let Some(other) = joining.iter().find(|id| on_adapter(id)) {
+        return Err(format!(
+            "'{}' and '{}' are on the same gs_usb adapter, which only one source can open at a time.",
+            name(other),
+            name(profile_id)
+        ));
+    }
+    let usage = PROFILE_USAGE.lock().map_err(|e| e.to_string())?;
+    if let Some((held, sessions)) = usage.iter().find(|(id, _)| on_adapter(id)) {
+        let mut sessions: Vec<_> = sessions.iter().cloned().collect();
+        sessions.sort();
+        return Err(format!(
+            "The gs_usb adapter is in use by '{}' in session '{}'. Stop that session first.",
+            name(held),
+            sessions.join(", ")
+        ));
+    }
+    Ok(())
+}
+
 /// Check if a profile kind requires single-handle access
 #[allow(dead_code)]
 pub fn is_single_handle_kind(profile_kind: &str) -> bool {
@@ -138,5 +184,49 @@ mod tests {
         let second = can_use_profile("gs-usb-held", "gs_usb");
         unregister_usage_by_session("gs-usb-held", "f_first");
         assert!(second.is_err(), "the adapter's interface has one owner");
+    }
+
+    fn gs_usb(id: &str, connection: serde_json::Value) -> IOProfile {
+        IOProfile {
+            id: id.into(),
+            name: format!("{id} name"),
+            kind: "gs_usb".into(),
+            connection: serde_json::from_value(connection).unwrap(),
+            preferred_catalog: None,
+            ephemeral: false,
+        }
+    }
+
+    #[test]
+    fn a_second_gs_usb_profile_on_a_held_adapter_is_refused() {
+        let profiles = [
+            gs_usb("gs-held-ch0", serde_json::json!({ "serial": "A1", "channel": 0 })),
+            gs_usb("gs-held-ch1", serde_json::json!({ "serial": "A1", "channel": 1 })),
+            gs_usb("gs-other", serde_json::json!({ "serial": "B2" })),
+        ];
+        register_usage("gs-held-ch0", "f_holder");
+        let same_adapter = can_use_adapter("gs-held-ch1", &profiles, &[]);
+        let other_adapter = can_use_adapter("gs-other", &profiles, &[]);
+        unregister_usage_by_session("gs-held-ch0", "f_holder");
+
+        let error = same_adapter.expect_err("the adapter's interface has one owner");
+        assert!(error.contains("gs-held-ch0 name") && error.contains("f_holder"), "{error}");
+        assert!(other_adapter.is_ok(), "{other_adapter:?}");
+    }
+
+    #[test]
+    fn two_gs_usb_sources_on_one_adapter_cannot_share_a_session() {
+        let profiles = [
+            gs_usb("gs-join-ch0", serde_json::json!({ "bus": 2, "address": 7, "channel": 0 })),
+            gs_usb("gs-join-ch1", serde_json::json!({ "bus": 2, "address": 7, "channel": 1 })),
+            gs_usb("gs-join-elsewhere", serde_json::json!({ "bus": 2, "address": 8 })),
+        ];
+        let error = can_use_adapter("gs-join-ch1", &profiles, &["gs-join-ch0"])
+            .expect_err("both channels claim the one interface");
+        assert!(error.contains("gs-join-ch0 name"), "{error}");
+        assert!(can_use_adapter("gs-join-elsewhere", &profiles, &["gs-join-ch0"]).is_ok());
+
+        let unidentified = [gs_usb("gs-bare-a", serde_json::json!({})), gs_usb("gs-bare-b", serde_json::json!({}))];
+        assert!(can_use_adapter("gs-bare-b", &unidentified, &["gs-bare-a"]).is_ok(), "no identity, nothing to compare");
     }
 }

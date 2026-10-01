@@ -821,6 +821,7 @@ pub async fn create_reader_session(
 
     // Check if this profile is already in use (for single-handle devices)
     profile_tracker::can_use_profile(&profile.id, &profile.kind)?;
+    profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[])?;
 
     // Anonymous usage telemetry: which source kind gets started (wiretap,
     // wiretap, and any MCP-driven kind all land here).
@@ -1351,8 +1352,13 @@ pub async fn resume_session_to_live(
     };
 
     // Check profile availability before committing
+    let profiles = settings::load_settings(app.clone())
+        .await
+        .map_err(|e| format!("Failed to load settings: {}", e))?
+        .io_profiles;
     for config in &configs {
         crate::profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind)?;
+        crate::profile_tracker::can_use_adapter(&config.profile_id, &profiles, &[])?;
     }
 
     // Re-register profiles with the tracker
@@ -1527,6 +1533,7 @@ pub async fn add_source_to_session_cmd(
 
     // Check if profile is already in use by another session
     profile_tracker::can_use_profile(&source_config.profile_id, &source_config.profile_kind)?;
+    profile_tracker::can_use_adapter(&source_config.profile_id, &settings.io_profiles, &[])?;
 
     // Register profile usage
     let profile_id = source_config.profile_id.clone();
@@ -2308,7 +2315,7 @@ pub async fn create_multi_source_session(
     }
 
     // Validate all profiles are real-time devices supported by IOBroker
-    for config in &source_configs {
+    for (idx, config) in source_configs.iter().enumerate() {
         if !is_realtime_device(&config.profile_kind) {
             return Err(format!(
                 "Profile '{}' has unsupported type '{}' for multi-source mode. \
@@ -2337,6 +2344,8 @@ pub async fn create_multi_source_session(
 
         // Check if profile is already in use
         profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind)?;
+        let joining: Vec<&str> = source_configs[..idx].iter().map(|c| c.profile_id.as_str()).collect();
+        profile_tracker::can_use_adapter(&config.profile_id, &settings.io_profiles, &joining)?;
     }
 
     // Track all profiles for this session
