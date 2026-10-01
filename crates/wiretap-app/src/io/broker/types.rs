@@ -86,6 +86,10 @@ impl SourceConfig {
         self.profile_kind == "virtual"
             && self.bus_mappings.iter().any(|m| m.protocol == Protocol::Serial)
     }
+
+    pub(super) fn transmits_raw_bytes(&self) -> bool {
+        matches!(self.profile_kind.as_str(), "serial" | "framelink") || self.is_virtual_serial()
+    }
 }
 
 /// Transmit routing info: maps output bus to source and device bus

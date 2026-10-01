@@ -579,7 +579,7 @@ impl IOBroker {
         let routes = self.current_transmit_routes();
         let serial_route = routes
             .values()
-            .find(|route| route.profile_kind == "serial" || route.profile_kind == "framelink")
+            .find(|route| self.sources[route.source_idx].transmits_raw_bytes())
             .ok_or_else(|| "No serial or FrameLink source configured in this session".to_string())?;
 
         let channels = self
@@ -1119,5 +1119,16 @@ mod tests {
         };
         assert_eq!(streams(&[virtual_device(Protocol::Serial)], &[]), (false, true));
         assert_eq!(streams(&[virtual_device(Protocol::Can)], &[]), (true, false));
+    }
+
+    #[test]
+    fn a_virtual_device_takes_raw_bytes_only_when_its_traffic_is_serial() {
+        let virtual_device = |protocol| SourceConfig {
+            profile_kind: "virtual".into(),
+            bus_mappings: vec![BusMapping::default().with_protocol(protocol)],
+            ..Default::default()
+        };
+        assert!(virtual_device(Protocol::Serial).transmits_raw_bytes());
+        assert!(!virtual_device(Protocol::Can).transmits_raw_bytes());
     }
 }

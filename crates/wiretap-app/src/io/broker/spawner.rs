@@ -413,13 +413,20 @@ async fn run_virtual_reader(
     // A blocking thread, not a tokio task: `recv_timeout` never yields, and on a worker it wedged the runtime.
     let tx_loopback = tx.clone();
     let stop_flag_for_transmit = stop_flag.clone();
+    let serial_echo_bus = (traffic == VirtualTrafficType::Serial).then(|| {
+        bus_mappings.iter().find(|m| m.enabled).map_or(0, |m| m.output_bus)
+    });
     tokio::task::spawn_blocking(move || {
         while !stop_flag_for_transmit.load(Ordering::Relaxed) {
             match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
                 Ok(req) => {
                     let data = &req.data;
-                    // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
-                    if data.len() >= 8 {
+                    if let Some(bus) = serial_echo_bus {
+                        let timestamp_us = now_us();
+                        let entries = data.iter().map(|&byte| ByteEntry { byte, timestamp_us, bus }).collect();
+                        let _ = tx_loopback.blocking_send(SourceMessage::Bytes(source_idx, entries));
+                    } else if data.len() >= 8 {
+                        // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
                         let frame_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
                         let bus = data[4];
                         let is_extended = data[5] != 0;
@@ -724,6 +731,7 @@ async fn relay_source_flags(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::Protocol;
     use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
 
@@ -890,6 +898,47 @@ mod tests {
             }
             SourceMessage::Frames(_, frames) => panic!("generated frames: {frames:?}"),
             _ => panic!("generated neither bytes nor frames"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_serial_virtual_device_echoes_the_bytes_it_is_sent() {
+        let mut profile = loopback_profile();
+        profile.connection.insert("traffic_type".into(), "serial".into());
+        profile.connection.insert(
+            "interfaces".into(),
+            serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+        );
+        let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }.with_protocol(Protocol::Serial)];
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, mut rx) = mpsc::channel(64);
+        let reader = tokio::spawn({
+            let stop = stop.clone();
+            async move { run_virtual_reader(0, &profile, mappings, stop, tx, Default::default(), None).await }
+        });
+
+        let echoed = loop {
+            match rx.recv().await.expect("the reader is running") {
+                SourceMessage::Connected(..) => continue,
+                SourceMessage::TransmitReady(_, transmit) => {
+                    let (result_tx, _) = std_mpsc::sync_channel(1);
+                    let data = b"AT+PING\r\n".to_vec();
+                    transmit.try_send(TransmitRequest { data, frame: None, result_tx }).unwrap();
+                }
+                msg => break msg,
+            }
+        };
+        stop.store(true, Ordering::Relaxed);
+        reader.await.expect("the reader task").expect("the reader ends cleanly");
+
+        match echoed {
+            SourceMessage::Bytes(0, entries) => {
+                let bytes: Vec<u8> = entries.iter().map(|e| e.byte).collect();
+                assert_eq!(bytes, b"AT+PING\r\n");
+                assert!(entries.iter().all(|e| e.bus == 3), "echoed on the output bus");
+            }
+            SourceMessage::Frames(_, frames) => panic!("echoed frames: {frames:?}"),
+            _ => panic!("echoed neither bytes nor frames"),
         }
     }
 }
