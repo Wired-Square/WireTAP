@@ -15,6 +15,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **`wiretap-can-cli` closes the adapter when it is terminated, not only on Ctrl-C.** `dump`, `gen` and a `pattern` responder stopped by SIGTERM (`timeout`, `kill`, a service manager) used to leave the adapter on the bus, still acknowledging frames. They now take it off the bus as Ctrl-C does.
+- **Changing a live CAN source's buses or settings no longer fails to reopen the adapter.** The source was restarted before the old connection had let go of the device, so a USB adapter could come back as busy and drop out of the session. The restart now waits for the old connection to close.
 
 ## [0.13.0] - 2026-09-29
 

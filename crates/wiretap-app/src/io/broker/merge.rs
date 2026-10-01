@@ -155,6 +155,7 @@ pub(super) async fn run_merge_task(
     }
 
     let mut live = LiveSources::new(source_profiles.keys().copied());
+    let mut pending_readds = PendingReadds::default();
     // The last error a source reported, kept so the session can end as "error"
     // rather than "complete" when every source has failed.
     let mut last_source_error: Option<String> = None;
@@ -178,6 +179,7 @@ pub(super) async fn run_merge_task(
             break;
         }
 
+        let mut ready_to_add: Option<SourceConfig> = None;
         tokio::select! {
             msg = rx.recv() => {
                 match msg {
@@ -214,6 +216,7 @@ pub(super) async fn run_merge_task(
                             emit_session_error(&session_id, error);
                         }
                         live.end(source_idx);
+                        ready_to_add = pending_readds.source_ended(source_idx);
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} error: {}", source_idx, error);
@@ -223,6 +226,7 @@ pub(super) async fn run_merge_task(
                         last_source_error = Some(error.clone());
                         emit_session_error(&session_id, error);
                         live.end(source_idx);
+                        ready_to_add = pending_readds.source_ended(source_idx);
                     }
                     Some(SourceMessage::Interrupted(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} interrupted: {}", source_idx, error);
@@ -307,57 +311,15 @@ pub(super) async fn run_merge_task(
             cmd = merge_cmd_rx.recv() => {
                 match cmd {
                     Some(MergeCommand::AddSource(source_config)) => {
-                        let idx = next_source_idx;
-                        next_source_idx += 1;
-                        // Re-read rather than using the profiles loaded at task
-                        // start: a source is hot-added to pick up a profile that
-                        // has *changed* — reconfiguring a live device's bitrate
-                        // or baud rate is a remove-then-add of that source — so
-                        // the original copy would respawn the device on exactly
-                        // the settings the user just replaced.
-                        let fresh = match settings::load_settings_sync(&app) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                tlog!("[IOBroker] Hot-add: failed to reload settings: {}", e);
-                                continue;
-                            }
-                        };
-                        let Some(profile) = fresh
-                            .io_profiles
-                            .into_iter()
-                            .find(|p| p.id == source_config.profile_id)
-                        else {
-                            tlog!("[IOBroker] Hot-add: profile '{}' not found", source_config.profile_id);
-                            continue;
-                        };
-                        let source_stop = Arc::new(AtomicBool::new(false));
-                        source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
-                        let source_pause =
-                            register_pause_flag(&source_pause_flags, &source_config.profile_id);
-                        source_profiles.insert(idx, SourceIdentity::of(&source_config));
-                        // A re-added source re-reconciles once it connects; drop
-                        // the previous answer so a stale one is never served.
-                        if let Ok(mut resolved) = resolved_mappings.lock() {
-                            resolved.remove(&source_config.profile_id);
-                        }
-                        let handle = spawn_source(
-                            idx,
-                            &source_config,
-                            &profile,
-                            source_stop,
-                            source_pause,
-                            &app,
-                            &session_id,
-                            &stop_flag,
-                            &tx,
-                            &virtual_bus_controls,
-                            &virtual_cmd_txs,
-                        );
-                        source_handles.push(handle);
-                        live.add(idx);
-                        tlog!("[IOBroker] Hot-added source {} (profile '{}')", idx, source_config.profile_id);
+                        ready_to_add = pending_readds.add(source_config);
                     }
                     Some(MergeCommand::RemoveSource(profile_id)) => {
+                        let running = source_profiles
+                            .iter()
+                            .find(|(idx, s)| s.profile_id == profile_id && live.contains(**idx));
+                        if let Some((&idx, _)) = running {
+                            pending_readds.removing(idx, profile_id.clone());
+                        }
                         if let Some(flag) = source_stop_flags.remove(&profile_id) {
                             flag.store(true, Ordering::SeqCst);
                             tlog!("[IOBroker] Hot-removing source (profile '{}')", profile_id);
@@ -382,6 +344,58 @@ pub(super) async fn run_merge_task(
             _ = tokio::time::sleep(emit_interval) => {
                 // Periodic wakeup for batch emission
             }
+        }
+
+        if let Some(source_config) = ready_to_add {
+            let idx = next_source_idx;
+            next_source_idx += 1;
+            // Re-read rather than using the profiles loaded at task
+            // start: a source is hot-added to pick up a profile that
+            // has *changed* — reconfiguring a live device's bitrate
+            // or baud rate is a remove-then-add of that source — so
+            // the original copy would respawn the device on exactly
+            // the settings the user just replaced.
+            let fresh = match settings::load_settings_sync(&app) {
+                Ok(s) => s,
+                Err(e) => {
+                    tlog!("[IOBroker] Hot-add: failed to reload settings: {}", e);
+                    continue;
+                }
+            };
+            let Some(profile) = fresh
+                .io_profiles
+                .into_iter()
+                .find(|p| p.id == source_config.profile_id)
+            else {
+                tlog!("[IOBroker] Hot-add: profile '{}' not found", source_config.profile_id);
+                continue;
+            };
+            let source_stop = Arc::new(AtomicBool::new(false));
+            source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
+            let source_pause =
+                register_pause_flag(&source_pause_flags, &source_config.profile_id);
+            source_profiles.insert(idx, SourceIdentity::of(&source_config));
+            // A re-added source re-reconciles once it connects; drop
+            // the previous answer so a stale one is never served.
+            if let Ok(mut resolved) = resolved_mappings.lock() {
+                resolved.remove(&source_config.profile_id);
+            }
+            let handle = spawn_source(
+                idx,
+                &source_config,
+                &profile,
+                source_stop,
+                source_pause,
+                &app,
+                &session_id,
+                &stop_flag,
+                &tx,
+                &virtual_bus_controls,
+                &virtual_cmd_txs,
+            );
+            source_handles.push(handle);
+            live.add(idx);
+            tlog!("[IOBroker] Hot-added source {} (profile '{}')", idx, source_config.profile_id);
         }
 
         // Periodically log frames per bus (every 5 seconds)
@@ -567,14 +581,84 @@ impl LiveSources {
         self.0.remove(&index);
     }
 
+    fn contains(&self, index: usize) -> bool {
+        self.0.contains(&index)
+    }
+
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
 
+/// Re-adds waiting on the source they replace. A reader closes its device only
+/// after it sees its stop flag, so a re-add spawned at once would open an adapter
+/// the old reader still holds.
+#[derive(Default)]
+struct PendingReadds {
+    removing: HashMap<usize, String>,
+    held: HashMap<String, SourceConfig>,
+}
+
+impl PendingReadds {
+    /// Only a source still running is waited on; one that has already ended
+    /// will send nothing more to release its successor.
+    fn removing(&mut self, index: usize, profile_id: String) {
+        self.held.remove(&profile_id);
+        self.removing.insert(index, profile_id);
+    }
+
+    /// The config back if it can spawn now, `None` if it is held.
+    fn add(&mut self, config: SourceConfig) -> Option<SourceConfig> {
+        if self.removing.values().any(|p| *p == config.profile_id) {
+            self.held.insert(config.profile_id.clone(), config);
+            None
+        } else {
+            Some(config)
+        }
+    }
+
+    fn source_ended(&mut self, index: usize) -> Option<SourceConfig> {
+        let profile_id = self.removing.remove(&index)?;
+        self.held.remove(&profile_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{stream_ended_reason, LiveSources};
+    use super::{stream_ended_reason, LiveSources, PendingReadds};
+    use crate::io::broker::types::SourceConfig;
+
+    fn config(profile_id: &str) -> SourceConfig {
+        SourceConfig { profile_id: profile_id.to_string(), ..Default::default() }
+    }
+
+    #[test]
+    fn a_readd_waits_for_the_removed_source_to_end() {
+        let mut pending = PendingReadds::default();
+        pending.removing(0, "can".into());
+        assert!(pending.add(config("can")).is_none());
+        assert!(pending.source_ended(1).is_none());
+        assert_eq!(pending.source_ended(0).map(|c| c.profile_id), Some("can".into()));
+        assert!(pending.source_ended(0).is_none());
+    }
+
+    #[test]
+    fn an_add_with_no_removal_in_flight_spawns_at_once() {
+        let mut pending = PendingReadds::default();
+        pending.removing(0, "can".into());
+        assert!(pending.add(config("serial")).is_some());
+        pending.source_ended(0);
+        assert!(pending.add(config("can")).is_some());
+    }
+
+    #[test]
+    fn removing_again_drops_the_held_readd() {
+        let mut pending = PendingReadds::default();
+        pending.removing(0, "can".into());
+        pending.add(config("can"));
+        pending.removing(0, "can".into());
+        assert!(pending.source_ended(0).is_none());
+    }
 
     #[test]
     fn a_source_that_errors_and_then_ends_is_counted_out_once() {
