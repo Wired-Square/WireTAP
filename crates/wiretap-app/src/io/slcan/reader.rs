@@ -17,14 +17,17 @@ use tokio::sync::mpsc;
 use wiretap_io::can::slcan::{open as open_slcan, probe, SlcanOptions};
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use wiretap_io::serial::LineSettings;
+use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRATES, NOMINAL_BITRATES};
 
 use crate::io::bus_mapping::BusMapping;
+use crate::io::device_kinds::{req_bool, req_i64};
 use crate::io::can_task::{
     can_options, link_lost, mapped_frames, open_failed, serve, PortOutage, PORT_REOPEN,
     PROBE_TIMEOUT,
 };
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
+use crate::settings::IOProfile;
 
 // ============================================================================
 // Types and Configuration
@@ -171,6 +174,28 @@ fn on_event(
             .collect()),
         CanEvent::Disconnected { error, .. } => Err(error),
     }
+}
+
+/// The nominal and CAN FD data rates a profile asks for, refused when SLCAN has
+/// no command for one. The library refuses the same at open, but only once the
+/// session has already reported Running.
+pub fn slcan_rates(profile: &IOProfile) -> Result<(u32, Option<u32>), String> {
+    let bitrate = req_i64(profile, "bitrate")? as u32;
+    let data_bitrate = req_bool(profile, "enable_fd")?
+        .then(|| req_i64(profile, "data_bitrate").map(|bps| bps as u32))
+        .transpose()?;
+    nameable(bitrate, bitrate_command, &NOMINAL_BITRATES)?;
+    if let Some(bps) = data_bitrate {
+        nameable(bps, data_bitrate_command, &DATA_BITRATES)?;
+    }
+    Ok((bitrate, data_bitrate))
+}
+
+fn nameable(bps: u32, lookup: fn(u32) -> Option<&'static str>, table: &[(u32, &str)]) -> Result<(), String> {
+    lookup(bps).map(drop).ok_or_else(|| {
+        let rates: Vec<String> = table.iter().map(|(rate, _)| rate.to_string()).collect();
+        format!("{bps} bit/s is not an SLCAN rate; it takes {}", rates.join(", "))
+    })
 }
 
 /// Run slcan source and send frames to merge task

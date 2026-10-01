@@ -28,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 - **CSV import maps data columns past `D99` by their header.** Columns `D100` and up, as in an export of frames longer than 99 bytes, were only guessed from their contents and could be taken for a sequence number. They are now data bytes like `D1` to `D99`.
 - **A gs_usb adapter leaves the bus when its session ends on an error.** A session that failed and stopped could leave the adapter on the bus, still acknowledging frames, until it was unplugged. It is now closed and taken off the bus as a normal stop does.
 - **Transmit queue rows stay with the session they were queued on.** A source that disconnected while it had queued rows was dropped from Transmit instead of being kept for them, and renaming a capture could fail while any row was queued. Assigning an orphaned row to the current session now also sends it through that session, where before it could keep pointing at the old one.
+- **An SLCAN bitrate the adapter cannot be set to is refused at start.** A profile at a rate SLCAN has no command for, such as 33 333 bit/s, used to start as running and then sit in error. The start now fails at once with the rates SLCAN takes, and no session is left behind. Pick one of those rates in the profile.
 
 ## [0.13.0] - 2026-09-29
 

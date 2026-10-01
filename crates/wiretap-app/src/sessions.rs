@@ -771,6 +771,18 @@ fn framelink_bus_mapping(iface_index: u8, iface_type: u8, output_bus: u8) -> Bus
     }
 }
 
+/// Refuse a profile its device would refuse at open, before a session exists to
+/// report Running and then fail.
+fn refuse_at_start(profile: &IOProfile) -> Result<(), String> {
+    match profile.kind.as_str() {
+        #[cfg(not(target_os = "ios"))]
+        "slcan" => io::slcan::reader::slcan_rates(profile)
+            .map(drop)
+            .map_err(|e| format!("{}: {e}", profile.name)),
+        _ => Ok(()),
+    }
+}
+
 /// Create a new reader session
 #[tauri::command(rename_all = "snake_case")]
 #[allow(clippy::too_many_arguments)]
@@ -805,6 +817,7 @@ pub async fn create_reader_session(
 
     let profile = choose_profile_by_id(&settings, profile_id.as_deref())
         .ok_or_else(|| "No IO profile configured".to_string())?;
+    refuse_at_start(&profile)?;
 
     // Check if this profile is already in use (for single-handle devices)
     profile_tracker::can_use_profile(&profile.id, &profile.kind)?;
@@ -2225,6 +2238,7 @@ fn resolve_source_config(
         .iter()
         .find(|p| p.id == input.profile_id)
         .ok_or_else(|| format!("Profile '{}' not found", input.profile_id))?;
+    refuse_at_start(profile)?;
 
     let display_name = input.display_name.unwrap_or_else(|| profile.name.clone());
     let profile_kind = profile.kind.clone();
@@ -2891,6 +2905,17 @@ mod bus_mapping_tests {
             "interfaces": [{ "index": 0, "iface_type": 1 }, { "index": 1, "iface_type": 3 }]
         })));
         assert_eq!(mappings.len(), 2);
+    }
+
+    #[test]
+    fn an_slcan_rate_the_protocol_cannot_name_refuses_the_start() {
+        let slcan = |connection| profile("slcan", connection);
+        let error = refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 33_333 })))
+            .expect_err("SLCAN has no command for 33 333 bit/s");
+        assert!(error.contains("33333") && error.contains("10000"), "{error}");
+        assert!(refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 500_000 }))).is_ok());
+        let fd = json!({ "port": "/dev/x", "bitrate": 500_000, "enable_fd": true, "data_bitrate": 3_000_000 });
+        assert!(refuse_at_start(&slcan(fd)).is_err(), "nor a data rate it cannot name");
     }
 
     #[test]

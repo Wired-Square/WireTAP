@@ -28,7 +28,7 @@ use crate::io::serial::{parse_profile_for_source, run_source as run_serial_sourc
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::utils::line_settings;
 #[cfg(not(target_os = "ios"))]
-use crate::io::slcan::run_slcan_source;
+use crate::io::slcan::{reader::slcan_rates, run_slcan_source};
 use crate::io::framelink::reader::run_source as run_framelink_source;
 use crate::io::types::{ByteEntry, EndReason, SourceMessage, TransmitRequest};
 use crate::settings::IOProfile;
@@ -170,11 +170,8 @@ async fn run_slcan_reader(
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
-    let bitrate = req_i64(profile, "bitrate")? as u32;
+    let (bitrate, data_bitrate) = slcan_rates(profile)?;
     let silent_mode = req_bool(profile, "silent_mode")?;
-    let data_bitrate = req_bool(profile, "enable_fd")?
-        .then(|| req_i64(profile, "data_bitrate").map(|bps| bps as u32))
-        .transpose()?;
 
     run_slcan_source(
         source_idx,
