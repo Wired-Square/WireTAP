@@ -629,6 +629,27 @@ pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
     Ok(settings)
 }
 
+impl AppSettings {
+    pub fn profile(&self, profile_id: &str) -> Result<&IOProfile, String> {
+        self.io_profiles
+            .iter()
+            .find(|p| p.id == profile_id)
+            .ok_or_else(|| format!("Profile '{profile_id}' not found"))
+    }
+
+    pub fn profile_mut(&mut self, profile_id: &str) -> Result<&mut IOProfile, String> {
+        self.io_profiles
+            .iter_mut()
+            .find(|p| p.id == profile_id)
+            .ok_or_else(|| format!("Profile '{profile_id}' not found"))
+    }
+}
+
+/// The saved profile with this id, from the settings file as it is now.
+pub fn profile_by_id(app: &AppHandle, profile_id: &str) -> Result<IOProfile, String> {
+    load_settings_sync(app)?.profile(profile_id).cloned()
+}
+
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
     let settings_path = get_settings_path(&app)?;

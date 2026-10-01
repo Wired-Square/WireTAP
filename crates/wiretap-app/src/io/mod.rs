@@ -2782,49 +2782,59 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
     let sessions = IO_SESSIONS.lock().await;
     sessions
         .iter()
-        .map(|(session_id, session)| {
-            // Get source profile IDs from the session tracking
-            let source_profile_ids = sessions::get_session_profile_ids(session_id);
-
-            // Get capture info if this session has one of its own. Kind travels with the
-            // id — picking an arbitrary owned capture and leaving the roster to assume
-            // "frames" is how the two came apart.
-            let (capture_id, capture_kind) = capture_store::get_session_capture(session_id)
-                .map(|(id, kind)| (id, kind.as_str().to_string()))
-                .unzip();
-            let capture_frame_count = capture_id
-                .as_ref()
-                .map(|id| capture_store::get_capture_count(id));
-            let capture_unique_frame_count = capture_id
-                .as_ref()
-                .map(|id| capture_store::get_capture_unique_count(id));
-
-            // Check if session is actively streaming (running state)
-            let is_streaming = matches!(session.source.state(), IOState::Running);
-
-            // Build individual subscriber details (derived from the open-app registry)
-            let subscribers = subscribers_for_session(session_id);
-
-            ActiveSessionInfo {
-                session_id: session_id.clone(),
-                source_type: session.source.source_type().to_string(),
-                state: session.source.state(),
-                capabilities: session.source.capabilities(),
-                subscriber_count: subscribers.len(),
-                subscribers,
-                broker_configs: session.source.broker_configs(),
-                source_profile_ids,
-                origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
-                capture_id,
-                capture_kind,
-                capture_frame_count,
-                capture_unique_frame_count,
-                is_streaming,
-                catalog_path: crate::ws::dispatch::attached_catalog_path(session_id),
-                paused_source_profile_ids: session.source.paused_source_profile_ids(),
-            }
-        })
+        .map(|(session_id, session)| describe_session(session_id, session))
         .collect()
+}
+
+/// One session's listing, or `None` when there is no such session.
+pub async fn session_info(session_id: &str) -> Option<ActiveSessionInfo> {
+    let sessions = IO_SESSIONS.lock().await;
+    sessions
+        .get(session_id)
+        .map(|session| describe_session(session_id, session))
+}
+
+fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo {
+    // Get source profile IDs from the session tracking
+    let source_profile_ids = sessions::get_session_profile_ids(session_id);
+
+    // Get capture info if this session has one of its own. Kind travels with the
+    // id — picking an arbitrary owned capture and leaving the roster to assume
+    // "frames" is how the two came apart.
+    let (capture_id, capture_kind) = capture_store::get_session_capture(session_id)
+        .map(|(id, kind)| (id, kind.as_str().to_string()))
+        .unzip();
+    let capture_frame_count = capture_id
+        .as_ref()
+        .map(|id| capture_store::get_capture_count(id));
+    let capture_unique_frame_count = capture_id
+        .as_ref()
+        .map(|id| capture_store::get_capture_unique_count(id));
+
+    // Check if session is actively streaming (running state)
+    let is_streaming = matches!(session.source.state(), IOState::Running);
+
+    // Build individual subscriber details (derived from the open-app registry)
+    let subscribers = subscribers_for_session(session_id);
+
+    ActiveSessionInfo {
+        session_id: session_id.to_string(),
+        source_type: session.source.source_type().to_string(),
+        state: session.source.state(),
+        capabilities: session.source.capabilities(),
+        subscriber_count: subscribers.len(),
+        subscribers,
+        broker_configs: session.source.broker_configs(),
+        source_profile_ids,
+        origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
+        capture_id,
+        capture_kind,
+        capture_frame_count,
+        capture_unique_frame_count,
+        is_streaming,
+        catalog_path: crate::ws::dispatch::attached_catalog_path(session_id),
+        paused_source_profile_ids: session.source.paused_source_profile_ids(),
+    }
 }
 
 /// Transmit a payload through a session (unified)

@@ -168,13 +168,8 @@ fn modbus_endpoint_of(
     app: &tauri::AppHandle,
     profile_id: &str,
 ) -> Result<(String, u16, u8), McpError> {
-    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == profile_id)
-        .ok_or_else(|| err(format!("Profile '{profile_id}' not found")))?;
-    Ok(crate::io::modbus_endpoint(profile))
+    let profile = crate::settings::profile_by_id(app, profile_id).map_err(err)?;
+    Ok(crate::io::modbus_endpoint(&profile))
 }
 
 /// The session's Modbus source profile, which names its device and keys its poll.
@@ -260,10 +255,8 @@ impl WireTapTools {
         }
 
         let capture_id = || async {
-            crate::io::list_sessions()
+            crate::io::session_info(&sid)
                 .await
-                .into_iter()
-                .find(|s| s.session_id == sid)
                 .and_then(|s| s.capture_id)
         };
 
@@ -488,10 +481,8 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<SessionIdParams>,
     ) -> Result<CallToolResult, McpError> {
-        let info = crate::io::list_sessions()
+        let info = crate::io::session_info(&p.session_id)
             .await
-            .into_iter()
-            .find(|s| s.session_id == p.session_id)
             .ok_or_else(|| err(format!("Session '{}' not found", p.session_id)))?;
         ok_json(info)
     }
@@ -1459,12 +1450,11 @@ impl WireTapTools {
         Parameters(p): Parameters<SessionIdParams>,
     ) -> Result<CallToolResult, McpError> {
         let state = crate::io::modbus_tcp::scanner::get_scan_state(&p.session_id);
-        let sessions = crate::io::list_sessions().await;
-        let session = sessions.iter().find(|s| s.session_id == p.session_id);
+        let session = crate::io::session_info(&p.session_id).await;
         let progress = state.as_ref().and_then(|s| s.progress.clone());
         let status = scan_status(
             state.as_ref().map(|s| s.status.clone()),
-            session.map(|s| &s.state),
+            session.as_ref().map(|s| &s.state),
         );
         ok_json(json!({
             "session_id": p.session_id,
@@ -1474,8 +1464,8 @@ impl WireTapTools {
             "found_count": progress.as_ref().map(|p| p.found_count),
             "pass": progress.as_ref().map(|p| p.pass),
             "total_passes": progress.as_ref().map(|p| p.total_passes),
-            "capture_id": session.and_then(|s| s.capture_id.clone()),
-            "frames": session.and_then(|s| s.capture_frame_count),
+            "capture_id": session.as_ref().and_then(|s| s.capture_id.clone()),
+            "frames": session.as_ref().and_then(|s| s.capture_frame_count),
             "device_info": state.as_ref().map(|s| s.device_info.clone()).unwrap_or_default(),
             "notes": state.map(|s| s.notes).unwrap_or_default(),
         }))

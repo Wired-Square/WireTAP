@@ -75,11 +75,7 @@ pub async fn open(
         modbus_ranges,
     } = opts;
     let settings = crate::settings::load_settings_sync(&app)?;
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == profile_id)
-        .ok_or_else(|| format!("Profile '{profile_id}' not found"))?;
+    let profile = settings.profile(&profile_id)?;
 
     // Read the preferred catalogue once: Modbus needs it for poll groups, and
     // every protocol needs it to decode.
