@@ -1263,10 +1263,13 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
     a session, **returning the resolved `Catalog`** so the caller builds its UI
     model from that one parse; the optional `path` is recorded as the session's
     authoritative decoder path (see below). `catalog.detach` `{ session_id }` — unbind
-- **`DecodedSignals` push** (0x14): while a catalogue is attached,
-  `send_new_frames` decodes the same batch via `decode_by_id` (applying
-  `frame_id_mask`) and pushes a parallel JSON message with **one entry per
-  frame**, routed by the catalogue:
+- **`DecodedSignals` push** (0x14): while a catalogue is attached, every
+  `FrameData` batch — live via `send_new_frames`, capture playback via
+  `send_frames`, both through `frame_batch_messages` — is decoded via
+  `decode_by_id` (applying `frame_id_mask`) and pushed as a parallel JSON
+  message with **one entry per frame**, routed by the catalogue. A playback
+  seek or direction change resets the mirror and tunnel state, as
+  `reset_frame_offset` does:
   - decoded — `{ frameId, maskedFrameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress, mirror?, tunnel?, checksum? }`,
     with no `kind`;
   - `kind: "unmatched"` — no catalogue frame decoded it and it completed no

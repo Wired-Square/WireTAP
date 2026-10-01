@@ -664,22 +664,7 @@ pub fn send_new_frames(session_id: &str) {
 
     let new_offset = offset + frames.len();
 
-    let payload = protocol::encode_frame_batch(&frames);
-    let msg = protocol::encode_message(MsgType::FrameData, channel, &payload);
-    server.send_to_channel(channel, msg);
-
-    // If a catalogue is attached, decode the same batch once (in Rust) and push
-    // it as a parallel DecodedSignals message, routing every frame — the
-    // Decoder reads its tabs from this alone.
-    if let Some(catalog) = attached_catalog(session_id) {
-        let verdicts = mirror_verdicts(session_id, &frames);
-        let tunnels = tunnel_decoders(session_id);
-        let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), true);
-        if !decoded.is_empty() {
-            let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
-            server.send_to_channel(channel, dmsg);
-        }
-    }
+    send_frames(session_id, &frames);
 
     // Push live counts so the frontend renders Frames/Unique straight from the
     // backend (no TS-side counting). total is the capture count; unique is the
@@ -737,10 +722,15 @@ pub fn reset_frame_offset(session_id: &str) {
         offsets.insert(session_id.to_string(), count);
     }
 
-    // Same moment, same meaning — start from here. Without this the tracker
-    // keeps its pre-clear samples and latch, so the next batch re-asserts the
-    // verdict the user just cleared (and on a replay restart, timestamps jump
-    // backwards past the fuzz window and it can never be re-compared away).
+    reset_decode_state(session_id);
+}
+
+/// Drop the order-dependent decode state — mirror samples and part-built tunnel
+/// messages — wherever the frame stream restarts or jumps. Without this the
+/// tracker keeps its pre-clear samples and latch, so the next batch re-asserts
+/// the verdict the user just cleared (and after a rewind, timestamps jump
+/// backwards past the fuzz window and it can never be re-compared away).
+pub fn reset_decode_state(session_id: &str) {
     if let Some(tracker) = mirror_tracker(session_id) {
         if let Ok(mut tracker) = tracker.lock() {
             tracker.reset();
@@ -796,17 +786,25 @@ pub fn redecode_delivered(session_id: &str) {
 
 /// Send a batch of frames to all WebSocket subscribers for this session.
 pub fn send_frames(session_id: &str, frames: &[FrameMessage]) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let payload = protocol::encode_frame_batch(frames);
-    let msg = protocol::encode_message(MsgType::FrameData, channel, &payload);
-    server.send_to_channel(channel, msg);
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
+    for (kind, payload) in frame_batch_messages(session_id, frames) {
+        server.send_to_channel(channel, protocol::encode_message(kind, channel, &payload));
+    }
+}
+
+/// Live capture and playback both deliver through here, so neither can skip the decode.
+fn frame_batch_messages(session_id: &str, frames: &[FrameMessage]) -> Vec<(MsgType, Vec<u8>)> {
+    let mut messages = vec![(MsgType::FrameData, protocol::encode_frame_batch(frames))];
+    if let Some(catalog) = attached_catalog(session_id) {
+        let verdicts = mirror_verdicts(session_id, frames);
+        let tunnels = tunnel_decoders(session_id);
+        let decoded = encode_decoded_batch(session_id, frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), true);
+        if !decoded.is_empty() {
+            messages.push((MsgType::DecodedSignals, decoded));
+        }
+    }
+    messages
 }
 
 /// Send session state change.
@@ -1680,5 +1678,23 @@ bit_length = 8
             routed as f64 / decoded_only as f64
         );
         assert!(routed < decoded_only * 2);
+    }
+
+    /// Capture playback delivers frames through `send_frames`, not the
+    /// capture-offset path, and must reach the Decoder all the same.
+    #[test]
+    fn a_playback_batch_carries_its_decode_at_the_captures_stamp() {
+        let session = "playback-decode";
+        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        let messages = frame_batch_messages(session, &[can(0x1A5, 1_234_567, vec![7; 8])]);
+        detach_catalog(session);
+
+        let decoded = messages
+            .iter()
+            .find(|(kind, _)| *kind == MsgType::DecodedSignals)
+            .expect("a DecodedSignals batch");
+        let batch: Vec<serde_json::Value> = serde_json::from_slice(&decoded.1).expect("JSON array");
+        assert_eq!(batch[0]["t"], 1_234_567);
+        assert_eq!(batch[0]["maskedFrameId"], 0x100);
     }
 }

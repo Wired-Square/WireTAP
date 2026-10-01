@@ -393,6 +393,7 @@ fn handle_seek(
 
             // Discard pending batch
             batch_buffer.clear();
+            crate::ws::dispatch::reset_decode_state(session_id);
 
             // Reset timing baselines
             let seek_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
@@ -443,6 +444,7 @@ fn handle_seek(
 
             // Discard pending batch
             batch_buffer.clear();
+            crate::ws::dispatch::reset_decode_state(session_id);
 
             // Get frame at this rowid for timing info
             if let Some((_, ref frame)) = chunk.first() {
@@ -624,6 +626,7 @@ async fn run_capture_stream(
                 playback_baseline_secs = last_time;
                 wall_clock_baseline = std::time::Instant::now();
             }
+            crate::ws::dispatch::reset_decode_state(&session_id);
             last_reverse = is_reverse;
         }
 
