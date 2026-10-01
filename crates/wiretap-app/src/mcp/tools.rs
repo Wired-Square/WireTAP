@@ -4,6 +4,8 @@
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
 use crate::capture_store::{FrameSelection, ProtocolFrames};
+use crate::io::FrameMessage;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -15,7 +17,7 @@ use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
-use serde_json::json;
+use serde_json::{json, Value};
 use wslib_ai_mcp::dom::{self, DomBridge};
 use wslib_ai_mcp::result::{internal_error as err, ok_json};
 use wslib_ai_mcp::rmcp;
@@ -79,10 +81,9 @@ impl WireTapTools {
                  human-controllable row), replay captures, and read/write Modbus. \
                  attach_source surfaces a session in a source-aware tab (discovery, \
                  decoder, transmit, query, or dashboard) so the human sees what the agent is \
-                 working on. Tier 2 tools (decoded signals, live frame map) require \
-                 the WireTAP window to be open, as do the DOM tools: \
-                 query and wait_for read the window, and with UI control click, type and \
-                 press drive it without needing focus.",
+                 working on. Every read tool answers with no window open. The DOM tools \
+                 need one: query and wait_for read the window, and with UI control click, \
+                 type and press drive it without needing focus.",
             )
     }
 }
@@ -347,7 +348,121 @@ fn parse_frame_key(key: &str) -> Result<(&str, u32), String> {
         .ok_or_else(|| format!("Bad frame key '{key}' — expected protocol:id, e.g. \"can:256\""))
 }
 
-/// Forward a Tier 2 request to the frontend over the bridge and wrap the result.
+/// The session's frame capture, which the live tools read.
+fn session_frame_capture(session_id: &str) -> Result<String, McpError> {
+    crate::capture_store::get_session_frame_capture_id(session_id).ok_or_else(|| {
+        err(format!(
+            "Session '{session_id}' has no frame capture — use list_sessions, or list_captures and the capture tools"
+        ))
+    })
+}
+
+/// How many of a capture's newest frames `get_decoded_signals` decodes: every
+/// mux case of a frame at 5 kfps over 200 ms.
+const DECODED_TAIL_FRAMES: usize = 1000;
+
+/// A `get_decoded_signals` frame filter: a masked decimal id, bare or as a frame key.
+fn masked_id_of(filter: &str) -> Result<u32, String> {
+    filter
+        .rsplit(':')
+        .next()
+        .and_then(|id| id.parse().ok())
+        .ok_or_else(|| format!("Bad frame_id '{filter}' — expected a decimal id (\"256\") or frame key (\"can:256\")"))
+}
+
+/// Decode a chronological run of frames into one entry per masked frame id,
+/// newest last. Signals merge by `muxValue:name`, so an inactive mux case keeps
+/// its last value, as the Decoder keeps it.
+fn decode_tail(
+    catalog: &wiretap_catalog::Catalog,
+    frames: &[FrameMessage],
+    wanted: Option<u32>,
+) -> Vec<Value> {
+    let mask = wiretap_catalog::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
+    let mut latest: Vec<(u32, Value)> = Vec::new();
+    for f in frames {
+        let masked = f.frame_id & mask;
+        if wanted.is_some_and(|id| id != masked) {
+            continue;
+        }
+        let Some(mut entry) = crate::ws::dispatch::decode_entry(catalog, f, None, &[]) else {
+            continue;
+        };
+        let object = entry
+            .as_object_mut()
+            .expect("decode_entry builds an object");
+        object.remove("bytes");
+        object.insert("maskedFrameId".into(), json!(masked));
+        match latest.iter_mut().find(|(id, _)| *id == masked) {
+            Some((_, seen)) => {
+                let mut signals = seen["signals"].take();
+                merge_signals(
+                    signals.as_array_mut().expect("array"),
+                    entry["signals"].take(),
+                );
+                entry["signals"] = signals;
+                *seen = entry;
+            }
+            None => latest.push((masked, entry)),
+        }
+    }
+    latest.into_iter().map(|(_, entry)| entry).collect()
+}
+
+fn merge_signals(seen: &mut Vec<Value>, newer: Value) {
+    for signal in newer.as_array().into_iter().flatten() {
+        match seen
+            .iter_mut()
+            .find(|s| signal_key(s) == signal_key(signal))
+        {
+            Some(slot) => *slot = signal.clone(),
+            None => seen.push(signal.clone()),
+        }
+    }
+}
+
+fn signal_key(s: &Value) -> (Option<i64>, &str) {
+    (
+        s["muxValue"].as_i64(),
+        s["name"].as_str().unwrap_or_default(),
+    )
+}
+
+/// Discovery's live map: the newest frame per `protocol:id` key, in the
+/// `LastFrameData` shape plus its stamp.
+fn latest_by_key(
+    frames: Vec<FrameMessage>,
+    wanted: Option<&HashSet<String>>,
+) -> serde_json::Map<String, Value> {
+    let mut latest: BTreeMap<String, FrameMessage> = BTreeMap::new();
+    for f in frames {
+        let key = format!("{}:{}", f.protocol, f.frame_id);
+        if wanted.is_some_and(|w| !w.contains(&key)) {
+            continue;
+        }
+        if latest
+            .get(&key)
+            .is_none_or(|seen| seen.timestamp_us <= f.timestamp_us)
+        {
+            latest.insert(key, f);
+        }
+    }
+    latest
+        .into_iter()
+        .map(|(key, f)| {
+            let data = json!({
+                "bytes": f.bytes,
+                "bus": f.bus,
+                "is_extended": f.is_extended,
+                "dlc": f.dlc,
+                "timestampUs": f.timestamp_us,
+            });
+            (key, data)
+        })
+        .collect()
+}
+
+/// Forward a request to the page over the bridge and wrap the result.
 async fn bridge_call(method: &str, params: impl serde::Serialize) -> Result<CallToolResult, McpError> {
     let value = serde_json::to_value(params).map_err(|e| err(e.to_string()))?;
     ok_json(super::bridge::request(method, value, BRIDGE_TIMEOUT).await.map_err(err)?)
@@ -359,7 +474,7 @@ impl DomBridge for WireTapTools {
     }
 }
 
-// ── Read tools (Tier 1 Rust-native + Tier 2 frontend bridge) ─────────────────
+// ── Read tools ───────────────────────────────────────────────────────────────
 
 #[tool_router(router = read_router)]
 impl WireTapTools {
@@ -560,13 +675,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<SessionAnalysisParams>,
     ) -> Result<CallToolResult, McpError> {
-        let capture_id = crate::capture_store::get_session_frame_capture_id(&p.session_id)
-            .ok_or_else(|| {
-                err(format!(
-                    "Session '{}' has no frame capture to analyse — use list_sessions, or list_captures and frame_byte_profile",
-                    p.session_id
-                ))
-            })?;
+        let capture_id = session_frame_capture(&p.session_id)?;
         let groups = p
             .frame_ids
             .unwrap_or_default()
@@ -592,22 +701,51 @@ impl WireTapTools {
         }))
     }
 
-    // ── Tier 2: frontend bridge ──────────────────────────────────────────────
-
-    #[tool(description = "Get the latest decoded signals (name, value, unit) for the loaded catalog. Requires the WireTAP Decoder view to be open.")]
+    #[tool(
+        description = "Decode the latest frames of a session's capture against its attached catalogue. Returns one entry per masked frame id with the newest reading of every signal (each mux case keeps its last value), the mux selectors, header fields and source address. Headless — no view needed. The session must have a catalogue: open_session binds the profile's preferred catalogue, set_profile_catalog chooses one. frame_id restricts it to one frame."
+    )]
     async fn get_decoded_signals(
         &self,
         Parameters(p): Parameters<DecodedSignalsParams>,
     ) -> Result<CallToolResult, McpError> {
-        bridge_call("decoder.signals", p).await
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let catalog = crate::ws::dispatch::attached_catalog(&p.session_id).ok_or_else(|| {
+            err(format!(
+                "Session '{}' has no catalogue attached — bind one with set_profile_catalog and reopen it with open_session",
+                p.session_id
+            ))
+        })?;
+        let wanted = p
+            .frame_id
+            .as_deref()
+            .map(masked_id_of)
+            .transpose()
+            .map_err(err)?;
+        let tail = crate::capture_store::get_capture_frames_tail(
+            &capture_id,
+            DECODED_TAIL_FRAMES,
+            &FrameSelection::default(),
+        );
+        let frames = decode_tail(&catalog, &tail.frames, wanted);
+        ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
     }
 
-    #[tool(description = "Get the last-seen payload bytes for every discovered frame id. Requires the WireTAP Discovery view to be open.")]
+    #[tool(
+        description = "The last-seen payload of every frame id in a session's capture, keyed as Discovery keys them (\"can:256\", \"modbus:5013\"): bytes, bus, is_extended, dlc and timestampUs. Headless — no view needed. frame_ids restricts it to those keys."
+    )]
     async fn get_live_frame_map(
         &self,
-        Parameters(p): Parameters<DiscoveryAnalysisParams>,
+        Parameters(p): Parameters<LiveFrameMapParams>,
     ) -> Result<CallToolResult, McpError> {
-        bridge_call("live.frameMap", p).await
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let wanted: Option<HashSet<String>> = p
+            .frame_ids
+            .filter(|ids| !ids.is_empty())
+            .map(|ids| ids.into_iter().collect());
+        let frames =
+            crate::capture_store::get_capture_latest_frames(&capture_id).unwrap_or_default();
+        let frames = latest_by_key(frames, wanted.as_ref());
+        ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
     }
 
     // ── Headless analysis levers (capture OR WireTAP backend) ───────────────────────
@@ -1683,6 +1821,122 @@ mod tests {
             wait_for(&test_id, |s| s.status == TestStatus::Listening).await;
             io_test_stop(test_id.clone()).await.unwrap();
             wait_for(&test_id, |s| s.status == TestStatus::Stopped).await;
+        }
+    }
+
+    mod live_reads {
+        use super::super::{decode_tail, latest_by_key, masked_id_of};
+        use crate::io::FrameMessage;
+        use serde_json::json;
+        use std::collections::HashSet;
+
+        fn frame(
+            protocol: &str,
+            frame_id: u32,
+            bus: u8,
+            timestamp_us: u64,
+            bytes: Vec<u8>,
+        ) -> FrameMessage {
+            FrameMessage {
+                protocol: protocol.to_string(),
+                timestamp_us,
+                frame_id,
+                bus,
+                dlc: bytes.len() as u16,
+                bytes,
+                is_extended: false,
+                is_fd: false,
+                source_address: None,
+                incomplete: None,
+                direction: None,
+            }
+        }
+
+        fn mux_catalogue() -> wiretap_catalog::Catalog {
+            wiretap_catalog::Catalog::parse(
+                r#"
+[meta]
+name = "mux"
+[frame.can.0x200]
+length = 8
+[frame.can.0x200.mux]
+name = "sel"
+start_bit = 0
+bit_length = 8
+[[frame.can.0x200.mux."0".signals]]
+name = "low"
+start_bit = 8
+bit_length = 8
+[[frame.can.0x200.mux."1".signals]]
+name = "high"
+start_bit = 8
+bit_length = 8
+"#,
+            )
+            .expect("catalogue parses")
+        }
+
+        /// The tail ends on case 1, yet case 0's last value is still reported:
+        /// the Decoder keeps an inactive mux case, and so does the tool.
+        #[test]
+        fn a_two_case_mux_over_a_tail_keeps_both_cases() {
+            let tail = [
+                frame("can", 0x200, 0, 1, vec![0, 0x11, 0, 0, 0, 0, 0, 0]),
+                frame("can", 0x200, 0, 2, vec![1, 0x22, 0, 0, 0, 0, 0, 0]),
+                frame("can", 0x200, 0, 3, vec![0, 0x33, 0, 0, 0, 0, 0, 0]),
+                frame("can", 0x200, 0, 4, vec![1, 0x44, 0, 0, 0, 0, 0, 0]),
+                frame("can", 0x201, 0, 5, vec![0; 8]),
+            ];
+            let out = decode_tail(&mux_catalogue(), &tail, None);
+            assert_eq!(out.len(), 1, "0x201 is not in the catalogue");
+            let entry = &out[0];
+            assert_eq!(
+                (entry["maskedFrameId"].as_u64(), entry["t"].as_u64()),
+                (Some(0x200), Some(4))
+            );
+            let signals = entry["signals"].as_array().expect("signals");
+            let value = |name: &str| {
+                signals
+                    .iter()
+                    .find(|s| s["name"] == name)
+                    .map(|s| s["value"].as_f64())
+            };
+            assert_eq!(value("low"), Some(Some(0x33 as f64)));
+            assert_eq!(value("high"), Some(Some(0x44 as f64)));
+            assert_eq!(entry["selectors"][0]["value"], 1);
+            assert!(entry.get("bytes").is_none());
+        }
+
+        #[test]
+        fn a_frame_filter_is_a_bare_id_or_a_frame_key() {
+            assert_eq!(masked_id_of("512"), Ok(0x200));
+            assert_eq!(masked_id_of("can:512"), Ok(0x200));
+            assert!(masked_id_of("can:0x200").is_err());
+            let tail = [frame("can", 0x200, 0, 1, vec![0, 0x11, 0, 0, 0, 0, 0, 0])];
+            assert!(decode_tail(&mux_catalogue(), &tail, Some(0x201)).is_empty());
+        }
+
+        #[test]
+        fn the_live_map_keys_by_protocol_and_id_and_keeps_the_newest() {
+            let frames = || {
+                vec![
+                    frame("can", 256, 0, 10, vec![1]),
+                    frame("modbus", 5013, 0, 11, vec![2, 3]),
+                    frame("can", 256, 1, 12, vec![9]),
+                    frame("can", 256, 2, 5, vec![7]),
+                ]
+            };
+            let map = latest_by_key(frames(), None);
+            assert_eq!(map.keys().collect::<Vec<_>>(), ["can:256", "modbus:5013"]);
+            assert_eq!(
+                map["can:256"],
+                json!({ "bytes": [9], "bus": 1, "is_extended": false, "dlc": 1, "timestampUs": 12 })
+            );
+            assert_eq!(map["modbus:5013"]["dlc"], 2);
+
+            let wanted: HashSet<String> = ["modbus:5013".to_string()].into();
+            let map = latest_by_key(frames(), Some(&wanted));
+            assert_eq!(map.keys().collect::<Vec<_>>(), ["modbus:5013"]);
         }
     }
 

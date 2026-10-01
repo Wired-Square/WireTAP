@@ -5,7 +5,7 @@
 //! in `tools/list`).
 
 use rmcp::schemars::{self, JsonSchema};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use wslib_ai_mcp::rmcp;
 
 fn default_count() -> usize {
@@ -24,7 +24,7 @@ fn default_one() -> u16 {
     1
 }
 
-// ── Tier 1 (Rust-native) ────────────────────────────────────────────────────
+// ── Sessions and captures ────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct SessionIdParams {
@@ -104,24 +104,23 @@ pub struct SessionAnalysisParams {
     pub frame_ids: Option<Vec<String>>,
 }
 
-// ── Tier 2 (frontend bridge) ─────────────────────────────────────────────────
+// ── Live session reads ───────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-pub struct DiscoveryAnalysisParams {
-    /// Optional: restrict to a single session.
-    #[serde(default)]
-    pub session_id: Option<String>,
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct LiveFrameMapParams {
+    /// The session whose frame capture to read (from `list_sessions`).
+    pub session_id: String,
     /// Optional: restrict to specific frame keys (e.g. `"can:256"`).
     #[serde(default)]
     pub frame_ids: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct DecodedSignalsParams {
-    /// Optional: restrict to a single session.
-    #[serde(default)]
-    pub session_id: Option<String>,
-    /// Optional: restrict to a single frame key (e.g. `"can:256"`).
+    /// The session whose frame capture to decode (from `list_sessions`).
+    pub session_id: String,
+    /// Optional: restrict to one frame, by its masked decimal id (`"256"`) or
+    /// frame key (`"can:256"`).
     #[serde(default)]
     pub frame_id: Option<String>,
 }

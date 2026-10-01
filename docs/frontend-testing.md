@@ -63,20 +63,18 @@ Two patterns worth copying rather than inventing:
 
 There is a **reverse RPC channel, Rust → frontend**
 ([src/services/mcpBridge.ts](../frontend/wiretap-ui/src/services/mcpBridge.ts)), so an agent or
-script driving the MCP server can ask the running frontend what it computed.
-It exposes exactly three methods:
+script driving the MCP server can reach what only the page can do:
 
 | Method | MCP tool | Use |
 |---|---|---|
-| `decoder.signals` | `get_decoded_signals` | read back decoded signals |
-| `live.frameMap` | `get_live_frame_map` | read back the live frame map |
 | `ui.openPanel` | `open_app` | drive: open a panel |
+| `dom.*` | `query`, `wait_for`, `click`, `type`, `press` | read and drive the DOM |
 
 Plus `attach_source`, which surfaces a session in a source-aware tab. Requires
 the app running, `mcp_server_enabled`, and the relevant control permissions in
-Settings. This is genuine end-to-end — it asserts on real frontend output over a
-real session — but its vocabulary is data, not UI. It cannot click a button,
-read a label, or see a dialog.
+Settings. Decoded signals and the live frame map are read from Rust
+(`get_decoded_signals`, `get_live_frame_map`) and need no window, so an
+end-to-end check of what the page shows goes through the DOM tools.
 
 ### Screenshots
 

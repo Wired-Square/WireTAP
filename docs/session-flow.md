@@ -1419,7 +1419,7 @@ request. An earlier cut grouped them with a synthetic `muxValue` instead; the
 signal table renders a mux group as **"Mux 9 (0x9)"** and swaps the frame-level
 byte row for that group's payload, which for a message rebuilt from three frames
 is simply the wrong bytes. **A frame that is not multiplexed must not claim to
-be** — the MCP `decoder.signals` surface reports selectors too.
+be** — the MCP `get_decoded_signals` tool reports selectors too.
 
 Registers are catalogued as ordinary `[frame.modbus.*]` entries in the same
 file, `disabled = true` so the Modbus poller never drives what the tunnel only

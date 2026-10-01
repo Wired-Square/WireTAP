@@ -54,8 +54,8 @@ export function getLastFrameDataMap(): Map<string, LastFrameData> {
  * Drop every frame held outside Zustand and cancel any pending flush.
  *
  * All three module-level caches are reset together — clearing the buffer while leaving
- * `_lastFrameDataMap` behind leaves bulk-add and the MCP live frame map reporting
- * frames from a session that is already gone.
+ * `_lastFrameDataMap` behind leaves bulk-add reporting frames from a session that is
+ * already gone.
  *
  * Callers own the accompanying `set()`; nothing here touches store state.
  */

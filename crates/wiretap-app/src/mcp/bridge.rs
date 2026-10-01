@@ -1,10 +1,10 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 //! Reverse RPC: lets the Rust backend (driven by the MCP server) ask the
-//! frontend for state only it holds — payload analysis, decoded signals, the
-//! live discovery buffer. A request is pushed to the frontend over the global
-//! WS channel; the frontend replies with a `BridgeResponse` which `resolve`
-//! routes back to the awaiting caller.
+//! frontend for what only the page can do — open a panel, read or drive the
+//! DOM. A request is pushed to the frontend over the global WS channel; the
+//! frontend replies with a `BridgeResponse` which `resolve` routes back to the
+//! awaiting caller.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -27,13 +27,12 @@ static PENDING: Lazy<Mutex<HashMap<u32, oneshot::Sender<Result<Value, String>>>>
 /// Send a request to the frontend and await its JSON response.
 ///
 /// Fails fast (without waiting for `timeout`) when no frontend window is
-/// connected, so Tier 2 MCP tools return a clear error instead of hanging.
+/// connected, so a window-driving MCP tool returns a clear error instead of hanging.
 pub async fn request(method: &str, params: Value, timeout: Duration) -> Result<Value, String> {
     let server = ws_server().ok_or_else(|| "WebSocket server not running".to_string())?;
     if authenticated_connection_count() == 0 {
         return Err(
-            "Frontend not available — open the WireTAP window and the relevant \
-             (Discovery/Decoder) view to use this tool"
+            "Frontend not available — this tool drives the WireTAP window, so open it first"
                 .to_string(),
         );
     }
@@ -57,7 +56,9 @@ pub async fn request(method: &str, params: Value, timeout: Duration) -> Result<V
         }
         Err(_) => {
             remove(id);
-            Err(format!("Bridge request '{method}' timed out — is a relevant view open?"))
+            Err(format!(
+                "Bridge request '{method}' timed out — is the WireTAP window open?"
+            ))
         }
     }
 }

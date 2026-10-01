@@ -11,6 +11,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Changed
 
 - **gs_usb adapters follow the Linux driver more closely.** Only the six USB ids the kernel's gs_usb driver knows are recognised, so a device on `1d50:606d` is no longer listed. A bit timing the adapter cannot do is now refused at start with the bitrate and the adapter's limits, instead of retried with looser limits, and a frame counts as CAN FD only when the adapter flags it so. When the adapter reports that it dropped frames, the log now says so.
+- **MCP `get_decoded_signals` and `get_live_frame_map` no longer need the window open.** Both now take a `session_id` and read that session's capture: the decoded signals are the latest 1,000 frames decoded against the session's catalogue, with every mux case's last value kept, and the live map is the newest frame per id. The output shapes have changed: see the MCP analysis tools reference.
 
 ### Fixed
 

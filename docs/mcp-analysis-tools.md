@@ -64,11 +64,34 @@ Every analysis tool takes **exactly one** of:
 Backend time bounds are RFC3339 strings (`start_time` / `end_time`); for captures
 they are converted to the capture's microsecond timeline automatically.
 
-These are **headless** — unlike `get_decoded_signals` / `get_live_frame_map` (which
-bridge to an open Decoder/Discovery view), they read the data store directly, so no
-window need be open.
+The live tools (`get_discovery_analysis`, `get_decoded_signals`,
+`get_live_frame_map`) take a `session_id` instead and read that session's frame
+capture. Every read tool is **headless**: it reads the data store directly, so no
+window need be open. Only `open_app` and the DOM tools drive the window.
 
 ## Tools
+
+### `get_decoded_signals`
+Decodes the newest 1000 frames of a session's capture against the catalogue
+attached to the session — the one `open_session` bound from the profile's
+`preferred_catalog`, or `set_profile_catalog` chose — and folds them into one
+entry per **masked** frame id, newest last:
+`{ frameCount, frames: [{ frameId, maskedFrameId, bus, t, signals, selectors,
+headerFields, sourceAddress }] }`. `signals` is the stream's own shape
+(`name, value, scaled, display, unit, muxValue, format`), merged by
+`muxValue:name`, so a multiplexed frame reports the last reading of **every**
+case it showed in that window, not only the case its newest frame carried;
+`selectors` and `headerFields` are the newest frame's. `frame_id` restricts it to
+one frame, as a masked decimal id (`"256"`) or a frame key (`"can:256"`). A
+session with no frame capture, or no catalogue attached, is an error that says
+which. The Decoder's own view filters do not apply: this is what the catalogue
+says the latest frames mean.
+
+### `get_live_frame_map`
+The newest frame per identity in a session's capture, keyed as Discovery keys
+them — `"can:256"`, `"modbus:5013"` — each `{ bytes, bus, is_extended, dlc,
+timestampUs }`. `frame_ids` restricts it to those keys. A session with no frame
+capture is an error.
 
 ### `frame_inventory`
 Per-frame-id rollup: `count`, `first_us` / `last_us`, `max_dlc`, `is_extended` and

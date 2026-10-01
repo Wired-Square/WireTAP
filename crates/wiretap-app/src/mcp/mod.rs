@@ -4,8 +4,8 @@
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only
 //! unless `mcp_allow_control` is also enabled. The transport, bearer gate and
 //! connection tracking are `wslib-ai-mcp`'s; this module owns the settings
-//! mapping and the start/stop lifecycle. Tier 2 tools reach frontend-only state
-//! via [`bridge`].
+//! mapping and the start/stop lifecycle. The tools that drive the window
+//! (`open_app`, `dom.*`) reach the page via [`bridge`].
 
 pub mod bridge;
 mod session;

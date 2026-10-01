@@ -377,84 +377,96 @@ fn encode_decoded_batch(
             }
             taken
         };
-
-        // decode_by_id applies frame_id_mask, looks up the frame, decodes
-        // signals/mux, and extracts header fields (CAN id / serial bytes).
-        // Defaulted, not skipped, when the catalogue has no frame for this id:
-        // a serial RTU message has no frame layout of its own — its registers
-        // are decoded from the message — so a frame that decoded nothing still
-        // has something to render when it carried a message.
-        let decoded = wiretap_catalog::decode::decode_by_id(catalog, f.frame_id, &f.bytes)
-            .unwrap_or_default();
-        if tunnel_messages.is_empty()
-            && decoded.signals.is_empty()
-            && decoded.selectors.is_empty()
-            && decoded.header_fields.is_empty()
-        {
-            continue;
-        }
-        let mut signals: Vec<_> = decoded.signals.iter().map(signal_json).collect();
-        let selectors: Vec<_> = decoded
-            .selectors
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "name": s.name,
-                    "value": s.value,
-                    "matchedCase": s.matched_case,
-                    "startBit": s.start_bit,
-                    "bitLength": s.bit_length,
-                })
-            })
-            .collect();
-        // Messages this frame completed. They belong to the frame that finished
-        // them, not the one that started them, so the UI's timestamp is when the
-        // exchange was actually readable.
-        let mut transactions: Vec<serde_json::Value> = Vec::new();
-        for msg in &tunnel_messages {
-            let decoded = tunnel_signals::decode_message(msg, catalog);
-            signals.extend(decoded.signals.iter().map(signal_json));
-            transactions.push(decoded.transaction);
-        }
-        let header_fields: Vec<_> = decoded
-            .header_fields
-            .iter()
-            .map(|h| {
-                serde_json::json!({
-                    "name": h.name,
-                    "value": h.value,
-                    "display": h.display,
-                    "format": h.format,
-                })
-            })
-            .collect();
-        let mut entry = serde_json::json!({
-            "frameId": f.frame_id,
-            "bus": f.bus,
-            "t": f.timestamp_us,
-            "signals": signals,
-            "selectors": selectors,
-            "headerFields": header_fields,
-            "sourceAddress": decoded.source_address,
-            // Raw payload this decode came from, so the frontend can show a
-            // hex/ASCII byte row per mux group (each mux occurrence has its own
-            // payload; a single per-frame rawBytes would be last-writer-wins).
-            "bytes": f.bytes,
-        });
-        // Only mirrors carry this key, so the frontend can treat its absence as
-        // "not a mirror" rather than "no verdict yet".
-        if let Some(verdict) = verdicts.and_then(|v| v.get(f.frame_id)) {
-            entry["mirror"] = verdict.clone();
-        }
-        if !transactions.is_empty() {
-            entry["tunnel"] = serde_json::Value::Array(transactions);
-        }
-        out.push(entry);
+        let verdict = verdicts.and_then(|v| v.get(f.frame_id));
+        out.extend(decode_entry(catalog, f, verdict, &tunnel_messages));
     }
     if out.is_empty() {
         return Vec::new();
     }
     serde_json::to_vec(&out).unwrap_or_default()
+}
+
+/// One frame's entry in the `DecodedSignals` payload, or `None` when the
+/// catalogue says nothing about it. Shared by the live stream and the MCP
+/// `get_decoded_signals` tool, so both describe a frame alike.
+pub(crate) fn decode_entry(
+    catalog: &wiretap_catalog::Catalog,
+    f: &FrameMessage,
+    verdict: Option<&serde_json::Value>,
+    tunnel_messages: &[wiretap_catalog::ModbusRtuMessage],
+) -> Option<serde_json::Value> {
+    // decode_by_id applies frame_id_mask, looks up the frame, decodes
+    // signals/mux, and extracts header fields (CAN id / serial bytes).
+    // Defaulted, not skipped, when the catalogue has no frame for this id:
+    // a serial RTU message has no frame layout of its own — its registers
+    // are decoded from the message — so a frame that decoded nothing still
+    // has something to render when it carried a message.
+    let decoded =
+        wiretap_catalog::decode::decode_by_id(catalog, f.frame_id, &f.bytes).unwrap_or_default();
+    if tunnel_messages.is_empty()
+        && decoded.signals.is_empty()
+        && decoded.selectors.is_empty()
+        && decoded.header_fields.is_empty()
+    {
+        return None;
+    }
+    let mut signals: Vec<_> = decoded.signals.iter().map(signal_json).collect();
+    let selectors: Vec<_> = decoded
+        .selectors
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "name": s.name,
+                "value": s.value,
+                "matchedCase": s.matched_case,
+                "startBit": s.start_bit,
+                "bitLength": s.bit_length,
+            })
+        })
+        .collect();
+    // Messages this frame completed. They belong to the frame that finished
+    // them, not the one that started them, so the UI's timestamp is when the
+    // exchange was actually readable.
+    let mut transactions: Vec<serde_json::Value> = Vec::new();
+    for msg in tunnel_messages {
+        let decoded = tunnel_signals::decode_message(msg, catalog);
+        signals.extend(decoded.signals.iter().map(signal_json));
+        transactions.push(decoded.transaction);
+    }
+    let header_fields: Vec<_> = decoded
+        .header_fields
+        .iter()
+        .map(|h| {
+            serde_json::json!({
+                "name": h.name,
+                "value": h.value,
+                "display": h.display,
+                "format": h.format,
+            })
+        })
+        .collect();
+    let mut entry = serde_json::json!({
+        "frameId": f.frame_id,
+        "bus": f.bus,
+        "t": f.timestamp_us,
+        "signals": signals,
+        "selectors": selectors,
+        "headerFields": header_fields,
+        "sourceAddress": decoded.source_address,
+        // Raw payload this decode came from, so the frontend can show a
+        // hex/ASCII byte row per mux group (each mux occurrence has its own
+        // payload; a single per-frame rawBytes would be last-writer-wins).
+        "bytes": f.bytes,
+    });
+    // Only mirrors carry this key, so the frontend can treat its absence as
+    // "not a mirror" rather than "no verdict yet".
+    if let Some(verdict) = verdict {
+        entry["mirror"] = verdict.clone();
+    }
+    if !transactions.is_empty() {
+        entry["tunnel"] = serde_json::Value::Array(transactions);
+    }
+    Some(entry)
 }
 
 /// Read new frames from capture_store since the last send, encode as binary, and send via WS.
