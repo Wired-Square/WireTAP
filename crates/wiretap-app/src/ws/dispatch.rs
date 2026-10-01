@@ -94,6 +94,42 @@ struct SessionTunnels {
     /// still per-session state, because pairing a read response with the
     /// register address it answers needs the request that came before it.
     serial: Option<Mutex<HashMap<u8, wiretap_catalog::ModbusRtuStream>>>,
+    /// The stamp of the last request per (bus, masked id, device, function). An
+    /// unanswered request is superseded by the next rather than queued.
+    requests: Mutex<HashMap<(u8, u32, u8, u8), u64>>,
+}
+
+impl SessionTunnels {
+    fn new(declared: HashMap<u32, wiretap_catalog::FrameTunnel>, modbus_catalog: bool) -> Self {
+        Self {
+            declared,
+            active: Mutex::new(HashMap::new()),
+            serial: modbus_catalog.then(|| Mutex::new(HashMap::new())),
+            requests: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Microseconds since the request a response answers; records a request.
+    fn latency_us(
+        &self,
+        bus: u8,
+        masked_id: u32,
+        msg: &wiretap_catalog::ModbusRtuMessage,
+        t: u64,
+    ) -> Option<u64> {
+        let mut requests = self.requests.lock().ok()?;
+        // An exception response carries its request's function code with the high bit set.
+        let key = (bus, masked_id, msg.device_address, msg.function & 0x7F);
+        match msg.direction {
+            wiretap_catalog::Direction::Request => {
+                requests.insert(key, t);
+                None
+            }
+            wiretap_catalog::Direction::Response => {
+                requests.get(&key).map(|sent| t.saturating_sub(*sent))
+            }
+        }
+    }
 }
 
 type SharedTunnels = Arc<SessionTunnels>;
@@ -128,15 +164,10 @@ pub fn attach_catalog(session_id: &str, path: Option<String>, catalog: wiretap_c
     if let Ok(mut m) = TUNNEL_DECODERS.write() {
         // Replaced wholesale for the same reason as the mirror tracker: a
         // half-reassembled message describes a catalogue that is gone.
-        let serial = modbus_catalog.then(|| Mutex::new(HashMap::new()));
-        if declared.is_empty() && serial.is_none() {
+        if declared.is_empty() && !modbus_catalog {
             m.remove(session_id);
         } else {
-            let tunnels = SessionTunnels {
-                declared,
-                active: Mutex::new(HashMap::new()),
-                serial,
-            };
+            let tunnels = SessionTunnels::new(declared, modbus_catalog);
             m.insert(session_id.to_string(), Arc::new(tunnels));
         }
     }
@@ -172,6 +203,9 @@ fn reset_tunnels(session_id: &str) {
         // just as stale after a rewind.
         if let Some(Ok(mut streams)) = tunnels.serial.as_ref().map(|s| s.lock()) {
             streams.clear();
+        }
+        if let Ok(mut requests) = tunnels.requests.lock() {
+            requests.clear();
         }
     }
 }
@@ -214,11 +248,16 @@ pub fn attached_catalog_path(session_id: &str) -> Option<String> {
 /// so a mirror seen many times in the batch is serialised once.
 struct MirrorVerdicts {
     tracker: SharedMirrorTracker,
-    by_masked_id: HashMap<u32, serde_json::Value>,
+    by_masked_id: HashMap<u32, EncodedVerdict>,
+}
+
+pub(crate) struct EncodedVerdict {
+    verdict: wiretap_catalog::MirrorVerdict,
+    json: serde_json::Value,
 }
 
 impl MirrorVerdicts {
-    fn get(&self, raw_frame_id: u32) -> Option<&serde_json::Value> {
+    fn get(&self, raw_frame_id: u32) -> Option<&EncodedVerdict> {
         if self.by_masked_id.is_empty() {
             return None;
         }
@@ -244,7 +283,10 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
         }
         tracker
             .verdicts()
-            .filter_map(|(id, v)| Some((id, serde_json::to_value(v).ok()?)))
+            .filter_map(|(id, verdict)| {
+                let json = serde_json::to_value(&verdict).ok()?;
+                Some((id, EncodedVerdict { verdict, json }))
+            })
             .collect()
     };
     Some(MirrorVerdicts {
@@ -338,15 +380,20 @@ fn signal_json(s: &wiretap_catalog::decode::Decoded) -> serde_json::Value {
 /// `redecode_delivered` over a long capture builds a message nobody reads.
 const MAX_RENDERED_TUNNEL_MESSAGES: usize = 500;
 
-/// Decode a frame batch against `catalog` into the `DecodedSignals` JSON
-/// payload (one entry per frame that has a matching catalogue frame). Returns
-/// an empty vec when nothing decoded, so the caller can skip the send.
+/// A completed tunnel message and, for a response, the time since its request.
+pub(crate) type TunnelMessage = (wiretap_catalog::ModbusRtuMessage, Option<u64>);
+
+/// Encode a frame batch against `catalog` into the `DecodedSignals` JSON
+/// payload. `with_unrouted` adds an entry for every frame the catalogue did not
+/// decode, saying why; without it only decoded frames are sent. Returns an
+/// empty vec when there is nothing to send.
 fn encode_decoded_batch(
     session_id: &str,
     frames: &[FrameMessage],
     catalog: &wiretap_catalog::Catalog,
     verdicts: Option<&MirrorVerdicts>,
     tunnels: Option<&SharedTunnels>,
+    with_unrouted: bool,
 ) -> Vec<u8> {
     let mut out: Vec<serde_json::Value> = Vec::new();
     let mask = wiretap_catalog::decode::frame_id_mask(catalog);
@@ -356,15 +403,16 @@ fn encode_decoded_batch(
     // anything — a skipped frame is a hole that desyncs everything after it.
     // Only the newest messages are then rendered, and the ring bounds what is
     // held while the rest of the batch is still being fed.
-    let mut completed: VecDeque<(usize, wiretap_catalog::ModbusRtuMessage)> = VecDeque::new();
-    if tunnels.is_some() {
+    let mut completed: VecDeque<(usize, TunnelMessage)> = VecDeque::new();
+    if let Some(shared) = tunnels {
         for (i, f) in frames.iter().enumerate() {
             let masked_id = mask.map_or(f.frame_id, |m| f.frame_id & m);
             for msg in feed_tunnels(tunnels, catalog, session_id, f, masked_id) {
+                let latency = shared.latency_us(f.bus, masked_id, &msg, f.timestamp_us);
                 if completed.len() == MAX_RENDERED_TUNNEL_MESSAGES {
                     completed.pop_front();
                 }
-                completed.push_back((i, msg));
+                completed.push_back((i, (msg, latency)));
             }
         }
     }
@@ -377,13 +425,44 @@ fn encode_decoded_batch(
             }
             taken
         };
-        let verdict = verdicts.and_then(|v| v.get(f.frame_id));
-        out.extend(decode_entry(catalog, f, verdict, &tunnel_messages));
+        let entry = if tunnel_messages.is_empty() && below_min_length(catalog, f) {
+            with_unrouted.then(|| unrouted_entry("short", f))
+        } else {
+            let verdict = verdicts.and_then(|v| v.get(f.frame_id));
+            decode_entry(catalog, f, verdict, &tunnel_messages)
+                .or_else(|| with_unrouted.then(|| unrouted_entry("unmatched", f)))
+        };
+        out.extend(entry);
     }
     if out.is_empty() {
         return Vec::new();
     }
     serde_json::to_vec(&out).unwrap_or_default()
+}
+
+/// The catalogue's serial `min_frame_length` says this is no frame of its own.
+fn below_min_length(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> bool {
+    catalog
+        .serial
+        .as_ref()
+        .and_then(|s| s.min_frame_length)
+        .is_some_and(|min| f.bytes.len() < min as usize)
+}
+
+/// A frame the catalogue did not decode, with `kind` saying why.
+fn unrouted_entry(kind: &str, f: &FrameMessage) -> serde_json::Value {
+    let mut entry = serde_json::json!({
+        "kind": kind,
+        "frameId": f.frame_id,
+        "bus": f.bus,
+        "t": f.timestamp_us,
+        "bytes": f.bytes,
+        "protocol": f.protocol,
+    });
+    if let Some(source_address) = f.source_address {
+        entry["sourceAddress"] = source_address.into();
+    }
+    entry
 }
 
 /// One frame's entry in the `DecodedSignals` payload, or `None` when the
@@ -392,8 +471,8 @@ fn encode_decoded_batch(
 pub(crate) fn decode_entry(
     catalog: &wiretap_catalog::Catalog,
     f: &FrameMessage,
-    verdict: Option<&serde_json::Value>,
-    tunnel_messages: &[wiretap_catalog::ModbusRtuMessage],
+    verdict: Option<&EncodedVerdict>,
+    tunnel_messages: &[TunnelMessage],
 ) -> Option<serde_json::Value> {
     // decode_by_id applies frame_id_mask, looks up the frame, decodes
     // signals/mux, and extracts header fields (CAN id / serial bytes).
@@ -410,7 +489,23 @@ pub(crate) fn decode_entry(
     {
         return None;
     }
-    let mut signals: Vec<_> = decoded.signals.iter().map(signal_json).collect();
+    let masked_id =
+        wiretap_catalog::decode::frame_id_mask(catalog).map_or(f.frame_id, |m| f.frame_id & m);
+    let mismatches = verdict.zip(catalog.frame(masked_id)).map_or_else(Vec::new, |(v, frame)| {
+        mirror_mismatches(&v.verdict, frame, &decoded.selectors)
+    });
+    let mut signals: Vec<_> = decoded
+        .signals
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let mut json = signal_json(s);
+            if let Some(mismatch) = mismatches.get(i).copied().flatten() {
+                json["mirrorMismatch"] = mismatch.into();
+            }
+            json
+        })
+        .collect();
     let selectors: Vec<_> = decoded
         .selectors
         .iter()
@@ -428,10 +523,14 @@ pub(crate) fn decode_entry(
     // them, not the one that started them, so the UI's timestamp is when the
     // exchange was actually readable.
     let mut transactions: Vec<serde_json::Value> = Vec::new();
-    for msg in tunnel_messages {
+    for (msg, latency_us) in tunnel_messages {
         let decoded = tunnel_signals::decode_message(msg, catalog);
         signals.extend(decoded.signals.iter().map(signal_json));
-        transactions.push(decoded.transaction);
+        let mut transaction = decoded.transaction;
+        if let Some(latency_us) = latency_us {
+            transaction["latencyUs"] = (*latency_us).into();
+        }
+        transactions.push(transaction);
     }
     let header_fields: Vec<_> = decoded
         .header_fields
@@ -447,6 +546,7 @@ pub(crate) fn decode_entry(
         .collect();
     let mut entry = serde_json::json!({
         "frameId": f.frame_id,
+        "maskedFrameId": masked_id,
         "bus": f.bus,
         "t": f.timestamp_us,
         "signals": signals,
@@ -461,12 +561,68 @@ pub(crate) fn decode_entry(
     // Only mirrors carry this key, so the frontend can treat its absence as
     // "not a mirror" rather than "no verdict yet".
     if let Some(verdict) = verdict {
-        entry["mirror"] = verdict.clone();
+        entry["mirror"] = verdict.json.clone();
     }
     if !transactions.is_empty() {
         entry["tunnel"] = serde_json::Value::Array(transactions);
     }
+    if let Some(checksum) = catalog
+        .serial
+        .as_ref()
+        .and_then(|s| s.checksum.as_ref())
+        .and_then(|c| crate::checksums::validate_serial_checksum(c, &f.bytes))
+    {
+        entry["checksum"] = serde_json::json!(checksum);
+    }
     Some(entry)
+}
+
+/// Each decoded signal's mirror verdict, index-aligned with the decode: whether
+/// the bytes it covers differed from the source, or `None` where the tracker
+/// did not compare them — a signal the mirror declares itself, or a mux case
+/// signal outside the inherited plain signals' bytes.
+fn mirror_mismatches(
+    verdict: &wiretap_catalog::MirrorVerdict,
+    frame: &wiretap_catalog::Frame,
+    selectors: &[wiretap_catalog::decode::MuxSelector],
+) -> Vec<Option<bool>> {
+    let Some(is_valid) = verdict.is_valid else {
+        return Vec::new();
+    };
+    let compared = wiretap_catalog::mirror::inherited_byte_indices(frame);
+    decoded_signal_defs(frame, selectors)
+        .into_iter()
+        .map(|def| {
+            let span = byte_span(def)
+                .filter(|span| def.inherited && span.clone().all(|i| compared.contains(&i)))?;
+            // Per-signal crosses only once the frame has latched Mismatch.
+            Some(!is_valid && span.into_iter().any(|i| verdict.mismatched_byte_indices.contains(&i)))
+        })
+        .collect()
+}
+
+/// The catalogue signals behind a frame's decode, in the order `decode_frame`
+/// emits them: the plain signals, then each matched mux case's, outermost first.
+fn decoded_signal_defs<'a>(
+    frame: &'a wiretap_catalog::Frame,
+    selectors: &[wiretap_catalog::decode::MuxSelector],
+) -> Vec<&'a wiretap_catalog::Signal> {
+    let mut defs: Vec<_> = frame.signals.iter().collect();
+    let mut mux = frame.mux.as_ref();
+    for selector in selectors {
+        let Some(case) = mux.zip(selector.matched_case.as_deref()).and_then(|(m, k)| m.cases.get(k))
+        else {
+            break;
+        };
+        defs.extend(&case.signals);
+        mux = case.mux.as_deref();
+    }
+    defs
+}
+
+fn byte_span(signal: &wiretap_catalog::Signal) -> Option<std::ops::RangeInclusive<usize>> {
+    let (start_bit, bit_length) = (signal.start_bit?, signal.bit_length?);
+    (bit_length > 0).then(|| (start_bit / 8) as usize..=((start_bit + bit_length - 1) / 8) as usize)
 }
 
 /// Read new frames from capture_store since the last send, encode as binary, and send via WS.
@@ -513,11 +669,12 @@ pub fn send_new_frames(session_id: &str) {
     server.send_to_channel(channel, msg);
 
     // If a catalogue is attached, decode the same batch once (in Rust) and push
-    // it as a parallel DecodedSignals message — the frontend stops re-decoding.
+    // it as a parallel DecodedSignals message, routing every frame — the
+    // Decoder reads its tabs from this alone.
     if let Some(catalog) = attached_catalog(session_id) {
         let verdicts = mirror_verdicts(session_id, &frames);
         let tunnels = tunnel_decoders(session_id);
-        let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref());
+        let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), true);
         if !decoded.is_empty() {
             let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
             server.send_to_channel(channel, dmsg);
@@ -630,7 +787,7 @@ pub fn redecode_delivered(session_id: &str) {
     // reset keeps that true for any future caller.
     reset_tunnels(session_id);
     let tunnels = tunnel_decoders(session_id);
-    let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref());
+    let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), false);
     if !decoded.is_empty() {
         let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
         server.send_to_channel(channel, dmsg);
@@ -1155,11 +1312,7 @@ allow_broadcast = true
     }
 
     fn modbus_session() -> SessionTunnels {
-        SessionTunnels {
-            declared: HashMap::new(),
-            active: Mutex::new(HashMap::new()),
-            serial: Some(Mutex::new(HashMap::new())),
-        }
+        SessionTunnels::new(HashMap::new(), true)
     }
 
     /// The serial port is already framed, so each frame is one whole message —
@@ -1255,11 +1408,7 @@ bit_length = 16
     /// happens to parse as Modbus must not be reported as a message.
     #[test]
     fn a_non_modbus_catalogue_interprets_nothing() {
-        let tunnels = Arc::new(SessionTunnels {
-            declared: HashMap::new(),
-            active: Mutex::new(HashMap::new()),
-            serial: None,
-        });
+        let tunnels = Arc::new(SessionTunnels::new(HashMap::new(), false));
         let frame = serial_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
         assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &frame, 0).is_empty());
     }
@@ -1292,5 +1441,244 @@ bit_length = 16
             feed_tunnels(Some(&tunnels), &catalog, "test", &vendor, 0).len(),
             1
         );
+    }
+
+    fn can(frame_id: u32, t: u64, bytes: Vec<u8>) -> FrameMessage {
+        FrameMessage {
+            timestamp_us: t,
+            ..framed("can", frame_id, bytes)
+        }
+    }
+
+    fn entries(
+        catalog: &wiretap_catalog::Catalog,
+        frames: &[FrameMessage],
+        with_unrouted: bool,
+    ) -> Vec<serde_json::Value> {
+        let json = encode_decoded_batch("routing", frames, catalog, None, None, with_unrouted);
+        if json.is_empty() {
+            return Vec::new();
+        }
+        serde_json::from_slice(&json).expect("batch is a JSON array")
+    }
+
+    const ROUTED: &str = r#"
+[meta]
+name = "routed"
+[meta.can]
+frame_id_mask = 0xFF00
+[frame.can."0x100"]
+length = 8
+[[frame.can."0x100".signals]]
+name = "Level"
+start_bit = 0
+bit_length = 8
+"#;
+
+    #[test]
+    fn every_frame_is_routed_and_a_backlog_carries_decoded_only() {
+        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let frames = [can(0x1A5, 10, vec![7; 8]), can(0x2A5, 20, vec![1, 2])];
+
+        let live = entries(&catalog, &frames, true);
+        assert_eq!(live.len(), 2);
+        assert!(live[0].get("kind").is_none(), "absent kind means decoded");
+        assert_eq!(live[0]["frameId"], 0x1A5);
+        assert_eq!(live[0]["maskedFrameId"], 0x100);
+        assert_eq!(live[1]["kind"], "unmatched");
+        assert_eq!(live[1]["frameId"], 0x2A5);
+        assert_eq!(live[1]["t"], 20);
+        assert_eq!(live[1]["bytes"], serde_json::json!([1, 2]));
+        assert_eq!(live[1]["protocol"], "can");
+
+        let backlog = entries(&catalog, &frames, false);
+        assert_eq!(backlog.len(), 1);
+        assert!(backlog[0].get("kind").is_none());
+    }
+
+    const SERIAL: &str = r#"
+[meta]
+name = "serial"
+[meta.serial]
+encoding = "slip"
+min_frame_length = 4
+[meta.serial.checksum]
+algorithm = "xor"
+start_byte = -1
+byte_length = 1
+[frame.serial."0x01"]
+length = 4
+[[frame.serial."0x01".signals]]
+name = "Value"
+start_bit = 8
+bit_length = 8
+"#;
+
+    #[test]
+    fn a_frame_under_the_catalogues_minimum_length_is_short_not_decoded() {
+        let catalog = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let live = entries(&catalog, &[framed("serial", 1, vec![0x01, 0x02])], true);
+        assert_eq!(live.len(), 1);
+        assert_eq!(live[0]["kind"], "short");
+        assert_eq!(live[0]["protocol"], "serial");
+        assert!(entries(&catalog, &[framed("serial", 1, vec![0x01, 0x02])], false).is_empty());
+    }
+
+    #[test]
+    fn a_framed_serial_frame_carries_its_checksum_verdict() {
+        let catalog = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let good = framed("serial", 1, vec![0x01, 0x02, 0x03, 0x01 ^ 0x02 ^ 0x03]);
+        let bad = framed("serial", 1, vec![0x01, 0x02, 0x03, 0xFF]);
+        let live = entries(&catalog, &[good, bad], true);
+        assert_eq!(live[0]["checksum"]["valid"], true);
+        assert_eq!(live[0]["checksum"]["extracted"], 0x00);
+        assert_eq!(live[1]["checksum"]["valid"], false);
+        assert_eq!(live[1]["checksum"]["extracted"], 0xFF);
+
+        let can_catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let live = entries(&can_catalog, &[can(0x100, 0, vec![0; 8])], true);
+        assert!(live[0].get("checksum").is_none(), "no serial checksum, no verdict");
+    }
+
+    const MIRRORED_MUX: &str = r#"
+[meta]
+name = "mirror"
+[meta.can]
+default_interval = 100
+[frame.can."0x705"]
+length = 8
+[[frame.can."0x705".signals]]
+name = "Plain"
+start_bit = 0
+bit_length = 16
+[[frame.can."0x705".signals]]
+name = "Own"
+start_bit = 32
+bit_length = 8
+[frame.can."0x705".mux]
+start_bit = 16
+bit_length = 8
+[[frame.can."0x705".mux."1".signals]]
+name = "Case_Over_Plain"
+start_bit = 8
+bit_length = 8
+[[frame.can."0x705".mux."1".signals]]
+name = "Case_Alone"
+start_bit = 24
+bit_length = 8
+[frame.can."0x005"]
+length = 8
+mirror_of = "0x705"
+[[frame.can."0x005".signals]]
+name = "Own"
+start_bit = 32
+bit_length = 8
+"#;
+
+    fn mirror_signals(source: [u8; 8], mirror: [u8; 8]) -> HashMap<String, serde_json::Value> {
+        let catalog = wiretap_catalog::Catalog::parse(MIRRORED_MUX).expect("catalogue parses");
+        let mut tracker = wiretap_catalog::MirrorTracker::new(&catalog);
+        for k in 0..3 {
+            tracker.observe(0x705, &source, f64::from(k));
+            tracker.observe(0x005, &mirror, f64::from(k) + 0.01);
+        }
+        let (_, verdict) = tracker.verdicts().next().expect("0x005 is tracked");
+        let json = serde_json::to_value(&verdict).expect("verdict serialises");
+        let verdict = EncodedVerdict { verdict, json };
+        let entry = decode_entry(&catalog, &can(0x005, 0, mirror.to_vec()), Some(&verdict), &[])
+            .expect("mirror decodes");
+        entry["signals"]
+            .as_array()
+            .expect("signals")
+            .iter()
+            .map(|s| (s["name"].as_str().expect("named").to_string(), s.clone()))
+            .collect()
+    }
+
+    /// Byte 1 differs. The mux case signal reading it was compared, through the
+    /// plain signal over the same byte; the one at byte 3 was not, so it has no
+    /// verdict rather than the frame's; the mirror's own signal is never compared.
+    #[test]
+    fn a_mirror_signal_takes_the_verdict_of_the_bytes_it_covers() {
+        let source = [0x10, 0x20, 0x01, 0x40, 0x50, 0, 0, 0];
+        let mut mirror = source;
+        mirror[1] = 0x21;
+        mirror[3] = 0x41;
+        let signals = mirror_signals(source, mirror);
+        assert_eq!(signals["Plain"]["mirrorMismatch"], true);
+        assert_eq!(signals["Case_Over_Plain"]["mirrorMismatch"], true);
+        assert!(signals["Case_Alone"].get("mirrorMismatch").is_none());
+        assert!(signals["Own"].get("mirrorMismatch").is_none());
+
+        let signals = mirror_signals(source, source);
+        assert_eq!(signals["Plain"]["mirrorMismatch"], false);
+        assert_eq!(signals["Case_Over_Plain"]["mirrorMismatch"], false);
+        assert!(signals["Case_Alone"].get("mirrorMismatch").is_none());
+    }
+
+    /// A vendor message between the request and its response neither pairs
+    /// with either nor displaces the request's stamp.
+    #[test]
+    fn a_tunnel_response_carries_its_latency_past_an_interleaved_vendor_message() {
+        let catalog = tunnel_catalogue("");
+        let session = "tunnel-latency";
+        attach_catalog(session, None, catalog.clone());
+        let tunnels = tunnel_decoders(session);
+        let mut frames = Vec::new();
+        for (t, body) in [
+            (1_000, vec![0x01, 0x04, 0x4D, 0xE2, 0x00, 0x02]),
+            (2_000, vec![0x01, 0x60, 0x00, 0x01, 0x0A]),
+            (5_000, vec![0x01, 0x04, 0x04, 0x01, 0x2C, 0x00, 0x00]),
+        ] {
+            frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
+        }
+        let json = encode_decoded_batch(session, &frames, &catalog, None, tunnels.as_ref(), true);
+        detach_catalog(session);
+
+        let batch: Vec<serde_json::Value> = serde_json::from_slice(&json).expect("JSON array");
+        let transactions: Vec<_> = batch
+            .iter()
+            .filter_map(|e| e["tunnel"].as_array())
+            .flatten()
+            .map(|t| (t["function"].as_u64().expect("function"), t.get("latencyUs").cloned()))
+            .collect();
+        assert_eq!(
+            transactions,
+            [
+                (0x04, None),
+                (0x60, None),
+                (0x04, Some(serde_json::json!(4_000))),
+            ]
+        );
+    }
+
+    /// The wire cost of routing every frame, on a bus where the catalogue
+    /// covers a third of the ids. Run with `--nocapture` for the numbers.
+    #[test]
+    fn routing_every_frame_costs_less_than_doubling_the_batch() {
+        let mut toml = String::from("[meta]\nname = \"third\"\n");
+        for id in 0x100..0x10A {
+            toml += &format!("[frame.can.\"0x{id:X}\"]\nlength = 8\n");
+            for (n, name) in ["Pack_Voltage", "Pack_Current", "Cell_Temperature_Max", "State_Of_Charge"]
+                .iter()
+                .enumerate()
+            {
+                toml += &format!(
+                    "[[frame.can.\"0x{id:X}\".signals]]\nname = \"{name}\"\nstart_bit = {}\nbit_length = 16\nfactor = 0.1\nunit = \"V\"\n",
+                    n * 16
+                );
+            }
+        }
+        let catalog = wiretap_catalog::Catalog::parse(&toml).expect("catalogue parses");
+        let frames: Vec<_> = (0..300u32)
+            .map(|i| can(0x100 + (i % 30), u64::from(i) * 1_000, vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]))
+            .collect();
+        let decoded_only = encode_decoded_batch("size", &frames, &catalog, None, None, false).len();
+        let routed = encode_decoded_batch("size", &frames, &catalog, None, None, true).len();
+        eprintln!(
+            "DecodedSignals bytes per 300-frame batch: decoded only {decoded_only}, routed {routed} ({:.2}x)",
+            routed as f64 / decoded_only as f64
+        );
+        assert!(routed < decoded_only * 2);
     }
 }

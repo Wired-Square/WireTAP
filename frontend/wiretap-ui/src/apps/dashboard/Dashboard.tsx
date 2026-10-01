@@ -33,7 +33,7 @@ import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { extractBits } from "../../utils/bits";
 import type { FrameMessage } from "../../types/frame";
-import type { DecodedFrameMsg } from "../../services/wsProtocol";
+import type { DecodedSignalsEntry } from "../../services/wsProtocol";
 
 function DashboardInner() {
   const { t } = useTranslation("dashboard");
@@ -268,17 +268,16 @@ function DashboardInner() {
   // Catalog-decoded signals from the Rust decoder (DecodedSignals stream). The
   // stream already flattens mux-case signals into `signals`, so there's no
   // separate mux handling here. Replaces the former TS catalog decode.
-  const handleDecoded = useCallback((decoded: DecodedFrameMsg[]) => {
-    const mask = frameIdMaskRef.current;
+  const handleDecoded = useCallback((decoded: DecodedSignalsEntry[]) => {
     const store = useDashboardStore.getState();
     for (const msg of decoded) {
+      if (msg.kind) continue;
       const timestamp = msg.t / 1_000_000;
-      const maskedFrameId = mask !== undefined ? (msg.frameId & mask) : msg.frameId;
-      store.recordFrameId(maskedFrameId);
+      store.recordFrameId(msg.maskedFrameId);
       for (const s of msg.signals) {
         if (Number.isFinite(s.scaled)) {
           pendingValuesRef.current.push({
-            frameId: maskedFrameId,
+            frameId: msg.maskedFrameId,
             signalName: s.name,
             value: s.scaled,
             timestamp,

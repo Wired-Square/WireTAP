@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
-import type { DecodedFrameMsg } from "../services/wsProtocol";
+import type { DecodedSignalsEntry } from "../services/wsProtocol";
 import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
 import { tlog } from "../api/settings";
 import {
@@ -131,7 +131,7 @@ export interface UseIOSessionManagerOptions {
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
-  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
-import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames, getTunnelTransactions, type UnmatchedFrame, type FilteredFrame } from "../../stores/decoderStore";
+import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames, getTunnelTransactions } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
@@ -45,9 +45,8 @@ import { useDecoderHandlers } from "./hooks/useDecoderHandlers";
 import { useModbusPolling } from "../../hooks/useModbusPolling";
 import { anyModbusProfile } from "../../utils/modbusProfiles";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
-import type { FrameMessage } from "../../types/frame";
 import type { SerialFrameConfig } from "../../utils/frameExport";
-import type { DecodedFrameMsg } from "../../services/wsProtocol";
+import type { DecodedSignalsEntry } from "../../services/wsProtocol";
 import { isMessageProtocol } from "../../utils/profileTraits";
 
 /** The loaded catalogue's poll groups, but only for sources they actually apply to.
@@ -142,7 +141,6 @@ function DecoderInner() {
   const seenHeaderFieldValues = useDecoderStore((state) => state.seenHeaderFieldValues);
   const showAsciiGutter = useDecoderStore((state) => state.showAsciiGutter);
   const frameIdFilter = useDecoderStore((state) => state.frameIdFilter);
-  const frameIdFilterSet = useDecoderStore((state) => state.frameIdFilterSet);
   const mirrorValidation = useDecoderStore((state) => state.mirrorValidation);
 
   // Zustand store actions
@@ -151,8 +149,6 @@ function DecoderInner() {
   const bulkSelectBus = useDecoderStore((state) => state.bulkSelectBus);
   const selectAllFrames = useDecoderStore((state) => state.selectAllFrames);
   const deselectAllFrames = useDecoderStore((state) => state.deselectAllFrames);
-  const decodeSignalsBatch = useDecoderStore((state) => state.decodeSignalsBatch);
-  const applyDecodedBatch = useDecoderStore((state) => state.applyDecodedBatch);
   const setIoProfile = useDecoderStore((state) => state.setIoProfile);
   const updateCurrentTime = useDecoderStore((state) => state.updateCurrentTime);
   const setCurrentFrameIndex = useDecoderStore((state) => state.setCurrentFrameIndex);
@@ -221,140 +217,28 @@ function DecoderInner() {
     }
   }, [isFocused, activeTab]);
 
-  // Batching: accumulate frames and flush to store at limited rate
-  // We store all frames (not just latest per ID) to ensure mux cases aren't lost
-  // Note: sessionStore also throttles frame delivery at 10Hz, this provides additional
-  // batching for expensive decode/store operations within each callback
-  const pendingFramesRef = useRef<Array<{ frameId: number; bytes: number[] }>>([]);
-  const pendingUnmatchedRef = useRef<UnmatchedFrame[]>([]);
-  const pendingFilteredRef = useRef<FilteredFrame[]>([]);
-  const pendingTimeRef = useRef<number | null>(null);
-  const flushScheduledRef = useRef<boolean>(false);
-  // UI_UPDATE_INTERVAL_MS imported from constants
+  // Rust routes every frame (decoded, unmatched, short); batch its stream so a
+  // fast replay costs one store update per UI tick.
+  const pendingEntriesRef = useRef<DecodedSignalsEntry[]>([]);
+  const flushScheduledRef = useRef(false);
 
-  // Use refs for store functions to avoid stale closures in setTimeout
-  const decodeSignalsBatchRef = useRef(decodeSignalsBatch);
-  const applyDecodedBatchRef = useRef(applyDecodedBatch);
-  const updateCurrentTimeRef = useRef(updateCurrentTime);
-  const selectedFramesRef = useRef(selectedFrames);
-  const frameIdFilterSetRef = useRef(frameIdFilterSet);
-
-  // Keep refs up to date
-  useEffect(() => {
-    decodeSignalsBatchRef.current = decodeSignalsBatch;
-  }, [decodeSignalsBatch]);
-  useEffect(() => {
-    applyDecodedBatchRef.current = applyDecodedBatch;
-  }, [applyDecodedBatch]);
-  useEffect(() => {
-    updateCurrentTimeRef.current = updateCurrentTime;
-  }, [updateCurrentTime]);
-  useEffect(() => {
-    selectedFramesRef.current = selectedFrames;
-  }, [selectedFrames]);
-  useEffect(() => {
-    frameIdFilterSetRef.current = frameIdFilterSet;
-  }, [frameIdFilterSet]);
-
-  const flushPendingFrames = useCallback(() => {
+  const flushPendingEntries = useCallback(() => {
     flushScheduledRef.current = false;
-
-    // Update current time if we have one
-    if (pendingTimeRef.current !== null) {
-      updateCurrentTimeRef.current(pendingTimeRef.current);
-      pendingTimeRef.current = null;
-    }
-
-    // Collect all pending data
-    const framesToDecode = pendingFramesRef.current;
-    const unmatchedToAdd = pendingUnmatchedRef.current;
-    const filteredToAdd = pendingFilteredRef.current;
-    pendingFramesRef.current = [];
-    pendingUnmatchedRef.current = [];
-    pendingFilteredRef.current = [];
-
-    // Single batch call: creates LRU maps once and does one Zustand set()
-    // (replaces per-frame decodeSignals loop that copied maps N times)
-    decodeSignalsBatchRef.current(framesToDecode, unmatchedToAdd, filteredToAdd);
+    const entries = pendingEntriesRef.current;
+    if (entries.length === 0) return;
+    pendingEntriesRef.current = [];
+    const store = useDecoderStore.getState();
+    store.updateCurrentTime(entries[entries.length - 1].t / 1_000_000);
+    store.applyDecodedBatch(entries);
   }, []);
 
-  // Callbacks for reader session
-  // Note: Watch frame counting is handled by useIOSessionManager
-  const handleFrames = useCallback((receivedFrames: FrameMessage[]) => {
-    if (!receivedFrames || receivedFrames.length === 0) return;
-
-    // Update current time from the last frame with a timestamp (most recent)
-    for (let i = receivedFrames.length - 1; i >= 0; i--) {
-      if (receivedFrames[i].timestamp_us !== undefined) {
-        pendingTimeRef.current = receivedFrames[i].timestamp_us! / 1_000_000; // Convert to seconds
-        break;
-      }
-    }
-
-    // Accumulate ALL frames to ensure mux cases aren't lost
-    // Use ref for selectedFrames to avoid stale closure
-    const currentSelectedFrames = selectedFramesRef.current;
-    // Get state directly from store to avoid ref timing issues
-    const storeState = useDecoderStore.getState();
-    const catalogFrames = storeState.frames;
-    const minFrameLength = storeState.serialConfig?.min_frame_length ?? 0;
-    const idFilterSet = frameIdFilterSetRef.current;
-
-    // Get frame_id_mask for catalog matching (from canConfig or serialConfig based on protocol)
-    const currentProtocol = storeState.protocol;
-    const frameIdMask = currentProtocol === 'can'
-      ? storeState.canConfig?.frame_id_mask
-      : storeState.serialConfig?.frame_id_mask;
-
-    for (const f of receivedFrames) {
-      const timestamp = f.timestamp_us !== undefined ? f.timestamp_us / 1_000_000 : Date.now() / 1000;
-
-      // Check if frame is too short (filtered by length)
-      if (minFrameLength > 0 && f.bytes.length < minFrameLength) {
-        pendingFilteredRef.current.push({ frameId: f.frame_id, bytes: f.bytes, timestamp, sourceAddress: f.source_address, protocol: f.protocol, reason: 'too_short' });
-        continue;
-      }
-
-      const frameId = f.frame_id;
-
-      // Check if frame ID matches the filter (if filter is set, matching IDs go to Filtered tab)
-      if (idFilterSet !== null && idFilterSet.has(frameId)) {
-        pendingFilteredRef.current.push({ frameId, bytes: f.bytes, timestamp, sourceAddress: f.source_address, protocol: f.protocol, reason: 'id_filter' });
-        continue;
-      }
-
-      // Apply frame_id_mask before catalog lookup (same as decodeSignals does)
-      const maskedFrameId = frameIdMask !== undefined ? (frameId & frameIdMask) : frameId;
-
-      // Check if frame exists in catalog (using composite key with masked ID)
-      const maskedKey = frameKey(currentProtocol, maskedFrameId);
-      if (catalogFrames.has(maskedKey)) {
-        // Frame exists in catalog - keep its bytes if selected (check both raw
-        // and masked IDs). An unselected mirror *source* no longer has to be
-        // pushed through: the mirror comparison runs in Rust over every frame
-        // the session delivers, not over what this view happens to be showing.
-        const rawKey = frameKey(currentProtocol, frameId);
-        if (currentSelectedFrames.has(maskedKey) || currentSelectedFrames.has(rawKey)) {
-          pendingFramesRef.current.push({ frameId, bytes: f.bytes });
-        }
-      } else {
-        // Frame not in catalog - add to unmatched
-        pendingUnmatchedRef.current.push({
-          frameId,
-          bytes: f.bytes,
-          timestamp,
-          sourceAddress: f.source_address,
-          protocol: f.protocol,
-        });
-      }
-    }
-
-    // Schedule a flush if not already scheduled
+  const handleDecoded = useCallback((entries: DecodedSignalsEntry[]) => {
+    for (const entry of entries) pendingEntriesRef.current.push(entry);
     if (!flushScheduledRef.current) {
       flushScheduledRef.current = true;
-      setTimeout(flushPendingFrames, UI_UPDATE_INTERVAL_MS);
+      setTimeout(flushPendingEntries, UI_UPDATE_INTERVAL_MS);
     }
-  }, [flushPendingFrames]);
+  }, [flushPendingEntries]);
 
   // Error handling - errors are shown globally via sessionStore's IO error dialog
   // This callback is kept for logging but UI display is handled centrally
@@ -471,12 +355,6 @@ function DecoderInner() {
     }
   }, []);
 
-  // Decoded signals from the Rust decoder stream (catalogue attached). The
-  // backend already throttles these, so apply directly.
-  const handleDecoded = useCallback((decoded: DecodedFrameMsg[]) => {
-    applyDecodedBatchRef.current(decoded);
-  }, []);
-
   // Use the IO session manager hook - manages session lifecycle, ingest, multi-bus, and derived state
   const manager = useIOSessionManager({
     appName: "decoder",
@@ -485,7 +363,6 @@ function DecoderInner() {
     enableIngest: true,
     onIngestComplete: handleIngestComplete,
     requireFrames: true,
-    onFrames: handleFrames,
     onDecoded: handleDecoded,
     onError: handleError,
     onTimeUpdate: handleTimeUpdate,
@@ -842,12 +719,10 @@ function DecoderInner() {
     }
   }, [pendingCaptureTransition, isDecoding, switchToCaptureReplay, playbackSpeed, setIoProfile, updateCurrentTime, setCurrentFrameIndex]);
 
-  // Flush any pending frames when decoding stops to ensure nothing is lost
+  // Flush what is pending when decoding stops so nothing is lost
   useEffect(() => {
-    if (!isDecoding && pendingFramesRef.current.length > 0) {
-      flushPendingFrames();
-    }
-  }, [isDecoding, flushPendingFrames]);
+    if (!isDecoding) flushPendingEntries();
+  }, [isDecoding, flushPendingEntries]);
 
   // For realtime sources, update clock every second while decoding
   const [realtimeClock, setRealtimeClock] = useState<number | null>(null);

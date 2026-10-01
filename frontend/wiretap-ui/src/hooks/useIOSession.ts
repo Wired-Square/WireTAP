@@ -59,7 +59,7 @@ import {
   type PlaybackPosition,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
-import type { DecodedFrameMsg } from "../services/wsProtocol";
+import type { DecodedSignalsEntry } from "../services/wsProtocol";
 
 // ============================================================================
 // Local Session State Type
@@ -178,7 +178,7 @@ export interface UseIOSessionOptions {
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
-  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */

@@ -389,7 +389,6 @@ fn decode_tail(
             .as_object_mut()
             .expect("decode_entry builds an object");
         object.remove("bytes");
-        object.insert("maskedFrameId".into(), json!(masked));
         match latest.iter_mut().find(|(id, _)| *id == masked) {
             Some((_, seen)) => {
                 let mut signals = seen["signals"].take();

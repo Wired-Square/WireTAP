@@ -5,7 +5,6 @@ import { Calculator, Flag, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter,
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
-import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
 import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
@@ -28,6 +27,7 @@ import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
+import type { LRUMap } from "../../../utils/LRUMap";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
 import { bytesToHex, byteToHex, byteToAscii, bytesToAscii } from "../../../utils/byteUtils";
 import type { SerialFrameConfig } from "../../../utils/frameExport";
@@ -41,7 +41,7 @@ import { Badge, type BadgeTone } from "../../../components/Badge";
 type Props = {
   frames: FrameDetail[];
   selectedIds: Set<string>;
-  decoded: Map<number, DecodedFrame>;
+  decoded: LRUMap<number, DecodedFrame>;
   /** Decoded frames keyed by "frameId:sourceAddress" for per-source view mode */
   decodedPerSource: Map<string, DecodedFrame>;
   /** Version counter for decoded data — triggers useMemo recomputation */
@@ -367,7 +367,6 @@ function FrameCard({
   showAsciiGutter = false,
   signalColours,
   sourceAddressLabel,
-  serialConfig,
   displayTimeFormat = "human",
   onToggleHeaderFieldFilter,
   startTimeSeconds,
@@ -388,8 +387,6 @@ function FrameCard({
   };
   /** Source address to display as a label (for per-source view mode) */
   sourceAddressLabel?: number;
-  /** Serial config for extracting checksum info */
-  serialConfig?: SerialFrameConfig | null;
   /** Time format for signal timestamps */
   displayTimeFormat?: TimeFormat;
   /** Callback for header field badge clicks to toggle filter */
@@ -597,35 +594,7 @@ function FrameCard({
   );
 
   const headerFields = decodedFrame?.headerFields ?? [];
-
-  // Async checksum validation state
-  const [checksumResult, setChecksumResult] = useState<ChecksumValidationResult | null>(null);
-
-  // Validate checksum asynchronously when raw bytes change
-  useEffect(() => {
-    if (!serialConfig?.checksum || !rawBytes || rawBytes.length === 0) {
-      setChecksumResult(null);
-      return;
-    }
-
-    const { algorithm, start_byte, byte_length, calc_start_byte, calc_end_byte, big_endian } = serialConfig.checksum;
-
-    // Validate the checksum via Tauri backend
-    validateChecksum(
-      algorithm as ChecksumAlgorithm,
-      rawBytes,
-      start_byte,
-      byte_length,
-      big_endian ?? false,
-      calc_start_byte,
-      calc_end_byte
-    )
-      .then(setChecksumResult)
-      .catch((err) => {
-        console.warn('[FrameCard] checksum validation failed:', err);
-        setChecksumResult(null);
-      });
-  }, [serialConfig?.checksum, rawBytes]);
+  const checksumResult = decodedFrame?.checksum;
 
   // Map built-in field names to friendly display names
   const getFriendlyFieldName = (name: string): string => {
@@ -769,23 +738,6 @@ function FrameCard({
           // Find signal definition for confidence color
           const findSignalDef = (name: string) => allSignals.find(s => s.name === name);
 
-          // Check if a signal's bytes have any mismatches (for per-signal validation indicator)
-          // Only show per-signal mismatch when frame-level is also showing mismatch (respects hysteresis)
-          const signalHasMismatch = (signal: SignalDef): boolean | null => {
-            if (!mirrorValidation || mirrorValidation.isValid === null) return null; // No validation data yet
-            if (!signal._inherited) return null; // Only show for inherited signals
-            // If frame shows Match, all signals show as matching (green checkmark)
-            if (mirrorValidation.isValid === true) return false;
-            // Frame shows Mismatch - check which specific signals have mismatched bytes
-            const signalBytes = signalByteIndices(signal);
-            for (const byteIdx of signalBytes) {
-              if (mirrorValidation.mismatchedByteIndices.includes(byteIdx)) {
-                return true; // Has mismatch
-              }
-            }
-            return false; // All bytes match
-          };
-
           // Render a single signal row
           const renderSignalRow = (decoded: DecodedSignal, idx: number, rowOffset: number) => {
             const signalDef = findSignalDef(decoded.name);
@@ -800,7 +752,7 @@ function FrameCard({
               ? "bg-table-row-alt"
               : bgSurface;
             const timestampStr = formatSignalTimestamp(decoded.timestamp, displayTimeFormat, startTimeSeconds);
-            const signalMismatch = signalDef ? signalHasMismatch(signalDef) : null;
+            const signalMismatch = decoded.mirrorMismatch;
 
             return (
               <div
@@ -842,7 +794,7 @@ function FrameCard({
                     >
                       {signalMismatch === true && <X className={iconXs} />}
                       {signalMismatch === false && <Check className={iconXs} />}
-                      {signalMismatch === null && '(inherited)'}
+                      {signalMismatch === undefined && '(inherited)'}
                     </span>
                   )}
                 </div>
@@ -1051,10 +1003,10 @@ export default function DecoderFramesView({
     return map;
   }, [seenHeaderFieldValues]);
 
-  // Filter decoded frames based on header field filters
+  // Filter decoded frames based on header field filters; null when none apply
   const filteredDecoded = useMemo(() => {
     if (!headerFieldFilters || headerFieldFilters.size === 0) {
-      return decoded;
+      return null;
     }
 
     const result = new Map<number, DecodedFrame>();
@@ -1079,6 +1031,8 @@ export default function DecoderFramesView({
 
     return result;
   }, [decoded, headerFieldFilters, decodedVersion]);
+  // `peek`, not `get`: a read during render must not reorder the LRU.
+  const decodedFor = (id: number) => filteredDecoded ? filteredDecoded.get(id) : decoded.peek(id);
 
   const isPaused = playbackState === "paused";
   const supportsTimeRange = capabilities?.supports_time_range ?? false;
@@ -1587,17 +1541,16 @@ export default function DecoderFramesView({
               // Single view: most recent message per frame ID
               // When hideUnseen is true, only show frames that have been decoded
               selectedFrames
-                .filter((f) => !hideUnseen || filteredDecoded.has(f.id))
+                .filter((f) => !hideUnseen || decodedFor(f.id) !== undefined)
                 .map((f) => (
                   <FrameCard
                     key={f.id}
                     frame={f}
-                    decodedFrame={filteredDecoded.get(f.id)}
+                    decodedFrame={decodedFor(f.id)}
                     displayFrameIdFormat={displayFrameIdFormat}
                     showRawBytes={showRawBytes}
                     showAsciiGutter={showAsciiGutter}
                     signalColours={signalColours}
-                    serialConfig={serialConfig}
                     displayTimeFormat={displayTimeFormat}
                     onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                     startTimeSeconds={startTimeSeconds}
@@ -1641,7 +1594,7 @@ export default function DecoderFramesView({
 
                   // If no per-source data yet, fall back to single decoded entry (if it passes filter)
                   if (sourceEntries.length === 0) {
-                    const singleDecoded = filteredDecoded.get(f.id);
+                    const singleDecoded = decodedFor(f.id);
                     if (singleDecoded) {
                       sourceEntries.push({
                         sourceAddress: singleDecoded.sourceAddress ?? 0,
@@ -1665,7 +1618,6 @@ export default function DecoderFramesView({
                         showAsciiGutter={showAsciiGutter}
                         signalColours={signalColours}
                         sourceAddressLabel={sourceEntries.length > 1 || sourceAddress !== 0 ? sourceAddress : undefined}
-                        serialConfig={serialConfig}
                         displayTimeFormat={displayTimeFormat}
                         onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                         startTimeSeconds={startTimeSeconds}
@@ -1714,12 +1666,11 @@ export default function DecoderFramesView({
               <FrameCard
                 key={f.id}
                 frame={f}
-                decodedFrame={decoded.get(f.id)}
+                decodedFrame={decoded.peek(f.id)}
                 displayFrameIdFormat={displayFrameIdFormat}
                 showRawBytes={showRawBytes}
                 showAsciiGutter={showAsciiGutter}
                 signalColours={signalColours}
-                serialConfig={serialConfig}
                 displayTimeFormat={displayTimeFormat}
                 onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                 startTimeSeconds={startTimeSeconds}

@@ -9,11 +9,11 @@
 // different data (`0x504`'s sign-inverted current, `0x005`'s end-stop flag) and
 // must not be reported as a mismatch.
 //
-// The live Decoder gets its verdict from Rust
-// (`wiretap_catalog::mirror::MirrorTracker`). This module exists for the two
-// places TypeScript still has to answer the same question itself: rendering the
-// per-signal ✓/×, and telling the offline mirror-validation queries which bytes
-// to compare so they agree with the live badge.
+// The live Decoder gets its verdict, per frame and per signal, from Rust
+// (`wiretap_catalog::mirror::MirrorTracker`). This module exists for the one
+// place TypeScript still has to answer the same question itself: telling the
+// offline mirror-validation queries which bytes to compare so they agree with
+// the live badge.
 
 /**
  * The bits of a signal these functions need — structural, so both the decoder's

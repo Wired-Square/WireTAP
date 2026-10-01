@@ -5,6 +5,7 @@
 
 import type { FrameMessage } from "../types/frame";
 import type { DeviceInfoEntry, ScanProgressPayload, StreamEndedInfo } from "../api/io";
+import type { ChecksumValidationResult } from "../api/checksums";
 import { trackAlloc } from "./memoryDiag";
 
 // ============================================================================
@@ -230,7 +231,7 @@ export function decodeFrameBatch(
 //
 // Pushed alongside FrameData when a catalogue is attached to the session.
 // Decoding happens once, in Rust (the wiretap-catalog crate); the payload is
-// a UTF-8 JSON array, one entry per frame that matched a catalogue frame.
+// a UTF-8 JSON array, one entry per frame: decoded, or why it was not.
 // ============================================================================
 
 export interface DecodedSignalValue {
@@ -246,6 +247,9 @@ export interface DecodedSignalValue {
   muxValue?: number | null;
   /** Declared signal format (enum/hex/ascii/utf8/unix_time), if any. */
   format?: string | null;
+  /** On a mirror frame, whether the bytes this signal covers differed from the
+   *  source; absent where they were not compared. */
+  mirrorMismatch?: boolean;
 }
 
 export interface DecodedMuxSelector {
@@ -325,10 +329,15 @@ export interface DecodedTunnelMessage {
    * Modbus length rules alone — so the message may have been guessed.
    */
   crcValid: boolean;
+  /** µs since the request this response answers, when that request was seen. */
+  latencyUs?: number;
 }
 
 export interface DecodedFrameMsg {
+  kind?: undefined;
   frameId: number;
+  /** `frameId` under the catalogue's `frame_id_mask` — the catalogue frame it decoded as. */
+  maskedFrameId: number;
   bus: number;
   /** Host timestamp (µs). */
   t: number;
@@ -339,12 +348,28 @@ export interface DecodedFrameMsg {
   /** Source address resolved from a CAN header field, if any. */
   sourceAddress?: number | null;
   /** Raw payload of the frame this decode came from (for per-mux byte rows). */
-  bytes?: number[];
+  bytes: number[];
   /** Mirror comparison verdict; absent when this frame is not a mirror. */
   mirror?: DecodedMirrorVerdict;
   /** Tunnel messages this frame completed; absent on non-tunnel frames. */
   tunnel?: DecodedTunnelMessage[];
+  /** The serial catalogue's checksum over `bytes`; absent when it declares none. */
+  checksum?: ChecksumValidationResult;
 }
+
+/** A frame the catalogue did not decode: no frame for its id, or shorter than
+ *  its serial `min_frame_length`. */
+export interface UnroutedFrameMsg {
+  kind: "unmatched" | "short";
+  frameId: number;
+  bus: number;
+  t: number;
+  bytes: number[];
+  protocol: string;
+  sourceAddress?: number;
+}
+
+export type DecodedSignalsEntry = DecodedFrameMsg | UnroutedFrameMsg;
 
 const wsJsonDecoder = new TextDecoder();
 
@@ -357,12 +382,12 @@ export function decodeWsJson<T>(raw: ArrayBuffer): T {
 const decodedSignalsDecoder = new TextDecoder();
 
 /** Decode a DecodedSignals batch (JSON payload) into per-frame decode results. */
-export function decodeDecodedSignals(payload: DataView): DecodedFrameMsg[] {
+export function decodeDecodedSignals(payload: DataView): DecodedSignalsEntry[] {
   if (payload.byteLength === 0) return [];
   const bytes = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
   try {
     const parsed = JSON.parse(decodedSignalsDecoder.decode(bytes));
-    return Array.isArray(parsed) ? (parsed as DecodedFrameMsg[]) : [];
+    return Array.isArray(parsed) ? (parsed as DecodedSignalsEntry[]) : [];
   } catch {
     return [];
   }

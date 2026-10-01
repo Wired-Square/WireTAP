@@ -29,43 +29,20 @@ function resetDecodeBuffers() {
  */
 export const MAX_TUNNEL_TRANSACTIONS = 500;
 
-/**
- * Append the tunnel messages a frame completed, pairing each response with the
- * request it answers so the tab can show the round-trip time.
- *
- * The pairing is the last outstanding request on the same (bus, frame, device,
- * function) — each bus is its own serial line, and on one of them an unanswered
- * request is simply superseded by the next rather than queued. An exception
- * response carries the request's function code with the high bit set.
- */
-function recordTunnelMessages(msg: DecodedFrameMsg, maskedFrameId: number) {
-  for (const t of msg.tunnel ?? []) {
-    const entry: TunnelTransaction = {
-      ...t,
-      frameId: maskedFrameId,
-      bus: msg.bus,
-      timestampUs: msg.t,
-    };
-    if (t.direction === 'response') {
-      for (let i = _tunnelTransactions.length - 1; i >= 0; i--) {
-        const prior = _tunnelTransactions[i];
-        if (
-          prior.direction === 'request' &&
-          prior.frameId === maskedFrameId &&
-          prior.bus === msg.bus &&
-          prior.device === t.device &&
-          (t.function & 0x7f) === prior.function
-        ) {
-          entry.latencyUs = msg.t - prior.timestampUs;
-          break;
-        }
-      }
-    }
-    _tunnelTransactions.push(entry);
-  }
-  if (_tunnelTransactions.length > MAX_TUNNEL_TRANSACTIONS) {
-    _tunnelTransactions.splice(0, _tunnelTransactions.length - MAX_TUNNEL_TRANSACTIONS);
-  }
+function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFrame {
+  return {
+    frameId: msg.frameId,
+    bytes: msg.bytes,
+    timestamp,
+    sourceAddress: msg.sourceAddress ?? undefined,
+    protocol: msg.kind ? msg.protocol : undefined,
+  };
+}
+
+/** Append to a mutable list in place, dropping the oldest beyond `max`. */
+function appendCapped<T>(list: T[], items: T[], max: number) {
+  for (const item of items) list.push(item);
+  if (list.length > max) list.splice(0, list.length - max);
 }
 
 /** Read current decoder buffer limits from the settings store. */
@@ -104,9 +81,10 @@ import { saveCatalog } from '../api';
 import { buildFramesToml, type SerialFrameConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
 import type { FrameDetail, SignalDef } from '../types/decoder';
-import type { DecodedFrameMsg, DecodedMirrorVerdict, DecodedTunnelMessage } from '../services/wsProtocol';
+import type { DecodedMirrorVerdict, DecodedSignalsEntry, DecodedTunnelMessage } from '../services/wsProtocol';
+import type { ChecksumValidationResult } from '../api/checksums';
 import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
-import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
+import type { HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, attachAndResolve, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
 import { type ModbusPollGroup } from '../api/catalog';
@@ -125,8 +103,11 @@ export type DecodedSignal = {
   rawValue?: number;
   /** Mux selector value this signal belongs to (undefined for non-mux signals) */
   muxValue?: number;
-  /** Timestamp when this signal was last updated (epoch seconds) */
+  /** Stream timestamp of the frame that last updated this signal (epoch seconds) */
   timestamp?: number;
+  /** On a mirror frame, whether this signal's bytes differed from the source;
+   *  absent where they were not compared. */
+  mirrorMismatch?: boolean;
 };
 
 /** Extracted header field value with display formatting */
@@ -168,6 +149,8 @@ export type DecodedFrame = {
    *  fragment — for a response split across three frames it is whichever
    *  fragment arrived last. These are the messages the CRC validated. */
   tunnelBytes?: Map<TunnelTransaction['direction'], number[]>;
+  /** The serial catalogue's checksum over `rawBytes`. */
+  checksum?: ChecksumValidationResult;
 };
 
 export type FrameMetadata = {
@@ -176,15 +159,6 @@ export type FrameMetadata = {
   default_byte_order: 'little' | 'big';
   default_interval: number;
   filename: string;
-};
-
-/** CAN config from [frame.can.config] - used for frame ID masking and header field extraction */
-export type CanConfig = {
-  default_byte_order?: 'little' | 'big';
-  /** Mask applied to frame_id before catalog matching (e.g., 0x1FFFFF00 for J1939) */
-  frame_id_mask?: number;
-  /** Header fields extracted from CAN ID (e.g., source_address, priority, pgn) */
-  fields?: Record<string, CanHeaderField>;
 };
 
 
@@ -213,16 +187,13 @@ export type FilteredFrame = {
 
 /**
  * One tunnelled Modbus message, as the Decoder's Modbus tab shows it: the wire
- * message plus where and when it arrived, and the latency back to the request
- * it answers (responses only — a request has nothing to measure against yet).
+ * message plus where and when it arrived.
  */
 export type TunnelTransaction = DecodedTunnelMessage & {
   frameId: number;
   bus: number;
   /** Host timestamp (µs) of the frame that completed the message. */
   timestampUs: number;
-  /** µs since the matching request, for a response that answers one. */
-  latencyUs?: number;
 };
 
 /**
@@ -245,8 +216,6 @@ interface DecoderState {
   seenIds: Set<string>;
   /** Protocol type from catalog meta (default_frame) */
   protocol: 'can' | 'serial' | 'modbus';
-  /** CAN config from [frame.can.config] - used for frame ID masking and source address extraction */
-  canConfig: CanConfig | null;
   /** Serial config from [frame.serial.config] - used for frame ID/source address extraction */
   serialConfig: SerialFrameConfig | null;
   /** Mirror validation results from the Rust stream - keyed by mirror frame ID */
@@ -327,16 +296,9 @@ interface DecoderState {
   clearDecoded: () => void;
 
   // Actions - Decoding
-  /** Batch decode multiple frames in a single state update (for high-speed playback) */
-  decodeSignalsBatch: (
-    framesToDecode: Array<{ frameId: number; bytes: number[] }>,
-    unmatchedFrames: UnmatchedFrame[],
-    filteredFrames: FilteredFrame[]
-  ) => void;
-  applyDecodedBatch: (decoded: DecodedFrameMsg[]) => void;
-  addUnmatchedFrame: (frame: UnmatchedFrame) => void;
+  /** Route one DecodedSignals batch into the decoded map, Unmatched and Filtered. */
+  applyDecodedBatch: (entries: DecodedSignalsEntry[]) => void;
   clearUnmatchedFrames: () => void;
-  addFilteredFrame: (frame: FilteredFrame) => void;
   clearFilteredFrames: () => void;
   setIoProfile: (profile: string | null) => void;
   toggleShowRawBytes: () => void;
@@ -384,7 +346,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   selectedFrames: new Set(),
   seenIds: new Set(),
   protocol: 'can',
-  canConfig: null,
   serialConfig: null,
   mirrorValidation: new Map(),
   pollGroups: [],
@@ -466,29 +427,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         });
         seenIds.add(fk);
         if (frame.tunnel) hasTunnel = true;
-      }
-
-      // Convert CanProtocolConfig to CanConfig (compatible structure)
-      let canConfig: CanConfig | null = null;
-      if (catalog.canConfig) {
-        const fields: Record<string, CanHeaderField> | undefined = catalog.canConfig.fields
-          ? Object.fromEntries(
-              Object.entries(catalog.canConfig.fields).map(([name, field]) => [
-                name,
-                {
-                  mask: field.mask,
-                  shift: field.shift,
-                  format: field.format || 'hex',
-                } as CanHeaderField,
-              ])
-            )
-          : undefined;
-
-        canConfig = {
-          default_byte_order: catalog.canConfig.default_byte_order,
-          frame_id_mask: catalog.canConfig.frame_id_mask,
-          fields,
-        };
       }
 
       // Convert SerialProtocolConfig to SerialFrameConfig
@@ -574,7 +512,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         hasTunnel,
         seenIds,
         protocol: catalog.protocol,
-        canConfig,
         serialConfig,
         // Verdicts describe the catalogue that produced them; the Rust tracker
         // is rebuilt on attach, so drop the old ones rather than let a stale
@@ -667,90 +604,47 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     });
   },
 
-  // Store raw frame bytes. Everything derived from a payload — signal decode,
-  // header fields, mux selectors and the mirror comparison — is computed in
-  // Rust and arrives via applyDecodedBatch (the DecodedSignals stream); this
-  // keeps only the raw byte view the UI renders alongside it.
-  decodeSignalsBatch: (framesToDecode, unmatchedToAdd, filteredToAdd) => {
-    if (framesToDecode.length === 0 && unmatchedToAdd.length === 0 && filteredToAdd.length === 0) {
-      return;
-    }
+  // Route a DecodedSignals batch. Rust has already decided each frame's fate
+  // against the catalogue — decoded, unmatched or short — so this only applies
+  // the panel's own length and id filters and merges: signals by muxValue:name so each
+  // mux case persists, plus header fields, source address and mux selectors.
+  applyDecodedBatch: (entries) => {
+    if (entries.length === 0) return;
 
-    const { frames, protocol, canConfig, serialConfig } = get();
-
-    const nextDecoded = _decoded;
-
-    for (const { frameId, bytes } of framesToDecode) {
-      // Apply frame_id_mask before catalog lookup (header fields + signal decode
-      // now come from the Rust stream).
-      let maskedFrameId = frameId;
-      if (protocol === 'can' && canConfig?.frame_id_mask !== undefined) {
-        maskedFrameId = frameId & canConfig.frame_id_mask;
-      } else if (protocol === 'serial' && serialConfig?.frame_id_mask !== undefined) {
-        maskedFrameId = frameId & serialConfig.frame_id_mask;
-      }
-
-      if (!frames.has(frameKey(protocol, maskedFrameId))) continue;
-
-      // Store raw bytes, preserving any decoded values already received.
-      const existing = nextDecoded.get(maskedFrameId);
-      nextDecoded.set(maskedFrameId, existing
-        ? { ...existing, rawBytes: bytes }
-        : { signals: [], rawBytes: bytes, headerFields: [], sourceAddress: undefined, muxSelectors: undefined });
-    }
-
-    // Add unmatched frames in place (with limit)
-    const limits = getDecoderLimits();
-    if (unmatchedToAdd.length > 0) {
-      _unmatchedFrames.push(...unmatchedToAdd);
-      if (_unmatchedFrames.length > limits.maxUnmatched) {
-        _unmatchedFrames = _unmatchedFrames.slice(-limits.maxUnmatched);
-      }
-    }
-
-    // Add filtered frames in place (with limit)
-    if (filteredToAdd.length > 0) {
-      _filteredFrames.push(...filteredToAdd);
-      if (_filteredFrames.length > limits.maxFiltered) {
-        _filteredFrames = _filteredFrames.slice(-limits.maxFiltered);
-      }
-    }
-
-    set({ decodedVersion: get().decodedVersion + 1 });
-  },
-
-  // Apply decoded signals from the Rust DecodedSignals stream — signals (merged
-  // by muxValue:name so each mux case persists), header fields, source address,
-  // and mux selectors. Raw bytes come from decodeSignalsBatch (the frame path);
-  // the two merge into the same _decoded entry.
-  applyDecodedBatch: (decoded: DecodedFrameMsg[]) => {
-    if (decoded.length === 0) return;
-
-    const { protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorValidation } = get();
-    const nextDecoded = _decoded;
-    const nextDecodedPerSource = _decodedPerSource;
+    const { frameIdFilterSet, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorValidation } = get();
+    const minLength = serialConfig?.min_frame_length ?? 0;
     const nextSeenValues = new Map(seenHeaderFieldValues);
     const nextMirrorValidation = new Map(mirrorValidation);
-    let newStreamStartTime = streamStartTimeSeconds;
-    const now = Date.now() / 1000;
-    if (newStreamStartTime === null) newStreamStartTime = now;
+    const unmatched: UnmatchedFrame[] = [];
+    const filtered: FilteredFrame[] = [];
+    const tunnel: TunnelTransaction[] = [];
 
     const signalKey = (signal: DecodedSignal) =>
       signal.muxValue !== undefined ? `${signal.muxValue}:${signal.name}` : signal.name;
 
-    for (const msg of decoded) {
-      let maskedFrameId = msg.frameId;
-      if (protocol === 'can' && canConfig?.frame_id_mask !== undefined) {
-        maskedFrameId = msg.frameId & canConfig.frame_id_mask;
-      } else if (protocol === 'serial' && serialConfig?.frame_id_mask !== undefined) {
-        maskedFrameId = msg.frameId & serialConfig.frame_id_mask;
+    for (const msg of entries) {
+      const timestamp = msg.t / 1_000_000;
+      if (msg.kind === 'short' || msg.bytes.length < minLength) {
+        filtered.push({ ...unroutedFrame(msg, timestamp), reason: 'too_short' });
+        continue;
       }
+      if (frameIdFilterSet?.has(msg.frameId)) {
+        filtered.push({ ...unroutedFrame(msg, timestamp), reason: 'id_filter' });
+        continue;
+      }
+      if (msg.kind) {
+        unmatched.push(unroutedFrame(msg, timestamp));
+        continue;
+      }
+      const id = msg.maskedFrameId;
 
       // Mirror verdicts are computed in Rust and only ride frames the catalogue
       // declares as mirrors.
-      if (msg.mirror) nextMirrorValidation.set(maskedFrameId, msg.mirror);
+      if (msg.mirror) nextMirrorValidation.set(id, msg.mirror);
 
-      if (msg.tunnel) recordTunnelMessages(msg, maskedFrameId);
+      for (const t of msg.tunnel ?? []) {
+        tunnel.push({ ...t, frameId: id, bus: msg.bus, timestampUs: msg.t });
+      }
 
       const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({
         name: h.name,
@@ -768,7 +662,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }));
 
       // Merge new signals over previously-seen ones (preserves inactive mux cases).
-      const existing = nextDecoded.get(maskedFrameId);
+      const existing = _decoded.peek(id);
       const mergedSignals = new Map<string, DecodedSignal>();
       for (const signal of existing?.signals ?? []) {
         mergedSignals.set(signalKey(signal), signal);
@@ -776,7 +670,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       // Track the payload per mux value so each mux group can render its own
       // byte row: carry inactive cases forward (shared map, mutated in place),
       // refresh the ones present in this frame. Folded into the signal loop.
-      const frameBytes = msg.bytes && msg.bytes.length > 0 ? msg.bytes : null;
+      const frameBytes = msg.bytes.length > 0 ? msg.bytes : null;
       let rawBytesByMux = existing?.rawBytesByMux;
 
       // Carry each direction's last complete message forward, so a request
@@ -795,7 +689,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           format: s.format ?? undefined,
           rawValue: s.value,
           muxValue: s.muxValue ?? undefined,
-          timestamp: now,
+          timestamp,
+          mirrorMismatch: s.mirrorMismatch,
         };
         mergedSignals.set(signalKey(sig), sig);
         if (frameBytes && sig.muxValue !== undefined) {
@@ -806,17 +701,18 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
       const decodedFrame: DecodedFrame = {
         signals: Array.from(mergedSignals.values()),
-        rawBytes: existing?.rawBytes ?? [],
+        rawBytes: msg.bytes,
         headerFields,
         sourceAddress,
         muxSelectors: muxSelectors.length > 0 ? muxSelectors : undefined,
         rawBytesByMux,
         tunnelBytes,
+        checksum: msg.checksum,
       };
-      nextDecoded.set(maskedFrameId, decodedFrame);
+      _decoded.set(id, decodedFrame);
 
       if (sourceAddress !== undefined) {
-        nextDecodedPerSource.set(`${maskedFrameId}:${sourceAddress}`, decodedFrame);
+        _decodedPerSource.set(`${id}:${sourceAddress}`, decodedFrame);
       }
 
       // Accumulate header field values for the filter UI.
@@ -835,34 +731,21 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }
     }
 
+    const limits = getDecoderLimits();
+    appendCapped(_unmatchedFrames, unmatched, limits.maxUnmatched);
+    appendCapped(_filteredFrames, filtered, limits.maxFiltered);
+    appendCapped(_tunnelTransactions, tunnel, MAX_TUNNEL_TRANSACTIONS);
+
     set({
       decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: nextSeenValues,
-      streamStartTimeSeconds: newStreamStartTime,
+      streamStartTimeSeconds: streamStartTimeSeconds ?? entries[0].t / 1_000_000,
       mirrorValidation: nextMirrorValidation,
     });
   },
 
-  addUnmatchedFrame: (frame) => {
-    _unmatchedFrames.push(frame);
-    const maxUnmatched = getDecoderLimits().maxUnmatched;
-    if (_unmatchedFrames.length > maxUnmatched) {
-      _unmatchedFrames.splice(0, _unmatchedFrames.length - maxUnmatched);
-    }
-    set({ decodedVersion: get().decodedVersion + 1 });
-  },
-
   clearUnmatchedFrames: () => {
     _unmatchedFrames = [];
-    set({ decodedVersion: get().decodedVersion + 1 });
-  },
-
-  addFilteredFrame: (frame) => {
-    _filteredFrames.push(frame);
-    const maxFiltered = getDecoderLimits().maxFiltered;
-    if (_filteredFrames.length > maxFiltered) {
-      _filteredFrames.splice(0, _filteredFrames.length - maxFiltered);
-    }
     set({ decodedVersion: get().decodedVersion + 1 });
   },
 

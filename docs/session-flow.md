@@ -1265,11 +1265,32 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
     authoritative decoder path (see below). `catalog.detach` `{ session_id }` — unbind
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
   `send_new_frames` decodes the same batch via `decode_by_id` (applying
-  `frame_id_mask`) and pushes a parallel JSON message
-  (`[{ frameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress, mirror?, tunnel? }]`).
-  Each entry carries `bytes` — the raw payload decode ran on — so the Decoder can
-  render a hex/ASCII byte row **per mux value** (stored as `rawBytesByMux`); the
-  frame-level `rawBytes` from the `FrameData` path is last-writer-wins, so a
+  `frame_id_mask`) and pushes a parallel JSON message with **one entry per
+  frame**, routed by the catalogue:
+  - decoded — `{ frameId, maskedFrameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress, mirror?, tunnel?, checksum? }`,
+    with no `kind`;
+  - `kind: "unmatched"` — no catalogue frame decoded it and it completed no
+    tunnel message;
+  - `kind: "short"` — under the serial catalogue's `min_frame_length`, so not
+    decoded at all.
+
+  The two unrouted kinds carry only `{ kind, frameId, bus, t, bytes[], protocol, sourceAddress? }`.
+  `kind` is additive: absent means decoded. `checksum` (`{ extracted, calculated, valid }`) is the serial
+  catalogue's `[meta.serial.checksum]` over `bytes`, through the same
+  `wiretap-checksum::validate_checksum` the `validate_checksum_cmd` IPC uses.
+  The **Decoder reads only this stream** — it no longer subscribes to
+  `FrameData`, so it holds no id mask, no catalogue membership test and no
+  length rule of its own. What stays in TypeScript is the view's own filters:
+  a minimum length or a frame id typed into the Filter dialog moves matching
+  entries to Filtered in that panel only, since two panels on one session share
+  the stream. The
+  Decoder batches entries into the store every `UI_UPDATE_INTERVAL_MS`, and a
+  signal's timestamp is its entry's `t`, so "last updated" follows the capture
+  clock under replay. A session with no catalogue sends no `DecodedSignals`,
+  so its Unmatched tab stays empty.
+  Each decoded entry carries `bytes` — the raw payload decode ran on — so the
+  Decoder can render a hex/ASCII byte row **per mux value** (stored as
+  `rawBytesByMux`); a single frame-level payload is last-writer-wins, so a
   multiplexed frame would otherwise show one mux occurrence's payload under every
   group.
   `sessionStore` routes it to an `onDecoded` callback (threaded through
@@ -1277,6 +1298,7 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   loads a catalogue. Because `send_new_frames` only decodes frames *past* a
   forward-only per-session send offset, `catalog.attach` also re-decodes the frames
   already delivered to the client (`redecode_delivered`) and pushes their signals —
+  decoded entries only, since no tab shows unmatched history —
   otherwise a catalogue bound *after* a capture replay had already streamed its
   frames (e.g. the per-app Leave switching the decoder to a fresh replay session)
   would leave them showing "No signals decoded". Raw `FrameData` keeps flowing for
@@ -1370,9 +1392,9 @@ carrying no registers.
 
 Four things about it differ from every other decode:
 
-- **It is order-dependent.** `encode_decoded_batch` feeds a tunnel frame
-  *before* the "skip frames that decoded nothing" filter — a skipped frame is a
-  hole that desyncs every message after it. `reset_frame_offset` and
+- **It is order-dependent.** `encode_decoded_batch` feeds every tunnel frame
+  in a pass of its own, before any entry is built — a skipped frame is a hole
+  that desyncs every message after it. `reset_frame_offset` and
   `redecode_delivered` drop the buffers for the same reason `MirrorTracker`
   resets there: a stream fed the same bytes twice, or fed a rewind mid-message,
   desyncs.
@@ -1382,7 +1404,10 @@ Four things about it differ from every other decode:
   bus recovers all 499 with no unconsumed bytes.
 - **A message rides the frame that *completed* it**, so its timestamp is when
   the exchange became readable, and `tunnel[].frames` says how many frames it
-  spanned.
+  spanned. A response carries `latencyUs` back to the last request on the same
+  (bus, masked id, device, function) — an exception response's function has the
+  high bit set — kept per session beside the tunnels and cleared with them. An
+  unanswered request is superseded by the next, not queued.
 - **Rendering is capped** at `MAX_RENDERED_TUNNEL_MESSAGES` (500, mirroring the
   frontend's `MAX_TUNNEL_TRANSACTIONS`). The reassembler still sees every frame;
   only the newest messages are serialised. Without it `redecode_delivered` over
@@ -1430,6 +1455,14 @@ observes.
 `mirror` rides the same 0x14 entry, on mirror frames only —
 `{ sourceFrameId, isValid, timeDeltaMs, mismatchedByteIndices[] }`. Absent means
 "not a mirror"; `isValid: null` means no comparison has run yet.
+
+Each signal on a mirror entry carries `mirrorMismatch` once a comparison has
+run: `true` when the frame has latched Mismatch and the bytes the signal covers
+(its `start_bit` / `bit_length`) include a mismatched one, else `false`. It is
+absent where the tracker did not compare the signal's bytes — a signal the
+mirror declares itself, or a mux case signal whose bytes lie outside the
+inherited plain signals' — so an inherited mux case shows no tick or cross for a
+check that never ran.
 
 State is a `wiretap_catalog::mirror::MirrorTracker` per session, held in
 `ws/dispatch.rs` beside `ATTACHED_CATALOGS` and **built at `catalog.attach`,

@@ -61,6 +61,25 @@ pub fn validate_checksum_cmd(
     ))
 }
 
+/// Check a frame against its serial catalogue's `[meta.serial.checksum]`.
+/// `None` when the catalogue names an algorithm this build does not know.
+pub fn validate_serial_checksum(
+    config: &wiretap_catalog::ChecksumConfig,
+    data: &[u8],
+) -> Option<ChecksumValidationResult> {
+    let algo = ChecksumAlgorithm::from_str(&config.algorithm).ok()?;
+    Some(validate_checksum(
+        algo,
+        data,
+        config.start_byte,
+        config.byte_length as usize,
+        config.big_endian,
+        config.calc_start_byte,
+        // Absent stops short of the last byte, as the Decoder has always read it.
+        config.calc_end_byte.unwrap_or(-1),
+    ))
+}
+
 /// Resolve a byte index, supporting negative indexing (-1 = last byte).
 #[tauri::command]
 pub fn resolve_byte_index_cmd(index: i32, frame_length: usize) -> usize {

@@ -66,7 +66,7 @@ import {
   HEADER_SIZE,
   decodeFrameBatch,
   decodeDecodedSignals,
-  type DecodedFrameMsg,
+  type DecodedSignalsEntry,
   decodeSessionState,
   decodeStreamEnded,
   decodeSessionError,
@@ -324,7 +324,7 @@ export type SessionReconfiguredPayload = Record<string, never>;
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
   /** Decoded signals streamed from the Rust decoder (when a catalogue is attached). */
-  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
+  onDecoded?: (decoded: DecodedSignalsEntry[]) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
   onStreamEnded?: (payload: StreamEndedInfo) => void;
