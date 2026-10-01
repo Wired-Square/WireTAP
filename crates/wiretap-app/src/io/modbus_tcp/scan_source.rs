@@ -40,7 +40,7 @@ use super::scanner::{
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_session_error, emit_stream_ended, lifecycle::SourceLifecycle,
-    IOCapabilities, IOSource, IOState, Protocol,
+    IOCapabilities, IOSource, IOState, Protocol, StreamEndReason,
 };
 
 // ============================================================================
@@ -142,7 +142,7 @@ impl ModbusScanSource {
 
 /// Runs the sweep, parks its outcome for `await_scan_result`, and returns the
 /// stream-end reason.
-async fn sweep_and_park(job: ScanJob, cancel: &Arc<AtomicBool>, session_id: &str) -> String {
+async fn sweep_and_park(job: ScanJob, cancel: &Arc<AtomicBool>, session_id: &str) -> StreamEndReason {
     let sink = FrameSink::SessionCapture {
         session_id: session_id.to_string(),
     };
@@ -159,16 +159,16 @@ async fn sweep_and_park(job: ScanJob, cancel: &Arc<AtomicBool>, session_id: &str
     // that passed wait=false, say — can still collect it afterwards.
     store_scan_result(session_id, outcome.clone());
     match outcome {
-        Ok(payload) => match (payload.truncated, cancel.load(Ordering::Relaxed)) {
-            (false, _) => "complete".to_string(),
-            (true, true) => "cancelled".to_string(),
-            (true, false) => "stopped".to_string(),
-        },
+        Ok(payload) => swept_end_reason(payload.truncated),
         Err(e) => {
             emit_session_error(session_id, format!("Modbus scan failed: {e}"));
-            format!("error: {e}")
+            StreamEndReason::Error
         }
     }
+}
+
+fn swept_end_reason(truncated: bool) -> StreamEndReason {
+    if truncated { StreamEndReason::Stopped } else { StreamEndReason::Complete }
 }
 
 #[async_trait]
@@ -220,7 +220,7 @@ impl IOSource for ModbusScanSource {
             unregister_scan(&session_id);
             // Finalises the capture, so the results are queryable the moment the
             // sweep ends rather than only after the session is torn down.
-            emit_stream_ended(&session_id, &reason, "ModbusScan");
+            emit_stream_ended(&session_id, reason, "ModbusScan");
         }));
 
         self.state = IOState::Running;
@@ -313,6 +313,22 @@ mod tests {
             .expect("the waiter was never given the failure")
             .unwrap_err();
         assert!(error.contains("Failed to connect"), "{error}");
+        clear_scan_state(sid);
+    }
+
+    #[test]
+    fn a_cut_short_scan_ends_its_stream_as_stopped() {
+        assert_eq!(swept_end_reason(true), StreamEndReason::Stopped);
+        assert_eq!(swept_end_reason(false), StreamEndReason::Complete);
+    }
+
+    #[tokio::test]
+    async fn a_failed_scan_ends_its_stream_as_an_error() {
+        let closed_port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let sid = "scan-ends-in-error";
+        clear_scan_state(sid);
+        let reason = sweep_and_park(register_job(closed_port), &Arc::new(AtomicBool::new(false)), sid).await;
+        assert_eq!(reason, StreamEndReason::Error);
         clear_scan_state(sid);
     }
 }

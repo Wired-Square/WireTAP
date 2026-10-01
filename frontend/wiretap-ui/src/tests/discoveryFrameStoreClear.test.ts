@@ -27,6 +27,7 @@ const frame = (id: number, ts: number): FrameMessage => ({
   dlc: 5,
   bytes: [1, 0, 0, 0, 0x7b],
   is_extended: false,
+  is_fd: false,
 });
 
 /** addFrames buffers on a trailing timeout — advance past it to land the flush. */

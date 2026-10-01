@@ -97,7 +97,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
       if (matchingNumericSet.has(f.frame_id)) {
         lastSeenMap.set(f.frame_id, {
           bytes: f.bytes,
-          is_extended: f.is_extended ?? false,
+          is_extended: f.is_extended,
           dlc: f.dlc,
         });
       }

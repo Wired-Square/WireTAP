@@ -17,7 +17,7 @@ use crate::capture_store::{self, TimestampedByte};
 use crate::io::error::IoError;
 use crate::io::bus_mapping::BusMapping;
 use crate::io::types::SourceMessage;
-use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, take_startup_error, FrameMessage, SignalThrottle};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, take_startup_error, FrameMessage, SignalThrottle, StreamEndReason};
 
 /// Who a source index belongs to, for the two things that have to name a source
 /// after it has started: reconciled bus mappings (by profile) and a disconnect
@@ -104,7 +104,7 @@ pub(super) async fn run_merge_task(
         Ok(s) => s.io_profiles,
         Err(e) => {
             tlog!("[IOBroker] Failed to load settings: {}", e);
-            emit_stream_ended(&session_id, "error", "IOBroker");
+            emit_stream_ended(&session_id, StreamEndReason::Error, "IOBroker");
             return;
         }
     };
@@ -472,7 +472,7 @@ pub(super) async fn run_merge_task(
     // Only a run that *ended* in error is a failed session. A source that
     // dropped hours ago must not turn a deliberate stop into one — it was
     // reported at the time, via emit_session_error.
-    if reason == "error" {
+    if reason == StreamEndReason::Error {
         if let (Some(error), Ok(mut slot)) = (last_source_error, fatal_error.lock()) {
             *slot = Some(error);
         }
@@ -556,11 +556,11 @@ fn spawn_source(
 ///
 /// A run in which every source errored used to report `complete` — a clean
 /// finish for a session that never carried a frame.
-fn stream_ended_reason(stopped: bool, had_error: bool) -> &'static str {
+fn stream_ended_reason(stopped: bool, had_error: bool) -> StreamEndReason {
     match (stopped, had_error) {
-        (true, _) => "stopped",
-        (false, true) => "error",
-        (false, false) => "complete",
+        (true, _) => StreamEndReason::Stopped,
+        (false, true) => StreamEndReason::Error,
+        (false, false) => StreamEndReason::Complete,
     }
 }
 
@@ -625,7 +625,7 @@ impl PendingReadds {
 
 #[cfg(test)]
 mod tests {
-    use super::{stream_ended_reason, LiveSources, PendingReadds};
+    use super::{stream_ended_reason, LiveSources, PendingReadds, StreamEndReason};
     use crate::io::broker::types::SourceConfig;
 
     fn config(profile_id: &str) -> SourceConfig {
@@ -680,13 +680,13 @@ mod tests {
 
     #[test]
     fn a_deliberate_stop_outranks_a_source_error() {
-        assert_eq!(stream_ended_reason(true, false), "stopped");
-        assert_eq!(stream_ended_reason(true, true), "stopped");
+        assert_eq!(stream_ended_reason(true, false), StreamEndReason::Stopped);
+        assert_eq!(stream_ended_reason(true, true), StreamEndReason::Stopped);
     }
 
     #[test]
     fn sources_ending_in_error_is_not_a_complete_run() {
-        assert_eq!(stream_ended_reason(false, true), "error");
-        assert_eq!(stream_ended_reason(false, false), "complete");
+        assert_eq!(stream_ended_reason(false, true), StreamEndReason::Error);
+        assert_eq!(stream_ended_reason(false, false), StreamEndReason::Complete);
     }
 }

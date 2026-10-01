@@ -258,92 +258,6 @@ impl FrameEnvelope {
 }
 
 // ============================================================================
-// CAN 2.0 Frame
-//
-// Layout inside envelope data: [id_flags: u32 LE][payload: 0-8 bytes]
-// id_flags bits: [28:0] CAN ID, [29] is_extended, [30] is_rtr, [31] direction_tx
-// ============================================================================
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct CanFrame {
-    pub id: u32,
-    pub is_extended: bool,
-    pub is_rtr: bool,
-    pub direction_tx: bool,
-    pub payload: Vec<u8>,
-}
-
-impl CanFrame {
-    pub fn encode(&self) -> Vec<u8> {
-        let id_flags = (self.id & ID_ARB_MASK)
-            | if self.is_extended  { ID_EXTENDED } else { 0 }
-            | if self.is_rtr       { 1 << 30 } else { 0 }
-            | if self.direction_tx { ID_TX } else { 0 };
-
-        let mut out = Vec::with_capacity(4 + self.payload.len());
-        out.extend_from_slice(&id_flags.to_le_bytes());
-        out.extend_from_slice(&self.payload);
-        out
-    }
-
-    pub fn decode(data: &[u8]) -> Result<CanFrame, ProtocolError> {
-        if data.len() < 4 {
-            return Err(ProtocolError::InsufficientData { needed: 4, available: data.len() });
-        }
-        let id_flags   = u32::from_le_bytes(data[0..4].try_into().unwrap());
-        let id         = id_flags & 0x1FFF_FFFF;
-        let is_extended = (id_flags >> 29) & 1 != 0;
-        let is_rtr      = (id_flags >> 30) & 1 != 0;
-        let direction_tx = (id_flags >> 31) & 1 != 0;
-        let payload    = data[4..].to_vec();
-        Ok(CanFrame { id, is_extended, is_rtr, direction_tx, payload })
-    }
-}
-
-// ============================================================================
-// CAN-FD Frame
-//
-// Same layout as CAN 2.0 but bit [30] is brs (bit rate switch) and payload
-// up to 64 bytes.
-// ============================================================================
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct CanFdFrame {
-    pub id: u32,
-    pub is_extended: bool,
-    pub brs: bool,
-    pub direction_tx: bool,
-    pub payload: Vec<u8>,
-}
-
-impl CanFdFrame {
-    pub fn encode(&self) -> Vec<u8> {
-        let id_flags = (self.id & ID_ARB_MASK)
-            | if self.is_extended  { ID_EXTENDED } else { 0 }
-            | if self.brs          { 1 << 30 } else { 0 }
-            | if self.direction_tx { ID_TX } else { 0 };
-
-        let mut out = Vec::with_capacity(4 + self.payload.len());
-        out.extend_from_slice(&id_flags.to_le_bytes());
-        out.extend_from_slice(&self.payload);
-        out
-    }
-
-    pub fn decode(data: &[u8]) -> Result<CanFdFrame, ProtocolError> {
-        if data.len() < 4 {
-            return Err(ProtocolError::InsufficientData { needed: 4, available: data.len() });
-        }
-        let id_flags    = u32::from_le_bytes(data[0..4].try_into().unwrap());
-        let id          = id_flags & 0x1FFF_FFFF;
-        let is_extended  = (id_flags >> 29) & 1 != 0;
-        let brs          = (id_flags >> 30) & 1 != 0;
-        let direction_tx = (id_flags >> 31) & 1 != 0;
-        let payload     = data[4..].to_vec();
-        Ok(CanFdFrame { id, is_extended, brs, direction_tx, payload })
-    }
-}
-
-// ============================================================================
 // Non-frame message encoding / decoding helpers
 // ============================================================================
 
@@ -651,7 +565,7 @@ pub fn encode_subscribe_nack(error: &str) -> Vec<u8> {
 pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     // Encode straight into one pre-sized buffer — this runs per send cycle at
     // full frame rate, so avoid the per-frame Vec/clone churn of building
-    // CanFrame/FrameEnvelope intermediates. Worst case per frame: envelope
+    // FrameEnvelope intermediates. Worst case per frame: envelope
     // header + 4-byte id/register prefix + payload.
     let mut out = Vec::with_capacity(
         frames.iter().map(|f| ENVELOPE_HEADER_SIZE + 4 + f.bytes.len()).sum(),
@@ -859,91 +773,12 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // CAN 2.0 round-trip
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn can_11bit_id_round_trip() {
-        let frame = CanFrame { id: 0x123, is_extended: false, is_rtr: false, direction_tx: false, payload: vec![0xDE, 0xAD] };
-        let encoded = frame.encode();
-        let decoded = CanFrame::decode(&encoded).unwrap();
-        assert_eq!(decoded.id, 0x123);
-        assert!(!decoded.is_extended);
-        assert!(!decoded.is_rtr);
-        assert!(!decoded.direction_tx);
-        assert_eq!(decoded.payload, vec![0xDE, 0xAD]);
-    }
-
-    #[test]
-    fn can_29bit_extended_id_round_trip() {
-        let frame = CanFrame { id: 0x1FFF_FFFF, is_extended: true, is_rtr: false, direction_tx: true, payload: vec![1, 2, 3, 4, 5, 6, 7, 8] };
-        let encoded = frame.encode();
-        let decoded = CanFrame::decode(&encoded).unwrap();
-        assert_eq!(decoded.id, 0x1FFF_FFFF);
-        assert!(decoded.is_extended);
-        assert!(!decoded.is_rtr);
-        assert!(decoded.direction_tx);
-        assert_eq!(decoded.payload.len(), 8);
-    }
-
-    #[test]
-    fn can_rtr_flag_round_trip() {
-        let frame = CanFrame { id: 0x7FF, is_extended: false, is_rtr: true, direction_tx: false, payload: vec![] };
-        let encoded = frame.encode();
-        let decoded = CanFrame::decode(&encoded).unwrap();
-        assert!(decoded.is_rtr);
-        assert!(decoded.payload.is_empty());
-    }
-
-    #[test]
-    fn can_dlc_zero_round_trip() {
-        let frame = CanFrame { id: 0x100, is_extended: false, is_rtr: false, direction_tx: false, payload: vec![] };
-        let encoded = frame.encode();
-        assert_eq!(encoded.len(), 4);
-        let decoded = CanFrame::decode(&encoded).unwrap();
-        assert!(decoded.payload.is_empty());
-    }
-
-    #[test]
-    fn can_decode_too_short_returns_error() {
-        let result = CanFrame::decode(&[0x01, 0x02, 0x03]);
-        assert_eq!(result, Err(ProtocolError::InsufficientData { needed: 4, available: 3 }));
-    }
-
-    // -----------------------------------------------------------------------
-    // CAN-FD round-trip
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn canfd_max_payload_round_trip() {
-        let payload: Vec<u8> = (0u8..64).collect();
-        let frame = CanFdFrame { id: 0x1ABCDEF, is_extended: true, brs: true, direction_tx: false, payload: payload.clone() };
-        let encoded = frame.encode();
-        let decoded = CanFdFrame::decode(&encoded).unwrap();
-        assert_eq!(decoded.id, 0x1ABCDEF);
-        assert!(decoded.is_extended);
-        assert!(decoded.brs);
-        assert!(!decoded.direction_tx);
-        assert_eq!(decoded.payload, payload);
-    }
-
-    #[test]
-    fn canfd_brs_flag_independent_of_rtr() {
-        // brs lives in bit 30; verify it does not alias is_extended (bit 29)
-        let frame = CanFdFrame { id: 0x100, is_extended: false, brs: true, direction_tx: false, payload: vec![0xFF] };
-        let encoded = frame.encode();
-        let decoded = CanFdFrame::decode(&encoded).unwrap();
-        assert!(!decoded.is_extended);
-        assert!(decoded.brs);
-    }
-
-    // -----------------------------------------------------------------------
     // FrameEnvelope round-trip
     // -----------------------------------------------------------------------
 
     #[test]
     fn envelope_round_trip_can() {
-        let inner = CanFrame { id: 0x42, is_extended: false, is_rtr: false, direction_tx: false, payload: vec![0xAA, 0xBB] }.encode();
+        let inner = vec![0x42, 0, 0, 0, 0xAA, 0xBB];
         let env = FrameEnvelope { timestamp_us: 1_000_000, bus: 2, frame_type: FrameType::Can, data: inner };
         let encoded = env.encode();
         assert_eq!(encoded.len(), ENVELOPE_HEADER_SIZE + 4 + 2);
@@ -1046,6 +881,10 @@ mod tests {
         }
     }
 
+    fn id_flags(data: &[u8]) -> u32 {
+        u32::from_le_bytes(data[..4].try_into().unwrap())
+    }
+
     #[test]
     fn batch_empty_returns_empty_vec() {
         assert!(encode_frame_batch(&[]).is_empty());
@@ -1058,10 +897,8 @@ mod tests {
         let (env, consumed) = FrameEnvelope::decode(&batch).unwrap();
         assert_eq!(consumed, batch.len());
         assert_eq!(env.frame_type, FrameType::Can);
-        let cf = CanFrame::decode(&env.data).unwrap();
-        assert_eq!(cf.id, 0x123);
-        assert!(!cf.direction_tx);
-        assert_eq!(cf.payload, vec![0xAA, 0xBB]);
+        assert_eq!(id_flags(&env.data), 0x123);
+        assert_eq!(&env.data[4..], &[0xAA, 0xBB]);
     }
 
     #[test]
@@ -1071,10 +908,8 @@ mod tests {
         let batch = encode_frame_batch(&[msg]);
         let (env, _) = FrameEnvelope::decode(&batch).unwrap();
         assert_eq!(env.frame_type, FrameType::CanFd);
-        let cf = CanFdFrame::decode(&env.data).unwrap();
-        assert_eq!(cf.id, 0x1FF);
-        assert!(cf.direction_tx);
-        assert_eq!(cf.payload, payload);
+        assert_eq!(id_flags(&env.data), 0x1FF | ID_TX);
+        assert_eq!(&env.data[4..], &payload[..]);
     }
 
     #[test]
@@ -1114,7 +949,7 @@ mod tests {
 
         assert_eq!(&e1.data[4..], &rtu[..]);
         assert_eq!(e2.data, serial);
-        assert_eq!(CanFrame::decode(&e3.data).unwrap().id, 0x123);
+        assert_eq!(id_flags(&e3.data), 0x123);
         assert_eq!(n1 + n2 + n3, batch.len());
     }
 

@@ -13,7 +13,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 use super::base::{PlaybackControl, RecordedSourceState};
-use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, TemporalMode};
+use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
 use crate::{capture_db, capture_store};
 
 /// `source_type()` for a session replaying a capture.
@@ -843,10 +843,10 @@ async fn run_capture_stream(
     control.pause();
     let frame_count = capture_store::get_capture_count(&buf_id);
     let stream_ended_info = post_session::StreamEndedInfo {
-        reason: "paused".to_string(),
+        reason: StreamEndReason::Paused,
         capture_available: true,
         capture_id: Some(buf_id.clone()),
-        capture_kind: Some(capture_store::CaptureKind::Frames.as_str().to_string()),
+        capture_kind: Some(capture_store::CaptureKind::Frames),
         count: frame_count,
         time_range: None,
     };
@@ -906,10 +906,10 @@ async fn run_capture_stream(
             completed_flag.store(true, Ordering::Relaxed);
             let frame_count = capture_store::get_capture_count(&buf_id);
             let stream_ended_info = post_session::StreamEndedInfo {
-                reason: "paused".to_string(),
+                reason: StreamEndReason::Paused,
                 capture_available: true,
                 capture_id: Some(buf_id.clone()),
-                capture_kind: Some(capture_store::CaptureKind::Frames.as_str().to_string()),
+                capture_kind: Some(capture_store::CaptureKind::Frames),
                 count: frame_count,
                 time_range: None,
             };

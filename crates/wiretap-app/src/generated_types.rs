@@ -279,6 +279,13 @@ fn outputs_serialise_as_declared() {
     assert_serialises_as_declared(&[Protocol::Can, Protocol::CanFd, Protocol::Modbus, Protocol::ModbusRtu, Protocol::Serial]);
     assert_serialises_as_declared(&[TemporalMode::Realtime, TemporalMode::Recorded, TemporalMode::Capture]);
     assert_serialises_as_declared(&[crate::capture_store::CaptureKind::Frames, crate::capture_store::CaptureKind::Bytes]);
+    assert_serialises_as_declared(&[
+        StreamEndReason::Complete,
+        StreamEndReason::Disconnected,
+        StreamEndReason::Error,
+        StreamEndReason::Stopped,
+        StreamEndReason::Paused,
+    ]);
     assert_serialises_as_declared(&[RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete]);
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;

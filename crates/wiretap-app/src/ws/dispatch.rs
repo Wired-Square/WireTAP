@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use once_cell::sync::Lazy;
 
+use crate::capture_store::CaptureKind;
 use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
 use crate::transmit::{RepeatStartedEvent, RepeatStoppedEvent};
@@ -764,17 +765,6 @@ fn frame_batch_messages(session_id: &str, frames: &[FrameMessage]) -> Vec<(MsgTy
     messages
 }
 
-fn session_state_code(state: &IOState) -> u8 {
-    let name = match state {
-        IOState::Stopped => "stopped",
-        IOState::Starting => "starting",
-        IOState::Running => "running",
-        IOState::Paused => "paused",
-        IOState::Error(_) => "error",
-    };
-    protocol::code_of(&protocol::SESSION_STATES, name)
-}
-
 /// Send session state change.
 pub fn send_session_state(session_id: &str, current: &IOState) {
     let server = match ws_server() {
@@ -789,7 +779,7 @@ pub fn send_session_state(session_id: &str, current: &IOState) {
         IOState::Error(msg) => Some(msg.as_str()),
         _ => None,
     };
-    let payload = protocol::encode_session_state(session_state_code(current), error_msg);
+    let payload = protocol::encode_session_state(current.code(), error_msg);
     let msg = protocol::encode_message(MsgType::SessionState, channel, &payload);
     server.send_to_channel(channel, msg);
 }
@@ -804,16 +794,19 @@ pub fn send_stream_ended(session_id: &str, info: &StreamEndedInfo) {
         Some(c) => c,
         None => return,
     };
-    let payload = protocol::encode_stream_ended(
-        protocol::code_of(&protocol::STREAM_END_REASONS, &info.reason),
+    let msg = protocol::encode_message(MsgType::StreamEnded, channel, &stream_ended_payload(info));
+    server.send_to_channel(channel, msg);
+}
+
+fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
+    protocol::encode_stream_ended(
+        info.reason.code(),
         info.capture_available,
         info.capture_id.as_deref(),
-        info.capture_kind.as_deref(),
+        info.capture_kind.as_ref().map(CaptureKind::as_str),
         info.count as u32,
         info.time_range,
-    );
-    let msg = protocol::encode_message(MsgType::StreamEnded, channel, &payload);
-    server.send_to_channel(channel, msg);
+    )
 }
 
 /// Send session error.
@@ -1148,7 +1141,7 @@ pub fn send_session_lifecycle_scoped(
         None => return,
     };
 
-    let state_byte = session_state_code(state);
+    let state_byte = state.code();
 
     let json_bytes = serde_json::to_vec(capabilities).unwrap_or_default();
     let json_len = json_bytes.len() as u16;
@@ -1172,6 +1165,56 @@ mod tests {
         let mut m = body.to_vec();
         m.extend(crc16_modbus_checksum(body).to_le_bytes());
         m
+    }
+
+    #[test]
+    fn stream_ended_keeps_its_wire_and_json() {
+        use crate::io::StreamEndReason;
+        let cases = [
+            (
+                StreamEndedInfo {
+                    reason: StreamEndReason::Paused,
+                    capture_available: true,
+                    capture_id: Some("buf1".into()),
+                    capture_kind: Some(CaptureKind::Frames),
+                    count: 42,
+                    time_range: None,
+                },
+                vec![4, 7, 42, 0, 0, 0, 4, 0, 98, 117, 102, 49, 6, 0, 102, 114, 97, 109, 101, 115],
+                r#"{"reason":"paused","capture_available":true,"capture_id":"buf1","capture_kind":"frames","count":42,"time_range":null}"#,
+            ),
+            (
+                StreamEndedInfo {
+                    reason: StreamEndReason::Error,
+                    capture_available: true,
+                    capture_id: Some("b_2".into()),
+                    capture_kind: Some(CaptureKind::Bytes),
+                    count: 42,
+                    time_range: Some((1000, 2000)),
+                },
+                vec![
+                    2, 15, 42, 0, 0, 0, 3, 0, 98, 95, 50, 5, 0, 98, 121, 116, 101, 115, 232, 3, 0, 0, 0, 0, 0, 0,
+                    208, 7, 0, 0, 0, 0, 0, 0,
+                ],
+                r#"{"reason":"error","capture_available":true,"capture_id":"b_2","capture_kind":"bytes","count":42,"time_range":[1000,2000]}"#,
+            ),
+            (
+                StreamEndedInfo {
+                    reason: StreamEndReason::Complete,
+                    capture_available: false,
+                    capture_id: None,
+                    capture_kind: None,
+                    count: 42,
+                    time_range: None,
+                },
+                vec![0, 0, 42, 0, 0, 0],
+                r#"{"reason":"complete","capture_available":false,"capture_id":null,"capture_kind":null,"count":42,"time_range":null}"#,
+            ),
+        ];
+        for (info, wire, json) in cases {
+            assert_eq!(stream_ended_payload(&info), wire);
+            assert_eq!(serde_json::to_string(&info).unwrap(), json);
+        }
     }
 
     fn serial_frame(bytes: Vec<u8>) -> FrameMessage {

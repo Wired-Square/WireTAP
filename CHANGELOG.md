@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A Modbus scan that fails or is cut short no longer ends as complete.** A scan that could not reach its device left its session stopped rather than in error, and a cancelled scan reported a clean finish. A failed scan now ends in error and a cancelled one as stopped.
 - **The repository dialog no longer offers to save a repository that is already saved.** Its Save button stayed enabled, and saving again replaced the saved entry with what the dialog held.
 - **Re-wiring a bus in the Session Manager keeps its protocol.** Dragging a CAN FD bus to a new mapping turned it into classic CAN. It now keeps the protocol it had.
 - **The Decoder's Modbus tab lists each exchange once.** Reloading or swapping a tunnel catalogue, or opening a Dashboard on the same session in the Decoder's window, listed every exchange already shown a second time.

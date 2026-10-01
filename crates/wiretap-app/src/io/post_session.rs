@@ -9,6 +9,9 @@ use std::time::{Duration, Instant};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
+use crate::capture_store::CaptureKind;
+use crate::ws::protocol::STREAM_END_REASONS;
+
 /// How long post-session data survives after storage
 const TTL: Duration = Duration::from_secs(10);
 
@@ -16,12 +19,35 @@ const TTL: Duration = Duration::from_secs(10);
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StreamEndedInfo {
-    pub reason: String,
+    pub reason: StreamEndReason,
     pub capture_available: bool,
     pub capture_id: Option<String>,
-    pub capture_kind: Option<String>,
+    pub capture_kind: Option<CaptureKind>,
     pub count: usize,
     pub time_range: Option<(u64, u64)>,
+}
+
+/// Why a session's stream ended; the discriminant is its byte on the wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[repr(u8)]
+pub enum StreamEndReason {
+    Complete,
+    Disconnected,
+    Error,
+    Stopped,
+    Paused,
+}
+
+impl StreamEndReason {
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+
+    pub fn as_str(self) -> &'static str {
+        STREAM_END_REASONS[usize::from(self.code())]
+    }
 }
 
 /// Connected source info for a session.
@@ -154,17 +180,28 @@ mod tests {
         store_stream_ended(
             sid,
             StreamEndedInfo {
-                reason: "complete".into(),
+                reason: StreamEndReason::Complete,
                 capture_available: true,
                 capture_id: Some("buf1".into()),
-                capture_kind: Some("frames".into()),
+                capture_kind: Some(CaptureKind::Frames),
                 count: 42,
                 time_range: Some((1000, 2000)),
             },
         );
         let info = get_stream_ended(sid).unwrap();
-        assert_eq!(info.reason, "complete");
+        assert_eq!(info.reason, StreamEndReason::Complete);
         assert_eq!(info.count, 42);
+    }
+
+    #[test]
+    fn every_stream_end_reason_serialises_as_its_wire_name() {
+        use StreamEndReason::*;
+        let all = [Complete, Disconnected, Error, Stopped, Paused];
+        assert_eq!(all.len(), STREAM_END_REASONS.len());
+        for (code, reason) in all.into_iter().enumerate() {
+            assert_eq!(usize::from(reason.code()), code);
+            assert_eq!(serde_json::to_value(reason).unwrap(), reason.as_str());
+        }
     }
 
     #[test]

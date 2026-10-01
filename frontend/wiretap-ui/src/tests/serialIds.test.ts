@@ -7,7 +7,7 @@ import { withSerialIds } from "../stores/discoverySerialStore";
 import type { FrameMessage } from "../types/frame";
 
 const frame = (bytes: number[], frame_id: number, source_address?: number): FrameMessage =>
-  ({ protocol: "serial", timestamp_us: 0, frame_id, bus: 0, dlc: bytes.length, bytes, source_address });
+  ({ protocol: "serial", timestamp_us: 0, frame_id, bus: 0, dlc: bytes.length, bytes, is_extended: false, is_fd: false, source_address });
 
 describe("withSerialIds", () => {
   beforeEach(() => invoke.mockReset());

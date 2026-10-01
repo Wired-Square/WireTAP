@@ -189,7 +189,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
           _lastFrameDataMap.set(keyOf(f), {
             bytes: f.bytes,
             bus: f.bus ?? 0,
-            is_extended: f.is_extended ?? false,
+            is_extended: f.is_extended,
             dlc: f.dlc,
           });
         }
@@ -320,7 +320,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
       _lastFrameDataMap.set(fk, {
         bytes: f.bytes,
         bus: f.bus ?? 0,
-        is_extended: f.is_extended ?? false,
+        is_extended: f.is_extended,
         dlc: f.dlc,
       });
       if (!nextSeenIds.has(fk)) {

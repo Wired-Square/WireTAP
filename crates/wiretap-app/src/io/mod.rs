@@ -15,6 +15,7 @@ pub(crate) mod periodic; // Shared cadence primitive for interval-driven loops
 mod signal_throttle;
 pub use signal_throttle::SignalThrottle;
 pub mod post_session;
+pub use post_session::StreamEndReason;
 pub mod traits; // InterfaceTraits validation
 pub(crate) mod types;
 
@@ -470,6 +471,23 @@ pub enum IOState {
     Error(String),
 }
 
+impl IOState {
+    /// This state's byte in [`SESSION_STATES`](crate::ws::protocol::SESSION_STATES).
+    pub fn code(&self) -> u8 {
+        match self {
+            IOState::Stopped => 0,
+            IOState::Starting => 1,
+            IOState::Running => 2,
+            IOState::Paused => 3,
+            IOState::Error(_) => 4,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        crate::ws::protocol::SESSION_STATES[usize::from(self.code())]
+    }
+}
+
 /// Options for replacing a session's device in-place.
 pub struct ReplaceSourceOptions {
     /// Human-readable transition name ("capture", "live", "reinitialize")
@@ -703,11 +721,8 @@ pub struct IOSession {
 /// Convert IOState to a simple string for TypeScript
 fn state_to_string(state: &IOState) -> String {
     match state {
-        IOState::Stopped => "stopped".to_string(),
-        IOState::Starting => "starting".to_string(),
-        IOState::Running => "running".to_string(),
-        IOState::Paused => "paused".to_string(),
-        IOState::Error(msg) => format!("error:{}", msg),
+        IOState::Error(msg) => format!("error:{msg}"),
+        other => other.name().to_string(),
     }
 }
 
@@ -1513,7 +1528,7 @@ pub fn signal_bytes_ready(session_id: &str) {
 /// fetches, then emits an empty signal for the frontend to fetch via command.
 pub fn emit_stream_ended(
     session_id: &str,
-    reason: &str,
+    reason: StreamEndReason,
     log_prefix: &str,
 ) {
     use crate::capture_store::{self, CaptureKind};
@@ -1529,7 +1544,7 @@ pub fn emit_stream_ended(
         Some(m) => {
             (
                 Some(m.id.clone()),
-                Some(m.kind.as_str().to_string()),
+                Some(m.kind.clone()),
                 m.count,
                 match (m.start_time_us, m.end_time_us) {
                     (Some(start), Some(end)) => Some((start, end)),
@@ -1543,10 +1558,10 @@ pub fn emit_stream_ended(
 
     // Store in post-session cache for late-arriving fetches
     let stream_ended_info = post_session::StreamEndedInfo {
-        reason: reason.to_string(),
+        reason,
         capture_available,
-        capture_id: capture_id.clone(),
-        capture_kind: capture_kind.clone(),
+        capture_id,
+        capture_kind,
         count,
         time_range,
     };
@@ -1555,7 +1570,7 @@ pub fn emit_stream_ended(
     crate::ws::dispatch::send_stream_ended(session_id, &stream_ended_info);
     tlog!(
         "[{}:{}] Stream ended (reason: {}, count: {})",
-        log_prefix, session_id, reason, count
+        log_prefix, session_id, reason.as_str(), count
     );
 }
 
@@ -1984,13 +1999,7 @@ async fn log_session_status() {
 
     tlog!("[session status] ========== Active Sessions ==========");
     for (session_id, session) in sessions.iter() {
-        let state = match session.source.state() {
-            IOState::Stopped => "stopped",
-            IOState::Starting => "starting",
-            IOState::Running => "running",
-            IOState::Paused => "paused",
-            IOState::Error(_) => "error",
-        };
+        let state = session.source.state().name();
         let subscribers = subscribers_for_session(session_id);
         let subscriber_ids: Vec<&str> = subscribers.iter().map(|s| s.subscriber_id.as_str()).collect();
         let sources = if session.source_names.is_empty() {
@@ -3604,6 +3613,23 @@ pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_act
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_session_state_keeps_its_name_code_and_string() {
+        let cases = [
+            (IOState::Stopped, "stopped", 0, "stopped"),
+            (IOState::Starting, "starting", 1, "starting"),
+            (IOState::Running, "running", 2, "running"),
+            (IOState::Paused, "paused", 3, "paused"),
+            (IOState::Error("boom".into()), "error", 4, "error:boom"),
+        ];
+        for (state, name, code, string) in cases {
+            assert_eq!(state.name(), name);
+            assert_eq!(state.code(), code);
+            assert_eq!(crate::ws::protocol::code_of(&crate::ws::protocol::SESSION_STATES, name), code);
+            assert_eq!(state_to_string(&state), string);
+        }
+    }
 
     #[test]
     fn a_bit_rate_switch_on_a_classic_frame_is_refused() {

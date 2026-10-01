@@ -5,6 +5,7 @@
 
 import type { FrameMessage } from "../types/frame";
 import type { IOCapabilities, PlaybackPosition, StreamEndedInfo } from "../api/io";
+import type { CaptureKind } from "../generated/CaptureKind";
 import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
 import { trackAlloc } from "./memoryDiag";
 import {
@@ -279,12 +280,16 @@ export function decodeSessionState(payload: DataView): {
 //   optional: capture_kind (length-prefixed string, present if HAS_CAPTURE_KIND)
 //   optional: time_range   (two u64 LE, present if HAS_TIME_RANGE)
 
+const CAPTURE_KINDS: Record<CaptureKind, true> = { frames: true, bytes: true };
+const isCaptureKind = (kind: string): kind is CaptureKind =>
+  Object.prototype.hasOwnProperty.call(CAPTURE_KINDS, kind);
+
 export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   let offset = 0;
 
   const reasonByte = payload.getUint8(offset);
   offset += 1;
-  const reason = STREAM_END_REASONS[reasonByte] ?? `unknown(${reasonByte})`;
+  const reason = STREAM_END_REASONS[reasonByte] ?? "stopped";
 
   const flags = payload.getUint8(offset);
   offset += 1;
@@ -303,10 +308,10 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
     offset = next;
   }
 
-  let captureKind: string | null = null;
+  let captureKind: CaptureKind | null = null;
   if (hasCaptureKind) {
     const [kind, next] = decodeLengthPrefixedStr(payload, offset);
-    captureKind = kind.length > 0 ? kind : null;
+    captureKind = isCaptureKind(kind) ? kind : null;
     offset = next;
   }
 
@@ -340,25 +345,6 @@ export function decodePlaybackPosition(payload: DataView): PlaybackPosition {
   const frame_index = payload.getUint32(8, true);
   const frame_count = payload.getUint32(12, true);
   return { timestamp_us, frame_index, frame_count };
-}
-
-export function decodeDeviceConnected(payload: DataView): {
-  source_type: string;
-  address: string;
-  bus?: number;
-} {
-  let offset = 0;
-  const [source_type, next1] = decodeLengthPrefixedStr(payload, offset);
-  offset = next1;
-  const [address, next2] = decodeLengthPrefixedStr(payload, offset);
-  offset = next2;
-
-  let bus: number | undefined;
-  if (offset < payload.byteLength) {
-    bus = payload.getUint8(offset);
-  }
-
-  return { source_type, address, bus };
 }
 
 export function decodeCaptureChanged(payload: Uint8Array): string {

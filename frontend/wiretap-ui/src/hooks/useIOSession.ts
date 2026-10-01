@@ -49,6 +49,7 @@ import {
   type PlaybackPosition,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
+import type { StreamEndReason } from "../generated/StreamEndReason";
 import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
 
 // ============================================================================
@@ -86,7 +87,7 @@ interface LocalSessionState {
   /** Whether the session was stopped explicitly by user */
   stoppedExplicitly: boolean;
   /** Reason why the stream ended */
-  streamEndedReason: "complete" | "stopped" | "disconnected" | "error" | null;
+  streamEndedReason: StreamEndReason | null;
   /** Current playback speed */
   speed: number | null;
 }
@@ -235,7 +236,7 @@ export interface UseIOSessionResult {
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
   stoppedExplicitly: boolean;
   /** Reason why the stream ended: "complete" = natural end, "stopped" = explicit stop */
-  streamEndedReason: "complete" | "stopped" | "disconnected" | "error" | null;
+  streamEndedReason: StreamEndReason | null;
   /** Current playback speed (null until set, 1 = realtime, 0 = unlimited) */
   speed: number | null;
   /** Current playback position (centralised for all apps sharing this session) */

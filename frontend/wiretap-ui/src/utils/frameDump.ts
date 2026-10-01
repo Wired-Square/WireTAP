@@ -26,8 +26,8 @@ export function exportToJson(frames: FrameMessage[]): string {
     frame_id_hex: `0x${frame.frame_id.toString(16).toUpperCase()}`,
     bus: frame.bus,
     dlc: frame.dlc,
-    is_extended: frame.is_extended ?? false,
-    is_fd: frame.is_fd ?? false,
+    is_extended: frame.is_extended,
+    is_fd: frame.is_fd,
     bytes: frame.bytes,
     bytes_hex: frame.bytes.map((b) => b.toString(16).padStart(2, "0").toUpperCase()),
   }));

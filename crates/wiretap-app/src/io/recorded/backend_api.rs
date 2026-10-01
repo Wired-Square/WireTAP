@@ -20,7 +20,7 @@ use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
     signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
-    Protocol, SignalThrottle,
+    Protocol, SignalThrottle, StreamEndReason,
 };
 
 /// Connection details for a backend-API source.
@@ -331,13 +331,13 @@ async fn run_api_stream(
     }
 
     if let Err(e) = refill(&mut fetcher, &mut frame_queue, BUFFER_SIZE).await {
-        emit_stream_ended(&session_id, "error", "BackendAPI");
+        emit_stream_ended(&session_id, StreamEndReason::Error, "BackendAPI");
         return Err(e.into());
     }
 
     if frame_queue.is_empty() {
         tlog!("[BackendAPI:{}] No frames returned from query", session_id);
-        emit_stream_ended(&session_id, "complete", "BackendAPI");
+        emit_stream_ended(&session_id, StreamEndReason::Complete, "BackendAPI");
         return Ok(());
     }
 
@@ -490,7 +490,7 @@ async fn run_api_stream(
         tlog!("[BackendAPI:{}] Stream cancelled by user (emitted: {})", session_id, total_emitted);
     } else {
         tlog!("[BackendAPI:{}] Stream ended (emitted: {})", session_id, total_emitted);
-        emit_stream_ended(&session_id, "complete", "BackendAPI");
+        emit_stream_ended(&session_id, StreamEndReason::Complete, "BackendAPI");
     }
     Ok(())
 }

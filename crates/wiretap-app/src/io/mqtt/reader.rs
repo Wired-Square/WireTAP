@@ -24,7 +24,7 @@ use tauri::AppHandle;
 use tokio::time::Duration;
 
 use crate::io::lifecycle::{SourceLifecycle, SourceLifecycleGuard};
-use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle, StreamEndReason};
 use crate::capture_store::{self, CaptureKind};
 
 // ============================================================================
@@ -251,7 +251,7 @@ fn spawn_mqtt_stream(
         let mut throttle = SignalThrottle::new();
 
         #[allow(unused_assignments)]
-        let mut stream_reason = "disconnected";
+        let mut stream_reason = StreamEndReason::Disconnected;
 
         // Generate client ID if not provided
         let client_id = config.client_id.clone().unwrap_or_else(|| {
@@ -284,7 +284,7 @@ fn spawn_mqtt_stream(
                 &session_id,
                 format!("Failed to subscribe to {}: {}", config.topic, e),
             );
-            stream_reason = "error";
+            stream_reason = StreamEndReason::Error;
             emit_stream_ended(&session_id, stream_reason, "MQTT");
             return;
         }
@@ -301,7 +301,7 @@ fn spawn_mqtt_stream(
         // Process incoming messages
         loop {
             if cancel_flag.load(Ordering::Relaxed) {
-                stream_reason = "stopped";
+                stream_reason = StreamEndReason::Stopped;
                 break;
             }
 
@@ -353,7 +353,7 @@ fn spawn_mqtt_stream(
                         &session_id,
                         format!("MQTT error: {}", e),
                     );
-                    stream_reason = "error";
+                    stream_reason = StreamEndReason::Error;
                     break;
                 }
                 Err(_) => {
@@ -369,7 +369,7 @@ fn spawn_mqtt_stream(
         // Disconnect cleanly
         let _ = client.disconnect().await;
 
-        tlog!("[MQTT:{}] Stream ended: {}", session_id, stream_reason);
+        tlog!("[MQTT:{}] Stream ended: {}", session_id, stream_reason.as_str());
         emit_stream_ended(&session_id, stream_reason, "MQTT");
     })
 }

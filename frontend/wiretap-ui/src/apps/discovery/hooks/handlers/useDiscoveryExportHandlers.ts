@@ -109,8 +109,8 @@ export function useDiscoveryExportHandlers({
           const framesToExport =
             "frames" in source
               ? source.frames
-              : ((await getCaptureFramesPaginatedById(source.captureId, 0, captureModeEnabled ? captureModeTotalFrames : backendFrameCount))
-                  .frames as FrameMessage[]);
+              : (await getCaptureFramesPaginatedById(source.captureId, 0, captureModeEnabled ? captureModeTotalFrames : backendFrameCount))
+                  .frames;
           const { exportToJson } = await import("../../../../utils/frameDump");
           await saveCatalog(selectedPath, exportToJson(framesToExport));
         }

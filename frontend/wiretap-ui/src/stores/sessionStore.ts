@@ -53,6 +53,7 @@ import {
 } from "../api/io";
 import { reconcileKnownSessions } from "./sessionRoster";
 import type { FrameMessage } from "../types/frame";
+import type { StreamEndReason } from "../generated/StreamEndReason";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
 import { hexToBytes } from "../utils/byteUtils";
@@ -108,7 +109,7 @@ const EXPECTED_MISSING_ENTITY = /^(Session|Capture)\b.*\bnot found$/;
 const EXPECTED_MODBUS_READ_ERROR = /^Modbus read error \(.+ @ \d+\):/;
 
 /** Stream-end reasons that mean something other than a plain stop. */
-const IO_STATE_FOR_STREAM_END: Partial<Record<string, IOStateType>> = {
+const IO_STATE_FOR_STREAM_END: Partial<Record<StreamEndReason, IOStateType>> = {
   paused: "paused",
   error: "error",
 };
@@ -250,7 +251,7 @@ export interface Session {
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
   stoppedExplicitly: boolean;
   /** Reason why the stream ended (from stream-ended event) */
-  streamEndedReason: "complete" | "stopped" | "disconnected" | "error" | null;
+  streamEndedReason: StreamEndReason | null;
   /** Current playback speed (null until set, 1 = realtime, 0 = unlimited) */
   speed: number | null;
   /** Current playback position (centralised for all apps sharing this session) */
@@ -619,11 +620,11 @@ async function setupSessionEventSubscribers(
         const ioState = IO_STATE_FOR_STREAM_END[info.reason] ?? "stopped";
         updateSession(sessionId, {
           ioState,
-          streamEndedReason: info.reason as Session["streamEndedReason"],
+          streamEndedReason: info.reason,
           capture: {
             available: info.capture_available,
             id: info.capture_id,
-            kind: info.capture_kind as "frames" | "bytes" | null,
+            kind: info.capture_kind,
             count: info.count,
             owningSessionId: sessionId,
             startTimeUs: info.time_range?.[0] ?? null,

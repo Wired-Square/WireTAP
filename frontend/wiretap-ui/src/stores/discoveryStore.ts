@@ -465,7 +465,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
                 offset,
                 BATCH_SIZE
               );
-              payloadFrames.push(...(response.frames as FrameMessage[]));
+              payloadFrames.push(...response.frames);
               offset += response.frames.length;
               if (response.frames.length === 0) break; // Safety check
             }
@@ -551,12 +551,12 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         try {
           const firstResponse = await getCaptureFramesPaginatedFiltered(sessionCaptureId, 0, BATCH_SIZE, selection);
           const totalCount = firstResponse.total_count;
-          selectedFrameData.push(...(firstResponse.frames as FrameMessage[]));
+          selectedFrameData.push(...firstResponse.frames);
           offset = firstResponse.frames.length;
 
           while (offset < totalCount) {
             const response = await getCaptureFramesPaginatedFiltered(sessionCaptureId, offset, BATCH_SIZE, selection);
-            selectedFrameData.push(...(response.frames as FrameMessage[]));
+            selectedFrameData.push(...response.frames);
             offset += response.frames.length;
           }
         } catch (e) {
