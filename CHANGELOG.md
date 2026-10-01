@@ -35,6 +35,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Two gs_usb profiles on one adapter are refused at start.** Each channel of a gs_usb adapter claims the adapter's one USB interface, so a second profile on the same adapter, or two of its channels in one session, showed as running and then failed. The second now fails at once and names the profile and session holding the adapter. Using several channels of one adapter at once is not yet supported.
 - **A GVRET bus saved as CAN FD no longer offers FD transmit.** GVRET sends classic CAN only, but a bus whose profile still said CAN FD kept offering FD in Transmit and then refused the send. Such a bus now opens as classic CAN.
 - **Transmit's History and Replay tabs show only the panel's session.** Both tabs used to count and list every session's transmits, so a panel with no source showed an agent's MCP traffic climbing. They now show the session the panel is on, and nothing when it is on none. Clear removes only that session's history, and an export holds only its rows.
+- **A group repeat sends through the sessions its rows name.** With two sessions open on one profile, a group could repeat through the first of them even when its rows were queued on the second. Each row now repeats through its own session.
 
 ## [0.13.0] - 2026-09-29
 

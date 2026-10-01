@@ -870,39 +870,29 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       return;
     }
 
-    // Group items by session (profileId)
+    const { sessions } = useSessionStore.getState();
     const itemsBySession = new Map<string, typeof groupItems>();
     for (const item of groupItems) {
-      const existing = itemsBySession.get(item.profileId) || [];
-      existing.push(item);
-      itemsBySession.set(item.profileId, existing);
-    }
-
-    // Validate all sessions are connected and can transmit
-    const { sessions } = useSessionStore.getState();
-    for (const [profileId, items] of itemsBySession) {
-      const session = resolveQueueItemSession({ profileId }, sessions);
+      const session = resolveQueueItemSession(item, sessions);
       if (!session || session.lifecycleState !== "connected") {
-        set({ error: `Session '${items[0].profileName}' is not connected. Connect to it first.` });
+        set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
         return;
       }
       if (!session.capabilities?.traits.tx_frames) {
-        set({ error: `Session '${items[0].profileName}' does not support transmit` });
+        set({ error: `Session '${item.profileName}' does not support transmit` });
         return;
       }
+      itemsBySession.set(session.id, [...(itemsBySession.get(session.id) ?? []), item]);
     }
 
     // Use interval from first item in group (applies to all sub-groups)
     const intervalMs = groupItems[0].repeatIntervalMs;
 
     try {
-      // Start a repeat for each session's frames
-      // Use unique sub-group names to track them: "groupName:profileId"
-      for (const [profileId, items] of itemsBySession) {
-        const session = resolveQueueItemSession({ profileId }, sessions);
+      for (const [sessionId, items] of itemsBySession) {
         const frames = items.map((q) => q.canFrame!);
-        const subGroupName = itemsBySession.size > 1 ? `${groupName}:${profileId}` : groupName;
-        await ioStartRepeatGroup(session!.id, subGroupName, frames, intervalMs);
+        const subGroupName = itemsBySession.size > 1 ? `${groupName}:${sessionId}` : groupName;
+        await ioStartRepeatGroup(sessionId, subGroupName, frames, intervalMs);
       }
 
       // Mark group as active and items as repeating
@@ -930,19 +920,18 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     try {
-      // Get unique profile IDs for items in this group (to stop sub-groups)
-      const groupItems = state.queue.filter(
-        (q) => q.groupName === groupName && q.type === "can"
+      const { sessions } = useSessionStore.getState();
+      const sessionIds = new Set(
+        state.queue
+          .filter((q) => q.groupName === groupName && q.type === "can")
+          .flatMap((q) => [q.sessionId, resolveQueueItemSession(q, sessions)?.id])
+          .filter((id): id is string => id !== undefined)
       );
-      const profileIds = [...new Set(groupItems.map((q) => q.profileId))];
 
-      // Stop the main group and any sub-groups (groupName:profileId)
+      // Stop the main group and any sub-groups (groupName:sessionId)
       await ioStopRepeatGroup(groupName);
-      if (profileIds.length > 1) {
-        // Multi-session group - stop each sub-group
-        for (const profileId of profileIds) {
-          await ioStopRepeatGroup(`${groupName}:${profileId}`).catch(() => {});
-        }
+      for (const sessionId of sessionIds) {
+        await ioStopRepeatGroup(`${groupName}:${sessionId}`).catch(() => {});
       }
 
       // Remove group from active and mark items as not repeating
