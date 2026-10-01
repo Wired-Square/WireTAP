@@ -2856,6 +2856,9 @@ fn transmitting_session<'a>(
     session_id: &str,
     payload: &TransmitPayload,
 ) -> Result<&'a IOSession, String> {
+    if matches!(payload, TransmitPayload::CanFrame(f) if f.is_brs && !f.is_fd) {
+        return Err("A classic CAN frame does not support bit rate switch (BRS)".to_string());
+    }
     let session = sessions
         .get(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
@@ -3582,6 +3585,24 @@ pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_act
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_bit_rate_switch_on_a_classic_frame_is_refused() {
+        let frame = CanTransmitFrame {
+            frame_id: 0x123,
+            data: vec![0; 8],
+            bus: 0,
+            is_extended: false,
+            is_fd: false,
+            is_brs: true,
+            is_rtr: false,
+        };
+        let refused = tauri::async_runtime::block_on(transmit_frame("no-such-session", &frame));
+        assert_eq!(
+            refused.unwrap_err(),
+            "A classic CAN frame does not support bit rate switch (BRS)"
+        );
+    }
 
     /// The registry invariant: after a session is torn down nothing may still claim
     /// it, but the instances themselves survive — their panels are still open, they
