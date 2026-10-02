@@ -167,6 +167,7 @@ function QueryInner() {
     session,
     watchFrameCount,
     watchUniqueFrameCount,
+    selectProfile,
   } = manager;
 
   // The query source is derived from the session: a capture replay sets
@@ -427,7 +428,7 @@ function QueryInner() {
         ioProfiles={backendProfiles}
         selectedId={sourceProfileId}
         defaultId={settings?.default_read_profile}
-        onSelect={setIoProfile}
+        onSelect={selectProfile}
       />
 
       {/* Error Dialog */}

@@ -59,6 +59,21 @@ fn random_suffix() -> u64 {
     hasher.finish()
 }
 
+/// The session open on `source_id` alone, else a fresh id to open it under. The one
+/// place a saved profile or capture is turned into a session id.
+pub(crate) async fn session_for_source(source_id: &str, settings: &AppSettings) -> String {
+    let live = io::session_ids().await;
+    let mut open: Vec<String> = super::get_sessions_for_profile(source_id)
+        .into_iter()
+        .filter(|id| live.contains(id) && super::get_session_profile_ids(id) == [source_id])
+        .collect();
+    open.sort();
+    match open.into_iter().next() {
+        Some(id) => id,
+        None => mint_session_id(sources_prefix(&[source_id.to_string()], settings, None)).await,
+    }
+}
+
 /// A stored capture replays under `c`; otherwise the profiles decide.
 pub(super) fn sources_prefix(
     profile_ids: &[String],
@@ -157,6 +172,25 @@ mod tests {
         let mut calls = 0;
         draw_session_id("f", || { calls += 1; 7 }, |_| true);
         assert_eq!(calls, MINT_ATTEMPTS);
+    }
+
+    #[tokio::test]
+    async fn a_source_resolves_to_the_session_open_on_it_alone_else_to_a_new_id() {
+        use crate::io::{create_session, destroy_session, test_source::TestSource};
+        let settings = AppSettings::default();
+        let (alone, merged) = ("f_source_alone", "f_source_merged");
+        for id in [alone, merged] {
+            create_session(id.into(), Box::new(TestSource::new(id)), None, None, None, vec![]).await;
+        }
+        super::super::register_session_profile(alone, "p-source-alone");
+        super::super::register_session_profiles(merged, &["p-source-merged".into(), "p-other".into()]);
+
+        assert_eq!(session_for_source("p-source-alone", &settings).await, alone);
+        let fresh = session_for_source("p-source-merged", &settings).await;
+        assert!(fresh.starts_with("s_") && fresh != merged, "{fresh}");
+        for id in [alone, merged] {
+            destroy_session(id, false).await.unwrap();
+        }
     }
 
     #[test]

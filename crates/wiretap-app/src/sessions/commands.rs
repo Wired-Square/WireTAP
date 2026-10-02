@@ -31,7 +31,7 @@ use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
 use super::open::{refused_on, SessionRefusal};
-use super::ids::{mint_session_id, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
+use super::ids::{mint_session_id, session_for_source, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
 use super::source_config::{
     allocate_inputs, create_source_config_from_profile, declared_bus_mappings, resolve_source_configs,
     MultiSourceInput,
@@ -68,6 +68,13 @@ pub async fn generate_session_id(
         SessionPurpose::ModbusScan => MODBUS_SCAN_SESSION_PREFIX,
     };
     Ok(mint_session_id(prefix).await)
+}
+
+/// The session to open a saved profile or capture under: the one already on it, else a new id.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn resolve_source_session(app: tauri::AppHandle, source_id: String) -> Result<String, String> {
+    let settings = settings::load_settings(app).await?;
+    Ok(session_for_source(&source_id, &settings).await)
 }
 
 /// Bus mappings every IO profile declares, keyed by profile id.
@@ -718,12 +725,7 @@ pub async fn probe_gvret_device(
         }
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
-            let port = profile
-                .connection
-                .get("port")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            probe_gvret_usb(port, line_settings(profile)?).await
+            probe_gvret_usb(&req_str(profile, "port")?, line_settings(profile)?).await
         }
         #[cfg(target_os = "ios")]
         "gvret_usb" => {
@@ -859,17 +861,15 @@ pub async fn probe_device(
 
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
-            let port = profile.connection.get("port")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required for GVRET USB".to_string())?;
-            match probe_gvret_usb(port, line_settings(profile)?).await {
+            let port = req_str(profile, "port")?;
+            match probe_gvret_usb(&port, line_settings(profile)?).await {
                 Ok(info) => Ok(DeviceProbeResult {
                     success: true,
                     source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: info.bus_count,
                     primary_info: Some(format!("{} buses available", info.bus_count)),
-                    secondary_info: Some(port.to_string()),
+                    secondary_info: Some(port),
                     supports_fd: None,
                     error: None,
                 }),
@@ -902,10 +902,7 @@ pub async fn probe_device(
         // slcan devices - single-bus (desktop only)
         #[cfg(not(target_os = "ios"))]
         "slcan" => {
-            let port = profile.connection.get("port")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required for slcan".to_string())?;
-            let result = probe_slcan(port, line_settings(profile)?).await;
+            let result = probe_slcan(&req_str(profile, "port")?, line_settings(profile)?).await;
 
             Ok(DeviceProbeResult {
                 success: result.success,
@@ -937,16 +934,10 @@ pub async fn probe_device(
         "gs_usb" => {
             use crate::io::gs_usb::probe_gs_usb_device;
 
-            let bus = profile.connection.get("bus")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(0) as u8;
-            let address = profile.connection.get("address")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(0) as u8;
+            let bus = conn_i64(profile, "bus").unwrap_or_default() as u8;
+            let address = conn_i64(profile, "address").unwrap_or_default() as u8;
             // Serial number for stable device matching across USB re-enumeration
-            let serial = profile.connection.get("serial")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let serial = conn_str(profile, "serial");
 
             match probe_gs_usb_device(bus, address, serial).await {
                 Ok(info) => Ok(DeviceProbeResult {
@@ -1011,9 +1002,7 @@ pub async fn probe_device(
         // Serial port - check if port exists (desktop only)
         #[cfg(not(target_os = "ios"))]
         "serial" => {
-            let port = profile.connection.get("port")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required".to_string())?;
+            let port = req_str(profile, "port")?;
 
             let port_exists = wiretap_io::serial::ports()
                 .unwrap_or_default()
@@ -1026,7 +1015,7 @@ pub async fn probe_device(
                     source_type: "serial".to_string(),
                     is_multi_bus: false,
                     bus_count: 1,
-                    primary_info: Some(port.to_string()),
+                    primary_info: Some(port.clone()),
                     secondary_info: None,
                     supports_fd: None,
                     error: None,
@@ -1169,24 +1158,9 @@ pub async fn probe_device(
                 .get("interfaces")
                 .and_then(|v| v.as_array())
                 .map(|a| a.len() as u8)
-                .unwrap_or_else(|| {
-                    profile
-                        .connection
-                        .get("bus_count")
-                        .and_then(|v| {
-                            v.as_str()
-                                .and_then(|s| s.parse::<u8>().ok())
-                                .or_else(|| v.as_i64().map(|n| n as u8))
-                        })
-                        .unwrap_or(1)
-                        .clamp(1, 8)
-                });
-            let traffic_type = profile
-                .connection
-                .get("traffic_type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("can");
-            let traffic_label = match traffic_type {
+                .unwrap_or_else(|| conn_i64(profile, "bus_count").unwrap_or_default().clamp(1, 8) as u8);
+            let traffic_type = conn_str(profile, "traffic_type").unwrap_or_default();
+            let traffic_label = match traffic_type.as_str() {
                 "canfd" => "CAN-FD",
                 "modbus" => "Modbus",
                 "serial" => "Serial",

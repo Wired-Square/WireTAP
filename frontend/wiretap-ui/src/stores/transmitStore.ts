@@ -34,7 +34,6 @@ import {
 } from "../api/transmit";
 
 import { useSessionStore, type Session } from "./sessionStore";
-import { resolveQueueItemSession } from "./transmitRowSession";
 
 import { CAN_FD_DLC_VALUES } from "../constants";
 
@@ -84,8 +83,8 @@ export interface TransmitQueueItem {
   groupName?: string;
   /** Who added this item. `"agent"` rows come from an MCP client, not the UI. */
   origin?: "user" | "agent";
-  /** The backend session this row transmits through (authoritative resolver key). */
-  sessionId?: string;
+  /** The backend session this row transmits through */
+  sessionId: string;
 }
 
 /** Progress info for an active replay */
@@ -329,9 +328,6 @@ const getActiveSession = () => {
 
 type QueueRowSession = Pick<Session, "id" | "profileId" | "profileName">;
 
-const rowSessionId = (item: TransmitQueueItem) =>
-  resolveQueueItemSession(item, useSessionStore.getState().sessions)?.id;
-
 const mintId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function patchRows(
@@ -353,10 +349,10 @@ function groupStopped(state: TransmitState, groupName: string): Partial<Transmit
 
 const TERMINAL_LOG_KIND = { finished: "completed", stopped: "stoppedByUser", failed: "deviceError" } as const;
 
-function syncQueuedMarks(queue: TransmitQueueItem[], sessionIds: Iterable<string | undefined>) {
-  const { sessions, setHasQueuedMessages } = useSessionStore.getState();
+function syncQueuedMarks(queue: TransmitQueueItem[], sessionIds: Iterable<string>) {
+  const { setHasQueuedMessages } = useSessionStore.getState();
   for (const id of new Set(sessionIds)) {
-    if (id) setHasQueuedMessages(id, queue.some((q) => resolveQueueItemSession(q, sessions)?.id === id));
+    setHasQueuedMessages(id, queue.some((q) => q.sessionId === id));
   }
 }
 
@@ -611,12 +607,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     set({ queue: state.queue.filter((q) => q.id !== queueId) });
-    if (item) syncQueuedMarks(get().queue, [rowSessionId(item)]);
+    if (item) syncQueuedMarks(get().queue, [item.sessionId]);
   },
 
   clearQueue: async () => {
     const state = get();
-    const sessionIds = state.queue.map(rowSessionId);
+    const sessionIds = state.queue.map((q) => q.sessionId);
 
     // Stop all repeats
     for (const item of state.queue) {
@@ -634,9 +630,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const item = state.queue.find((q) => q.id === queueId);
     if (!item || item.isRepeating) return;
 
-    // Resolve the row's session by its sessionId (agent/new rows) or profile (legacy).
-    const { sessions } = useSessionStore.getState();
-    const session = resolveQueueItemSession(item, sessions);
+    const session = useSessionStore.getState().sessions[item.sessionId];
 
     if (!session || session.lifecycleState !== "connected") {
       set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
@@ -792,7 +786,6 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const state = get();
     const item = state.queue.find((q) => q.id === queueId);
     if (!item) return;
-    const oldSessionId = rowSessionId(item);
 
     set({
       queue: patchRows(state.queue, byId(queueId), {
@@ -801,7 +794,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         profileName: session.profileName,
       }),
     });
-    syncQueuedMarks(get().queue, [oldSessionId, session.id]);
+    syncQueuedMarks(get().queue, [item.sessionId, session.id]);
   },
 
   // Group Actions
@@ -845,7 +838,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const { sessions } = useSessionStore.getState();
     const members: RepeatGroupMember[] = [];
     for (const item of groupItems) {
-      const session = resolveQueueItemSession(item, sessions);
+      const session = sessions[item.sessionId];
       if (!session || session.lifecycleState !== "connected") {
         set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
         return;

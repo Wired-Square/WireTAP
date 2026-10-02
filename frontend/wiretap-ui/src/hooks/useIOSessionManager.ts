@@ -27,7 +27,7 @@ import type { EventOwner } from "../api/captureEvents";
 import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, resolveSourceSession, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { useProfileBusStore, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { WINDOW_EVENTS } from "../events/registry";
@@ -84,20 +84,19 @@ export interface LoadOptions {
 }
 
 /** What a single-profile open takes from the picker's options. */
-function reinitializeOptions(opts: LoadOptions, sessionId: string): CreateSessionOptions {
+function reinitializeOptions(opts: LoadOptions): CreateSessionOptions {
   return {
     ...opts,
-    sessionId,
     limit: opts.maxFrames,
     frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
     sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
   };
 }
 
-/** Store interface for apps that manage ioProfile in their store */
+/** Store interface for apps that keep their session id (`ioProfile`) in their store */
 export interface IOProfileStore {
   ioProfile: string | null;
-  setIoProfile: (profileId: string | null) => void;
+  setIoProfile: (sessionId: string | null) => void;
 }
 
 /** Configuration for the IO session manager */
@@ -108,8 +107,8 @@ export interface UseIOSessionManagerOptions {
   ioProfiles: IOProfile[];
   /** Store with ioProfile state (for apps using Zustand stores) */
   store?: IOProfileStore;
-  /** Initial ioProfile value (for apps using local state) */
-  initialProfileId?: string | null;
+  /** A saved profile or capture to open when the app starts with no source */
+  defaultSourceId?: string | null;
   /** Callback before ingest starts (e.g., to clear capture) */
   onBeforeIngestStart?: () => Promise<void>;
   /** Callback when ingest completes */
@@ -152,10 +151,9 @@ export interface UseIOSessionManagerOptions {
 /** Result of the IO session manager hook */
 export interface UseIOSessionManagerResult {
   // ---- Profile State ----
-  /** Current IO profile ID */
+  /** The session this app is on; a session id, never a profile id */
   ioProfile: string | null;
-  /** Set the current IO profile */
-  setIoProfile: (profileId: string | null) => void;
+  setIoProfile: (sessionId: string | null) => void;
   /** Profile name for display */
   ioProfileName: string | undefined;
   /** Map of profile ID to name */
@@ -171,7 +169,6 @@ export interface UseIOSessionManagerResult {
   outputBusToSource: Map<number, BusSourceInfo>;
 
   // ---- Effective Session ----
-  /** Effective session ID (multi-bus ID or single profile ID) */
   effectiveSessionId: string | undefined;
   /** The underlying session hook result */
   session: UseIOSessionResult;
@@ -252,8 +249,8 @@ export interface UseIOSessionManagerResult {
   resumeWithNewCapture: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
   connectOnly: (profileId: string, options?: LoadOptions) => Promise<void>;
-  /** Select a profile (clear multi-bus, set profile, set default speed) */
-  selectProfile: (profileId: string | null) => void;
+  /** Open a saved profile or capture, joining the session already on it; null leaves for no source */
+  selectProfile: (sourceId: string | null) => Promise<void>;
   /** Select multiple profiles for multi-bus mode */
   selectMultipleProfiles: (profileIds: string[]) => void;
   /** Join an existing session and close the IO picker dialog */
@@ -279,7 +276,7 @@ export function useIOSessionManager(
     appName,
     ioProfiles,
     store,
-    initialProfileId = null,
+    defaultSourceId,
     onBeforeIngestStart,
     onIngestComplete,
     onFrames: onFramesProp,
@@ -301,7 +298,7 @@ export function useIOSessionManager(
 
   // ---- Profile State ----
   // Use store if provided, otherwise local state
-  const [localProfile, setLocalProfile] = useState<string | null>(initialProfileId);
+  const [localProfile, setLocalProfile] = useState<string | null>(null);
   const ioProfile = store?.ioProfile ?? localProfile;
   const setIoProfile = store?.setIoProfile ?? setLocalProfile;
 
@@ -372,19 +369,9 @@ export function useIOSessionManager(
     if (multiBusProfiles.length > 1) {
       return `Multi-Bus (${multiBusProfiles.length} sources)`;
     }
-    // For single profile (whether directly selected or routed through multi-source),
-    // look up the actual profile name. Try multi-bus first, then ioProfile, then
-    // sourceProfileId (for connect-only sessions where ioProfile is a session ID)
-    const lookupId = multiBusProfiles.length === 1 ? multiBusProfiles[0] : ioProfile;
-    if (!lookupId) return undefined;
-    const found = ioProfiles.find((p) => p.id === lookupId)?.name;
-    if (found) return found;
-    // Fall back to sourceProfileId (e.g., ioProfile is a generated session ID like t_xxxx)
-    if (sourceProfileId) {
-      return ioProfiles.find((p) => p.id === sourceProfileId)?.name;
-    }
-    return undefined;
-  }, [ioProfile, sourceProfileId, multiBusProfiles, ioProfiles]);
+    const lookupId = multiBusProfiles.length === 1 ? multiBusProfiles[0] : sourceProfileId;
+    return lookupId ? ioProfiles.find((p) => p.id === lookupId)?.name : undefined;
+  }, [sourceProfileId, multiBusProfiles, ioProfiles]);
 
   // ---- Ingest frame suppression ----
   const isLoadingRef = useRef(isLoading);
@@ -540,8 +527,8 @@ export function useIOSessionManager(
     [currentTimeUs, isStreaming, isRealtime, captureStartTimeUs]
   );
   const eventOwner = useMemo(
-    () => eventOwnerForSession({ sourceProfileId, ioProfile, profiles: ioProfiles, captureId }),
-    [sourceProfileId, ioProfile, ioProfiles, captureId]
+    () => eventOwnerForSession({ sourceProfileId, profiles: ioProfiles, captureId }),
+    [sourceProfileId, ioProfiles, captureId]
   );
 
   // ---- Handlers ----
@@ -729,7 +716,7 @@ export function useIOSessionManager(
       const profileId = profileIds[0];
       const sessionId = await sourcesSessionId([profileId]);
 
-      await session.reinitialize(profileId, reinitializeOptions(opts, sessionId));
+      await session.reinitialize(sessionId, profileId, reinitializeOptions(opts));
 
       setMultiBusProfiles([]);
       setIoProfile(sessionId);
@@ -812,7 +799,7 @@ export function useIOSessionManager(
     try {
       if (isSingleNonMulti) {
         // Recorded/capture: reinitialize path with speed=0 (no pacing)
-        await session.reinitialize(profileIds[0], reinitializeOptions({ ...opts, speed: 0 }, sessionId));
+        await session.reinitialize(sessionId, profileIds[0], reinitializeOptions({ ...opts, speed: 0 }));
 
         setMultiBusProfiles([]);
         setIoProfile(sessionId);
@@ -863,13 +850,12 @@ export function useIOSessionManager(
   ) => {
     const sessionId = await sourcesSessionId([profileId]);
 
-    await session.reinitialize(profileId, {
+    await session.reinitialize(sessionId, profileId, {
       startTime: opts?.startTime,
       endTime: opts?.endTime,
       speed: opts?.speed,
       limit: opts?.maxFrames,
       skipAutoStart: true, // Don't auto-start - Query connects but doesn't stream
-      sessionId,
     });
 
     // Mark our subscriber as INACTIVE so we don't receive frames
@@ -892,74 +878,38 @@ export function useIOSessionManager(
     // Note: Do NOT set isWatching - session is connected but not streaming to us
   }, [session, appName, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
 
-  // Re-window the source: stop if streaming, cleanup, reconfigure or reinitialise with the new range
+  // Re-window the source: reconfigure a recorded one in place, reopen anything else with the new range
   const jumpToTimeRange = useCallback(
     async (startUtc: string, endUtc?: string) => {
-      const targetProfileId = sourceProfileId || ioProfile;
-      if (!targetProfileId) {
-        tlog.debug("[IOSessionManager:jumpToTimeRange] No profile available");
+      const sessionId = ioProfile;
+      if (!sourceProfileId || !sessionId) {
+        tlog.debug("[IOSessionManager:jumpToTimeRange] No source profile");
         return;
       }
+      const sourceProfile = findProfile(sourceProfileId);
+      const isRecorded = sourceProfile ? !isRealtimeProfile(sourceProfile) : false;
+      tlog.debug(`[IOSessionManager:jumpToTimeRange] ${startUtc} → ${endUtc ?? "open"} (session: ${sessionId}, profile: ${sourceProfileId}, isRecorded: ${isRecorded})`);
 
-      // For recorded sources on the profile we're already watching, reuse the session ID
-      // (other apps stay connected, capture is finalised and new one created); otherwise
-      // generate a unique session ID
-      const targetProfile = findProfile(targetProfileId);
-      const isRecorded = targetProfile ? !isRealtimeProfile(targetProfile) : false;
-      const isSameProfile = sourceProfileId === targetProfileId;
-
-      let sessionId: string;
-      if (isSameProfile && ioProfile) {
-        sessionId = ioProfile;
-      } else if (isRecorded) {
-        sessionId = await sourcesSessionId([targetProfileId]);
-      } else {
-        sessionId = targetProfileId;
-      }
-
-      tlog.debug(`[IOSessionManager:jumpToTimeRange] ${startUtc} → ${endUtc ?? "open"} (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
-
-      // Step 1: Run cleanup callback (same as onBeforeWatch)
       onBeforeWatch?.();
-
-      // Step 2: Notify app of reconfiguration BEFORE the async backend call.
-      // This lets the app set streamStartTimeUs (for correct time deltas) before
-      // frames start arriving during the await below.
+      // Before the backend call, so the app sets its stream start before frames arrive.
       onSessionReconfigured?.({ startTime: startUtc, endTime: endUtc });
-
-      // Step 3: Clear multi-bus state
       setMultiBusProfiles([]);
 
-      // Step 4: Reconfigure or reinitialize (backend auto-starts and may send frames)
-      if (isSameProfile && ioProfile && isRecorded) {
-        // Same profile, recorded source - use reconfigure to keep session alive
-        // This stops the stream, orphans old capture, creates new capture, and restarts
-        // Other apps joined to this session stay connected
-        tlog.debug("[IOSessionManager:jumpToTimeRange] Using reconfigure (same profile, session stays alive)");
+      if (isRecorded) {
+        // Other apps on the session stay connected; the old capture is orphaned and a new one starts.
         await reconfigureReaderSession(sessionId, startUtc, endUtc);
       } else {
-        // Different profile or realtime source - full reinitialize
-        tlog.debug("[IOSessionManager:jumpToTimeRange] Using reinitialize (different profile or realtime)");
-
-        // Stop current stream if watching
         if (isWatching) {
-          tlog.debug("[IOSessionManager:jumpToTimeRange] Stopping current watch...");
           await session.stop();
           setIsWatching(false);
         }
-
-        await session.reinitialize(targetProfileId, {
+        await session.reinitialize(sessionId, sourceProfileId, {
           startTime: startUtc,
           endTime: endUtc,
           speed: session.speed ?? 1,
-          sessionId,
         });
       }
 
-      // Step 5: Update manager state (use session ID so callbacks are registered correctly)
-      setIoProfile(sessionId);
-
-      // Step 6: Mark as watching and reset state
       setIsWatching(true);
       streamCompletedRef.current = false;
     },
@@ -968,30 +918,39 @@ export function useIOSessionManager(
       ioProfile,
       isWatching,
       session,
+      findProfile,
       onBeforeWatch,
       setMultiBusProfiles,
-      setIoProfile,
       streamCompletedRef,
       onSessionReconfigured,
     ]
   );
 
-  // Select a profile: clear multi-bus, set profile, set default speed
-  // App handlers call this for common logic, then add capture-specific or app-specific logic
-  const selectProfile = useCallback((profileId: string | null) => {
-    // Clear multi-bus state when selecting a single profile
+  // The one place an app turns a saved profile or capture into a session: Rust names
+  // the session already on it, or a new one to open it under.
+  const selectProfile = useCallback(async (sourceId: string | null) => {
     setMultiBusProfiles([]);
-    setIoProfile(profileId);
-
-    // Set default speed from the selected profile if it has one
-    if (profileId) {
-      const profile = findProfile(profileId);
-      if (profile && profile.kind === "wiretap" && profile.connection?.default_speed) {
-        const defaultSpeed = parseFloat(profile.connection.default_speed);
-        setPlaybackSpeedProp?.(defaultSpeed);
-      }
+    if (!sourceId) {
+      setIoProfile(null);
+      return;
     }
-  }, [setMultiBusProfiles, setIoProfile, ioProfiles, setPlaybackSpeedProp]);
+    const profile = findProfile(sourceId);
+    if (profile?.kind === "wiretap" && profile.connection?.default_speed) {
+      setPlaybackSpeedProp?.(parseFloat(profile.connection.default_speed));
+    }
+    const sessionId = await resolveSourceSession(sourceId);
+    await session.rejoin(sessionId, sourceId);
+    setIoProfile(sessionId);
+  }, [session, findProfile, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
+
+  // The default source is an initial selection only: settings reload on every save
+  // in any window, and reapplying it would retarget a running session.
+  const defaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!defaultSourceId || defaultAppliedRef.current) return;
+    defaultAppliedRef.current = true;
+    if (!ioProfile) selectProfile(defaultSourceId).catch((e) => tlog.info(`[IOSessionManager:${appName}] default source: ${e}`));
+  }, [defaultSourceId, ioProfile, selectProfile, appName]);
 
   // Select multiple profiles for multi-bus mode
   const selectMultipleProfiles = useCallback((profileIds: string[]) => {

@@ -45,9 +45,10 @@ import {
   type SessionMode,
   type SessionSourceKind,
 } from "../api/io";
-import { reconcileKnownSessions } from "./sessionRoster";
+import { emptyCapture, reconcileKnownSessions } from "./sessionRoster";
 import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
+import type { CaptureMetadata } from "../api/capture";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
 import { hexToBytes } from "../utils/byteUtils";
@@ -175,8 +176,8 @@ export interface Session {
 
 /** Options for creating a session */
 export interface CreateSessionOptions extends SerialSettings {
-  /** Custom session ID (defaults to auto-generated) */
-  sessionId?: string;
+  /** The saved profile or capture to create the session from when nothing is under its id */
+  sourceId?: string;
   /** Devices merged into one session, replacing whatever is under its id */
   sources?: MultiSourceInput[];
   /** Start time for time-range capable readers (ISO-8601) */
@@ -253,9 +254,9 @@ export interface SessionStore {
   _eventListeners: Record<string, SessionEventSubscribers>;
 
   // ---- Actions: Session Lifecycle ----
-  /** Open a session - creates if not exists, joins if exists */
+  /** Join the session, or create it from `options.sourceId` when nothing is under its id */
   openSession: (
-    profileId: string,
+    sessionId: string,
     profileName: string,
     subscriberId: string,
     appName: string,
@@ -381,23 +382,6 @@ export interface SessionStore {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/** Invoke all callbacks for an event type */
-/** A session's capture slot before anything is known about the capture — or with
- *  only its id, as the CaptureChanged message reports it. */
-function emptyCapture(id: string | null = null, owningSessionId: string | null = null): Session["capture"] {
-  return {
-    available: id !== null,
-    id,
-    kind: id ? "frames" : null,
-    count: 0,
-    owningSessionId,
-    startTimeUs: null,
-    endTimeUs: null,
-    name: null,
-    persistent: false,
-  };
-}
 
 const TRANSITION_CALLBACK = {
   suspended: "onSuspended",
@@ -527,19 +511,7 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
         },
       });
       if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.capture?.name) {
-        import("../api/capture").then(({ getCaptureMetadataById }) =>
-          getCaptureMetadataById(info.capture_id!).then((meta) => {
-            if (meta) {
-              updateSession(sessionId, {
-                capture: {
-                  ...useSessionStore.getState().sessions[sessionId]?.capture!,
-                  name: meta.name,
-                  persistent: meta.persistent,
-                },
-              });
-            }
-          }).catch(() => {/* ignore */})
-        );
+        patchCaptureFromMetadata(sessionId, info.capture_id, ({ name, persistent }) => ({ name, persistent }));
       }
       invokeCallbacks(eventListeners, "onStreamEnded", info);
       if (info.reason === "paused") {
@@ -689,9 +661,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Session Lifecycle ----
-  openSession: (profileId, profileName, subscriberId, appName, options = {}) =>
-    inOrder(subscriberId, () => openNow(profileId, profileName, subscriberId, appName, options)).then(
-      () => get().sessions[options.sessionId ?? profileId]
+  openSession: (sessionId, profileName, subscriberId, appName, options = {}) =>
+    inOrder(subscriberId, () => openNow(sessionId, profileName, subscriberId, appName, options)).then(
+      () => get().sessions[sessionId]
     ),
 
   holdSession: (sessionId, profileName, subscriberId, appName) => {
@@ -820,7 +792,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         dropSessionListeners(sessionId);
         updateSession(sessionId, { ioState: "starting" });
       }
-      await openNow(profileId, profileName, subscriberId, appName, { ...options, sessionId });
+      await openNow(sessionId, profileName, subscriberId, appName, { ...options, sourceId: profileId });
       return get().sessions[sessionId];
     }),
 
@@ -1378,20 +1350,19 @@ function dropSessionListeners(sessionId: string) {
  * channel is subscribed first, so a source the open starts loses no frames.
  */
 async function openNow(
-  profileId: string,
+  sessionId: string,
   profileName: string,
   subscriberId: string,
   appName: string,
   options: CreateSessionOptions
 ): Promise<OpenedSession> {
-  const sessionId = options.sessionId ?? profileId;
   const listeners = ensureSessionListeners(sessionId);
   await listeners.subscribed;
 
   let opened: OpenedSession;
   try {
     opened = await openSessionCommand(sessionId, subscriberId, appName, {
-      source_id: profileId,
+      source_id: options.sourceId,
       sources: options.sources,
       start_time: options.startTime,
       end_time: options.endTime,
@@ -1407,7 +1378,7 @@ async function openNow(
     if (!isSessionNotFound(e)) {
       updateSessionOrCreate(sessionId, {
         id: sessionId,
-        profileId,
+        profileId: options.sourceId ?? "",
         profileName,
         lifecycleState: "error",
         ioState: "error",
@@ -1428,7 +1399,7 @@ async function openNow(
   const fresh = opened.created || !existing;
   updateSessionOrCreate(sessionId, {
     id: sessionId,
-    profileId,
+    profileId: opened.origin_profile_ids[0] ?? options.sourceId ?? "",
     profileName,
     lifecycleState: "connected",
     ioState: getStateType(opened.state),
@@ -1452,27 +1423,33 @@ async function openNow(
 
   // Without the metadata a capture session's count and time range stay zero.
   if (captureId) {
-    import("../api/capture").then(({ getCaptureMetadataById }) =>
-      getCaptureMetadataById(captureId).then((meta) => {
-        const current = useSessionStore.getState().sessions[sessionId];
-        if (!meta || current?.capture.id !== captureId) return;
-        updateSession(sessionId, {
-          capture: {
-            ...current.capture,
-            available: true,
-            kind: meta.kind,
-            count: meta.count,
-            startTimeUs: meta.start_time_us,
-            endTimeUs: meta.end_time_us,
-            name: meta.name,
-            persistent: meta.persistent,
-          },
-        });
-      }).catch(() => {/* ignore */})
-    );
+    patchCaptureFromMetadata(sessionId, captureId, (meta) => ({
+      available: true,
+      kind: meta.kind,
+      count: meta.count,
+      startTimeUs: meta.start_time_us,
+      endTimeUs: meta.end_time_us,
+      name: meta.name,
+      persistent: meta.persistent,
+    }));
   }
 
   return opened;
+}
+
+/** Fill in a session's capture from its stored metadata, unless the session has moved to another capture since. */
+function patchCaptureFromMetadata(
+  sessionId: string,
+  captureId: string,
+  patch: (meta: CaptureMetadata) => Partial<Session["capture"]>
+) {
+  import("../api/capture")
+    .then(({ getCaptureMetadataById }) => getCaptureMetadataById(captureId))
+    .then((meta) => {
+      const current = useSessionStore.getState().sessions[sessionId];
+      if (meta && current?.capture.id === captureId) updateSession(sessionId, { capture: { ...current.capture, ...patch(meta) } });
+    })
+    .catch(() => {});
 }
 
 /** Patch a session's record, creating it with defaults for what `updates` leaves out. */
@@ -1620,7 +1597,7 @@ export async function createAndStartMultiSourceSession(
   });
 
   const opened = await inOrder(subscriberId, () =>
-    openNow(sessionId, sessionId, subscriberId, appName, { sessionId, sources, modbusPollsJson: options.modbusPollsJson })
+    openNow(sessionId, sessionId, subscriberId, appName, { sources, modbusPollsJson: options.modbusPollsJson })
   );
   return { busMappings: new Map(Object.entries(opened.bus_mappings ?? {})) };
 }

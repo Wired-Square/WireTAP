@@ -287,7 +287,6 @@ interface DecoderState {
   applyParsedCatalog: (catalog: ParsedCatalog, path: string) => void;
   /** Track the active catalogue path without parsing (mirrors session changes). */
   setCatalogPath: (path: string | null) => void;
-  initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
 
   // Actions - Frame management
   toggleFrameSelection: (id: string) => void;
@@ -529,13 +528,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       tlog.info(`[decoderStore] Failed to load catalog: ${e}`);
       throw e;
     }
-  },
-
-  initFromSettings: async (_decoderDir, defaultReadProfile) => {
-    if (defaultReadProfile) {
-      set({ ioProfile: defaultReadProfile });
-    }
-    // decoderDir is stored implicitly via the catalog path when a catalog is loaded
   },
 
   // Frame management actions

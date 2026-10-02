@@ -122,6 +122,12 @@ export interface SessionButtonProps {
   isCaptureMode?: boolean;
 }
 
+/** The saved profile a session was opened from. */
+function useSourceProfile(ioProfiles: IOProfile[], sessionId: string | null): IOProfile | undefined {
+  const profileId = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.originProfileIds[0] : undefined));
+  return ioProfiles.find((p) => p.id === profileId);
+}
+
 export function SessionButton({
   ioProfile,
   ioProfiles,
@@ -137,7 +143,7 @@ export function SessionButton({
 }: SessionButtonProps) {
   const openedOnCapture = useSessionStore((s) => isCaptureSession(s, ioProfile));
   const isCaptureProfile = isCaptureModeProp ?? openedOnCapture;
-  const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
+  const selectedProfile = useSourceProfile(ioProfiles, ioProfile);
 
   // Show as multi-bus when multiBusProfiles has entries
   // BUT: never show as multi-bus when viewing a capture (capture takes precedence)
@@ -221,6 +227,7 @@ interface SessionDetails {
 function getSessionDetails({
   ioProfile,
   ioProfiles,
+  selectedProfile,
   multiBusProfiles,
   ioState,
   outputBusToSource,
@@ -228,12 +235,12 @@ function getSessionDetails({
 }: {
   ioProfile: string | null;
   ioProfiles: IOProfile[];
+  selectedProfile: IOProfile | undefined;
   multiBusProfiles: string[];
   ioState?: string | null;
   outputBusToSource?: Map<number, BusSourceInfo>;
   isCaptureMode: boolean;
 }): SessionDetails {
-  const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
   const showAsMultiBus = !isCaptureMode && multiBusProfiles.length > 0;
 
   let statusLabel: SessionDetails["statusLabel"] = null;
@@ -426,9 +433,11 @@ export function IOSessionControls({
   const openDeviceSettings = useDeviceEditorStore((s) => s.open);
 
   // --- Details + action visibility ---
+  const selectedProfile = useSourceProfile(ioProfiles, ioProfile);
   const { statusLabel, typeLabel, interfaceEntries } = getSessionDetails({
     ioProfile,
     ioProfiles,
+    selectedProfile,
     multiBusProfiles,
     ioState,
     outputBusToSource,

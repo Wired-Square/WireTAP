@@ -3,7 +3,7 @@ use std::future::Future;
 
 use serde::{Deserialize, Serialize};
 
-use crate::io::device_kinds::{self, req_str};
+use crate::io::device_kinds::{self, conn_f64, conn_i64, conn_str, req_str};
 use crate::io::{
     create_session, current_session_of_app, destroy_session_by, get_session_state, register_subscriber_from,
     session_exists, settle_session, start_session, BackendApiConfig, BackendApiSource, BackendApiSourceOptions, BusMapping,
@@ -20,7 +20,7 @@ use super::tracking::{claim_session_profile, register_session_profiles};
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(default)]
 pub struct OpenSessionOptions {
-    /// The saved profile or capture to open; the session id itself when absent.
+    /// The saved profile or capture to create the session from when nothing is under its id.
     #[cfg_attr(test, ts(optional))]
     pub source_id: Option<String>,
     /// Devices merged into one session, replacing whatever is under the id.
@@ -121,9 +121,8 @@ pub async fn open_from(
             Some(sources) => create_from_sources(app, session_id, sources, opts.modbus_polls.take(), named).await,
             None => {
                 let settings = settings::load_settings(app.clone()).await?;
-                let source_id = opts.source_id.clone().unwrap_or_else(|| session_id.to_string());
-                match source_of(&settings, session_id, &source_id)? {
-                    Source::Capture => create_from_capture(session_id, source_id, opts.speed, named).await,
+                match source_of(&settings, session_id, opts.source_id.take())? {
+                    Source::Capture(capture_id) => create_from_capture(session_id, capture_id, opts.speed, named).await,
                     Source::Profile(profile) => create_from_profile(app, &settings, session_id, profile, opts, named).await,
                 }
             }
@@ -168,13 +167,16 @@ pub(super) async fn open_or_join(
 }
 
 enum Source {
-    Capture,
+    Capture(String),
     Profile(IOProfile),
 }
 
-fn source_of(settings: &AppSettings, session_id: &str, source_id: &str) -> Result<Source, SessionRefusal> {
-    if capture_store::is_known_capture(source_id) {
-        return Ok(Source::Capture);
+fn source_of(settings: &AppSettings, session_id: &str, source_id: Option<String>) -> Result<Source, SessionRefusal> {
+    let Some(source_id) = source_id else {
+        return Err(SessionRefusal::NotFound { message: format!("No session '{session_id}'") });
+    };
+    if capture_store::is_known_capture(&source_id) {
+        return Ok(Source::Capture(source_id));
     }
     match settings.io_profiles.iter().find(|p| p.id == source_id) {
         Some(profile) => Ok(Source::Profile(profile.clone())),
@@ -237,13 +239,6 @@ fn profile_reader(
             source_config,
         )?));
     }
-    let connection_number = |key: &str| {
-        profile
-            .connection
-            .get(key)
-            .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-    };
-    let connection_str = |key: &str| profile.connection.get(key).and_then(|v| v.as_str()).map(String::from);
     match profile.kind.as_str() {
         "wiretap" => {
             let config = BackendApiConfig {
@@ -253,17 +248,11 @@ fn profile_reader(
                 protocol: crate::apiclient::archive_protocol(&profile.connection)?,
             };
             let options = BackendApiSourceOptions {
-                start: opts.start_time.or_else(|| connection_str("start")),
-                end: opts.end_time.or_else(|| connection_str("end")),
-                limit: opts.limit.or_else(|| connection_number("limit")),
-                speed: opts.speed.unwrap_or_else(|| {
-                    profile
-                        .connection
-                        .get("speed")
-                        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(0.0)
-                }),
-                batch_size: connection_number("batch_size").unwrap_or(1000) as i32,
+                start: opts.start_time.or_else(|| conn_str(profile, "start")),
+                end: opts.end_time.or_else(|| conn_str(profile, "end")),
+                limit: opts.limit.or_else(|| conn_i64(profile, "limit")),
+                speed: opts.speed.or_else(|| conn_f64(profile, "speed")).unwrap_or(0.0),
+                batch_size: conn_i64(profile, "batch_size").unwrap_or(1000) as i32,
             };
             Ok(Box::new(BackendApiSource::new(session_id.to_string(), config, options)))
         }
@@ -279,17 +268,14 @@ fn profile_reader(
             let config = MqttConfig {
                 host: req_str(profile, "host")?,
                 port: device_kinds::req_i64(profile, "port")? as u16,
-                username: connection_str("username"),
+                username: conn_str(profile, "username"),
                 password: credentials::resolve_secret(profile, "password"),
                 topic,
                 client_id: None,
             };
             Ok(Box::new(MqttSource::new(session_id.to_string(), config)))
         }
-        kind => Err(format!(
-            "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, virtual, gvret_tcp, gvret_usb, wiretap, csv, serial, slcan, socketcan, gs_usb",
-            kind
-        )),
+        kind => Err(format!("Unsupported reader type '{kind}'")),
     }
 }
 
@@ -513,7 +499,14 @@ mod tests {
 
     #[test]
     fn an_id_that_names_neither_a_profile_nor_a_capture_is_not_found() {
-        let refused = source_of(&AppSettings::default(), "f_nothing", "p-nothing").err();
+        let refused = source_of(&AppSettings::default(), "f_nothing", Some("p-nothing".into())).err();
+        assert!(matches!(refused, Some(SessionRefusal::NotFound { .. })));
+    }
+
+    #[test]
+    fn a_session_id_is_never_read_as_the_profile_to_open() {
+        let settings = AppSettings { io_profiles: vec![slcan_at(500_000)], ..AppSettings::default() };
+        let refused = source_of(&settings, "p-open-slcan", None).err();
         assert!(matches!(refused, Some(SessionRefusal::NotFound { .. })));
     }
 

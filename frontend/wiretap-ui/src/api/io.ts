@@ -867,6 +867,11 @@ export async function generateSessionId(purpose: SessionPurpose): Promise<string
   return invoke("generate_session_id", { purpose });
 }
 
+/** The session to open a saved profile or capture under: the one already on it, else a new id. */
+export async function resolveSourceSession(sourceId: string): Promise<string> {
+  return invoke("resolve_source_session", { source_id: sourceId });
+}
+
 // ============================================================================
 // Profile-to-Session Mapping API
 // ============================================================================

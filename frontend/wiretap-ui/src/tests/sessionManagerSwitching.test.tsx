@@ -51,6 +51,7 @@ vi.mock("../stores/profileBusStore", () => ({
 vi.mock("../api/io", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/io")>()),
   generateSessionId: vi.fn(async (purpose: SessionPurpose) => mintedFor(purpose)),
+  resolveSourceSession: vi.fn(async (sourceId: string) => `resolved:${sourceId}`),
   setSessionSubscriberActive: vi.fn(async () => {}),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -73,9 +74,10 @@ const profiles = [virtualDevice];
 
 let root: Root;
 const manager = {} as { current: Manager };
+let defaultSourceId: string | undefined;
 
 function Harness() {
-  manager.current = useIOSessionManager({ appName: "discovery", ioProfiles: profiles });
+  manager.current = useIOSessionManager({ appName: "discovery", ioProfiles: profiles, defaultSourceId });
   return null;
 }
 
@@ -91,6 +93,7 @@ async function fromVirtualDevice() {
 
 beforeEach(() => {
   openedSessions.length = 0;
+  defaultSourceId = undefined;
   root = createRoot(document.createElement("div"));
   act(() => root.render(<Harness />));
 });
@@ -121,6 +124,18 @@ describe("useIOSessionManager source switching", () => {
   it("follows a connect-only session started after a multi-source session", async () => {
     await fromVirtualDevice();
     expect(await run((m) => m.connectOnly("cap_a"))).toMatch(/^cap_a#/);
+  });
+
+  it("opens a picked source under the session Rust names for it, never under the source's own id", async () => {
+    expect(await run((m) => m.selectProfile(virtualDevice.id))).toBe("resolved:walk-v");
+  });
+
+  it("opens the default source the same way", async () => {
+    act(() => root.unmount());
+    defaultSourceId = virtualDevice.id;
+    root = createRoot(document.createElement("div"));
+    await act(async () => root.render(<Harness />));
+    expect(manager.current.effectiveSessionId).toBe("resolved:walk-v");
   });
 
   it("returns to no source when the picker is skipped after a multi-source session", async () => {

@@ -24,7 +24,6 @@ export function catalogBaseName(filePath: string): string {
 /**
  * Build a catalog path from decoder_dir and filename.
  * Handles both absolute paths and relative paths.
- * Used when catalogs list isn't available (e.g., decoderStore.initFromSettings).
  */
 export function buildCatalogPath(
   catalog: string,

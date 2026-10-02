@@ -7,7 +7,7 @@ import type { SerialOverrides } from "./SerialOverrides";
  */
 export type OpenSessionOptions = { 
 /**
- * The saved profile or capture to open; the session id itself when absent.
+ * The saved profile or capture to create the session from when nothing is under its id.
  */
 source_id?: string, 
 /**

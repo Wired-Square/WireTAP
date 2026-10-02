@@ -240,6 +240,7 @@ export default function IoSourcePickerDialog({
   const getSessionForProfile = useSessionStore((s) => s.getSessionForProfile);
   const startSession = useSessionStore((s) => s.startSession);
   const selectedIsCapture = useSessionStore((s) => isCaptureSession(s, selectedId));
+  const selectedSessionCaptureId = useSessionStore((s) => (selectedId ? s.sessions[selectedId]?.capture.id : null));
   const roster = useSessionStore((s) => s.roster);
   const joinableSessions = useMemo(() => roster.filter((s) => s.joinable), [roster]);
   const profileUsage = useSessionStore((s) => s.profileUsage);
@@ -443,8 +444,7 @@ export default function IoSourcePickerDialog({
       // If a specific capture is selected (e.g., "xk9m2p"), use that
       // Otherwise if legacy capture ID is selected, use the most recent capture
       if (selectedIsCapture && loadedCaptures.length > 0) {
-        // Check if selectedId matches a specific capture (e.g., "xk9m2p")
-        const matchingCapture = loadedCaptures.find(b => b.id === selectedId);
+        const matchingCapture = loadedCaptures.find(b => b.id === selectedSessionCaptureId);
         if (matchingCapture) {
           setSelectedCaptureId(matchingCapture.id);
           // Probe capture to populate shared bus config maps
@@ -1240,12 +1240,8 @@ export default function IoSourcePickerDialog({
 
       // If capture was selected and it was deleted, clear selection
       const deletedIds = new Set(clearableCaptures.map(b => b.id));
-      if (selectedIsCapture) {
-        // Check if the selected capture was deleted
-        const selectedCapture = captures.find(b => b.id === selectedId);
-        if (selectedCapture && deletedIds.has(selectedCapture.id)) {
-          onSelect(null);
-        }
+      if (selectedIsCapture && selectedSessionCaptureId && deletedIds.has(selectedSessionCaptureId)) {
+        onSelect(null);
       }
 
       // Notify other windows that captures have been cleared

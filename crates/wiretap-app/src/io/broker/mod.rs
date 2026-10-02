@@ -534,10 +534,6 @@ impl IOBroker {
         // Encode the frame based on the profile kind
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
-            "gvret_tcp" | "gvret_usb" | "slcan" | "socketcan" | "gs_usb" => {
-                frame = Some(can_frame(&routed_frame));
-                Vec::new()
-            }
             "framelink" => encode_framelink_can_tx(&routed_frame),
             "virtual" => {
                 // Simple binary loopback encoding: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
@@ -549,6 +545,10 @@ impl IOBroker {
                 buf.push(routed_frame.data.len() as u8);
                 buf.extend_from_slice(&routed_frame.data);
                 buf
+            }
+            kind if super::device_kinds::spec(kind).is_some_and(|s| s.can_tx) => {
+                frame = Some(can_frame(&routed_frame));
+                Vec::new()
             }
             _ => {
                 return Err(format!(

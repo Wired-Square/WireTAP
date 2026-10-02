@@ -58,11 +58,7 @@ export interface UseIOSessionOptions {
    * Example: "discovery", "decoder", "transmit"
    */
   appName: string;
-  /**
-   * Session ID = Profile ID.
-   * Multiple apps using the same profileId automatically share the session.
-   * Pass undefined/empty if no profile selected yet.
-   */
+  /** The session to hold, opened elsewhere; undefined/empty when no source is selected. */
   sessionId?: string;
   /**
    * Human-readable profile name for display in UI.
@@ -101,7 +97,6 @@ export interface UseIOSessionOptions {
 }
 
 export interface UseIOSessionResult {
-  /** Session ID (= profile ID) */
   sessionId: string;
   /** IO device capabilities (null until session is created) */
   capabilities: IOCapabilities | null;
@@ -161,12 +156,12 @@ export interface UseIOSessionResult {
   seek: (timestampUs: number) => Promise<void>;
   /** Seek to a specific frame index (preferred for capture playback - avoids float issues) */
   seekByFrame: (frameIndex: number) => Promise<void>;
-  /** Reopen on `profileId` (else the current session's), under `options.sessionId` when given */
-  reinitialize: (profileId?: string, options?: CreateSessionOptions) => Promise<void>;
+  /** Reopen `sessionId` from `profileId`, tearing it down first when this hook is its only subscriber */
+  reinitialize: (sessionId: string, profileId: string, options?: CreateSessionOptions) => Promise<void>;
   /** Switch to capture replay mode (after stream ends with capture data) */
   switchToCaptureReplay: (speed?: number) => Promise<void>;
-  /** Rejoin an existing session after leaving (for shared sessions) */
-  rejoin: (profileId?: string, profileName?: string) => Promise<void>;
+  /** Join a session, or open it from `sourceId` when nothing is under its id */
+  rejoin: (sessionId: string, sourceId?: string) => Promise<void>;
   /** Transmit a CAN frame (only if capabilities.traits.tx_frames is true) */
   transmitFrame: (frame: CanTransmitFrame) => Promise<TransmitResult>;
 }
@@ -501,13 +496,7 @@ export function useIOSession(
   );
 
   const reinitialize = useCallback(
-    async (newProfileId?: string, opts: CreateSessionOptions = {}) => {
-      const targetProfileId = newProfileId || effectiveSessionId;
-      if (!targetProfileId) return;
-      const targetSessionId = opts.sessionId || targetProfileId;
-      // The new profile id names it until the parent re-renders with its name.
-      const targetProfileName = newProfileId || effectiveProfileName;
-
+    async (targetSessionId: string, profileId: string, opts: CreateSessionOptions = {}) => {
       try {
         const oldSessionId = currentSessionIdRef.current;
         if (oldSessionId && oldSessionId !== targetSessionId) {
@@ -515,14 +504,15 @@ export function useIOSession(
           await leaveSession(oldSessionId, subscriberIdRef.current);
         }
         // Rust's atomic check: with other subscribers on it, the session is not torn down
-        await reinitializeSession(targetSessionId, subscriberIdRef.current, appName, targetProfileId, targetProfileName, opts);
+        // The profile id names it until the parent re-renders with its name.
+        await reinitializeSession(targetSessionId, subscriberIdRef.current, appName, profileId, profileId, opts);
         currentSessionIdRef.current = targetSessionId;
         registerCallbacks(targetSessionId, subscriberIdRef.current, forwarding);
       } catch (e) {
         callbacksRef.current.onError?.(messageOf(e));
       }
     },
-    [appName, effectiveSessionId, effectiveProfileName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession, forwarding]
+    [appName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession, forwarding]
   );
 
   const switchToCaptureReplay = useCallback(
@@ -537,13 +527,9 @@ export function useIOSession(
     [effectiveSessionId, switchToCapture]
   );
 
-  const rejoin = useCallback(async (profileId?: string, profileName?: string) => {
-    // Use provided profileId or fall back to current session ID
-    const targetSessionId = profileId || effectiveSessionId;
-    const targetProfileName = profileName || effectiveProfileName;
-    if (!targetSessionId) return;
+  const rejoin = useCallback(async (targetSessionId: string, sourceId?: string) => {
     try {
-      await openSession(targetSessionId, targetProfileName, subscriberIdRef.current, appName, {});
+      await openSession(targetSessionId, sourceId ?? effectiveProfileName, subscriberIdRef.current, appName, { sourceId });
 
       // Mark subscriber as active in Rust so it receives frames again
       try {
@@ -556,7 +542,7 @@ export function useIOSession(
     } catch (e) {
       callbacksRef.current.onError?.(messageOf(e));
     }
-  }, [appName, effectiveSessionId, effectiveProfileName, openSession, registerCallbacks, forwarding]);
+  }, [appName, effectiveProfileName, openSession, registerCallbacks, forwarding]);
 
   const transmitFrame = useCallback(
     async (frame: CanTransmitFrame): Promise<TransmitResult> => {

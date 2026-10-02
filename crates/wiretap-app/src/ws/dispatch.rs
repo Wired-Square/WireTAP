@@ -571,14 +571,8 @@ fn byte_span(signal: &wiretap_catalog::Signal) -> Option<std::ops::RangeInclusiv
 /// Read new frames from capture_store since the last send, encode as binary, and send via WS.
 /// Called from signal_frames_ready at the 2Hz throttle cadence.
 pub fn send_new_frames(session_id: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
 
     let capture_id = match crate::capture_store::get_session_frame_capture_id(session_id) {
         Some(id) => id,
@@ -633,14 +627,8 @@ pub fn send_new_frames(session_id: &str) {
 /// message twice a second, whether the link is 9600 or 921600 — and avoids a second copy
 /// of data the capture already holds durably.
 pub fn send_new_bytes(session_id: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
 
     let capture_id = match crate::capture_store::get_session_bytes_capture_id(session_id) {
         Some(id) => id,
@@ -765,37 +753,38 @@ fn frame_batch_messages(session_id: &str, frames: &[FrameMessage]) -> Vec<(MsgTy
     messages
 }
 
+/// Send on a session's own channel. The payload is built only once a subscriber
+/// is known to exist, so a headless session never pays for it; `None` sends nothing.
+fn send_to_session<P: Into<Option<Vec<u8>>>>(session_id: &str, msg_type: MsgType, payload: impl FnOnce() -> P) {
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
+    let Some(payload) = payload().into() else { return };
+    server.send_to_channel(channel, protocol::encode_message(msg_type, channel, &payload));
+}
+
+/// Send on the global channel, to every connected client; `None` sends nothing.
+fn send_to_all<P: Into<Option<Vec<u8>>>>(msg_type: MsgType, payload: impl FnOnce() -> P) {
+    let Some(server) = ws_server() else { return };
+    let Some(payload) = payload().into() else { return };
+    server.send_global(protocol::encode_message(msg_type, 0, &payload));
+}
+
+fn send_json_to_all<T: serde::Serialize + ?Sized>(msg_type: MsgType, value: &T) {
+    send_to_all(msg_type, || serde_json::to_vec(value).ok());
+}
+
 /// Send session state change.
 pub fn send_session_state(session_id: &str, current: &IOState) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
     let error_msg = match current {
         IOState::Error(msg) => Some(msg.as_str()),
         _ => None,
     };
-    let payload = protocol::encode_session_state(current.code(), error_msg);
-    let msg = protocol::encode_message(MsgType::SessionState, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::SessionState, || protocol::encode_session_state(current.code(), error_msg));
 }
 
 /// Send stream-ended info.
 pub fn send_stream_ended(session_id: &str, info: &StreamEndedInfo) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let msg = protocol::encode_message(MsgType::StreamEnded, channel, &stream_ended_payload(info));
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::StreamEnded, || stream_ended_payload(info));
 }
 
 fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
@@ -811,36 +800,18 @@ fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
 
 /// Send session error.
 pub fn send_session_error(session_id: &str, severity: crate::io::ErrorSeverity, error: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let payload = protocol::encode_session_error(severity.code(), error);
-    let msg = protocol::encode_message(MsgType::SessionError, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::SessionError, || protocol::encode_session_error(severity.code(), error));
 }
 
 /// Send playback position update.
 pub fn send_playback_position(session_id: &str, pos: &PlaybackPosition) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let payload = protocol::encode_playback_position(
-        pos.timestamp_us as u64,
-        pos.frame_index as u32,
-        pos.frame_count.unwrap_or(0) as u32,
-    );
-    let msg = protocol::encode_message(MsgType::PlaybackPosition, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::PlaybackPosition, || {
+        protocol::encode_playback_position(
+            pos.timestamp_us as u64,
+            pos.frame_index as u32,
+            pos.frame_count.unwrap_or(0) as u32,
+        )
+    });
 }
 
 /// Send device-connected info.
@@ -850,73 +821,33 @@ pub fn send_device_connected(
     address: &str,
     bus: Option<u8>,
 ) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let payload = protocol::encode_device_connected(device_type, address, bus);
-    let msg = protocol::encode_message(MsgType::DeviceConnected, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::DeviceConnected, || {
+        protocol::encode_device_connected(device_type, address, bus)
+    });
 }
 
 /// Send capture-changed, carrying the session's frames capture id (empty: none).
 pub fn send_capture_changed(session_id: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let capture_id = crate::capture_store::get_session_frame_capture_id(session_id).unwrap_or_default();
-    let payload = protocol::encode_capture_changed(&capture_id);
-    let msg = protocol::encode_message(MsgType::CaptureChanged, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::CaptureChanged, || {
+        let capture_id = crate::capture_store::get_session_frame_capture_id(session_id).unwrap_or_default();
+        protocol::encode_capture_changed(&capture_id)
+    });
 }
 
 /// Send session info (speed + subscriber count).
 pub fn send_session_info(session_id: &str, speed: f64, subscriber_count: u16) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-    let payload = protocol::encode_session_info(speed, subscriber_count);
-    let msg = protocol::encode_message(MsgType::SessionInfo, channel, &payload);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::SessionInfo, || protocol::encode_session_info(speed, subscriber_count));
 }
 
 /// Send session-reconfigured signal.
 pub fn send_reconfigured(session_id: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
     // Empty payload — the frontend clears stale frames on receipt
-    let msg = protocol::encode_message(MsgType::Reconfigured, channel, &[]);
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::Reconfigured, Vec::new);
 }
 
 /// Send transmit-updated signal with history count (global, channel 0).
 pub fn send_transmit_updated(count: i64) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let msg = protocol::encode_message(MsgType::TransmitUpdated, 0, &count.to_le_bytes());
-    server.send_global(msg);
+    send_to_all(MsgType::TransmitUpdated, || count.to_le_bytes().to_vec());
 }
 
 // ============================================================================
@@ -959,55 +890,26 @@ pub async fn dispatch_command(
 /// channel. Payload is opaque JSON — the frontend decodes the
 /// discriminated union by `type` field.
 pub fn send_ota_event(event: &serde_json::Value) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let payload = match serde_json::to_vec(event) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let msg = protocol::encode_message(MsgType::OtaEvent, 0, &payload);
-    server.send_global(msg);
+    send_json_to_all(MsgType::OtaEvent, event);
 }
 
 /// Push the open-app roster snapshot to all connected WS clients on the global
 /// channel. Payload is opaque JSON (`Vec<AppInstanceInfo>`); the frontend replaces
 /// its roster state. Mirrors `send_ota_event` / `send_replay_state`.
 pub fn send_open_apps_changed(roster: &[crate::io::AppInstanceInfo]) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let payload = match serde_json::to_vec(roster) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let msg = protocol::encode_message(MsgType::OpenAppsChanged, 0, &payload);
-    server.send_global(msg);
+    send_json_to_all(MsgType::OpenAppsChanged, roster);
 }
 
 /// Signal all connected WS clients that the decoder-catalogue list changed.
 /// Payload is the fresh list as JSON; the frontend treats this as a "re-sync"
 /// trigger and reconciles via `list_catalogs`. Mirrors `send_open_apps_changed`.
 pub fn send_catalog_list_changed(catalogs: &[crate::catalog::CatalogFile]) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let payload = match serde_json::to_vec(catalogs) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let msg = protocol::encode_message(MsgType::CatalogListChanged, 0, &payload);
-    server.send_global(msg);
+    send_json_to_all(MsgType::CatalogListChanged, catalogs);
 }
 
 /// Signal all connected WS clients that the capture list changed.
 pub fn send_capture_list_changed() {
-    if let Some(server) = ws_server() {
-        server.send_global(protocol::encode_message(MsgType::CaptureListChanged, 0, &[]));
-    }
+    send_to_all(MsgType::CaptureListChanged, Vec::new);
 }
 
 pub fn send_session_log_entry(entry: &crate::io::session_log::SessionLogEntry) {
@@ -1022,18 +924,7 @@ fn session_log_message(entry: &crate::io::session_log::SessionLogEntry) -> Vec<u
 
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    // Encode replay state as JSON bytes for now; a dedicated binary encoder
-    // can be added in a future task if needed.
-    let payload = match serde_json::to_vec(state) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let msg = protocol::encode_message(MsgType::ReplayState, 0, &payload);
-    server.send_global(msg);
+    send_json_to_all(MsgType::ReplayState, state);
 }
 
 /// Repeat-transmit lifecycle payload, pushed on the global channel as
@@ -1049,16 +940,7 @@ enum RepeatEventPayload<'a> {
 }
 
 fn send_repeat_event(payload: &RepeatEventPayload<'_>) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let bytes = match serde_json::to_vec(payload) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let msg = protocol::encode_message(MsgType::RepeatEvent, 0, &bytes);
-    server.send_global(msg);
+    send_json_to_all(MsgType::RepeatEvent, payload);
 }
 
 /// Announce a repeat transmit that started outside the Transmit UI (e.g. an MCP
@@ -1086,13 +968,7 @@ pub struct AttachToPanelMsg<'a> {
 /// Ask the frontend to surface a session in a source-aware tab (open/focus the
 /// panel and point it at the session).
 pub fn send_attach_to_panel(panel: &str, session_id: &str) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let Ok(payload) = serde_json::to_vec(&AttachToPanelMsg { panel, session_id }) else { return };
-    let msg = protocol::encode_message(MsgType::AttachToPanel, 0, &payload);
-    server.send_global(msg);
+    send_json_to_all(MsgType::AttachToPanel, &AttachToPanelMsg { panel, session_id });
 }
 
 /// Send Test Pattern state update (global, channel 0).
@@ -1100,35 +976,21 @@ pub fn send_attach_to_panel(panel: &str, session_id: &str) {
 /// Takes the state rather than an id: the caller is about to store this very
 /// value, so reading it back out of the map would copy the whole thing again.
 pub fn send_io_test_state(state: &crate::io_test::IOTestState) {
-    let Some(server) = ws_server() else { return };
-    let Ok(payload) = serde_json::to_vec(state) else { return };
-    server.send_global(protocol::encode_message(MsgType::TestPatternState, 0, &payload));
+    send_json_to_all(MsgType::TestPatternState, state);
 }
 
 /// Send a JSON-payload message on a session's own channel.
-///
-/// Silently drops when the server is down or nobody is subscribed, like every
-/// other session sender here. The payload is only serialised once a subscriber
-/// is known to exist, so a headless session never pays for it.
 pub fn send_session_json<T: serde::Serialize>(
     session_id: &str,
     msg_type: MsgType,
     value: &T,
 ) {
-    let Some(server) = ws_server() else { return };
-    let Some(channel) = server.channel_for_session(session_id) else { return };
-    let Ok(payload) = serde_json::to_vec(value) else { return };
-    server.send_to_channel(channel, protocol::encode_message(msg_type, channel, &payload));
+    send_to_session(session_id, msg_type, || serde_json::to_vec(value).ok());
 }
 
 /// Send session lifecycle event (global, channel 0).
 pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let msg = protocol::encode_message(MsgType::SessionLifecycle, 0, &session_lifecycle_payload(payload));
-    server.send_global(msg);
+    send_to_all(MsgType::SessionLifecycle, || session_lifecycle_payload(payload));
 }
 
 fn session_lifecycle_payload(payload: &crate::io::SessionLifecyclePayload) -> Vec<u8> {
@@ -1143,10 +1005,7 @@ fn session_lifecycle_payload(payload: &crate::io::SessionLifecyclePayload) -> Ve
 
 /// Send a session's transition on its own channel.
 pub fn send_session_transition(session_id: &str, payload: &crate::io::SessionTransitionPayload) {
-    let Some(server) = ws_server() else { return };
-    let Some(channel) = server.channel_for_session(session_id) else { return };
-    let msg = protocol::encode_message(MsgType::SessionLifecycle, channel, &session_transition_payload(payload));
-    server.send_to_channel(channel, msg);
+    send_to_session(session_id, MsgType::SessionLifecycle, || session_transition_payload(payload));
 }
 
 fn session_transition_payload(payload: &crate::io::SessionTransitionPayload) -> Vec<u8> {

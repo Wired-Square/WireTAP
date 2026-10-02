@@ -214,6 +214,7 @@ function DashboardInner() {
     appName: "dashboard",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
+    defaultSourceId: settings?.default_read_profile,
     onDecoded: handleDecoded,
     onAdhocSignals: handleAdhocSignals,
     onError: handleError,
@@ -244,6 +245,7 @@ function DashboardInner() {
     watchUniqueFrameCount,
     stopWatch,
     handleDestroy,
+    selectProfile,
   } = manager;
 
   const { sessionId, state: readerState } = session;
@@ -370,10 +372,7 @@ function DashboardInner() {
   // ── Initialise from settings ──
   useEffect(() => {
     if (settings) {
-      initFromSettings(
-        settings.decoder_dir,
-        settings.default_read_profile,
-      );
+      initFromSettings(settings.decoder_dir);
       setBufferCapacity(settings.graph_buffer_size ?? 10_000);
     }
   }, [settings, initFromSettings, setBufferCapacity]);
@@ -488,7 +487,7 @@ function DashboardInner() {
         ioProfiles={allIOProfiles}
         selectedId={ioProfile}
         defaultId={settings?.default_read_profile}
-        onSelect={setIoProfile}
+        onSelect={selectProfile}
         autoImport={autoImportRef.current}
         onAutoImportConsumed={() => { autoImportRef.current = false; }}
         defaultCatalogPath={catalogPath}

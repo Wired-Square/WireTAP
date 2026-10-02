@@ -7,9 +7,8 @@ import { isTimeRangeCapableKind } from "./profileTraits";
 import { formatHumanUs } from "./timeFormat";
 
 interface SessionSource {
-  /** The profile the session was opened from, when it differs from the session id. */
+  /** The profile the session was opened from. */
   sourceProfileId: string | null | undefined;
-  ioProfile: string | null | undefined;
   profiles: IOProfile[];
   captureId: string | null | undefined;
 }
@@ -18,9 +17,8 @@ interface SessionSource {
  * A backend session also streams into a local capture (its load window), so
  * the profile is tested first: the archive owns those events, not the copy.
  */
-export function eventOwnerForSession({ sourceProfileId, ioProfile, profiles, captureId }: SessionSource): EventOwner | null {
-  const profileId = sourceProfileId || ioProfile;
-  const profile = profileId ? profiles.find((p) => p.id === profileId) : undefined;
+export function eventOwnerForSession({ sourceProfileId, profiles, captureId }: SessionSource): EventOwner | null {
+  const profile = sourceProfileId ? profiles.find((p) => p.id === sourceProfileId) : undefined;
   if (profile && isTimeRangeCapableKind(profile.kind)) {
     return { kind: "backend", profile_id: profile.id };
   }

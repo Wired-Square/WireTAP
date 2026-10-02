@@ -61,6 +61,13 @@ describe("a group repeat transmits through its rows' sessions", () => {
     await useTransmitStore.getState().startGroupRepeat("g");
     expect(repeatGroupMembers()).toEqual([[["first", 1], ["second", 1], ["first", 1]]]);
   });
+
+  it("a row whose session is gone is refused, not sent through another session on its profile", async () => {
+    useTransmitStore.setState({ queue: [row("a", "gone")] });
+    await useTransmitStore.getState().startGroupRepeat("g");
+    expect(repeatGroupMembers()).toEqual([]);
+    expect(useTransmitStore.getState().error).toMatch(/not connected/);
+  });
 });
 
 describe("a group repeat's state follows the backend", () => {

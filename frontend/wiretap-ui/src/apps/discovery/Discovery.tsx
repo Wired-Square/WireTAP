@@ -421,6 +421,7 @@ function DiscoveryInner() {
     appName: "discovery",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
+    defaultSourceId: settings?.default_read_profile,
     onIngestComplete: handleIngestComplete,
     onFrames: handleFrames,
     onError: handleError,
@@ -492,7 +493,6 @@ function DiscoveryInner() {
     setTimeRange,
     seek,
     seekByFrame,
-    reinitialize,
   } = session;
 
   // The Modbus session on screen, if this is one — the poll switch's subject.
@@ -641,17 +641,6 @@ function DiscoveryInner() {
   }, [captureMetadata?.start_time_us, isStreaming, updateCurrentTime]);
 
   const displayTimeSeconds = isRealtime ? realtimeClock : currentTime;
-
-  // The default source is an initial selection only: settings reload on every save
-  // in any window, and reapplying it would retarget a running session.
-  const defaultProfileAppliedRef = useRef(false);
-  useEffect(() => {
-    if (!settings || defaultProfileAppliedRef.current) return;
-    defaultProfileAppliedRef.current = true;
-    if (settings.default_read_profile && !useDiscoveryUIStore.getState().ioProfile) {
-      setIoProfile(settings.default_read_profile);
-    }
-  }, [settings, setIoProfile]);
 
   useEffect(() => {
     if (settings?.discovery_history_buffer) {
@@ -902,11 +891,9 @@ function DiscoveryInner() {
     watchSource,
 
     // Session actions
-    setIoProfile,
     start,
     pause,
     resume,
-    reinitialize,
     handleClearCapture: manager.handleClearCapture,
     setSpeed,
     setTimeRange,

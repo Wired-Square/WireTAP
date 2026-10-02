@@ -45,7 +45,7 @@ const opened = (overrides: Partial<OpenedSession> = {}): OpenedSession => ({
 
 const sessionCommands = () =>
   invoke.mock.calls.map(([cmd]) => cmd).filter((cmd) => cmd !== "log_frontend" && !cmd.startsWith("plugin:"));
-const open = () => useSessionStore.getState().openSession("p-dev", "Bench", "discovery_1", "discovery", { sessionId: "f_open" });
+const open = () => useSessionStore.getState().openSession("f_open", "Bench", "discovery_1", "discovery", { sourceId: "p-dev" });
 
 beforeEach(() => {
   invoke.mockClear();
@@ -116,6 +116,8 @@ describe("a view on a session", () => {
 
     const opens = invoke.mock.calls.filter(([cmd]) => cmd === "open_session");
     expect(new Set(opens.map(([, args]) => args!.subscriber_id)).size).toBe(1);
+    expect(opens.every(([, args]) => (args!.opts as { source_id?: string }).source_id === undefined)).toBe(true);
+    expect(useSessionStore.getState().sessions.f_view?.profileId).toBe("p-dev");
     expect(sessionCommands()).not.toContain("unregister_session_subscriber");
     expect(useSessionStore.getState().sessions.f_view?.lifecycleState).toBe("connected");
 

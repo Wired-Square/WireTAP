@@ -72,9 +72,10 @@ const captureOption = () => withText("[role=option]", byteCapture.name);
 const rawPortOption = () => withText("[role=option]", rawPort.name);
 
 // The app is on a session Rust opened on the capture.
+const captureSessionId = "c_000001";
 beforeEach(() => {
   useSessionStore.setState({
-    sessions: { [byteCapture.id]: { id: byteCapture.id, sourceKind: "capture" } as Session },
+    sessions: { [captureSessionId]: { id: captureSessionId, sourceKind: "capture", capture: { id: byteCapture.id } } as Session },
   });
   useCaptureListStore.setState({ orphaned: [byteCapture] });
 });
@@ -85,7 +86,7 @@ afterEach(() => {
 });
 
 describe("IO picker capture framing", () => {
-  beforeEach(() => renderPicker({ selectedId: byteCapture.id, selectedIds: [rawPort.id] }));
+  beforeEach(() => renderPicker({ selectedId: captureSessionId, selectedIds: [rawPort.id] }));
 
   it("the picker offers no framing for a byte capture", () => {
     expect(captureOption()).toBeDefined();
@@ -112,7 +113,7 @@ describe("IO picker selection is a capture or ticked sources, never both", () =>
   });
 
   it("ticking a source deselects the capture", async () => {
-    await renderPicker({ selectedId: byteCapture.id, allowMultiSelect: true, onStartLoad, onStartMultiLoad });
+    await renderPicker({ selectedId: captureSessionId, allowMultiSelect: true, onStartLoad, onStartMultiLoad });
     await click(withText("[role=tab]", "ioSourcePicker.tabs.devices"));
     await click(rawPortOption());
     await click(rawPortOption());

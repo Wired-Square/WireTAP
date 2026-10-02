@@ -287,7 +287,7 @@ interface DashboardState {
   applyParsedCatalog: (catalog: ParsedCatalog) => void;
   /** Track the active catalogue path without parsing. */
   setCatalogPath: (path: string | null) => void;
-  initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
+  initFromSettings: (decoderDir?: string) => Promise<void>;
   setIoProfile: (profile: string | null) => void;
   setPlaybackSpeed: (speed: number) => void;
   setBufferCapacity: (capacity: number) => void;
@@ -440,10 +440,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  initFromSettings: async (_decoderDir, defaultReadProfile) => {
-    if (defaultReadProfile) {
-      set({ ioProfile: defaultReadProfile });
-    }
+  initFromSettings: async (_decoderDir) => {
     // Restore panels from last session
     await get().restoreLastSession();
   },

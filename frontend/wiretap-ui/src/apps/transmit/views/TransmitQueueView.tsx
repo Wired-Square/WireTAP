@@ -24,7 +24,6 @@ import { flexRowGap2 } from "../../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { formatBusLabel } from "../../../utils/busFormat";
-import { resolveQueueItemSession } from "../../../stores/transmitRowSession";
 import { Button, IconButton } from "../../../components/Button";
 import { Select, Input, Checkbox } from "../../../components/forms";
 import { Table } from "../../../components/Table";
@@ -250,7 +249,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
               const isFirstEnabledInGroup = item.groupName ? firstEnabledInGroup.get(item.groupName) === item.id : false;
 
               // Check item's session state (not active session)
-              const itemSession = resolveQueueItemSession(item, sessions);
+              const itemSession = sessions[item.sessionId];
               const isOrphaned = !itemSession || itemSession.lifecycleState === "disconnected";
               const isItemSessionConnected = itemSession?.lifecycleState === "connected";
 

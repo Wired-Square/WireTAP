@@ -7,6 +7,22 @@
 import type { Session } from "./sessionStore";
 import { getStateType, type ActiveSessionInfo } from "../api/io";
 
+/** A session's capture slot before anything is known about the capture — or with
+ *  only its id, as the CaptureChanged message reports it. */
+export function emptyCapture(id: string | null = null, owningSessionId: string | null = null): Session["capture"] {
+  return {
+    available: id !== null,
+    id,
+    kind: id ? "frames" : null,
+    count: 0,
+    owningSessionId,
+    startTimeUs: null,
+    endTimeUs: null,
+    name: null,
+    persistent: false,
+  };
+}
+
 /**
  * Returns a new sessions map that:
  *  - adds a known-only `Session` for each roster session the store doesn't own,
@@ -104,17 +120,7 @@ export function reconcileKnownSessions(
       // Adopted from the roster, which reports frame counts only. Rust re-pushes the byte
       // total on its next signal if this session has a byte capture.
       byteCount: 0,
-      capture: {
-        available: false,
-        id: info.capture_id,
-        kind: info.capture_kind,
-        count: info.capture_frame_count ?? 0,
-        owningSessionId: null,
-        startTimeUs: null,
-        endTimeUs: null,
-        name: null,
-        persistent: false,
-      },
+      capture: { ...emptyCapture(), id: info.capture_id, kind: info.capture_kind, count: info.capture_frame_count ?? 0 },
       createdAt: Date.now(),
       hasQueuedMessages: false,
       speed: null,

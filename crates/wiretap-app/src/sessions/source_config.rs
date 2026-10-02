@@ -322,14 +322,7 @@ pub fn profile_bus_mappings(profile: &IOProfile) -> Vec<BusMapping> {
 
 /// Create default single-bus mapping for devices without interface configuration.
 fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> Vec<BusMapping> {
-    let output_bus = bus_override.unwrap_or_else(|| {
-        profile
-            .connection
-            .get("bus_override")
-            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-            .map(|v| v as u8)
-            .unwrap_or(0)
-    });
+    let output_bus = bus_override.unwrap_or_else(|| conn_i64(profile, "bus_override").unwrap_or_default() as u8);
 
     // The protocol this kind's single bus carries; the traits follow from it.
     let (device_bus, interface_id, protocol) = match profile.kind.as_str() {
@@ -348,12 +341,8 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
                 }).collect();
             }
             // Legacy single-interface fallback
-            let iface_index = profile.connection.get("interface_index")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u8;
-            let iface_type = profile.connection.get("interface_type")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1) as u8;
+            let iface_index = conn_i64(profile, "interface_index").unwrap_or_default() as u8;
+            let iface_type = conn_i64(profile, "interface_type").unwrap_or(1) as u8;
             return vec![framelink_bus_mapping(iface_index, iface_type, output_bus)];
         }
         kind => {

@@ -78,11 +78,9 @@ export interface UseDiscoveryHandlersParams {
   watchSource: (profileIds: string[], options: ManagerLoadOptions) => Promise<void>;
 
   // Session actions
-  setIoProfile: (profileId: string | null) => void;
   start: () => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
-  reinitialize: (profileId?: string, options?: any) => Promise<void>;
   /** Centralised buffer clear from the session manager */
   handleClearCapture: () => Promise<void>;
   setSpeed: (speed: number) => Promise<void>;

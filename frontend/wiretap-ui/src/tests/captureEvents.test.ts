@@ -14,23 +14,18 @@ const profiles = [backend, gvret];
 
 describe("eventOwnerForSession", () => {
   it("gives a WireTAP Backend profile's events to the archive, not its load-window capture", () => {
-    expect(eventOwnerForSession({ sourceProfileId: "wt1", ioProfile: "t_abc", profiles, captureId: "xk9m2p" }))
-      .toEqual({ kind: "backend", profile_id: "wt1" });
-  });
-
-  it("falls back to the source profile id when the session id is the profile", () => {
-    expect(eventOwnerForSession({ sourceProfileId: null, ioProfile: "wt1", profiles, captureId: null }))
+    expect(eventOwnerForSession({ sourceProfileId: "wt1", profiles, captureId: "xk9m2p" }))
       .toEqual({ kind: "backend", profile_id: "wt1" });
   });
 
   it("gives a realtime session's events to its live capture", () => {
-    expect(eventOwnerForSession({ sourceProfileId: null, ioProfile: "gv1", profiles, captureId: "xk9m2p" }))
+    expect(eventOwnerForSession({ sourceProfileId: "gv1", profiles, captureId: "xk9m2p" }))
       .toEqual({ kind: "capture", capture_id: "xk9m2p" });
   });
 
   it("has no owner before a capture exists", () => {
-    expect(eventOwnerForSession({ sourceProfileId: null, ioProfile: "gv1", profiles, captureId: null })).toBeNull();
-    expect(eventOwnerForSession({ sourceProfileId: null, ioProfile: null, profiles, captureId: null })).toBeNull();
+    expect(eventOwnerForSession({ sourceProfileId: "gv1", profiles, captureId: null })).toBeNull();
+    expect(eventOwnerForSession({ sourceProfileId: null, profiles, captureId: null })).toBeNull();
   });
 });
 

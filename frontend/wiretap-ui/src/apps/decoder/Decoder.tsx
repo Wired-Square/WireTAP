@@ -144,7 +144,6 @@ function DecoderInner() {
   const mirrorValidation = useDecoderStore((state) => state.mirrorValidation);
 
   // Zustand store actions
-  const initFromSettings = useDecoderStore((state) => state.initFromSettings);
   const toggleFrameSelection = useDecoderStore((state) => state.toggleFrameSelection);
   const bulkSelectBus = useDecoderStore((state) => state.bulkSelectBus);
   const selectAllFrames = useDecoderStore((state) => state.selectAllFrames);
@@ -366,6 +365,7 @@ function DecoderInner() {
     appName: "decoder",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
+    defaultSourceId: settings?.default_read_profile,
     onIngestComplete: handleIngestComplete,
     onDecoded: handleDecoded,
     onError: handleError,
@@ -709,10 +709,6 @@ function DecoderInner() {
         const bid = sess?.capture?.id;
         const meta = bid ? await getCaptureMetadata(bid) : null;
         setCaptureMetadata(meta);
-        // Use the actual buffer ID for unique session naming
-        if (meta) {
-          setIoProfile(meta.id);
-        }
         // Reset time slider and frame index to start of buffer
         if (meta?.start_time_us != null) {
           updateCurrentTime(meta.start_time_us / 1_000_000);
@@ -720,7 +716,7 @@ function DecoderInner() {
         setCurrentFrameIndex(0);
       }).catch((e) => console.error("Failed to switch to buffer replay:", e));
     }
-  }, [pendingCaptureTransition, isDecoding, switchToCaptureReplay, playbackSpeed, setIoProfile, updateCurrentTime, setCurrentFrameIndex]);
+  }, [pendingCaptureTransition, isDecoding, switchToCaptureReplay, playbackSpeed, updateCurrentTime, setCurrentFrameIndex]);
 
   // Flush what is pending when decoding stops so nothing is lost
   useEffect(() => {
@@ -744,29 +740,6 @@ function DecoderInner() {
 
   // Display time: use stored currentTime for non-realtime, realtimeClock for realtime
   const displayTime = isRealtime ? realtimeClock : currentTime;
-
-  // Initialize decoder when settings are loaded
-  useEffect(() => {
-    if (!settings) return;
-
-    const init = async () => {
-      await initFromSettings(
-        settings.decoder_dir,
-        settings.default_read_profile
-      );
-
-      // Set default speed from the default read profile if it has one
-      if (settings.default_read_profile && settings.io_profiles) {
-        const profile = settings.io_profiles.find((p) => p.id === settings.default_read_profile);
-        if (profile && profile.kind === "wiretap" && profile.connection?.default_speed) {
-          const defaultSpeed = parseFloat(profile.connection.default_speed) as PlaybackSpeed;
-          setPlaybackSpeed(defaultSpeed);
-        }
-      }
-    };
-    init().catch((e) => console.error("Failed to init decoder", e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
 
   // Listen for buffer changes from other windows
   useEffect(() => {

@@ -140,11 +140,6 @@ export default function SourceList({
     return undefined;
   };
 
-  // Get profile info for a session ID
-  const getProfileForSession = (sessionId: string): IOProfile | null => {
-    return readProfiles.find((p) => p.id === sessionId) || null;
-  };
-
   // Collapsed single-source card — rendered in the active tab body once a
   // profile (or CSV) is selected. Active-session selections highlight in place
   // above the tabs instead, so they don't collapse here.
@@ -211,10 +206,7 @@ export default function SourceList({
     } else {
       // Single-source session (e.g., a WireTAP backend)
       // Look up profile via sourceProfileIds (session IDs like t_XXXXX differ from profile IDs)
-      const sourceProfileIds = session.source_profile_ids;
-      const profile = sourceProfileIds.length > 0
-        ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
-        : getProfileForSession(session.session_id);
+      const profile = readProfiles.find((p) => session.source_profile_ids.includes(p.id));
       const profileName = profile?.name || session.source_type;
       const deviceKind = profile?.kind || session.source_type;
       return { displayName, subtitle, sourceDetails: `${profileName} (${deviceKind})`, icon: Database, kind: "recorded" as const };
