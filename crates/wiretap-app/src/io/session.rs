@@ -9,13 +9,13 @@ use tokio::sync::{Mutex, OwnedMutexGuard};
 
 use super::roster::{
     attach_app, current_session_of_app, detach_all_from_session, detach_app, other_instances_on_session,
-    session_exists, set_app_active, subscriber_count_for_session,
+    session_exists, set_app_active, subscriber_count_for_session, unpark_app,
 };
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
     CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader,
-    SessionLifecyclePayload, SessionTransition, SessionTransitionPayload, SourceConfig, TransmitPayload, TransmitResult,
-    VirtualBusState, CAPTURE_SOURCE_TYPE,
+    SessionLifecyclePayload, SessionTransition, SessionTransitionPayload, SourceConfig, TemporalMode, TransmitPayload,
+    TransmitResult, VirtualBusState, CAPTURE_SOURCE_TYPE,
 };
 use crate::{capture_store, sessions};
 
@@ -171,6 +171,7 @@ fn emit_transition(session_id: &str, session: &IOSession, transition: SessionTra
             transition,
             state: session.source.state(),
             capabilities: session.source.capabilities(),
+            mode: session_mode(session_id, session),
             capture_id,
             capture_count,
         },
@@ -200,13 +201,13 @@ fn emit_speed_change(session_id: &str, speed: f64) {
 /// `reset` marks a deliberate move away from this session (see `destroy_session`);
 /// it rides the `destroyed` event so apps return to "No source" instead of adopting
 /// the orphaned capture.
-pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool) {
+pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool, by: Option<&str>) {
     let count = subscriber_count_for_session(session_id);
     if count == 0 {
         if let Ok(session) = lock_session(session_id).await {
             tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
             emit_joiner_count_change(session_id, 0, None, None, Some("left"));
-            tear_down(session_id, session, Teardown::Destroy { reset }).await;
+            tear_down(session_id, session, Teardown::Destroy { reset, by }).await;
         }
     } else if session_exists(session_id).await {
         emit_joiner_count_change(session_id, count, None, None, Some("left"));
@@ -338,7 +339,7 @@ pub async fn create_session(
                 "[reader] Session '{}' clearing suspension (new subscriber joining)",
                 session_id
             );
-            // Resume will happen via register_subscriber or auto-start
+            // Resume will happen via register_subscriber_from or auto-start
         }
 
         // Attach the joining subscriber to the registry (idempotent — refreshes
@@ -385,7 +386,7 @@ pub async fn create_session(
         state: Some(state),
         subscriber_count,
         source_profile_ids,
-        creator_subscriber_id: subscriber_id,
+        subscriber_id,
         reset: false,
     });
 
@@ -815,8 +816,13 @@ pub async fn resume_to_live_session(
 /// Destroy a reader session. `reset` marks a deliberate user destroy so the
 /// frontend resets to "No source" rather than the orphaned capture.
 pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String> {
+    destroy_session_by(session_id, reset, None).await
+}
+
+/// [`destroy_session`] on behalf of `by`, whose own call it is.
+pub async fn destroy_session_by(session_id: &str, reset: bool, by: Option<&str>) -> Result<(), String> {
     match lock_session(session_id).await {
-        Ok(session) => tear_down(session_id, session, Teardown::Destroy { reset }).await,
+        Ok(session) => tear_down(session_id, session, Teardown::Destroy { reset, by }).await,
         // Stale attachments and per-session state must go even if the session had
         // already been removed (see `detach_all_from_session`).
         Err(_) => {
@@ -827,17 +833,18 @@ pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String
     Ok(())
 }
 
-enum Teardown {
-    Destroy { reset: bool },
+/// `by` is the subscriber whose call tears the session down.
+enum Teardown<'a> {
+    Destroy { reset: bool, by: Option<&'a str> },
     /// The session comes straight back under the same id, so its subscribers stay
     /// attached and its captures stay owned.
-    Reinitialise,
+    Reinitialise { by: &'a str },
 }
 
 /// Stop the session, forget it, then emit `destroyed`. It stays registered and
 /// locked until stopped, so a same-id create waits for the teardown instead of
 /// having its profiles released by it.
-async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, how: Teardown) {
+async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, how: Teardown<'_>) {
     let destroying = matches!(how, Teardown::Destroy { .. });
     if destroying {
         detach_all_from_session(session_id);
@@ -851,7 +858,10 @@ async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, ho
         let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
         emit_capture_orphaned_as_changed(session_id, orphaned);
     }
-    let reset = matches!(how, Teardown::Destroy { reset: true });
+    let (reset, by) = match how {
+        Teardown::Destroy { reset, by } => (reset, by),
+        Teardown::Reinitialise { by } => (true, Some(by)),
+    };
     let source_profile_ids = forget_session(session_id);
     emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.to_string(),
@@ -860,7 +870,7 @@ async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, ho
         state: None,
         subscriber_count: 0,
         source_profile_ids,
-        creator_subscriber_id: None,
+        subscriber_id: by.map(str::to_string),
         reset,
     });
     tlog!("[reader] Session '{}' destroyed", session_id);
@@ -975,6 +985,7 @@ pub struct RegisterSubscriberResult {
     /// What kind of source is behind the session, as the roster reports it
     pub source_type: String,
     pub source_kind: SessionSourceKind,
+    pub mode: SessionMode,
 }
 
 /// What a session was opened from. A stopped source replaying its capture is
@@ -987,25 +998,62 @@ pub enum SessionSourceKind {
     Capture,
 }
 
+/// What a session is streaming now, which decides what the frontend offers for it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+#[repr(u8)]
+pub enum SessionMode {
+    Live,
+    Recorded,
+    /// Opened on a capture.
+    Capture,
+    /// A device session replaying the capture it streamed; it can return to live.
+    Replaying,
+}
+
+impl SessionMode {
+    /// This mode's byte in [`SESSION_MODES`](crate::ws::protocol::SESSION_MODES).
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+}
+
+pub fn session_mode(session_id: &str, session: &IOSession) -> SessionMode {
+    match (source_kind(session_id), session.source.capabilities().traits.temporal_mode) {
+        (SessionSourceKind::Capture, _) => SessionMode::Capture,
+        (SessionSourceKind::Device, TemporalMode::Capture) => SessionMode::Replaying,
+        (SessionSourceKind::Device, TemporalMode::Realtime) => SessionMode::Live,
+        (SessionSourceKind::Device, TemporalMode::Recorded) => SessionMode::Recorded,
+    }
+}
+
+fn opened_capture(session_id: &str) -> Option<String> {
+    sessions::get_session_origin_profile_ids(session_id)
+        .into_iter()
+        .next()
+        .filter(|id| capture_store::is_known_capture(id))
+}
+
 pub fn source_kind(session_id: &str) -> SessionSourceKind {
-    let origin = sessions::get_session_origin_profile_ids(session_id);
-    if origin.first().is_some_and(|id| capture_store::is_known_capture(id)) {
+    if opened_capture(session_id).is_some() {
         SessionSourceKind::Capture
     } else {
         SessionSourceKind::Device
     }
 }
 
-/// Register a subscriber for a session.
-/// This is the primary way for frontend components to join a session.
-/// If the subscriber is already registered, this updates their heartbeat.
-/// Returns session info for the registered subscriber.
-pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name: Option<&str>) -> Result<RegisterSubscriberResult, String> {
-    register_subscriber_from(current_session_of_app(subscriber_id), session_id, subscriber_id, app_name).await
+/// The session's own capture, or else the one it was opened on and replays.
+pub fn session_capture(session_id: &str) -> Option<(String, crate::capture_store::CaptureKind)> {
+    capture_store::get_session_capture(session_id).or_else(|| {
+        let id = opened_capture(session_id)?;
+        let kind = capture_store::get_capture_kind(&id)?;
+        Some((id, kind))
+    })
 }
 
-/// `register_subscriber` for a subscriber that was on `prev_session_id` before
-/// the caller attached it anywhere.
+/// Register a subscriber that was on `prev_session_id` before the caller attached it
+/// anywhere. Registering again refreshes its heartbeat.
 pub async fn register_subscriber_from(
     prev_session_id: Option<String>,
     session_id: &str,
@@ -1020,20 +1068,6 @@ pub async fn register_subscriber_from(
     let result = {
         let mut session = lock_session(session_id).await?;
 
-        // Resume the session if a heartbeat arrived while it was suspended (e.g.
-        // display woke up, App Nap ended).
-        let needs_resume = match with_state(session_id, |s| s.suspended_at.take()).flatten() {
-            Some(suspended_at) => {
-                tlog!(
-                    "[reader] Session '{}' resuming from suspension (was suspended for {:?}, subscriber '{}' heartbeat)",
-                    session_id, suspended_at.elapsed(), subscriber_id
-                );
-                // Only resume if the device is paused (we paused it during suspension)
-                matches!(session.source.state(), IOState::Paused)
-            }
-            None => false,
-        };
-
         // Attach (idempotent — refreshes heartbeat / app_name / is_active). The
         // per-session subscriber view is derived from the registry.
         attach_app(subscriber_id, &resolved_app_name, session_id);
@@ -1044,17 +1078,11 @@ pub async fn register_subscriber_from(
         );
         emit_joiner_count_change(session_id, count, Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
 
-        // Get the session's own capture. Reporting its real kind is what lets a joining
-        // app tell a raw serial link from a CAN one — Discovery keys its serial view off
-        // exactly this, and used to be told "frames" or nothing at all.
-        let (capture_id, capture_kind) = crate::capture_store::get_session_capture(session_id).unzip();
+        // Reporting the capture's real kind is what lets a joining app tell a raw
+        // serial link from a CAN one — Discovery keys its serial view off exactly this.
+        let (capture_id, capture_kind) = session_capture(session_id).unzip();
 
-        if needs_resume {
-            match transition(session_id, &mut session, Transition::Resume).await {
-                Ok(_) => tlog!("[reader] Session '{}' reader resumed successfully", session_id),
-                Err(e) => tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e),
-            }
-        }
+        resume_if_suspended(session_id, &mut session, subscriber_id).await;
 
         // Retrieve any startup error (one-shot: cleared after retrieval)
         let startup_error = take_startup_error(session_id);
@@ -1072,6 +1100,7 @@ pub async fn register_subscriber_from(
             origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
             source_type: session.source.source_type().to_string(),
             source_kind: source_kind(session_id),
+            mode: session_mode(session_id, &session),
         }
     };
     // Lock released here
@@ -1081,11 +1110,34 @@ pub async fn register_subscriber_from(
     // subscriber chose this new session; see `teardown_session_if_empty`.
     if let Some(prev) = prev_session_id {
         if prev != session_id {
-            teardown_session_if_empty(&prev, true).await;
+            teardown_session_if_empty(&prev, true, Some(subscriber_id)).await;
         }
     }
 
     Ok(result)
+}
+
+/// Resume a session the watchdog paused for want of subscribers, now that one is back.
+async fn resume_if_suspended(session_id: &str, session: &mut IOSession, back: &str) {
+    let Some(suspended_at) = with_state(session_id, |s| s.suspended_at.take()).flatten() else { return };
+    tlog!(
+        "[reader] Session '{}' resuming from suspension (was suspended for {:?}, {} back)",
+        session_id, suspended_at.elapsed(), back
+    );
+    if !matches!(session.source.state(), IOState::Paused) {
+        return;
+    }
+    match transition(session_id, session, Transition::Resume).await {
+        Ok(_) => tlog!("[reader] Session '{}' reader resumed successfully", session_id),
+        Err(e) => tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e),
+    }
+}
+
+/// Resume a session whose parked subscribers a WS heartbeat re-attached.
+pub(super) async fn resume_reattached(session_id: &str) {
+    let Ok(mut session) = lock_session(session_id).await else { return };
+    resume_if_suspended(session_id, &mut session, "parked subscribers").await;
+    emit_joiner_count_change(session_id, subscriber_count_for_session(session_id), None, None, Some("joined"));
 }
 
 /// Unregister a subscriber from a session.
@@ -1094,6 +1146,7 @@ pub async fn register_subscriber_from(
 pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Result<usize, String> {
     // Only act if the subscriber is actually attached to THIS session.
     if current_session_of_app(subscriber_id).as_deref() != Some(session_id) {
+        unpark_app(subscriber_id, session_id);
         return Ok(subscriber_count_for_session(session_id));
     }
 
@@ -1109,7 +1162,7 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
     // Emit the updated count and destroy the session if that was the last subscriber.
     // `reset: false` — a plain leave is an ordinary end-of-session, so any app still
     // on it keeps the existing orphaned-capture fallback.
-    teardown_session_if_empty(session_id, false).await;
+    teardown_session_if_empty(session_id, false, Some(subscriber_id)).await;
 
     Ok(remaining)
 }
@@ -1338,7 +1391,7 @@ pub async fn set_source_polling(
         state: None,
         subscriber_count: subscriber_count_for_session(session_id),
         source_profile_ids: sessions::get_session_profile_ids(session_id),
-        creator_subscriber_id: None,
+        subscriber_id: None,
         reset: false,
     });
     Ok(())
@@ -1468,7 +1521,7 @@ pub async fn reinitialize_session_if_safe(
         });
     }
 
-    tear_down(session_id, session, Teardown::Reinitialise).await;
+    tear_down(session_id, session, Teardown::Reinitialise { by: subscriber_id }).await;
 
     tlog!(
         "[reader] Session '{}' reinitialized by subscriber '{}'",
@@ -1729,5 +1782,76 @@ mod tests {
         store_playback_position(id, PlaybackPosition { timestamp_us: 1, frame_index: 1, frame_count: None });
         assert_eq!(get_startup_error(id), None);
         assert_eq!(get_playback_position(id).map(|p| p.frame_index), None);
+    }
+
+    fn last_destroyed(session_id: &str) -> (bool, Option<String>) {
+        let emitted = super::super::EMITTED_LIFECYCLE.lock().unwrap();
+        let event = emitted
+            .iter()
+            .rev()
+            .find(|e| e.session_id == session_id && e.event_type == LifecycleEvent::Destroyed)
+            .expect("a destroyed event");
+        (event.reset, event.subscriber_id.clone())
+    }
+
+    async fn create_for(session_id: &str, subscriber: Option<&str>) {
+        create_session(session_id.into(), Box::new(TestSource::new(session_id)), subscriber.map(Into::into), None, None, vec![]).await;
+    }
+
+    #[tokio::test]
+    async fn a_teardown_names_the_subscriber_whose_call_caused_it() {
+        let me = "w_cause";
+        create_for("f_cause_left", Some(me)).await;
+        create_for("f_cause_joined", None).await;
+        register_subscriber_from(Some("f_cause_left".into()), "f_cause_joined", me, None).await.unwrap();
+        assert_eq!(last_destroyed("f_cause_left"), (true, Some(me.into())));
+
+        unregister_subscriber("f_cause_joined", me).await.unwrap();
+        assert_eq!(last_destroyed("f_cause_joined").1.as_deref(), Some(me));
+
+        create_for("f_cause_reinit", Some(me)).await;
+        assert!(reinitialize_session_if_safe("f_cause_reinit", me).await.unwrap().success);
+        assert_eq!(last_destroyed("f_cause_reinit"), (true, Some(me.into())));
+
+        create_for("f_cause_external", Some("w_cause_other")).await;
+        destroy_session("f_cause_external", false).await.unwrap();
+        assert_eq!(last_destroyed("f_cause_external"), (false, None));
+    }
+
+    fn miss_heartbeats(instance_id: &str) {
+        let mut registry = super::super::roster::APP_REGISTRY.lock().unwrap();
+        let stale = Duration::from_secs(super::super::HEARTBEAT_TIMEOUT_SECS + 1);
+        registry.get_mut(instance_id).unwrap().last_heartbeat = Instant::now() - stale;
+    }
+
+    #[tokio::test]
+    async fn a_parked_subscriber_comes_back_on_its_sessions_heartbeat() {
+        let id = "f_parked";
+        let me = "f_parked-app";
+        open(id, TestSource::new(id)).await;
+        miss_heartbeats(me);
+        super::super::cleanup_stale_subscribers().await;
+        assert_eq!(current_session_of_app(me), None);
+        assert_eq!(with_state(id, |s| s.suspended_at.is_some()), Some(true));
+
+        super::super::touch_subscriber_heartbeats(&[id.to_string()]).await;
+        assert_eq!(current_session_of_app(me).as_deref(), Some(id));
+        assert_eq!(with_state(id, |s| s.suspended_at.is_some()), Some(false));
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_parked_subscriber_that_left_is_not_brought_back() {
+        let id = "f_parked_left";
+        let me = "f_parked_left-app";
+        open(id, TestSource::new(id)).await;
+        create_for(id, Some("w_parked_left_other")).await;
+        miss_heartbeats(me);
+        super::super::cleanup_stale_subscribers().await;
+
+        unregister_subscriber(id, me).await.unwrap();
+        super::super::touch_subscriber_heartbeats(&[id.to_string()]).await;
+        assert_eq!(current_session_of_app(me), None);
+        destroy_session(id, false).await.unwrap();
     }
 }

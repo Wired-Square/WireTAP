@@ -26,7 +26,7 @@ const SUSPENSION_GRACE_PERIOD_SECS: u64 = 300; // 5 minutes
 // ============================================================================
 
 /// How long after suspension before we start probing the WebView (seconds).
-/// Gives time for normal display-sleep recovery via visibilitychange heartbeats.
+/// Gives time for normal display-sleep recovery via the WS heartbeat.
 const PROBE_START_DELAY_SECS: u64 = 15;
 
 /// Number of consecutive pings with no pong before triggering recovery.
@@ -223,7 +223,7 @@ async fn trigger_webview_recovery(app: &AppHandle) {
 /// When all listeners go stale, the session is NOT destroyed immediately.
 /// Instead the reader is paused and a grace period starts. This tolerates
 /// WKWebView timer throttling during display sleep / App Nap. If heartbeats
-/// resume within the grace period, the session is resumed (see `register_subscriber`).
+/// resume within the grace period, the session is resumed (see `register_subscriber_from`).
 /// Only after `SUSPENSION_GRACE_PERIOD_SECS` does the watchdog destroy the session.
 ///
 /// Returns a list of (session_id, removed_count, remaining_count) for sessions that had stale subscribers.
@@ -236,28 +236,25 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
     let timeout = std::time::Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
     let grace = std::time::Duration::from_secs(SUSPENSION_GRACE_PERIOD_SECS);
 
-    // Phase 1: Evict stale ATTACHED app instances from the registry. Unattached
-    // instances have no WS heartbeat path (no channel subscription), so they are
-    // NOT evicted on staleness — window-close pruning reaps those. An attached
-    // instance implies its session is not suspended (attach clears suspended_at),
-    // so this only affects live sessions. Returns affected session → removed count.
+    // Phase 1: Park stale ATTACHED app instances: detach them, remembering the
+    // session, so the WS heartbeat of a webview waking from display sleep re-attaches
+    // them (`touch_subscriber_heartbeats`). Unattached instances have no WS heartbeat
+    // path, so window-close pruning reaps those. Returns affected session → parked count.
     let mut affected: HashMap<String, usize> = HashMap::new();
     {
         let Ok(mut reg) = APP_REGISTRY.lock() else { return results };
-        let stale: Vec<String> = reg
-            .values()
-            .filter(|a| a.session_id.is_some() && now.duration_since(a.last_heartbeat) > timeout)
-            .map(|a| a.instance_id.clone())
-            .collect();
-        for id in stale {
-            if let Some(inst) = reg.remove(&id) {
-                let sid = inst.session_id.unwrap_or_default();
-                tlog!(
-                    "[reader] Removing stale subscriber '{}' from session '{}' (no heartbeat)",
-                    id, sid
-                );
-                *affected.entry(sid).or_insert(0) += 1;
+        for inst in reg.values_mut() {
+            if inst.session_id.is_none() || now.duration_since(inst.last_heartbeat) <= timeout {
+                continue;
             }
+            let sid = inst.session_id.take().unwrap_or_default();
+            tlog!(
+                "[reader] Parking stale subscriber '{}' from session '{}' (no heartbeat)",
+                inst.instance_id, sid
+            );
+            inst.is_active = false;
+            inst.parked_on = Some(sid.clone());
+            *affected.entry(sid).or_insert(0) += 1;
         }
     } // APP_REGISTRY lock released
     if !affected.is_empty() {

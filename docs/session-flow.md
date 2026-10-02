@@ -670,9 +670,14 @@ creates, starts and registers. The store:
      started unless it replays a capture or `connect_only` is set, and the
      start's refusal comes back as `start_error`, the session left in its error
      state.
-3. Records what Rust reported — state, capabilities, capture, counts,
-   `source_kind` (`device` or `capture`) — and shows `start_error` (or an earlier
-   `startup_error`).
+3. Records what Rust reported — state, capabilities, capture (a capture session's
+   is the capture it replays), counts, `source_kind` (`device` or `capture`) and
+   `mode` — and shows `start_error` (or an earlier `startup_error`).
+
+`mode` (`SessionMode`: live, recorded, capture, replaying) is what the manager's
+`isRealtime`, `isCaptureMode` and `canReturnToLive` read; only `replaying`, a device
+session replaying the capture it streamed, can return to live. Registration, the
+roster and every scoped `SessionLifecycle` carry it.
 
 A refusal is a `SessionRefusal`: `not_found` when there is no session and nothing
 to open one from, which the hook treats as expected, or `failed`. `stop` and the
@@ -828,9 +833,9 @@ settles it.
 A scan result therefore keeps its `sessionId` for life; `isScanning` is what
 bounds the progress subscription and what Cancel targets.
 
-The ordering only holds because of `markSessionSwitch` (§ App cleanup on
+The ordering only holds because a teardown names its cause (§ App cleanup on
 teardown). Joining the scan session is what empties the poller session, and its
-`destroyed` arrives *after* the tab has been opened — so without that guard a
+`destroyed` arrives *after* the tab has been opened — so if the app acted on it, a
 second, asynchronous `onBeforeWatch` would clear the tab all over again.
 
 MCP is the exception, and deliberately: it is in-process Rust rather than a
@@ -998,29 +1003,21 @@ frames and the frame picker separately produces a render in between where rows
 exist but the picker already reads 0/0.
 
 **A reset only ever applies to one session.** Registering on a new session makes
-Rust tear the old one down (`teardown_session_if_empty(prev, true)`,
-[io/mod.rs](../crates/wiretap-app/src/io/mod.rs)) and broadcast `destroyed` with
-`reset: true`. That event lands a few milliseconds *after* the switch returned
-and set the new session id, and `useIOSession`'s lifecycle listener is
-registered per session id behind an `await listen(...)` — so the departing
-session's listener is still live to receive it. Left alone, the old session's
-teardown reset the one just joined: a Modbus sweep used to land the app on
-"No source" with its results tab gone.
+Rust tear the old one down (`teardown_session_if_empty(prev, true, Some(subscriber))`,
+[io/session.rs](../crates/wiretap-app/src/io/session.rs)) and broadcast `destroyed`.
+That event lands a few milliseconds *after* the switch returned and set the new
+session id, while the departing session's listener is still live to receive it.
+Left alone, the old session's teardown reset the one just joined: a Modbus sweep
+used to land the app on "No source" with its results tab gone.
 
-`useIOSession` therefore keeps `abandonedSessionRef` — the session this hook
-moved off — and a `destroyed` naming it gets the store cleanup but never reaches
-`onDestroyed`. **`markSessionSwitch` is what stamps it, and every path that
-moves an app to a different session must call it before the backend call**,
-because the registration is what triggers the old session's teardown.
-`reinitialize` stamps for itself, which covers watch, load, connect-only and
-jump-to-event in one place; `useIOSessionManager` stamps the two that bypass
-it (`startMultiBusSession` and `joinExistingSession`). `selectProfile` needs no
-stamp — it sets the profile and lets the effect re-register the listener before
-`open_session` runs.
-
-The ref names the session *left*, not the one held, so a path that never stamps
-degrades to the old behaviour rather than stranding the app on a session that is
-genuinely gone.
+So `destroyed` carries `subscriber_id`, the subscriber whose own call caused the
+teardown: a move to another session, a leave, a same-id replace or a reinitialise.
+`useIOSession` ignores a `destroyed` it caused (`isDestroyedUnderneath`), store
+cleanup included, since the same-id paths bring the session straight back. A
+teardown nobody on the session asked for (the Session Manager, the watchdog's
+grace period) names no subscriber, and only that one can make an app adopt the
+orphaned capture. Adopting opens a capture session, which owns no captures, so
+its own teardown orphans none and the fallback cannot loop.
 
 ### Leave session — per-app detach to a snapshot
 
@@ -1244,7 +1241,7 @@ Per-session (channel 1..254):
 | `PlaybackPosition`  | 0x05 | timestamp_us / frame_index / frame_count |
 | `DeviceConnected`   | 0x06 | A source inside a multi-source session connected |
 | `CaptureChanged`    | 0x07 | Capture created/orphaned; frontend re-fetches |
-| `SessionLifecycle`  | 0x08 | The transition Rust made (`SESSION_TRANSITIONS`: suspended, switched_to_capture, resuming, returned_to_live, capabilities_changed), with the state, capabilities and the capture id + count it finished with |
+| `SessionLifecycle`  | 0x08 | The transition Rust made (`SESSION_TRANSITIONS`: suspended, switched_to_capture, resuming, returned_to_live, capabilities_changed), with the state, `SessionMode`, capabilities and the capture id + count it finished with |
 | `SessionInfo`       | 0x09 | Speed, subscriber count |
 | `Reconfigured`      | 0x0A | Session was reconfigured (time range, event jump) |
 | `DecodedSignals`    | 0x14 | JSON batch of decoded signals, pushed alongside `FrameData` when a catalogue is attached (see [§ Decoded-signal stream](#decoded-signal-stream)) |
@@ -1911,19 +1908,22 @@ Watchdog loop:
 every 5s:
   for each session:
     for each subscriber:
-      if now - last_heartbeat > 30s: remove subscriber
+      if now - last_heartbeat > 30s: park subscriber (detach, remember the session)
     if session has no subscribers:
       if not yet suspended: pause device, set suspended_at = now
       else if now - suspended_at > 5 min: destroy_session
-    if subscriber heartbeats resume: clear suspended_at, device.resume()
+on a WS heartbeat for the session:
+  re-attach its parked subscribers, clear suspended_at, device.resume()
 ```
 
 The 30-second stale threshold (up from 10s) is tuned for WKWebView timer
 throttling during display sleep. Frontend heartbeats ride the WebSocket as
 `Heartbeat` (0xFE) control frames, which touch every subscriber on the
-connection's channels. A subscriber the watchdog already removed is not on any
-channel, so on `visibilitychange` to visible the store re-registers each of its
-subscribers by `invoke`, which re-attaches them and resumes a suspended session.
+connection's channels. The watchdog parks a stale subscriber rather than removing
+it, so the first heartbeat of a woken webview re-attaches it and resumes a
+suspended session (`touch_subscriber_heartbeats`). The transport sends that
+heartbeat as soon as the page turns visible rather than at its next tick. A subscriber that leaves while
+parked is forgotten, so a later heartbeat does not bring it back.
 
 The WebSocket *connection* itself times out separately, at
 `2 × HEARTBEAT_TIMEOUT_SECS` ([ws/server.rs](../crates/wiretap-app/src/ws/server.rs)) —

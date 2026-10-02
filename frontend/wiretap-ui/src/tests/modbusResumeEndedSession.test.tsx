@@ -62,7 +62,6 @@ const endedManager = withStubs({
   currentTimeUs: null,
   currentFrameIndex: null,
   eventOwner: null,
-  isDetached: false,
   watchFrameCount: 0,
   watchUniqueFrameCount: 0,
   watchByteCount: 0,

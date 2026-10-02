@@ -75,6 +75,12 @@ describe("reconcileKnownSessions", () => {
     expect(next.f_mcp1.capture.persistent).toBe(true);
   });
 
+  it("re-syncs the mode Rust reports", () => {
+    const owned = ownedSession({ mode: "live" });
+    const next = reconcileKnownSessions({ f_mcp1: owned }, [{ ...info("f_mcp1"), mode: "replaying" }]);
+    expect(next.f_mcp1.mode).toBe("replaying");
+  });
+
   it("leaves an entry untouched when no authoritative field changed", () => {
     // info() reports state=running, subscriberCount=1, no capture.
     const owned = ownedSession({ ioState: "running", subscriberCount: 1, capabilities: caps });

@@ -1242,8 +1242,6 @@ pub fn run() {
             sessions::stop_reader_session,
             sessions::pause_reader_session,
             sessions::resume_reader_session,
-            sessions::suspend_reader_session,
-            sessions::io_stop_and_switch_to_capture,
             sessions::session_stop_to_capture,
             sessions::resume_reader_session_fresh,
             sessions::update_reader_speed,
@@ -1265,7 +1263,6 @@ pub fn run() {
             sessions::step_capture_frame,
             sessions::session_transmit_frame,
             // Subscriber registration API
-            sessions::register_session_subscriber,
             sessions::unregister_session_subscriber,
             sessions::evict_session_subscriber_cmd,
             sessions::session_leave_to_capture,
@@ -1293,7 +1290,6 @@ pub fn run() {
             // Profile-to-session mapping API
             sessions::get_profiles_usage,
             // Signal-then-fetch query commands
-            sessions::get_playback_position_cmd,
             sessions::get_stream_ended_info,
             sessions::get_session_error,
             sessions::get_session_sources,

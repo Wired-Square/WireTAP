@@ -39,6 +39,7 @@ const opened = (overrides: Partial<OpenedSession> = {}): OpenedSession => ({
   origin_profile_ids: ["p-dev"],
   source_type: "multi_source",
   source_kind: "device",
+  mode: "live",
   ...overrides,
 });
 

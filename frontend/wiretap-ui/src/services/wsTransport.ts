@@ -482,19 +482,26 @@ class WsTransport {
     }, this.reconnectDelay);
   }
 
+  private sendHeartbeat = (): void => {
+    if (this.connected) this.ws?.send(encodeHeartbeat());
+  };
+
+  // A woken webview's first heartbeat re-attaches the subscribers the watchdog parked.
+  private heartbeatOnWake = (): void => {
+    if (document.visibilityState === "visible") this.sendHeartbeat();
+  };
+
   private startHeartbeat(): void {
     this.stopHeartbeat();
     // 10s interval keeps IO listener heartbeats fresh (30s watchdog timeout).
     // Each heartbeat also bridges to the IO session watchdog via the Rust
     // WS server, so the frontend no longer needs per-listener invoke polling.
-    this.heartbeatTimer = setInterval(() => {
-      if (this.connected) {
-        this.ws?.send(encodeHeartbeat());
-      }
-    }, 10000);
+    this.heartbeatTimer = setInterval(this.sendHeartbeat, 10000);
+    document.addEventListener("visibilitychange", this.heartbeatOnWake);
   }
 
   private stopHeartbeat(): void {
+    document.removeEventListener("visibilitychange", this.heartbeatOnWake);
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;

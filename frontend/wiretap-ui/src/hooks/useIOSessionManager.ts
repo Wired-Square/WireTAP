@@ -16,8 +16,8 @@ import { tlog } from "../api/settings";
 import {
   createAndStartMultiSourceSession,
   useSessionStore,
-  isCaptureSession,
   type CreateMultiSourceOptions,
+  type CreateSessionOptions,
   type InterfaceFramingConfig,
   type BusSourceInfo,
 } from "../stores/sessionStore";
@@ -39,10 +39,6 @@ function attachSessionCatalog(sessionId: string, catalogPath?: string | null): v
 
 const sourcesSessionId = (profileIds: string[], emitRawBytes?: boolean) =>
   generateSessionId({ purpose: "sources", profile_ids: profileIds, emit_raw_bytes: emitRawBytes });
-
-/** Orphaned-capture fallback hops tolerated before an app gives up and shows No source. */
-const CAPTURE_ADOPTION_LIMIT = 3;
-const CAPTURE_ADOPTION_WINDOW_MS = 2000;
 
 /** The window a session was re-configured to (UTC ISO-8601). */
 export interface SessionReconfigurationInfo {
@@ -87,6 +83,17 @@ export interface LoadOptions {
   catalogPath?: string | null;
 }
 
+/** What a single-profile open takes from the picker's options. */
+function reinitializeOptions(opts: LoadOptions, sessionId: string): CreateSessionOptions {
+  return {
+    ...opts,
+    sessionId,
+    limit: opts.maxFrames,
+    frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
+    sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
+  };
+}
+
 /** Store interface for apps that manage ioProfile in their store */
 export interface IOProfileStore {
   ioProfile: string | null;
@@ -103,14 +110,10 @@ export interface UseIOSessionManagerOptions {
   store?: IOProfileStore;
   /** Initial ioProfile value (for apps using local state) */
   initialProfileId?: string | null;
-  /** Enable ingest session support */
-  enableIngest?: boolean;
   /** Callback before ingest starts (e.g., to clear capture) */
   onBeforeIngestStart?: () => Promise<void>;
   /** Callback when ingest completes */
   onIngestComplete?: (payload: IngestStreamEndedInfo) => Promise<void>;
-  /** Only join sessions that produce frames (not raw bytes) */
-  requireFrames?: boolean;
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
   /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
@@ -205,11 +208,6 @@ export interface UseIOSessionManagerResult {
   /** Who holds this session's events — the archive behind a WireTAP profile, else its capture; null before either exists */
   eventOwner: EventOwner | null;
 
-  // ---- Detach/Rejoin State ----
-  /** Whether detached from session */
-  isDetached: boolean;
-  /** Rejoin after detaching */
-  handleRejoin: () => Promise<void>;
   /** Leave session — unregister subscriber, fully reset app state (no data preserved) */
   handleLeave: () => Promise<void>;
   /** Destroy the session entirely */
@@ -242,30 +240,14 @@ export interface UseIOSessionManagerResult {
   loadError: string | null;
   /** Stop ingest */
   stopLoad: () => Promise<void>;
-  /** Clear ingest error */
-  clearIngestError: () => void;
   /** Unified ingest from one or more sources (fast ingest, auto-transitions to capture reader) */
   loadSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
-
-  // ---- Multi-Bus Session Handlers ----
-  /** Start a multi-bus session */
-  startMultiBusSession: (
-    profileIds: string[],
-    options: LoadOptions
-  ) => Promise<void>;
-  /** Join an existing multi-source session */
-  joinExistingSession: (
-    sessionId: string,
-    sourceProfileIds?: string[]
-  ) => Promise<void>;
 
   // ---- Session Switching Methods ----
   /** Unified watch for one or more sources (routes based on multi_source trait) */
   watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
   /** Stop watching (stop session, clear watch state) */
   stopWatch: () => Promise<void>;
-  /** Suspend the session - stops streaming, finalises capture, session stays alive */
-  suspendSession: () => Promise<void>;
   /** Resume a suspended session with a fresh capture (orphans old capture) */
   resumeWithNewCapture: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
@@ -298,10 +280,8 @@ export function useIOSessionManager(
     ioProfiles,
     store,
     initialProfileId = null,
-    enableIngest: _enableIngest = false, // Deprecated - ingest is now always available
     onBeforeIngestStart,
     onIngestComplete,
-    requireFrames,
     onFrames: onFramesProp,
     onDecoded,
     onAdhocSignals,
@@ -331,8 +311,6 @@ export function useIOSessionManager(
     () => new Map()
   );
 
-  // ---- Detach/Watch State ----
-  const [isDetached, setIsDetached] = useState(false);
   const [isWatching, setIsWatching] = useState(false);
 
   // ---- Ingest State (unified with session) ----
@@ -349,11 +327,6 @@ export function useIOSessionManager(
   // Use provided ref (from app) or create a local one
   const localStreamCompletedRef = useRef(false);
   const streamCompletedRef = streamCompletedRefProp ?? localStreamCompletedRef;
-
-  // Flag to suppress handleReconfigure when the reconfigure was self-initiated
-  // (e.g., our own jumpToTimeRange). The backend fires session-reconfigured for ALL
-  // listeners, including the one that initiated the reconfigure.
-  const selfReconfigureRef = useRef(0);
 
   // ---- Derived Values ----
   // ioProfile holds the session id for every source kind, so a path that switches
@@ -379,7 +352,7 @@ export function useIOSessionManager(
   // survives a stopped source replaying its capture.
   const sourceProfileId = useSessionStore((s) =>
     effectiveSessionId ? s.sessions[effectiveSessionId]?.originProfileIds[0] ?? null : null);
-  const openedOnCapture = useSessionStore((s) => isCaptureSession(s, effectiveSessionId));
+  const mode = useSessionStore((s) => (effectiveSessionId ? s.sessions[effectiveSessionId]?.mode : undefined));
 
   // Resolve a profile id, falling back to the ad-hoc registry.
   //
@@ -430,12 +403,6 @@ export function useIOSessionManager(
       setLoadFrameCount((prev) => prev + frames.length);
       return; // Don't call onFramesProp
     }
-    if (selfReconfigureRef.current > 0) {
-      // During self-initiated reconfigure: suppress stale in-flight frames from the old stream.
-      // The counter is decremented by handleReconfigure when the session-reconfigured event
-      // arrives, so new-stream frames flow normally after the matching event.
-      return;
-    }
     // Frame counts come from the backend (FrameCounts push) — no TS counting here.
     onFramesProp?.(frames);
   }, [onFramesProp]);
@@ -449,38 +416,13 @@ export function useIOSessionManager(
   }, [onIngestComplete, onBeforeIngestStart]);
 
   // ---- IO Session ----
-  // Handler for when session is reconfigured externally (e.g., another app jumped to an event)
-  // This resets frame counts and calls cleanup so the UI clears its state.
-  // Skipped for self-initiated reconfigures (jumpToTimeRange already handled cleanup).
-  const handleReconfigure = useCallback(() => {
-    if (selfReconfigureRef.current > 0) {
-      selfReconfigureRef.current--;
-      // Self-initiated reconfigure: the backend emits this event AFTER the old stream has
-      // stopped and BEFORE the new one starts. Any stale in-flight frames from the old stream
-      // were suppressed by the flag check in handleFrames. Clear the flag so new-stream
-      // frames flow normally.
-      tlog.debug(`[IOSessionManager:${appName}] Self-initiated reconfigure - skipping external cleanup`);
-      return;
-    }
-    tlog.debug(`[IOSessionManager:${appName}] Session reconfigured externally - clearing state`);
-    // Call the same cleanup as before watch (frame counts are backend-driven)
+  // A reconfigure (any app's, this one's included) or a resume to live: Rust sends it
+  // after the old stream's last frame and before the new one's first, so clearing here
+  // drops exactly the old stream's frames.
+  const clearForFreshStream = useCallback(() => {
+    tlog.debug(`[IOSessionManager:${appName}] Fresh stream on the session - clearing state`);
     onBeforeWatch?.();
-    // Reset stream completed flag
-    if (streamCompletedRef) {
-      streamCompletedRef.current = false;
-    }
-  }, [appName, onBeforeWatch, streamCompletedRef]);
-
-  // Handler for when session resumes to live (another app clicked Resume)
-  // This clears frames so the app doesn't show old capture frames mixed with new live frames
-  const handleResuming = useCallback(() => {
-    tlog.debug(`[IOSessionManager:${appName}] Session resuming to live - clearing state`);
-    // Call the same cleanup as before watch (frame counts are backend-driven)
-    onBeforeWatch?.();
-    // Reset stream completed flag
-    if (streamCompletedRef) {
-      streamCompletedRef.current = false;
-    }
+    streamCompletedRef.current = false;
   }, [appName, onBeforeWatch, streamCompletedRef]);
 
   // Handle stream-ended with auto-transition for ingest mode
@@ -523,14 +465,11 @@ export function useIOSessionManager(
     onStreamEnded?.(payload);
   }, [appName, onStreamEnded]);
 
-  // Adoption timestamps, not capture IDs: every hop of the loop this caps has a
-  // *different* capture ID, so tracking IDs would never trip.
-  const captureAdoptionsRef = useRef<number[]>([]);
-
   // Handle external session destruction (e.g., destroyed from Sessions app).
   // Switches to capture mode if orphaned captures are available, otherwise clears
-  // state. Never fires for a session this app moved off — `useIOSession` filters
-  // those out, since the destroy of the session being left is part of switching.
+  // state. Never fires for a teardown this app's own call caused — Rust names the
+  // caller on `destroyed` and `useIOSession` drops it — so adopting the capture cannot
+  // feed back into another teardown.
   const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[], userInitiated: boolean) => {
     // A user-initiated "Destroy session" wants a clean slate, not the orphaned
     // capture the external-destroy path falls back to. The intent is carried by
@@ -544,34 +483,15 @@ export function useIOSessionManager(
     setMultiBusProfiles([]);
     setIsWatching(false);
     setIsLoading(false);
-    setIsDetached(false);
     streamCompletedRef.current = false;
 
     if (userInitiated) {
       // Deliberate destroy → clean slate, skip the capture fallback.
-      captureAdoptionsRef.current = [];
       setIoProfile(null);
     } else {
       // External destroy → switch to the orphaned capture if there is one.
-      const now = Date.now();
-      const recent = captureAdoptionsRef.current.filter((t) => now - t < CAPTURE_ADOPTION_WINDOW_MS);
-      const adopt = orphanedCaptureIds.length > 0 && recent.length < CAPTURE_ADOPTION_LIMIT;
-      captureAdoptionsRef.current = adopt ? [...recent, now] : recent;
-
-      if (adopt) {
-        setIoProfile(orphanedCaptureIds[0]);
-      } else {
-        if (recent.length >= CAPTURE_ADOPTION_LIMIT) {
-          tlog.info(
-            `[IOSessionManager:${appName}] Capture fallback looped ${recent.length}× in ${CAPTURE_ADOPTION_WINDOW_MS}ms — returning to No source`
-          );
-        }
-        setIoProfile(null);
-      }
-      // Notify app with orphaned capture IDs so it can set up capture mode — but only
-      // the ones actually adopted, or the app would set up capture mode for a capture
-      // this hook just declined to switch to.
-      onSessionDestroyed?.(adopt ? orphanedCaptureIds : []);
+      setIoProfile(orphanedCaptureIds[0] ?? null);
+      onSessionDestroyed?.(orphanedCaptureIds);
     }
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
@@ -579,7 +499,6 @@ export function useIOSessionManager(
     appName,
     sessionId: effectiveSessionId,
     profileName: ioProfileName,
-    requireFrames,
     onFrames: handleFrames,
     onDecoded,
     onAdhocSignals,
@@ -597,8 +516,8 @@ export function useIOSessionManager(
     },
     onStreamComplete,
     onSpeedChange,
-    onReconfigure: handleReconfigure,
-    onResuming: handleResuming,
+    onReconfigure: clearForFreshStream,
+    onResuming: clearForFreshStream,
     onDestroyed: handleSessionDestroyed,
   };
 
@@ -606,17 +525,12 @@ export function useIOSessionManager(
 
   // ---- Derived State ----
   const readerState = session.state;
-  const isStreaming = !isDetached && (readerState === "running" || readerState === "paused");
+  const isStreaming = readerState === "running" || readerState === "paused";
   const isPaused = readerState === "paused";
-  const isRealtime = session.capabilities?.traits.temporal_mode === "realtime";
-  // Capture mode = viewing capture data: opened on a capture, or a device switched to its CaptureSource
-  const isCaptureMode = openedOnCapture || session.capabilities?.traits.temporal_mode === "capture";
-  // Stopped with a profile selected (ready to restart)
-  // For realtime sources: can restart the live stream
-  // For recorded sources: can restart from the beginning
-  const isStopped = !isDetached && readerState === "stopped" && ioProfile !== null;
-  // Can return to live: a device session replaying its capture
-  const canReturnToLive = !isDetached && isCaptureMode && sourceProfileId !== null && !openedOnCapture;
+  const isRealtime = mode === "live";
+  const isCaptureMode = mode === "capture" || mode === "replaying";
+  const isStopped = readerState === "stopped" && ioProfile !== null;
+  const canReturnToLive = mode === "replaying";
   const sessionReady = session.isReady;
   const capabilities = session.capabilities;
   const joinerCount = session.joinerCount;
@@ -643,7 +557,6 @@ export function useIOSessionManager(
       setMultiBusProfiles([]);
       setIoProfile(null);
       setIsWatching(false);
-      setIsDetached(false);
       await session.leave();
     };
 
@@ -668,12 +581,6 @@ export function useIOSessionManager(
     }
   }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, isCaptureMode, appName]);
 
-  const handleRejoin = useCallback(async () => {
-    await session.rejoin();
-    setIsDetached(false);
-    setIsWatching(true);
-  }, [session]);
-
   // Destroy the session entirely — reset=true so the global `destroyed` broadcast tells
   // EVERY connected app to return to "No source" (not fall back to the orphaned capture).
   const handleDestroy = useCallback(async () => {
@@ -690,7 +597,6 @@ export function useIOSessionManager(
     // Clear local state
     setMultiBusProfiles([]);
     setIsWatching(false);
-    setIsDetached(false);
   }, [session.sessionId, setMultiBusProfiles, onBeforeWatch]);
 
   // Clear capture — behaviour depends on source type:
@@ -698,10 +604,9 @@ export function useIOSessionManager(
   // Buffer (non-persistent): delete capture + leave session
   const handleClearCapture = useCallback(async () => {
     const { clearCaptureData, deleteCapture } = await import("../api/capture");
-    // A capture session's origin is its capture; a device session owns one on the session object.
-    const bid = openedOnCapture ? sourceProfileId : session.captureId;
+    const bid = session.captureId;
 
-    if (openedOnCapture) {
+    if (mode === "capture") {
       // Capture mode: delete capture + leave session (clean leave, no suspend/copy)
       tlog.info(`[IOSessionManager] Clear capture: deleting capture ${bid} and leaving session`);
       if (bid) {
@@ -713,13 +618,12 @@ export function useIOSessionManager(
       setMultiBusProfiles([]);
       setIoProfile(null);
       setIsWatching(false);
-      setIsDetached(false);
     } else {
       // Real-time or recorded: clear capture data, session continues streaming
       tlog.info(`[IOSessionManager] Clear capture: clearing data for capture ${bid}`);
       if (bid) await clearCaptureData(bid);
     }
-  }, [session, openedOnCapture, sourceProfileId, setMultiBusProfiles, setIoProfile]);
+  }, [session, mode, setMultiBusProfiles, setIoProfile]);
 
   // Start multi-bus session
   const startMultiBusSession = useCallback(async (
@@ -773,9 +677,6 @@ export function useIOSessionManager(
       modbusPollsJson: opts.modbusPollsJson,
     };
 
-    // Stamped first: registering here is what makes Rust destroy the session
-    // this app is leaving.
-    session.markSessionSwitch(sessionId);
     const { busMappings } = await createAndStartMultiSourceSession(createOptions);
 
     // Build output bus → source mapping. Names come from `findProfile`, not the
@@ -801,25 +702,10 @@ export function useIOSessionManager(
     setMultiBusProfiles(profileIds);
     setOutputBusToSource(busToSource);
     setIoProfile(sessionId);
-    setIsDetached(false);
 
     attachSessionCatalog(sessionId, opts.catalogPath);
   }, [appName, findProfile, setMultiBusProfiles, setOutputBusToSource, setIoProfile]);
 
-  // Join existing multi-source session
-  const joinExistingSession = useCallback(async (
-    sessionId: string,
-    sourceProfileIds?: string[]
-  ) => {
-    // Clear frontend state before joining (fixes frame count showing stale data)
-    session.markSessionSwitch(sessionId);
-    onBeforeWatch?.();
-
-    setIoProfile(sessionId);
-    setMultiBusProfiles(sourceProfileIds || []);
-    setIsDetached(false);
-    await session.rejoin(sessionId);
-  }, [session, setIoProfile, setMultiBusProfiles, onBeforeWatch]);
 
   // ---- Session Switching Methods ----
 
@@ -843,31 +729,7 @@ export function useIOSessionManager(
       const profileId = profileIds[0];
       const sessionId = await sourcesSessionId([profileId]);
 
-      await session.reinitialize(profileId, {
-        startTime: opts.startTime,
-        endTime: opts.endTime,
-        speed: opts.speed,
-        limit: opts.maxFrames,
-        framingEncoding: opts.framingEncoding,
-        delimiter: opts.delimiter,
-        maxFrameLength: opts.maxFrameLength,
-        modbusValidateCrc: opts.modbusValidateCrc,
-        modbusDeviceAddress: opts.modbusDeviceAddress,
-        modbusVendorFunctions: opts.modbusVendorFunctions,
-        modbusAllowBroadcast: opts.modbusAllowBroadcast,
-        modbusAnyFunction: opts.modbusAnyFunction,
-        frameIdStartByte: opts.frameIdStartByte,
-        frameIdBytes: opts.frameIdBytes,
-        frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
-        sourceAddressStartByte: opts.sourceAddressStartByte,
-        sourceAddressBytes: opts.sourceAddressBytes,
-        sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
-        minFrameLength: opts.minFrameLength,
-        emitRawBytes: opts.emitRawBytes,
-        busOverride: opts.busOverride,
-        sessionIdOverride: sessionId,
-        modbusPollsJson: opts.modbusPollsJson,
-      });
+      await session.reinitialize(profileId, reinitializeOptions(opts, sessionId));
 
       setMultiBusProfiles([]);
       setIoProfile(sessionId);
@@ -900,9 +762,6 @@ export function useIOSessionManager(
     await sessionStopToCapture(session.sessionId);
     setIsWatching(false);
   }, [session.sessionId]);
-
-  // Suspend session: alias for stopWatch (kept for backward compatibility)
-  const suspendSession = stopWatch;
 
   // Resume a suspended session: return to live if possible, otherwise restart capture
   const resumeWithNewCapture = useCallback(async () => {
@@ -952,32 +811,8 @@ export function useIOSessionManager(
 
     try {
       if (isSingleNonMulti) {
-        // Recorded/capture: reinitialize path with speed=0
-        const profileId = profileIds[0];
-        await session.reinitialize(profileId, {
-          startTime: opts.startTime,
-          endTime: opts.endTime,
-          speed: 0, // Max speed - no pacing
-          limit: opts.maxFrames,
-          framingEncoding: opts.framingEncoding,
-          delimiter: opts.delimiter,
-          maxFrameLength: opts.maxFrameLength,
-          modbusValidateCrc: opts.modbusValidateCrc,
-          modbusDeviceAddress: opts.modbusDeviceAddress,
-          modbusVendorFunctions: opts.modbusVendorFunctions,
-          modbusAllowBroadcast: opts.modbusAllowBroadcast,
-          modbusAnyFunction: opts.modbusAnyFunction,
-          frameIdStartByte: opts.frameIdStartByte,
-          frameIdBytes: opts.frameIdBytes,
-          frameIdBigEndian: opts.frameIdStartByte !== undefined ? opts.frameIdEndianness !== "little" : undefined,
-          sourceAddressStartByte: opts.sourceAddressStartByte,
-          sourceAddressBytes: opts.sourceAddressBytes,
-          sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
-          minFrameLength: opts.minFrameLength,
-          emitRawBytes: opts.emitRawBytes,
-          busOverride: opts.busOverride,
-          sessionIdOverride: sessionId,
-        });
+        // Recorded/capture: reinitialize path with speed=0 (no pacing)
+        await session.reinitialize(profileIds[0], reinitializeOptions({ ...opts, speed: 0 }, sessionId));
 
         setMultiBusProfiles([]);
         setIoProfile(sessionId);
@@ -1016,11 +851,6 @@ export function useIOSessionManager(
     // Note: handleStreamEndedWithIngest will handle the state cleanup and transition
   }, [appName, session]);
 
-  // Clear ingest error
-  const clearIngestError = useCallback(() => {
-    setLoadError(null);
-  }, []);
-
   // Connect only: create session without streaming (for Query app)
   // Creates/joins the session with skipAutoStart to prevent auto-starting playback sources.
   // Also marks our subscriber as INACTIVE so we don't receive frames even if session is running.
@@ -1039,7 +869,7 @@ export function useIOSessionManager(
       speed: opts?.speed,
       limit: opts?.maxFrames,
       skipAutoStart: true, // Don't auto-start - Query connects but doesn't stream
-      sessionIdOverride: sessionId,
+      sessionId,
     });
 
     // Mark our subscriber as INACTIVE so we don't receive frames
@@ -1105,8 +935,6 @@ export function useIOSessionManager(
         // Same profile, recorded source - use reconfigure to keep session alive
         // This stops the stream, orphans old capture, creates new capture, and restarts
         // Other apps joined to this session stay connected
-        // Suppress the session-reconfigured event handler since we already ran cleanup
-        selfReconfigureRef.current++;
         tlog.debug("[IOSessionManager:jumpToTimeRange] Using reconfigure (same profile, session stays alive)");
         await reconfigureReaderSession(sessionId, startUtc, endUtc);
       } else {
@@ -1124,8 +952,7 @@ export function useIOSessionManager(
           startTime: startUtc,
           endTime: endUtc,
           speed: session.speed ?? 1,
-          // Pass session ID override when it differs from profile ID (recorded sources use unique session IDs)
-          sessionIdOverride: sessionId !== targetProfileId ? sessionId : undefined,
+          sessionId,
         });
       }
 
@@ -1177,8 +1004,12 @@ export function useIOSessionManager(
     sessionId: string,
     sourceProfileIds?: string[]
   ) => {
-    await joinExistingSession(sessionId, sourceProfileIds);
-  }, [joinExistingSession]);
+    // Clear frontend state before joining (fixes frame count showing stale data)
+    onBeforeWatch?.();
+    setIoProfile(sessionId);
+    setMultiBusProfiles(sourceProfileIds || []);
+    await session.rejoin(sessionId);
+  }, [session, setIoProfile, setMultiBusProfiles, onBeforeWatch]);
 
   // Skip IO reader selection: clear state, leave if streaming
   const skipReader = useCallback(async () => {
@@ -1256,9 +1087,7 @@ export function useIOSessionManager(
     eventOwner,
     currentFrameIndex: session.currentFrameIndex,
 
-    // Rejoin/Leave/Destroy
-    isDetached,
-    handleRejoin,
+    // Leave/Destroy
     handleLeave,
     handleDestroy,
     handleClearCapture,
@@ -1277,17 +1106,11 @@ export function useIOSessionManager(
     loadFrameCount,
     loadError,
     stopLoad,
-    clearIngestError,
     loadSource,
-
-    // Multi-Bus Handlers
-    startMultiBusSession,
-    joinExistingSession,
 
     // Session Switching Methods
     watchSource,
     stopWatch,
-    suspendSession,
     resumeWithNewCapture,
     connectOnly,
     selectProfile,

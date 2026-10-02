@@ -14,17 +14,14 @@ import {
   stopReaderSession,
   pauseReaderSession,
   resumeReaderSession,
-  suspendReaderSession,
   resumeReaderSessionFresh,
   resumeSessionToLive,
-  switchSessionToCaptureReplay,
   updateReaderSpeed,
   updateReaderTimeRange,
   seekReaderSession,
   seekReaderSessionByFrame,
   transitionToCaptureSource,
   sessionTransmitFrame,
-  registerSessionSubscriber,
   unregisterSessionSubscriber,
   reinitializeSessionIfSafe,
   serialPayload,
@@ -43,6 +40,8 @@ import {
   type PlaybackPosition,
   type ActiveSessionInfo,
   type OpenedSession,
+  type SerialSettings,
+  type SessionMode,
   type SessionSourceKind,
 } from "../api/io";
 import { reconcileKnownSessions } from "./sessionRoster";
@@ -85,44 +84,6 @@ const IO_STATE_FOR_STREAM_END: Partial<Record<StreamEndReason, IOStateType>> = {
 };
 
 // ============================================================================
-// Visibility: Log changes and send immediate heartbeats on wake.
-// When the display sleeps, WKWebView may throttle/suspend timers.
-// The Rust watchdog pauses the session after HEARTBEAT_TIMEOUT (30s).
-// When the display wakes, we immediately send heartbeats so the Rust
-// backend can resume the session before the grace period expires.
-// ============================================================================
-
-// HMR guard: remove previous handler before adding.
-// Use a property on `window` so the reference survives module re-evaluation.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const prevHandler = (window as any).__wiretap_visibilityHandler as (() => void) | undefined;
-if (prevHandler) {
-  document.removeEventListener("visibilitychange", prevHandler);
-}
-const _visibilityHandler = () => {
-  tlog.info(`[visibility] ${document.visibilityState}`);
-
-  if (document.visibilityState === "visible" && getEventListeners) {
-    // Page just became visible — immediately send heartbeats for all sessions
-    // to revive any sessions that were paused during display sleep / App Nap.
-    const eventListenersMap = getEventListeners();
-    for (const [sessionId, listeners] of Object.entries(eventListenersMap)) {
-      if (listeners.registeredSubscribers.size > 0) {
-        tlog.info(`[visibility] sending immediate heartbeats for session '${sessionId}' (${listeners.registeredSubscribers.size} listeners)`);
-        for (const lid of listeners.registeredSubscribers) {
-          registerSessionSubscriber(sessionId, lid).catch((e) => {
-            tlog.info(`[visibility] heartbeat failed for ${sessionId}/${lid}: ${e}`);
-          });
-        }
-      }
-    }
-  }
-};
-document.addEventListener("visibilitychange", _visibilityHandler);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__wiretap_visibilityHandler = _visibilityHandler;
-
-// ============================================================================
 // Session Logging Helper
 // ============================================================================
 
@@ -149,9 +110,6 @@ function addSessionLog(entry: SessionLogInput) {
 export function isCaptureSession(state: SessionStore, sessionId?: string | null): boolean {
   return !!sessionId && state.sessions[sessionId]?.sourceKind === "capture";
 }
-
-/** Getter for event listeners - set after store is created */
-let getEventListeners: (() => Record<string, SessionEventSubscribers>) | null = null;
 
 /** Getter for showAppError - set after store is created */
 // Type derived from the store so it can't drift from showAppError's signature.
@@ -213,10 +171,6 @@ export interface Session {
   createdAt: number;
   /** Whether session has queued messages (prevents auto-removal from Transmit dropdown) */
   hasQueuedMessages: boolean;
-  /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
-  stoppedExplicitly: boolean;
-  /** Reason why the stream ended (from stream-ended event) */
-  streamEndedReason: StreamEndReason | null;
   /** Current playback speed (null until set, 1 = realtime, 0 = unlimited) */
   speed: number | null;
   /** Current playback position (centralised for all apps sharing this session) */
@@ -239,18 +193,18 @@ export interface Session {
   originProfileIds: string[];
   /** What the session was opened from; undefined until Rust reports it. */
   sourceKind?: SessionSourceKind;
+  /** What the session is streaming now; undefined until Rust reports it. */
+  mode?: SessionMode;
   /** True when adopted from the backend roster (known-only, not UI-owned). */
   external?: boolean;
 }
 
 /** Options for creating a session */
-export interface CreateSessionOptions {
+export interface CreateSessionOptions extends SerialSettings {
   /** Custom session ID (defaults to auto-generated) */
   sessionId?: string;
   /** Devices merged into one session, replacing whatever is under its id */
   sources?: MultiSourceInput[];
-  /** Only join sessions that produce frames (not raw bytes) */
-  requireFrames?: boolean;
   /** Start time for time-range capable readers (ISO-8601) */
   startTime?: string;
   /** End time for time-range capable readers (ISO-8601) */
@@ -259,24 +213,6 @@ export interface CreateSessionOptions {
   speed?: number;
   /** Maximum number of frames to read */
   limit?: number;
-  /** File path for file-based readers */
-  filePath?: string;
-  /** Framing encoding for serial readers */
-  framingEncoding?: FramingMode;
-  /** Delimiter bytes for delimiter-based framing */
-  delimiter?: number[];
-  /** Maximum frame length for delimiter-based framing */
-  maxFrameLength?: number;
-  /** Also emit raw bytes in addition to frames */
-  emitRawBytes?: boolean;
-  /** Modbus RTU framing settings, when framingEncoding is "modbus_rtu" */
-  modbusValidateCrc?: boolean;
-  modbusDeviceAddress?: number;
-  modbusVendorFunctions?: number[];
-  modbusAllowBroadcast?: boolean;
-  modbusAnyFunction?: boolean;
-  /** Minimum frame length to accept */
-  minFrameLength?: number;
   /** Bus number override for single-bus devices (0-7) */
   busOverride?: number;
   /** Skip auto-starting playback sources (WireTAP backend, csv) - for connect-only mode */
@@ -319,7 +255,7 @@ interface SessionEventSubscribers {
   wsUnlistenFunctions: (() => void)[];
   /** Callbacks registered by subscribers, keyed by subscriber ID */
   callbacks: Map<string, SessionCallbacks>;
-  /** This window's subscribers on the session, re-registered on a wake */
+  /** This window's subscribers on the session */
   registeredSubscribers: Set<string>;
   /** Settles once the WS channel is subscribed, so an open's first frames are not missed */
   subscribed: Promise<unknown>;
@@ -378,8 +314,6 @@ export interface SessionStore {
   pauseSession: (sessionId: string) => Promise<void>;
   /** Resume streaming on a session */
   resumeSession: (sessionId: string) => Promise<void>;
-  /** Suspend a session - stops streaming, finalises capture, session stays alive */
-  suspendSession: (sessionId: string) => Promise<void>;
   /** Resume a suspended session with a fresh capture (orphans old capture) */
   resumeSessionFresh: (sessionId: string) => Promise<void>;
   /** Update playback speed */
@@ -495,15 +429,13 @@ const TRANSITION_CALLBACK = {
 
 /** What a pushed transition does to the session's entry, and which callback it fires. */
 export function sessionTransitionEffect(msg: SessionTransitionMsg, session: Session | undefined, sessionId: string) {
-  const updates: Partial<Session> = { ioState: msg.state };
+  const updates: Partial<Session> = { ioState: msg.state, mode: msg.mode };
   if (msg.capabilities) updates.capabilities = msg.capabilities;
   switch (msg.transition) {
     case "resuming":
     case "returned_to_live":
       // A fresh run has a fresh capture; Rust re-pushes the counts and the byte capture id.
       Object.assign(updates, {
-        stoppedExplicitly: false,
-        streamEndedReason: null,
         frameCount: 0,
         uniqueFrameCount: 0,
         byteCount: 0,
@@ -602,7 +534,6 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
       const ioState = IO_STATE_FOR_STREAM_END[info.reason] ?? "stopped";
       updateSession(sessionId, {
         ioState,
-        streamEndedReason: info.reason,
         capture: {
           available: info.capture_available,
           id: info.capture_id,
@@ -929,8 +860,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         [sessionId]: {
           ...s.sessions[sessionId],
           ioState: "starting",
-          stoppedExplicitly: false, // Reset flag when starting
-          streamEndedReason: null, // Reset reason when starting
         },
       },
     }));
@@ -964,20 +893,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   stopSession: async (sessionId) => {
-    // Set stoppedExplicitly BEFORE the async call to avoid race condition:
-    // The stream-ended event (which updates capture state) may fire before
-    // stopReaderSession returns. Effects checking both captureAvailable and
-    // stoppedExplicitly need both to be true at the same time.
-    set((s) => ({
-      sessions: {
-        ...s.sessions,
-        [sessionId]: {
-          ...s.sessions[sessionId],
-          stoppedExplicitly: true, // User explicitly stopped
-        },
-      },
-    }));
-
     try {
       const confirmedState = await stopReaderSession(sessionId);
       set((s) => ({
@@ -1023,96 +938,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }));
   },
 
-  suspendSession: async (sessionId) => {
-    // Check if the session is a realtime source - if so, switch to capture replay mode
-    // so playback controls work. For recorded sources, just stop the source.
-    const session = get().sessions[sessionId];
-    const isRealtime = session?.capabilities?.traits.temporal_mode === "realtime";
-    const profileName = session?.profileName ?? sessionId;
-
-    if (isRealtime) {
-      // Realtime source: switch to CaptureSource for capture playback
-      tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to capture replay`);
-      try {
-        const capabilities = await switchSessionToCaptureReplay(sessionId, 1.0);
-        // Capture state will be updated by the session-lifecycle event handler.
-        // Use existing session capture state for the log message if already available.
-        const existingCapture = get().sessions[sessionId]?.capture;
-        addSessionLog({
-          eventType: "state-change",
-          sessionId,
-          profileId: session?.profileId ?? null,
-          profileName,
-          appName: null,
-          details: `Switched to capture replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, capture: ${existingCapture?.id ?? 'none'})`,
-        });
-        set((s) => ({
-          sessions: {
-            ...s.sessions,
-            [sessionId]: {
-              ...s.sessions[sessionId],
-              capabilities,
-              ioState: "stopped",
-              // Buffer state is populated by the session-lifecycle event handler
-            },
-          },
-        }));
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        tlog.info(`[sessionStore] suspendSession: failed to switch to capture replay: ${msg}`);
-        addSessionLog({
-          eventType: "session-error",
-          sessionId,
-          profileId: session?.profileId ?? null,
-          profileName,
-          appName: null,
-          details: `Failed to switch to capture replay: ${msg}`,
-        });
-        // Fall back to just stopping the reader
-        try {
-          const confirmedState = await suspendReaderSession(sessionId);
-          set((s) => ({
-            sessions: {
-              ...s.sessions,
-              [sessionId]: {
-                ...s.sessions[sessionId],
-                ioState: getStateType(confirmedState),
-              },
-            },
-          }));
-        } catch (fallbackError) {
-          tlog.info(`[sessionStore] suspendSession: fallback also failed: ${fallbackError}`);
-        }
-      }
-    } else {
-      // Recorded source: just stop the source
-      tlog.info(`[sessionStore] suspendSession: recorded session '${sessionId}' - stopping source`);
-      const confirmedState = await suspendReaderSession(sessionId);
-      set((s) => ({
-        sessions: {
-          ...s.sessions,
-          [sessionId]: {
-            ...s.sessions[sessionId],
-            ioState: getStateType(confirmedState),
-          },
-        },
-      }));
-    }
-  },
-
   resumeSessionFresh: async (sessionId) => {
-    // Clear stopped flags before resuming
-    set((s) => ({
-      sessions: {
-        ...s.sessions,
-        [sessionId]: {
-          ...s.sessions[sessionId],
-          stoppedExplicitly: false,
-          streamEndedReason: null,
-        },
-      },
-    }));
-
     // Try to resume to live first (for realtime sources that were suspended to capture mode)
     // This will fail if the session doesn't have stored profile IDs (recorded sources)
     try {
@@ -1343,9 +1169,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 }));
-
-// Initialize the event listeners getter for frame throttling
-getEventListeners = () => useSessionStore.getState()._eventListeners;
 
 // Initialize the showAppError getter for error handling
 getGlobalShowAppError = () => useSessionStore.getState().showAppError;
@@ -1624,8 +1447,7 @@ async function openNow(
     });
   }
 
-  // A capture session replays a capture it does not own, so the registration names none.
-  const captureId = opened.capture_id ?? (opened.source_kind === "capture" ? opened.origin_profile_ids[0] ?? null : null);
+  const captureId = opened.capture_id;
   const existing = useSessionStore.getState().sessions[sessionId];
   const fresh = opened.created || !existing;
   updateSessionOrCreate(sessionId, {
@@ -1643,11 +1465,12 @@ async function openNow(
       ...emptyCapture(),
       ...(existing && { startTimeUs: existing.capture.startTimeUs, endTimeUs: existing.capture.endTimeUs, name: existing.capture.name, persistent: existing.capture.persistent }),
       id: captureId,
-      kind: opened.capture_kind ?? (captureId ? "frames" : null),
+      kind: opened.capture_kind,
       available: false,
     },
     sourceType: opened.source_type,
     sourceKind: opened.source_kind,
+    mode: opened.mode,
     originProfileIds: opened.origin_profile_ids,
   });
 
@@ -1699,8 +1522,6 @@ function newSession({ id, profileId, profileName }: Pick<Session, "id" | "profil
     capture: emptyCapture(),
     createdAt: Date.now(),
     hasQueuedMessages: false,
-    stoppedExplicitly: false,
-    streamEndedReason: null,
     speed: null,
     playbackPosition: null,
     catalogPath: null,

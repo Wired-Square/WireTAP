@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::io::device_kinds::{self, req_str};
 use crate::io::{
-    create_session, current_session_of_app, destroy_session, get_session_state, register_subscriber_from,
+    create_session, current_session_of_app, destroy_session_by, get_session_state, register_subscriber_from,
     session_exists, settle_session, start_session, BackendApiConfig, BackendApiSource, BackendApiSourceOptions, BusMapping,
     CaptureSource, IOBroker, IOSource, MqttConfig, MqttSource, RegisterSubscriberResult, SerialOverrides,
 };
@@ -338,7 +338,7 @@ async fn create_from_sources(
     // treat the teardown as an external death and adopt the orphaned capture: doing
     // so made the capture the app's next session id and churned this path in a loop.
     if get_session_state(session_id).await.is_some() {
-        let _ = destroy_session(session_id, true).await;
+        let _ = destroy_session_by(session_id, true, Some(&subscriber_id)).await;
     }
 
     let profile_ids: Vec<String> = source_configs.iter().map(|c| c.profile_id.clone()).collect();
@@ -371,7 +371,7 @@ async fn create_from_sources(
 mod tests {
     use super::*;
     use crate::io::test_source::{Gate, TestSource};
-    use crate::io::{IOState, SourceConfig, SessionSourceKind};
+    use crate::io::{destroy_session, IOState, SessionMode, SessionSourceKind, SourceConfig};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -400,6 +400,19 @@ mod tests {
         assert_eq!(opened.registration.state, IOState::Running);
         assert_eq!(opened.registration.subscriber_count, 1);
         assert_eq!(opened.registration.source_kind, SessionSourceKind::Device);
+        assert_eq!(opened.registration.mode, SessionMode::Live);
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_capture_session_reports_the_capture_it_replays() {
+        crate::capture_db::use_in_memory_database();
+        let capture = capture_store::create_standalone_capture(capture_store::CaptureKind::Frames, "replayed".into());
+        let id = "c_open_capture";
+        let create = create_from_capture(id, capture.clone(), None, ("open-capture-app".into(), None));
+        let opened = open_or_join(id, "open-capture-app", None, false, false, None, create).await.unwrap();
+        assert_eq!(opened.registration.capture_id.as_deref(), Some(capture.as_str()));
+        assert_eq!(opened.registration.mode, SessionMode::Capture);
         destroy_session(id, false).await.unwrap();
     }
 

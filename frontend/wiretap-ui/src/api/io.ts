@@ -43,6 +43,7 @@ import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
 import type { SerialOverrides } from "../generated/SerialOverrides";
 import type { SessionPurpose } from "../generated/SessionPurpose";
 import type { SessionRefusal } from "../generated/SessionRefusal";
+import type { SessionMode } from "../generated/SessionMode";
 import type { SessionSourceKind } from "../generated/SessionSourceKind";
 import type { SourceInfo } from "../generated/SourceInfo";
 import type { StepResult } from "../generated/StepResult";
@@ -85,6 +86,7 @@ export type {
   ScanCompletePayload,
   ScanJob,
   ScanProgressPayload,
+  SessionMode,
   SessionRefusal,
   SessionSourceKind,
   SourceInfo,
@@ -142,7 +144,7 @@ export interface InterfaceFramingConfig extends ModbusFramingSettings {
 }
 
 /** The serial settings an options object carries, camelCase on the way to Rust's `SerialOverrides`. */
-interface SerialSettings {
+export interface SerialSettings {
   framingEncoding?: FramingMode;
   delimiter?: number[];
   maxFrameLength?: number;
@@ -322,16 +324,6 @@ export async function pauseSourcePolling(sessionId: string, profileId: string): 
  */
 export async function resumeSourcePolling(sessionId: string, profileId: string): Promise<void> {
   return invoke("resume_source_polling", { session_id: sessionId, profile_id: profileId });
-}
-
-/**
- * Suspend a reader session - stops streaming, finalises capture, session stays alive.
- * The capture remains owned by the session and all joined apps can view it.
- * Use `resumeReaderSessionFresh` to start streaming again with a new capture.
- * Returns the confirmed state after the operation.
- */
-export async function suspendReaderSession(sessionId: string): Promise<IOState> {
-  return invoke("suspend_reader_session", { session_id: sessionId });
 }
 
 /**
@@ -567,20 +559,6 @@ export async function switchSessionToCaptureReplay(
 }
 
 /**
- * Stop a realtime session and switch all subscribers to capture replay.
- * Emits `session-lifecycle` signal so all apps on the session refresh state.
- * Falls back to normal suspend if no capture exists.
- * @param sessionId The session ID
- * @param speed Initial capture playback speed (default: 1.0)
- */
-export async function stopAndSwitchToCapture(
-  sessionId: string,
-  speed?: number
-): Promise<IOCapabilities> {
-  return invoke("io_stop_and_switch_to_capture", { session_id: sessionId, speed });
-}
-
-/**
  * Stop a session and switch it to capture replay. Rust picks the path from the
  * source's temporal mode (realtime → stop-and-switch w/ suspend fallback;
  * recorded → suspend + switch), so callers don't branch.
@@ -627,26 +605,6 @@ export async function sessionTransmitFrame(
 // ============================================================================
 // Listener Registration API
 // ============================================================================
-
-/**
- * Register a subscriber for a session.
- * This is the primary way for frontend components to join a session.
- * If the subscriber is already registered, this updates their heartbeat.
- * @param sessionId The session ID
- * @param subscriberId A unique ID for this subscriber (e.g., "discovery", "decoder")
- * @returns Session info including whether this subscriber is the owner
- */
-export async function registerSessionSubscriber(
-  sessionId: string,
-  subscriberId: string,
-  appName?: string
-): Promise<RegisterSubscriberResult> {
-  return invoke("register_session_subscriber", {
-    session_id: sessionId,
-    subscriber_id: subscriberId,
-    app_name: appName,
-  });
-}
 
 /**
  * Unregister a subscriber from a session.
@@ -995,13 +953,6 @@ export async function buildModbusPollsFromRanges(
 // ============================================================================
 // Signal-then-fetch query API
 // ============================================================================
-
-/** Fetch current playback position for a recorded/capture session. */
-export async function getPlaybackPosition(
-  sessionId: string
-): Promise<PlaybackPosition | null> {
-  return invoke("get_playback_position_cmd", { session_id: sessionId });
-}
 
 /** Fetch stream-ended info (survives session destruction via TTL cache). */
 export async function getStreamEndedInfo(

@@ -3,6 +3,7 @@ import type { BusMapping } from "./BusMapping";
 import type { CaptureKind } from "./CaptureKind";
 import type { IOCapabilities } from "./IOCapabilities";
 import type { IOState } from "./IOState";
+import type { SessionMode } from "./SessionMode";
 import type { SessionSourceKind } from "./SessionSourceKind";
 
 /**
@@ -48,4 +49,4 @@ origin_profile_ids: Array<string>,
 /**
  * What kind of source is behind the session, as the roster reports it
  */
-source_type: string, source_kind: SessionSourceKind, };
+source_type: string, source_kind: SessionSourceKind, mode: SessionMode, };

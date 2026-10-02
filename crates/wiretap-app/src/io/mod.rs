@@ -516,6 +516,7 @@ pub struct SessionTransitionPayload {
     pub transition: SessionTransition,
     pub state: IOState,
     pub capabilities: IOCapabilities,
+    pub mode: SessionMode,
     /// The capture the session finished with, for a suspend or a switch to capture.
     pub capture_id: Option<String>,
     pub capture_count: usize,
@@ -726,8 +727,9 @@ pub struct SessionLifecyclePayload {
     pub subscriber_count: usize,
     /// Source profile IDs
     pub source_profile_ids: Vec<String>,
-    /// The subscriber ID that created the session (only for "created")
-    pub creator_subscriber_id: Option<String>,
+    /// The subscriber whose call caused the event: a created session's creator, or
+    /// the caller of a teardown, which ignores the `destroyed` it hears.
+    pub subscriber_id: Option<String>,
     /// True when a "destroyed" event was a deliberate user destroy (the app should
     /// reset to "No source" rather than fall back to the orphaned capture).
     #[serde(default)]
@@ -755,9 +757,14 @@ pub fn emit_session_lifecycle(payload: SessionLifecyclePayload) {
         "[lifecycle_event] Emitting '{:?}' for session '{}' (profiles: {:?})",
         payload.event_type, payload.session_id, payload.source_profile_ids
     );
+    #[cfg(test)]
+    EMITTED_LIFECYCLE.lock().unwrap().push(payload.clone());
     emit_to_windows("session-lifecycle", &payload);
     crate::ws::dispatch::send_session_lifecycle(&payload);
 }
+
+#[cfg(test)]
+pub(crate) static EMITTED_LIFECYCLE: std::sync::Mutex<Vec<SessionLifecyclePayload>> = std::sync::Mutex::new(Vec::new());
 
 /// Emit a session error signal and store for later retrieval.
 ///

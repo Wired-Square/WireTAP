@@ -3,7 +3,10 @@ use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
-use super::session::{each_session, lock_session, session_states, source_kind, teardown_session_if_empty, IOSession, SessionSourceKind};
+use super::session::{
+    each_session, lock_session, resume_reattached, session_capture, session_mode, session_states, source_kind,
+    teardown_session_if_empty, IOSession, SessionMode, SessionSourceKind,
+};
 use super::{broker, IOCapabilities, IOState, SourceConfig};
 use crate::{capture_store, sessions};
 
@@ -43,6 +46,9 @@ pub struct AppInstance {
     pub last_heartbeat: std::time::Instant,
     /// Whether actively receiving frames (false when detached / paused).
     pub is_active: bool,
+    /// The session the watchdog detached this instance from for a missed heartbeat;
+    /// the next WS heartbeat for that session re-attaches it.
+    pub parked_on: Option<String>,
 }
 
 /// Serializable snapshot of an app instance for the frontend roster.
@@ -139,6 +145,7 @@ pub fn register_app(instance_id: &str, display_id: &str, app_name: &str, window_
                 registered_at: now,
                 last_heartbeat: now,
                 is_active: false,
+                parked_on: None,
             });
     }
     emit_open_apps_changed();
@@ -156,6 +163,7 @@ pub fn attach_app(instance_id: &str, app_name: &str, session_id: &str) {
                 a.session_id = Some(session_id.to_string());
                 a.is_active = true;
                 a.last_heartbeat = now;
+                a.parked_on = None;
                 if a.app_name.is_empty() {
                     a.app_name = app_name.to_string();
                 }
@@ -171,6 +179,7 @@ pub fn attach_app(instance_id: &str, app_name: &str, session_id: &str) {
                 registered_at: now,
                 last_heartbeat: now,
                 is_active: true,
+                parked_on: None,
             });
     }
     emit_open_apps_changed();
@@ -194,7 +203,16 @@ pub fn detach_app(instance_id: &str) {
     update_app(instance_id, |a| {
         a.session_id = None;
         a.is_active = false;
+        a.parked_on = None;
     });
+}
+
+/// Forget that the watchdog parked `instance_id` on `session_id`: it left on purpose.
+pub(super) fn unpark_app(instance_id: &str, session_id: &str) {
+    let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+    if let Some(a) = reg.get_mut(instance_id).filter(|a| a.parked_on.as_deref() == Some(session_id)) {
+        a.parked_on = None;
+    }
 }
 
 /// Clear the session attachment of every instance on `session_id`, keeping the
@@ -202,20 +220,25 @@ pub fn detach_app(instance_id: &str) {
 /// this so the registry invariant holds: no entry may reference a session that is
 /// no longer in `IO_SESSIONS`. A stale attachment is not cosmetic — it makes
 /// `subscriber_count_for_session` report a phantom count, and it becomes the
-/// `prev_session_id` that `register_subscriber` then evicts and tears down again.
+/// `prev_session_id` that `register_subscriber_from` then evicts and tears down again.
 pub(super) fn detach_all_from_session(session_id: &str) {
     let detached = {
         let Ok(mut reg) = APP_REGISTRY.lock() else { return };
         let mut n = 0usize;
-        for a in reg.values_mut().filter(|a| a.session_id.as_deref() == Some(session_id)) {
-            a.session_id = None;
-            a.is_active = false;
-            n += 1;
+        for a in reg.values_mut() {
+            if a.parked_on.as_deref() == Some(session_id) {
+                a.parked_on = None;
+            }
+            if a.session_id.as_deref() == Some(session_id) {
+                a.session_id = None;
+                a.is_active = false;
+                n += 1;
+            }
         }
         n
     };
     // Log and broadcast outside the lock — `tlog!` writes to stderr and an unbuffered
-    // file, and `APP_REGISTRY` is taken inside `register_subscriber`'s session lock,
+    // file, and `APP_REGISTRY` is taken inside `register_subscriber_from`'s session lock,
     // so blocking here would extend it.
     if detached == 0 {
         return;
@@ -241,7 +264,7 @@ pub async fn unregister_app(instance_id: &str) {
     let Some(inst) = removed else { return };
     emit_open_apps_changed();
     if let Some(sid) = inst.session_id {
-        teardown_session_if_empty(&sid, false).await;
+        teardown_session_if_empty(&sid, false, None).await;
     }
 }
 
@@ -267,7 +290,7 @@ pub async fn prune_window_sessions(window_label: &str) {
     for sid in removed.into_iter().filter_map(|a| a.session_id) {
         if !seen.contains(&sid) {
             seen.push(sid.clone());
-            teardown_session_if_empty(&sid, false).await;
+            teardown_session_if_empty(&sid, false, None).await;
         }
     }
 }
@@ -323,23 +346,35 @@ pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
         .unwrap_or_default()
 }
 
-/// Touch `last_heartbeat` for all app instances attached to the given sessions.
+/// Touch `last_heartbeat` for all app instances attached to the given sessions,
+/// re-attaching any the watchdog parked there and resuming their sessions.
 /// Called by the WS server when a client heartbeat arrives, bridging the WS
-/// keepalive to the IO session watchdog so the frontend can skip per-subscriber
-/// `register_subscriber` invoke polling.
+/// keepalive to the IO session watchdog, so a webview waking from display sleep
+/// needs no call of its own to get its sessions back.
 pub async fn touch_subscriber_heartbeats(session_ids: &[String]) {
-    if session_ids.is_empty() {
-        return;
-    }
-    if let Ok(mut reg) = APP_REGISTRY.lock() {
+    let reattached: HashSet<String> = {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
         let now = std::time::Instant::now();
+        let named = |sid: &Option<String>| sid.as_ref().is_some_and(|sid| session_ids.contains(sid));
+        let mut reattached = HashSet::new();
         for inst in reg.values_mut() {
-            if let Some(sid) = inst.session_id.as_deref() {
-                if session_ids.iter().any(|s| s == sid) {
-                    inst.last_heartbeat = now;
-                }
+            if inst.session_id.is_none() && named(&inst.parked_on) {
+                inst.session_id = inst.parked_on.take();
+                inst.is_active = true;
+                reattached.extend(inst.session_id.clone());
+            }
+            if named(&inst.session_id) {
+                inst.last_heartbeat = now;
             }
         }
+        reattached
+    };
+    if reattached.is_empty() {
+        return;
+    }
+    emit_open_apps_changed();
+    for session_id in reattached {
+        resume_reattached(&session_id).await;
     }
 }
 
@@ -378,7 +413,8 @@ pub struct ActiveSessionInfo {
     #[serde(default)]
     pub origin_profile_ids: Vec<String>,
     pub source_kind: SessionSourceKind,
-    /// Capture ID owned by this session (if any)
+    pub mode: SessionMode,
+    /// The session's own capture, or else the one it was opened on
     #[serde(default)]
     pub capture_id: Option<String>,
     /// Kind of the capture named by `capture_id`
@@ -421,16 +457,13 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
     // Get source profile IDs from the session tracking
     let source_profile_ids = sessions::get_session_profile_ids(session_id);
 
-    // Get capture info if this session has one of its own. Kind travels with the
-    // id — picking an arbitrary owned capture and leaving the roster to assume
-    // "frames" is how the two came apart.
-    let (capture_id, capture_kind) = capture_store::get_session_capture(session_id).unzip();
-    let capture_frame_count = capture_id
-        .as_ref()
-        .map(|id| capture_store::get_capture_count(id));
-    let capture_unique_frame_count = capture_id
-        .as_ref()
-        .map(|id| capture_store::get_capture_unique_count(id));
+    // Kind travels with the id — picking an arbitrary owned capture and leaving the
+    // roster to assume "frames" is how the two came apart. The counts are the session's
+    // own capture's, which is the one it streams.
+    let owned = capture_store::get_session_capture(session_id).map(|(id, _)| id);
+    let capture_frame_count = owned.as_deref().map(capture_store::get_capture_count);
+    let capture_unique_frame_count = owned.as_deref().map(capture_store::get_capture_unique_count);
+    let (capture_id, capture_kind) = session_capture(session_id).unzip();
 
     // Check if session is actively streaming (running state)
     let is_streaming = matches!(session.source.state(), IOState::Running);
@@ -449,6 +482,7 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
         source_profile_ids,
         origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
         source_kind: source_kind(session_id),
+        mode: session_mode(session_id, session),
         capture_id,
         capture_kind,
         capture_frame_count,

@@ -4,12 +4,12 @@ use crate::{
         self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
         get_session_subscribers, get_session_source_configs, list_sessions, pause_session,
-        reconfigure_session, register_subscriber, reinitialize_session_if_safe, resume_session,
+        reconfigure_session, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
         stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
         evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, set_source_polling, get_session_next_output_bus,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
-        SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
+        SubscriberInfo, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, Protocol, TemporalMode,
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusRangeSpec, PollGroup,
@@ -161,24 +161,6 @@ pub async fn pause_reader_session(session_id: String) -> Result<IOState, String>
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resume_reader_session(session_id: String) -> Result<IOState, String> {
     resume_session(&session_id).await
-}
-
-/// Suspend a reader session - stops streaming, finalizes capture, session stays alive.
-/// The capture remains owned by the session and all joined apps can view it.
-/// Use `resume_reader_session_fresh` to start streaming again with a new capture.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn suspend_reader_session(session_id: String) -> Result<IOState, String> {
-    suspend_session(&session_id).await
-}
-
-/// Stop a realtime session and switch all listeners to capture replay.
-/// Emits `session-lifecycle` signal so all apps on the session refresh state.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn io_stop_and_switch_to_capture(
-    session_id: String,
-    speed: Option<f64>,
-) -> Result<IOCapabilities, String> {
-    stop_and_switch_to_capture(&session_id, speed.unwrap_or(1.0)).await
 }
 
 /// Stop a session and switch it to capture replay, choosing the backend path from
@@ -484,19 +466,6 @@ pub async fn session_transmit_frame(
 // ============================================================================
 // Listener Registration Commands
 // ============================================================================
-
-/// Register a listener for a session.
-/// This is the primary way for frontend components to join a session.
-/// If the listener is already registered, this updates their heartbeat.
-/// Returns session info including whether this listener is the owner.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn register_session_subscriber(
-    session_id: String,
-    subscriber_id: String,
-    app_name: Option<String>,
-) -> Result<RegisterSubscriberResult, String> {
-    register_subscriber(&session_id, &subscriber_id, app_name.as_deref()).await
-}
 
 /// Unregister a listener from a session.
 /// If this was the last listener, the session will be stopped (but not destroyed).
@@ -1433,11 +1402,6 @@ pub fn modbus_polls_from_ranges(spec: ModbusRangeSpec) -> Result<Vec<PollGroup>,
 // ============================================================================
 // Signal-then-fetch query commands
 // ============================================================================
-
-#[tauri::command(rename_all = "snake_case")]
-pub fn get_playback_position_cmd(session_id: String) -> Option<io::PlaybackPosition> {
-    io::get_playback_position(&session_id)
-}
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn get_stream_ended_info(session_id: String) -> Option<io::post_session::StreamEndedInfo> {

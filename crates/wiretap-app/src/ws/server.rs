@@ -158,7 +158,7 @@ enum ServerCommand {
     Activity { conn_id: usize },
     /// Touch IO listener heartbeats for all sessions a connection is subscribed to.
     /// Sent when a client Heartbeat message is received, bridging WS keepalive
-    /// to the IO session watchdog so the frontend can skip `register_session_subscriber` polling.
+    /// to the IO session watchdog so the frontend needs no subscriber polling of its own.
     HeartbeatListeners { conn_id: usize },
     /// Execute a command received from a client and send the response back.
     ExecuteCommand {
@@ -689,7 +689,7 @@ async fn connection_read_task(
 
 /// Update `last_heartbeat` on all listeners for the given sessions.
 /// This bridges the WS keepalive to the IO session watchdog, allowing
-/// the frontend to stop sending per-listener `register_session_subscriber` invoke calls.
+/// the frontend to stop sending per-listener invoke calls.
 async fn touch_subscriber_heartbeats(session_ids: Vec<String>) {
     crate::io::touch_subscriber_heartbeats(&session_ids).await;
 }

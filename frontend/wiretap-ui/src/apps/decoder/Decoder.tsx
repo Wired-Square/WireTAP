@@ -366,9 +366,7 @@ function DecoderInner() {
     appName: "decoder",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
-    enableIngest: true,
     onIngestComplete: handleIngestComplete,
-    requireFrames: true,
     onDecoded: handleDecoded,
     onError: handleError,
     onTimeUpdate: handleTimeUpdate,
@@ -409,7 +407,6 @@ function DecoderInner() {
     currentTimeUs: sessionCurrentTimeUs,
     currentFrameIndex: sessionCurrentFrameIndex,
     handleLeave,
-    isDetached,
     // Ingest state
     isLoading,
     // Session switching methods
@@ -969,7 +966,7 @@ function DecoderInner() {
             isStopped={isStopped || canReturnToLive}
             onPlay={isStopped || canReturnToLive ? resumeWithNewCapture : handlers.handlePlay}
             onPause={isDecoding ? handlers.handlePause : undefined}
-            onLeave={!isDetached ? handleLeave : undefined}
+            onLeave={handleLeave}
             onStop={isStreaming ? stopWatch : undefined}
             onDestroy={handleDestroy}
             frameCount={frameList.length}

@@ -27,9 +27,10 @@ subscriber_count: number,
  */
 source_profile_ids: Array<string>, 
 /**
- * The subscriber ID that created the session (only for "created")
+ * The subscriber whose call caused the event: a created session's creator, or
+ * the caller of a teardown, which ignores the `destroyed` it hears.
  */
-creator_subscriber_id: string | null, 
+subscriber_id: string | null, 
 /**
  * True when a "destroyed" event was a deliberate user destroy (the app should
  * reset to "No source" rather than fall back to the orphaned capture).

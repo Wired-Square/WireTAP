@@ -7,6 +7,7 @@ import type { FrameMessage } from "../types/frame";
 import type { IOCapabilities, IOStateType, PlaybackPosition, StreamEndedInfo } from "../api/io";
 import type { CaptureKind } from "../generated/CaptureKind";
 import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
+import type { SessionMode } from "../generated/SessionMode";
 import { trackAlloc } from "./memoryDiag";
 import {
   ENVELOPE_HEADER_SIZE,
@@ -16,6 +17,7 @@ import {
   MsgType,
   PROTOCOL_VERSION,
   SESSION_ERROR_SEVERITIES,
+  SESSION_MODES,
   SESSION_STATES,
   SESSION_TRANSITIONS,
   STREAM_END_REASONS,
@@ -428,6 +430,7 @@ export type SessionTransition = (typeof SESSION_TRANSITIONS)[number];
 export interface SessionTransitionMsg {
   transition: SessionTransition;
   state: IOStateType;
+  mode: SessionMode;
   capabilities: IOCapabilities | null;
   /** The capture the session finished with, for a suspend or a switch to capture. */
   capture_id: string | null;
@@ -435,12 +438,14 @@ export interface SessionTransitionMsg {
 }
 
 // Wire format (matches Rust encode_session_transition in ws/protocol.rs): state u8,
-// transition u8, length-prefixed capabilities JSON, length-prefixed capture id (empty
-// for none), capture count u32 LE. An unknown transition reads as capabilities_changed.
+// transition u8, mode u8, length-prefixed capabilities JSON, length-prefixed capture id
+// (empty for none), capture count u32 LE. An unknown transition reads as
+// capabilities_changed, an unknown mode as live.
 export function decodeSessionTransition(payload: DataView): SessionTransitionMsg {
   const state = (SESSION_STATES[payload.getUint8(0)] ?? "stopped") as IOStateType;
   const transition = SESSION_TRANSITIONS[payload.getUint8(1)] ?? "capabilities_changed";
-  const [json, idOffset] = decodeLengthPrefixedStr(payload, 2);
+  const mode = SESSION_MODES[payload.getUint8(2)] ?? "live";
+  const [json, idOffset] = decodeLengthPrefixedStr(payload, 3);
   const [captureId, countOffset] = decodeLengthPrefixedStr(payload, idOffset);
   let capabilities: IOCapabilities | null = null;
   try {
@@ -451,6 +456,7 @@ export function decodeSessionTransition(payload: DataView): SessionTransitionMsg
   return {
     transition,
     state,
+    mode,
     capabilities,
     capture_id: captureId || null,
     capture_count: payload.getUint32(countOffset, true),

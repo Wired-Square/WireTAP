@@ -28,6 +28,9 @@ pub const SESSION_ERROR_SEVERITIES: [&str; 2] = ["fault", "routine"];
 pub const SESSION_TRANSITIONS: [&str; 5] =
     ["suspended", "switched_to_capture", "resuming", "returned_to_live", "capabilities_changed"];
 
+/// The mode byte of a scoped `SessionLifecycle` indexes this table.
+pub const SESSION_MODES: [&str; 4] = ["live", "recorded", "capture", "replaying"];
+
 pub const CAPTURE_AVAILABLE: u8 = 1 << 0;
 pub const HAS_CAPTURE_ID: u8 = 1 << 1;
 pub const HAS_CAPTURE_KIND: u8 = 1 << 2;
@@ -473,17 +476,18 @@ pub fn encode_session_lifecycle(
     out
 }
 
-/// Encode a session's scoped SessionLifecycle payload: the [`SESSION_STATES`]
-/// byte, the [`SESSION_TRANSITIONS`] byte, the capabilities JSON and the capture
-/// id (both length-prefixed, the id empty for none), then the capture count as u32.
+/// Encode a session's scoped SessionLifecycle payload: the [`SESSION_STATES`],
+/// [`SESSION_TRANSITIONS`] and [`SESSION_MODES`] bytes, the capabilities JSON and the
+/// capture id (both length-prefixed, the id empty for none), then the capture count as u32.
 pub fn encode_session_transition(
     state: u8,
     transition: u8,
+    mode: u8,
     capabilities_json: &str,
     capture_id: Option<&str>,
     capture_count: u32,
 ) -> Vec<u8> {
-    let mut out = vec![state, transition];
+    let mut out = vec![state, transition, mode];
     out.extend_from_slice(&encode_length_prefixed_str(capabilities_json));
     out.extend_from_slice(&encode_length_prefixed_str(capture_id.unwrap_or_default()));
     out.extend_from_slice(&capture_count.to_le_bytes());
@@ -1266,14 +1270,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn every_session_mode_names_its_byte() {
+        use crate::io::SessionMode::*;
+        for mode in [Live, Recorded, Capture, Replaying] {
+            assert_eq!(serde_json::to_value(mode).unwrap(), SESSION_MODES[usize::from(mode.code())]);
+        }
+    }
+
     // The TS half is src/tests/wsSessionTransition.test.ts, which decodes these bytes.
     #[test]
-    fn session_transition_leads_with_state_and_transition() {
+    fn session_transition_leads_with_state_transition_and_mode() {
         assert_eq!(
-            encode_session_transition(0, 1, "{}", Some("c1"), 42),
-            [0, 1, 2, 0, b'{', b'}', 2, 0, b'c', b'1', 42, 0, 0, 0]
+            encode_session_transition(0, 1, 3, "{}", Some("c1"), 42),
+            [0, 1, 3, 2, 0, b'{', b'}', 2, 0, b'c', b'1', 42, 0, 0, 0]
         );
-        assert_eq!(encode_session_transition(2, 3, "{}", None, 0), [2, 3, 2, 0, b'{', b'}', 0, 0, 0, 0, 0, 0]);
+        assert_eq!(encode_session_transition(2, 3, 0, "{}", None, 0), [2, 3, 0, 2, 0, b'{', b'}', 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]

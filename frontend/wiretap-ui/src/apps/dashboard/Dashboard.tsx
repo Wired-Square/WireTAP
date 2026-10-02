@@ -214,7 +214,6 @@ function DashboardInner() {
     appName: "dashboard",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
-    requireFrames: true,
     onDecoded: handleDecoded,
     onAdhocSignals: handleAdhocSignals,
     onError: handleError,
@@ -237,7 +236,6 @@ function DashboardInner() {
     isStopped,
     sessionReady,
     capabilities,
-    isDetached,
     joinerCount,
     handleLeave,
     resumeWithNewCapture,
@@ -441,7 +439,7 @@ function DashboardInner() {
           isPaused={isPaused}
           isStopped={isStopped}
           onPlay={resumeWithNewCapture}
-          onLeave={!isDetached ? handleLeave : undefined}
+          onLeave={handleLeave}
           onStop={isStreaming ? stopWatch : undefined}
           onDestroy={handleDestroy}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}

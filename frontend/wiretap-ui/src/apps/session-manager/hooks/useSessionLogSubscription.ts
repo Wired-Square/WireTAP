@@ -133,18 +133,18 @@ export function useSessionLogSubscription(): void {
           sessionId: p.session_id,
           profileId: p.source_profile_ids[0] ?? null,
           profileName,
-          appName: p.creator_subscriber_id,
+          appName: p.subscriber_id,
           details: `Session created${modeLabel}`,
         });
         // Log the initial listener (this event fires before we can set up the listener)
-        if (p.subscriber_count > 0 && p.creator_subscriber_id) {
+        if (p.subscriber_count > 0 && p.subscriber_id) {
           addEntryFn({
             eventType: "session-joined",
             sessionId: p.session_id,
             profileId: p.source_profile_ids[0] ?? null,
             profileName,
-            appName: p.creator_subscriber_id,
-            details: `${p.creator_subscriber_id} joined (${p.subscriber_count} listeners)`,
+            appName: p.subscriber_id,
+            details: `${p.subscriber_id} joined (${p.subscriber_count} listeners)`,
           });
         }
         setupPerSessionListeners(p.session_id, perSessionListeners);

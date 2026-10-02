@@ -1131,6 +1131,7 @@ fn session_transition_payload(payload: &crate::io::SessionTransitionPayload) -> 
     protocol::encode_session_transition(
         payload.state.code(),
         payload.transition.code(),
+        payload.mode.code(),
         &serde_json::to_string(&payload.capabilities).unwrap_or_default(),
         payload.capture_id.as_deref(),
         payload.capture_count as u32,
@@ -1159,7 +1160,7 @@ mod tests {
             state,
             subscriber_count: 1,
             source_profile_ids: vec![],
-            creator_subscriber_id: None,
+            subscriber_id: None,
             reset: false,
         };
         let running = session_lifecycle_payload(&created(LifecycleEvent::Created, Some(IOState::Running)));
@@ -1170,17 +1171,18 @@ mod tests {
 
     #[test]
     fn a_transition_carries_its_codes_capabilities_and_capture() {
-        use crate::io::{IOCapabilities, SessionTransition, SessionTransitionPayload};
+        use crate::io::{IOCapabilities, SessionMode, SessionTransition, SessionTransitionPayload};
         let capabilities = IOCapabilities::realtime_can();
         let json = serde_json::to_string(&capabilities).unwrap();
         let bytes = session_transition_payload(&SessionTransitionPayload {
             transition: SessionTransition::SwitchedToCapture,
             state: IOState::Stopped,
             capabilities,
+            mode: SessionMode::Replaying,
             capture_id: Some("c1".into()),
             capture_count: 42,
         });
-        let mut want = vec![IOState::Stopped.code(), SessionTransition::SwitchedToCapture.code()];
+        let mut want = vec![IOState::Stopped.code(), SessionTransition::SwitchedToCapture.code(), SessionMode::Replaying.code()];
         want.extend((json.len() as u16).to_le_bytes());
         want.extend(json.as_bytes());
         want.extend([2, 0, b'c', b'1', 42, 0, 0, 0]);

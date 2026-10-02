@@ -421,7 +421,6 @@ function DiscoveryInner() {
     appName: "discovery",
     ioProfiles: allIOProfiles,
     store: { ioProfile, setIoProfile },
-    enableIngest: true,
     onIngestComplete: handleIngestComplete,
     onFrames: handleFrames,
     onError: handleError,

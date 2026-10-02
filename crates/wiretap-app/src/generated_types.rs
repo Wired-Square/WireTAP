@@ -159,6 +159,7 @@ fn wire_constants() -> String {
         names("STREAM_END_REASONS", &STREAM_END_REASONS),
         names("SESSION_ERROR_SEVERITIES", &SESSION_ERROR_SEVERITIES),
         names("SESSION_TRANSITIONS", &SESSION_TRANSITIONS),
+        names("SESSION_MODES", &SESSION_MODES),
         format!(
             "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE

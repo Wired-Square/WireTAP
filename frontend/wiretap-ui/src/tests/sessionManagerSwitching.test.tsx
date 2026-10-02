@@ -26,7 +26,6 @@ vi.mock("../hooks/useIOSession", () => ({
       captureId: null,
       captureStartTimeUs: null,
       reinitialize: vi.fn(async () => {}),
-      markSessionSwitch: vi.fn(),
       leave: vi.fn(async () => {}),
       rejoin: vi.fn(async () => {}),
     };
@@ -36,7 +35,6 @@ vi.mock("../stores/sessionStore", async () => {
   const { create } = await import("zustand");
   return {
     createAndStartMultiSourceSession: vi.fn(async () => ({ busMappings: new Map() })),
-    isCaptureSession: () => false,
     useSessionStore: create(() => ({
       pendingJoins: {},
       sessions: {},

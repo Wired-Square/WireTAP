@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The Rust halves are `session_transition_leads_with_state_and_transition` in
+// The Rust halves are `session_transition_leads_with_state_transition_and_mode` in
 // ws/protocol.rs and `a_transition_carries_its_codes_capabilities_and_capture` in
 // ws/dispatch.rs; these are their bytes.
 
@@ -16,16 +16,18 @@ const utf8 = (s: string) => [...new TextEncoder().encode(s)];
 
 describe("SessionLifecycle (scoped) wire format", () => {
   it("decodes Rust's golden payloads", () => {
-    expect(decodeSessionTransition(view([0, 1, 2, 0, ...utf8("{}"), 2, 0, ...utf8("c1"), 42, 0, 0, 0]))).toEqual({
+    expect(decodeSessionTransition(view([0, 1, 3, 2, 0, ...utf8("{}"), 2, 0, ...utf8("c1"), 42, 0, 0, 0]))).toEqual({
       state: "stopped",
       transition: "switched_to_capture",
+      mode: "replaying",
       capabilities: {},
       capture_id: "c1",
       capture_count: 42,
     });
-    expect(decodeSessionTransition(view([2, 3, 2, 0, ...utf8("{}"), 0, 0, 0, 0, 0, 0]))).toEqual({
+    expect(decodeSessionTransition(view([2, 3, 0, 2, 0, ...utf8("{}"), 0, 0, 0, 0, 0, 0]))).toEqual({
       state: "running",
       transition: "returned_to_live",
+      mode: "live",
       capabilities: {},
       capture_id: null,
       capture_count: 0,
@@ -33,7 +35,7 @@ describe("SessionLifecycle (scoped) wire format", () => {
   });
 
   it("reads an unknown transition as a capabilities change", () => {
-    expect(decodeSessionTransition(view([0, 9, 2, 0, ...utf8("{}"), 0, 0, 0, 0, 0, 0])).transition).toBe("capabilities_changed");
+    expect(decodeSessionTransition(view([0, 9, 0, 2, 0, ...utf8("{}"), 0, 0, 0, 0, 0, 0])).transition).toBe("capabilities_changed");
   });
 });
 
@@ -111,7 +113,7 @@ describe("the pushed transition against the retired inference", () => {
     expect(retiredInference(prev, state, temporal)).toEqual({ callback: old, resets: oldResets });
 
     const effect = sessionTransitionEffect(
-      { transition, state: pushedState ?? state, capabilities: capabilities(temporal), capture_id: null, capture_count: 0 },
+      { transition, state: pushedState ?? state, mode: "live", capabilities: capabilities(temporal), capture_id: null, capture_count: 0 },
       undefined,
       "f_1",
     );
@@ -126,7 +128,7 @@ describe("the pushed transition against the retired inference", () => {
   // The retired inference fabricated these from the store's capture; the push carries
   // what Rust finished with, under the names Discovery, Decoder and the manager read.
   it.each(["suspended", "switched_to_capture"] as const)("%s carries the capture id and count", (transition) => {
-    const msg = { transition, state: "stopped" as const, capabilities: capabilities("capture"), capture_id: "c1", capture_count: 42 };
+    const msg = { transition, state: "stopped" as const, mode: "replaying" as const, capabilities: capabilities("capture"), capture_id: "c1", capture_count: 42 };
     const { updates } = sessionTransitionEffect(msg, undefined, "f_1");
     expect(updates.capture).toMatchObject({ id: "c1", count: 42, available: true });
   });
