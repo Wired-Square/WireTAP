@@ -39,6 +39,7 @@ import {
   type BusOverride,
   type PlaybackPosition,
   type ActiveSessionInfo,
+  type ProfileUsageInfo,
   type OpenedSession,
   type SerialSettings,
   type SessionMode,
@@ -269,6 +270,10 @@ export interface SessionStore {
   // ---- Data ----
   /** All sessions keyed by session ID */
   sessions: Record<string, Session>;
+  /** Rust's session roster as last listed */
+  roster: ActiveSessionInfo[];
+  /** Usage of every profile a session holds, by profile ID */
+  profileUsage: Record<string, ProfileUsageInfo>;
   /** Currently selected session ID for transmission (Transmit app) */
   activeSessionId: string | null;
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
@@ -394,6 +399,8 @@ export interface SessionStore {
   requestSessionJoin: (appName: string, sessionId: string) => void;
   /** Adopt backend roster sessions as known-only entries (reconcile). */
   registerKnownSessions: (infos: ActiveSessionInfo[]) => void;
+  /** Hold Rust's profile usage, keyed by profile ID */
+  registerProfileUsage: (usage: ProfileUsageInfo[]) => void;
   /** Clear a pending join for an app (consumed by useIOSessionManager) */
   clearPendingJoin: (appName: string) => void;
 }
@@ -695,6 +702,8 @@ function cleanupEventListeners(eventListeners: SessionEventSubscribers) {
 export const useSessionStore = create<SessionStore>((set, get) => ({
   // ---- Initial State ----
   sessions: {},
+  roster: [],
+  profileUsage: {},
   activeSessionId: null,
   _eventListeners: {},
   pendingJoins: {},
@@ -1159,7 +1168,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   registerKnownSessions: (infos) => {
-    set((s) => ({ sessions: reconcileKnownSessions(s.sessions, infos) }));
+    set((s) => ({ sessions: reconcileKnownSessions(s.sessions, infos), roster: infos }));
+  },
+
+  registerProfileUsage: (usage) => {
+    set({ profileUsage: Object.fromEntries(usage.map((u) => [u.profile_id, u])) });
   },
 
   clearPendingJoin: (appName) => {

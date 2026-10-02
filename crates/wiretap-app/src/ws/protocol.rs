@@ -119,6 +119,9 @@ wire_enum! {
         // A Dashboard window's ad-hoc signal values, seen frame ids and heatmap
         // toggle counts for a frame batch, sent only to the window that set them.
         AdhocSignals     = 0x1C,
+        // Global signal: the capture list changed (create, delete, rename, pin, owner,
+        // orphan, finalise, copy, clear). The frontend reconciles via list_orphaned_captures.
+        CaptureListChanged = 0x1D,
         Command          = 0x20,
         CommandResponse  = 0x21,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.

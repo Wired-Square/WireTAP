@@ -39,10 +39,6 @@ const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
       return servedTable();
     case "validate_directory":
       return { exists: true, writable: true };
-    case "list_orphaned_captures":
-    case "list_active_sessions":
-    case "get_profiles_usage":
-      return [];
     case "default_connection_for_kind":
     case "get_profile_bus_mappings":
     case "get_supported_protocols":

@@ -35,6 +35,7 @@ export const MsgType = {
   ModbusScanState: 0x1a,
   DecodedBacklog: 0x1b,
   AdhocSignals: 0x1c,
+  CaptureListChanged: 0x1d,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,

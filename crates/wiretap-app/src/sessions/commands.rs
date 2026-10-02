@@ -38,7 +38,7 @@ use super::source_config::{
 };
 use super::tracking::{
     cache_probe_result, claim_session_profile, clear_probe_cache, get_cached_probe, get_session_profile_ids,
-    get_sessions_for_profile, hold_profile_while, restore_session_profiles,
+    hold_profile_while, profiles_in_use, restore_session_profiles,
     unregister_session_profile,
 };
 
@@ -1256,13 +1256,12 @@ pub struct ProfileUsageInfo {
     pub config_locked: bool,
 }
 
-/// Get usage info for multiple profiles at once.
+/// Usage of every profile a session holds.
 #[tauri::command(rename_all = "snake_case")]
-pub fn get_profiles_usage(profile_ids: Vec<String>) -> Vec<ProfileUsageInfo> {
-    profile_ids
+pub fn get_profiles_usage() -> Vec<ProfileUsageInfo> {
+    profiles_in_use()
         .into_iter()
-        .map(|profile_id| {
-            let session_ids = get_sessions_for_profile(&profile_id);
+        .map(|(profile_id, session_ids)| {
             let session_count = session_ids.len();
             ProfileUsageInfo {
                 profile_id,

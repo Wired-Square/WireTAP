@@ -24,13 +24,8 @@ const byteCapture: CaptureMetadata = {
 
 const invoke = vi.fn(async (cmd: string) => {
   switch (cmd) {
-    case "list_orphaned_captures":
-      return [byteCapture];
     case "probe_device":
       return { success: true, source_type: "serial", is_multi_bus: false, bus_count: 1, primary_info: null, secondary_info: null, supports_fd: null, error: null };
-    case "list_active_sessions":
-    case "get_profiles_usage":
-      return [];
     case "get_profile_bus_mappings":
     case "get_supported_protocols":
       return {};
@@ -48,6 +43,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 const { default: IoSourcePickerDialog } = await import("../dialogs/IoSourcePickerDialog");
 const { useSessionStore } = await import("../stores/sessionStore");
+const { useCaptureListStore } = await import("../stores/captureListStore");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -76,11 +72,12 @@ const captureOption = () => withText("[role=option]", byteCapture.name);
 const rawPortOption = () => withText("[role=option]", rawPort.name);
 
 // The app is on a session Rust opened on the capture.
-beforeEach(() =>
+beforeEach(() => {
   useSessionStore.setState({
     sessions: { [byteCapture.id]: { id: byteCapture.id, sourceKind: "capture" } as Session },
-  })
-);
+  });
+  useCaptureListStore.setState({ orphaned: [byteCapture] });
+});
 
 afterEach(() => {
   act(() => root.unmount());

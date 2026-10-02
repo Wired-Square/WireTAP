@@ -866,6 +866,7 @@ pub fn emit_stream_ended(
     post_session::store_stream_ended(session_id, stream_ended_info.clone());
 
     crate::ws::dispatch::send_stream_ended(session_id, &stream_ended_info);
+    session::note_roster_moved(session_id);
     tlog!(
         "[{}:{}] Stream ended (reason: {}, count: {})",
         log_prefix, session_id, reason.as_str(), count

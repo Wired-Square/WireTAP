@@ -10,10 +10,6 @@ const invoke = vi.fn(async (cmd: string) => {
   switch (cmd) {
     case "probe_device":
       return { success: true, source_type: "serial", is_multi_bus: false, bus_count: 1, primary_info: null, secondary_info: null, supports_fd: null, error: null };
-    case "list_orphaned_captures":
-    case "list_active_sessions":
-    case "get_profiles_usage":
-      return [];
     case "get_profile_bus_mappings":
     case "get_supported_protocols":
       return {};

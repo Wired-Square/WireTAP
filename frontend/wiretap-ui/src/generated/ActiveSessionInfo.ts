@@ -78,4 +78,8 @@ catalog_path: string | null,
  * like `catalog_path`: the poll switch reads it rather than remembering
  * what it last asked for.
  */
-paused_source_profile_ids: Array<string>, };
+paused_source_profile_ids: Array<string>, 
+/**
+ * Whether the picker offers the session to join
+ */
+joinable: boolean, };

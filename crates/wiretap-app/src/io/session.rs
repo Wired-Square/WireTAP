@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, MutexGuard, PoisonError, RwLock};
 use std::time::Instant;
 
@@ -9,7 +10,7 @@ use tokio::sync::{Mutex, OwnedMutexGuard};
 
 use super::roster::{
     attach_app, current_session_of_app, detach_all_from_session, detach_app, other_instances_on_session,
-    session_exists, set_app_active, subscriber_count_for_session, unpark_app,
+    session_exists, set_app_active, subscriber_count_for_session, unpark_app, SessionSnapshot,
 };
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
@@ -53,6 +54,10 @@ pub(super) struct SessionState {
     playback_position: Option<PlaybackPosition>,
     /// An error from before any subscriber registered, handed to the first one.
     startup_error: Option<String>,
+    /// The roster row as the last operation left it, listed while another holds the session.
+    snapshot: SessionSnapshot,
+    /// A roster push owed once the operation holding the session lets go.
+    roster_moved: bool,
 }
 
 /// The session registry. Held only to find a session or touch its synchronous
@@ -68,23 +73,86 @@ fn not_found(session_id: &str) -> String {
     format!("Session '{}' not found", session_id)
 }
 
+/// One operation's hold on a session. Letting go records the session's roster row
+/// and sends any roster push the operation owed, so no path can leave either behind.
+pub(super) struct SessionGuard {
+    id: String,
+    io: Option<OwnedMutexGuard<IOSession>>,
+    records: bool,
+}
+
+impl SessionGuard {
+    async fn acquire(session_id: &str, cell: Arc<Mutex<IOSession>>) -> Self {
+        Self { id: session_id.to_string(), io: Some(cell.lock_owned().await), records: true }
+    }
+}
+
+/// A hold for an operation that cannot change the roster row: no `DerefMut`, so it
+/// skips the snapshot, which the per-frame paths (transmit, replay, repeat) cannot afford.
+pub(super) struct SessionReader(SessionGuard);
+
+impl Deref for SessionReader {
+    type Target = IOSession;
+    fn deref(&self) -> &IOSession {
+        &self.0
+    }
+}
+
+impl Deref for SessionGuard {
+    type Target = IOSession;
+    fn deref(&self) -> &IOSession {
+        self.io.as_deref().expect("held until dropped")
+    }
+}
+
+impl DerefMut for SessionGuard {
+    fn deref_mut(&mut self) -> &mut IOSession {
+        self.io.as_deref_mut().expect("held until dropped")
+    }
+}
+
+impl Drop for SessionGuard {
+    fn drop(&mut self) {
+        let Some(io) = self.io.take() else { return };
+        if io.retired {
+            return;
+        }
+        if self.records {
+            let snapshot = SessionSnapshot::of(&self.id, &io);
+            with_state(&self.id, |s| s.snapshot = snapshot);
+        }
+        // Released before the owed push is taken, so `note_roster_moved` either sees
+        // the session idle and pushes itself, or leaves the flag for this take.
+        drop(io);
+        if with_state(&self.id, |s| std::mem::take(&mut s.roster_moved)) == Some(true) {
+            emit_roster_moved(&self.id);
+        }
+    }
+}
+
 /// The session, held for one operation. Operations on one session run one at a
 /// time; different sessions' run in parallel.
-pub(super) async fn lock_session(session_id: &str) -> Result<OwnedMutexGuard<IOSession>, String> {
+pub(super) async fn lock_session(session_id: &str) -> Result<SessionGuard, String> {
     let cell = session_states()
         .get(session_id)
         .map(|s| s.io.clone())
         .ok_or_else(|| not_found(session_id))?;
-    let session = cell.lock_owned().await;
+    let session = SessionGuard::acquire(session_id, cell).await;
     if session.retired {
         return Err(not_found(session_id));
     }
     Ok(session)
 }
 
+pub(super) async fn read_session(session_id: &str) -> Result<SessionReader, String> {
+    let mut session = lock_session(session_id).await?;
+    session.records = false;
+    Ok(SessionReader(session))
+}
+
 /// Wait out whatever operation is running on the session, a teardown included.
 pub async fn settle_session(session_id: &str) {
-    let _ = lock_session(session_id).await;
+    let _ = read_session(session_id).await;
 }
 
 fn with_state<R>(session_id: &str, f: impl FnOnce(&mut SessionState) -> R) -> Option<R> {
@@ -95,16 +163,60 @@ fn session_cells() -> Vec<(String, Arc<Mutex<IOSession>>)> {
     session_states().iter().map(|(id, s)| (id.clone(), s.io.clone())).collect()
 }
 
-/// `f` over every session, waiting for any that is mid-operation.
-pub(super) async fn each_session<R>(mut f: impl FnMut(&str, &IOSession) -> R) -> Vec<R> {
-    let mut out = Vec::new();
-    for (id, cell) in session_cells() {
-        let session = cell.lock().await;
-        if !session.retired {
-            out.push(f(&id, &session));
-        }
+/// Every session's roster row, without waiting: as it is now, or for a session
+/// mid-operation, as its last operation left it.
+pub(super) fn session_snapshots() -> Vec<(String, SessionSnapshot)> {
+    let entries: Vec<_> = session_states()
+        .iter()
+        .map(|(id, s)| (id.clone(), s.io.clone(), s.snapshot.clone()))
+        .collect();
+    entries
+        .into_iter()
+        .filter_map(|(id, cell, last)| current_snapshot(&id, &cell, last).map(|s| (id, s)))
+        .collect()
+}
+
+pub(super) fn session_snapshot(session_id: &str) -> Option<SessionSnapshot> {
+    let (cell, last) = session_states()
+        .get(session_id)
+        .map(|s| (s.io.clone(), s.snapshot.clone()))?;
+    current_snapshot(session_id, &cell, last)
+}
+
+fn current_snapshot(session_id: &str, cell: &Mutex<IOSession>, last: SessionSnapshot) -> Option<SessionSnapshot> {
+    match cell.try_lock() {
+        Ok(session) if session.retired => None,
+        Ok(session) => Some(SessionSnapshot::of(session_id, &session)),
+        Err(_) => Some(last),
     }
-    out
+}
+
+/// Tell every window the session's roster row moved. The push waits for the
+/// operation holding the session to let go, so the re-read it prompts sees the change.
+pub(super) fn note_roster_moved(session_id: &str) {
+    let idle = {
+        let mut states = session_states();
+        let Some(state) = states.get_mut(session_id) else { return };
+        let idle = state.io.try_lock().is_ok();
+        state.roster_moved = !idle;
+        idle
+    };
+    if idle {
+        emit_roster_moved(session_id);
+    }
+}
+
+fn emit_roster_moved(session_id: &str) {
+    emit_session_lifecycle(SessionLifecyclePayload {
+        session_id: session_id.to_string(),
+        event_type: LifecycleEvent::Updated,
+        source_type: None,
+        state: None,
+        subscriber_count: subscriber_count_for_session(session_id),
+        source_profile_ids: sessions::get_session_profile_ids(session_id),
+        subscriber_id: None,
+        reset: false,
+    });
 }
 
 /// `f` over every session not mid-operation: the watchdog's view, which must not
@@ -161,6 +273,7 @@ async fn transition(session_id: &str, session: &mut IOSession, to: Transition) -
 /// Emit a state change event for a session
 fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
     crate::ws::dispatch::send_session_state(session_id, current);
+    note_roster_moved(session_id);
 }
 
 fn emit_transition(session_id: &str, session: &IOSession, transition: SessionTransition, capture_id: Option<String>) {
@@ -176,6 +289,7 @@ fn emit_transition(session_id: &str, session: &IOSession, transition: SessionTra
             capture_count,
         },
     );
+    note_roster_moved(session_id);
 }
 
 /// Emit a joiner count change event for a session.
@@ -188,6 +302,7 @@ pub(super) fn emit_joiner_count_change(
     _change: Option<&str>,
 ) {
     crate::ws::dispatch::send_session_info(session_id, -1.0, joiner_count as u16);
+    note_roster_moved(session_id);
 }
 
 /// Emit a speed change event for a session.
@@ -303,28 +418,32 @@ pub async fn create_session(
     let source_type = device.source_type().to_string();
     let state = device.state();
 
+    let session = IOSession {
+        source: device,
+        source_names: source_names.unwrap_or_default(),
+        source_configs,
+        retired: false,
+    };
+    let snapshot = SessionSnapshot::of(&session_id, &session);
+
     // Join an existing session rather than overwrite it, once whatever it is doing
     // has finished. One that a teardown retired meanwhile is gone: look again.
     let existing = loop {
         let cell = match session_states().entry(session_id.clone()) {
             Entry::Occupied(entry) => entry.get().io.clone(),
             Entry::Vacant(entry) => {
-                let io = Arc::new(Mutex::new(IOSession {
-                    source: device,
-                    source_names: source_names.unwrap_or_default(),
-                    source_configs,
-                    retired: false,
-                }));
                 entry.insert(SessionState {
-                    io,
+                    snapshot,
+                    io: Arc::new(Mutex::new(session)),
                     suspended_at: None,
                     playback_position: None,
                     startup_error: None,
+                    roster_moved: false,
                 });
                 break None;
             }
         };
-        let session = cell.lock_owned().await;
+        let session = SessionGuard::acquire(&session_id, cell).await;
         if !session.retired {
             break Some(session);
         }
@@ -635,7 +754,7 @@ pub async fn set_session_bus_cadence(session_id: &str, bus: u8, frame_rate_hz: f
 
 /// Query per-bus signal generator states
 pub async fn get_session_virtual_bus_states(session_id: &str) -> Result<Vec<VirtualBusState>, String> {
-    lock_session(session_id).await?.source.virtual_bus_states()
+    read_session(session_id).await?.source.virtual_bus_states()
 }
 
 /// Add a virtual bus generator to a running session
@@ -844,7 +963,7 @@ enum Teardown<'a> {
 /// Stop the session, forget it, then emit `destroyed`. It stays registered and
 /// locked until stopped, so a same-id create waits for the teardown instead of
 /// having its profiles released by it.
-async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, how: Teardown<'_>) {
+async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_>) {
     let destroying = matches!(how, Teardown::Destroy { .. });
     if destroying {
         detach_all_from_session(session_id);
@@ -885,14 +1004,14 @@ fn forget_session(session_id: &str) -> Vec<String> {
 async fn transmitting_session(
     session_id: &str,
     payload: &TransmitPayload,
-) -> Result<OwnedMutexGuard<IOSession>, String> {
+) -> Result<SessionReader, String> {
     if matches!(payload, TransmitPayload::CanFrame(f) if f.is_brs && !f.is_fd) {
         return Err("A classic CAN frame does not support bit rate switch (BRS)".to_string());
     }
     if matches!(payload, TransmitPayload::CanFrame(f) if f.is_rtr && f.is_fd) {
         return Err("A CAN FD frame does not support remote request (RTR)".to_string());
     }
-    let session = lock_session(session_id).await?;
+    let session = read_session(session_id).await?;
 
     let caps = session.source.capabilities();
 
@@ -1247,6 +1366,7 @@ pub async fn add_source_to_session(
     new_source: SourceConfig,
 ) -> Result<IOCapabilities, String> {
     let mut session = lock_session(session_id).await?;
+    note_roster_moved(session_id);
 
     // Get current source configs — only multi-source sessions support this
     let existing_configs = session.source.broker_configs()
@@ -1305,6 +1425,7 @@ pub async fn remove_source_from_session(
     profile_id: &str,
 ) -> Result<IOCapabilities, String> {
     let mut session = lock_session(session_id).await?;
+    note_roster_moved(session_id);
 
     // Get current source configs — only multi-source sessions support this
     let existing_configs = session.source.broker_configs()
@@ -1366,35 +1487,19 @@ pub async fn remove_source_from_session(
 /// Pause or resume one source, then tell every window the roster moved.
 ///
 /// The session stays active and other sources continue normally.
-///
-/// The broadcast is the half that makes `paused_source_profile_ids` worth
-/// reporting: `useSessionRosterSync` re-fetches on a lifecycle push, on mount and
-/// on reconnect, and nothing else. Without it a second panel on the same session
-/// would keep showing the state it last set for itself.
 pub async fn set_source_polling(
     session_id: &str,
     profile_id: &str,
     polling: bool,
 ) -> Result<(), String> {
     let session = lock_session(session_id).await?;
+    note_roster_moved(session_id);
 
     if polling {
-        session.source.resume_source_polling(profile_id)?;
+        session.source.resume_source_polling(profile_id)
     } else {
-        session.source.pause_source_polling(profile_id)?;
+        session.source.pause_source_polling(profile_id)
     }
-
-    emit_session_lifecycle(SessionLifecyclePayload {
-        session_id: session_id.to_string(),
-        event_type: LifecycleEvent::Updated,
-        source_type: Some(session.source.source_type().to_string()),
-        state: None,
-        subscriber_count: subscriber_count_for_session(session_id),
-        source_profile_ids: sessions::get_session_profile_ids(session_id),
-        subscriber_id: None,
-        reset: false,
-    });
-    Ok(())
 }
 
 /// Update bus mappings for a source in a multi-source session.
@@ -1406,6 +1511,7 @@ pub async fn update_source_bus_mappings(
     mut bus_mappings: Vec<BusMapping>,
 ) -> Result<IOCapabilities, String> {
     let mut session = lock_session(session_id).await?;
+    note_roster_moved(session_id);
 
     // Only multi-source sessions support this
     let configs = session.source.broker_configs()
@@ -1816,6 +1922,74 @@ mod tests {
         create_for("f_cause_external", Some("w_cause_other")).await;
         destroy_session("f_cause_external", false).await.unwrap();
         assert_eq!(last_destroyed("f_cause_external"), (false, None));
+    }
+
+    #[tokio::test]
+    async fn a_busy_session_is_listed_as_its_last_operation_left_it() {
+        let id = "f_listed_busy";
+        let gate = Arc::new(Gate::default());
+        open(id, TestSource::new(id).slow_stop(&gate)).await;
+        start_session(id).await.unwrap();
+        let stop = tokio::spawn(stop_session(id));
+        gate.entered().await;
+
+        let rows = tokio::time::timeout(Duration::from_secs(1), super::super::list_sessions())
+            .await
+            .expect("the listing waited on a busy session");
+        let row = rows.into_iter().find(|r| r.session_id == id).expect("a busy session is listed");
+        assert_eq!(row.state, IOState::Running);
+        assert!(row.joinable);
+
+        gate.release();
+        stop.await.unwrap().unwrap();
+        assert_eq!(super::super::session_info(id).await.map(|r| r.state), Some(IOState::Stopped));
+        // The teardown stops the source again.
+        gate.release();
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_transmit_takes_no_snapshot() {
+        let id = "f_transmit_quiet";
+        let source = TestSource::new(id).transmitting(|_, _| TransmitResult::success());
+        open(id, source).await;
+        let frame = CanTransmitFrame { frame_id: 0x100, data: vec![1], bus: 0, is_extended: false, is_fd: false, is_brs: false, is_rtr: false };
+        let taken = || super::super::roster::SNAPSHOTS_TAKEN.with(std::cell::Cell::get);
+
+        let before = taken();
+        for _ in 0..3 {
+            transmit_frame(id, &frame).await.unwrap();
+        }
+        assert_eq!(taken(), before);
+        destroy_session(id, false).await.unwrap();
+    }
+
+    fn roster_pushes(session_id: &str) -> usize {
+        super::super::EMITTED_LIFECYCLE
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.session_id == session_id && e.event_type == LifecycleEvent::Updated)
+            .count()
+    }
+
+    #[tokio::test]
+    async fn a_moved_row_is_pushed_once_its_operation_lets_go() {
+        let id = "f_roster_push";
+        open(id, TestSource::new(id)).await;
+
+        let session = lock_session(id).await.unwrap();
+        note_roster_moved(id);
+        assert_eq!(roster_pushes(id), 0, "pushed before the change could be read");
+        drop(session);
+        assert_eq!(roster_pushes(id), 1);
+
+        note_roster_moved(id);
+        assert_eq!(roster_pushes(id), 2, "an idle session is pushed at once");
+
+        start_session(id).await.unwrap();
+        assert_eq!(roster_pushes(id), 3, "a state change moves the row");
+        destroy_session(id, false).await.unwrap();
     }
 
     fn miss_heartbeats(instance_id: &str) {

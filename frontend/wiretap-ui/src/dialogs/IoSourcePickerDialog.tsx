@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import Dialog, { DialogBody } from "../components/Dialog";
 import { useSettings, type IOProfile } from "../hooks/useSettings";
 import { buildCatalogPath } from "../utils/catalogUtils";
@@ -15,9 +15,9 @@ import {
 import { validateSourceSelection } from "../api/deviceKinds";
 import { isCaptureSession, useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
-import { generateSessionId } from "../api/io";
+import { generateSessionId, listActiveSessions } from "../api/io";
+import { useCaptureListStore } from "../stores/captureListStore";
 import {
-  listOrphanedCaptures,
   deleteCapture,
   setActiveCapture,
   detectCandump,
@@ -34,14 +34,10 @@ import {
   unregisterSessionSubscriber,
   probeDevice,
   previewSourceBuses,
-  listActiveSessions,
-  getProfilesUsage,
   type GvretDeviceInfo,
   type BusMapping,
   type BusOverride,
-  type ActiveSessionInfo,
   type DeviceProbeResult,
-  type ProfileUsageInfo,
   type FramingMode,
   type ModbusRangeSpec,
 } from '../api/io';
@@ -244,6 +240,9 @@ export default function IoSourcePickerDialog({
   const getSessionForProfile = useSessionStore((s) => s.getSessionForProfile);
   const startSession = useSessionStore((s) => s.startSession);
   const selectedIsCapture = useSessionStore((s) => isCaptureSession(s, selectedId));
+  const roster = useSessionStore((s) => s.roster);
+  const joinableSessions = useMemo(() => roster.filter((s) => s.joinable), [roster]);
+  const profileUsage = useSessionStore((s) => s.profileUsage);
 
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -261,8 +260,7 @@ export default function IoSourcePickerDialog({
   // Track auto-import mode (menu shortcut) so cancel closes the dialog
   const autoImportActiveRef = useRef(false);
 
-  // Multi-capture state
-  const [captures, setCaptures] = useState<CaptureMetadata[]>([]);
+  const captures = useCaptureListStore((s) => s.orphaned);
   const [selectedCaptureId, setSelectedCaptureId] = useState<string | null>(null);
 
   // Source tab (Captures | Devices) — smart default set on open
@@ -326,12 +324,6 @@ export default function IoSourcePickerDialog({
   // "Sessions" default). Reset on each open in the init effect.
   const tabUserPickedRef = useRef(false);
   const hasExplicitSelectionRef = useRef(false);
-
-  // Active multi-source sessions (for sharing between apps)
-  const [activeMultiSourceSessions, setActiveMultiSourceSessions] = useState<ActiveSessionInfo[]>([]);
-
-  // Profile usage info - which sessions are using each profile
-  const [profileUsage, setProfileUsage] = useState<Map<string, ProfileUsageInfo>>(new Map());
 
   const isLoading = externalIsLoading ?? false;
   const loadProfileId = externalLoadProfileId ?? null;
@@ -408,8 +400,8 @@ export default function IoSourcePickerDialog({
   // Is the checked reader an active multi-source session?
   const checkedMultiSourceSession = useMemo(() => {
     if (!checkedSourceId) return null;
-    return activeMultiSourceSessions.find((s) => s.session_id === checkedSourceId) || null;
-  }, [checkedSourceId, activeMultiSourceSessions]);
+    return joinableSessions.find((s) => s.session_id === checkedSourceId) || null;
+  }, [checkedSourceId, joinableSessions]);
 
   // Is the checked selection an active session that can be joined?
   // This is ONLY true when the user explicitly selects an Active Session from the list.
@@ -426,12 +418,12 @@ export default function IoSourcePickerDialog({
   const liveMultiSourceSession = useMemo(() => {
     if (checkedSourceIds.length === 0) return null;
     // Find a session whose source profiles match our selection
-    return activeMultiSourceSessions.find((session) => {
+    return joinableSessions.find((session) => {
       const sessionProfileIds = session.broker_configs?.map((c) => c.profile_id) || [];
       // Check if selected profiles are a subset of or match the session's profiles
       return checkedSourceIds.every((id) => sessionProfileIds.includes(id));
     }) || null;
-  }, [checkedSourceIds, activeMultiSourceSessions]);
+  }, [checkedSourceIds, joinableSessions]);
 
   const isMultiSourceLive = liveMultiSourceSession !== null;
 
@@ -447,33 +439,30 @@ export default function IoSourcePickerDialog({
     if (didInitForOpenRef.current) return;
     didInitForOpenRef.current = true;
     {
-      // Load all captures from the registry and initialize selected capture
-      listOrphanedCaptures().then((loadedCaptures) => {
-        setCaptures(loadedCaptures);
-        // If a specific capture is selected (e.g., "xk9m2p"), use that
-        // Otherwise if legacy capture ID is selected, use the most recent capture
-        if (selectedIsCapture && loadedCaptures.length > 0) {
-          // Check if selectedId matches a specific capture (e.g., "xk9m2p")
-          const matchingCapture = loadedCaptures.find(b => b.id === selectedId);
-          if (matchingCapture) {
-            setSelectedCaptureId(matchingCapture.id);
-            // Probe capture to populate shared bus config maps
-            probeDevice(matchingCapture.id)
-              .then((result) => {
-                setDeviceProbeResultMap((prev) => new Map(prev).set(matchingCapture.id, result));
-                const busList = matchingCapture.buses.length > 0 ? matchingCapture.buses : [0];
-                setCaptureBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, captureBusMappings(busList)));
-              })
-              .catch(console.error);
-          } else {
-            // Legacy capture ID - fall back to most recent capture
-            const sorted = [...loadedCaptures].sort((a, b) => b.created_at - a.created_at);
-            setSelectedCaptureId(sorted[0].id);
-          }
+      const loadedCaptures = useCaptureListStore.getState().orphaned;
+      // If a specific capture is selected (e.g., "xk9m2p"), use that
+      // Otherwise if legacy capture ID is selected, use the most recent capture
+      if (selectedIsCapture && loadedCaptures.length > 0) {
+        // Check if selectedId matches a specific capture (e.g., "xk9m2p")
+        const matchingCapture = loadedCaptures.find(b => b.id === selectedId);
+        if (matchingCapture) {
+          setSelectedCaptureId(matchingCapture.id);
+          // Probe capture to populate shared bus config maps
+          probeDevice(matchingCapture.id)
+            .then((result) => {
+              setDeviceProbeResultMap((prev) => new Map(prev).set(matchingCapture.id, result));
+              const busList = matchingCapture.buses.length > 0 ? matchingCapture.buses : [0];
+              setCaptureBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, captureBusMappings(busList)));
+            })
+            .catch(console.error);
         } else {
-          setSelectedCaptureId(null);
+          // Legacy capture ID - fall back to most recent capture
+          const sorted = [...loadedCaptures].sort((a, b) => b.created_at - a.created_at);
+          setSelectedCaptureId(sorted[0].id);
         }
-      }).catch(console.error);
+      } else {
+        setSelectedCaptureId(null);
+      }
       // Reset options when dialog opens
       setTimeBounds({
         startTime: "",
@@ -548,12 +537,12 @@ export default function IoSourcePickerDialog({
   // one of those sessions.
   useEffect(() => {
     if (!isOpen || tabUserPickedRef.current || hideSessions) return;
-    if (activeMultiSourceSessions.length === 0) return;
-    const selectedIsSession = activeMultiSourceSessions.some((s) => s.session_id === selectedId);
+    if (joinableSessions.length === 0) return;
+    const selectedIsSession = joinableSessions.some((s) => s.session_id === selectedId);
     if (selectedIsSession || !hasExplicitSelectionRef.current) {
       setActiveTab("sessions");
     }
-  }, [isOpen, activeMultiSourceSessions, selectedId, hideSessions]);
+  }, [isOpen, joinableSessions, selectedId, hideSessions]);
 
   // Apply the decoder picker selection (and mirror it into the host app).
   const handleCatalogSelect = useCallback((path: string | null) => {
@@ -634,91 +623,18 @@ export default function IoSourcePickerDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, autoImport]);
 
-  // Refresh capture list periodically while dialog is open
-  // This catches transitions from streaming to stopped even if the stream-ended
-  // event wasn't received (e.g., stream stopped by another window)
+  // A live session's frame count moves with every frame, and no push carries it to a
+  // window not subscribed to that session, so the visible Sessions tab re-reads it.
+  const sessionsTabShown = isOpen && activeTab === "sessions" && !hideSessions && joinableSessions.length > 0;
   useEffect(() => {
-    if (!isOpen) return;
-    if (captures.length === 0) return;
-
-    // Poll more frequently while streaming, less frequently when not
-    const hasStreamingCapture = captures.some(b => b.is_streaming);
-    const pollInterval = hasStreamingCapture ? 500 : 2000;
-
+    if (!sessionsTabShown) return;
     const intervalId = setInterval(() => {
-      listOrphanedCaptures().then(setCaptures).catch(console.error);
-    }, pollInterval);
-
+      listActiveSessions().then(useSessionStore.getState().registerKnownSessions).catch(() => {});
+    }, 2000);
     return () => clearInterval(intervalId);
-  }, [isOpen, captures]);
+  }, [sessionsTabShown]);
 
-  // Listen for capture changes from other windows while dialog is open
-  useEffect(() => {
-    if (!isOpen) return;
-    const unlistenFns: (() => void)[] = [];
-    const setup = async () => {
-      // Refresh capture list on delete/clear/import from another window
-      const u1 = await listen<CaptureChangedPayload>(WINDOW_EVENTS.CAPTURE_CHANGED, () => {
-        listOrphanedCaptures().then(setCaptures).catch(console.error);
-      });
-      unlistenFns.push(u1);
-      // Refresh capture list on rename/pin from another window
-      const u2 = await listen(WINDOW_EVENTS.CAPTURE_METADATA_UPDATED, () => {
-        listOrphanedCaptures().then(setCaptures).catch(console.error);
-      });
-      unlistenFns.push(u2);
-    };
-    setup();
-    return () => unlistenFns.forEach(fn => fn());
-  }, [isOpen]);
-
-  // Fetch active joinable sessions when dialog opens and periodically refresh
-  // Includes multi_source sessions AND recorded sessions (like the WireTAP backend)
-  // Also fetches profile usage info for showing "(in use)" indicators
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchSessions = async () => {
-      try {
-        const sessions = await listActiveSessions();
-        console.log("[IoSourcePickerDialog] All active sessions:", sessions);
-        // Show joinable sessions:
-        // - traits.multi_source: sources that can be combined (all realtime)
-        // - capture: sessions switched to capture replay (e.g., stopped live sessions)
-        // - supports_time_range && !is_realtime: recorded sources like the WireTAP backend
-        const joinableSessions = sessions.filter((s) =>
-          s.capabilities.traits.multi_source === true ||
-          s.source_type === "capture" ||
-          (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "recorded")
-        );
-        console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
-        setActiveMultiSourceSessions(joinableSessions);
-
-        // Fetch profile usage info for all profiles
-        const profileIds = ioProfiles.map((p) => p.id);
-        if (profileIds.length > 0) {
-          const usageList = await getProfilesUsage(profileIds);
-          const usageMap = new Map<string, ProfileUsageInfo>();
-          for (const usage of usageList) {
-            usageMap.set(usage.profile_id, usage);
-          }
-          setProfileUsage(usageMap);
-        }
-      } catch (err) {
-        console.error("[IoSourcePickerDialog] Error fetching sessions:", err);
-      }
-    };
-
-    // Fetch immediately
-    fetchSessions();
-
-    // Refresh periodically
-    const intervalId = setInterval(fetchSessions, 2000);
-
-    return () => clearInterval(intervalId);
-  }, [isOpen, ioProfiles]);
-
-  // After activeMultiSourceSessions loads, if current source is a capture with an
+  // After joinableSessions loads, if current source is a capture with an
   // active session, set checkedReaderId so the collapsed view shows it
   useEffect(() => {
     if (!isOpen) return;
@@ -726,13 +642,13 @@ export default function IoSourcePickerDialog({
     if (checkedSourceId !== null) return;
     if (hasUserExpandedRef.current) return;
 
-    const captureSession = activeMultiSourceSessions.find(
+    const captureSession = joinableSessions.find(
       (s) => s.session_id === selectedId
     );
     if (captureSession) {
       setCheckedReaderId(selectedId);
     }
-  }, [isOpen, selectedId, selectedIsCapture, checkedSourceId, activeMultiSourceSessions]);
+  }, [isOpen, selectedId, selectedIsCapture, checkedSourceId, joinableSessions]);
 
   // Multi-bus mode is active when at least one profile is selected in multi-select
   const isMultiBusMode = checkedSourceIds.length > 0;
@@ -972,7 +888,7 @@ export default function IoSourcePickerDialog({
   const handleJoinClick = () => {
     if (onJoinSession && checkedSourceId) {
       // Check if this is a multi-source session and get source profile IDs
-      const multiSourceSession = activeMultiSourceSessions.find((s) => s.session_id === checkedSourceId);
+      const multiSourceSession = joinableSessions.find((s) => s.session_id === checkedSourceId);
       const sourceProfileIds = multiSourceSession?.broker_configs?.map((c) => c.profile_id);
       onJoinSession(checkedSourceId, sourceProfileIds);
     }
@@ -1264,10 +1180,6 @@ export default function IoSourcePickerDialog({
     setCsvHasHeaderPerFile(null);
     setCsvImportSessionId(null);
 
-    // Refresh capture list
-    const allCaptures = await listOrphanedCaptures();
-    setCaptures(allCaptures);
-
     onImport?.(metadata);
 
     // Notify other windows that capture has changed
@@ -1300,12 +1212,8 @@ export default function IoSourcePickerDialog({
     try {
       await deleteCapture(captureId);
 
-      // Refresh capture list
-      const allCaptures = await listOrphanedCaptures();
-      setCaptures(allCaptures);
-
       // If no captures left and capture was selected, clear selection
-      if (allCaptures.length === 0 && selectedIsCapture) {
+      if (captures.every((c) => c.id === captureId) && selectedIsCapture) {
         onSelect(null);
       }
 
@@ -1329,10 +1237,6 @@ export default function IoSourcePickerDialog({
       for (const capture of clearableCaptures) {
         await deleteCapture(capture.id);
       }
-
-      // Refresh capture list (keep streaming and persistent captures)
-      const keptCaptures = captures.filter(b => b.is_streaming || b.persistent);
-      setCaptures(keptCaptures);
 
       // If capture was selected and it was deleted, clear selection
       const deletedIds = new Set(clearableCaptures.map(b => b.id));
@@ -1422,8 +1326,7 @@ export default function IoSourcePickerDialog({
             const isLoading = deviceProbeLoadingMap.get(profileId) || false;
             const isDeviceMultiBus = isMultiBusProfile(profile);
             // Check if config is locked for this profile (in use by 2+ sessions)
-            const usageInfo = profileUsage.get(profileId);
-            const configLocked = usageInfo?.config_locked ?? false;
+            const configLocked = profileUsage[profileId]?.config_locked ?? false;
 
             const busConfig = busAllocation.get(profileId) ?? [];
             const usedOutputBuses = new Set(
@@ -1492,7 +1395,7 @@ export default function IoSourcePickerDialog({
               />
             );
           }}
-          activeMultiSourceSessions={activeMultiSourceSessions}
+          joinableSessions={joinableSessions}
           onSelectMultiSourceSession={handleSelectMultiSourceSession}
           disabledProfiles={disabledProfiles}
           hideExternal={hideCaptures}
@@ -1508,8 +1411,6 @@ export default function IoSourcePickerDialog({
               onSelectCapture={handleSelectCapture}
               onDeleteCapture={handleDeleteCapture}
               onClearAllCaptures={handleClearAllCaptures}
-              onCaptureRenamed={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
-              onCapturePersistenceChanged={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
               busConfig={selectedCaptureId ? captureBusConfigMap.get(selectedCaptureId) : undefined}
               onBusConfigChange={(config) => {
                 if (selectedCaptureId) {
@@ -1519,7 +1420,7 @@ export default function IoSourcePickerDialog({
               isProbing={selectedCaptureId ? deviceProbeLoadingMap.get(selectedCaptureId) ?? false : false}
               probeError={selectedCaptureId ? deviceProbeResultMap.get(selectedCaptureId)?.error ?? null : null}
               activeSessionCaptureMap={new Map(
-                activeMultiSourceSessions
+                joinableSessions
                   .filter((s) => s.source_type === "capture")
                   .flatMap((s) => {
                     const entries: [string, string][] = [[s.session_id, s.session_id]];
@@ -1538,7 +1439,7 @@ export default function IoSourcePickerDialog({
           <ModbusPollConfig
             config={modbusPoll}
             onChange={setModbusPoll}
-            disabled={profileUsage.get(modbusProfile.id)?.config_locked ?? false}
+            disabled={profileUsage[modbusProfile.id]?.config_locked ?? false}
           />
         )}
 

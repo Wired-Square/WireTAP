@@ -161,8 +161,20 @@ pub fn get_session_profile_ids(session_id: &str) -> Vec<String> {
     registry().by_session.get(session_id).cloned().unwrap_or_default()
 }
 
-/// The sessions holding a profile — the picker's "(in use)" and the
-/// single-handle admission check both read it.
+/// Every held profile with the sessions holding it, sorted.
+pub fn profiles_in_use() -> Vec<(String, Vec<String>)> {
+    registry()
+        .by_profile
+        .iter()
+        .map(|(profile_id, sessions)| {
+            let mut sessions: Vec<String> = sessions.iter().cloned().collect();
+            sessions.sort();
+            (profile_id.clone(), sessions)
+        })
+        .collect()
+}
+
+/// The sessions holding a profile, which the single-handle admission check reads.
 pub fn get_sessions_for_profile(profile_id: &str) -> Vec<String> {
     registry()
         .by_profile

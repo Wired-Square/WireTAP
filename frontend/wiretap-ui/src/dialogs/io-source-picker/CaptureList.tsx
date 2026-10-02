@@ -26,10 +26,6 @@ type Props = {
   onSelectCapture: (captureId: string) => void;
   onDeleteCapture: (captureId: string) => void;
   onClearAllCaptures: () => void;
-  /** Called after a buffer is renamed so the parent can refresh */
-  onCaptureRenamed?: () => void;
-  /** Called after a buffer's persistent flag is toggled so the parent can refresh */
-  onCapturePersistenceChanged?: () => void;
   /** Map of buffer ID to session ID for captures owned by active sessions */
   activeSessionCaptureMap?: Map<string, string>;
   /** Bus mappings for the selected buffer (from shared probe maps) */
@@ -50,8 +46,6 @@ export default function CaptureList({
   onSelectCapture,
   onDeleteCapture,
   onClearAllCaptures,
-  onCaptureRenamed,
-  onCapturePersistenceChanged,
   activeSessionCaptureMap = new Map(),
   busConfig,
   onBusConfigChange,
@@ -84,7 +78,6 @@ export default function CaptureList({
     }
     try {
       await useSessionStore.getState().renameSessionCapture(renamingId, renameValue.trim());
-      onCaptureRenamed?.();
     } catch (e) {
       console.error("[CaptureList] Failed to rename buffer:", e);
     }
@@ -99,7 +92,6 @@ export default function CaptureList({
     e.stopPropagation();
     try {
       await useSessionStore.getState().setSessionCapturePersistent(capture.id, !capture.persistent);
-      onCapturePersistenceChanged?.();
     } catch (err) {
       console.error("[CaptureList] Failed to toggle persistence:", err);
     }

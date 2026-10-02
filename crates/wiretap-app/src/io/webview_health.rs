@@ -301,9 +301,6 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
             let Some(session) = sessions.get_mut(sid) else { continue };
             results.push((sid.clone(), removed_count, after_count));
 
-            // Emit joiner count change (sync - no specific subscriber)
-            emit_joiner_count_change(sid, after_count, None, None, None);
-
             // If no subscribers left, enter suspension grace period instead of destroying
             if after_count == 0 && session.suspended_at.is_none() {
                 tlog!(
@@ -318,6 +315,10 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
             }
         }
     } // Lock released here
+
+    for (sid, _, after_count) in &results {
+        emit_joiner_count_change(sid, *after_count, None, None, None);
+    }
 
     // Phase 2a: Pause suspended sessions, off the watchdog: one may be mid-open.
     for session_id in sessions_to_pause {

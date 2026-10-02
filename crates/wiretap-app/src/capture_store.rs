@@ -270,6 +270,19 @@ impl Default for CaptureRegistry {
 static CAPTURE_REGISTRY: Lazy<RwLock<CaptureRegistry>> =
     Lazy::new(|| RwLock::new(CaptureRegistry::default()));
 
+#[cfg(test)]
+thread_local! {
+    static CAPTURE_LIST_CHANGES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Every change to the list except an append to a session's own capture, whose
+/// count rides the session's frame counts.
+fn capture_list_changed() {
+    #[cfg(test)]
+    CAPTURE_LIST_CHANGES.with(|c| c.set(c.get() + 1));
+    crate::ws::dispatch::send_capture_list_changed();
+}
+
 // ============================================================================
 // Public API - Capture ID Queries
 // ============================================================================
@@ -401,6 +414,7 @@ fn create_capture_internal(
         "[CaptureStore] Created capture '{}' ({:?}) - '{}' [streaming={}, owner={:?}]",
         id, kind, name, set_streaming, owner
     );
+    capture_list_changed();
 
     id
 }
@@ -473,6 +487,7 @@ pub fn delete_capture(id: &str) -> Result<(), String> {
             tlog!("[CaptureStore] Failed to delete capture metadata from SQLite: {}", e);
         }
         tlog!("[CaptureStore] Deleted capture '{}'", id);
+        capture_list_changed();
         Ok(())
     } else {
         Err(format!("Capture '{}' not found", id))
@@ -511,6 +526,7 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
     }
 
     tlog!("[CaptureStore] Cleared capture '{}'", id);
+    capture_list_changed();
     Ok(())
 }
 
@@ -532,6 +548,7 @@ pub fn rename_capture(id: &str, new_name: &str) -> Result<CaptureMetadata, Strin
     }
 
     tlog!("[CaptureStore] Renamed capture '{}' to '{}'", id, new_name);
+    capture_list_changed();
     Ok(meta)
 }
 
@@ -553,6 +570,7 @@ pub fn set_capture_persistent(id: &str, persistent: bool) -> Result<CaptureMetad
     }
 
     tlog!("[CaptureStore] Set capture '{}' persistent={}", id, persistent);
+    capture_list_changed();
     Ok(meta)
 }
 
@@ -685,6 +703,7 @@ pub fn set_capture_owner(
             if let Err(e) = capture_db::save_capture_metadata(&m) {
                 tlog!("[CaptureStore] Failed to persist capture owner: {}", e);
             }
+            capture_list_changed();
             Ok(())
         }
         None => Err(format!("Capture '{}' not found", capture_id)),
@@ -740,6 +759,7 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
             session_id,
             orphaned.iter().map(|o| &o.capture_id).collect::<Vec<_>>()
         );
+        capture_list_changed();
     }
 
     orphaned
@@ -889,6 +909,9 @@ pub fn finalize_session_captures(session_id: &str) -> Vec<CaptureMetadata> {
             tlog!("[CaptureStore] Failed to persist finalized capture metadata: {}", e);
         }
     }
+    if !finalized.is_empty() {
+        capture_list_changed();
+    }
 
     finalized
 }
@@ -984,6 +1007,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
         "[CaptureStore] Copied capture '{}' -> '{}' ('{}', {} items)",
         source_capture_id, id, new_name, count
     );
+    capture_list_changed();
 
     Ok(id)
 }
@@ -1001,6 +1025,7 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
         return;
     }
 
+    let unowned;
     {
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
@@ -1008,6 +1033,7 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
             if cap.metadata.kind != CaptureKind::Frames {
                 return;
             }
+            unowned = cap.metadata.owning_session_id.is_none();
             if cap.metadata.start_time_us.is_none() {
                 cap.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
             }
@@ -1033,6 +1059,9 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 
     if let Err(e) = capture_db::insert_frames(capture_id, &new_frames) {
         tlog!("[CaptureStore] Failed to insert frames to capture '{}': {}", capture_id, e);
+    }
+    if unowned {
+        capture_list_changed();
     }
 }
 
@@ -1291,6 +1320,7 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
         return;
     }
 
+    let unowned;
     {
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
@@ -1298,6 +1328,7 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
             if cap.metadata.kind != CaptureKind::Bytes {
                 return;
             }
+            unowned = cap.metadata.owning_session_id.is_none();
             if cap.metadata.start_time_us.is_none() {
                 cap.metadata.start_time_us = new_bytes.first().map(|b| b.timestamp_us);
             }
@@ -1321,6 +1352,9 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
 
     if let Err(e) = capture_db::insert_bytes(capture_id, &new_bytes) {
         tlog!("[CaptureStore] Failed to insert bytes to capture '{}': {}", capture_id, e);
+    }
+    if unowned {
+        capture_list_changed();
     }
 }
 
@@ -1468,6 +1502,50 @@ mod tests {
 
         let copy = copy_capture(&source, "copy".to_string()).unwrap();
         assert_eq!(get_capture_unique_count(&copy), 2);
+    }
+
+    #[test]
+    fn every_change_to_the_list_is_pushed_but_a_session_append() {
+        crate::capture_db::use_in_memory_database();
+        let pushes = |change: &mut dyn FnMut()| {
+            let before = CAPTURE_LIST_CHANGES.with(std::cell::Cell::get);
+            change();
+            CAPTURE_LIST_CHANGES.with(std::cell::Cell::get) - before
+        };
+        let frame = FrameMessage {
+            protocol: "can".into(),
+            timestamp_us: 1,
+            frame_id: 0x100,
+            bus: 0,
+            dlc: 0,
+            bytes: Vec::new(),
+            is_extended: false,
+            is_fd: false,
+            source_address: None,
+            incomplete: None,
+            direction: None,
+        };
+        let session = "f_capture_list_pushes";
+
+        let mut id = String::new();
+        assert_eq!(pushes(&mut || id = create_standalone_capture(CaptureKind::Frames, "pushed".into())), 1);
+        assert_eq!(pushes(&mut || { rename_capture(&id, "renamed").unwrap(); }), 1);
+        assert_eq!(pushes(&mut || { set_capture_persistent(&id, true).unwrap(); }), 1);
+        assert_eq!(pushes(&mut || append_frames_to_capture(&id, vec![frame.clone()])), 1);
+        let mut copy = String::new();
+        assert_eq!(pushes(&mut || copy = copy_capture(&id, "copy".into()).unwrap()), 1);
+        assert_eq!(pushes(&mut || clear_capture(&id).unwrap()), 1);
+
+        let mut streamed = String::new();
+        assert_eq!(pushes(&mut || streamed = create_session_capture(session, CaptureKind::Frames, "s".into())), 1);
+        assert_eq!(pushes(&mut || append_frames_to_session(session, vec![frame.clone()])), 0);
+        assert_eq!(pushes(&mut || { finalize_session_captures(session); }), 1);
+        assert_eq!(pushes(&mut || { orphan_captures_for_session(session); }), 1);
+        assert_eq!(pushes(&mut || set_capture_owner(&streamed, session, CaptureRole::Stream).unwrap()), 1);
+
+        for capture in [id, copy, streamed] {
+            assert_eq!(pushes(&mut || delete_capture(&capture).unwrap()), 1);
+        }
     }
 
     /// Empty means "select everything" at every call site, so a group carrying no ids must

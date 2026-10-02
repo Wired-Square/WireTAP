@@ -51,7 +51,7 @@ type Props = {
   /** Render additional content below a profile when selected */
   renderProfileExtra?: (profileId: string) => ReactNode;
   /** Active multi-source sessions that can be joined */
-  activeMultiSourceSessions?: ActiveSessionInfo[];
+  joinableSessions?: ActiveSessionInfo[];
   /** Callback when selecting a multi-source session to join */
   onSelectMultiSourceSession?: (sessionId: string) => void;
   /** Map of profile ID to disabled status (for transmit mode) */
@@ -67,7 +67,7 @@ type Props = {
   /** Allow multi-select mode (default: true for real-time CAN interfaces) */
   allowMultiSelect?: boolean;
   /** Profile usage info - which sessions are using each profile */
-  profileUsage?: Map<string, ProfileUsageInfo>;
+  profileUsage?: Record<string, ProfileUsageInfo>;
   /** Content to render in the Captures tab body (e.g., CaptureList) */
   renderAfterSessions?: ReactNode;
   /** Map of buffer ID to display name (for resolving buffer source names in active sessions) */
@@ -97,7 +97,7 @@ export default function SourceList({
   isProfileLive,
   getSessionForProfile,
   renderProfileExtra,
-  activeMultiSourceSessions = [],
+  joinableSessions = [],
   onSelectMultiSourceSession,
   disabledProfiles,
   hideExternal = false,
@@ -174,11 +174,6 @@ export default function SourceList({
       </div>
     );
   };
-
-  // Filter active sessions to show joinable ones (running, starting, paused, or stopped)
-  const joinableSessions = activeMultiSourceSessions.filter(
-    (s) => s.state.type === "Running" || s.state.type === "Starting" || s.state.type === "Paused" || s.state.type === "Stopped"
-  );
 
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
@@ -306,7 +301,7 @@ export default function SourceList({
                 isLive={isProfileLive?.(profile.id) ?? false}
                 sessionState={getSessionForProfile?.(profile.id)?.ioState}
                 onSelect={onSelectSource}
-                usageInfo={profileUsage?.get(profile.id)}
+                usageInfo={profileUsage?.[profile.id]}
                 isRealtime={false}
               />
             ))}
@@ -372,7 +367,7 @@ export default function SourceList({
             ? () => onToggleSource(profile.id)
             : onSelectSource;
 
-          const usage = profileUsage?.get(profile.id);
+          const usage = profileUsage?.[profile.id];
           const isLive = isProfileLive?.(profile.id) ?? false;
 
           return (

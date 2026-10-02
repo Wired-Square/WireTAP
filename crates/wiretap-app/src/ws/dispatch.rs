@@ -1003,6 +1003,13 @@ pub fn send_catalog_list_changed(catalogs: &[crate::catalog::CatalogFile]) {
     server.send_global(msg);
 }
 
+/// Signal all connected WS clients that the capture list changed.
+pub fn send_capture_list_changed() {
+    if let Some(server) = ws_server() {
+        server.send_global(protocol::encode_message(MsgType::CaptureListChanged, 0, &[]));
+    }
+}
+
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
     let server = match ws_server() {

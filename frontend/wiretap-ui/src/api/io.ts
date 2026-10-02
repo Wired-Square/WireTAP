@@ -870,9 +870,9 @@ export async function generateSessionId(purpose: SessionPurpose): Promise<string
 // Profile-to-Session Mapping API
 // ============================================================================
 
-/** Which sessions are using each of these profiles, and whether that locks reconfiguration. */
-export async function getProfilesUsage(profileIds: string[]): Promise<ProfileUsageInfo[]> {
-  return invoke("get_profiles_usage", { profile_ids: profileIds });
+/** Which sessions hold each profile in use, and whether that locks reconfiguration. */
+export async function getProfilesUsage(): Promise<ProfileUsageInfo[]> {
+  return invoke("get_profiles_usage");
 }
 
 // ============================================================================

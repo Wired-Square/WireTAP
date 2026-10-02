@@ -4,10 +4,10 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use super::session::{
-    each_session, lock_session, resume_reattached, session_capture, session_mode, session_states, source_kind,
-    teardown_session_if_empty, IOSession, SessionMode, SessionSourceKind,
+    read_session, resume_reattached, session_capture, session_mode, session_snapshot, session_snapshots,
+    session_states, source_kind, teardown_session_if_empty, IOSession, SessionMode, SessionSourceKind,
 };
-use super::{broker, IOCapabilities, IOState, SourceConfig};
+use super::{broker, IOCapabilities, IOState, SourceConfig, TemporalMode, CAPTURE_SOURCE_TYPE};
 use crate::{capture_store, sessions};
 
 // ============================================================================
@@ -318,12 +318,12 @@ pub fn emit_open_apps_changed() {
 
 /// Get the state of a reader session (None if session doesn't exist)
 pub async fn get_session_state(session_id: &str) -> Option<IOState> {
-    lock_session(session_id).await.ok().map(|s| s.source.state())
+    read_session(session_id).await.ok().map(|s| s.source.state())
 }
 
 /// Get the capabilities of a session (None if session doesn't exist)
 pub async fn get_session_capabilities(session_id: &str) -> Option<IOCapabilities> {
-    lock_session(session_id).await.ok().map(|s| s.source.capabilities())
+    read_session(session_id).await.ok().map(|s| s.source.capabilities())
 }
 
 /// Get the joiner count for a session (0 if session doesn't exist). Derived from
@@ -338,7 +338,7 @@ pub async fn get_session_joiner_count(session_id: &str) -> usize {
 
 /// The first output bus no source of this session has claimed, disabled buses included.
 pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
-    lock_session(session_id)
+    read_session(session_id)
         .await
         .ok()
         .and_then(|s| s.source.broker_configs())
@@ -353,7 +353,7 @@ pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
 /// Get the stored source configs for a session (used for resume-to-live).
 /// Returns empty vec if session doesn't exist or has no stored configs.
 pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
-    lock_session(session_id)
+    read_session(session_id)
         .await
         .map(|s| s.source_configs.clone())
         .unwrap_or_default()
@@ -451,22 +451,65 @@ pub struct ActiveSessionInfo {
     /// what it last asked for.
     #[serde(default)]
     pub paused_source_profile_ids: Vec<String>,
+    /// Whether the picker offers the session to join
+    pub joinable: bool,
 }
 
-/// List all active sessions
+/// What a roster row reads off the session itself, kept so a session that is
+/// mid-operation is listed as its last operation left it instead of holding the listing.
+#[derive(Clone)]
+pub(super) struct SessionSnapshot {
+    source_type: String,
+    state: IOState,
+    capabilities: IOCapabilities,
+    broker_configs: Option<Vec<broker::SourceConfig>>,
+    mode: SessionMode,
+    paused_source_profile_ids: Vec<String>,
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(super) static SNAPSHOTS_TAKEN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+impl SessionSnapshot {
+    pub(super) fn of(session_id: &str, session: &IOSession) -> Self {
+        #[cfg(test)]
+        SNAPSHOTS_TAKEN.with(|c| c.set(c.get() + 1));
+        Self {
+            source_type: session.source.source_type().to_string(),
+            state: session.source.state(),
+            capabilities: session.source.capabilities(),
+            broker_configs: session.source.broker_configs(),
+            mode: session_mode(session_id, session),
+            paused_source_profile_ids: session.source.paused_source_profile_ids(),
+        }
+    }
+
+    /// A combinable live session, a capture replay or a recorded playback, while not failed.
+    fn joinable(&self) -> bool {
+        let caps = &self.capabilities;
+        !matches!(self.state, IOState::Error(_))
+            && (caps.traits.multi_source
+                || self.source_type == CAPTURE_SOURCE_TYPE
+                || (caps.supports_time_range && caps.traits.temporal_mode == TemporalMode::Recorded))
+    }
+}
+
+/// List all active sessions, none of them waited on.
 pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
-    each_session(describe_session).await
+    session_snapshots()
+        .into_iter()
+        .map(|(id, snapshot)| describe_session(&id, snapshot))
+        .collect()
 }
 
 /// One session's listing, or `None` when there is no such session.
 pub async fn session_info(session_id: &str) -> Option<ActiveSessionInfo> {
-    lock_session(session_id)
-        .await
-        .ok()
-        .map(|session| describe_session(session_id, &session))
+    session_snapshot(session_id).map(|snapshot| describe_session(session_id, snapshot))
 }
 
-fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo {
+fn describe_session(session_id: &str, session: SessionSnapshot) -> ActiveSessionInfo {
     // Get source profile IDs from the session tracking
     let source_profile_ids = sessions::get_session_profile_ids(session_id);
 
@@ -478,31 +521,32 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
     let capture_unique_frame_count = owned.as_deref().map(capture_store::get_capture_unique_count);
     let (capture_id, capture_kind) = session_capture(session_id).unzip();
 
-    // Check if session is actively streaming (running state)
-    let is_streaming = matches!(session.source.state(), IOState::Running);
+    let is_streaming = matches!(session.state, IOState::Running);
+    let joinable = session.joinable();
 
     // Build individual subscriber details (derived from the open-app registry)
     let subscribers = subscribers_for_session(session_id);
 
     ActiveSessionInfo {
         session_id: session_id.to_string(),
-        source_type: session.source.source_type().to_string(),
-        state: session.source.state(),
-        capabilities: session.source.capabilities(),
+        source_type: session.source_type,
+        state: session.state,
+        capabilities: session.capabilities,
         subscriber_count: subscribers.len(),
         subscribers,
-        broker_configs: session.source.broker_configs(),
+        broker_configs: session.broker_configs,
         source_profile_ids,
         origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
         source_kind: source_kind(session_id),
-        mode: session_mode(session_id, session),
+        mode: session.mode,
         capture_id,
         capture_kind,
         capture_frame_count,
         capture_unique_frame_count,
         is_streaming,
         catalog_path: crate::ws::dispatch::attached_catalog_path(session_id),
-        paused_source_profile_ids: session.source.paused_source_profile_ids(),
+        paused_source_profile_ids: session.paused_source_profile_ids,
+        joinable,
     }
 }
 
@@ -531,6 +575,7 @@ pub async fn get_session_subscribers(session_id: &str) -> Result<Vec<SubscriberI
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::InterfaceTraits;
 
     /// The registry invariant: after a session is torn down nothing may still claim
     /// it, but the instances themselves survive — their panels are still open, they
@@ -553,6 +598,31 @@ mod tests {
         assert_eq!(entry.session_id, None);
         assert!(!entry.is_active);
         assert_eq!(entry.display_id, "decoder_ab12");
+    }
+
+    fn snapshot(source_type: &str, state: IOState, capabilities: IOCapabilities) -> SessionSnapshot {
+        SessionSnapshot {
+            source_type: source_type.into(),
+            state,
+            capabilities,
+            broker_configs: None,
+            mode: SessionMode::Live,
+            paused_source_profile_ids: vec![],
+        }
+    }
+
+    #[test]
+    fn combinable_captured_and_recorded_sessions_are_joinable_until_they_fail() {
+        let live = IOCapabilities::realtime_can();
+        let single = IOCapabilities::realtime_can();
+        let single = IOCapabilities { traits: InterfaceTraits { multi_source: false, ..single.traits }, ..single };
+        let recorded = IOCapabilities::recorded_can().with_time_range(true);
+
+        assert!(snapshot("realtime", IOState::Stopped, live.clone()).joinable());
+        assert!(snapshot(CAPTURE_SOURCE_TYPE, IOState::Paused, IOCapabilities::recorded_can()).joinable());
+        assert!(snapshot("wiretap_backend", IOState::Running, recorded).joinable());
+        assert!(!snapshot("serial", IOState::Running, single).joinable());
+        assert!(!snapshot("realtime", IOState::Error("gone".into()), live).joinable());
     }
 
     #[test]

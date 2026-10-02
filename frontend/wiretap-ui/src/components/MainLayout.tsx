@@ -32,6 +32,7 @@ import {
 import { useWindowPersistence } from "../hooks/useWindowPersistence";
 import { useRepeatQueueEvents } from "../hooks/useRepeatQueueEvents";
 import { useSessionRosterSync } from "../hooks/useSessionRosterSync";
+import { useCaptureListSync } from "../hooks/useCaptureListSync";
 import { useOpenAppsSync } from "../hooks/useOpenAppsSync";
 import { useAttachSourceEvents } from "../hooks/useAttachSourceEvents";
 import {
@@ -252,6 +253,9 @@ export default function MainLayout() {
 
   // Adopt backend (incl. agent-created) sessions into the store as known-only.
   useSessionRosterSync();
+
+  // Keep the captures no session owns, which the source picker offers.
+  useCaptureListSync();
 
   // Mirror the Rust-owned open-app roster (every window's open apps) into the store.
   useOpenAppsSync();
