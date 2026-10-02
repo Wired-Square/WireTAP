@@ -2760,6 +2760,10 @@ pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String
     Ok(())
 }
 
+pub async fn session_ids() -> HashSet<String> {
+    IO_SESSIONS.lock().await.keys().cloned().collect()
+}
+
 /// Check if a session exists
 pub async fn session_exists(session_id: &str) -> bool {
     let sessions = IO_SESSIONS.lock().await;
@@ -3011,6 +3015,8 @@ pub struct RegisterSubscriberResult {
     pub startup_error: Option<String>,
     /// Profiles the session was opened from (see `get_session_origin_profile_ids`)
     pub origin_profile_ids: Vec<String>,
+    /// What kind of source is behind the session, as the roster reports it
+    pub source_type: String,
 }
 
 /// Register a subscriber for a session.
@@ -3099,6 +3105,7 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
             subscriber_count: subscriber_count_for_session(session_id),
             startup_error,
             origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
+            source_type: session.source.source_type().to_string(),
         }
     };
     // Lock released here

@@ -68,6 +68,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
     r.visit::<crate::sessions::ProfileUsageInfo>();
+    r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
     r.visit::<crate::adhoc::AdhocBatch>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
@@ -152,6 +153,10 @@ fn wire_constants() -> String {
         table("StreamEndedFlags", STREAM_ENDED_FLAGS.iter().copied(), 2),
         names("SESSION_STATES", &SESSION_STATES),
         names("STREAM_END_REASONS", &STREAM_END_REASONS),
+        format!(
+            "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
+            crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
+        ),
     ]
     .join("\n")
 }

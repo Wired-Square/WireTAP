@@ -17,6 +17,7 @@ import {
 import { validateSourceSelection } from "../api/deviceKinds";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
+import { generateSessionId } from "../api/io";
 import {
   listOrphanedCaptures,
   deleteCapture,
@@ -68,7 +69,6 @@ import { useConnectionDefaults } from "../hooks/useConnectionDefaults";
 import {
   localToIsoWithOffset,
   CSV_EXTERNAL_ID,
-  generateLoadSessionId,
 } from "./io-source-picker";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import type { InterfaceFramingConfig } from "./io-source-picker";
@@ -1334,14 +1334,14 @@ export default function IoSourcePickerDialog({
       }
 
       if (await detectCandump(filePaths)) {
-        const result = await importCandump(generateLoadSessionId(), filePaths);
+        const result = await importCandump(await generateSessionId({ purpose: "ingest" }), filePaths);
         if (result.skipped_count > 0) setCandumpReport(result);
         else await handleCsvMapperComplete(result.metadata);
       } else if (filePaths.length === 1) {
         // Single file — go straight to column mapper
         setCsvMapperFilePath(filePaths[0]);
         setCsvMapperFilePaths(null);
-        setCsvImportSessionId(generateLoadSessionId());
+        setCsvImportSessionId(await generateSessionId({ purpose: "ingest" }));
         setShowCsvMapper(true);
       } else {
         // Multiple files — show order confirmation first
@@ -1356,7 +1356,7 @@ export default function IoSourcePickerDialog({
     }
   };
 
-  const handleFileOrderConfirm = (orderedPaths: string[], hasHeaderPerFile: boolean[]) => {
+  const handleFileOrderConfirm = async (orderedPaths: string[], hasHeaderPerFile: boolean[]) => {
     setShowFileOrderDialog(false);
     setPendingFilePaths(null);
 
@@ -1364,7 +1364,7 @@ export default function IoSourcePickerDialog({
     setCsvMapperFilePath(orderedPaths[0]);
     setCsvMapperFilePaths(orderedPaths);
     setCsvHasHeaderPerFile(hasHeaderPerFile);
-    setCsvImportSessionId(generateLoadSessionId());
+    setCsvImportSessionId(await generateSessionId({ purpose: "ingest" }));
     setShowCsvMapper(true);
   };
 

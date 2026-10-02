@@ -16,19 +16,16 @@ import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
-import { runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
+import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
 import { useShallow } from "zustand/react/shallow";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
 import { useModbusScanSync } from "./hooks/useModbusScanSync";
 import type { StreamEndedInfo, PlaybackPosition, FcProbeConfig, ModbusScanConfig, UnitIdScanConfig } from '../../api/io';
-import { createModbusScanSession, probeModbusFunctionCodes, startReaderSession, stopReaderSession } from '../../api/io';
+import { createModbusScanSession, generateSessionId, probeModbusFunctionCodes, startReaderSession, stopReaderSession } from '../../api/io';
+import { MODBUS_SCAN_SOURCE_TYPE } from '../../generated/wireConstants';
 import type { ScanJob } from '../../api/io';
 import type { ModbusExportConfig } from '../../utils/frameExport';
-import {
-  MODBUS_SCAN_SESSION_PREFIX,
-  isModbusScanSession,
-  type ModbusPollerRef,
-} from '../../utils/modbusProfiles';
+import type { ModbusPollerRef } from '../../utils/modbusProfiles';
 import { useModbusPollControl } from '../../hooks/useModbusPollControl';
 import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
@@ -522,10 +519,11 @@ function DiscoveryInner() {
     return null;
   }, [ioProfiles, sourceProfileId, sessionId, allIOProfiles, capabilities?.traits?.protocols]);
 
-  // Rust names what it is (`source_type`); the id prefix only covers the beat
-  // between minting the scan session and the roster reconcile landing.
-  const scanSourceType = useSessionStore((s) => s.sessions[sessionId]?.sourceType);
-  const onScanSession = isModbusScanSession(sessionId, scanSourceType);
+  // A sweep reports Modbus too, so only its source type tells it from a poller.
+  // The panel's own record covers its sweep in the beat before the join lands.
+  const sweepBySourceType = useSessionStore((s) => s.sessions[sessionId]?.sourceType === MODBUS_SCAN_SOURCE_TYPE);
+  const sweepStartedHere = useDiscoveryToolboxStore((s) => isOwnScanSession(s.toolbox, sessionId));
+  const onScanSession = sweepBySourceType || sweepStartedHere;
 
   // The session whose poller the top-bar switch drives, and whether it is
   // actually polling — one fact, so one piece of state.
@@ -782,7 +780,6 @@ function DiscoveryInner() {
     meta: { registerType: string; unitId: number },
     errorMessage: string,
   ) => {
-    const scanSessionId = `${MODBUS_SCAN_SESSION_PREFIX}${Date.now().toString(36)}`;
     // Tell Save how to render the discovered registers as a catalogue.
     setModbusExportConfig({
       device_address: meta.unitId,
@@ -793,11 +790,12 @@ function DiscoveryInner() {
     try {
       // Contention is refused by name — another app polling this endpoint is a
       // reason to stop, not to collect a half-empty register map.
+      const scanSessionId = await generateSessionId({ purpose: "modbus_scan" });
       await createModbusScanSession(scanSessionId, job, { appName: "discovery" });
-      await joinSession(scanSessionId);
-      // After the session exists, not before: the record *is* the tab, so a
-      // refused sweep would otherwise leave one behind with nothing in it.
+      // After the session exists, so a refused sweep leaves no empty tab behind,
+      // and before the join, so the panel knows its sweep while the join lands.
       startModbusScanStore(scanType, scanSessionId);
+      await joinSession(scanSessionId);
       await startReaderSession(scanSessionId);
     } catch (e) {
       finishModbusScan();

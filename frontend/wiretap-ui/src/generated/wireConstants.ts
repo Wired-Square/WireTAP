@@ -67,3 +67,5 @@ export const StreamEndedFlags = {
 export const SESSION_STATES = ["stopped", "starting", "running", "paused", "error"] as const;
 
 export const STREAM_END_REASONS = ["complete", "disconnected", "error", "stopped", "paused"] as const;
+
+export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";

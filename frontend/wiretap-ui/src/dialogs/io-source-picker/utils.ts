@@ -46,13 +46,3 @@ export const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
 
 // Special ID for CSV external source
 export const CSV_EXTERNAL_ID = "__csv_external__";
-
-/**
- * Generate a unique session ID for load operations.
- * Pattern: load_{shortId}
- * Examples: load_a7f3c9, load_b2c4d6
- */
-export function generateLoadSessionId(): string {
-  const shortId = Math.random().toString(16).slice(2, 8);
-  return `load_${shortId}`;
-}

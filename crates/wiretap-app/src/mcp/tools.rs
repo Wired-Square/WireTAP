@@ -226,13 +226,10 @@ impl WireTapTools {
         wait: bool,
         max_wait_ms: u64,
     ) -> Result<CallToolResult, McpError> {
-        let sid = session_id.unwrap_or_else(|| {
-            format!(
-                "{}{}",
-                crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SESSION_PREFIX,
-                SCAN_COUNTER.fetch_add(1, AtomicOrdering::Relaxed)
-            )
-        });
+        let sid = match session_id {
+            Some(sid) => sid,
+            None => crate::sessions::mint_session_id(crate::sessions::MODBUS_SCAN_SESSION_PREFIX).await,
+        };
 
         crate::sessions::create_modbus_scan_session(
             self.app.clone(),
@@ -324,10 +321,6 @@ impl WireTapTools {
         }))
     }
 }
-
-/// Names generated scan sessions. Only ever incremented.
-static SCAN_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-use std::sync::atomic::Ordering as AtomicOrdering;
 
 /// Bounds an unfiltered `get_discovery_analysis` response.
 const DISCOVERY_ANALYSIS_MAX_FRAMES: usize = 64;

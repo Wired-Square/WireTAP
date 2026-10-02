@@ -48,7 +48,7 @@ can own one of each.
   `None` if the capture is orphaned.
 
 Capture IDs are **not** session IDs. A session replaying a capture gets its
-own `b_`-prefixed session ID (see
+own `c_`-prefixed session ID (see
 [session-flow.md § Session ID prefixes](session-flow.md#session-id-prefixes)).
 
 ---
@@ -413,7 +413,7 @@ speed. On reaching the end of data it pauses itself and emits a
 `StreamEnded` WS message; a subsequent seek or resume continues from the new
 position.
 
-A `CaptureSource` session lives under a `b_` session ID and never streams
+A `CaptureSource` session lives under a `c_` session ID and never streams
 frames into a new capture of its own — it reads from the existing one.
 
 ---

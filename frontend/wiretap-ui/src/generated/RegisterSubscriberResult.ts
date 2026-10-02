@@ -34,4 +34,8 @@ startup_error: string | null,
 /**
  * Profiles the session was opened from (see `get_session_origin_profile_ids`)
  */
-origin_profile_ids: Array<string>, };
+origin_profile_ids: Array<string>, 
+/**
+ * What kind of source is behind the session, as the roster reports it
+ */
+source_type: string, };

@@ -19,5 +19,4 @@ export {
   formatBufferTimestamp,
   SPEED_OPTIONS,
   CSV_EXTERNAL_ID,
-  generateLoadSessionId,
 } from "./utils";

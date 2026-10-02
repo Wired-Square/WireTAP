@@ -801,6 +801,15 @@ fn session_capture_id(session_id: &str, kind: CaptureKind) -> Option<String> {
         .map(|b| b.metadata.id.clone())
 }
 
+/// Whether any capture names this session as its owner, as an import's does.
+pub fn is_session_owner(session_id: &str) -> bool {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
+    registry
+        .captures
+        .values()
+        .any(|c| c.metadata.owning_session_id.as_deref() == Some(session_id))
+}
+
 /// Get the frame capture ID for a session, if one exists.
 pub fn get_session_frame_capture_id(session_id: &str) -> Option<String> {
     session_capture_id(session_id, CaptureKind::Frames)

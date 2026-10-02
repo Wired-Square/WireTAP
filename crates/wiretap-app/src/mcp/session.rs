@@ -5,12 +5,9 @@
 //! reader session) without needing an app window. A keep-alive task touches the
 //! MCP subscriber so the session isn't reaped by the heartbeat watchdog.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use serde_json::{json, Value};
-
-static SID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Touch the MCP subscriber every 10s so the heartbeat watchdog doesn't reap a
 /// headless session. Self-terminates once the session is gone.
@@ -112,14 +109,10 @@ pub async fn open(
         None
     };
 
-    // The app's prefix rule, with a suffix that marks the session as an agent's.
-    let sid = session_id.unwrap_or_else(|| {
-        format!(
-            "{}_mcp{}",
-            crate::sessions::session_id_prefix([profile], None),
-            SID_COUNTER.fetch_add(1, Ordering::Relaxed)
-        )
-    });
+    let sid = match session_id {
+        Some(sid) => sid,
+        None => crate::sessions::mint_session_id(crate::sessions::session_id_prefix([profile], None)).await,
+    };
     let capabilities = crate::sessions::create_reader_session(
         app.clone(),
         sid.clone(),

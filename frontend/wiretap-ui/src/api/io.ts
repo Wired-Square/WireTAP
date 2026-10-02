@@ -38,6 +38,7 @@ import type { ScanCompletePayload } from "../generated/ScanCompletePayload";
 import type { ScanJob } from "../generated/ScanJob";
 import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
 import type { SerialOverrides } from "../generated/SerialOverrides";
+import type { SessionPurpose } from "../generated/SessionPurpose";
 import type { SourceInfo } from "../generated/SourceInfo";
 import type { StepResult } from "../generated/StepResult";
 import type { StreamEndedInfo } from "../generated/StreamEndedInfo";
@@ -1089,18 +1090,9 @@ export async function listOpenApps(): Promise<AppInstanceInfo[]> {
   return invoke("list_open_apps");
 }
 
-/**
- * Generate an opaque realtime session id. The cosmetic prefix is inferred by Rust
- * from the given profiles' output type (nothing parses the id).
- */
-export async function generateSessionId(
-  profileIds: string[],
-  emitRawBytes = false,
-): Promise<string> {
-  return invoke("generate_session_id", {
-    profile_ids: profileIds,
-    emit_raw_bytes: emitRawBytes,
-  });
+/** Mint a session id. Rust picks the prefix; nothing classifies a session by it. */
+export async function generateSessionId(purpose: SessionPurpose): Promise<string> {
+  return invoke("generate_session_id", { purpose });
 }
 
 // ============================================================================

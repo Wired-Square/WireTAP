@@ -31,7 +31,6 @@ import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
 import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
-import { generateLoadSessionId } from "../dialogs/io-source-picker/utils";
 import { useProfileBusStore, profileBusMappings, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { WINDOW_EVENTS } from "../events/registry";
@@ -41,21 +40,8 @@ function attachSessionCatalog(sessionId: string, catalogPath?: string | null): v
   if (catalogPath) useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
 }
 
-/**
- * Generate a unique session ID for recorded sources.
- * Pattern: t_{shortId}
- * - t_ = recorded (WireTAP backend, csv, or other recorded sources)
- * - b_ = capture replay (viewing stored capture data)
- */
-function generateRecordedSessionId(): string {
-  const shortId = Math.random().toString(16).slice(2, 8);
-  return `t_${shortId}`;
-}
-
-function generateCaptureSessionId(): string {
-  const shortId = Math.random().toString(16).slice(2, 8);
-  return `b_${shortId}`;
-}
+const sourcesSessionId = (profileIds: string[], emitRawBytes?: boolean) =>
+  generateSessionId({ purpose: "sources", profile_ids: profileIds, emit_raw_bytes: emitRawBytes });
 
 /** Orphaned-capture fallback hops tolerated before an app gives up and shows No source. */
 const CAPTURE_ADOPTION_LIMIT = 3;
@@ -301,10 +287,6 @@ export interface UseIOSessionManagerResult {
   /** Re-window a recorded session (an event jump), stopping the current stream if needed. Times are UTC ISO-8601. */
   jumpToTimeRange: (startUtc: string, endUtc?: string) => Promise<void>;
 }
-
-// Multi-source session-id generation (prefix inference from output type) now
-// lives in Rust — see `generateSessionId("realtime", …)` / the `generate_session_id`
-// command. The frontend no longer infers the prefix.
 
 /**
  * High-level IO session management hook.
@@ -787,9 +769,7 @@ export function useIOSessionManager(
       nextOutputBus += declared.length;
     }
 
-    // Use provided session ID, otherwise let Rust generate one (it infers the
-    // cosmetic prefix from the profiles' output type).
-    const sessionId = sessionIdOverride ?? await generateSessionId(profileIds, emitRawBytes ?? false);
+    const sessionId = sessionIdOverride ?? await sourcesSessionId(profileIds, emitRawBytes);
 
     const createOptions: CreateMultiSourceOptions = {
       sessionId,
@@ -898,8 +878,7 @@ export function useIOSessionManager(
       // Recorded/capture: reinitialize path
       onBeforeWatch?.();
       const profileId = profileIds[0];
-      const isCapture = isCaptureProfileId(profileId);
-      const sessionId = isCapture ? generateCaptureSessionId() : generateRecordedSessionId();
+      const sessionId = await sourcesSessionId([profileId]);
 
       await session.reinitialize(profileId, {
         startTime: opts.startTime,
@@ -995,8 +974,7 @@ export function useIOSessionManager(
     setLoadError(null);
     setLoadFrameCount(0);
 
-    // Generate unique session ID for this ingest
-    const sessionId = generateLoadSessionId();
+    const sessionId = await generateSessionId({ purpose: "ingest" });
     tlog.info(`[IOSessionManager:${appName}] Starting ingest with session ID: ${sessionId}`);
 
     // IMPORTANT: Set refs SYNCHRONOUSLY before session creation
@@ -1092,8 +1070,7 @@ export function useIOSessionManager(
     profileId: string,
     opts?: LoadOptions
   ) => {
-    // Generate a unique session ID like other recorded sources
-    const sessionId = generateRecordedSessionId();
+    const sessionId = await sourcesSessionId([profileId]);
 
     await session.reinitialize(profileId, {
       startTime: opts?.startTime,
@@ -1144,7 +1121,7 @@ export function useIOSessionManager(
       if (isSameProfile && ioProfile) {
         sessionId = ioProfile;
       } else if (isRecorded) {
-        sessionId = generateRecordedSessionId();
+        sessionId = await sourcesSessionId([targetProfileId]);
       } else {
         sessionId = targetProfileId;
       }

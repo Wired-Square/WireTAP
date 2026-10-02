@@ -18,9 +18,8 @@
 // reimplementing capture ownership and the WebSocket channel lookup, and the
 // results would be invisible until something forced a refresh.
 
-/// What a generated scan session id starts with; the Discovery panel mints its
-/// own ids with the same prefix.
-pub const MODBUS_SCAN_SESSION_PREFIX: &str = "m_scan";
+/// What the roster's `source_type` says for a sweep, as opposed to a poller.
+pub const MODBUS_SCAN_SOURCE_TYPE: &str = "modbus_scan";
 
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
@@ -268,7 +267,7 @@ impl IOSource for ModbusScanSource {
     }
 
     fn source_type(&self) -> &'static str {
-        "modbus_scan"
+        MODBUS_SCAN_SOURCE_TYPE
     }
 }
 

@@ -4,9 +4,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { IOProfile } from "../hooks/useSettings";
+import type { SessionPurpose } from "../generated/SessionPurpose";
 
 const captureIds = new Set(["cap_a", "cap_b"]);
 const openedSessions: Array<string | undefined> = [];
+let minted = 0;
+const mintedFor = (purpose: SessionPurpose) =>
+  `${purpose.purpose === "sources" ? purpose.profile_ids.join("+") : purpose.purpose}#${++minted}`;
 
 vi.mock("../hooks/useIOSession", () => ({
   useIOSession: (opts: { sessionId?: string }) => {
@@ -53,7 +57,7 @@ vi.mock("../stores/profileBusStore", () => ({
 }));
 vi.mock("../api/io", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/io")>()),
-  generateSessionId: vi.fn(async () => "f_vd"),
+  generateSessionId: vi.fn(async (purpose: SessionPurpose) => mintedFor(purpose)),
   setSessionSubscriberActive: vi.fn(async () => {}),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -89,7 +93,7 @@ async function run(step: (m: Manager) => Promise<void>) {
 
 /** A stopped Virtual Device session: the multi-source path, then Change source. */
 async function fromVirtualDevice() {
-  expect(await run((m) => m.watchSource([virtualDevice.id], {}))).toBe("f_vd");
+  expect(await run((m) => m.watchSource([virtualDevice.id], {}))).toMatch(/^walk-v#/);
 }
 
 beforeEach(() => {
@@ -107,23 +111,23 @@ describe("useIOSessionManager source switching", () => {
     await fromVirtualDevice();
 
     const first = await run((m) => m.watchSource(["cap_a"], {}));
-    expect(first).toMatch(/^b_/);
+    expect(first).toMatch(/^cap_a#/);
     expect(first).toBe(manager.current.ioProfile);
 
     const second = await run((m) => m.watchSource(["cap_b"], {}));
-    expect(second).toMatch(/^b_/);
+    expect(second).toMatch(/^cap_b#/);
     expect(second).not.toBe(first);
     expect(openedSessions[openedSessions.length - 1]).toBe(second);
   });
 
   it("follows a load started after a multi-source session", async () => {
     await fromVirtualDevice();
-    expect(await run((m) => m.loadSource(["cap_a"], {}))).toMatch(/^load_/);
+    expect(await run((m) => m.loadSource(["cap_a"], {}))).toMatch(/^ingest#/);
   });
 
   it("follows a connect-only session started after a multi-source session", async () => {
     await fromVirtualDevice();
-    expect(await run((m) => m.connectOnly("cap_a"))).toMatch(/^t_/);
+    expect(await run((m) => m.connectOnly("cap_a"))).toMatch(/^cap_a#/);
   });
 
   it("returns to no source when the picker is skipped after a multi-source session", async () => {

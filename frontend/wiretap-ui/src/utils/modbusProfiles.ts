@@ -14,32 +14,6 @@ export const MODBUS_PROFILE_KIND = "modbus_tcp";
 /** A Modbus profile, narrowed out of the profile-kind union. */
 export type ModbusProfile = Extract<IOProfile, { kind: "modbus_tcp" }>;
 
-/** Session-id prefix for a discovery sweep, as opposed to a polling session. */
-export const MODBUS_SCAN_SESSION_PREFIX = "m_scan";
-
-/** What `ModbusScanSource::source_type()` reports for a sweep. */
-export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";
-
-/**
- * Whether this session is a sweep rather than a poller.
- *
- * A sweep reports `Protocol::Modbus` too — that is what keeps the tools lit while
- * its results are in view — so protocol alone cannot tell the two apart, and the
- * poll switch has to address the poller, not the sweep that borrowed the screen.
- *
- * `sourceType` is the authoritative answer and comes off the session roster. The
- * id prefix stays as the fallback for one reason: Discovery mints a scan session
- * id and joins it before the roster reconcile lands, so `sourceType` is undefined
- * for a beat — and during that beat the switch would un-latch. The prefix is
- * Rust's `MODBUS_SCAN_SESSION_PREFIX` (`io/modbus_tcp/scan_source.rs`), which
- * the MCP scan tools mint ids with; this copy agrees with it by convention.
- */
-export function isModbusScanSession(sessionId: string, sourceType?: string): boolean {
-  return sourceType !== undefined
-    ? sourceType === MODBUS_SCAN_SOURCE_TYPE
-    : sessionId.startsWith(MODBUS_SCAN_SESSION_PREFIX);
-}
-
 /**
  * Just enough of a profile to read an address off it.
  *

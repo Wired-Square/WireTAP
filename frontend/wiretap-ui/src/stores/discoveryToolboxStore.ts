@@ -206,6 +206,11 @@ export function runningModbusScan(toolbox: ToolboxState): ModbusScanResults | nu
   return MODBUS_SCAN_KEYS.map((k) => toolbox[k]).find((scan) => scan?.isScanning) ?? null;
 }
 
+/** Whether this session is one of the panel's own sweeps, running or finished. */
+export function isOwnScanSession(toolbox: ToolboxState, sessionId: string): boolean {
+  return MODBUS_SCAN_KEYS.some((k) => toolbox[k]?.sessionId === sessionId);
+}
+
 export type ToolboxState = {
   isExpanded: boolean;
   activeView: ToolboxView;
