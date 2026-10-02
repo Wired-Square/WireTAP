@@ -8,6 +8,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useProfileBusStore, profileTraits } from "../../../stores/profileBusStore";
 import { useSessionLogStore } from "../stores/sessionLogStore";
+import type { SessionLifecyclePayload } from "../../../generated/SessionLifecyclePayload";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import {
   listActiveSessions,
@@ -15,18 +16,6 @@ import {
   getStateType,
   getReaderSessionJoinerCount,
 } from "../../../api/io";
-
-/** Payload for session-lifecycle event from Rust */
-interface SessionLifecyclePayload {
-  session_id: string;
-  event_type: "created" | "destroyed";
-  source_type: string | null;
-  state: string | null;
-  subscriber_count: number;
-  source_profile_ids: string[];
-  /** The listener ID that created the session (only for "created") */
-  creator_subscriber_id: string | null;
-}
 
 
 /** Payload for device-probe event (global, not session-scoped) */

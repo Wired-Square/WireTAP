@@ -9,7 +9,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   decodeHeader,
-  decodeSessionError,
+  decodeSubscribeNack,
   decodeSubscribeAck,
   decodeCommandResponse,
   decodeBridgeRequest,
@@ -418,16 +418,12 @@ class WsTransport {
   }
 
   private handleSubscribeNack(buf: ArrayBuffer): void {
-    const payload = new Uint8Array(buf, HEADER_SIZE);
-    const error = decodeSessionError(payload);
-
-    // Reject the first pending subscribe (SubscribeNack doesn't carry session ID)
-    for (const [sid, pending] of this.pendingSubscribes) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(error));
-      this.pendingSubscribes.delete(sid);
-      break;
-    }
+    const { sessionId, error } = decodeSubscribeNack(new DataView(buf, HEADER_SIZE));
+    const pending = this.pendingSubscribes.get(sessionId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pending.reject(new Error(error));
+    this.pendingSubscribes.delete(sessionId);
   }
 
   private scheduleReconnect(): void {

@@ -68,4 +68,6 @@ export const SESSION_STATES = ["stopped", "starting", "running", "paused", "erro
 
 export const STREAM_END_REASONS = ["complete", "disconnected", "error", "stopped", "paused"] as const;
 
+export const SESSION_ERROR_SEVERITIES = ["fault", "routine"] as const;
+
 export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";

@@ -15,6 +15,7 @@ import {
   IdFlags,
   MsgType,
   PROTOCOL_VERSION,
+  SESSION_ERROR_SEVERITIES,
   SESSION_STATES,
   STREAM_END_REASONS,
   StreamEndedFlags,
@@ -336,8 +337,18 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   };
 }
 
-export function decodeSessionError(payload: Uint8Array): string {
-  return new TextDecoder().decode(payload);
+export type SessionErrorSeverity = (typeof SESSION_ERROR_SEVERITIES)[number];
+
+// Wire format: severity u8 (an index into SESSION_ERROR_SEVERITIES), then the
+// rest of the payload is the UTF-8 message.
+export function decodeSessionError(payload: Uint8Array): {
+  severity: SessionErrorSeverity;
+  message: string;
+} {
+  return {
+    severity: SESSION_ERROR_SEVERITIES[payload[0]] ?? "fault",
+    message: new TextDecoder().decode(payload.subarray(1)),
+  };
 }
 
 export function decodePlaybackPosition(payload: DataView): PlaybackPosition {
@@ -392,6 +403,16 @@ export function decodeSubscribeAck(payload: DataView): {
   const channel = payload.getUint8(0);
   const [sessionId] = decodeLengthPrefixedStr(payload, 1);
   return { channel, sessionId };
+}
+
+// Wire format: length-prefixed session id, then the rest of the payload is the UTF-8 error.
+export function decodeSubscribeNack(payload: DataView): {
+  sessionId: string;
+  error: string;
+} {
+  const [sessionId, offset] = decodeLengthPrefixedStr(payload, 0);
+  const rest = new Uint8Array(payload.buffer, payload.byteOffset + offset, payload.byteLength - offset);
+  return { sessionId, error: new TextDecoder().decode(rest) };
 }
 
 /** Decode TransmitUpdated payload: i64 LE history count. */

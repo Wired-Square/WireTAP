@@ -166,8 +166,8 @@ pub async fn io_start_replay(
 
                 // Stop on permanent device errors
                 let is_permanent = match &result {
-                    Ok(r) => r.error.as_deref().map(crate::transmit::is_permanent_error_pub).unwrap_or(false) && !r.success,
-                    Err(e) => crate::transmit::is_permanent_error_pub(e),
+                    Ok(r) => r.error.as_deref().is_some_and(crate::transmit::is_permanent_error) && !r.success,
+                    Err(e) => crate::transmit::transmit_refusal_is_permanent(&session_id_clone, e).await,
                 };
                 if is_permanent {
                     let err_msg = match &result {

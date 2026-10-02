@@ -13,7 +13,7 @@ use super::roster::{
 };
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
-    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, PlaybackPosition, ProfileLoader, ReplaceSourceOptions,
+    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader, ReplaceSourceOptions,
     SessionLifecyclePayload, SourceConfig, SourceReplacedPayload, TransmitPayload, TransmitResult,
     VirtualBusState, CAPTURE_SOURCE_TYPE,
 };
@@ -156,14 +156,6 @@ async fn transition(session_id: &str, session: &mut IOSession, to: Transition) -
         emit_state_change(session_id, &previous, &current);
     }
     Ok(current)
-}
-
-/// Convert IOState to a simple string for TypeScript
-fn state_to_string(state: &IOState) -> String {
-    match state {
-        IOState::Error(msg) => format!("error:{msg}"),
-        other => other.name().to_string(),
-    }
 }
 
 /// Emit a state change event for a session
@@ -374,9 +366,9 @@ pub async fn create_session(
     let source_profile_ids = crate::sessions::get_session_profile_ids(&session_id);
     emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.clone(),
-        event_type: "created".to_string(),
+        event_type: LifecycleEvent::Created,
         source_type: Some(source_type),
-        state: Some(format!("{:?}", state)),
+        state: Some(state),
         subscriber_count,
         source_profile_ids,
         creator_subscriber_id: subscriber_id,
@@ -491,14 +483,13 @@ async fn replace_session_source(
     }
 
     let current_state = session.source.state();
-    let state_str = state_to_string(&current_state);
 
     // 8. Build result payload (still returned to callers, just not emitted as event)
     let payload = SourceReplacedPayload {
         previous_source_type: previous_source_type.clone(),
         new_source_type: new_source_type.clone(),
         capabilities: capabilities.clone(),
-        state: state_str.clone(),
+        state: current_state.clone(),
         transition: opts.transition.clone(),
     };
 
@@ -511,8 +502,8 @@ async fn replace_session_source(
     }
 
     tlog!(
-        "[io] replace_session_source('{}') {} → {} (transition: {}, state: {})",
-        session_id, previous_source_type, new_source_type, opts.transition, state_str
+        "[io] replace_session_source('{}') {} → {} (transition: {}, state: {:?})",
+        session_id, previous_source_type, new_source_type, opts.transition, current_state
     );
 
     Ok(payload)
@@ -896,7 +887,7 @@ async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, ho
     let source_profile_ids = forget_session(session_id);
     emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.to_string(),
-        event_type: "destroyed".to_string(),
+        event_type: LifecycleEvent::Destroyed,
         source_type: None,
         state: None,
         subscriber_count: 0,
@@ -1353,7 +1344,7 @@ pub async fn set_source_polling(
 
     emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.to_string(),
-        event_type: "updated".to_string(),
+        event_type: LifecycleEvent::Updated,
         source_type: Some(session.source.source_type().to_string()),
         state: None,
         subscriber_count: subscriber_count_for_session(session_id),
@@ -1526,19 +1517,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_session_state_keeps_its_name_code_and_string() {
+    fn every_session_state_keeps_its_name_and_code() {
         let cases = [
-            (IOState::Stopped, "stopped", 0, "stopped"),
-            (IOState::Starting, "starting", 1, "starting"),
-            (IOState::Running, "running", 2, "running"),
-            (IOState::Paused, "paused", 3, "paused"),
-            (IOState::Error("boom".into()), "error", 4, "error:boom"),
+            (IOState::Stopped, "stopped", 0),
+            (IOState::Starting, "starting", 1),
+            (IOState::Running, "running", 2),
+            (IOState::Paused, "paused", 3),
+            (IOState::Error("boom".into()), "error", 4),
         ];
-        for (state, name, code, string) in cases {
+        for (state, name, code) in cases {
             assert_eq!(state.name(), name);
             assert_eq!(state.code(), code);
-            assert_eq!(crate::ws::protocol::code_of(&crate::ws::protocol::SESSION_STATES, name), code);
-            assert_eq!(state_to_string(&state), string);
         }
     }
 
@@ -1573,7 +1562,7 @@ mod tests {
         };
         let refused = tauri::async_runtime::block_on(transmit_frame("no-such-session", &frame)).unwrap_err();
         assert_eq!(refused, "A CAN FD frame does not support remote request (RTR)");
-        assert!(crate::transmit::is_permanent_error_pub(&refused));
+        assert!(crate::transmit::is_permanent_error(&refused));
     }
 
     #[test]

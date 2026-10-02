@@ -51,6 +51,7 @@ import {
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
+import type { SessionLifecyclePayload } from "../generated/SessionLifecyclePayload";
 import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
 
 // ============================================================================
@@ -586,7 +587,7 @@ export function useIOSession(
       // Session destroyed externally (from Session Manager, last-subscriber auto-destroy, etc.)
       // This is a global event - we filter by our session ID.
       // Orphaned capture IDs are fetched from the post-session cache.
-      const unlistenLifecycle = await listen<{ session_id: string; event_type: string; reset?: boolean }>(
+      const unlistenLifecycle = await listen<SessionLifecyclePayload>(
         "session-lifecycle",
         async (event) => {
           if (cancelled) return;

@@ -21,10 +21,8 @@ pub const SESSION_STATES: [&str; 5] = ["stopped", "starting", "running", "paused
 /// The reason byte of `StreamEnded` indexes this table.
 pub const STREAM_END_REASONS: [&str; 5] = ["complete", "disconnected", "error", "stopped", "paused"];
 
-/// `name`'s byte in a code table; a name it lacks encodes as the first entry.
-pub fn code_of(table: &[&str], name: &str) -> u8 {
-    table.iter().position(|n| *n == name).unwrap_or(0) as u8
-}
+/// The severity byte of `SessionError` indexes this table.
+pub const SESSION_ERROR_SEVERITIES: [&str; 2] = ["fault", "routine"];
 
 pub const CAPTURE_AVAILABLE: u8 = 1 << 0;
 pub const HAS_CAPTURE_ID: u8 = 1 << 1;
@@ -371,9 +369,13 @@ pub fn encode_stream_ended(
 // 0x04 — Session Error
 // ----------------------------------------------------------------------------
 
-/// Encode a SessionError payload — entire payload is the raw UTF-8 error string.
-pub fn encode_session_error(error: &str) -> Vec<u8> {
-    error.as_bytes().to_vec()
+/// Encode a SessionError payload: the [`SESSION_ERROR_SEVERITIES`] byte, then
+/// the rest of the payload is the UTF-8 message.
+pub fn encode_session_error(severity: u8, error: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(1 + error.len());
+    out.push(severity);
+    out.extend_from_slice(error.as_bytes());
+    out
 }
 
 // ----------------------------------------------------------------------------
@@ -553,9 +555,12 @@ pub fn decode_subscribe_ack(payload: &[u8]) -> Result<SubscribeAckMsg, ProtocolE
 // 0x13 — Subscribe Nack
 // ----------------------------------------------------------------------------
 
-/// Encode a SubscribeNack payload — entire payload is the raw UTF-8 error string.
-pub fn encode_subscribe_nack(error: &str) -> Vec<u8> {
-    error.as_bytes().to_vec()
+/// Encode a SubscribeNack payload: the length-prefixed session id, then the
+/// rest of the payload is the UTF-8 error.
+pub fn encode_subscribe_nack(session_id: &str, error: &str) -> Vec<u8> {
+    let mut out = encode_length_prefixed_str(session_id);
+    out.extend_from_slice(error.as_bytes());
+    out
 }
 
 // ============================================================================
@@ -1104,15 +1109,18 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn session_error_encodes_raw_bytes() {
-        let payload = encode_session_error("something went wrong");
-        assert_eq!(payload, b"something went wrong");
+    fn every_severity_names_its_byte() {
+        use crate::io::ErrorSeverity::*;
+        for (severity, name) in [(Fault, "fault"), (Routine, "routine")] {
+            assert_eq!(SESSION_ERROR_SEVERITIES[usize::from(severity.code())], name);
+        }
     }
 
+    // The TS half is src/tests/wsSessionErrors.test.ts, which decodes these bytes.
     #[test]
-    fn session_error_empty_string() {
-        let payload = encode_session_error("");
-        assert!(payload.is_empty());
+    fn session_error_leads_with_its_severity() {
+        assert_eq!(encode_session_error(1, "boom"), [1, b'b', b'o', b'o', b'm']);
+        assert_eq!(encode_session_error(0, ""), [0]);
     }
 
     // -----------------------------------------------------------------------
@@ -1310,15 +1318,11 @@ mod tests {
     // 0x13 Subscribe Nack
     // -----------------------------------------------------------------------
 
+    // The TS half is src/tests/wsSessionErrors.test.ts, which decodes these bytes.
     #[test]
-    fn subscribe_nack_encodes_raw_bytes() {
-        let payload = encode_subscribe_nack("session not found");
-        assert_eq!(payload, b"session not found");
-    }
-
-    #[test]
-    fn subscribe_nack_empty_error() {
-        assert!(encode_subscribe_nack("").is_empty());
+    fn subscribe_nack_names_its_session() {
+        assert_eq!(encode_subscribe_nack("f_1", "full"), [3, 0, b'f', b'_', b'1', b'f', b'u', b'l', b'l']);
+        assert_eq!(encode_subscribe_nack("f_1", ""), [3, 0, b'f', b'_', b'1']);
     }
 
     #[test]

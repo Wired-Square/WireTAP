@@ -810,7 +810,7 @@ fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
 }
 
 /// Send session error.
-pub fn send_session_error(session_id: &str, error: &str) {
+pub fn send_session_error(session_id: &str, severity: crate::io::ErrorSeverity, error: &str) {
     let server = match ws_server() {
         Some(s) => s,
         None => return,
@@ -819,7 +819,7 @@ pub fn send_session_error(session_id: &str, error: &str) {
         Some(c) => c,
         None => return,
     };
-    let payload = protocol::encode_session_error(error);
+    let payload = protocol::encode_session_error(severity.code(), error);
     let msg = protocol::encode_message(MsgType::SessionError, channel, &payload);
     server.send_to_channel(channel, msg);
 }
@@ -1105,24 +1105,18 @@ pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
         Some(s) => s,
         None => return,
     };
-    let state_byte = payload.state.as_deref().map(|s| protocol::code_of(&protocol::SESSION_STATES, s));
-    // "updated" (a source paused or resumed) rides the "created" code: every
-    // global consumer re-fetches the roster on any lifecycle push and reads the
-    // answer from there, so a third code would be one nothing branches on.
-    let event_type = match payload.event_type.as_str() {
-        "created" => 0u8,
-        "destroyed" => 1,
-        _ => 0,
-    };
-    let encoded = protocol::encode_session_lifecycle(
-        event_type,
+    let msg = protocol::encode_message(MsgType::SessionLifecycle, 0, &session_lifecycle_payload(payload));
+    server.send_global(msg);
+}
+
+fn session_lifecycle_payload(payload: &crate::io::SessionLifecyclePayload) -> Vec<u8> {
+    protocol::encode_session_lifecycle(
+        payload.event_type.code(),
         &payload.session_id,
         payload.source_type.as_deref(),
-        state_byte,
+        payload.state.as_ref().map(IOState::code),
         payload.subscriber_count as u16,
-    );
-    let msg = protocol::encode_message(MsgType::SessionLifecycle, 0, &encoded);
-    server.send_global(msg);
+    )
 }
 
 /// Send scoped session-lifecycle signal with inline state + capabilities.
@@ -1165,6 +1159,25 @@ mod tests {
         let mut m = body.to_vec();
         m.extend(crc16_modbus_checksum(body).to_le_bytes());
         m
+    }
+
+    #[test]
+    fn a_created_session_sends_its_state_byte() {
+        use crate::io::{LifecycleEvent, SessionLifecyclePayload};
+        let created = |event_type, state| SessionLifecyclePayload {
+            session_id: "f_1".into(),
+            event_type,
+            source_type: None,
+            state,
+            subscriber_count: 1,
+            source_profile_ids: vec![],
+            creator_subscriber_id: None,
+            reset: false,
+        };
+        let running = session_lifecycle_payload(&created(LifecycleEvent::Created, Some(IOState::Running)));
+        assert_eq!(running, [0, 1, 0, 3, 0, b'f', b'_', b'1', 2, IOState::Running.code()]);
+        let destroyed = session_lifecycle_payload(&created(LifecycleEvent::Destroyed, None));
+        assert_eq!(destroyed, [1, 1, 0, 3, 0, b'f', b'_', b'1', 0]);
     }
 
     #[test]

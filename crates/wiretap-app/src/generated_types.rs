@@ -53,6 +53,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::PlaybackPosition>();
     r.visit::<crate::io::RegisterSubscriberResult>();
     r.visit::<crate::io::ReinitializeResult>();
+    r.visit::<crate::io::SessionLifecyclePayload>();
     r.visit::<crate::io::ScanJob>();
     r.visit::<crate::io::SerialOverrides>();
     r.visit::<crate::io::StepResult>();
@@ -154,6 +155,7 @@ fn wire_constants() -> String {
         table("StreamEndedFlags", STREAM_ENDED_FLAGS.iter().copied(), 2),
         names("SESSION_STATES", &SESSION_STATES),
         names("STREAM_END_REASONS", &STREAM_END_REASONS),
+        names("SESSION_ERROR_SEVERITIES", &SESSION_ERROR_SEVERITIES),
         format!(
             "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
@@ -294,6 +296,7 @@ fn outputs_serialise_as_declared() {
         StreamEndReason::Stopped,
         StreamEndReason::Paused,
     ]);
+    assert_serialises_as_declared(&[LifecycleEvent::Created, LifecycleEvent::Destroyed, LifecycleEvent::Updated]);
     assert_serialises_as_declared(&[RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete]);
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;

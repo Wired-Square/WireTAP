@@ -336,7 +336,7 @@ async fn connection_manager_task(
                                     let nack = encode_message(
                                         MsgType::SubscribeNack,
                                         0,
-                                        &encode_subscribe_nack(e),
+                                        &encode_subscribe_nack(&session_id, e),
                                     );
                                     send_or_warn(conn, Message::Binary(nack.into())).await;
                                 }

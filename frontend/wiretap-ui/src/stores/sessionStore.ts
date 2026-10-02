@@ -83,32 +83,6 @@ import {
   decodeScopedSessionLifecycle,
 } from "../services/wsProtocol";
 
-/**
- * A session or capture that has already been torn down — a benign race, not a
- * fault, so it is not worth a dialog.
- *
- * Anchored to the entity kind because this replaced a bare `includes("not found")`
- * that also swallowed genuine faults on this channel — SocketCAN's "pkexec not
- * found", gs_usb's "Device not found", FrameLink's "Device '…' not found via
- * discovery" — leaving the session in an error state with nothing shown.
- *
- * Note these `Session`/`Capture` messages are Tauri *command* rejections, so on the
- * SessionError channel this clause is defensive rather than load-bearing; the paths
- * that do see them are the catch blocks in `useIOSession`.
- */
-const EXPECTED_MISSING_ENTITY = /^(Session|Capture)\b.*\bnot found$/;
-
-/**
- * One register group the device declined, which a poller reports and then keeps
- * polling through — routine on a device whose map does not match the catalogue.
- *
- * Anchored for the same reason as the clause above: as a bare substring test it
- * would swallow any message that merely quoted this text, and the poller's own
- * shape is exact — `poll.rs` formats `Modbus read error (<type> @ <reg>): …`.
- * A connection-level Modbus failure is phrased differently and still surfaces.
- */
-const EXPECTED_MODBUS_READ_ERROR = /^Modbus read error \(.+ @ \d+\):/;
-
 /** Stream-end reasons that mean something other than a plain stop. */
 const IO_STATE_FOR_STREAM_END: Partial<Record<StreamEndReason, IOStateType>> = {
   paused: "paused",
@@ -658,18 +632,14 @@ async function setupSessionEventSubscribers(
       })
     );
 
-    // SessionError (0x04) — error string decoded from binary
+    // SessionError (0x04) — severity and message decoded from binary
     eventListeners.wsUnlistenFunctions.push(
       wsTransport.onSessionMessage(sessionId, MsgType.SessionError, (payload) => {
-        const error = decodeSessionError(
+        const { severity, message: error } = decodeSessionError(
           new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
         );
         if (error) {
-          const isExpectedError =
-            error === "No IO profile configured" ||
-            EXPECTED_MISSING_ENTITY.test(error) ||
-            EXPECTED_MODBUS_READ_ERROR.test(error);
-          if (!isExpectedError) {
+          if (severity === "fault") {
             invokeCallbacks(eventListeners, "onError", error);
             if (typeof getGlobalShowAppError === "function") {
               const showAppError = getGlobalShowAppError();

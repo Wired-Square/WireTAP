@@ -513,7 +513,7 @@ pub struct SourceReplacedPayload {
     /// New capabilities after the swap
     pub capabilities: IOCapabilities,
     /// New IO state after the swap
-    pub state: String,
+    pub state: IOState,
     /// Context hint for the frontend ("capture", "live", "reinitialize")
     pub transition: String,
 }
@@ -686,17 +686,39 @@ pub trait IOSource: Send + Sync {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum LifecycleEvent {
+    Created,
+    Destroyed,
+    /// A source paused or resumed.
+    Updated,
+}
+
+impl LifecycleEvent {
+    /// "updated" rides the "created" code: every global consumer re-fetches the
+    /// roster on any lifecycle push and reads the answer from there, so a third
+    /// code would be one nothing branches on.
+    pub fn code(self) -> u8 {
+        match self {
+            LifecycleEvent::Created | LifecycleEvent::Updated => 0,
+            LifecycleEvent::Destroyed => 1,
+        }
+    }
+}
+
 /// Payload for global session lifecycle events (emitted to all windows)
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SessionLifecyclePayload {
     /// The session ID
     pub session_id: String,
-    /// Event type: "created" or "destroyed"
-    pub event_type: String,
+    pub event_type: LifecycleEvent,
     /// Device type (e.g., "gvret_tcp", "realtime") - only for "created"
     pub source_type: Option<String>,
     /// Current state - only for "created"
-    pub state: Option<String>,
+    pub state: Option<IOState>,
     /// Number of listeners
     pub subscriber_count: usize,
     /// Source profile IDs
@@ -727,7 +749,7 @@ pub(crate) fn emit_to_windows<S: Serialize + Clone>(event: &str, payload: S) {
 /// This event is NOT scoped to a session ID - it broadcasts to all windows.
 pub fn emit_session_lifecycle(payload: SessionLifecyclePayload) {
     tlog!(
-        "[lifecycle_event] Emitting '{}' for session '{}' (profiles: {:?})",
+        "[lifecycle_event] Emitting '{:?}' for session '{}' (profiles: {:?})",
         payload.event_type, payload.session_id, payload.source_profile_ids
     );
     emit_to_windows("session-lifecycle", &payload);
@@ -742,7 +764,29 @@ pub fn emit_session_lifecycle(payload: SessionLifecyclePayload) {
 pub fn emit_session_error(session_id: &str, error: String) {
     store_startup_error(session_id, error.clone());
     post_session::store_error(session_id, error.clone());
-    crate::ws::dispatch::send_session_error(session_id, &error);
+    crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Fault, &error);
+}
+
+/// Report an error the source carries on through. Nothing is stored for a
+/// joining window, and the frontend does not show it as a fault.
+pub fn emit_routine_session_error(session_id: &str, error: &str) {
+    crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Routine, error);
+}
+
+/// How the frontend treats a session error; the discriminant is its byte on the wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ErrorSeverity {
+    /// Shown, and the session reads as errored.
+    Fault,
+    /// Logged only, such as one Modbus register group declining a read.
+    Routine,
+}
+
+impl ErrorSeverity {
+    pub fn code(self) -> u8 {
+        self as u8
+    }
 }
 
 /// Signal the frontend that the playback position has changed.

@@ -301,17 +301,16 @@ static IO_REPEAT_TASK_COUNTER: AtomicU64 = AtomicU64::new(0);
 // Simple Transmit Helpers
 // ============================================================================
 
-/// Public re-export of is_permanent_error for use by other modules (e.g. replay).
-pub fn is_permanent_error_pub(error: &str) -> bool {
-    is_permanent_error(error)
+/// Whether a refused transmit ends a repeat or replay: the session is gone, or
+/// the device is.
+pub(crate) async fn transmit_refusal_is_permanent(session_id: &str, error: &str) -> bool {
+    !io::session_exists(session_id).await || is_permanent_error(error)
 }
 
-/// Check if an error is permanent (should stop repeat) vs transient (can continue)
-fn is_permanent_error(error: &str) -> bool {
+/// Check if a device error is permanent (should stop repeat) vs transient (can continue)
+pub(crate) fn is_permanent_error(error: &str) -> bool {
     let error_lower = error.to_lowercase();
-    // Permanent errors - device is gone or session invalid
-    error_lower.contains("not found")
-        || error_lower.contains("disconnected")
+    error_lower.contains("disconnected")
         || error_lower.contains("does not support")
         || error_lower.contains("no device")
         || error_lower.contains("permission denied")
@@ -337,7 +336,7 @@ async fn do_transmit(
             (result, should_stop)
         }
         Err(e) => {
-            let should_stop = is_permanent_error(e);
+            let should_stop = transmit_refusal_is_permanent(session_id, e).await;
             (result, should_stop)
         }
     }
@@ -358,7 +357,7 @@ async fn do_serial_transmit(
             (result, should_stop)
         }
         Err(e) => {
-            let should_stop = is_permanent_error(e);
+            let should_stop = transmit_refusal_is_permanent(session_id, e).await;
             (result, should_stop)
         }
     }
@@ -793,7 +792,6 @@ mod tests {
 
     #[test]
     fn existing_permanent_needles_still_match() {
-        assert!(is_permanent_error("device not found"));
         assert!(is_permanent_error("Serial port disconnected"));
         assert!(is_permanent_error("Permission denied"));
     }
@@ -802,5 +800,10 @@ mod tests {
     fn transient_error_is_not_permanent() {
         assert!(!is_permanent_error("timed out"));
         assert!(!is_permanent_error("bus off"));
+    }
+
+    #[test]
+    fn a_refusal_from_a_missing_session_is_permanent_whatever_it_says() {
+        assert!(tauri::async_runtime::block_on(super::transmit_refusal_is_permanent("f_gone", "queue full")));
     }
 }

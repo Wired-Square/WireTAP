@@ -17,7 +17,7 @@ use super::reader::{PollEmitMode, PollGroup};
 use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
 use crate::io::types::SourceMessage;
-use crate::io::{emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
+use crate::io::{emit_routine_session_error, emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
 
 pub use wiretap_io::modbus::ReadData;
 
@@ -169,6 +169,14 @@ impl FrameSink {
     fn error(&self, message: String) {
         if let FrameSink::SessionCapture { session_id } = self {
             emit_session_error(session_id, message);
+        }
+    }
+
+    /// One register group the device declined, which the poller keeps polling
+    /// through — routine on a device whose map does not match the catalogue.
+    fn routine_error(&self, message: &str) {
+        if let FrameSink::SessionCapture { session_id } = self {
+            emit_routine_session_error(session_id, message);
         }
     }
 }
@@ -392,10 +400,7 @@ impl Drain {
                     code,
                     retry_in
                 );
-                self.sink.error(format!(
-                    "Modbus read error ({} @ {}): Modbus exception: {}",
-                    type_name, poll.start_register, code
-                ));
+                self.sink.routine_error(&register_read_error(&poll, format_args!("Modbus exception: {code}")));
             }
             PollEvent::Transport {
                 item,
@@ -414,10 +419,7 @@ impl Drain {
                     consecutive,
                     self.limit_text()
                 );
-                self.sink.error(format!(
-                    "Modbus read error ({} @ {}): IO error: {}",
-                    type_name, poll.start_register, error
-                ));
+                self.sink.routine_error(&register_read_error(&poll, format_args!("IO error: {error}")));
                 if exhausted(consecutive, self.max_register_errors) {
                     task.retire(item);
                     tlog!(
@@ -467,6 +469,10 @@ impl Drain {
     }
 }
 
+fn register_read_error(poll: &PollGroup, cause: std::fmt::Arguments) -> String {
+    format!("Modbus read error ({} @ {}): {cause}", poll.register_type.catalog().as_str(), poll.start_register)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +488,21 @@ mod tests {
             device_address: 3,
             emit_mode: emit,
         }
+    }
+
+    // The messages src/tests/wsSessionErrors.test.ts records as routine.
+    #[test]
+    fn a_declined_register_read_names_its_group() {
+        let holding = poll(RegisterType::Holding, 100, 2, PollEmitMode::Block);
+        let input = poll(RegisterType::Input, 7, 1, PollEmitMode::Block);
+        assert_eq!(
+            register_read_error(&holding, format_args!("Modbus exception: {}", "Illegal data address")),
+            "Modbus read error (holding @ 100): Modbus exception: Illegal data address"
+        );
+        assert_eq!(
+            register_read_error(&input, format_args!("IO error: {}", "timed out")),
+            "Modbus read error (input @ 7): IO error: timed out"
+        );
     }
 
     #[test]
