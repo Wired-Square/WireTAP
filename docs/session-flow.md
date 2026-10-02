@@ -692,8 +692,8 @@ release's leave runs, so the leave is skipped instead of raced.
 
 [crates/wiretap-app/src/mcp/session.rs](../crates/wiretap-app/src/mcp/session.rs) is the Rust-native
 equivalent of the flow above, for `open_session` with no window open. It calls the
-same `open_from`, connect-only and leaving no session behind (an agent may hold
-several), then:
+same `open_from`, connect-only, under a subscriber per session (`mcp_<session id>`):
+a subscriber is on one session at a time, and an agent may hold several. Then it:
 
 - **Starts the source** after binding the catalogue — only when `Stopped`, since
   `start_session` is idempotent for `Running`
@@ -725,7 +725,9 @@ several), then:
   on an agent's behalf is not a safe default.
 
 A keepalive task then touches the MCP subscriber every 10 s so the heartbeat
-watchdog doesn't reap a session with no window attached.
+watchdog doesn't reap a session with no window attached, and drops the subscriber
+from the roster once the session has gone. A Modbus scan the MCP starts gets the
+same subscriber and keepalive.
 
 ### Modbus discovery
 

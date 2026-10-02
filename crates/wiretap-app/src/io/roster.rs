@@ -215,6 +215,19 @@ pub(super) fn unpark_app(instance_id: &str, session_id: &str) {
     }
 }
 
+/// Drop an instance that is neither attached nor parked: a headless subscriber
+/// whose session has ended. No-op otherwise.
+pub fn forget_detached_app(instance_id: &str) {
+    let removed = {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        let detached = reg.get(instance_id).is_some_and(|a| a.session_id.is_none() && a.parked_on.is_none());
+        detached && reg.remove(instance_id).is_some()
+    };
+    if removed {
+        emit_open_apps_changed();
+    }
+}
+
 /// Clear the session attachment of every instance on `session_id`, keeping the
 /// instances themselves (their panels are still open). Every teardown path calls
 /// this so the registry invariant holds: no entry may reference a session that is
@@ -540,6 +553,20 @@ mod tests {
         assert_eq!(entry.session_id, None);
         assert!(!entry.is_active);
         assert_eq!(entry.display_id, "decoder_ab12");
+    }
+
+    #[test]
+    fn only_a_detached_instance_is_forgotten() {
+        attach_app("mcp_test_forget_held", "mcp", "test_forget_held");
+        attach_app("mcp_test_forget_ended", "mcp", "test_forget_ended");
+        detach_all_from_session("test_forget_ended");
+
+        forget_detached_app("mcp_test_forget_held");
+        forget_detached_app("mcp_test_forget_ended");
+
+        let reg = APP_REGISTRY.lock().unwrap();
+        assert!(reg.contains_key("mcp_test_forget_held"));
+        assert!(!reg.contains_key("mcp_test_forget_ended"));
     }
 
     /// Detaching one session must not disturb another — the sweep is filtered by

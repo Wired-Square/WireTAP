@@ -236,7 +236,7 @@ impl WireTapTools {
             sid.clone(),
             job,
             None,
-            Some("mcp".to_string()),
+            Some(super::session::subscriber_for(&sid)),
             Some("mcp".to_string()),
             // An agent sweeping a device that something else is polling may well be
             // doing so deliberately, and it has no parameter to override a refusal with.
@@ -244,6 +244,7 @@ impl WireTapTools {
         )
         .await
         .map_err(err)?;
+        super::session::spawn_keepalive(sid.clone());
 
         if let Err(e) = crate::io::start_session(&sid).await {
             let _ = crate::io::destroy_session(&sid, false).await;

@@ -9,13 +9,20 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
+/// The MCP's subscriber on `session_id`. A subscriber is on one session at a time,
+/// and an agent may hold several.
+pub fn subscriber_for(session_id: &str) -> String {
+    format!("mcp_{session_id}")
+}
+
 /// Touch the MCP subscriber every 10s so the heartbeat watchdog doesn't reap a
-/// headless session. Self-terminates once the session is gone.
-fn spawn_keepalive(session_id: String) {
+/// headless session. Once the session is gone, drops the subscriber from the roster.
+pub(super) fn spawn_keepalive(session_id: String) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
             if crate::io::get_session_state(&session_id).await.is_none() {
+                crate::io::forget_detached_app(&subscriber_for(&session_id));
                 break;
             }
             crate::io::touch_subscriber_heartbeats(std::slice::from_ref(&session_id)).await;
@@ -113,8 +120,7 @@ pub async fn open(
         Some(sid) => sid,
         None => crate::sessions::mint_session_id(crate::sessions::session_id_prefix([profile], None)).await,
     };
-    // Connect-only, so the catalogue is bound before the first frame. Leaving
-    // nothing: an agent may hold several sessions at once.
+    // Connect-only, so the catalogue is bound before the first frame.
     let opts = crate::sessions::OpenSessionOptions {
         source_id: Some(profile_id.clone()),
         start_time: window.start,
@@ -125,10 +131,11 @@ pub async fn open(
         connect_only: Some(true),
         ..Default::default()
     };
-    let opened = crate::sessions::open_from(&app, &sid, "mcp", Some("mcp"), opts, None)
+    let opened = crate::sessions::open_from(&app, &sid, &subscriber_for(&sid), Some("mcp"), opts)
         .await
         .map_err(|e| e.to_string())?;
     let capabilities = opened.registration.capabilities;
+    spawn_keepalive(sid.clone());
 
     // Bind the catalogue before the source is started, so frames decode from the
     // first one rather than relying on a re-decode after the fact. This is also
@@ -156,15 +163,13 @@ pub async fn open(
             Ok(state) => state,
             Err(e) => {
                 // Leave nothing behind holding the profile open: the session
-                // would keep its "mcp" subscriber and never be reaped.
+                // would keep its MCP subscriber and never be reaped.
                 let _ = crate::io::destroy_session(&sid, false).await;
                 return Err(e);
             }
         },
         Some(state) => state,
     };
-
-    spawn_keepalive(sid.clone());
 
     Ok(json!({
         "session_id": sid,

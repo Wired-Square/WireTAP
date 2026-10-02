@@ -101,19 +101,17 @@ pub async fn open_session(
     app_name: Option<String>,
     opts: OpenSessionOptions,
 ) -> Result<OpenedSession, SessionRefusal> {
-    let leaving = current_session_of_app(&subscriber_id);
-    open_from(&app, &session_id, &subscriber_id, app_name.as_deref(), opts, leaving).await
+    open_from(&app, &session_id, &subscriber_id, app_name.as_deref(), opts).await
 }
 
-/// `open_session` for a subscriber that was on `leaving`, which is torn down if
-/// this leaves it empty. The MCP passes none: an agent may hold several sessions.
+/// `open_session` without a webview. A subscriber is on one session at a time, so
+/// the one it leaves is torn down if this empties it.
 pub async fn open_from(
     app: &tauri::AppHandle,
     session_id: &str,
     subscriber_id: &str,
     app_name: Option<&str>,
     mut opts: OpenSessionOptions,
-    leaving: Option<String>,
 ) -> Result<OpenedSession, SessionRefusal> {
     let connect_only = opts.connect_only.unwrap_or(false);
     let replaces = opts.sources.is_some();
@@ -131,7 +129,7 @@ pub async fn open_from(
             }
         }
     };
-    open_or_join(session_id, subscriber_id, app_name, connect_only, replaces, leaving, create).await
+    open_or_join(session_id, subscriber_id, app_name, connect_only, replaces, create).await
 }
 
 /// A session `open_or_join` made, before its start.
@@ -146,9 +144,9 @@ pub(super) async fn open_or_join(
     app_name: Option<&str>,
     connect_only: bool,
     replaces: bool,
-    leaving: Option<String>,
     create: impl Future<Output = Result<Created, SessionRefusal>>,
 ) -> Result<OpenedSession, SessionRefusal> {
+    let leaving = current_session_of_app(subscriber_id);
     settle_session(session_id).await;
     let created = if replaces || !session_exists(session_id).await {
         Some(create.await?)
@@ -388,7 +386,7 @@ mod tests {
     }
 
     async fn open(session_id: &str, subscriber: &str) -> Result<OpenedSession, SessionRefusal> {
-        open_or_join(session_id, subscriber, None, false, false, None, create_test_source(session_id)).await
+        open_or_join(session_id, subscriber, None, false, false, create_test_source(session_id)).await
     }
 
     #[tokio::test]
@@ -410,7 +408,7 @@ mod tests {
         let capture = capture_store::create_standalone_capture(capture_store::CaptureKind::Frames, "replayed".into());
         let id = "c_open_capture";
         let create = create_from_capture(id, capture.clone(), None, ("open-capture-app".into(), None));
-        let opened = open_or_join(id, "open-capture-app", None, false, false, None, create).await.unwrap();
+        let opened = open_or_join(id, "open-capture-app", None, false, false, create).await.unwrap();
         assert_eq!(opened.registration.capture_id.as_deref(), Some(capture.as_str()));
         assert_eq!(opened.registration.mode, SessionMode::Capture);
         destroy_session(id, false).await.unwrap();
@@ -420,16 +418,37 @@ mod tests {
     async fn an_open_of_a_live_session_joins_it() {
         let id = "f_open_joins";
         open(id, "open-joins-first").await.unwrap();
-        let joined = open_or_join(id, "open-joins-second", None, false, false, None, not_created()).await.unwrap();
+        let joined = open_or_join(id, "open-joins-second", None, false, false, not_created()).await.unwrap();
         assert!(!joined.created);
         assert_eq!(joined.registration.subscriber_count, 2);
         destroy_session(id, false).await.unwrap();
     }
 
     #[tokio::test]
+    async fn a_subscriber_that_opens_another_session_leaves_no_session_unwatched() {
+        let (first, second) = ("f_open_moves_a", "f_open_moves_b");
+        open(first, "open-moves-app").await.unwrap();
+        open(second, "open-moves-app").await.unwrap();
+        assert!(!session_exists(first).await, "the session it left still streams with no subscriber");
+        destroy_session(second, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn the_mcp_keeps_every_session_it_opens() {
+        let sessions = ["f_open_mcp_a", "f_open_mcp_b"];
+        for id in sessions {
+            open(id, &crate::mcp::session::subscriber_for(id)).await.unwrap();
+        }
+        for id in sessions {
+            assert_eq!(crate::io::subscriber_count_for_session(id), 1, "{id}");
+            destroy_session(id, false).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
     async fn a_connect_only_open_leaves_the_session_stopped() {
         let id = "f_open_connect_only";
-        let opened = open_or_join(id, "connect-only-app", None, true, false, None, create_test_source(id)).await.unwrap();
+        let opened = open_or_join(id, "connect-only-app", None, true, false, create_test_source(id)).await.unwrap();
         assert_eq!(opened.registration.state, IOState::Stopped);
         destroy_session(id, false).await.unwrap();
     }
@@ -464,7 +483,7 @@ mod tests {
             create_session(id.into(), Box::new(broker), None, None, None, vec![]).await;
             Ok(Created { starts: true, bus_mappings: None })
         };
-        let opened = open_or_join(id, "open-refused-app", None, false, false, None, create).await.unwrap();
+        let opened = open_or_join(id, "open-refused-app", None, false, false, create).await.unwrap();
 
         let error = opened.start_error.expect("an SLCAN rate the protocol cannot name refuses the start");
         assert!(error.contains("33333") && error.contains("10000"), "{error}");

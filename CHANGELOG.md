@@ -25,6 +25,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **An MCP agent can hold several sessions at once.** Opening a second session moved the agent off the first, which kept streaming with no subscriber until the app was closed, and the Session Manager showed it unattached. Each session an agent opens or scans now keeps it as a subscriber until stopped.
 - **A copy of a capture counts its distinct frames.** The copy kept when you leave a session reported none; it now reports the same count as the capture it was copied from.
 - **Apps sharing a session follow a stop or a resume as it happened.** Resuming a stopped session, or returning to live from a playing replay, now clears the old frames in every app joined to it, where some kept showing them alongside the new run. Changing a stopped session's serial framing no longer moves the joined apps into capture review, and resuming no longer briefly reads as a suspend.
 - **A device that fails to open no longer starts as running.** A missing port, an unreachable host or a refused handshake used to report the session as running and then put it in error a moment later. Starting now waits up to 10 seconds for the device to connect, and a device that refuses leaves the session in error with the reason. In a session of several devices, one that fails is reported while the others carry on, and a device still connecting after 10 seconds starts as before.
