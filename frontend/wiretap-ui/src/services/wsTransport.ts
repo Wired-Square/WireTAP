@@ -91,7 +91,11 @@ class WsTransport {
     const config = await invoke<WsConfig>("get_ws_config");
     this.port = config.port;
     this.token = config.token;
-    return this.doConnect();
+    await this.doConnect();
+    // Sessions opened before the socket was up queued their handlers without a subscribe.
+    for (const [sessionId, handlers] of this.pendingHandlers) {
+      if (handlers.length > 0) this.ws?.send(encodeSubscribe(sessionId));
+    }
   }
 
   private doConnect(): Promise<void> {

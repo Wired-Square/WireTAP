@@ -58,6 +58,7 @@ export function reconcileKnownSessions(
         // comparison rather than an accident of map iteration order.
         existing.pausedSourceProfileIds.join() !== paused.join() ||
         existing.originProfileIds.join() !== origin.join() ||
+        existing.sourceKind !== info.source_kind ||
         // `catalogPath` is normalised to null when the roster omits it, so
         // normalise the existing side too — an absent (undefined) path must not
         // read as a change against null and rebuild the entry every reconcile.
@@ -74,6 +75,7 @@ export function reconcileKnownSessions(
           sourceType: info.source_type,
           pausedSourceProfileIds: paused,
           originProfileIds: origin,
+          sourceKind: info.source_kind,
           capture: {
             ...existing.capture,
             id: info.capture_id ?? existing.capture.id,
@@ -122,6 +124,7 @@ export function reconcileKnownSessions(
       sourceType: info.source_type,
       pausedSourceProfileIds: info.paused_source_profile_ids,
       originProfileIds: info.origin_profile_ids,
+      sourceKind: info.source_kind,
       external: true,
     };
   }

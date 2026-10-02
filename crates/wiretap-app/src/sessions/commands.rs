@@ -1,6 +1,5 @@
 use crate::{
     capture_store,
-    credentials,
     io::{
         self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
@@ -14,9 +13,7 @@ use crate::{
         BusMapping, Protocol, TemporalMode,
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusRangeSpec, PollGroup,
-        MqttConfig, MqttSource,
         IOBroker, SerialOverrides, SourceConfig,
-        BackendApiConfig, BackendApiSource, BackendApiSourceOptions,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
         set_wake_settings as io_set_wake_settings,
@@ -33,15 +30,15 @@ use crate::io::serial::utils::line_settings;
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
+use super::open::{refused_on, SessionRefusal};
 use super::ids::{mint_session_id, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
 use super::source_config::{
-    allocate_inputs, attach_modbus_polls, choose_profile_by_id, create_source_config_from_profile,
-    declared_bus_mappings, parse_modbus_polls, reader_source_config, refuse_at_start, resolve_source_configs,
+    allocate_inputs, create_source_config_from_profile, declared_bus_mappings, resolve_source_configs,
     MultiSourceInput,
 };
 use super::tracking::{
     cache_probe_result, claim_session_profile, clear_probe_cache, get_cached_probe, get_session_profile_ids,
-    get_sessions_for_profile, hold_profile_while, register_session_profiles, restore_session_profiles,
+    get_sessions_for_profile, hold_profile_while, restore_session_profiles,
     unregister_session_profile,
 };
 
@@ -112,179 +109,6 @@ pub fn get_supported_protocols() -> HashMap<String, Vec<Protocol>> {
         .collect()
 }
 
-/// Create a new reader session
-#[tauri::command(rename_all = "snake_case")]
-#[allow(clippy::too_many_arguments)]
-pub async fn create_reader_session(
-    app: tauri::AppHandle,
-    session_id: String,
-    profile_id: Option<String>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    speed: Option<f64>,
-    limit: Option<i64>,
-    _file_path: Option<String>,
-    // Bus override for single-bus devices (overrides profile config)
-    bus_override: Option<u8>,
-    // Listener ID (for session logging)
-    subscriber_id: Option<String>,
-    // Human-readable app name (e.g., "discovery", "decoder")
-    app_name: Option<String>,
-    // Modbus TCP poll groups (JSON-serialised from frontend catalog)
-    modbus_polls: Option<String>,
-    // Serial framing chosen in the picker, overriding the device profile.
-    // These arrived as eleven flat parameters until Feb 2026, when they were
-    // removed as unused — they were unread here, but the frontend was, and still
-    // is, sending them, so the picker's framing dropdown and its "Capture raw
-    // bytes" tick quietly went nowhere on the single-device path.
-    // Optional so a caller with nothing to say — MCP — can omit it.
-    serial: Option<SerialOverrides>,
-) -> Result<IOCapabilities, String> {
-    let settings = settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    let profile = choose_profile_by_id(&settings, profile_id.as_deref())
-        .ok_or_else(|| "No IO profile configured".to_string())?;
-    refuse_at_start(&profile)?;
-
-    // Check if this profile is already in use (for single-handle devices)
-    profile_tracker::can_use_profile(&profile.id, &profile.kind, None)?;
-    profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[], None)?;
-
-    // Anonymous usage telemetry: which source kind gets started (wiretap,
-    // wiretap, and any MCP-driven kind all land here).
-    crate::telemetry::emit_feature_usage("io_source_start", &profile.kind);
-
-    // Track profile_id for later registration
-    let profile_id_for_tracking = profile.id.clone();
-
-    // Create the appropriate reader based on profile kind
-    // Real-time devices (gvret, slcan, gs_usb, socketcan) use IOBroker for unified handling
-    let is_realtime = device_kinds::is_multi_source(&profile.kind);
-    let reader: Box<dyn IOSource> = if is_realtime {
-        // Use IOBroker for all real-time devices (unified path)
-        let source_config = reader_source_config(
-            &profile,
-            bus_override,
-            serial.unwrap_or_default(),
-            modbus_polls.as_deref(),
-            settings.modbus_max_register_errors,
-        )?;
-
-        Box::new(IOBroker::single_source(
-            settings::saved_profiles(&app),
-            session_id.clone(),
-            source_config,
-        )?)
-    } else {
-        // Non-realtime devices use their direct readers
-        match profile.kind.as_str() {
-        "wiretap" => {
-            let config = BackendApiConfig {
-                base_url: req_str(&profile, "url")?.trim_end_matches('/').to_string(),
-                api_key: credentials::resolve_secret(&profile, "api_key").unwrap_or_default(),
-                database: req_str(&profile, "database")?,
-                protocol: crate::apiclient::archive_protocol(&profile.connection)?,
-            };
-
-            let start_from_profile =
-                profile.connection.get("start").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let end_from_profile =
-                profile.connection.get("end").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let limit_from_profile = profile
-                .connection
-                .get("limit")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
-
-            let options = BackendApiSourceOptions {
-                start: start_time.or(start_from_profile),
-                end: end_time.or(end_from_profile),
-                limit: limit.or(limit_from_profile),
-                speed: speed.unwrap_or_else(|| {
-                    profile
-                        .connection
-                        .get("speed")
-                        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(0.0)
-                }),
-                batch_size: profile
-                    .connection
-                    .get("batch_size")
-                    .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                    .unwrap_or(1000) as i32,
-            };
-
-            Box::new(BackendApiSource::new(session_id.clone(), config, options))
-        }
-        "mqtt" => {
-            let host = req_str(&profile, "host")?;
-            let port = device_kinds::req_i64(&profile, "port")? as u16;
-
-            let username = profile
-                .connection
-                .get("username")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-
-            let password = credentials::resolve_secret(&profile, "password");
-
-            // Get subscription topic from savvycan format config
-            let topic = profile
-                .connection
-                .get("formats")
-                .and_then(|f| f.get("savvycan"))
-                .and_then(|s| s.get("topic"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("wiretap/#")
-                .to_string();
-
-            let config = MqttConfig {
-                host,
-                port,
-                username,
-                password,
-                topic,
-                client_id: None,
-            };
-
-            Box::new(MqttSource::new(session_id.clone(), config))
-        }
-        kind => {
-            return Err(format!(
-                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, virtual, gvret_tcp, gvret_usb, wiretap, csv, serial, slcan, socketcan, gs_usb",
-                kind
-            ));
-        }
-    }
-    };
-
-    // Register profile usage BEFORE create_session so lifecycle event has profile IDs
-    claim_session_profile(&session_id, &profile_id_for_tracking).await;
-
-    let result = create_session(session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
-
-    // Auto-start the session after creation (only for real-time devices)
-    // Playback sources should NOT auto-start because frames would be emitted
-    // before the frontend has registered its listener and set up event handlers.
-    // The frontend will call start_reader_session after registering the listener.
-    let is_playback_source = profile.kind == "wiretap";
-
-    if result.is_new && !is_playback_source {
-        tlog!("[create_reader_session] Auto-starting new session '{}' (device type: {})", session_id, profile.kind);
-        match start_session(&session_id).await {
-            Ok(_) => tlog!("[create_reader_session] Auto-start succeeded for '{}' (device type: {})", session_id, profile.kind),
-            Err(e) => tlog!("[create_reader_session] Auto-start FAILED for '{}': {}", session_id, e),
-        }
-    } else if result.is_new && is_playback_source {
-        tlog!("[create_reader_session] Created playback session '{}' (not auto-starting - frontend will start after listener registration)", session_id);
-    } else {
-        tlog!("[create_reader_session] Joined existing session '{}' (subscriber_count: {})", session_id, result.subscriber_count);
-    }
-
-    Ok(result.capabilities)
-}
-
 /// Get the state of a reader session
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_reader_session_state(session_id: String) -> Result<Option<IOState>, String> {
@@ -321,8 +145,8 @@ pub async fn start_reader_session(session_id: String) -> Result<IOState, String>
 /// Stop a reader session
 /// Returns the confirmed state after the operation.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn stop_reader_session(session_id: String) -> Result<IOState, String> {
-    stop_session(&session_id).await
+pub async fn stop_reader_session(session_id: String) -> Result<IOState, SessionRefusal> {
+    refused_on(&session_id, stop_session(&session_id).await).await
 }
 
 /// Pause a reader session
@@ -485,14 +309,14 @@ pub async fn reconfigure_reader_session(
 
 /// Seek to a specific timestamp in microseconds
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), String> {
-    seek_session(&session_id, timestamp_us).await
+pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), SessionRefusal> {
+    refused_on(&session_id, seek_session(&session_id, timestamp_us).await).await
 }
 
 /// Seek to a specific frame index (preferred for capture playback - avoids floating-point issues)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), String> {
-    seek_session_by_frame(&session_id, frame_index).await
+pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), SessionRefusal> {
+    refused_on(&session_id, seek_session_by_frame(&session_id, frame_index).await).await
 }
 
 /// Set playback direction for a reader session (reverse = true for backwards playback)
@@ -507,34 +331,6 @@ pub async fn update_reader_direction(session_id: String, reverse: bool) -> Resul
 #[tauri::command(rename_all = "snake_case")]
 pub async fn destroy_reader_session(session_id: String, reset: bool) -> Result<(), String> {
     destroy_session(&session_id, reset).await
-}
-
-/// Create a reader session for a capture.
-/// The capture is registered as a source profile so it appears in
-/// `sourceProfileIds` and the session manager graph.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn create_capture_source_session(
-    session_id: String,
-    capture_id: String,
-    speed: Option<f64>,
-) -> Result<IOCapabilities, String> {
-    if !capture_store::has_any_data() {
-        return Err("No data in capture. Please import a CSV file first.".to_string());
-    }
-
-    claim_session_profile(&session_id, &capture_id).await;
-
-    let reader = CaptureSource::new(
-        session_id.clone(),
-        capture_id,
-        speed.unwrap_or(0.0), // 0 = no limit by default
-    );
-
-    // Anonymous usage telemetry: user explicitly opened a capture for replay.
-    crate::telemetry::emit_feature_usage("io_source_start", "capture");
-
-    let result = create_session(session_id, Box::new(reader), None, None, None, vec![]).await;
-    Ok(result.capabilities)
 }
 
 /// Transition an existing session to use a capture for replay.
@@ -1459,15 +1255,7 @@ pub async fn probe_device(
 // Multi-Source Session Commands
 // ============================================================================
 
-/// What a multi-source session opened, and the buses Rust gave each source.
-#[derive(Debug, Clone, serde::Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct MultiSourceSession {
-    pub capabilities: IOCapabilities,
-    pub bus_mappings: HashMap<String, Vec<BusMapping>>,
-}
-
-/// The buses `create_multi_source_session` would give these sources, for the
+/// The buses `open_session` would give these sources, for the
 /// picker to show before anything opens.
 #[tauri::command(rename_all = "snake_case")]
 pub fn preview_source_buses(
@@ -1479,120 +1267,6 @@ pub fn preview_source_buses(
         .into_iter()
         .map(|(profile, buses)| (profile.id.clone(), buses))
         .collect())
-}
-
-/// Create a multi-source reader session that combines frames from multiple devices.
-///
-/// This is used for multi-bus capture where frames from diverse sources are merged
-/// into a single stream. Each source can have its own bus mappings to:
-/// - Filter out disabled buses
-/// - Remap device bus numbers to different output bus numbers
-///
-/// The merged frames are sorted by timestamp and emitted as a single stream.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn create_multi_source_session(
-    app: tauri::AppHandle,
-    session_id: String,
-    sources: Vec<MultiSourceInput>,
-    subscriber_id: Option<String>,
-    app_name: Option<String>,
-    modbus_polls: Option<String>,
-) -> Result<MultiSourceSession, String> {
-    if sources.is_empty() {
-        return Err("At least one source is required".to_string());
-    }
-
-    let settings = settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    let parsed_polls = parse_modbus_polls(modbus_polls.as_deref())?;
-    let mut source_configs = resolve_source_configs(sources, &settings, 0)?;
-
-    for config in &mut source_configs {
-        attach_modbus_polls(config, &parsed_polls, settings.modbus_max_register_errors);
-    }
-
-    // Validate all profiles are real-time devices supported by IOBroker
-    for (idx, config) in source_configs.iter().enumerate() {
-        if !device_kinds::is_multi_source(&config.profile_kind) {
-            return Err(format!(
-                "Profile '{}' has unsupported type '{}' for multi-source mode.",
-                config.profile_id, config.profile_kind
-            ));
-        }
-
-        if !device_kinds::spec(&config.profile_kind).is_some_and(|s| s.available) {
-            return Err(format!(
-                "Profile '{}' uses {}, which this platform cannot open.",
-                config.profile_id, config.profile_kind
-            ));
-        }
-
-        // Check if profile is already in use
-        profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind, Some(&session_id))?;
-        let joining: Vec<&str> = source_configs[..idx].iter().map(|c| c.profile_id.as_str()).collect();
-        profile_tracker::can_use_adapter(&config.profile_id, &settings.io_profiles, &joining, Some(&session_id))?;
-    }
-
-    // Track all profiles for this session
-    let profile_ids: Vec<String> = source_configs.iter().map(|c| c.profile_id.clone()).collect();
-
-    // Always destroy any existing session with this ID first.
-    // This ensures we use the fresh bus mappings provided by the frontend.
-    // Without this, a stopped session would be reused with stale mappings.
-    // `reset: true` — the session is about to be recreated under this same id, so
-    // apps must not treat the teardown as an external death and adopt the orphaned
-    // capture. Doing so made the capture the app's next session id, which re-entered
-    // this path and churned the session in a loop.
-    if get_session_state(&session_id).await.is_some() {
-        let _ = destroy_session(&session_id, true).await;
-    }
-
-    // Create the multi-source reader (validates interface trait compatibility)
-    // Extract display names for logging before moving source_configs
-    let source_display_names: Vec<String> = source_configs.iter()
-        .map(|c| c.display_name.clone())
-        .collect();
-    let stored_configs = source_configs.clone();
-    let bus_mappings = source_configs.iter().map(|c| (c.profile_id.clone(), c.bus_mappings.clone())).collect();
-    let reader = IOBroker::new(settings::saved_profiles(&app), session_id.clone(), source_configs)?;
-
-    // Register profile usage BEFORE create_session so lifecycle event has profile IDs
-    register_session_profiles(&session_id, &profile_ids);
-
-    // Anonymous usage telemetry: which source kinds get started (deduped so a
-    // multi-bus start doesn't over-count a single user action).
-    let mut seen = std::collections::HashSet::new();
-    for config in &stored_configs {
-        if seen.insert(config.profile_kind.as_str()) {
-            crate::telemetry::emit_feature_usage("io_source_start", &config.profile_kind);
-        }
-    }
-
-    let result = create_session(session_id.clone(), Box::new(reader), subscriber_id, app_name, Some(source_display_names), stored_configs).await;
-
-    // Auto-start the session if it's new OR if it exists but is stopped
-    let should_start = if result.is_new {
-        true
-    } else {
-        // Check if existing session is stopped
-        matches!(
-            get_session_state(&session_id).await,
-            Some(state) if matches!(state, IOState::Stopped)
-        )
-    };
-
-    if should_start {
-        if let Err(e) = start_session(&session_id).await {
-            tlog!(
-                "[create_multi_source_session] Failed to auto-start session '{}': {}",
-                session_id, e
-            );
-        }
-    }
-
-    Ok(MultiSourceSession { capabilities: result.capabilities, bus_mappings })
 }
 
 // ============================================================================

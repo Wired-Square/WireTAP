@@ -974,6 +974,26 @@ pub struct RegisterSubscriberResult {
     pub origin_profile_ids: Vec<String>,
     /// What kind of source is behind the session, as the roster reports it
     pub source_type: String,
+    pub source_kind: SessionSourceKind,
+}
+
+/// What a session was opened from. A stopped source replaying its capture is
+/// still a device session; one opened on a capture is a capture session.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum SessionSourceKind {
+    Device,
+    Capture,
+}
+
+pub fn source_kind(session_id: &str) -> SessionSourceKind {
+    let origin = sessions::get_session_origin_profile_ids(session_id);
+    if origin.first().is_some_and(|id| capture_store::is_known_capture(id)) {
+        SessionSourceKind::Capture
+    } else {
+        SessionSourceKind::Device
+    }
 }
 
 /// Register a subscriber for a session.
@@ -981,14 +1001,22 @@ pub struct RegisterSubscriberResult {
 /// If the subscriber is already registered, this updates their heartbeat.
 /// Returns session info for the registered subscriber.
 pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name: Option<&str>) -> Result<RegisterSubscriberResult, String> {
+    register_subscriber_from(current_session_of_app(subscriber_id), session_id, subscriber_id, app_name).await
+}
+
+/// `register_subscriber` for a subscriber that was on `prev_session_id` before
+/// the caller attached it anywhere.
+pub async fn register_subscriber_from(
+    prev_session_id: Option<String>,
+    session_id: &str,
+    subscriber_id: &str,
+    app_name: Option<&str>,
+) -> Result<RegisterSubscriberResult, String> {
     let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
 
-    // The subscriber's prior session attachment, captured before we re-attach it here.
     // Enforcing the one-subscriber-one-session invariant is automatic: `session_id` is a
     // single Option, so attaching to this session detaches from any other. If that other
     // session is left empty we tear it down after releasing the lock.
-    let prev_session_id = current_session_of_app(subscriber_id);
-
     let result = {
         let mut session = lock_session(session_id).await?;
 
@@ -1043,6 +1071,7 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
             startup_error,
             origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
             source_type: session.source.source_type().to_string(),
+            source_kind: source_kind(session_id),
         }
     };
     // Lock released here
@@ -1331,7 +1360,7 @@ pub async fn update_source_bus_mappings(
 
     // Traits are derived, never accepted — the same normalisation the create
     // path applies, so a hot-swap cannot leave a session in a state
-    // `create_multi_source_session` would never have produced. The live source
+    // `open_session` would never have produced. The live source
     // already knows its kind, so the caller needn't say.
     let kind = configs
         .iter()

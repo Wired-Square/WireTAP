@@ -6,12 +6,10 @@
 
 import * as Sentry from "@sentry/react";
 import { create } from "zustand";
-import { listen, emit, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import { WINDOW_EVENTS } from "../events/registry";
 import {
-  createIOSession,
-  getIOSessionState,
-  getIOSessionCapabilities,
+  openSession as openSessionCommand,
   startReaderSession,
   stopReaderSession,
   pauseReaderSession,
@@ -22,7 +20,6 @@ import {
   switchSessionToCaptureReplay,
   updateReaderSpeed,
   updateReaderTimeRange,
-  destroyReaderSession,
   seekReaderSession,
   seekReaderSessionByFrame,
   transitionToCaptureSource,
@@ -30,23 +27,23 @@ import {
   registerSessionSubscriber,
   unregisterSessionSubscriber,
   reinitializeSessionIfSafe,
-  createMultiSourceSession,
   serialPayload,
+  isSessionNotFound,
   getStateType,
   type IOCapabilities,
   type IOStateType,
-  type IOState,
   type InterfaceFramingConfig,
   type StreamEndedInfo,
   type CanTransmitFrame,
   type TransmitResult,
-  type CreateIOSessionOptions,
   type FramingMode,
   type MultiSourceInput,
   type BusMapping,
   type BusOverride,
   type PlaybackPosition,
   type ActiveSessionInfo,
+  type OpenedSession,
+  type SessionSourceKind,
 } from "../api/io";
 import { reconcileKnownSessions } from "./sessionRoster";
 import type { FrameMessage } from "../types/frame";
@@ -148,14 +145,9 @@ function addSessionLog(entry: SessionLogInput) {
   }
 }
 
-/**
- * Check if a profile ID represents a capture.
- * Checks against the cached set of known capture IDs from the Rust backend.
- * The set is populated on app startup and updated when captures are created/deleted.
- */
-export function isCaptureProfileId(profileId: string | null): boolean {
-  if (!profileId) return false;
-  return useSessionStore.getState().knownCaptureIds.has(profileId);
+/** Whether Rust opened the session on a capture, as `open_session` and the roster report it. */
+export function isCaptureSession(state: SessionStore, sessionId?: string | null): boolean {
+  return !!sessionId && state.sessions[sessionId]?.sourceKind === "capture";
 }
 
 /** Getter for event listeners - set after store is created */
@@ -245,6 +237,8 @@ export interface Session {
    * even while it replays its capture after a stop. Empty until Rust reports it.
    */
   originProfileIds: string[];
+  /** What the session was opened from; undefined until Rust reports it. */
+  sourceKind?: SessionSourceKind;
   /** True when adopted from the backend roster (known-only, not UI-owned). */
   external?: boolean;
 }
@@ -253,8 +247,8 @@ export interface Session {
 export interface CreateSessionOptions {
   /** Custom session ID (defaults to auto-generated) */
   sessionId?: string;
-  /** Join existing session if profile is in use (default: true for single-handle profiles) */
-  joinExisting?: boolean;
+  /** Devices merged into one session, replacing whatever is under its id */
+  sources?: MultiSourceInput[];
   /** Only join sessions that produce frames (not raw bytes) */
   requireFrames?: boolean;
   /** Start time for time-range capable readers (ISO-8601) */
@@ -267,8 +261,6 @@ export interface CreateSessionOptions {
   limit?: number;
   /** File path for file-based readers */
   filePath?: string;
-  /** Use the shared capture source */
-  useCapture?: boolean;
   /** Framing encoding for serial readers */
   framingEncoding?: FramingMode;
   /** Delimiter bytes for delimiter-based framing */
@@ -323,16 +315,14 @@ export interface SessionCallbacks {
 interface SessionEventSubscribers {
   /** Session ID this subscriber set belongs to (for WS unsubscribe on cleanup) */
   sessionId: string;
-  /** Unlisten functions for Tauri events */
-  unlistenFunctions: UnlistenFn[];
   /** Unlisten functions for WebSocket message handlers */
   wsUnlistenFunctions: (() => void)[];
   /** Callbacks registered by subscribers, keyed by subscriber ID */
   callbacks: Map<string, SessionCallbacks>;
-  /** Heartbeat interval ID (for keeping listeners alive in Rust backend) */
-  heartbeatIntervalId: ReturnType<typeof setInterval> | null;
-  /** Listener IDs that need heartbeats (separate from callbacks for timing) */
+  /** This window's subscribers on the session, re-registered on a wake */
   registeredSubscribers: Set<string>;
+  /** Settles once the WS channel is subscribed, so an open's first frames are not missed */
+  subscribed: Promise<unknown>;
 }
 
 // ============================================================================
@@ -347,8 +337,6 @@ export interface SessionStore {
   activeSessionId: string | null;
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
   _eventListeners: Record<string, SessionEventSubscribers>;
-  /** Cached set of known capture IDs (populated from Rust backend on startup) */
-  knownCaptureIds: Set<string>;
 
   // ---- Actions: Session Lifecycle ----
   /** Open a session - creates if not exists, joins if exists */
@@ -359,6 +347,10 @@ export interface SessionStore {
     appName: string,
     options?: CreateSessionOptions
   ) => Promise<Session>;
+  /** Open a session for a mounted view, which `releaseSession` undoes */
+  holdSession: (sessionId: string, profileName: string, subscriberId: string, appName: string) => Promise<Session>;
+  /** Leave a held session, unless the view held it again before the leave ran */
+  releaseSession: (sessionId: string, subscriberId: string) => Promise<void>;
   /** Leave a session (unregister subscriber) */
   leaveSession: (sessionId: string, subscriberId: string) => Promise<void>;
   /** Remove session from list entirely */
@@ -470,14 +462,6 @@ export interface SessionStore {
   registerKnownSessions: (infos: ActiveSessionInfo[]) => void;
   /** Clear a pending join for an app (consumed by useIOSessionManager) */
   clearPendingJoin: (appName: string) => void;
-
-  // ---- Capture ID Registry ----
-  /** Load all capture IDs from the backend into the cached set */
-  loadCaptureIds: () => Promise<void>;
-  /** Add a capture ID to the cached set (call when a capture is created) */
-  addKnownCaptureId: (id: string) => void;
-  /** Remove a capture ID from the cached set (call when a capture is deleted) */
-  removeKnownCaptureId: (id: string) => void;
 }
 
 // ============================================================================
@@ -561,239 +545,207 @@ export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, 
   callbacks.get(subscriber)?.onDecoded?.(decoded, true);
 }
 
-/** Set up Tauri event listeners for a session */
-async function setupSessionEventSubscribers(
-  sessionId: string,
-  eventListeners: SessionEventSubscribers,
-  updateSession: (id: string, updates: Partial<Session>) => void
-): Promise<UnlistenFn[]> {
-  // ==========================================================================
-  // WebSocket binary message handlers (sole push path — Tauri events removed)
-  // ==========================================================================
+/** Route a session's WebSocket pushes to its callbacks and store entry. */
+function setupSessionEventSubscribers(sessionId: string, eventListeners: SessionEventSubscribers) {
+  // Handlers registered before the channel is subscribed are queued by the transport.
+  // FrameData (0x01)
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.FrameData, (_payload, raw) => {
+      const frames = decodeFrameBatch(raw, HEADER_SIZE);
+      if (frames.length > 0) {
+        trackAlloc("session.onFrames", frames.length * 300);
+        invokeCallbacks(eventListeners, "onFrames", frames);
+      }
+    })
+  );
 
-  // Subscribe to WS channel
-  if (wsTransport.isConnected) {
-    wsTransport.subscribe(sessionId).catch(() => {});
-  }
+  // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached.
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.DecodedSignals, (payload) => {
+      const decoded = decodeDecodedSignals(payload);
+      if (decoded.length > 0) invokeCallbacks(eventListeners, "onDecoded", decoded, false);
+    })
+  );
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklog, (payload) =>
+      deliverDecodedBacklog(eventListeners.callbacks, payload)
+    )
+  );
 
-  if (wsTransport.isConnected) {
-    // FrameData (0x01)
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.FrameData, (_payload, raw) => {
-        const frames = decodeFrameBatch(raw, HEADER_SIZE);
-        if (frames.length > 0) {
-          trackAlloc("session.onFrames", frames.length * 300);
-          invokeCallbacks(eventListeners, "onFrames", frames);
-        }
-      })
-    );
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.AdhocSignals, (_payload, raw) => {
+      invokeCallbacks(eventListeners, "onAdhocSignals", decodeWsJson<AdhocSignalsMsg>(raw));
+    })
+  );
 
-    // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached.
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.DecodedSignals, (payload) => {
-        const decoded = decodeDecodedSignals(payload);
-        if (decoded.length > 0) invokeCallbacks(eventListeners, "onDecoded", decoded, false);
-      })
-    );
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklog, (payload) =>
-        deliverDecodedBacklog(eventListeners.callbacks, payload)
-      )
-    );
+  // SessionState (0x02) — state string + optional error decoded from binary
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.SessionState, (payload) => {
+      const { state, errorMsg } = decodeSessionState(payload);
+      const stateType = state as IOStateType;
+      updateSession(sessionId, {
+        ioState: stateType,
+        ...(errorMsg ? { errorMessage: errorMsg } : {}),
+      });
+      if (stateType === "running") closeStreamErrorFor(sessionId);
+      invokeCallbacks(eventListeners, "onStateChange", stateType);
+    })
+  );
 
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.AdhocSignals, (_payload, raw) => {
-        invokeCallbacks(eventListeners, "onAdhocSignals", decodeWsJson<AdhocSignalsMsg>(raw));
-      })
-    );
-
-    // SessionState (0x02) — state string + optional error decoded from binary
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.SessionState, (payload) => {
-        const { state, errorMsg } = decodeSessionState(payload);
-        const stateType = state as IOStateType;
-        updateSession(sessionId, {
-          ioState: stateType,
-          ...(errorMsg ? { errorMessage: errorMsg } : {}),
-        });
-        if (stateType === "running") closeStreamErrorFor(sessionId);
-        invokeCallbacks(eventListeners, "onStateChange", stateType);
-      })
-    );
-
-    // StreamEnded (0x03) — full stream-ended info decoded from binary
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.StreamEnded, (payload) => {
-        const info = decodeStreamEnded(payload);
-        // A run that lost every source to an error must not read as a clean
-        // stop; this is the only push that reports it, so the mapping is the
-        // whole mechanism rather than a defence against an ordering race.
-        const ioState = IO_STATE_FOR_STREAM_END[info.reason] ?? "stopped";
-        updateSession(sessionId, {
-          ioState,
-          streamEndedReason: info.reason,
-          capture: {
-            available: info.capture_available,
-            id: info.capture_id,
-            kind: info.capture_kind,
-            count: info.count,
-            owningSessionId: sessionId,
-            startTimeUs: info.time_range?.[0] ?? null,
-            endTimeUs: info.time_range?.[1] ?? null,
-            name: useSessionStore.getState().sessions[sessionId]?.capture?.name ?? null,
-            persistent: useSessionStore.getState().sessions[sessionId]?.capture?.persistent ?? false,
-          },
-        });
-        if (info.capture_id) {
-          useSessionStore.getState().addKnownCaptureId(info.capture_id);
-        }
-        if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.capture?.name) {
-          import("../api/capture").then(({ getCaptureMetadataById }) =>
-            getCaptureMetadataById(info.capture_id!).then((meta) => {
-              if (meta) {
-                updateSession(sessionId, {
-                  capture: {
-                    ...useSessionStore.getState().sessions[sessionId]?.capture!,
-                    name: meta.name,
-                    persistent: meta.persistent,
-                  },
-                });
-              }
-            }).catch(() => {/* ignore */})
-          );
-        }
-        invokeCallbacks(eventListeners, "onStreamEnded", info);
-        if (info.reason === "paused") {
-          invokeCallbacks(eventListeners, "onStreamComplete", undefined as never);
-        }
-      })
-    );
-
-    // SessionError (0x04) — severity and message decoded from binary
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.SessionError, (payload) => {
-        const { severity, message: error } = decodeSessionError(
-          new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
-        );
-        if (error) {
-          if (severity === "fault") {
-            invokeCallbacks(eventListeners, "onError", error);
-            if (typeof getGlobalShowAppError === "function") {
-              const showAppError = getGlobalShowAppError();
-              if (showAppError) {
-                // The backend now sends an actionable, device-identified message
-                // (e.g. "COM5 stopped responding … reconnect and try again"), so
-                // show it directly rather than a generic sentence. A stable
-                // fingerprint keeps these grouped as one Sentry issue despite the
-                // device name / OS code varying.
-                showAppError("Stream Error", error, undefined, "stream-error", sessionId);
-              }
+  // StreamEnded (0x03) — full stream-ended info decoded from binary
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.StreamEnded, (payload) => {
+      const info = decodeStreamEnded(payload);
+      // A run that lost every source to an error must not read as a clean
+      // stop; this is the only push that reports it, so the mapping is the
+      // whole mechanism rather than a defence against an ordering race.
+      const ioState = IO_STATE_FOR_STREAM_END[info.reason] ?? "stopped";
+      updateSession(sessionId, {
+        ioState,
+        streamEndedReason: info.reason,
+        capture: {
+          available: info.capture_available,
+          id: info.capture_id,
+          kind: info.capture_kind,
+          count: info.count,
+          owningSessionId: sessionId,
+          startTimeUs: info.time_range?.[0] ?? null,
+          endTimeUs: info.time_range?.[1] ?? null,
+          name: useSessionStore.getState().sessions[sessionId]?.capture?.name ?? null,
+          persistent: useSessionStore.getState().sessions[sessionId]?.capture?.persistent ?? false,
+        },
+      });
+      if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.capture?.name) {
+        import("../api/capture").then(({ getCaptureMetadataById }) =>
+          getCaptureMetadataById(info.capture_id!).then((meta) => {
+            if (meta) {
+              updateSession(sessionId, {
+                capture: {
+                  ...useSessionStore.getState().sessions[sessionId]?.capture!,
+                  name: meta.name,
+                  persistent: meta.persistent,
+                },
+              });
             }
-            updateSession(sessionId, {
-              ioState: "error",
-              errorMessage: error,
-            });
+          }).catch(() => {/* ignore */})
+        );
+      }
+      invokeCallbacks(eventListeners, "onStreamEnded", info);
+      if (info.reason === "paused") {
+        invokeCallbacks(eventListeners, "onStreamComplete", undefined as never);
+      }
+    })
+  );
+
+  // SessionError (0x04) — severity and message decoded from binary
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.SessionError, (payload) => {
+      const { severity, message: error } = decodeSessionError(
+        new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
+      );
+      if (error) {
+        if (severity === "fault") {
+          invokeCallbacks(eventListeners, "onError", error);
+          if (typeof getGlobalShowAppError === "function") {
+            const showAppError = getGlobalShowAppError();
+            if (showAppError) {
+              // The backend now sends an actionable, device-identified message
+              // (e.g. "COM5 stopped responding … reconnect and try again"), so
+              // show it directly rather than a generic sentence. A stable
+              // fingerprint keeps these grouped as one Sentry issue despite the
+              // device name / OS code varying.
+              showAppError("Stream Error", error, undefined, "stream-error", sessionId);
+            }
           }
+          updateSession(sessionId, {
+            ioState: "error",
+            errorMessage: error,
+          });
         }
-      })
-    );
+      }
+    })
+  );
 
-    // PlaybackPosition (0x05) — position decoded from binary
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.PlaybackPosition, (payload) => {
-        const pos = decodePlaybackPosition(payload);
-        updateSession(sessionId, { playbackPosition: pos });
-        invokeCallbacks(eventListeners, "onTimeUpdate", pos);
-      })
-    );
+  // PlaybackPosition (0x05) — position decoded from binary
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.PlaybackPosition, (payload) => {
+      const pos = decodePlaybackPosition(payload);
+      updateSession(sessionId, { playbackPosition: pos });
+      invokeCallbacks(eventListeners, "onTimeUpdate", pos);
+    })
+  );
 
-    // SessionInfo (0x09) — speed + listener count decoded from binary.
-    // Either field may be a sentinel meaning "no update":
-    //   speed = -1.0 → listener-count-only update
-    //   subscriber_count = 0xFFFF (65535) → speed-only update
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.SessionInfo, (payload) => {
-        const info = decodeSessionInfo(payload);
-        const updates: Record<string, unknown> = {};
-        if (info.subscriber_count < 0xFFFF) {
-          updates.subscriberCount = info.subscriber_count;
-        }
-        if (info.speed >= 0) {
-          updates.speed = info.speed;
-          invokeCallbacks(eventListeners, "onSpeedChange", info.speed);
-        }
-        if (Object.keys(updates).length > 0) {
-          updateSession(sessionId, updates);
-        }
-      })
-    );
-
-    // FrameCounts (0x16) — live total + unique counts, Rust-authoritative.
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.FrameCounts, (payload) => {
-        const { total, unique } = decodeFrameCounts(payload);
-        updateSession(sessionId, { frameCount: total, uniqueFrameCount: unique });
-      })
-    );
-
-    // ByteCounts (0x19) — live raw-byte total plus the byte capture's id, Rust-authoritative.
-    // The bytes themselves are never pushed; readers fetch rows from that capture when the
-    // count moves (see useCaptureFrameView for the same contract on frames).
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.ByteCounts, (payload) => {
-        const { total, captureId } = decodeByteCounts(payload);
-        updateSession(sessionId, { byteCount: total, bytesCaptureId: captureId });
-      })
-    );
-
-    // CaptureChanged (0x07) — the session's frames capture id, empty when it has none.
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.CaptureChanged, (payload) => {
-        const captureId =
-          decodeCaptureChanged(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)) || null;
-        const current = useSessionStore.getState().sessions[sessionId];
-        if (!current || current.capture.id === captureId) return;
-        updateSession(sessionId, { capture: emptyCapture(captureId, captureId ? sessionId : null) });
-        if (captureId) useSessionStore.getState().addKnownCaptureId(captureId);
-      })
-    );
-
-    // Reconfigured (0x0A) — signal-only, no payload to decode
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.Reconfigured, () => {
-        tlog.debug(`[sessionStore] Session '${sessionId}' reconfigured (WS)`);
-        invokeCallbacks(eventListeners, "onReconfigure", {} as SessionReconfiguredPayload);
-      })
-    );
-
-    // SessionLifecycle (0x08) — the transition Rust made, with the state and capabilities it left
-    eventListeners.wsUnlistenFunctions.push(
-      wsTransport.onSessionMessage(sessionId, MsgType.SessionLifecycle, (payload) => {
-        const msg = decodeSessionTransition(payload);
-        const { updates, callback } = sessionTransitionEffect(msg, useSessionStore.getState().sessions[sessionId], sessionId);
+  // SessionInfo (0x09) — speed + listener count decoded from binary.
+  // Either field may be a sentinel meaning "no update":
+  //   speed = -1.0 → listener-count-only update
+  //   subscriber_count = 0xFFFF (65535) → speed-only update
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.SessionInfo, (payload) => {
+      const info = decodeSessionInfo(payload);
+      const updates: Record<string, unknown> = {};
+      if (info.subscriber_count < 0xFFFF) {
+        updates.subscriberCount = info.subscriber_count;
+      }
+      if (info.speed >= 0) {
+        updates.speed = info.speed;
+        invokeCallbacks(eventListeners, "onSpeedChange", info.speed);
+      }
+      if (Object.keys(updates).length > 0) {
         updateSession(sessionId, updates);
-        if (callback) invokeCallbacks(eventListeners, callback, msg);
-      })
-    );
-  }
+      }
+    })
+  );
 
-  return [];
+  // FrameCounts (0x16) — live total + unique counts, Rust-authoritative.
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.FrameCounts, (payload) => {
+      const { total, unique } = decodeFrameCounts(payload);
+      updateSession(sessionId, { frameCount: total, uniqueFrameCount: unique });
+    })
+  );
+
+  // ByteCounts (0x19) — live raw-byte total plus the byte capture's id, Rust-authoritative.
+  // The bytes themselves are never pushed; readers fetch rows from that capture when the
+  // count moves (see useCaptureFrameView for the same contract on frames).
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.ByteCounts, (payload) => {
+      const { total, captureId } = decodeByteCounts(payload);
+      updateSession(sessionId, { byteCount: total, bytesCaptureId: captureId });
+    })
+  );
+
+  // CaptureChanged (0x07) — the session's frames capture id, empty when it has none.
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.CaptureChanged, (payload) => {
+      const captureId =
+        decodeCaptureChanged(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)) || null;
+      const current = useSessionStore.getState().sessions[sessionId];
+      if (!current || current.capture.id === captureId) return;
+      updateSession(sessionId, { capture: emptyCapture(captureId, captureId ? sessionId : null) });
+    })
+  );
+
+  // Reconfigured (0x0A) — signal-only, no payload to decode
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.Reconfigured, () => {
+      tlog.debug(`[sessionStore] Session '${sessionId}' reconfigured (WS)`);
+      invokeCallbacks(eventListeners, "onReconfigure", {} as SessionReconfiguredPayload);
+    })
+  );
+
+  // SessionLifecycle (0x08) — the transition Rust made, with the state and capabilities it left
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.SessionLifecycle, (payload) => {
+      const msg = decodeSessionTransition(payload);
+      const { updates, callback } = sessionTransitionEffect(msg, useSessionStore.getState().sessions[sessionId], sessionId);
+      updateSession(sessionId, updates);
+      if (callback) invokeCallbacks(eventListeners, callback, msg);
+    })
+  );
 }
 
 /** Clean up session event listeners */
 function cleanupEventListeners(eventListeners: SessionEventSubscribers) {
-  // Clear heartbeat interval
-  if (eventListeners.heartbeatIntervalId) {
-    clearInterval(eventListeners.heartbeatIntervalId);
-    eventListeners.heartbeatIntervalId = null;
-  }
-
-  // Unlisten from Tauri events
-  for (const unlisten of eventListeners.unlistenFunctions) {
-    unlisten();
-  }
-  eventListeners.unlistenFunctions = [];
-
   // Unlisten from WebSocket message handlers and unsubscribe channel
   for (const unlisten of eventListeners.wsUnlistenFunctions) {
     unlisten();
@@ -814,7 +766,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: {},
   activeSessionId: null,
   _eventListeners: {},
-  knownCaptureIds: new Set<string>(),
   pendingJoins: {},
   appErrorDialog: {
     isOpen: false,
@@ -825,482 +776,30 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Session Lifecycle ----
-  openSession: async (profileId, profileName, subscriberId, appName, options = {}) => {
-    tlog.debug(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, subscriberId=${subscriberId}`);
+  openSession: (profileId, profileName, subscriberId, appName, options = {}) =>
+    inOrder(subscriberId, () => openNow(profileId, profileName, subscriberId, appName, options)).then(
+      () => get().sessions[options.sessionId ?? profileId]
+    ),
 
-    // Session ID can be explicitly provided (for recorded sources that need unique IDs)
-    // or defaults to profile ID (for realtime sources that share sessions)
-    const sessionId = options.sessionId ?? profileId;
+  holdSession: (sessionId, profileName, subscriberId, appName) => {
+    const key = holdKey(sessionId, subscriberId);
+    holds.set(key, (holds.get(key) ?? 0) + 1);
+    return get().openSession(sessionId, profileName, subscriberId, appName);
+  },
 
-    // Step 1: Check if we already have this session in our store
-    const existingSession = get().sessions[sessionId];
-    if (existingSession?.lifecycleState === "connected") {
-      // Register this listener with Rust backend
-      try {
-        const result = await registerSessionSubscriber(sessionId, subscriberId, appName);
-
-        // Handle startup error (error that occurred before listener registered)
-        if (result.startup_error) {
-          get().showAppError("Stream Error", "An error occurred while starting the session.", result.startup_error);
-        }
-
-        // Add listener to heartbeat tracking
-        const eventListeners = get()._eventListeners[sessionId];
-        if (eventListeners) {
-          eventListeners.registeredSubscribers.add(subscriberId);
-        }
-
-        // Update session with latest info from Rust
-        set((s) => ({
-          sessions: {
-            ...s.sessions,
-            [sessionId]: {
-              ...s.sessions[sessionId],
-              subscriberCount: result.subscriber_count,
-              originProfileIds: result.origin_profile_ids,
-              sourceType: result.source_type,
-            },
-          },
-        }));
-
-        return get().sessions[sessionId];
-      } catch {
-        // Session doesn't exist in backend, will create below
-      }
-    }
-
-    // Step 2: Check if session exists in backend
-    const existingCaps = await getIOSessionCapabilities(sessionId);
-    const existingState = await getIOSessionState(sessionId);
-    const backendExists = existingCaps && existingState?.type !== "Error";
-
-    // Step 3: Destroy error session if exists
-    if (existingCaps && existingState?.type === "Error") {
-      try {
-        await destroyReaderSession(sessionId);
-      } catch {
-        // Ignore
-      }
-    }
-
-    // Step 4: Create or join the backend session
-    let capabilities: IOCapabilities;
-    let ioState: IOStateType = "stopped";
-    let subscriberCount = 1;
-    let captureId: string | null = null;
-    let captureKind: "frames" | "bytes" | null = null;
-    let originProfileIds: string[] | null = null;
-    let sourceType: string | undefined;
-
-    if (backendExists) {
-      // Join existing backend session using registerSessionSubscriber only
-      // Don't call joinReaderSession - it increments joiner_count separately from the listener map,
-      // which causes count to overshoot when React StrictMode double-mounts components
-      const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
-      capabilities = regResult.capabilities;
-      ioState = getStateType(regResult.state);
-      subscriberCount = regResult.subscriber_count;
-      captureId = regResult.capture_id;
-      captureKind = regResult.capture_kind;
-      originProfileIds = regResult.origin_profile_ids;
-      sourceType = regResult.source_type;
-
-      // Handle startup error (error that occurred before listener registered)
-      if (regResult.startup_error) {
-        get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
-      }
-
-      // Log session-joined event
-      addSessionLog({
-        eventType: "session-joined",
-        sessionId,
-        profileId,
-        profileName,
-        appName,
-        details: `Joined existing session (${subscriberCount} listeners, state: ${ioState})`,
-      });
-    } else {
-      // Create new backend session
-      // Auto-detect capture mode from profile ID (supports both legacy and new capture ID formats)
-      const isCaptureMode = isCaptureProfileId(profileId) || options.useCapture;
-
-      const createOptions: CreateIOSessionOptions = {
-        sessionId,
-        profileId: isCaptureMode ? undefined : profileId, // Don't pass fake profile ID for capture mode
-        captureId: isCaptureMode ? profileId : undefined, // Pass capture ID so Rust registers it as source
-        startTime: options.startTime,
-        endTime: options.endTime,
-        // For capture mode, default to 1x speed (paced playback) instead of 0 (no pacing)
-        speed: options.speed ?? (isCaptureMode ? 1.0 : undefined),
-        limit: options.limit,
-        filePath: options.filePath,
-        useCapture: isCaptureMode,
-        framingEncoding: options.framingEncoding,
-        delimiter: options.delimiter,
-        maxFrameLength: options.maxFrameLength,
-        emitRawBytes: options.emitRawBytes,
-        modbusValidateCrc: options.modbusValidateCrc,
-        modbusDeviceAddress: options.modbusDeviceAddress,
-        modbusVendorFunctions: options.modbusVendorFunctions,
-        modbusAllowBroadcast: options.modbusAllowBroadcast,
-        modbusAnyFunction: options.modbusAnyFunction,
-        minFrameLength: options.minFrameLength,
-        busOverride: options.busOverride,
-        subscriberId, // For session logging
-        appName, // Human-readable app name
-        modbusPollsJson: options.modbusPollsJson,
-      };
-
-      try {
-        capabilities = await createIOSession(createOptions);
-
-        // For capture mode, the session IS the capture — set capture ID so actions can find it
-        if (isCaptureMode) {
-          captureId = profileId;
-          captureKind = "frames"; // Buffer sessions default to frames
-        }
-
-        // Backend auto-starts the session, so query the actual state
-        const currentState = await getIOSessionState(sessionId);
-        if (currentState) {
-          ioState = getStateType(currentState);
-        }
-
-        // Register as owner listener
-        try {
-          const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
-          subscriberCount = regResult.subscriber_count;
-          originProfileIds = regResult.origin_profile_ids;
-          sourceType = regResult.source_type;
-          // Pick up capture info from the registration result (more accurate than our guess)
-          if (regResult.capture_id) captureId = regResult.capture_id;
-          if (regResult.capture_kind) captureKind = regResult.capture_kind;
-          // Handle startup error (error that occurred before listener registered)
-          if (regResult.startup_error) {
-            get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
-          }
-        } catch {
-          // Ignore
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-
-        // If profile is in use, try to join instead using registerSessionSubscriber only
-        if (msg.includes("Profile is in use by session")) {
-          const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
-          capabilities = regResult.capabilities;
-          ioState = getStateType(regResult.state);
-          subscriberCount = regResult.subscriber_count;
-          captureId = regResult.capture_id;
-          captureKind = regResult.capture_kind;
-          originProfileIds = regResult.origin_profile_ids;
-          sourceType = regResult.source_type;
-
-          // Handle startup error (error that occurred before listener registered)
-          if (regResult.startup_error) {
-            get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
-          }
-        } else {
-          // Create error session entry
-          const errorSession: Session = {
-            id: sessionId,
-            profileId,
-            profileName,
-            frameCount: 0,
-            uniqueFrameCount: 0,
-            byteCount: 0,
-            lifecycleState: "error",
-            ioState: "error",
-            capabilities: null,
-            errorMessage: msg,
-            subscriberCount: 0,
-            capture: emptyCapture(),
-            createdAt: Date.now(),
-            hasQueuedMessages: false,
-            stoppedExplicitly: false,
-            streamEndedReason: null,
-            speed: null,
-            playbackPosition: null,
-            catalogPath: null,
-            bytesCaptureId: null,
-            pausedSourceProfileIds: [],
-            originProfileIds: [],
-          };
-          set((s) => ({
-            sessions: { ...s.sessions, [sessionId]: errorSession },
-          }));
-          throw e;
-        }
-      }
-    }
-
-    // Step 5: Set up event listeners if needed
-    // Use a synchronous check-and-set pattern to avoid race conditions
-    // where two callers both see no event listeners and both try to create them
-    let eventListeners = get()._eventListeners[sessionId];
-    if (!eventListeners) {
-      // Create the structure first and immediately set it in the store
-      // This prevents race conditions where another caller also tries to create
-      eventListeners = {
-        sessionId,
-        unlistenFunctions: [],
-        wsUnlistenFunctions: [],
-        callbacks: new Map(),
-        heartbeatIntervalId: null,
-        registeredSubscribers: new Set(),
-      };
-
-      // Set immediately BEFORE async setup to claim the slot
-      set((s) => {
-        // Double-check another caller didn't beat us
-        if (s._eventListeners[sessionId]) {
-          // Someone else created it, use theirs
-          eventListeners = s._eventListeners[sessionId];
-          return s; // No change needed
-        }
-        return {
-          ...s,
-          _eventListeners: { ...s._eventListeners, [sessionId]: eventListeners! },
-        };
-      });
-
-      // Re-fetch in case another caller won the race
-      eventListeners = get()._eventListeners[sessionId]!;
-
-      // Only set up Tauri listeners if we don't have any yet
-      if (eventListeners.unlistenFunctions.length === 0) {
-        eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
-          sessionId,
-          eventListeners,
-          updateSession
-        );
-
-        // Heartbeat keepalive for the Rust IO session watchdog.
-        // When WS is connected, the WS server bridges its 10s heartbeat to
-        // touch IO listener timestamps — no invoke polling needed.
-        // Fall back to invoke-based heartbeats only when WS is unavailable.
-        if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
-          const heartbeatSessionId = sessionId;
-          eventListeners.heartbeatIntervalId = setInterval(async () => {
-            const listeners = get()._eventListeners[heartbeatSessionId];
-            if (!listeners || listeners.registeredSubscribers.size === 0) return;
-
-            tlog.info(
-              `[heartbeat:${heartbeatSessionId}] sending for ${listeners.registeredSubscribers.size} listener(s)`
-            );
-
-            for (const lid of listeners.registeredSubscribers) {
-              try {
-                await registerSessionSubscriber(heartbeatSessionId, lid);
-              } catch (e) {
-                tlog.info(
-                  `[heartbeat:${heartbeatSessionId}] failed for ${lid}: ${e}`
-                );
-              }
-            }
-          }, 5000);
-        }
-      }
-    }
-
-    // Add this listener to the registered listeners set for heartbeat tracking
-    const currentEventListeners = get()._eventListeners[sessionId];
-    if (currentEventListeners) {
-      currentEventListeners.registeredSubscribers.add(subscriberId);
-    }
-
-    // Step 5.5: Start the session if it's still stopped (for playback sources like the WireTAP backend, CSV)
-    // Playback sources don't auto-start on the backend to avoid emitting frames before listeners are ready.
-    // Now that event listeners are set up, we can safely start.
-    // EXCEPTION 1: Capture mode should NOT auto-start - data is already in the capture store
-    // and can be accessed via pagination without streaming. User can start playback manually.
-    // EXCEPTION 2: skipAutoStart option - for connect-only mode (Query app) where we want
-    // to create the session but not start streaming until user explicitly requests it.
-    const isCaptureSession = isCaptureProfileId(profileId);
-    const shouldAutoStart = ioState === "stopped" && !isCaptureSession && !options.skipAutoStart;
-    if (shouldAutoStart) {
-      try {
-        await startReaderSession(sessionId);
-        ioState = "running";
-      } catch {
-        // Session might have been started by another caller - continue anyway
-      }
-    }
-
-    // Step 6: Create session entry
-    // IMPORTANT: Use a function updater to preserve any subscriberCount updates
-    // that may have occurred via events while we were setting up.
-    // The `subscriberCount` variable may be stale by now.
-    set((s) => {
-      // Check if session already exists with a higher listener count
-      // (could have been updated by session-info event)
-      const existingSession = s.sessions[sessionId];
-      const currentListenerCount = existingSession?.subscriberCount ?? 0;
-      const finalListenerCount = Math.max(subscriberCount, currentListenerCount);
-
-      const session: Session = {
-        id: sessionId,
-        profileId,
-        profileName,
-        lifecycleState: "connected",
-        ioState,
-        capabilities,
-        errorMessage: null,
-        subscriberCount: finalListenerCount,
-        frameCount: 0,
-        uniqueFrameCount: 0,
-        byteCount: 0,
-        capture: {
-          available: false,
-          id: captureId,
-          kind: captureKind,
-          count: 0,
-          owningSessionId: null,
-          startTimeUs: existingSession?.capture?.startTimeUs ?? null,
-          endTimeUs: existingSession?.capture?.endTimeUs ?? null,
-          name: existingSession?.capture?.name ?? null,
-          persistent: existingSession?.capture?.persistent ?? false,
-        },
-        createdAt: existingSession?.createdAt ?? Date.now(),
-        hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
-        stoppedExplicitly: existingSession?.stoppedExplicitly ?? false,
-        streamEndedReason: existingSession?.streamEndedReason ?? null,
-        speed: existingSession?.speed ?? null,
-        playbackPosition: existingSession?.playbackPosition ?? null,
-        catalogPath: existingSession?.catalogPath ?? null,
-        bytesCaptureId: existingSession?.bytesCaptureId ?? null,
-        sourceType: sourceType ?? existingSession?.sourceType,
-        // Rust owns this; the next roster reconcile fills it in. A session that
-        // has only just been created has nothing paused yet.
-        pausedSourceProfileIds: existingSession?.pausedSourceProfileIds ?? [],
-        originProfileIds: originProfileIds ?? existingSession?.originProfileIds ?? [],
-      };
-
-      return {
-        sessions: { ...s.sessions, [sessionId]: session },
-      };
+  releaseSession: (sessionId, subscriberId) => {
+    const key = holdKey(sessionId, subscriberId);
+    const remaining = (holds.get(key) ?? 1) - 1;
+    if (remaining > 0) holds.set(key, remaining);
+    else holds.delete(key);
+    return inOrder(subscriberId, async () => {
+      if (holds.has(key)) return;
+      get().clearCallbacks(sessionId, subscriberId);
+      await leaveNow(sessionId, subscriberId);
     });
-
-    // For capture-mode sessions, fetch capture metadata to populate the
-    // session's capture fields. Without this, count/available/kind/times
-    // stay at their initial zero values forever — which makes the session
-    // tooltip show "Frames: 0, Unique: 0" and breaks any downstream code
-    // that reads session.capture.count (e.g. the Discovery top-bar tooltip).
-    if (captureId) {
-      import("../api/capture").then(({ getCaptureMetadataById }) =>
-        getCaptureMetadataById(captureId!).then((meta) => {
-          if (meta) {
-            const currentSession = get().sessions[sessionId];
-            if (currentSession && currentSession.capture.id === captureId) {
-              set((s) => ({
-                sessions: {
-                  ...s.sessions,
-                  [sessionId]: {
-                    ...s.sessions[sessionId],
-                    capture: {
-                      ...s.sessions[sessionId].capture,
-                      available: true,
-                      kind: meta.kind,
-                      count: meta.count,
-                      startTimeUs: meta.start_time_us,
-                      endTimeUs: meta.end_time_us,
-                      name: meta.name,
-                      persistent: meta.persistent,
-                    },
-                  },
-                },
-              }));
-            }
-          }
-        }).catch(() => {/* ignore */})
-      );
-    }
-
-    tlog.debug(`[sessionStore:openSession] Complete - returning session for ${sessionId}`);
-    return get().sessions[sessionId];
   },
 
-  leaveSession: async (sessionId, subscriberId) => {
-    const eventListeners = get()._eventListeners[sessionId];
-
-    try {
-      // Unregister listener from Rust backend
-      const remaining = await unregisterSessionSubscriber(sessionId, subscriberId);
-
-      // Log session-left event
-      const session = get().sessions[sessionId];
-      addSessionLog({
-        eventType: "session-left",
-        sessionId,
-        profileId: session?.profileId ?? null,
-        profileName: session?.profileName ?? null,
-        appName: subscriberId,
-        details: `Left session (${remaining} listeners remaining)`,
-      });
-
-      // Remove callbacks and registered listener for heartbeats
-      if (eventListeners) {
-        eventListeners.callbacks.delete(subscriberId);
-        eventListeners.registeredSubscribers.delete(subscriberId);
-
-        // If no more local callbacks, clean up event listeners
-        if (eventListeners.callbacks.size === 0) {
-          cleanupEventListeners(eventListeners);
-
-          // NOTE: Don't call leaveReaderSession here - unregisterSessionSubscriber already
-          // handles the backend cleanup including stopping the session when no listeners remain.
-          // Calling leaveReaderSession would double-decrement joiner_count.
-
-          const session = get().sessions[sessionId];
-
-          // If session has queued messages, preserve it as disconnected instead of removing
-          if (session?.hasQueuedMessages) {
-            set((s) => {
-              const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
-              return {
-                sessions: {
-                  ...s.sessions,
-                  [sessionId]: {
-                    ...s.sessions[sessionId],
-                    lifecycleState: "disconnected",
-                    subscriberCount: 0,
-                  },
-                },
-                _eventListeners: remainingListeners,
-                activeSessionId:
-                  s.activeSessionId === sessionId ? null : s.activeSessionId,
-              };
-            });
-          } else {
-            // Remove from local store only
-            set((s) => {
-              const { [sessionId]: _, ...remainingSessions } = s.sessions;
-              const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
-              return {
-                sessions: remainingSessions,
-                _eventListeners: remainingListeners,
-                activeSessionId:
-                  s.activeSessionId === sessionId ? null : s.activeSessionId,
-              };
-            });
-          }
-        } else {
-          // Update listener count
-          set((s) => ({
-            sessions: {
-              ...s.sessions,
-              [sessionId]: {
-                ...s.sessions[sessionId],
-                subscriberCount: remaining,
-              },
-            },
-          }));
-        }
-      }
-    } catch {
-      // Ignore - session may already be gone
-    }
-  },
+  leaveSession: (sessionId, subscriberId) => inOrder(subscriberId, () => leaveNow(sessionId, subscriberId)),
 
   removeSession: async (sessionId) => {
     const session = get().sessions[sessionId];
@@ -1391,56 +890,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
-  reinitializeSession: async (sessionId, subscriberId, appName, profileId, profileName, options) => {
-    // Use Rust's atomic reinitialize check
-    const result = await reinitializeSessionIfSafe(sessionId, subscriberId);
-
-    if (!result.success) {
-      // Can't fully reinitialize (other listeners exist), but we can update the time range
+  reinitializeSession: (sessionId, subscriberId, appName, profileId, profileName, options) =>
+    inOrder(subscriberId, async () => {
+      // Rust tears the session down only when this subscriber is its last
+      const result = await reinitializeSessionIfSafe(sessionId, subscriberId);
       const existing = get().sessions[sessionId];
-      if (existing) {
-        // Apply time range update even when we can't reinitialize
+      if (!result.success && existing) {
+        // Others are watching it, so only the time range can change
         if (options?.startTime !== undefined || options?.endTime !== undefined) {
           await updateReaderTimeRange(sessionId, options.startTime, options.endTime);
         }
         return existing;
       }
-      // If no session exists, create one
-      // Pass sessionId via options so openSession uses it instead of defaulting to profileId
-      return get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
-    }
-
-    // Clean up local event listeners but keep session in store
-    // This prevents React re-renders from causing the useIOSession effect
-    // to try to openSession during the gap between remove and create
-    const eventListeners = get()._eventListeners[sessionId];
-    if (eventListeners) {
-      cleanupEventListeners(eventListeners);
-    }
-
-    // Mark session as reinitializing with lifecycleState="disconnected" to prevent
-    // the useIOSession effect from trying to openSession during the gap.
-    // openSession checks lifecycleState !== "connected" before short-circuiting.
-    set((s) => {
-      const { [sessionId]: _, ..._remainingListeners } = s._eventListeners;
-      return {
-        sessions: {
-          ...s.sessions,
-          [sessionId]: {
-            ...s.sessions[sessionId],
-            lifecycleState: "disconnected" as const,
-            ioState: "starting" as const,
-          },
-        },
-        // Clear event listeners for this session
-        _eventListeners: _remainingListeners,
-      };
-    });
-
-    // Create new session - this will update the existing entry in the store
-    // Pass sessionId via options so openSession uses it instead of defaulting to profileId
-    return get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
-  },
+      if (result.success) {
+        // A fresh WS subscription resets the frame offset for the new capture
+        dropSessionListeners(sessionId);
+        updateSession(sessionId, { ioState: "starting" });
+      }
+      await openNow(profileId, profileName, subscriberId, appName, { ...options, sessionId });
+      return get().sessions[sessionId];
+    }),
 
   // ---- Session Control ----
   startSession: async (sessionId) => {
@@ -1873,27 +1342,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { pendingJoins: rest };
     });
   },
-
-  // ---- Buffer ID Registry ----
-  loadCaptureIds: async () => {
-    const { listCaptureIds } = await import("../api/capture");
-    const ids = await listCaptureIds();
-    set({ knownCaptureIds: new Set(ids) });
-  },
-  addKnownCaptureId: (id) => {
-    set((state) => {
-      const next = new Set(state.knownCaptureIds);
-      next.add(id);
-      return { knownCaptureIds: next };
-    });
-  },
-  removeKnownCaptureId: (id) => {
-    set((state) => {
-      const next = new Set(state.knownCaptureIds);
-      next.delete(id);
-      return { knownCaptureIds: next };
-    });
-  },
 }));
 
 // Initialize the event listeners getter for frame throttling
@@ -1945,28 +1393,14 @@ let _unlistenCaptureChanged: (() => void) | null = null;
     }
   ).then(fn => { _unlistenCaptureMeta = fn; });
 
-  // Capture created/deleted — keep knownCaptureIds and session state in sync
-  listen<{ deletedCaptureIds?: string[]; metadata?: { id: string } | null }>(
+  // Capture deleted — clear it from any session referencing it
+  listen<{ deletedCaptureIds?: string[] }>(
     WINDOW_EVENTS.CAPTURE_CHANGED,
     (event) => {
-      // New/updated capture — register its id so isCaptureProfileId() recognises it
-      const metadata = event.payload.metadata;
-      if (metadata && metadata.id) {
-        useSessionStore.getState().addKnownCaptureId(metadata.id);
-      }
-
       const ids = event.payload.deletedCaptureIds;
       if (!ids || ids.length === 0) return;
       const deletedSet = new Set(ids);
-      const state = useSessionStore.getState();
-
-      // Remove from known capture IDs
-      for (const id of ids) {
-        state.removeKnownCaptureId(id);
-      }
-
-      // Clear capture info on any session referencing a deleted capture
-      const sessions = state.sessions;
+      const sessions = useSessionStore.getState().sessions;
       const updated: Record<string, Session> = {};
       for (const [sid, session] of Object.entries(sessions)) {
         if (session.capture.id && deletedSet.has(session.capture.id)) {
@@ -2088,36 +1522,233 @@ function updateSession(id: string, updates: Partial<Session>): void {
   }));
 }
 
-/**
- * Adopt the state registration reports onto the session record.
- *
- * A source can end between session creation and registration — a Modbus source
- * with no poll groups does it within a millisecond — and `StreamEnded` rides the
- * session channel, which nothing has subscribed to yet. Registration is the
- * first moment a subscriber exists, so its answer is the one that cannot be
- * missed.
- *
- * A no-op when the record has not been created yet: `useIOSession` pulls the
- * state again once it has, so this is the early half of a belt-and-braces pair,
- * not the only reader.
- */
-function applyRegisteredState(sessionId: string, state: IOState | undefined): void {
-  if (!state) return;
-  const ioState = getStateType(state);
-  // Guarded: registration usually reports the state the store already holds, and
-  // an unconditional write would notify every subscriber for nothing.
-  if (useSessionStore.getState().sessions[sessionId]?.ioState === ioState) return;
-  updateSession(sessionId, { ioState });
+/** One subscriber's opens and leaves, run in the order they were asked for. */
+const subscriberOps = new Map<string, Promise<unknown>>();
+
+function inOrder<T>(subscriberId: string, op: () => Promise<T>): Promise<T> {
+  const run = (subscriberOps.get(subscriberId) ?? Promise.resolve()).catch(() => {}).then(op);
+  subscriberOps.set(subscriberId, run);
+  const forget = () => {
+    if (subscriberOps.get(subscriberId) === run) subscriberOps.delete(subscriberId);
+  };
+  run.then(forget, forget);
+  return run;
 }
 
-/** Result of creating or joining a multi-source session. */
-export interface MultiSourceSessionResult {
-  /** The session ID */
-  sessionId: string;
-  /** Source profile IDs */
-  sourceProfileIds: string[];
-  /** The session capabilities */
-  capabilities: IOCapabilities;
+/** How many mounted views of a subscriber hold each session open. */
+const holds = new Map<string, number>();
+const holdKey = (sessionId: string, subscriberId: string) => `${subscriberId}\u0000${sessionId}`;
+
+function ensureSessionListeners(sessionId: string): SessionEventSubscribers {
+  const existing = useSessionStore.getState()._eventListeners[sessionId];
+  if (existing) return existing;
+  const listeners: SessionEventSubscribers = {
+    sessionId,
+    wsUnlistenFunctions: [],
+    callbacks: new Map(),
+    registeredSubscribers: new Set(),
+    subscribed: wsTransport.isConnected ? wsTransport.subscribe(sessionId).catch(() => {}) : Promise.resolve(),
+  };
+  setupSessionEventSubscribers(sessionId, listeners);
+  useSessionStore.setState((s) => ({ _eventListeners: { ...s._eventListeners, [sessionId]: listeners } }));
+  return listeners;
+}
+
+function dropSessionListeners(sessionId: string) {
+  const listeners = useSessionStore.getState()._eventListeners[sessionId];
+  if (!listeners) return;
+  cleanupEventListeners(listeners);
+  useSessionStore.setState((s) => {
+    const { [sessionId]: _, ...rest } = s._eventListeners;
+    return { _eventListeners: rest };
+  });
+}
+
+/**
+ * Open the session in one `open_session` call and record what Rust reports. The
+ * channel is subscribed first, so a source the open starts loses no frames.
+ */
+async function openNow(
+  profileId: string,
+  profileName: string,
+  subscriberId: string,
+  appName: string,
+  options: CreateSessionOptions
+): Promise<OpenedSession> {
+  const sessionId = options.sessionId ?? profileId;
+  const listeners = ensureSessionListeners(sessionId);
+  await listeners.subscribed;
+
+  let opened: OpenedSession;
+  try {
+    opened = await openSessionCommand(sessionId, subscriberId, appName, {
+      source_id: profileId,
+      sources: options.sources,
+      start_time: options.startTime,
+      end_time: options.endTime,
+      speed: options.speed,
+      limit: options.limit,
+      bus_override: options.busOverride,
+      modbus_polls: options.modbusPollsJson,
+      serial: serialPayload(options),
+      connect_only: options.skipAutoStart,
+    });
+  } catch (e) {
+    if (listeners.registeredSubscribers.size === 0) dropSessionListeners(sessionId);
+    if (!isSessionNotFound(e)) {
+      updateSessionOrCreate(sessionId, {
+        id: sessionId,
+        profileId,
+        profileName,
+        lifecycleState: "error",
+        ioState: "error",
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+    }
+    throw e;
+  }
+
+  listeners.registeredSubscribers.add(subscriberId);
+  const startProblem = opened.start_error ?? opened.startup_error;
+  if (startProblem) {
+    useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", startProblem);
+  }
+  if (!opened.created) {
+    addSessionLog({
+      eventType: "session-joined",
+      sessionId,
+      profileId,
+      profileName,
+      appName,
+      details: `Joined existing session (${opened.subscriber_count} listeners, state: ${getStateType(opened.state)})`,
+    });
+  }
+
+  // A capture session replays a capture it does not own, so the registration names none.
+  const captureId = opened.capture_id ?? (opened.source_kind === "capture" ? opened.origin_profile_ids[0] ?? null : null);
+  const existing = useSessionStore.getState().sessions[sessionId];
+  const fresh = opened.created || !existing;
+  updateSessionOrCreate(sessionId, {
+    id: sessionId,
+    profileId,
+    profileName,
+    lifecycleState: "connected",
+    ioState: getStateType(opened.state),
+    capabilities: opened.capabilities,
+    errorMessage: opened.start_error,
+    // A push may have counted subscribers past the snapshot already.
+    subscriberCount: Math.max(opened.subscriber_count, existing?.subscriberCount ?? 0),
+    ...(fresh ? { frameCount: 0, uniqueFrameCount: 0, byteCount: 0 } : {}),
+    capture: {
+      ...emptyCapture(),
+      ...(existing && { startTimeUs: existing.capture.startTimeUs, endTimeUs: existing.capture.endTimeUs, name: existing.capture.name, persistent: existing.capture.persistent }),
+      id: captureId,
+      kind: opened.capture_kind ?? (captureId ? "frames" : null),
+      available: false,
+    },
+    sourceType: opened.source_type,
+    sourceKind: opened.source_kind,
+    originProfileIds: opened.origin_profile_ids,
+  });
+
+  // Without the metadata a capture session's count and time range stay zero.
+  if (captureId) {
+    import("../api/capture").then(({ getCaptureMetadataById }) =>
+      getCaptureMetadataById(captureId).then((meta) => {
+        const current = useSessionStore.getState().sessions[sessionId];
+        if (!meta || current?.capture.id !== captureId) return;
+        updateSession(sessionId, {
+          capture: {
+            ...current.capture,
+            available: true,
+            kind: meta.kind,
+            count: meta.count,
+            startTimeUs: meta.start_time_us,
+            endTimeUs: meta.end_time_us,
+            name: meta.name,
+            persistent: meta.persistent,
+          },
+        });
+      }).catch(() => {/* ignore */})
+    );
+  }
+
+  return opened;
+}
+
+/** Patch a session's record, creating it with defaults for what `updates` leaves out. */
+function updateSessionOrCreate(id: string, updates: Partial<Session> & Pick<Session, "id" | "profileId" | "profileName">) {
+  useSessionStore.setState((s) => ({
+    sessions: { ...s.sessions, [id]: { ...(s.sessions[id] ?? newSession(updates)), ...updates } },
+  }));
+}
+
+function newSession({ id, profileId, profileName }: Pick<Session, "id" | "profileId" | "profileName">): Session {
+  return {
+    id,
+    profileId,
+    profileName,
+    lifecycleState: "connecting",
+    ioState: "stopped",
+    capabilities: null,
+    errorMessage: null,
+    subscriberCount: 0,
+    frameCount: 0,
+    uniqueFrameCount: 0,
+    byteCount: 0,
+    capture: emptyCapture(),
+    createdAt: Date.now(),
+    hasQueuedMessages: false,
+    stoppedExplicitly: false,
+    streamEndedReason: null,
+    speed: null,
+    playbackPosition: null,
+    catalogPath: null,
+    bytesCaptureId: null,
+    pausedSourceProfileIds: [],
+    originProfileIds: [],
+  };
+}
+
+async function leaveNow(sessionId: string, subscriberId: string): Promise<void> {
+  const { getState, setState } = useSessionStore;
+  const eventListeners = getState()._eventListeners[sessionId];
+  try {
+    const remaining = await unregisterSessionSubscriber(sessionId, subscriberId);
+    const session = getState().sessions[sessionId];
+    addSessionLog({
+      eventType: "session-left",
+      sessionId,
+      profileId: session?.profileId ?? null,
+      profileName: session?.profileName ?? null,
+      appName: subscriberId,
+      details: `Left session (${remaining} listeners remaining)`,
+    });
+    if (!eventListeners) return;
+    eventListeners.callbacks.delete(subscriberId);
+    eventListeners.registeredSubscribers.delete(subscriberId);
+    if (eventListeners.callbacks.size > 0) {
+      updateSession(sessionId, { subscriberCount: remaining });
+      return;
+    }
+    // unregisterSessionSubscriber already stopped and destroyed the session in Rust if it was the last.
+    cleanupEventListeners(eventListeners);
+    setState((s) => {
+      const { [sessionId]: _, ...remainingSessions } = s.sessions;
+      const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
+      // A session with queued messages stays, disconnected, for the Transmit dropdown.
+      const kept = s.sessions[sessionId]?.hasQueuedMessages
+        ? { ...remainingSessions, [sessionId]: { ...s.sessions[sessionId], lifecycleState: "disconnected" as const, subscriberCount: 0 } }
+        : remainingSessions;
+      return {
+        sessions: kept,
+        _eventListeners: remainingListeners,
+        activeSessionId: s.activeSessionId === sessionId ? null : s.activeSessionId,
+      };
+    });
+  } catch {
+    // Ignore - session may already be gone
+  }
 }
 
 /**
@@ -2129,7 +1760,7 @@ export interface MultiSourceSessionResult {
  */
 export async function createAndStartMultiSourceSession(
   options: CreateMultiSourceOptions
-): Promise<MultiSourceSessionResult & { busMappings: Map<string, BusMapping[]> }> {
+): Promise<{ busMappings: Map<string, BusMapping[]> }> {
   const {
     sessionId,
     subscriberId,
@@ -2200,182 +1831,8 @@ export async function createAndStartMultiSourceSession(
     };
   });
 
-  const { capabilities, bus_mappings } = await createMultiSourceSession({
-    sessionId,
-    sources,
-    subscriberId,
-    appName,
-    modbusPollsJson: options.modbusPollsJson,
-  });
-
-  // Register this listener with the session
-  const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
-  // Handle startup error (error that occurred before listener registered)
-  if (regResult.startup_error) {
-    useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
-  }
-  applyRegisteredState(sessionId, regResult.state);
-
-  // Set up event listeners and heartbeat interval
-  // This is needed because useIOSession's effect may skip setup when the session ID changes
-  // during multi-bus session creation (to avoid stale closure issues)
-  const store = useSessionStore.getState();
-  let eventListeners = store._eventListeners[sessionId];
-  if (!eventListeners) {
-    eventListeners = {
-      sessionId,
-      unlistenFunctions: [],
-      wsUnlistenFunctions: [],
-      callbacks: new Map(),
-      heartbeatIntervalId: null,
-      registeredSubscribers: new Set(),
-    };
-
-    useSessionStore.setState((s) => {
-      if (s._eventListeners[sessionId]) {
-        eventListeners = s._eventListeners[sessionId];
-        return s;
-      }
-      return {
-        ...s,
-        _eventListeners: { ...s._eventListeners, [sessionId]: eventListeners! },
-      };
-    });
-
-    eventListeners = useSessionStore.getState()._eventListeners[sessionId]!;
-
-    if (eventListeners.unlistenFunctions.length === 0) {
-      eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
-        sessionId,
-        eventListeners,
-        updateSession
-      );
-
-      // Heartbeat keepalive — WS server bridges its heartbeat to IO listeners.
-      // Fall back to invoke-based heartbeats only when WS is unavailable.
-      if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
-        const heartbeatSessionId = sessionId;
-        eventListeners.heartbeatIntervalId = setInterval(async () => {
-          const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
-          if (!listeners || listeners.registeredSubscribers.size === 0) return;
-
-          for (const lid of listeners.registeredSubscribers) {
-            try {
-              await registerSessionSubscriber(heartbeatSessionId, lid);
-            } catch {
-              // Ignore heartbeat errors - session may have been destroyed
-            }
-          }
-        }, 5000);
-      }
-    }
-  }
-
-  // Add this listener to the registered listeners set for heartbeat tracking
-  eventListeners.registeredSubscribers.add(subscriberId);
-
-  return {
-    sessionId,
-    sourceProfileIds: profileIds,
-    capabilities,
-    busMappings: new Map(Object.entries(bus_mappings)),
-  };
-}
-
-/**
- * Options for joining an existing multi-source session.
- */
-export interface JoinMultiSourceOptions {
-  /** Session ID to join */
-  sessionId: string;
-  /** Listener instance ID for this app */
-  subscriberId: string;
-  /** Human-readable app name (e.g., "discovery", "decoder") */
-  appName: string;
-  /** Source profile IDs (for display purposes) */
-  sourceProfileIds?: string[];
-}
-
-/**
- * Join an existing multi-source session (created by another app).
- * This connects to an already-running merged session.
- *
- * @param options Configuration for joining the session
- * @returns The session result with capabilities
- */
-export async function joinMultiSourceSession(
-  options: JoinMultiSourceOptions
-): Promise<MultiSourceSessionResult> {
-  const { sessionId, subscriberId, appName, sourceProfileIds = [] } = options;
-
-  // Join the existing session using registerSessionSubscriber only
-  // Don't call joinReaderSession - it increments joiner_count separately from the listener map
-  const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
-  // Handle startup error (error that occurred before listener registered)
-  if (regResult.startup_error) {
-    useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
-  }
-  applyRegisteredState(sessionId, regResult.state);
-
-  // Set up event listeners and heartbeat interval if not already set up
-  const store = useSessionStore.getState();
-  let eventListeners = store._eventListeners[sessionId];
-  if (!eventListeners) {
-    eventListeners = {
-      sessionId,
-      unlistenFunctions: [],
-      wsUnlistenFunctions: [],
-      callbacks: new Map(),
-      heartbeatIntervalId: null,
-      registeredSubscribers: new Set(),
-    };
-
-    useSessionStore.setState((s) => {
-      if (s._eventListeners[sessionId]) {
-        eventListeners = s._eventListeners[sessionId];
-        return s;
-      }
-      return {
-        ...s,
-        _eventListeners: { ...s._eventListeners, [sessionId]: eventListeners! },
-      };
-    });
-
-    eventListeners = useSessionStore.getState()._eventListeners[sessionId]!;
-
-    if (eventListeners.unlistenFunctions.length === 0) {
-      eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
-        sessionId,
-        eventListeners,
-        updateSession
-      );
-
-      // Heartbeat keepalive — WS server bridges its heartbeat to IO listeners.
-      // Fall back to invoke-based heartbeats only when WS is unavailable.
-      if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
-        const heartbeatSessionId = sessionId;
-        eventListeners.heartbeatIntervalId = setInterval(async () => {
-          const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
-          if (!listeners || listeners.registeredSubscribers.size === 0) return;
-
-          for (const lid of listeners.registeredSubscribers) {
-            try {
-              await registerSessionSubscriber(heartbeatSessionId, lid);
-            } catch {
-              // Ignore heartbeat errors - session may have been destroyed
-            }
-          }
-        }, 5000);
-      }
-    }
-  }
-
-  // Add this listener to the registered listeners set for heartbeat tracking
-  eventListeners.registeredSubscribers.add(subscriberId);
-
-  return {
-    sessionId,
-    sourceProfileIds,
-    capabilities: regResult.capabilities,
-  };
+  const opened = await inOrder(subscriberId, () =>
+    openNow(sessionId, sessionId, subscriberId, appName, { sessionId, sources, modbusPollsJson: options.modbusPollsJson })
+  );
+  return { busMappings: new Map(Object.entries(opened.bus_mappings ?? {})) };
 }

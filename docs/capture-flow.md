@@ -172,7 +172,7 @@ through the streaming loop.
 | `find_capture_offset_for_timestamp(...)` / `find_capture_bytes_offset_for_timestamp_by_id(...)` | Seek helpers. |
 | `get_capture_count(id)` / `get_capture_kind(id)` / `has_any_data()` | Misc. |
 | `copy_capture(source_id, new_name)` | Create an orphaned copy (used when an app detaches from a shared capture). |
-| `is_known_capture(id)` / `list_capture_ids()` | ID existence checks. |
+| `is_known_capture(id)` | ID existence check. |
 
 ---
 

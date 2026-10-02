@@ -413,12 +413,6 @@ pub async fn list_captures() -> Result<Vec<CaptureMetadata>, String> {
     Ok(capture_store::list_captures())
 }
 
-/// List all capture IDs (lightweight — no metadata)
-#[tauri::command(rename_all = "snake_case")]
-pub async fn list_capture_ids() -> Vec<String> {
-    capture_store::list_capture_ids()
-}
-
 /// Delete a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn delete_capture(capture_id: String) -> Result<(), String> {

@@ -1,42 +1,24 @@
 // ui/src/hooks/useIOSession.ts
 //
 // React hook for managing IO sessions with scoped event handling.
-// Each hook instance manages its own local state, queried from the backend on mount.
-// Tauri events update local state directly (no Zustand caching).
-// This enables cross-window sync since events are broadcast to all windows.
-//
-// SIMPLIFIED MODEL: Session ID = Profile ID
-// Multiple apps using the same profile automatically share the session.
+// Session state lives in sessionStore, which Rust's pushes and `open_session`
+// keep current; this hook opens the session, routes callbacks and wraps actions.
 //
 // Subscriber management is handled by Rust backend:
-// - registerSessionSubscriber() - registers this hook as a subscriber
+// - open_session registers this hook as a subscriber
 // - unregisterSessionSubscriber() - removes this hook as a subscriber
 // - Rust tracks all subscribers and destroys session when last one leaves
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useSessionStore } from "../stores/sessionStore";
+import { useShallow } from "zustand/react/shallow";
+import { useSessionStore, type Session, type SessionCallbacks } from "../stores/sessionStore";
 import { subscriberIdFor } from "../utils/subscriberId";
 import { tlog } from "../api/settings";
-
-// Module-level map to track sessions being reinitialized.
-// This persists across re-renders and prevents the effect from
-// trying to openSession while reinitialize() is in progress.
-// The value is a timestamp of when reinitialize completed, used to
-// skip effect state updates for a short window after reinitialize.
-const reinitializingSessions = new Map<string, number | true>();
-
-// Grace period (ms) after reinitialize completes during which effects
-// should skip resetting localState. This prevents race conditions where
-// the effects run after setIoProfile() triggers a re-render.
-const REINITIALIZE_GRACE_PERIOD_MS = 300;
 import {
   setSessionSubscriberActive,
-  getIOSessionState,
-  getIOSessionCapabilities,
-  getReaderSessionJoinerCount,
-  getStateType,
   getOrphanedCaptureIds,
+  isSessionNotFound,
   type IOCapabilities,
   type IOStateType,
   type StreamEndedInfo,
@@ -50,90 +32,23 @@ import type { StreamEndReason } from "../generated/StreamEndReason";
 import type { SessionLifecyclePayload } from "../generated/SessionLifecyclePayload";
 import type { AdhocSignalsMsg, DecodedSignalsEntry, SessionTransitionMsg } from "../services/wsProtocol";
 
-// ============================================================================
-// Local Session State Type
-// ============================================================================
-
-/**
- * Local session state managed by useIOSession.
- * This is updated from backend queries on mount and Tauri events during operation.
- * NOT cached in Zustand - each hook instance manages its own state.
- */
-interface LocalSessionState {
-  /** IO state from backend (running/stopped/paused/etc) */
-  ioState: IOStateType;
-  /** IO capabilities (null until connected) */
-  capabilities: IOCapabilities | null;
-  /** Error message if ioState is "error" */
-  errorMessage: string | null;
-  /** Number of subscribers connected to this session */
-  subscriberCount: number;
-  /** Whether session is ready (created and subscribers attached) */
-  isReady: boolean;
-  /** Capture info */
-  capture: {
-    available: boolean;
-    id: string | null;
-    type: "frames" | "bytes" | null;
-    count: number;
-    owningSessionId: string | null;
-    startTimeUs: number | null;
-    endTimeUs: number | null;
-    name: string | null;
-    persistent: boolean;
-  };
-  /** Whether the session was stopped explicitly by user */
-  stoppedExplicitly: boolean;
-  /** Reason why the stream ended */
-  streamEndedReason: StreamEndReason | null;
-  /** Current playback speed */
-  speed: number | null;
-}
-
-/** Empty capture state used when no session.capture info is available yet. */
-const EMPTY_CAPTURE: LocalSessionState["capture"] = {
-  available: false,
-  id: null,
-  type: null,
-  count: 0,
-  owningSessionId: null,
-  startTimeUs: null,
-  endTimeUs: null,
-  name: null,
-  persistent: false,
-};
-
-/**
- * Map a Session.capture (from sessionStore) into the nested capture shape
- * used by LocalSessionState. Handles the `kind → type` field rename.
- * Returns EMPTY_CAPTURE when the capture is undefined (session not yet in store).
- */
-function captureToLocal(
-  capture: {
-    available: boolean;
-    id: string | null;
-    kind: "frames" | "bytes" | null;
-    count: number;
-    owningSessionId: string | null;
-    startTimeUs: number | null;
-    endTimeUs: number | null;
-    name: string | null;
-    persistent: boolean;
-  } | undefined,
-): LocalSessionState["capture"] {
-  if (!capture) return { ...EMPTY_CAPTURE };
+/** The fields of a session's store entry this hook returns, compared shallowly so a count push does not re-render. */
+function sessionView(session: Session | undefined) {
   return {
-    available: capture.available,
-    id: capture.id,
-    type: capture.kind,
-    count: capture.count,
-    owningSessionId: capture.owningSessionId,
-    startTimeUs: capture.startTimeUs,
-    endTimeUs: capture.endTimeUs,
-    name: capture.name,
-    persistent: capture.persistent,
+    capabilities: session?.capabilities ?? null,
+    ioState: session?.ioState ?? "stopped",
+    isReady: session?.lifecycleState === "connected",
+    errorMessage: session?.errorMessage ?? null,
+    capture: session?.capture,
+    subscriberCount: session?.subscriberCount ?? 0,
+    stoppedExplicitly: session?.stoppedExplicitly ?? false,
+    streamEndedReason: session?.streamEndedReason ?? null,
+    speed: session?.speed ?? null,
+    playbackPosition: session?.playbackPosition ?? null,
   };
 }
+
+const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface UseIOSessionOptions {
   /**
@@ -272,7 +187,6 @@ export interface UseIOSessionResult {
     profileId?: string,
     options?: {
       filePath?: string;
-      useCapture?: boolean;
       startTime?: string;
       endTime?: string;
       speed?: number;
@@ -326,13 +240,8 @@ export interface UseIOSessionResult {
 /**
  * Hook for managing a CAN reader session.
  *
- * Creates a session on mount, listens for scoped events, and cleans up on unmount.
- * All session state is managed in sessionStore - this hook provides callbacks and actions.
- *
- * SIMPLIFIED MODEL: Session ID = Profile ID
- * - Pass the profile ID as sessionId (or profileId for backwards compat)
- * - Multiple apps using the same profile automatically share the session
- * - First app to use a profile creates the session, others join it
+ * Opens the session on mount, routes its pushes to the callbacks, and leaves it
+ * on unmount. All session state is in sessionStore.
  */
 export function useIOSession(
   options: UseIOSessionOptions
@@ -342,7 +251,6 @@ export function useIOSession(
     sessionId: sessionIdOption,
     profileName: profileNameOption,
     profileId: profileIdOption,
-    requireFrames,
     onFrames,
     onDecoded,
     onAdhocSignals,
@@ -363,13 +271,14 @@ export function useIOSession(
   // Profile name for display (fall back to session ID if not provided)
   const effectiveProfileName = profileNameOption || effectiveSessionId;
 
-  // ---- Local Session State (queried from backend, updated via events) ----
-  // This replaces the Zustand useSession() hook to enable cross-window sync.
-  // Each hook instance manages its own state, updated by Tauri events.
-  const [localState, setLocalState] = useState<LocalSessionState | null>(null);
+  const view = useSessionStore(
+    useShallow((s) => sessionView(effectiveSessionId ? s.sessions[effectiveSessionId] : undefined))
+  );
 
   // Store actions
   const openSession = useSessionStore((s) => s.openSession);
+  const holdSession = useSessionStore((s) => s.holdSession);
+  const releaseSession = useSessionStore((s) => s.releaseSession);
   const startSession = useSessionStore((s) => s.startSession);
   const stopSession = useSessionStore((s) => s.stopSession);
   const pauseSession = useSessionStore((s) => s.pauseSession);
@@ -387,13 +296,6 @@ export function useIOSession(
   const clearCallbacks = useSessionStore((s) => s.clearCallbacks);
   const transmitFrameAction = useSessionStore((s) => s.transmitFrame);
 
-  const initializingRef = useRef(false);
-  // Track which session ID is currently being initialized (to allow new sessions through)
-  const initializingSessionIdRef = useRef<string | null>(null);
-  // Track whether setup completed successfully (for cleanup)
-  const setupCompleteRef = useRef(false);
-  // Track whether component is mounted (to prevent cleanup after remount)
-  const isMountedRef = useRef(true);
   // Track the currently active session ID (for cleanup to check if session changed)
   const currentSessionIdRef = useRef<string | null>(null);
   /**
@@ -417,11 +319,6 @@ export function useIOSession(
   const subscriberIdRef = useRef<string>(subscriberIdFor(appName));
   // Track if we're currently leaving to prevent double-leave
   const isLeavingRef = useRef(false);
-  // Track when session was created/joined to prevent immediate leave (click-through protection)
-  const sessionCreatedAtRef = useRef<number>(0);
-  // Track the expected state from reinitialize - used to return correct state before React commits the update
-  // This is needed because Zustand updates (setIoProfile) trigger re-renders before React state (setLocalState) is committed
-  const expectedStateRef = useRef<{ sessionId: string; state: LocalSessionState } | null>(null);
 
   // Store callbacks in refs to keep them current
   const callbacksRef = useRef({
@@ -457,126 +354,30 @@ export function useIOSession(
     };
   }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onDestroyed]);
 
-  // ---- Sync session store → localState ----
-  // The session store receives WS push messages (SessionState, SessionLifecycle,
-  // StreamEnded, etc.) and updates sessions[id].ioState / capabilities / capture.
-  // useIOSession manages its own localState — this subscription keeps it in sync
-  // so the UI reflects backend state changes (e.g., stop → "stopped").
+  const forwarding = useRef<SessionCallbacks>({
+    onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+    onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
+    onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
+    onError: (error) => callbacksRef.current.onError?.(error),
+    onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
+    onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
+    onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
+    onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
+    onReconfigure: () => callbacksRef.current.onReconfigure?.(),
+    onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+    onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
+    onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
+  }).current;
+
+  // Session destroyed or this subscriber evicted, from the Session Manager or the
+  // last subscriber leaving. Global events, filtered to this session.
   useEffect(() => {
     if (!effectiveSessionId) return;
-    const unsub = useSessionStore.subscribe((state, prevState) => {
-      const session = state.sessions[effectiveSessionId];
-      const prevSession = prevState.sessions[effectiveSessionId];
-      if (!session || !prevSession) return;
-
-      const ioStateChanged = session.ioState !== prevSession.ioState;
-      const capsChanged = session.capabilities !== prevSession.capabilities;
-      const c = session.capture;
-      const pc = prevSession.capture;
-      const captureChanged =
-        c.id !== pc.id ||
-        c.kind !== pc.kind ||
-        c.count !== pc.count ||
-        c.available !== pc.available ||
-        c.owningSessionId !== pc.owningSessionId ||
-        c.startTimeUs !== pc.startTimeUs ||
-        c.endTimeUs !== pc.endTimeUs ||
-        c.name !== pc.name ||
-        c.persistent !== pc.persistent;
-
-      if (!ioStateChanged && !capsChanged && !captureChanged) return;
-
-      // Build the partial update
-      const patch: Partial<LocalSessionState> = {};
-      if (ioStateChanged) {
-        patch.ioState = session.ioState;
-      }
-      if (capsChanged && session.capabilities) {
-        patch.capabilities = session.capabilities;
-      }
-
-      // Update expectedStateRef if it's active (e.g., capture sessions that
-      // don't auto-start never receive streaming events to clear the ref, so
-      // effectiveState would read stale values from the ref instead of localState)
-      if (expectedStateRef.current?.sessionId === effectiveSessionId) {
-        const refState = { ...expectedStateRef.current.state };
-        if (ioStateChanged) refState.ioState = session.ioState;
-        if (capsChanged && session.capabilities) refState.capabilities = session.capabilities;
-        if (captureChanged) {
-          refState.capture = captureToLocal(c);
-        }
-        expectedStateRef.current = { ...expectedStateRef.current, state: refState };
-      }
-
-      setLocalState((prev) => {
-        if (!prev) return prev;
-        const updated = { ...prev, ...patch };
-        if (captureChanged) {
-          updated.capture = captureToLocal(c);
-        }
-        return updated;
-      });
-    });
-    return unsub;
-  }, [effectiveSessionId]);
-
-  // ---- Query Backend + Set Up Event Listeners ----
-  // This effect queries the backend for current state on mount/sessionId change,
-  // then sets up event listeners that update local state directly.
-  // This enables cross-window sync since each window receives the same Tauri events.
-  useEffect(() => {
-    if (!effectiveSessionId) {
-      setLocalState(null);
-      return;
-    }
 
     let cancelled = false;
     const unlistenFns: UnlistenFn[] = [];
 
     const setupStateTracking = async () => {
-      // Query backend for current state
-      try {
-        const [state, caps, joinerCount] = await Promise.all([
-          getIOSessionState(effectiveSessionId),
-          getIOSessionCapabilities(effectiveSessionId),
-          getReaderSessionJoinerCount(effectiveSessionId),
-        ]);
-
-        if (cancelled) return;
-
-        if (state && caps) {
-          const storeCapture = useSessionStore.getState().sessions[effectiveSessionId]?.capture;
-          setLocalState({
-            ioState: getStateType(state),
-            capabilities: caps,
-            errorMessage: state.type === "Error" ? state.message : null,
-            subscriberCount: joinerCount,
-            isReady: true,
-            capture: captureToLocal(storeCapture),
-            stoppedExplicitly: false,
-            streamEndedReason: null,
-            speed: null,
-          });
-        } else {
-          // Session doesn't exist yet - will be created by openSession below
-          // BUT: don't clear state if reinitialize just set it (grace period)
-          const reinitValue = reinitializingSessions.get(effectiveSessionId);
-          const inGracePeriod = typeof reinitValue === "number" && Date.now() - reinitValue < REINITIALIZE_GRACE_PERIOD_MS;
-          if (!inGracePeriod) {
-            setLocalState(null);
-          }
-        }
-      } catch (e) {
-        tlog.debug(`[useIOSession:${appName}] Failed to query backend state: ${e}`);
-        // Session may not exist yet - that's fine, openSession will create it
-      }
-
-      // Session-scoped event listeners removed — all push communication now flows
-      // through the WebSocket handlers in sessionStore. Only global Tauri events
-      // remain (session-lifecycle for destroy, subscriber-evicted).
-
-      // Session destroyed externally (from Session Manager, last-subscriber auto-destroy, etc.)
-      // This is a global event - we filter by our session ID.
       // Orphaned capture IDs are fetched from the post-session cache.
       const unlistenLifecycle = await listen<SessionLifecyclePayload>(
         "session-lifecycle",
@@ -608,29 +409,12 @@ export function useIOSession(
           tlog.info(
             `[useIOSession:${appName}] Session '${effectiveSessionId}' destroyed externally`
           );
-          // Prevent the cleanup timeout (from the mount effect) from trying to leave
-          setupCompleteRef.current = false;
           currentSessionIdRef.current = null;
-          // Clear local state
-          setLocalState(null);
-          // Fetch orphaned capture IDs from post-session cache
           let bufferIds: string[] = [];
           try {
             bufferIds = await getOrphanedCaptureIds(effectiveSessionId);
           } catch {
             // Cache may have expired
-          }
-          // Register orphaned captures so isCaptureProfileId() recognises them.
-          // Normally `StreamEnded` (WS) would have done this already, but the
-          // destroy path unsubscribes the session's WS channel in
-          // cleanupDestroyedSession before StreamEnded is processed, so on a
-          // leave-session-with-orphan the capture id never made it into
-          // knownCaptureIds. Without this, the subsequent re-setup via
-          // setIoProfile(captureId) takes the profile branch in openSession
-          // and calls create_reader_session instead of
-          // create_capture_source_session.
-          for (const id of bufferIds) {
-            useSessionStore.getState().addKnownCaptureId(id);
           }
           callbacksRef.current.onDestroyed?.(bufferIds, event.payload.reset ?? false);
         }
@@ -638,7 +422,6 @@ export function useIOSession(
       unlistenFns.push(unlistenLifecycle);
 
       // Listener evicted (from Session Manager "Remove" action).
-      // This is a global event - we filter by our session ID and subscriber ID.
       const unlistenEvicted = await listen<{ session_id: string; subscriber_id: string; capture_ids: string[] }>(
         "subscriber-evicted",
         (event) => {
@@ -650,18 +433,9 @@ export function useIOSession(
             tlog.info(
               `[useIOSession:${appName}] Evicted from session '${effectiveSessionId}', capture copies: ${event.payload.capture_ids}`
             );
-            // Prevent the cleanup timeout from trying to leave
-            setupCompleteRef.current = false;
             currentSessionIdRef.current = null;
             // Clean up local state in store (no backend calls - already unregistered)
             useSessionStore.getState().cleanupEvictedSubscriber(effectiveSessionId, subscriberIdRef.current);
-            // Clear local state
-            setLocalState(null);
-            // Register copied captures in knownCaptureIds — same rationale as
-            // the destroy path above.
-            for (const id of event.payload.capture_ids) {
-              useSessionStore.getState().addKnownCaptureId(id);
-            }
             // Notify higher-level hooks with copied capture IDs (same path as destroy).
             // Eviction is never a deliberate user reset.
             callbacksRef.current.onDestroyed?.(event.payload.capture_ids, false);
@@ -685,235 +459,52 @@ export function useIOSession(
     };
   }, [effectiveSessionId, appName]);
 
-  // Initialize session on mount
+  // Hold the session open while mounted on it. A StrictMode remount, or any
+  // re-run on the same id, holds it again before the release's leave runs, so
+  // the leave is skipped rather than raced (see `releaseSession`).
   useEffect(() => {
-    // Mark component as mounted
-    isMountedRef.current = true;
-
-    // No session ID means no profile selected - nothing to do
-    // BUT we need to update currentSessionIdRef so that cleanup for the OLD session
-    // will properly run (it checks if currentSession === cleanupSession to detect StrictMode)
     if (!effectiveSessionId) {
-      tlog.debug(`[useIOSession:${appName}] no effectiveSessionId, updating currentSessionIdRef to null and skipping`);
       currentSessionIdRef.current = null;
       return;
     }
-
-    if (initializingRef.current && initializingSessionIdRef.current === effectiveSessionId) {
-      tlog.debug(`[useIOSession:${appName}] already initializing session '${effectiveSessionId}', skipping`);
-      return;
-    }
-
-    const reinitValue = reinitializingSessions.get(effectiveSessionId);
-    if (reinitValue === true) {
-      // Reinitialize in progress - skip
-      tlog.debug(`[useIOSession:${appName}] reinitializing in progress for session '${effectiveSessionId}', skipping effect setup`);
-      return;
-    }
-    if (typeof reinitValue === "number" && Date.now() - reinitValue < REINITIALIZE_GRACE_PERIOD_MS) {
-      // Within grace period after reinitialize - skip since reinitialize already set up state
-      tlog.debug(`[useIOSession:${appName}] within reinitialize grace period for session '${effectiveSessionId}', skipping effect setup`);
-      return;
-    }
-
-    tlog.debug(`[useIOSession:${appName}] mount/effect: effectiveSessionId=${effectiveSessionId}`);
-
-    // Reset setup complete flag at start of each effect run
-    setupCompleteRef.current = false;
-
-    const setup = async () => {
-      initializingRef.current = true;
-      initializingSessionIdRef.current = effectiveSessionId;
-      tlog.debug(`[useIOSession:${appName}] setup() starting...`);
-
-      try {
-        // Open session (creates if not exists, joins if exists)
-        // This also registers this subscriber with the Rust backend
-        tlog.debug(`[useIOSession:${appName}] calling openSession...`);
-        await openSession(effectiveSessionId, effectiveProfileName, subscriberIdRef.current, appName, {
-          requireFrames,
-        });
-        tlog.debug(`[useIOSession:${appName}] openSession completed`);
-
-        // Check if component was unmounted during async work
-        if (!isMountedRef.current) {
-          tlog.debug(`[useIOSession:${appName}] component unmounted during openSession, cleaning up`);
-          // Unregister from Rust since we registered during openSession
-          leaveSession(effectiveSessionId, subscriberIdRef.current).catch(() => {});
-          initializingRef.current = false;
-          initializingSessionIdRef.current = null;
-          return;
-        }
-
-        // Register callbacks with the frontend store for event routing
-        tlog.debug(`[useIOSession:${appName}] calling registerCallbacks...`);
-        registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
-          onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-          onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
-          onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
-          onError: (error) => callbacksRef.current.onError?.(error),
-          onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
-          onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
-          onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
-          onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
-          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
-          onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-          onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
-          onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-        });
-        tlog.debug(`[useIOSession:${appName}] registerCallbacks completed`);
-
-        // Initialize local state after session is created/joined
-        // This ensures we have state even if the state tracking effect ran first
-        try {
-          const [state, caps, joinerCount] = await Promise.all([
-            getIOSessionState(effectiveSessionId),
-            getIOSessionCapabilities(effectiveSessionId),
-            getReaderSessionJoinerCount(effectiveSessionId),
-          ]);
-          if (state && caps && isMountedRef.current) {
-            const storeCapture = useSessionStore.getState().sessions[effectiveSessionId]?.capture;
-            setLocalState({
-              ioState: getStateType(state),
-              capabilities: caps,
-              errorMessage: state.type === "Error" ? state.message : null,
-              subscriberCount: joinerCount,
-              isReady: true,
-              capture: captureToLocal(storeCapture),
-              stoppedExplicitly: false,
-              streamEndedReason: null,
-              speed: null,
-            });
-            tlog.debug(`[useIOSession:${appName}] local state initialized: ioState=${getStateType(state)}`);
-          }
-        } catch (e) {
-          console.warn(`[useIOSession:${appName}] Failed to initialize local state:`, e);
-        }
-
-        // Mark setup as complete and track current session
-        setupCompleteRef.current = true;
-        sessionCreatedAtRef.current = Date.now();
-        tlog.debug(`[useIOSession:${appName}] setup() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${effectiveSessionId}'`);
+    let cancelled = false;
+    const subscriberId = subscriberIdRef.current;
+    holdSession(effectiveSessionId, effectiveProfileName, subscriberId, appName)
+      .then(() => {
+        if (cancelled) return;
+        registerCallbacks(effectiveSessionId, subscriberId, forwarding);
         currentSessionIdRef.current = effectiveSessionId;
-        tlog.debug(`[useIOSession:${appName}] setup() complete, setupComplete=true, currentSessionIdRef='${currentSessionIdRef.current}'`);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        tlog.info(`[useIOSession:${appName}] setup() failed: ${msg}`);
-        // Don't show error for expected errors
-        if (
-          msg !== "No IO profile configured" &&
-          !msg.includes("not found")
-        ) {
-          callbacksRef.current.onError?.(msg);
-        }
-      } finally {
-        initializingRef.current = false;
-        initializingSessionIdRef.current = null;
-      }
-    };
-
-    setup();
-
+      })
+      .catch((e) => {
+        tlog.info(`[useIOSession:${appName}] open failed: ${messageOf(e)}`);
+        if (!cancelled && !isSessionNotFound(e)) callbacksRef.current.onError?.(messageOf(e));
+      });
     return () => {
-      tlog.debug(
-        `[useIOSession:${appName}] cleanup: session=${effectiveSessionId}, currentRef=${currentSessionIdRef.current}, setupComplete=${setupCompleteRef.current}, mounted=${isMountedRef.current}`,
-      );
-
-      // Mark component as unmounted immediately
-      isMountedRef.current = false;
-
-      // Only clean up if setup actually completed
-      if (setupCompleteRef.current) {
-        // Mark as not complete to prevent double cleanup
-        setupCompleteRef.current = false;
-
-        // Capture values for delayed cleanup
-        const listenerId = subscriberIdRef.current;
-        const sessionId = effectiveSessionId;
-
-        // Delay cleanup to handle StrictMode remount
-        // StrictMode unmounts and immediately remounts with the SAME session ID.
-        // When switching sessions normally, we get cleanup for old ID then setup for new ID.
-        // We need to distinguish these cases to avoid skipping cleanup when switching sessions.
-        setTimeout(() => {
-          // Only skip cleanup if:
-          // 1. Component is still mounted AND
-          // 2. The CURRENT active session is the SAME as the one we're trying to clean up
-          //    (this means StrictMode remounted with the same session - don't clean up)
-          //
-          // If the current session is DIFFERENT (session switching), we must clean up the old one
-          // even though the component is mounted (with the new session)
-          //
-          // Use currentSessionIdRef to check what session the component is CURRENTLY using,
-          // not what session was used when this cleanup was created.
-          tlog.debug(`[useIOSession:${appName}] cleanup timeout - isMounted=${isMountedRef.current}, currentSession=${currentSessionIdRef.current}, cleanupSession=${sessionId}`);
-          if (isMountedRef.current && currentSessionIdRef.current === sessionId) {
-            tlog.debug(`[useIOSession:${appName}] skipping cleanup - component remounted with same session`);
-            return;
-          }
-
-          tlog.debug(`[useIOSession:${appName}] proceeding with cleanup for session '${sessionId}'...`);
-
-          // Clear frontend callbacks
-          clearCallbacks(sessionId, listenerId);
-
-          // Unregister from Rust backend - Rust will destroy session if last subscriber
-          tlog.debug(`[useIOSession:${appName}] calling leaveSession('${sessionId}', '${listenerId}')...`);
-          leaveSession(sessionId, listenerId).catch(() => {});
-        }, 100);
-      } else {
-        tlog.debug(`[useIOSession:${appName}] setup not complete, skipping cleanup`);
-      }
+      cancelled = true;
+      releaseSession(effectiveSessionId, subscriberId);
     };
-  }, [
-    appName,
-    effectiveSessionId,
-    requireFrames,
-    openSession,
-    registerCallbacks,
-    clearCallbacks,
-    leaveSession,
-  ]);
+  }, [appName, effectiveSessionId, holdSession, releaseSession, registerCallbacks, forwarding]);
 
   // Action wrappers - all use effectiveSessionId directly
   const start = useCallback(async () => {
-    tlog.debug(`[useIOSession:${appName}] start() called, effectiveSessionId=${effectiveSessionId}`);
-    if (!effectiveSessionId) {
-      tlog.debug(`[useIOSession:${appName}] start() - no effectiveSessionId, returning`);
-      return;
-    }
+    if (!effectiveSessionId) return;
     try {
-      tlog.debug(`[useIOSession:${appName}] start() - calling startSession...`);
       await startSession(effectiveSessionId);
-      tlog.debug(`[useIOSession:${appName}] start() - startSession completed`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      tlog.debug(`[useIOSession:${appName}] start() - ERROR: ${msg}`);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
-  }, [appName, effectiveSessionId, startSession]);
+  }, [effectiveSessionId, startSession]);
 
   const stop = useCallback(async () => {
-    tlog.debug(`[useIOSession:${appName}] stop() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
-    if (!effectiveSessionId) {
-      tlog.debug(`[useIOSession:${appName}] stop() - no effectiveSessionId, returning`);
-      return;
-    }
+    if (!effectiveSessionId) return;
     try {
-      tlog.debug(`[useIOSession:${appName}] stop() - calling stopSession...`);
       await stopSession(effectiveSessionId);
-      tlog.debug(`[useIOSession:${appName}] stop() - stopSession complete`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      tlog.debug(`[useIOSession:${appName}] stop() - ERROR: ${msg}`);
-      if (!msg.includes("not found")) {
-        callbacksRef.current.onError?.(msg);
-      }
+      if (!isSessionNotFound(e)) callbacksRef.current.onError?.(messageOf(e));
     }
-  }, [appName, effectiveSessionId, stopSession]);
+  }, [effectiveSessionId, stopSession]);
 
   const leave = useCallback(async () => {
-    tlog.debug(`[useIOSession:${appName}] leave() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
     if (!effectiveSessionId) {
       return;
     }
@@ -922,30 +513,19 @@ export function useIOSession(
       tlog.debug(`[useIOSession:${appName}] leave() - already leaving, skipping`);
       return;
     }
-    // Prevent immediate leave after session creation (click-through protection)
-    // This prevents accidental leave when dialog closes and click propagates
-    const timeSinceCreation = Date.now() - sessionCreatedAtRef.current;
-    if (timeSinceCreation < 500) {
-      tlog.debug(`[useIOSession:${appName}] leave() - session just created (${timeSinceCreation}ms ago), skipping to prevent click-through`);
-      return;
-    }
     isLeavingRef.current = true;
     try {
       // Drop callbacks first. This is synchronous and needs no backend round-trip,
       // whereas marking the subscriber inactive does — and for the whole of that await
       // any WS frames already queued would still be delivered to the app, repopulating
       // a buffer the caller is in the middle of tearing down.
-      tlog.debug(`[useIOSession:${appName}] leave() - clearing callbacks...`);
       clearCallbacks(effectiveSessionId, subscriberIdRef.current);
       try {
-        tlog.debug(`[useIOSession:${appName}] leave() - marking subscriber inactive...`);
         await setSessionSubscriberActive(effectiveSessionId, subscriberIdRef.current, false);
       } catch {
         // Ignore - session may not exist
       }
-      tlog.debug(`[useIOSession:${appName}] leave() - calling leaveSession...`);
       await leaveSession(effectiveSessionId, subscriberIdRef.current);
-      tlog.debug(`[useIOSession:${appName}] leave() - complete`);
     } finally {
       isLeavingRef.current = false;
     }
@@ -956,8 +536,7 @@ export function useIOSession(
     try {
       await pauseSession(effectiveSessionId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
   }, [effectiveSessionId, pauseSession]);
 
@@ -966,8 +545,7 @@ export function useIOSession(
     try {
       await resumeSession(effectiveSessionId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
   }, [effectiveSessionId, resumeSession]);
 
@@ -976,8 +554,7 @@ export function useIOSession(
     try {
       await suspendSession(effectiveSessionId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
   }, [effectiveSessionId, suspendSession]);
 
@@ -986,8 +563,7 @@ export function useIOSession(
     try {
       await resumeSessionFresh(effectiveSessionId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
   }, [effectiveSessionId, resumeSessionFresh]);
 
@@ -997,8 +573,7 @@ export function useIOSession(
       try {
         await setSessionSpeed(effectiveSessionId, speed);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        callbacksRef.current.onError?.(msg);
+        callbacksRef.current.onError?.(messageOf(e));
       }
     },
     [effectiveSessionId, setSessionSpeed]
@@ -1006,16 +581,11 @@ export function useIOSession(
 
   const setTimeRange = useCallback(
     async (start?: string, end?: string) => {
-      tlog.debug(`[useIOSession:setTimeRange] start=${start}, end=${end}, sessionId=${effectiveSessionId}`);
-      if (!effectiveSessionId) {
-        return;
-      }
+      if (!effectiveSessionId) return;
       try {
         await setSessionTimeRange(effectiveSessionId, start, end);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error("[useIOSession:setTimeRange] Error:", msg);
-        callbacksRef.current.onError?.(msg);
+        callbacksRef.current.onError?.(messageOf(e));
       }
     },
     [effectiveSessionId, setSessionTimeRange]
@@ -1027,9 +597,7 @@ export function useIOSession(
       try {
         await seekSession(effectiveSessionId, timestampUs);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("not found")) return;
-        callbacksRef.current.onError?.(msg);
+        if (!isSessionNotFound(e)) callbacksRef.current.onError?.(messageOf(e));
       }
     },
     [effectiveSessionId, seekSession]
@@ -1041,11 +609,8 @@ export function useIOSession(
       try {
         await seekSessionByFrame(effectiveSessionId, frameIndex);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        // Silently ignore "not found" — session may have been destroyed
-        // but the callback still holds a stale session ID
-        if (msg.includes("not found")) return;
-        callbacksRef.current.onError?.(msg);
+        // A callback can outlive its session and still hold the stale id.
+        if (!isSessionNotFound(e)) callbacksRef.current.onError?.(messageOf(e));
       }
     },
     [effectiveSessionId, seekSessionByFrame]
@@ -1056,7 +621,6 @@ export function useIOSession(
       newProfileId?: string,
       opts?: {
         filePath?: string;
-        useCapture?: boolean;
         startTime?: string;
         endTime?: string;
         speed?: number;
@@ -1086,34 +650,21 @@ export function useIOSession(
       // Profile ID stays targetProfileId for looking up profile configuration
       const targetSessionId = opts?.sessionIdOverride || targetProfileId;
 
-      // Mark as reinitializing in module-level map to prevent effect from running concurrently
-      // This persists across re-renders, unlike a ref
-      reinitializingSessions.set(targetSessionId, true);
-
       // Use the new profile ID for display when switching profiles, avoiding stale closure.
-      // When newProfileId is provided (profile switching), it's the correct name.
-      // When not provided (same-session reinit), effectiveProfileName is correct.
       const targetProfileName = newProfileId || effectiveProfileName;
 
-      tlog.debug(`[useIOSession:${appName}] reinitialize() - targetSessionId=${targetSessionId}, targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
-
       try {
-        // If switching to a different session, leave the old one first
         const oldSessionId = currentSessionIdRef.current;
         // Every reinitialize caller — watch, load, connect-only, jump-to-event —
         // funnels through here, so stamping the switch once covers all of them.
         markSessionSwitch(targetSessionId);
         if (oldSessionId && oldSessionId !== targetSessionId) {
-          tlog.debug(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
-          // Clear callbacks for old session
           clearCallbacks(oldSessionId, subscriberIdRef.current);
-          // Leave old session (Rust will destroy if we were the last subscriber)
+          // Rust will destroy the old session if we were the last subscriber
           await leaveSession(oldSessionId, subscriberIdRef.current);
         }
 
-        // Reinitialize uses Rust's atomic check - if other listeners exist, it won't destroy
-        // The backend doesn't auto-start playback sources (WireTAP backend, csv) - that happens in openSession
-        // unless skipAutoStart is set
+        // Rust's atomic check: with other subscribers on it, the session is not torn down
         await reinitializeSession(
           targetSessionId,
           subscriberIdRef.current,
@@ -1122,7 +673,6 @@ export function useIOSession(
           targetProfileName,
           {
             filePath: opts?.filePath,
-            useCapture: opts?.useCapture,
             startTime: opts?.startTime,
             endTime: opts?.endTime,
             speed: opts?.speed,
@@ -1138,78 +688,13 @@ export function useIOSession(
           }
         );
 
-        // Update current session ref with the actual session ID (may differ from profile ID)
-        tlog.debug(`[useIOSession:${appName}] reinitialize() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${targetSessionId}'`);
         currentSessionIdRef.current = targetSessionId;
-        tlog.debug(`[useIOSession:${appName}] reinitialize() - currentSessionIdRef is now '${currentSessionIdRef.current}'`);
-
-        // Re-register callbacks after reinitialize
-        registerCallbacks(targetSessionId, subscriberIdRef.current, {
-          onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-          onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
-          onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
-          onError: (error) => callbacksRef.current.onError?.(error),
-          onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
-          onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
-          onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
-          onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
-          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
-          onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-          onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
-          onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-        });
-
-        // Update local state after reinitialize
-        try {
-          const [state, caps, joinerCount] = await Promise.all([
-            getIOSessionState(targetSessionId),
-            getIOSessionCapabilities(targetSessionId),
-            getReaderSessionJoinerCount(targetSessionId),
-          ]);
-          if (state && caps) {
-            const storeCapture = useSessionStore.getState().sessions[targetSessionId]?.capture;
-            const newState: LocalSessionState = {
-              ioState: getStateType(state),
-              capabilities: caps,
-              errorMessage: state.type === "Error" ? state.message : null,
-              subscriberCount: joinerCount,
-              isReady: true,
-              capture: captureToLocal(storeCapture),
-              stoppedExplicitly: false,
-              streamEndedReason: null,
-              speed: opts?.speed ?? null,
-            };
-            // Store in ref BEFORE calling setLocalState - this ensures the ref is available
-            // immediately, even before React commits the state update
-            expectedStateRef.current = { sessionId: targetSessionId, state: newState };
-            setLocalState(newState);
-            tlog.debug(`[useIOSession:${appName}] reinitialize() - local state updated: ioState=${getStateType(state)}`);
-          }
-        } catch (e) {
-          console.warn(`[useIOSession:${appName}] reinitialize() - failed to update local state:`, e);
-        }
-
-        // Mark setup as complete for the new session
-        tlog.debug(`[useIOSession:${appName}] reinitialize() - setting setupCompleteRef=true for session ${targetSessionId}`);
-        setupCompleteRef.current = true;
-        sessionCreatedAtRef.current = Date.now();
+        registerCallbacks(targetSessionId, subscriberIdRef.current, forwarding);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        callbacksRef.current.onError?.(msg);
-      } finally {
-        // Set timestamp to mark end of reinitialize - effects will skip during grace period
-        const completedAt = Date.now();
-        reinitializingSessions.set(targetSessionId, completedAt);
-        // Schedule cleanup after grace period
-        setTimeout(() => {
-          // Only delete if timestamp hasn't changed (no new reinitialize started)
-          if (reinitializingSessions.get(targetSessionId) === completedAt) {
-            reinitializingSessions.delete(targetSessionId);
-          }
-        }, REINITIALIZE_GRACE_PERIOD_MS + 50);
+        callbacksRef.current.onError?.(messageOf(e));
       }
     },
-    [appName, effectiveSessionId, effectiveProfileName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession, markSessionSwitch]
+    [appName, effectiveSessionId, effectiveProfileName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession, markSessionSwitch, forwarding]
   );
 
   const switchToCaptureReplay = useCallback(
@@ -1217,15 +702,8 @@ export function useIOSession(
       if (!effectiveSessionId) return;
       try {
         await switchToCapture(effectiveSessionId, speed);
-
-        // Refetch capabilities since the reader changed (CaptureSource has different capabilities)
-        const caps = await getIOSessionCapabilities(effectiveSessionId);
-        if (caps) {
-          setLocalState((prev) => prev ? { ...prev, capabilities: caps } : prev);
-        }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        callbacksRef.current.onError?.(msg);
+        callbacksRef.current.onError?.(messageOf(e));
       }
     },
     [effectiveSessionId, switchToCapture]
@@ -1246,26 +724,11 @@ export function useIOSession(
         // Ignore - subscriber may already be active
       }
 
-      // Re-register callbacks
-      registerCallbacks(targetSessionId, subscriberIdRef.current, {
-        onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
-        onDecoded: (decoded, backlog) => callbacksRef.current.onDecoded?.(decoded, backlog),
-        onAdhocSignals: (msg) => callbacksRef.current.onAdhocSignals?.(msg),
-        onError: (error) => callbacksRef.current.onError?.(error),
-        onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
-        onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
-        onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
-        onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
-        onReconfigure: () => callbacksRef.current.onReconfigure?.(),
-        onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-        onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
-        onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-      });
+      registerCallbacks(targetSessionId, subscriberIdRef.current, forwarding);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      callbacksRef.current.onError?.(msg);
+      callbacksRef.current.onError?.(messageOf(e));
     }
-  }, [effectiveSessionId, effectiveProfileName, openSession, registerCallbacks]);
+  }, [appName, effectiveSessionId, effectiveProfileName, openSession, registerCallbacks, forwarding]);
 
   const transmitFrame = useCallback(
     async (frame: CanTransmitFrame): Promise<TransmitResult> => {
@@ -1279,50 +742,38 @@ export function useIOSession(
       try {
         return await transmitFrameAction(effectiveSessionId, frame);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
         return {
           success: false,
           timestamp_us: Date.now() * 1000,
-          error: msg,
+          error: messageOf(e),
         };
       }
     },
     [effectiveSessionId, transmitFrameAction]
   );
 
-  // Derive values from local state (queried from backend, updated via events)
-  // Use expectedStateRef if it matches the current session - this handles the race condition
-  // where setIoProfile() triggers a re-render before setLocalState() is committed
-  const effectiveState = (
-    expectedStateRef.current?.sessionId === effectiveSessionId
-      ? expectedStateRef.current.state
-      : localState
-  );
-  // The reader pushes positions to the store; nothing else in local state needs them.
-  const playbackPosition = useSessionStore((st) =>
-    effectiveSessionId ? st.sessions[effectiveSessionId]?.playbackPosition ?? null : null
-  );
+  const { capture, playbackPosition } = view;
 
   return {
     sessionId: effectiveSessionId,
     actualSessionId: effectiveSessionId, // Same as sessionId now (kept for backwards compat)
-    capabilities: effectiveState?.capabilities ?? null,
-    state: effectiveState?.ioState ?? "stopped",
-    isReady: effectiveState?.isReady ?? false,
-    errorMessage: effectiveState?.errorMessage ?? null,
-    captureAvailable: effectiveState?.capture?.available ?? false,
-    captureId: effectiveState?.capture?.id ?? null,
-    captureKind: effectiveState?.capture?.type ?? null,
-    captureCount: effectiveState?.capture?.count ?? 0,
-    captureOwningSessionId: effectiveState?.capture?.owningSessionId ?? null,
-    captureStartTimeUs: effectiveState?.capture?.startTimeUs ?? null,
-    captureEndTimeUs: effectiveState?.capture?.endTimeUs ?? null,
-    captureName: effectiveState?.capture?.name ?? null,
-    capturePersistent: effectiveState?.capture?.persistent ?? false,
-    joinerCount: effectiveState?.subscriberCount ?? 0,
-    stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
-    streamEndedReason: effectiveState?.streamEndedReason ?? null,
-    speed: effectiveState?.speed ?? null,
+    capabilities: view.capabilities,
+    state: view.ioState,
+    isReady: view.isReady,
+    errorMessage: view.errorMessage,
+    captureAvailable: capture?.available ?? false,
+    captureId: capture?.id ?? null,
+    captureKind: capture?.kind ?? null,
+    captureCount: capture?.count ?? 0,
+    captureOwningSessionId: capture?.owningSessionId ?? null,
+    captureStartTimeUs: capture?.startTimeUs ?? null,
+    captureEndTimeUs: capture?.endTimeUs ?? null,
+    captureName: capture?.name ?? null,
+    capturePersistent: capture?.persistent ?? false,
+    joinerCount: view.subscriberCount,
+    stoppedExplicitly: view.stoppedExplicitly,
+    streamEndedReason: view.streamEndedReason,
+    speed: view.speed,
     playbackPosition,
     currentTimeUs: playbackPosition?.timestamp_us ?? null,
     currentFrameIndex: playbackPosition?.frame_index ?? null,

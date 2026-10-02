@@ -5,7 +5,6 @@
 
 import { useCallback } from "react";
 import { getCaptureMetadataById, type CaptureMetadata } from "../api/capture";
-import { isCaptureProfileId } from "./useIOSessionManager";
 import { tlog } from "../api/settings";
 
 export interface CaptureSessionParams {
@@ -52,17 +51,14 @@ export function useCaptureSession({
    */
   const switchToCapture = useCallback(
     async (profileId: string): Promise<CaptureSwitchResult> => {
-      if (!isCaptureProfileId(profileId)) {
+      // No metadata: the id is not a capture
+      const meta = await getCaptureMetadataById(profileId);
+      if (!meta) {
         return { success: false, metadata: null };
       }
 
-      tlog.debug(`[CaptureSession] Switching to capture: ${profileId}`);
-
       // Run optional pre-switch actions (e.g., clearing previous state)
       onBeforeSwitch?.();
-
-      // Fetch metadata for this specific capture
-      const meta = await getCaptureMetadataById(profileId);
 
       tlog.debug(
         `[CaptureSession] Got metadata: id=${meta?.id}, count=${meta?.count}, kind=${meta?.kind}`
@@ -73,7 +69,7 @@ export function useCaptureSession({
 
       // Reset playback position to start of capture
       setCurrentFrameIndex(0);
-      if (meta?.start_time_us != null) {
+      if (meta.start_time_us != null) {
         updateCurrentTime(meta.start_time_us / 1_000_000);
       } else {
         updateCurrentTime(0);

@@ -65,15 +65,13 @@ export default function WireTAP() {
   // Load settings store eagerly so all apps have access to IO profiles,
   // preferred catalogs, etc. without requiring the Settings panel to be open.
   const loadSettingsStore = useSettingsStore((s) => s.loadSettings);
-  const loadCaptureIds = useSessionStore((s) => s.loadCaptureIds);
   // Ad-hoc devices live in the backend, so a second window (or a reload) picks
   // up the ones already registered rather than showing an empty list.
   const refreshAdHocProfiles = useAdHocProfileStore((s) => s.refresh);
   useEffect(() => {
     loadSettingsStore();
-    loadCaptureIds();
     void refreshAdHocProfiles();
-  }, [loadSettingsStore, loadCaptureIds, refreshAdHocProfiles]);
+  }, [loadSettingsStore, refreshAdHocProfiles]);
 
   // Hand the Sentry DSN to the Rust backend so it can initialise its
   // usage-analytics logs client (emission + consent gating live in Rust).

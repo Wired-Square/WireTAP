@@ -68,7 +68,9 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::captures::BytesTailResponse>();
     r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
-    r.visit::<crate::sessions::MultiSourceSession>();
+    r.visit::<crate::sessions::OpenSessionOptions>();
+    r.visit::<crate::sessions::OpenedSession>();
+    r.visit::<crate::sessions::SessionRefusal>();
     r.visit::<crate::sessions::ProfileUsageInfo>();
     r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();

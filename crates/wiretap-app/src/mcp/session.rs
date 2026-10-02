@@ -25,7 +25,7 @@ fn spawn_keepalive(session_id: String) {
 
 /// A recorded source replays its whole archive from the head unless bounded.
 /// Mirrors the frontend's playback controls; each falls back to the profile's
-/// own `connection` value when omitted (see `create_reader_session`).
+/// own `connection` value when omitted (see `open_session`).
 #[derive(Debug, Default)]
 pub struct Window {
     /// RFC3339 lower bound (inclusive).
@@ -113,23 +113,22 @@ pub async fn open(
         Some(sid) => sid,
         None => crate::sessions::mint_session_id(crate::sessions::session_id_prefix([profile], None)).await,
     };
-    let capabilities = crate::sessions::create_reader_session(
-        app.clone(),
-        sid.clone(),
-        Some(profile_id.clone()),
-        window.start,
-        window.end,
-        window.speed,
-        window.limit,
-        None,
-        None,
-        Some("mcp".to_string()),
-        Some("mcp".to_string()),
+    // Connect-only, so the catalogue is bound before the first frame. Leaving
+    // nothing: an agent may hold several sessions at once.
+    let opts = crate::sessions::OpenSessionOptions {
+        source_id: Some(profile_id.clone()),
+        start_time: window.start,
+        end_time: window.end,
+        speed: window.speed,
+        limit: window.limit,
         modbus_polls,
-        // No picker, so no session-level framing: the device profile decides.
-        None,
-    )
-    .await?;
+        connect_only: Some(true),
+        ..Default::default()
+    };
+    let opened = crate::sessions::open_from(&app, &sid, "mcp", Some("mcp"), opts, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    let capabilities = opened.registration.capabilities;
 
     // Bind the catalogue before the source is started, so frames decode from the
     // first one rather than relying on a re-decode after the fact. This is also
@@ -149,8 +148,6 @@ pub async fn open(
         }
     }
 
-    // `create_reader_session` leaves playback sources stopped so the frontend
-    // can register its frame listener first; headless there is nothing to race.
     // Only a stopped session is started — `start_session` is idempotent for
     // `Running` but would restart a `Paused` one, which an explicit session_id
     // can reach.

@@ -30,7 +30,8 @@ import type { ModbusRangeSpec } from "../generated/ModbusRangeSpec";
 import type { ModbusRegisterType } from "../generated/ModbusRegisterType";
 import type { ModbusScanConfig } from "../generated/ModbusScanConfig";
 import type { MultiSourceInput } from "../generated/MultiSourceInput";
-import type { MultiSourceSession } from "../generated/MultiSourceSession";
+import type { OpenedSession } from "../generated/OpenedSession";
+import type { OpenSessionOptions } from "../generated/OpenSessionOptions";
 import type { PlaybackPosition } from "../generated/PlaybackPosition";
 import type { ProfileUsageInfo } from "../generated/ProfileUsageInfo";
 import type { Protocol } from "../generated/Protocol";
@@ -41,6 +42,8 @@ import type { ScanJob } from "../generated/ScanJob";
 import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
 import type { SerialOverrides } from "../generated/SerialOverrides";
 import type { SessionPurpose } from "../generated/SessionPurpose";
+import type { SessionRefusal } from "../generated/SessionRefusal";
+import type { SessionSourceKind } from "../generated/SessionSourceKind";
 import type { SourceInfo } from "../generated/SourceInfo";
 import type { StepResult } from "../generated/StepResult";
 import type { StreamEndedInfo } from "../generated/StreamEndedInfo";
@@ -72,7 +75,8 @@ export type {
   ModbusRegisterType,
   ModbusScanConfig,
   MultiSourceInput,
-  MultiSourceSession,
+  OpenedSession,
+  OpenSessionOptions,
   PlaybackPosition,
   ProfileUsageInfo,
   Protocol,
@@ -81,6 +85,8 @@ export type {
   ScanCompletePayload,
   ScanJob,
   ScanProgressPayload,
+  SessionRefusal,
+  SessionSourceKind,
   SourceInfo,
   StepResult,
   StreamEndedInfo,
@@ -135,72 +141,6 @@ export interface InterfaceFramingConfig extends ModbusFramingSettings {
   emitRawBytes?: boolean;
 }
 
-/**
- * Options for creating an IO session.
- */
-export interface CreateIOSessionOptions {
-  /** Unique session ID (e.g., "discovery", "decoder") */
-  sessionId: string;
-  /** Profile ID to use (optional, defaults to default_read_profile) */
-  profileId?: string;
-  /** Start time for time-range capable readers (ISO-8601) */
-  startTime?: string;
-  /** End time for time-range capable readers (ISO-8601) */
-  endTime?: string;
-  /** Initial playback speed (default: 1.0) */
-  speed?: number;
-  /** Maximum number of frames to read (optional) */
-  limit?: number;
-  /** File path for file-based readers */
-  filePath?: string;
-  /** Use the shared capture source instead of a profile-based reader */
-  useCapture?: boolean;
-
-  // Serial framing configuration
-  framingEncoding?: FramingMode;
-  /** Delimiter byte sequence for delimiter-based framing (e.g., [0x0D, 0x0A] for CRLF) */
-  delimiter?: number[];
-  /** Maximum frame length for delimiter-based framing (default: 256) */
-  maxFrameLength?: number;
-  /** Modbus RTU framing settings, when framingEncoding is "modbus_rtu" */
-  modbusValidateCrc?: boolean;
-  modbusDeviceAddress?: number;
-  modbusVendorFunctions?: number[];
-  modbusAllowBroadcast?: boolean;
-  modbusAnyFunction?: boolean;
-
-  // Frame ID extraction configuration
-  /** Frame ID extraction: start byte position (supports negative indexing from end) */
-  frameIdStartByte?: number;
-  /** Frame ID extraction: number of bytes (1 or 2) */
-  frameIdBytes?: number;
-  /** Frame ID extraction: byte order (true = big endian) */
-  frameIdBigEndian?: boolean;
-
-  // Source address extraction configuration
-  /** Source address extraction: start byte position (supports negative indexing from end) */
-  sourceAddressStartByte?: number;
-  /** Source address extraction: number of bytes (1 or 2) */
-  sourceAddressBytes?: number;
-  /** Source address extraction: byte order (true = big endian) */
-  sourceAddressBigEndian?: boolean;
-
-  /** Minimum frame length to accept (frames shorter than this are discarded) */
-  minFrameLength?: number;
-  /** Also emit raw bytes (serial-raw-bytes) in addition to frames when framing is enabled */
-  emitRawBytes?: boolean;
-  /** Bus number override for single-bus devices (0-7) */
-  busOverride?: number;
-  /** Listener instance ID for session logging (e.g., "discovery_1", "decoder_2") */
-  subscriberId?: string;
-  /** Human-readable app name (e.g., "discovery", "decoder") */
-  appName?: string;
-  /** Capture ID for capture source sessions (e.g., "xk9m2p") */
-  captureId?: string;
-  /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
-  modbusPollsJson?: string;
-}
-
 /** The serial settings an options object carries, camelCase on the way to Rust's `SerialOverrides`. */
 interface SerialSettings {
   framingEncoding?: FramingMode;
@@ -248,43 +188,40 @@ export function serialPayload(source: SerialSettings): SerialOverrides {
   };
 }
 
-/**
- * Create a new IO session.
- * Returns the capabilities of the created IO device.
- */
-export async function createIOSession(
-  options: CreateIOSessionOptions
-): Promise<IOCapabilities> {
-  // Use capture source if requested
-  if (options.useCapture) {
-    return invoke("create_capture_source_session", {
-      session_id: options.sessionId,
-      capture_id: options.captureId,
-      speed: options.speed,
-    });
+/** A session command Rust refused, carrying why. */
+export class SessionCommandError extends Error {
+  constructor(readonly refusal: SessionRefusal) {
+    super(refusal.message);
   }
+}
 
-  return invoke("create_reader_session", {
-    session_id: options.sessionId,
-    profile_id: options.profileId,
-    start_time: options.startTime,
-    end_time: options.endTime,
-    speed: options.speed,
-    limit: options.limit,
-    file_path: options.filePath,
-    // Bus override for single-bus devices
-    bus_override: options.busOverride,
-    // Listener ID for session logging
-    subscriber_id: options.subscriberId,
-    // Human-readable app name
-    app_name: options.appName,
-    // Modbus TCP poll groups (catalog-derived)
-    modbus_polls: options.modbusPollsJson,
-    // Serial settings chosen for this session, overriding the device profile.
-    // One object rather than loose keys: as loose keys they were dropped
-    // silently for months when the Rust side stopped declaring them.
-    serial: serialPayload(options),
-  });
+/** Whether `e` says there is no such session, and nothing to open one from. */
+export function isSessionNotFound(e: unknown): boolean {
+  return e instanceof SessionCommandError && e.refusal.kind === "not_found";
+}
+
+async function sessionCommand<T>(command: string, args: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (e) {
+    const refusal = typeof e === "object" && e !== null && "kind" in e
+      ? (e as SessionRefusal)
+      : { kind: "failed" as const, message: String(e) };
+    throw new SessionCommandError(refusal);
+  }
+}
+
+/**
+ * Join the session, or create it from `opts` and start it, then register the
+ * subscriber — one round trip. Rejects with a `SessionCommandError`.
+ */
+export async function openSession(
+  sessionId: string,
+  subscriberId: string,
+  appName: string,
+  opts: OpenSessionOptions,
+): Promise<OpenedSession> {
+  return sessionCommand("open_session", { session_id: sessionId, subscriber_id: subscriberId, app_name: appName, opts });
 }
 
 /**
@@ -352,7 +289,7 @@ export async function startReaderSession(sessionId: string): Promise<IOState> {
  * Returns the confirmed state after the operation.
  */
 export async function stopReaderSession(sessionId: string): Promise<IOState> {
-  return invoke("stop_reader_session", { session_id: sessionId });
+  return sessionCommand("stop_reader_session", { session_id: sessionId });
 }
 
 /**
@@ -539,7 +476,7 @@ export async function seekReaderSession(
   sessionId: string,
   timestampUs: number
 ): Promise<void> {
-  return invoke("seek_reader_session", { session_id: sessionId, timestamp_us: Math.round(timestampUs) });
+  return sessionCommand("seek_reader_session", { session_id: sessionId, timestamp_us: Math.round(timestampUs) });
 }
 
 /**
@@ -552,7 +489,7 @@ export async function seekReaderSessionByFrame(
   sessionId: string,
   frameIndex: number
 ): Promise<void> {
-  return invoke("seek_reader_session_by_frame", {
+  return sessionCommand("seek_reader_session_by_frame", {
     session_id: sessionId,
     frame_index: Math.floor(frameIndex),
   });
@@ -899,38 +836,6 @@ export async function probeDevice(profileId: string): Promise<DeviceProbeResult>
 // ============================================================================
 
 /**
- * Options for creating a multi-source IO session.
- */
-export interface CreateMultiSourceSessionOptions {
-  /** Unique session ID for the combined session */
-  sessionId: string;
-  /** Array of source configurations */
-  sources: MultiSourceInput[];
-  /** Listener instance ID for session logging (e.g., "discovery_1", "decoder_2") */
-  subscriberId?: string;
-  /** Human-readable app name (e.g., "discovery", "decoder") */
-  appName?: string;
-  /** Shared Modbus poll groups JSON (injected into all modbus_tcp sources) */
-  modbusPollsJson?: string;
-}
-
-/**
- * Create a multi-source reader session that merges frames from several devices.
- * Rust allocates each source's output buses and applies its overrides.
- */
-export async function createMultiSourceSession(
-  options: CreateMultiSourceSessionOptions
-): Promise<MultiSourceSession> {
-  return invoke("create_multi_source_session", {
-    session_id: options.sessionId,
-    sources: options.sources,
-    subscriber_id: options.subscriberId,
-    app_name: options.appName,
-    modbus_polls: options.modbusPollsJson,
-  });
-}
-
-/**
  * List all active sessions.
  * Useful for discovering shareable sessions like multi-source.
  */
@@ -963,7 +868,7 @@ export async function getSupportedProtocols(): Promise<Map<string, Protocol[]>> 
   return new Map(Object.entries(raw));
 }
 
-/** The output buses `createMultiSourceSession` would give these sources, keyed by profile ID. */
+/** The output buses `openSession` would give these sources, keyed by profile ID. */
 export async function previewSourceBuses(sources: MultiSourceInput[]): Promise<Map<string, BusMapping[]>> {
   const raw: Record<string, BusMapping[]> = await invoke("preview_source_buses", { sources });
   return new Map(Object.entries(raw));

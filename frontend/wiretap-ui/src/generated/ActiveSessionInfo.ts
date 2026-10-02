@@ -2,6 +2,7 @@
 import type { CaptureKind } from "./CaptureKind";
 import type { IOCapabilities } from "./IOCapabilities";
 import type { IOState } from "./IOState";
+import type { SessionSourceKind } from "./SessionSourceKind";
 import type { SourceConfig } from "./SourceConfig";
 import type { SubscriberInfo } from "./SubscriberInfo";
 
@@ -45,7 +46,7 @@ source_profile_ids: Array<string>,
  * Profiles the session was opened from; differs from `source_profile_ids`
  * only while a stopped source is replaying its capture
  */
-origin_profile_ids: Array<string>, 
+origin_profile_ids: Array<string>, source_kind: SessionSourceKind, 
 /**
  * Capture ID owned by this session (if any)
  */

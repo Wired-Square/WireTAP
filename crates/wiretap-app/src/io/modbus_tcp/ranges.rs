@@ -6,7 +6,7 @@
 // know about — which is exactly what you don't have when reverse-engineering a
 // device. This module is its sibling for the discovery case: "sweep holding
 // 0..511 every second" becomes the same `Vec<PollGroup>` a catalogue would have
-// produced, so it flows through `create_multi_source_session`'s existing
+// produced, so it flows through `open_session`'s existing
 // `modbus_polls` parameter with no new plumbing.
 
 use serde::{Deserialize, Serialize};

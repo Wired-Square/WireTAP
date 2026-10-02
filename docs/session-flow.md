@@ -129,7 +129,7 @@ device bus through unchanged is what made the GVRET half invisible — the frame
 still arrived, un-remapped, while `available_buses` and `transmit_routes` never
 knew the bus existed.
 
-**Rust allocates a session's output buses.** `create_multi_source_session`
+**Rust allocates a session's output buses.** `open_session` with `sources`
 and `add_source_to_session_cmd` take each source as `{profile_id, overrides?}`.
 `allocate_output_buses` lays the sources' buses end to end — the profile's
 declared buses, else as many as a cached multi-bus probe counted, else one —
@@ -137,7 +137,7 @@ counting a disabled bus too so unticking it moves nothing, then applies the
 `BusOverride`s (enabled, output bus, protocol) the user set in the picker. An
 added source starts after the highest output bus the session already holds. The
 picker shows `preview_source_buses`, the same allocation for the same input, and
-the create returns what it allocated so the app labels each bus from it. The
+the open returns what it allocated so the app labels each bus from it. The
 picker and the session manager used to count separately and could put two
 sources on one bus; `io/bus_mapping/ts-allocation-golden.json` pins where.
 
@@ -654,35 +654,44 @@ a capture gets a fresh `c_` session ID that owns the capture. See
 
 ### `sessionStore.openSession` steps
 
-Defined in [src/stores/sessionStore.ts:711](../frontend/wiretap-ui/src/stores/sessionStore.ts#L711).
+One Rust command, `open_session(session_id, subscriber_id, app_name, opts)`
+([sessions/open.rs](../crates/wiretap-app/src/sessions/open.rs)), joins or
+creates, starts and registers. The store:
 
-1. Check if the session already exists locally (connected) — if so, register
-   another subscriber and return.
-2. Check if the session exists in the Rust backend via `getIOSessionState`.
-3. Destroy any session that was left in `error` state.
-4. Create or join:
-   - **4a** Backend exists: `registerSessionSubscriber` → read caps/state/capture.
-   - **4b** Backend missing: `createIOSession` (or `createCaptureSourceSession`
-     for capture replay) then `registerSessionSubscriber`.
-5. Subscribe to the session's WebSocket channel and wire message handlers
-   (see [§ WebSocket transport](#websocket-transport)). Start the heartbeat
-   interval.
-6. **Step 5.5** — auto-start playback for recorded sources (WireTAP backend, CSV).
-   Capture replay sessions explicitly do **not** auto-start — the user drives
-   playback manually. See [sessionStore.ts:992-999](../frontend/wiretap-ui/src/stores/sessionStore.ts#L992-L999).
-7. Create/update the `Session` entry in the Zustand store and return.
+1. Sets up the session's WebSocket handlers and subscribes its channel, and waits
+   for the subscription, so a source the open starts loses no frames
+   (see [§ WebSocket transport](#websocket-transport)).
+2. Calls `open_session`. Rust waits out any operation in flight on the id (a
+   same-id teardown included), then:
+   - joins a live session, registering the subscriber; or
+   - creates it from `opts.sources` (devices merged, replacing any session under
+     the id), else from `opts.source_id` or the session id itself, as a capture
+     when that names one and a saved profile otherwise. A session it creates is
+     started unless it replays a capture or `connect_only` is set, and the
+     start's refusal comes back as `start_error`, the session left in its error
+     state.
+3. Records what Rust reported — state, capabilities, capture, counts,
+   `source_kind` (`device` or `capture`) — and shows `start_error` (or an earlier
+   `startup_error`).
+
+A refusal is a `SessionRefusal`: `not_found` when there is no session and nothing
+to open one from, which the hook treats as expected, or `failed`. `stop` and the
+two seeks reject the same way.
+
+One subscriber's opens and leaves run in the order they were asked for, and a
+view holds the session it is mounted on (`holdSession` / `releaseSession`): a
+StrictMode remount, or an effect re-run on the same id, holds it again before the
+release's leave runs, so the leave is skipped instead of raced.
 
 ### Headless open — the MCP path
 
 [crates/wiretap-app/src/mcp/session.rs](../crates/wiretap-app/src/mcp/session.rs) is the Rust-native
 equivalent of the flow above, for `open_session` with no window open. It calls the
-same `create_reader_session`, then does the three things the frontend would have
-done:
+same `open_from`, connect-only and leaving no session behind (an agent may hold
+several), then:
 
-- **Starts the source.** `create_reader_session` leaves recorded sources stopped so
-  the frontend can register its frame listener before frames flow (step 5.5 above is
-  the frontend half). Headless there is no listener to race, so `open` starts it
-  itself — only when `Stopped`, since `start_session` is idempotent for `Running`
+- **Starts the source** after binding the catalogue — only when `Stopped`, since
+  `start_session` is idempotent for `Running`
   but would restart a `Paused` one, which an explicit `session_id` can reach. If the
   start fails the session is destroyed rather than left holding the profile open.
 - **Binds the profile's `preferred_catalog`** via `ws::dispatch::attach_catalog`,
@@ -693,9 +702,9 @@ done:
   raw stream. A catalogue that fails to parse is logged and skipped; the session
   still opens.
 - **Passes a time window through.** `start_time` / `end_time` / `speed` / `limit`
-  reach `create_reader_session`'s existing parameters, each overriding the profile's
-  own `connection` value without modifying the profile
-  ([sessions.rs](../crates/wiretap-app/src/sessions.rs) — `start_time.or(start_from_profile)`).
+  reach `OpenSessionOptions`, each overriding the profile's own `connection` value
+  without modifying the profile
+  ([sessions/open.rs](../crates/wiretap-app/src/sessions/open.rs) — `profile_reader`).
   Without them a recorded source replays its entire archive from the head, which on
   a long-term store is rarely what an agent wants; `speed` defaults to `0` (as fast
   as the source allows).
@@ -1007,7 +1016,7 @@ because the registration is what triggers the old session's teardown.
 jump-to-event in one place; `useIOSessionManager` stamps the two that bypass
 it (`startMultiBusSession` and `joinExistingSession`). `selectProfile` needs no
 stamp — it sets the profile and lets the effect re-register the listener before
-`openSession` runs.
+`open_session` runs.
 
 The ref names the session *left*, not the one held, so a path that never stamps
 degrades to the old behaviour rather than stranding the app on a session that is
@@ -1134,8 +1143,8 @@ both read, so a destroyed session can no longer hold a serial or slcan device.
 **`reset` distinguishes a deliberate move from an external death.** It rides the
 `destroyed` event: `reset: false` tells apps to fall back to the session's orphaned
 capture, `reset: true` tells them to return to "No source". Teardown paths pass it
-according to intent — the attach-elsewhere eviction and the same-id recreate in
-`create_multi_source_session` pass `true` (the subscriber chose a different session,
+according to intent — the attach-elsewhere eviction and the same-id recreate of
+an `open_session` with `sources` pass `true` (the subscriber chose a different session,
 or the session is about to come straight back), while a plain leave, a panel unmount
 and a window close pass `false`. Getting this wrong is what turned one teardown into
 a loop: adopting the orphaned capture makes that capture id the app's *next session
@@ -1911,8 +1920,10 @@ every 5s:
 
 The 30-second stale threshold (up from 10s) is tuned for WKWebView timer
 throttling during display sleep. Frontend heartbeats ride the WebSocket as
-`Heartbeat` (0xFE) control frames; if the WS connection is down the frontend
-falls back to polling via an `invoke` command.
+`Heartbeat` (0xFE) control frames, which touch every subscriber on the
+connection's channels. A subscriber the watchdog already removed is not on any
+channel, so on `visibilitychange` to visible the store re-registers each of its
+subscribers by `invoke`, which re-attaches them and resumes a suspended session.
 
 The WebSocket *connection* itself times out separately, at
 `2 × HEARTBEAT_TIMEOUT_SECS` ([ws/server.rs](../crates/wiretap-app/src/ws/server.rs)) —

@@ -14,17 +14,6 @@ use crate::io::traits::supported_protocols_for_kind;
 
 use super::tracking::get_cached_probe;
 
-pub(super) fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Option<IOProfile> {
-    if let Some(id) = profile_id {
-        settings.io_profiles.iter().find(|p| p.id == id).cloned()
-    } else if let Some(id) = &settings.default_read_profile {
-        settings.io_profiles.iter().find(|p| p.id == *id).cloned()
-    } else {
-        // Return the first profile as a fallback
-        settings.io_profiles.first().cloned()
-    }
-}
-
 /// Session-level serial settings, as the picker sends them for one source.
 /// Adopt a session's serial overrides, then settle the two fields the broker
 /// reads before any reader runs.
@@ -212,7 +201,7 @@ fn parse_gvret_probed_bus_count(
 /// `bus_count`. Protocol comes from `traffic_type`.
 ///
 /// The `bus` / `bus_count` coercions match the two other readers of this same
-/// config (`create_reader_session` and `broker::spawner::run_virtual_reader`) —
+/// config (`open_session` and `broker::spawner::run_virtual_reader`) —
 /// the settings form writes these as strings, so a number-only parse silently
 /// yields no buses.
 fn parse_virtual_interfaces(

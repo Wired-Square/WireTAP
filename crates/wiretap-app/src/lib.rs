@@ -1234,7 +1234,7 @@ pub fn run() {
             settings::get_app_version,
             settings::check_for_updates,
             // Session-based reader API
-            sessions::create_reader_session,
+            sessions::open_session,
             sessions::get_reader_session_state,
             sessions::get_reader_session_capabilities,
             sessions::get_reader_session_joiner_count,
@@ -1259,7 +1259,6 @@ pub fn run() {
             sessions::seek_reader_session_by_frame,
             sessions::update_reader_direction,
             sessions::destroy_reader_session,
-            sessions::create_capture_source_session,
             sessions::transition_to_capture_source,
             sessions::switch_session_to_capture_replay,
             sessions::resume_session_to_live,
@@ -1284,7 +1283,6 @@ pub fn run() {
             sessions::set_session_subscriber_active,
             sessions::probe_gvret_device,
             sessions::probe_device,
-            sessions::create_multi_source_session,
             sessions::preview_source_buses,
             sessions::list_active_sessions,
             sessions::get_profile_bus_mappings,
@@ -1326,7 +1324,6 @@ pub fn run() {
             captures::search_capture_frames,
             // Multi-capture registry API
             captures::list_captures,
-            captures::list_capture_ids,
             captures::delete_capture,
             captures::clear_capture,
             captures::get_capture_metadata_by_id,

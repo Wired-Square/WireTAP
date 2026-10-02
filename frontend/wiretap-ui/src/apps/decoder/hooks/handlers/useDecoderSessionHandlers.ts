@@ -6,7 +6,7 @@
 
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../../../../components/TimeController";
-import { isCaptureProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
+import type { LoadOptions } from "../../../../hooks/useIOSessionManager";
 import { useCaptureSession } from "../../../../hooks/useCaptureSession";
 import type { CaptureMetadata } from "../../../../api/capture";
 
@@ -47,18 +47,16 @@ export function useDecoderSessionHandlers({
     // The stream-ended event will handle buffer transition
   }, [stopWatch]);
 
-  // Handle IO profile change - manager handles common logic, app handles buffer mode
+  // The picker selects a capture it has just imported, or nothing
   const handleIoProfileChange = useCallback(
-    async (profileId: string | null) => {
-      if (isCaptureProfileId(profileId)) {
-        // Create a proper session for the buffer so it appears in the session manager
+    async (captureId: string | null) => {
+      if (captureId) {
+        // Create a proper session for the capture so it appears in the session manager
         // and has playback controls
-        await watchSource([profileId!], { speed: playbackSpeed });
-        // Load buffer metadata for the UI
-        await switchToCapture(profileId!);
+        await watchSource([captureId], { speed: playbackSpeed });
+        await switchToCapture(captureId);
       } else {
-        // Manager handles: clear multi-bus, set profile, default speed
-        selectProfile(profileId);
+        selectProfile(null);
       }
     },
     [selectProfile, watchSource, switchToCapture, playbackSpeed]

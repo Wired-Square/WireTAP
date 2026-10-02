@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
-use super::session::{each_session, lock_session, session_states, teardown_session_if_empty, IOSession};
+use super::session::{each_session, lock_session, session_states, source_kind, teardown_session_if_empty, IOSession, SessionSourceKind};
 use super::{broker, IOCapabilities, IOState, SourceConfig};
 use crate::{capture_store, sessions};
 
@@ -377,6 +377,7 @@ pub struct ActiveSessionInfo {
     /// only while a stopped source is replaying its capture
     #[serde(default)]
     pub origin_profile_ids: Vec<String>,
+    pub source_kind: SessionSourceKind,
     /// Capture ID owned by this session (if any)
     #[serde(default)]
     pub capture_id: Option<String>,
@@ -447,6 +448,7 @@ fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo 
         broker_configs: session.source.broker_configs(),
         source_profile_ids,
         origin_profile_ids: sessions::get_session_origin_profile_ids(session_id),
+        source_kind: source_kind(session_id),
         capture_id,
         capture_kind,
         capture_frame_count,

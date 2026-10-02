@@ -5,7 +5,7 @@ import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateC
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID } from "./utils";
 import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
-import { isCaptureProfileId } from "../../hooks/useIOSessionManager";
+import { isCaptureSession, useSessionStore } from "../../stores/sessionStore";
 import { DialogFooter } from "../../components/Dialog";
 import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
@@ -90,6 +90,7 @@ export default function ActionButtons({
   const { t } = useTranslation("dialogs");
   const traitsOf = useProfileTraits();
   const isCsvSelected = checkedSourceId === CSV_EXTERNAL_ID;
+  const checkedIsCapture = useSessionStore((s) => isCaptureSession(s, checkedSourceId));
   const isCheckedRealtime = checkedProfile ? isRealtime(traitsOf(checkedProfile)) : false;
 
   // Show release button when there's a selection that can be released
@@ -185,7 +186,7 @@ export default function ActionButtons({
           </SuccessButton>
           {releaseButton}
         </div>
-      ) : checkedSourceId && isCaptureProfileId(checkedSourceId) ? (
+      ) : checkedIsCapture ? (
         // Buffer source selected — show Connect (with bus mappings)
         <div className="flex gap-2">
           <SuccessButton

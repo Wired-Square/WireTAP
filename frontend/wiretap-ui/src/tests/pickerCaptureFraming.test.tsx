@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type { IOProfile } from "../hooks/useSettings";
 import { servedTable } from "./fixtures/profileTraits";
 import type { CaptureMetadata } from "../api/capture";
+import type { Session } from "../stores/sessionStore";
 
 const byteCapture: CaptureMetadata = {
   id: "cap_bytes",
@@ -25,8 +26,6 @@ const invoke = vi.fn(async (cmd: string) => {
   switch (cmd) {
     case "list_orphaned_captures":
       return [byteCapture];
-    case "list_capture_ids":
-      return [byteCapture.id];
     case "probe_device":
       return { success: true, source_type: "serial", is_multi_bus: false, bus_count: 1, primary_info: null, secondary_info: null, supports_fd: null, error: null };
     case "list_active_sessions":
@@ -76,7 +75,12 @@ const click = (el: HTMLElement | undefined) => act(async () => el!.click());
 const captureOption = () => withText("[role=option]", byteCapture.name);
 const rawPortOption = () => withText("[role=option]", rawPort.name);
 
-beforeEach(() => useSessionStore.getState().addKnownCaptureId(byteCapture.id));
+// The app is on a session Rust opened on the capture.
+beforeEach(() =>
+  useSessionStore.setState({
+    sessions: { [byteCapture.id]: { id: byteCapture.id, sourceKind: "capture" } as Session },
+  })
+);
 
 afterEach(() => {
   act(() => root.unmount());

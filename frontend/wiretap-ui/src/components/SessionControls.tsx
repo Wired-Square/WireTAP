@@ -13,9 +13,8 @@ import { sourceKindColours } from "../styles/colourTokens";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
-import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import { getIOKindLabel } from "../utils/ioKindLabel";
-import { useSessionStore } from "../stores/sessionStore";
+import { isCaptureSession, useSessionStore } from "../stores/sessionStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { Button } from "./Button";
@@ -136,7 +135,8 @@ export function SessionButton({
   title,
   isCaptureMode: isCaptureModeProp,
 }: SessionButtonProps) {
-  const isCaptureProfile = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
+  const openedOnCapture = useSessionStore((s) => isCaptureSession(s, ioProfile));
+  const isCaptureProfile = isCaptureModeProp ?? openedOnCapture;
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
   // Show as multi-bus when multiBusProfiles has entries
@@ -387,7 +387,8 @@ export function IOSessionControls({
   hasData = false,
 }: IOSessionControlsProps) {
   const { t } = useTranslation("common");
-  const isCaptureMode = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
+  const openedOnCapture = useSessionStore((s) => isCaptureSession(s, ioProfile));
+  const isCaptureMode = isCaptureModeProp ?? openedOnCapture;
   const hasSource = ioProfile !== null;
 
   // --- Rename popover state ---

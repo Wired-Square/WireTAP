@@ -13,7 +13,7 @@ import {
   isRealtimeProfile,
 } from "../stores/profileBusStore";
 import { validateSourceSelection } from "../api/deviceKinds";
-import { useSessionStore } from "../stores/sessionStore";
+import { isCaptureSession, useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
 import { generateSessionId } from "../api/io";
 import {
@@ -69,7 +69,6 @@ import {
   localToIsoWithOffset,
   CSV_EXTERNAL_ID,
 } from "./io-source-picker";
-import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import type { InterfaceFramingConfig } from "./io-source-picker";
 import { DeviceEditor } from "./io-source-picker";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
@@ -244,6 +243,7 @@ export default function IoSourcePickerDialog({
   const isProfileInUse = useSessionStore((s) => s.isProfileInUse);
   const getSessionForProfile = useSessionStore((s) => s.getSessionForProfile);
   const startSession = useSessionStore((s) => s.startSession);
+  const selectedIsCapture = useSessionStore((s) => isCaptureSession(s, selectedId));
 
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -447,14 +447,12 @@ export default function IoSourcePickerDialog({
     if (didInitForOpenRef.current) return;
     didInitForOpenRef.current = true;
     {
-      // Refresh known capture IDs so isCaptureProfileId() is up-to-date
-      useSessionStore.getState().loadCaptureIds();
       // Load all captures from the registry and initialize selected capture
       listOrphanedCaptures().then((loadedCaptures) => {
         setCaptures(loadedCaptures);
         // If a specific capture is selected (e.g., "xk9m2p"), use that
         // Otherwise if legacy capture ID is selected, use the most recent capture
-        if (isCaptureProfileId(selectedId) && loadedCaptures.length > 0) {
+        if (selectedIsCapture && loadedCaptures.length > 0) {
           // Check if selectedId matches a specific capture (e.g., "xk9m2p")
           const matchingCapture = loadedCaptures.find(b => b.id === selectedId);
           if (matchingCapture) {
@@ -488,7 +486,8 @@ export default function IoSourcePickerDialog({
       // If currently loading, pre-select that profile; otherwise use currently selected profile
       // Buffer IDs should NOT go into checkedReaderId — they use selectedCaptureId instead
       const initialReaderId = loadProfileId ?? selectedId;
-      if (initialReaderId && isCaptureProfileId(initialReaderId)) {
+      const initialIsCapture = !loadProfileId && selectedIsCapture;
+      if (initialIsCapture) {
         setCheckedReaderId(null);
       } else {
         setCheckedReaderId(initialReaderId);
@@ -509,7 +508,7 @@ export default function IoSourcePickerDialog({
         ? ioProfiles.find((p) => p.id === initialReaderId)
         : undefined;
       const isRecordedSel = selProfile ? !isRealtimeProfile(selProfile) : false;
-      setActiveTab(isCaptureProfileId(initialReaderId) || isRecordedSel ? "captures" : "devices");
+      setActiveTab(initialIsCapture || isRecordedSel ? "captures" : "devices");
 
       // Initialize multi-bus selection state
       if (selectedIds.length > 0) {
@@ -661,7 +660,6 @@ export default function IoSourcePickerDialog({
       // Refresh capture list on delete/clear/import from another window
       const u1 = await listen<CaptureChangedPayload>(WINDOW_EVENTS.CAPTURE_CHANGED, () => {
         listOrphanedCaptures().then(setCaptures).catch(console.error);
-        useSessionStore.getState().loadCaptureIds();
       });
       unlistenFns.push(u1);
       // Refresh capture list on rename/pin from another window
@@ -724,7 +722,7 @@ export default function IoSourcePickerDialog({
   // active session, set checkedReaderId so the collapsed view shows it
   useEffect(() => {
     if (!isOpen) return;
-    if (!selectedId || !isCaptureProfileId(selectedId)) return;
+    if (!selectedId || !selectedIsCapture) return;
     if (checkedSourceId !== null) return;
     if (hasUserExpandedRef.current) return;
 
@@ -734,7 +732,7 @@ export default function IoSourcePickerDialog({
     if (captureSession) {
       setCheckedReaderId(selectedId);
     }
-  }, [isOpen, selectedId, checkedSourceId, activeMultiSourceSessions]);
+  }, [isOpen, selectedId, selectedIsCapture, checkedSourceId, activeMultiSourceSessions]);
 
   // Multi-bus mode is active when at least one profile is selected in multi-select
   const isMultiBusMode = checkedSourceIds.length > 0;
@@ -1272,12 +1270,6 @@ export default function IoSourcePickerDialog({
 
     onImport?.(metadata);
 
-    // Register the new capture id so isCaptureProfileId() recognises it.
-    // Without this, the onSelect(metadata.id) → handleIoProfileChange call
-    // below takes the non-capture branch and skips the capture-load pipeline
-    // that populates frameInfoMap (tooltip/frame picker/Tools button).
-    useSessionStore.getState().addKnownCaptureId(metadata.id);
-
     // Notify other windows that capture has changed
     const payload: CaptureChangedPayload = {
       metadata,
@@ -1308,15 +1300,12 @@ export default function IoSourcePickerDialog({
     try {
       await deleteCapture(captureId);
 
-      // Remove from known capture IDs so isCaptureProfileId() stops matching
-      useSessionStore.getState().removeKnownCaptureId(captureId);
-
       // Refresh capture list
       const allCaptures = await listOrphanedCaptures();
       setCaptures(allCaptures);
 
       // If no captures left and capture was selected, clear selection
-      if (allCaptures.length === 0 && isCaptureProfileId(selectedId)) {
+      if (allCaptures.length === 0 && selectedIsCapture) {
         onSelect(null);
       }
 
@@ -1339,7 +1328,6 @@ export default function IoSourcePickerDialog({
       const clearableCaptures = captures.filter(b => !b.is_streaming && !b.persistent);
       for (const capture of clearableCaptures) {
         await deleteCapture(capture.id);
-        useSessionStore.getState().removeKnownCaptureId(capture.id);
       }
 
       // Refresh capture list (keep streaming and persistent captures)
@@ -1348,7 +1336,7 @@ export default function IoSourcePickerDialog({
 
       // If capture was selected and it was deleted, clear selection
       const deletedIds = new Set(clearableCaptures.map(b => b.id));
-      if (isCaptureProfileId(selectedId)) {
+      if (selectedIsCapture) {
         // Check if the selected capture was deleted
         const selectedCapture = captures.find(b => b.id === selectedId);
         if (selectedCapture && deletedIds.has(selectedCapture.id)) {
@@ -1386,7 +1374,7 @@ export default function IoSourcePickerDialog({
     }
   };
 
-  const isCaptureSelected = isCaptureProfileId(selectedId) || selectedCaptureId !== null;
+  const isCaptureSelected = selectedIsCapture || selectedCaptureId !== null;
 
   // The source list and its options. Hoisted out of the render tree so the
   // device editor swaps in as one line rather than burying 250 lines of JSX in

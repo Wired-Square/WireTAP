@@ -280,12 +280,6 @@ pub fn is_known_capture(id: &str) -> bool {
     registry.captures.contains_key(id)
 }
 
-/// Return all known capture IDs.
-pub fn list_capture_ids() -> Vec<String> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
-    registry.captures.keys().cloned().collect()
-}
-
 /// Whether any capture is currently receiving live appends — i.e. a recording is
 /// in progress. True independent of whether a UI panel is watching the session,
 /// so the wake lock can stay held while an unwatched capture keeps recording.

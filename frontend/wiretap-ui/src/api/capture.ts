@@ -4,7 +4,6 @@
 // Supports multiple named captures with typed storage (frames or bytes).
 
 import { invoke } from "@tauri-apps/api/core";
-import type { IOCapabilities } from "./io";
 import type { ProtocolFrames } from "../utils/frameKey";
 import type { Protocol } from "../utils/profileTraits";
 import type { FrameMessage } from "../types/frame";
@@ -310,26 +309,6 @@ export async function findCaptureOffsetForTimestamp(
   });
 }
 
-/**
- * Create a reader session for the shared capture.
- * The capture must have data loaded.
- *
- * @param sessionId - Unique session ID (e.g., "discovery", "decoder")
- * @param speed - Playback speed (0 = no limit, 1 = realtime)
- * @returns Reader capabilities
- */
-export async function createCaptureSourceSession(
-  sessionId: string,
-  captureId: string,
-  speed?: number
-): Promise<IOCapabilities> {
-  return invoke("create_capture_source_session", {
-    session_id: sessionId,
-    capture_id: captureId,
-    speed,
-  });
-}
-
 // ============================================================================
 // Multi-Capture Registry API
 // ============================================================================
@@ -340,14 +319,6 @@ export async function createCaptureSourceSession(
  */
 export async function listCaptures(): Promise<CaptureMetadata[]> {
   return invoke("list_captures");
-}
-
-/**
- * List all known capture IDs (lightweight — no metadata).
- * Used to populate the known capture ID set for `isCaptureProfileId()` lookups.
- */
-export async function listCaptureIds(): Promise<string[]> {
-  return invoke("list_capture_ids");
 }
 
 /**
@@ -366,9 +337,6 @@ export async function listOrphanedCaptures(): Promise<CaptureMetadata[]> {
  */
 export async function deleteCapture(captureId: string): Promise<void> {
   await invoke("delete_capture", { capture_id: captureId });
-  // Remove from known capture ID cache
-  const { useSessionStore } = await import("../stores/sessionStore");
-  useSessionStore.getState().removeKnownCaptureId(captureId);
 }
 
 /**

@@ -8,12 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
-import { useIOSessionManager, isCaptureProfileId } from "../../hooks/useIOSessionManager";
+import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useQueryStore } from "./stores/queryStore";
-import { useSessionStore } from "../../stores/sessionStore";
+import { isCaptureSession, useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { getIOKindLabel } from "../../utils/ioKindLabel";
@@ -172,7 +172,8 @@ function QueryInner() {
   // The query source is derived from the session: a capture replay sets
   // sourceProfileId to the capture id (isCaptureMode), otherwise it's a backend
   // profile. Queries target whichever is set — they are mutually exclusive.
-  const captureId = isCaptureMode && isCaptureProfileId(sourceProfileId) ? sourceProfileId : null;
+  const openedOnCapture = useSessionStore((s) => isCaptureSession(s, session.sessionId));
+  const captureId = isCaptureMode && openedOnCapture ? sourceProfileId : null;
   const profileId = captureId ? null : sourceProfileId;
 
   // Subscribe to session's catalogPath. Returns undefined when session doesn't exist

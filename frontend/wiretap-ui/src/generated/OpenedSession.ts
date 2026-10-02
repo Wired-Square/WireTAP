@@ -1,13 +1,22 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
+import type { BusMapping } from "./BusMapping";
 import type { CaptureKind } from "./CaptureKind";
 import type { IOCapabilities } from "./IOCapabilities";
 import type { IOState } from "./IOState";
 import type { SessionSourceKind } from "./SessionSourceKind";
 
 /**
- * Result of registering a subscriber
+ * The session an open joined or created, and how the start it made went.
  */
-export type RegisterSubscriberResult = { 
+export type OpenedSession = { created: boolean, 
+/**
+ * Why the start this open made failed. The session stays, in its error state.
+ */
+start_error: string | null, 
+/**
+ * The buses each source was given, when `sources` opened the session.
+ */
+bus_mappings: { [key in string]: Array<BusMapping> } | null, 
 /**
  * Session capabilities
  */

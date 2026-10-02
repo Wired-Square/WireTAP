@@ -8,7 +8,7 @@
 
 import { useCallback } from "react";
 import { getCaptureFrameInfo, setActiveCapture, type CaptureFrameInfo, type CaptureMetadata } from "../../../../api/capture";
-import { isCaptureProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
+import type { LoadOptions } from "../../../../hooks/useIOSessionManager";
 import { useCaptureSession } from "../../../../hooks/useCaptureSession";
 
 export interface UseDiscoverySessionHandlersParams {
@@ -74,22 +74,17 @@ export function useDiscoverySessionHandlers({
     },
   });
 
-  // Handle IO profile change - manager handles common logic, app handles buffer/non-buffer cleanup
-  const handleIoProfileChange = useCallback(async (profileId: string | null) => {
-    console.log(`[DiscoverySessionHandlers] handleIoProfileChange called - profileId=${profileId}`);
-
-    // Check if switching to a buffer session
-    if (isCaptureProfileId(profileId)) {
+  // The picker selects a capture it has just imported, or nothing
+  const handleIoProfileChange = useCallback(async (captureId: string | null) => {
+    if (captureId) {
       // Create a proper session for the capture so it appears in the session manager
       // and has playback controls. watchSource calls onBeforeWatch (clears state),
       // creates a CaptureSource session, and sets sourceProfileId to the capture ID.
-      await watchSource([profileId!], { speed: 1 });
+      await watchSource([captureId], { speed: 1 });
       // Load capture metadata and enable capture UI (frame picker, pagination)
-      await switchToCapture(profileId!);
+      await switchToCapture(captureId);
     } else {
-      // Manager handles: clear multi-bus, set profile, default speed
-      selectProfile(profileId);
-      // Clear state when switching to non-buffer profile
+      selectProfile(null);
       resetView();
     }
   }, [

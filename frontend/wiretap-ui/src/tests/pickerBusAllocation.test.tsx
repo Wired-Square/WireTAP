@@ -27,7 +27,7 @@ function allocate(sources: MultiSourceInput[]): Record<string, BusMapping[]> {
   };
 }
 
-const invoke = vi.fn(async (cmd: string, args?: { sources?: MultiSourceInput[] }) => {
+const invoke = vi.fn(async (cmd: string, args?: { sources?: MultiSourceInput[]; opts?: { sources?: MultiSourceInput[] } }) => {
   switch (cmd) {
     case "probe_device":
       return { success: true, source_type: "x", is_multi_bus: false, bus_count: 1, primary_info: null, secondary_info: null, supports_fd: null, error: null };
@@ -42,10 +42,21 @@ const invoke = vi.fn(async (cmd: string, args?: { sources?: MultiSourceInput[] }
       return servedTable({ gvret: traits({ multi_bus: true }), slcan: traits() });
     case "preview_source_buses":
       return allocate(args!.sources!);
-    case "create_multi_source_session":
-      return { capabilities: {}, bus_mappings: allocate(args!.sources!) };
-    case "register_session_subscriber":
-      return {};
+    case "open_session":
+      return {
+        created: true,
+        start_error: null,
+        startup_error: null,
+        bus_mappings: allocate(args!.opts!.sources!),
+        capabilities: {},
+        state: { type: "Running" },
+        capture_id: null,
+        capture_kind: null,
+        subscriber_count: 1,
+        origin_profile_ids: ["gvret", "slcan"],
+        source_type: "multi_source",
+        source_kind: "device",
+      };
     default:
       return null;
   }
@@ -66,7 +77,10 @@ const profiles = [
   { id: "slcan", name: "CANable", kind: "slcan", connection: {} },
 ] as unknown as IOProfile[];
 
-const lastSources = (cmd: string) => invoke.mock.calls.filter(([c]) => c === cmd).pop()?.[1]?.sources ?? [];
+const lastSources = (cmd: string) => {
+  const args = invoke.mock.calls.filter(([c]) => c === cmd).pop()?.[1];
+  return args?.sources ?? args?.opts?.sources ?? [];
+};
 const outputBusSelects = () =>
   [...document.querySelectorAll<HTMLSelectElement>("select")].filter((s) => s.options.length === 8);
 
@@ -155,7 +169,7 @@ describe("opening the session", () => {
     });
     vi.useRealTimers();
 
-    const sources = lastSources("create_multi_source_session");
+    const sources = lastSources("open_session");
     expect(sources.map(({ profile_id, overrides }) => ({ profile_id, overrides }))).toEqual([
       { profile_id: "gvret", overrides: undefined },
       { profile_id: "slcan", overrides },

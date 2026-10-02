@@ -15,16 +15,13 @@ import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
 import { tlog } from "../api/settings";
 import {
   createAndStartMultiSourceSession,
-  joinMultiSourceSession,
   useSessionStore,
-  isCaptureProfileId,
+  isCaptureSession,
   type CreateMultiSourceOptions,
   type InterfaceFramingConfig,
   type BusSourceInfo,
 } from "../stores/sessionStore";
 
-// Re-export for backward compatibility
-export { isCaptureProfileId };
 import type { BusOverride, FramingMode, PlaybackPosition } from "../api/io";
 import type { EventOwner } from "../api/captureEvents";
 import { eventOwnerForSession } from "../utils/captureEvents";
@@ -382,6 +379,7 @@ export function useIOSessionManager(
   // survives a stopped source replaying its capture.
   const sourceProfileId = useSessionStore((s) =>
     effectiveSessionId ? s.sessions[effectiveSessionId]?.originProfileIds[0] ?? null : null);
+  const openedOnCapture = useSessionStore((s) => isCaptureSession(s, effectiveSessionId));
 
   // Resolve a profile id, falling back to the ad-hoc registry.
   //
@@ -611,18 +609,14 @@ export function useIOSessionManager(
   const isStreaming = !isDetached && (readerState === "running" || readerState === "paused");
   const isPaused = readerState === "paused";
   const isRealtime = session.capabilities?.traits.temporal_mode === "realtime";
-  // Capture mode = viewing capture data. Detected via:
-  // 1. Profile ID is a capture ID (direct capture selection), OR
-  // 2. Session capabilities report temporal_mode="capture" (device switched to CaptureSource)
-  const isCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
-    || session.capabilities?.traits.temporal_mode === "capture";
+  // Capture mode = viewing capture data: opened on a capture, or a device switched to its CaptureSource
+  const isCaptureMode = openedOnCapture || session.capabilities?.traits.temporal_mode === "capture";
   // Stopped with a profile selected (ready to restart)
   // For realtime sources: can restart the live stream
   // For recorded sources: can restart from the beginning
   const isStopped = !isDetached && readerState === "stopped" && ioProfile !== null;
-  // Can return to live: was originally a realtime source but switched to capture replay
-  // Detected by isCaptureMode + sourceProfileId being a real profile (not a capture ID itself)
-  const canReturnToLive = !isDetached && isCaptureMode && sourceProfileId !== null && !isCaptureProfileId(sourceProfileId);
+  // Can return to live: a device session replaying its capture
+  const canReturnToLive = !isDetached && isCaptureMode && sourceProfileId !== null && !openedOnCapture;
   const sessionReady = session.isReady;
   const capabilities = session.capabilities;
   const joinerCount = session.joinerCount;
@@ -653,9 +647,7 @@ export function useIOSessionManager(
       await session.leave();
     };
 
-    const isCapture = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
-      || session.capabilities?.traits.temporal_mode === "capture";
-    if (isCapture) {
+    if (isCaptureMode) {
       // Already viewing a capture → "second leave" → No Source.
       await disconnect();
       return;
@@ -674,7 +666,7 @@ export function useIOSessionManager(
       tlog.info(`[IOSessionManager:${appName}] Leave failed, disconnecting: ${e}`);
       await disconnect();
     }
-  }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, ioProfile, sourceProfileId, appName]);
+  }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, isCaptureMode, appName]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();
@@ -706,16 +698,14 @@ export function useIOSessionManager(
   // Buffer (non-persistent): delete capture + leave session
   const handleClearCapture = useCallback(async () => {
     const { clearCaptureData, deleteCapture } = await import("../api/capture");
-    // For capture sessions, sourceProfileId holds the buf_N ID;
-    // for real-time/recorded sessions the capture ID is on the session object.
-    const bid = isCaptureProfileId(sourceProfileId) ? sourceProfileId : session.captureId;
+    // A capture session's origin is its capture; a device session owns one on the session object.
+    const bid = openedOnCapture ? sourceProfileId : session.captureId;
 
-    if (isCaptureProfileId(sourceProfileId)) {
+    if (openedOnCapture) {
       // Capture mode: delete capture + leave session (clean leave, no suspend/copy)
       tlog.info(`[IOSessionManager] Clear capture: deleting capture ${bid} and leaving session`);
       if (bid) {
         await deleteCapture(bid);
-        useSessionStore.getState().removeKnownCaptureId(bid);
         const { emit } = await import("@tauri-apps/api/event");
         emit(WINDOW_EVENTS.CAPTURE_CHANGED, { metadata: null, deletedCaptureIds: [bid], timestamp: Date.now() });
       }
@@ -729,7 +719,7 @@ export function useIOSessionManager(
       tlog.info(`[IOSessionManager] Clear capture: clearing data for capture ${bid}`);
       if (bid) await clearCaptureData(bid);
     }
-  }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
+  }, [session, openedOnCapture, sourceProfileId, setMultiBusProfiles, setIoProfile]);
 
   // Start multi-bus session
   const startMultiBusSession = useCallback(async (
@@ -783,8 +773,6 @@ export function useIOSessionManager(
       modbusPollsJson: opts.modbusPollsJson,
     };
 
-    // Create the session and set up heartbeats
-    // This ensures heartbeats start immediately, keeping the session alive.
     // Stamped first: registering here is what makes Rust destroy the session
     // this app is leaving.
     session.markSessionSwitch(sessionId);
@@ -827,20 +815,11 @@ export function useIOSessionManager(
     session.markSessionSwitch(sessionId);
     onBeforeWatch?.();
 
-    // Join the session and set up heartbeats
-    await joinMultiSourceSession({
-      sessionId,
-      subscriberId: session.subscriberId,
-      appName,
-      sourceProfileIds,
-    });
-
-    // Update state
     setIoProfile(sessionId);
     setMultiBusProfiles(sourceProfileIds || []);
     setIsDetached(false);
     await session.rejoin(sessionId);
-  }, [appName, session, setIoProfile, setMultiBusProfiles, onBeforeWatch]);
+  }, [session, setIoProfile, setMultiBusProfiles, onBeforeWatch]);
 
   // ---- Session Switching Methods ----
 
@@ -1177,8 +1156,8 @@ export function useIOSessionManager(
     setMultiBusProfiles([]);
     setIoProfile(profileId);
 
-    // Set default speed from the selected profile if it has one (non-capture only)
-    if (profileId && !isCaptureProfileId(profileId)) {
+    // Set default speed from the selected profile if it has one
+    if (profileId) {
       const profile = findProfile(profileId);
       if (profile && profile.kind === "wiretap" && profile.connection?.default_speed) {
         const defaultSpeed = parseFloat(profile.connection.default_speed);
@@ -1204,8 +1183,7 @@ export function useIOSessionManager(
   // Skip IO reader selection: clear state, leave if streaming
   const skipReader = useCallback(async () => {
     // Unconditional — this returns the app to "No source", so any data still on screen
-    // belongs to a source the user just dismissed. leave() cannot be relied on for this:
-    // it is skipped entirely for very young sessions, and it is not reached at all when
+    // belongs to a source the user just dismissed. leave() is not reached at all when
     // the session was never running.
     onBeforeWatch?.();
     setMultiBusProfiles([]);

@@ -124,7 +124,7 @@ export function useModbusPolling({
     try {
       // Reuse the current session id so the backend reinitialises THIS modbus
       // session with the poll groups (its "catalog reinitialise" path —
-      // create_multi_source_session destroys+recreates the same id) instead of
+      // open_session with sources destroys+recreates the same id) instead of
       // opening a second, competing connection to the device. Without this, a
       // catalogue loaded after the (pollless) session starts spawns a rival
       // session and the device's single connection slot breaks both.

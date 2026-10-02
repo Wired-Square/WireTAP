@@ -5,10 +5,12 @@
 
 mod commands;
 mod ids;
+mod open;
 mod source_config;
 mod tracking;
 pub use commands::*;
 pub use ids::*;
+pub use open::*;
 pub use source_config::*;
 pub use tracking::*;
 

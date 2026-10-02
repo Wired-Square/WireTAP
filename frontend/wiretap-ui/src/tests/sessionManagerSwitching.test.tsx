@@ -6,7 +6,6 @@ import { createRoot, type Root } from "react-dom/client";
 import type { IOProfile } from "../hooks/useSettings";
 import type { SessionPurpose } from "../generated/SessionPurpose";
 
-const captureIds = new Set(["cap_a", "cap_b"]);
 const openedSessions: Array<string | undefined> = [];
 let minted = 0;
 const mintedFor = (purpose: SessionPurpose) =>
@@ -37,8 +36,7 @@ vi.mock("../stores/sessionStore", async () => {
   const { create } = await import("zustand");
   return {
     createAndStartMultiSourceSession: vi.fn(async () => ({ busMappings: new Map() })),
-    joinMultiSourceSession: vi.fn(async () => ({})),
-    isCaptureProfileId: (id: string | null) => id !== null && captureIds.has(id),
+    isCaptureSession: () => false,
     useSessionStore: create(() => ({
       pendingJoins: {},
       sessions: {},
