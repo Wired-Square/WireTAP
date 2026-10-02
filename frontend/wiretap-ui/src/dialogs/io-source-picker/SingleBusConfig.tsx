@@ -29,10 +29,9 @@ interface SingleBusConfigProps {
   isLoading: boolean;
   /** Error message from probe (null if success) */
   error: string | null;
-  /** Current bus number override (undefined = use default 0) */
-  busOverride?: number;
-  /** Called when bus override changes */
-  onBusOverrideChange: (bus: number | undefined) => void;
+  /** The output bus Rust gave this source's one bus */
+  outputBus?: number;
+  onOutputBusChange: (bus: number) => void;
   /** Profile name for display */
   profileName?: string;
   /** Use compact inline styling (no header, reduced padding) */
@@ -53,8 +52,8 @@ export default function SingleBusConfig({
   probeResult,
   isLoading,
   error,
-  busOverride,
-  onBusOverrideChange,
+  outputBus,
+  onOutputBusChange,
   profileName,
   compact = false,
   usedBuses,
@@ -64,7 +63,7 @@ export default function SingleBusConfig({
   configLocked = false,
 }: SingleBusConfigProps) {
   const { t } = useTranslation("dialogs");
-  const effectiveBus = busOverride ?? 0;
+  const effectiveBus = outputBus ?? 0;
   const isDuplicate = usedBuses && usedBuses.has(effectiveBus);
   const isSerial = profileKind === "serial";
   const effectiveFraming = framingConfig?.encoding ?? "raw";
@@ -122,10 +121,7 @@ export default function SingleBusConfig({
   const busSelect = (
     <Select
       value={effectiveBus}
-      onChange={(e) => {
-        const val = parseInt(e.target.value, 10);
-        onBusOverrideChange(val === 0 ? undefined : val);
-      }}
+      onChange={(e) => onOutputBusChange(parseInt(e.target.value, 10))}
       disabled={configLocked}
       size={controlSize}
       tone={isDuplicate ? "warning" : undefined}

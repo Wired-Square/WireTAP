@@ -67,6 +67,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::captures::BytesTailResponse>();
     r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
+    r.visit::<crate::sessions::MultiSourceSession>();
     r.visit::<crate::sessions::ProfileUsageInfo>();
     r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
@@ -397,7 +398,7 @@ fn ws_json_bodies_serialise_as_declared() {
 fn inputs_accept_the_declared_minimum() {
     use crate::io::modbus_tcp::scanner::{FcProbeConfig, ModbusScanConfig, UnitIdScanConfig};
     use serde_json::json;
-    assert_accepts_declared_minimum::<crate::sessions::MultiSourceInput>(json!({ "bus_mappings": [], "profile_id": "p" }));
+    assert_accepts_declared_minimum::<crate::sessions::MultiSourceInput>(json!({ "profile_id": "p" }));
     assert_accepts_declared_minimum::<crate::io::ModbusRangeSpec>(json!({ "ranges": [] }));
     assert_accepts_declared_minimum::<crate::io::ModbusRange>(json!({ "end": 2, "register_type": "holding", "start": 1 }));
     assert_accepts_declared_minimum::<FcProbeConfig>(json!({}));

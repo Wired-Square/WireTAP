@@ -74,6 +74,34 @@ impl Default for BusMapping {
     }
 }
 
+/// What the source picker changed about one of a source's buses. Rust applies it
+/// over its own allocation, so the user's choice survives and the count stays Rust's.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct BusOverride {
+    pub device_bus: u8,
+    #[cfg_attr(test, ts(optional))]
+    pub enabled: Option<bool>,
+    #[cfg_attr(test, ts(optional))]
+    pub output_bus: Option<u8>,
+    #[cfg_attr(test, ts(optional))]
+    pub protocol: Option<Protocol>,
+}
+
+/// Apply the picker's overrides; one naming a bus the source does not have is ignored.
+pub fn apply_bus_overrides(mappings: &mut [BusMapping], overrides: &[BusOverride]) {
+    for o in overrides {
+        let Some(m) = mappings.iter_mut().find(|m| m.device_bus == o.device_bus) else {
+            continue;
+        };
+        m.enabled = o.enabled.unwrap_or(m.enabled);
+        m.output_bus = o.output_bus.unwrap_or(m.output_bus);
+        if let Some(protocol) = o.protocol {
+            *m = std::mem::take(m).with_protocol(protocol);
+        }
+    }
+}
+
 /// Create default bus mappings for a device with the given bus count.
 ///
 /// Every bus is classic CAN — the same answer a bus configured in Settings gets

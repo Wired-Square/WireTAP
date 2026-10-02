@@ -36,7 +36,7 @@ vi.mock("../hooks/useIOSession", () => ({
 vi.mock("../stores/sessionStore", async () => {
   const { create } = await import("zustand");
   return {
-    createAndStartMultiSourceSession: vi.fn(async () => ({})),
+    createAndStartMultiSourceSession: vi.fn(async () => ({ busMappings: new Map() })),
     joinMultiSourceSession: vi.fn(async () => ({})),
     isCaptureProfileId: (id: string | null) => id !== null && captureIds.has(id),
     useSessionStore: create(() => ({
@@ -51,9 +51,6 @@ vi.mock("../stores/profileBusStore", () => ({
   useProfileBusStore: { getState: () => ({ ensureLoaded: async () => {} }) },
   isMultiSourceCapable: () => true,
   isRealtimeProfile: () => true,
-  profileBusMappings: (_id: string, outputBus: number) => [
-    { device_bus: 0, output_bus: outputBus, enabled: true, interface_id: "can0", protocol: "can", supported_protocols: [], traits: null },
-  ],
 }));
 vi.mock("../api/io", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/io")>()),

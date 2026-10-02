@@ -48,6 +48,7 @@ import {
   type FramingMode,
   type MultiSourceInput,
   type BusMapping,
+  type BusOverride,
   type PlaybackPosition,
   type ActiveSessionInfo,
 } from "../api/io";
@@ -2125,8 +2126,8 @@ export interface CreateMultiSourceOptions {
   appName: string;
   /** Profile IDs to combine */
   profileIds: string[];
-  /** Bus mappings per profile (keyed by profile ID) */
-  busMappings?: Map<string, BusMapping[]>;
+  /** What the user changed about each profile's buses, keyed by profile ID */
+  busOverrides?: Map<string, BusOverride[]>;
   /** Map of profile ID to display name */
   profileNames?: Map<string, string>;
   framingEncoding?: FramingMode;
@@ -2208,17 +2209,17 @@ export interface MultiSourceSessionResult {
  * This creates a Rust-side merged session that other apps can join.
  *
  * @param options Configuration for the multi-source session
- * @returns The session result with capabilities
+ * @returns The session result, with the buses Rust gave each source
  */
 export async function createAndStartMultiSourceSession(
   options: CreateMultiSourceOptions
-): Promise<MultiSourceSessionResult> {
+): Promise<MultiSourceSessionResult & { busMappings: Map<string, BusMapping[]> }> {
   const {
     sessionId,
     subscriberId,
     appName,
     profileIds,
-    busMappings,
+    busOverrides,
     profileNames,
     framingEncoding,
     delimiter,
@@ -2258,7 +2259,7 @@ export async function createAndStartMultiSourceSession(
     return {
       profile_id: profileId,
       display_name: profileNames?.get(profileId),
-      bus_mappings: busMappings?.get(profileId) || [],
+      overrides: busOverrides?.get(profileId),
       // Apply framing config (per-interface or session-level)
       // Serial sources will use these overrides, CAN sources will ignore them
       ...serialPayload({
@@ -2283,8 +2284,7 @@ export async function createAndStartMultiSourceSession(
     };
   });
 
-  // Create the multi-source session in Rust
-  const capabilities = await createMultiSourceSession({
+  const { capabilities, bus_mappings } = await createMultiSourceSession({
     sessionId,
     sources,
     subscriberId,
@@ -2362,6 +2362,7 @@ export async function createAndStartMultiSourceSession(
     sessionId,
     sourceProfileIds: profileIds,
     capabilities,
+    busMappings: new Map(Object.entries(bus_mappings)),
   };
 }
 

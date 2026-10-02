@@ -1283,6 +1283,7 @@ pub fn run() {
             sessions::probe_gvret_device,
             sessions::probe_device,
             sessions::create_multi_source_session,
+            sessions::preview_source_buses,
             sessions::list_active_sessions,
             sessions::get_profile_bus_mappings,
             sessions::get_supported_protocols,

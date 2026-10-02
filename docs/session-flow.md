@@ -118,9 +118,8 @@ thing that answers "which buses does this profile declare", for every kind:
 `parse_interfaces_from_profile` (GVRET `interfaces[]`, its `_probed_bus_count`
 fallback, and virtual) falling through to `create_default_bus_mapping` (FrameLink
 `interfaces[]` and the legacy single-bus tail). `get_profile_bus_mappings`
-exposes it to the frontend, which caches it in `stores/profileBusStore.ts` and
-applies only an output-bus offset on top — the picker and the session graph no
-longer derive a bus list of their own. Two bugs fell out of the old arrangement
+exposes it to the frontend, which caches it in `stores/profileBusStore.ts` —
+the picker and the session graph no longer derive a bus list of their own. Two bugs fell out of the old arrangement
 and are fixed: the TypeScript copy read `interfaces[]` for FrameLink but *not*
 for GVRET or virtual, so a probed 2-bus GVRET reached a multi-source session as
 one bus-0 mapping; and `resolve_source_config` synthesised a lone `device_bus: 0`
@@ -130,13 +129,25 @@ device bus through unchanged is what made the GVRET half invisible — the frame
 still arrived, un-remapped, while `available_buses` and `transmit_routes` never
 knew the bus existed.
 
+**Rust allocates a session's output buses.** `create_multi_source_session`
+and `add_source_to_session_cmd` take each source as `{profile_id, overrides?}`.
+`allocate_output_buses` lays the sources' buses end to end — the profile's
+declared buses, else as many as a cached multi-bus probe counted, else one —
+counting a disabled bus too so unticking it moves nothing, then applies the
+`BusOverride`s (enabled, output bus, protocol) the user set in the picker. An
+added source starts after the highest output bus the session already holds. The
+picker shows `preview_source_buses`, the same allocation for the same input, and
+the create returns what it allocated so the app labels each bus from it. The
+picker and the session manager used to count separately and could put two
+sources on one bus; `io/bus_mapping/ts-allocation-golden.json` pins where.
+
 **A bus carries a protocol, and its traits follow from it (2026-09-03).** Each
 `BusMapping` has a `protocol` — the *input*, set from the profile's saved value
 and overridable per session by the source picker's per-bus dropdown — alongside
 two *outputs* the frontend never sends: `traits`, always
 `traits::traits_for_protocol(protocol)`, and `supported_protocols`, the options
 the dropdown renders. `traits::normalise_bus_traits` re-derives both on the way
-in, on the session-create path (`resolve_source_config`) and the running-session
+in, on the session-create path (`allocate_output_buses`) and the running-session
 hot-swap (`io::update_source_bus_mappings`) alike, so a stale or hand-written
 traits blob cannot claim a capability the protocol beside it does not imply.
 Seven copies of the protocol→traits match had accumulated across `sessions.rs`
@@ -472,7 +483,7 @@ A device is an `IOProfile`, and it lives in one of two places:
 `settings::load_settings` (and `load_settings_sync`) call
 [`ephemeral::overlay`](../crates/wiretap-app/src/io/ephemeral.rs), which appends the
 ad-hoc devices to `io_profiles` on the way out; `save_settings` drops them again
-on the way in. So `choose_profile_by_id`, `resolve_source_config`, the broker
+on the way in. So `choose_profile_by_id`, `resolve_source_configs`, the broker
 spawner, `probe_device`, transmit, Modbus and MCP all resolve an ad-hoc device by
 id exactly as they resolve a saved one. The alternative — a resolver threaded
 through ~22 lookup sites, several returning a borrowed `&'a IOProfile` — is what

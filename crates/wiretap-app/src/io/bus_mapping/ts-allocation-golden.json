@@ -1,0 +1,377 @@
+{
+  "about": "The output buses the TypeScript picker and session manager assembled before T5, recorded by driving the picker with these profiles and probe results (selection passed in, as when the picker reopens). A capture is not listed: captures open on the single-source path, which never sent the picker's capture mappings, and a capture cannot share a selection with a live device.",
+  "profiles": [
+    {
+      "id": "gvret_cfg",
+      "kind": "gvret_tcp",
+      "connection": {
+        "host": "h",
+        "port": 23,
+        "interfaces": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "protocol": "can"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gvret_probed",
+      "kind": "gvret_tcp",
+      "connection": {
+        "host": "h2",
+        "port": 23
+      }
+    },
+    {
+      "id": "gs_a",
+      "kind": "gs_usb",
+      "connection": {
+        "bus": 1,
+        "address": 1
+      }
+    },
+    {
+      "id": "gs_b",
+      "kind": "gs_usb",
+      "connection": {
+        "bus": 1,
+        "address": 2
+      }
+    },
+    {
+      "id": "slcan_a",
+      "kind": "slcan",
+      "connection": {
+        "port": "/dev/a"
+      }
+    },
+    {
+      "id": "serial_a",
+      "kind": "serial",
+      "connection": {
+        "port": "/dev/s"
+      }
+    }
+  ],
+  "probes": {
+    "gvret_cfg": {
+      "is_multi_bus": true,
+      "bus_count": 2
+    },
+    "gvret_probed": {
+      "is_multi_bus": true,
+      "bus_count": 3
+    },
+    "gs_a": {
+      "is_multi_bus": false,
+      "bus_count": 2
+    },
+    "gs_b": {
+      "is_multi_bus": false,
+      "bus_count": 2
+    },
+    "slcan_a": {
+      "is_multi_bus": false,
+      "bus_count": 1
+    },
+    "serial_a": {
+      "is_multi_bus": false,
+      "bus_count": 1
+    }
+  },
+  "cases": [
+    {
+      "name": "one_can",
+      "selection": [
+        "slcan_a"
+      ],
+      "ts": {
+        "slcan_a": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "can0",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {}
+    },
+    {
+      "name": "two_gvret",
+      "selection": [
+        "gvret_cfg",
+        "gvret_probed"
+      ],
+      "ts": {
+        "gvret_cfg": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "can0",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can1",
+            "protocol": "can"
+          }
+        ],
+        "gvret_probed": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 2,
+            "interface_id": "can0",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "output_bus": 3,
+            "interface_id": "can1",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 2,
+            "enabled": true,
+            "output_bus": 4,
+            "interface_id": "can2",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {}
+    },
+    {
+      "name": "two_gvret_probed_first",
+      "selection": [
+        "gvret_probed",
+        "gvret_cfg"
+      ],
+      "ts": {
+        "gvret_probed": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "can0",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can1",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 2,
+            "enabled": true,
+            "output_bus": 2,
+            "interface_id": "can2",
+            "protocol": "can"
+          }
+        ],
+        "gvret_cfg": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can0",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "output_bus": 2,
+            "interface_id": "can1",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {},
+      "differs": {
+        "why": "The picker seeded gvret_cfg at offset 1, read before gvret_probed's probe counted three buses, so both sources claimed buses 1 and 2. Rust counts from the probe cache.",
+        "rust": {
+          "gvret_probed": [
+            0,
+            1,
+            2
+          ],
+          "gvret_cfg": [
+            3,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "gs_usb_two_channels",
+      "selection": [
+        "gs_a",
+        "gs_b"
+      ],
+      "ts": {
+        "gs_a": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "can0",
+            "protocol": "can"
+          }
+        ],
+        "gs_b": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can0",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {}
+    },
+    {
+      "name": "serial_and_can",
+      "selection": [
+        "serial_a",
+        "slcan_a"
+      ],
+      "ts": {
+        "serial_a": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "serial0",
+            "protocol": "serial"
+          }
+        ],
+        "slcan_a": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can0",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {}
+    },
+    {
+      "name": "overrides",
+      "selection": [
+        "gvret_cfg",
+        "slcan_a"
+      ],
+      "ts": {
+        "gvret_cfg": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 5,
+            "interface_id": "can0",
+            "protocol": "canfd"
+          },
+          {
+            "device_bus": 1,
+            "enabled": false,
+            "output_bus": 1,
+            "interface_id": "can1",
+            "protocol": "can"
+          }
+        ],
+        "slcan_a": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 3,
+            "interface_id": "can0",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {
+        "gvret_cfg": [
+          {
+            "device_bus": 0,
+            "output_bus": 5,
+            "protocol": "canfd"
+          },
+          {
+            "device_bus": 1,
+            "enabled": false
+          }
+        ],
+        "slcan_a": [
+          {
+            "device_bus": 0,
+            "output_bus": 3
+          }
+        ]
+      },
+      "differs": {
+        "why": "A GVRET bus set to CAN FD runs as classic CAN (T3 divergence 5); the picker sent canfd. The recording offered the dropdown through a mocked protocol table: the app's table gives GVRET classic CAN only, so it draws none.",
+        "rust_protocol": {
+          "gvret_cfg": [
+            "can",
+            "can"
+          ]
+        }
+      }
+    },
+    {
+      "name": "manager_only",
+      "selection": [
+        "gvret_cfg",
+        "slcan_a"
+      ],
+      "ts": {
+        "gvret_cfg": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "output_bus": 0,
+            "interface_id": "can0",
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "output_bus": 1,
+            "interface_id": "can1",
+            "protocol": "can"
+          }
+        ]
+      },
+      "overrides": {},
+      "differs": {
+        "why": "The manager filled only declared buses, so slcan_a reached Rust with no mappings and took output bus 1 from its source index, on top of gvret_cfg's second bus. Rust allocates once.",
+        "rust": {
+          "gvret_cfg": [
+            0,
+            1
+          ],
+          "slcan_a": [
+            2
+          ]
+        }
+      }
+    }
+  ]
+}

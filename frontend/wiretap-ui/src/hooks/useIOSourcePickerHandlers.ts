@@ -15,7 +15,7 @@ export interface DialogLoadOptions {
   startTime?: string;
   endTime?: string;
   maxFrames?: number;
-  busMappings?: Map<string, import("../api/io").BusMapping[]>;
+  busOverrides?: Map<string, import("../api/io").BusOverride[]>;
   perInterfaceFraming?: Map<string, import("../dialogs/io-source-picker").InterfaceFramingConfig>;
   /** Catalogue path to attach to the new session (decoder picker) */
   catalogPath?: string | null;

@@ -65,8 +65,7 @@ export function trailingCheckBytes(protocol: string | undefined): number {
 
 /**
  * The family a frame protocol belongs to for grouping: CAN FD frames share the
- * CAN tab and table. The inverse fold to `busProtocol`, which picks the single
- * protocol a *bus* runs as (FD wins); here a mixed classic/FD stream is one family.
+ * CAN tab and table, so a mixed classic/FD stream is one family.
  */
 export function protocolFamily(protocol: string): string {
   return protocol === "canfd" ? "can" : protocol;

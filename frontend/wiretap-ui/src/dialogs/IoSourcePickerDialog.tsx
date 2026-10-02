@@ -9,10 +9,8 @@ import { buildCatalogPath } from "../utils/catalogUtils";
 import {
   useProfileBusStore,
   profileBusMappings,
-  kindSupportedProtocols,
   isMultiBusProfile,
   isRealtimeProfile,
-  busProtocol,
 } from "../stores/profileBusStore";
 import { validateSourceSelection } from "../api/deviceKinds";
 import { useSessionStore } from "../stores/sessionStore";
@@ -35,11 +33,12 @@ import {
   destroyReaderSession,
   unregisterSessionSubscriber,
   probeDevice,
-  probedBusMappings,
+  previewSourceBuses,
   listActiveSessions,
   getProfilesUsage,
   type GvretDeviceInfo,
   type BusMapping,
+  type BusOverride,
   type ActiveSessionInfo,
   type DeviceProbeResult,
   type ProfileUsageInfo,
@@ -89,8 +88,8 @@ export interface LoadOptions {
   endTime?: string;
   /** Maximum number of frames to read (for all sources) */
   maxFrames?: number;
-  /** Bus mappings per profile (for multi-bus mode) - map from profile ID to bus mappings */
-  busMappings?: Map<string, BusMapping[]>;
+  /** What the user changed about each source's buses, keyed by profile ID */
+  busOverrides?: Map<string, BusOverride[]>;
   /** Per-interface framing config (for serial profiles in multi-bus mode) - map from profile ID to framing config */
   perInterfaceFraming?: Map<string, InterfaceFramingConfig>;
   /** Catalogue path to attach to the new session (decoder picker) */
@@ -175,30 +174,7 @@ type Props = {
   onCatalogSelect?: (path: string | null) => void;
 };
 
-/**
- * The buses a profile declares, shifted onto this source's output bus range.
- *
- * Rust is the authority (it reads the same `connection.interfaces` the readers
- * do). `probedBusCount` is only a seed for a device the backend has never seen
- * — an ad-hoc profile registered moments ago, or a cache not yet loaded.
- */
-function declaredBusMappings(
-  profileId: string,
-  outputBusOffset: number,
-  profileKind: string | undefined,
-  probedBusCount?: number,
-): BusMapping[] {
-  const declared = profileBusMappings(profileId, outputBusOffset);
-  return declared.length > 0
-    ? declared
-    : probedBusMappings(
-        probedBusCount || 1,
-        outputBusOffset,
-        kindSupportedProtocols(profileKind),
-      );
-}
-
-/** A capture's buses, one-to-one, as recorded classic CAN. */
+/** A capture's buses, one-to-one, as recorded. */
 function captureBusMappings(buses: number[]): BusMapping[] {
   return buses.map((bus) => ({
     device_bus: bus,
@@ -207,8 +183,20 @@ function captureBusMappings(buses: number[]): BusMapping[] {
     interface_id: `can${bus}`,
     protocol: "can",
     supported_protocols: [],
-    traits: { temporal_mode: "recorded", protocols: ["can", "canfd"], tx_frames: false, tx_bytes: false, multi_source: false },
+    traits: null,
   }));
+}
+
+/** The fields an edit changed against Rust's allocation, kept over earlier edits. */
+function editedOverrides(allocated: BusMapping[], edited: BusMapping[], earlier: BusOverride[] = []): BusOverride[] {
+  return edited.flatMap((next) => {
+    const was = allocated.find((m) => m.device_bus === next.device_bus);
+    const override: BusOverride = { ...earlier.find((o) => o.device_bus === next.device_bus), device_bus: next.device_bus };
+    if (next.enabled !== was?.enabled) override.enabled = next.enabled;
+    if (next.output_bus !== was?.output_bus) override.output_bus = next.output_bus;
+    if (next.protocol !== was?.protocol) override.protocol = next.protocol;
+    return Object.keys(override).length > 1 ? [override] : [];
+  });
 }
 
 export default function IoSourcePickerDialog({
@@ -285,7 +273,6 @@ export default function IoSourcePickerDialog({
   // Once the user picks or clears a decoder, stop auto-filling from a source's
   // preferred catalogue (so a deliberate clear isn't undone). Reset on open.
   const decoderUserTouchedRef = useRef(false);
-  // (Buffer bus config now uses shared deviceBusConfigMap / singleBusOverrideMap via probeDevice)
 
   // Currently checked IO reader (for single-select / non-multi-source-capable profiles)
   const [checkedSourceId, setCheckedReaderId] = useState<string | null>(null);
@@ -309,8 +296,10 @@ export default function IoSourcePickerDialog({
   // Multi-bus mode - per-profile maps for device probing and configuration
   const [deviceProbeResultMap, setDeviceProbeResultMap] = useState<Map<string, DeviceProbeResult>>(new Map());
   const [deviceProbeLoadingMap, setDeviceProbeLoadingMap] = useState<Map<string, boolean>>(new Map());
-  const [deviceBusConfigMap, setDeviceBusConfigMap] = useState<Map<string, BusMapping[]>>(new Map());
-  const [singleBusOverrideMap, setSingleBusOverrideMap] = useState<Map<string, number>>(new Map());
+  const [captureBusConfigMap, setCaptureBusConfigMap] = useState<Map<string, BusMapping[]>>(new Map());
+  // What the user changed about a source's buses, and Rust's allocation with those changes applied.
+  const [busOverrides, setBusOverrides] = useState<Map<string, BusOverride[]>>(new Map());
+  const [busAllocation, setBusAllocation] = useState<Map<string, BusMapping[]>>(new Map());
   // Per-profile framing config (for serial profiles in multi-bus mode)
   const [framingConfigMap, setFramingConfigMap] = useState<Map<string, InterfaceFramingConfig>>(new Map());
   // What a Modbus session should read. Session-level, like `modbusPollsJson`.
@@ -349,9 +338,7 @@ export default function IoSourcePickerDialog({
   const loadFrameCount = externalLoadFrameCount ?? 0;
   const loadError = externalLoadError ?? null;
 
-  // Probe a capture and populate the shared device maps.
-  // All captures go into deviceBusConfigMap (not singleBusOverrideMap) so the
-  // bus mapper always appears — even single-bus captures show "Bus 0 → Bus 0".
+  // Probe a capture. Even a single-bus capture gets a bus mapper ("Bus 0 → Bus 0").
   const probeCapture = useCallback(async (captureId: string) => {
     setDeviceProbeLoadingMap((prev) => new Map(prev).set(captureId, true));
     try {
@@ -360,7 +347,7 @@ export default function IoSourcePickerDialog({
       // Use actual bus numbers from capture metadata (may be non-sequential)
       const capture = captures.find((b) => b.id === captureId);
       const busList = capture?.buses?.length ? capture.buses : [0]; // default to bus 0
-      setDeviceBusConfigMap((prev) => new Map(prev).set(captureId, captureBusMappings(busList)));
+      setCaptureBusConfigMap((prev) => new Map(prev).set(captureId, captureBusMappings(busList)));
     } catch (err) {
       console.error(`[IoSourcePickerDialog] Buffer probe failed for ${captureId}:`, err);
       setDeviceProbeResultMap((prev) => new Map(prev).set(captureId, {
@@ -479,7 +466,7 @@ export default function IoSourcePickerDialog({
               .then((result) => {
                 setDeviceProbeResultMap((prev) => new Map(prev).set(matchingCapture.id, result));
                 const busList = matchingCapture.buses.length > 0 ? matchingCapture.buses : [0];
-                setDeviceBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, captureBusMappings(busList)));
+                setCaptureBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, captureBusMappings(busList)));
               })
               .catch(console.error);
           } else {
@@ -540,8 +527,8 @@ export default function IoSourcePickerDialog({
       // (capture probe results will be populated after listOrphanedCaptures completes)
       setDeviceProbeResultMap(new Map());
       setDeviceProbeLoadingMap(new Map());
-      setDeviceBusConfigMap(new Map());
-      setSingleBusOverrideMap(new Map());
+      setCaptureBusConfigMap(new Map());
+      setBusOverrides(new Map());
       setModbusPoll(DEFAULT_MODBUS_POLL_CONFIG);
       probedProfilesRef.current.clear();
     }
@@ -754,30 +741,11 @@ export default function IoSourcePickerDialog({
   // Multi-bus mode is active when at least one profile is selected in multi-select
   const isMultiBusMode = checkedSourceIds.length > 0;
 
-  // Rust owns which buses a profile declares; load it before the probe effect
-  // needs the counts. The store invalidates itself on settings changes, so this
-  // only refetches when the answer can actually have changed.
-  const profileBuses = useProfileBusStore((s) => s.mappings);
+  // The probe effect waits for Rust's profile table before it runs.
   const profileBusesLoaded = useProfileBusStore((s) => s.loaded);
   useEffect(() => {
     if (isOpen) void useProfileBusStore.getState().ensureLoaded();
   }, [isOpen]);
-
-  // First output bus for each selected realtime source: the running sum of the
-  // buses every preceding source claims, so two 2-bus devices land on 0,1 and
-  // 2,3 rather than colliding on 1.
-  const outputBusOffsets = useMemo(() => {
-    const offsets = new Map<string, number>();
-    let next = 0;
-    for (const id of checkedSourceIds) {
-      const profile = readProfiles.find((p) => p.id === id);
-      if (!profile || !isRealtimeProfile(profile)) continue;
-      offsets.set(id, next);
-      // A profile that declares nothing still has a real bus count once probed.
-      next += profileBuses.get(id)?.length ?? deviceProbeResultMap.get(id)?.bus_count ?? 1;
-    }
-    return offsets;
-  }, [checkedSourceIds, readProfiles, profileBuses, deviceProbeResultMap]);
 
   // Probe all real-time devices in multi-bus mode
   useEffect(() => {
@@ -802,8 +770,6 @@ export default function IoSourcePickerDialog({
       // No real-time profiles selected, clear the maps and ref
       setDeviceProbeResultMap(new Map());
       setDeviceProbeLoadingMap(new Map());
-      setDeviceBusConfigMap(new Map());
-      setSingleBusOverrideMap(new Map());
       probedProfilesRef.current.clear();
       return;
     }
@@ -819,28 +785,6 @@ export default function IoSourcePickerDialog({
     }
 
     setDeviceProbeResultMap((prev) => {
-      let changed = false;
-      const newMap = new Map(prev);
-      for (const key of newMap.keys()) {
-        if (!selectedSet.has(key)) {
-          newMap.delete(key);
-          changed = true;
-        }
-      }
-      return changed ? newMap : prev;
-    });
-    setDeviceBusConfigMap((prev) => {
-      let changed = false;
-      const newMap = new Map(prev);
-      for (const key of newMap.keys()) {
-        if (!selectedSet.has(key)) {
-          newMap.delete(key);
-          changed = true;
-        }
-      }
-      return changed ? newMap : prev;
-    });
-    setSingleBusOverrideMap((prev) => {
       let changed = false;
       const newMap = new Map(prev);
       for (const key of newMap.keys()) {
@@ -879,10 +823,6 @@ export default function IoSourcePickerDialog({
       const profile = readProfiles.find((p) => p.id === profileId);
       const isMultiBus = profile ? isMultiBusProfile(profile) : false;
 
-      // Output bus offset: cumulative across preceding sources, so a multi-bus
-      // device doesn't overlap the next source's buses.
-      const outputBusOffset = outputBusOffsets.get(profileId) ?? 0;
-
       if (isLive && !isStopped) {
         // Use default config for live session
         probedProfilesRef.current.add(profileId);
@@ -896,11 +836,6 @@ export default function IoSourcePickerDialog({
           supports_fd: null,
           error: null,
         }));
-        if (isMultiBus) {
-          setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, declaredBusMappings(profileId, outputBusOffset, profile?.kind)));
-        } else {
-          setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
-        }
         return;
       }
 
@@ -911,11 +846,6 @@ export default function IoSourcePickerDialog({
       probeDevice(profileId)
         .then((result) => {
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, result));
-          if (result.is_multi_bus) {
-            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, declaredBusMappings(profileId, outputBusOffset, profile?.kind, result.bus_count)));
-          } else {
-            setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
-          }
         })
         .catch((err) => {
           console.error(`[IoSourcePickerDialog] Probe failed for ${profileId}:`, err);
@@ -929,10 +859,6 @@ export default function IoSourcePickerDialog({
             supports_fd: null,
             error: String(err),
           }));
-          if (isMultiBus) {
-            // Probe failed — fall back to whatever the profile itself declares
-            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, declaredBusMappings(profileId, outputBusOffset, profile?.kind)));
-          }
         })
         .finally(() => {
           setDeviceProbeLoadingMap((prev) => {
@@ -945,7 +871,37 @@ export default function IoSourcePickerDialog({
     // Note: isProfileInUse and getSessionForProfile are stable store functions,
     // intentionally excluded from deps to prevent infinite loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, checkedSourceIds, readProfiles, outputBusOffsets, profileBusesLoaded]);
+  }, [isOpen, checkedSourceIds, readProfiles, profileBusesLoaded]);
+
+  // Rust allocates the selection's output buses. Asked again when a probe lands,
+  // since a probe is how Rust counts the buses of a profile that declares none.
+  const realtimeSourceIds = useMemo(
+    () => checkedSourceIds.filter((id) => {
+      const profile = readProfiles.find((p) => p.id === id);
+      return profile && isRealtimeProfile(profile);
+    }),
+    [checkedSourceIds, readProfiles, profileBusesLoaded]
+  );
+  // A source that leaves the selection forgets its edits, so re-ticking it starts from Rust's allocation.
+  useEffect(() => {
+    setBusOverrides((prev) => {
+      const kept = new Map([...prev].filter(([id]) => checkedSourceIds.includes(id)));
+      return kept.size === prev.size ? prev : kept;
+    });
+  }, [checkedSourceIds]);
+  useEffect(() => {
+    if (!isOpen || !profileBusesLoaded || realtimeSourceIds.length === 0) {
+      setBusAllocation(new Map());
+      return;
+    }
+    let current = true;
+    previewSourceBuses(realtimeSourceIds.map((id) => ({ profile_id: id, overrides: busOverrides.get(id) })))
+      .then((allocation) => current && setBusAllocation(allocation))
+      .catch((e) => console.error("[IoSourcePickerDialog] Bus preview failed:", e));
+    return () => {
+      current = false;
+    };
+  }, [isOpen, profileBusesLoaded, realtimeSourceIds, busOverrides, deviceProbeResultMap]);
 
   // Build load options from current state
   const buildLoadOptions = (speed: number): LoadOptions => {
@@ -1011,15 +967,7 @@ export default function IoSourcePickerDialog({
     // or fall back to checkedSourceId (when dialog reopens with capture pre-selected)
     const captureId = selectedCaptureId ?? checkedSourceId;
     if (!captureId) return;
-    const options = buildLoadOptions(selectedSpeed);
-    // Attach capture bus mappings from shared device config map
-    const captureMappings = deviceBusConfigMap.get(captureId);
-    if (captureMappings && captureMappings.length > 0) {
-      const busMappings = new Map<string, BusMapping[]>();
-      busMappings.set(captureId, captureMappings);
-      options.busMappings = busMappings;
-    }
-    onStartLoad?.(captureId, true, options);
+    onStartLoad?.(captureId, true, buildLoadOptions(selectedSpeed));
     onClose();
   };
 
@@ -1235,8 +1183,8 @@ export default function IoSourcePickerDialog({
     // Reset multi-bus device probe maps
     setDeviceProbeResultMap(new Map());
     setDeviceProbeLoadingMap(new Map());
-    setDeviceBusConfigMap(new Map());
-    setSingleBusOverrideMap(new Map());
+    setCaptureBusConfigMap(new Map());
+    setBusOverrides(new Map());
     // Off is the deliberate default — a range left ticked for the previous
     // device would start polling this one the moment you press Connect.
     setModbusPoll(DEFAULT_MODBUS_POLL_CONFIG);
@@ -1251,65 +1199,15 @@ export default function IoSourcePickerDialog({
     if (checkedSourceIds.length === 0) return;
     const options = buildLoadOptions(selectedSpeed);
 
-    // Build combined bus mappings from both GVRET and single-bus devices
-    const combinedBusMappings = new Map<string, BusMapping[]>();
-
-    // Add multi-bus device mappings (GVRET, FrameLink, virtual, etc.)
-    for (const [profileId, mappings] of deviceBusConfigMap.entries()) {
-      combinedBusMappings.set(profileId, mappings);
+    if (busOverrides.size > 0) {
+      options.busOverrides = busOverrides;
     }
-
-    // Convert single-bus device overrides to BusMapping format. No traits here:
-    // Rust derives them from `protocol` when the session is created, so anything
-    // built client-side would be discarded.
-    for (const [profileId, output_bus] of singleBusOverrideMap.entries()) {
-      const profile = readProfiles.find(p => p.id === profileId);
-      const protocol = busProtocol(profile);
-
-      combinedBusMappings.set(profileId, [{
-        device_bus: 0,
-        enabled: true,
-        output_bus,
-        // `can0` whether or not the bus runs FD — every other producer of an
-        // interface id spells it that way, and Session Manager carries this one
-        // forward when a bus is re-wired.
-        interface_id: protocol === "can" || protocol === "canfd" ? "can0" : `${protocol}0`,
-        protocol,
-        supported_protocols: [],
-        traits: null,
-      }]);
-    }
-
-    // Fallback: checked profiles not in either map get default bus mappings
-    // (e.g., modbus_tcp profiles that aren't GVRET or single-bus override devices)
-    for (const profileId of checkedSourceIds) {
-      if (!combinedBusMappings.has(profileId)) {
-        const profile = readProfiles.find(p => p.id === profileId);
-        if (profile) {
-          combinedBusMappings.set(
-            profileId,
-            profileBusMappings(profileId, outputBusOffsets.get(profileId) ?? 0),
-          );
-        }
-      }
-    }
-
-    options.busMappings = combinedBusMappings;
 
     // Pass per-interface framing configs (for serial profiles)
     if (framingConfigMap.size > 0) {
       options.perInterfaceFraming = framingConfigMap;
     }
 
-    console.log("[IoSourcePickerDialog] handleMultiConnectClick - bus mappings:", {
-      checkedSourceIds,
-      combinedBusMappingsSize: combinedBusMappings.size,
-      combinedBusMappingsEntries: Array.from(combinedBusMappings.entries()).map(([k, v]) => ({
-        profileId: k,
-        mappings: v,
-      })),
-      perInterfaceFramingSize: framingConfigMap.size,
-    });
     if (onStartMultiLoad) {
       onStartMultiLoad(checkedSourceIds, true, options);
     }
@@ -1555,31 +1453,15 @@ export default function IoSourcePickerDialog({
             const usageInfo = profileUsage.get(profileId);
             const configLocked = usageInfo?.config_locked ?? false;
 
-            // Collect output buses used by OTHER profiles for duplicate detection
-            const usedOutputBuses = new Set<number>();
-            for (const [otherId, otherConfig] of deviceBusConfigMap.entries()) {
-              if (otherId !== profileId) {
-                for (const mapping of otherConfig) {
-                  if (mapping.enabled) {
-                    usedOutputBuses.add(mapping.output_bus);
-                  }
-                }
-              }
-            }
-            for (const [otherId, otherBus] of singleBusOverrideMap.entries()) {
-              if (otherId !== profileId) {
-                usedOutputBuses.add(otherBus);
-              }
-            }
+            const busConfig = busAllocation.get(profileId) ?? [];
+            const usedOutputBuses = new Set(
+              [...busAllocation]
+                .filter(([otherId]) => otherId !== profileId)
+                .flatMap(([, mappings]) => mappings.filter((m) => m.enabled).map((m) => m.output_bus))
+            );
 
             // Multi-bus devices - show DeviceBusConfig
             if (isDeviceMultiBus || probeResult?.is_multi_bus) {
-              let busConfig = deviceBusConfigMap.get(profileId);
-              if (!busConfig && probeResult) {
-                const offset = outputBusOffsets.get(profileId) ?? 0;
-                busConfig = declaredBusMappings(profileId, offset, profile.kind, probeResult.bus_count);
-              }
-              busConfig = busConfig || [];
 
               // Counted off the rows themselves, or the "(n/m enabled)" header
               // disagrees with what is rendered under it.
@@ -1594,7 +1476,7 @@ export default function IoSourcePickerDialog({
                   error={probeResult?.error || null}
                   busConfig={busConfig}
                   onBusConfigChange={(config) => {
-                    setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, config));
+                    setBusOverrides((prev) => new Map(prev).set(profileId, editedOverrides(busConfig, config, prev.get(profileId))));
                   }}
                   compact
                   usedOutputBuses={usedOutputBuses}
@@ -1608,7 +1490,7 @@ export default function IoSourcePickerDialog({
             }
 
             // Single-bus devices - show SingleBusConfig
-            const busOverride = singleBusOverrideMap.get(profileId);
+            const singleBus = busConfig[0];
             const profileForKind = ioProfiles.find((p) => p.id === profileId);
             const profileKind = profileForKind?.kind;
             // Kept out of the map: the session already frames by the profile, so no override is sent.
@@ -1618,17 +1500,13 @@ export default function IoSourcePickerDialog({
                 probeResult={probeResult}
                 isLoading={isLoading}
                 error={probeResult?.error || null}
-                busOverride={busOverride}
-                onBusOverrideChange={(bus) => {
-                  setSingleBusOverrideMap((prev) => {
-                    const newMap = new Map(prev);
-                    if (bus === undefined) {
-                      newMap.delete(profileId);
-                    } else {
-                      newMap.set(profileId, bus);
-                    }
-                    return newMap;
-                  });
+                outputBus={singleBus?.output_bus}
+                onOutputBusChange={(bus) => {
+                  if (!singleBus) return;
+                  setBusOverrides((prev) => new Map(prev).set(
+                    profileId,
+                    editedOverrides(busConfig, [{ ...singleBus, output_bus: bus }], prev.get(profileId)),
+                  ));
                 }}
                 compact
                 usedBuses={usedOutputBuses}
@@ -1660,10 +1538,10 @@ export default function IoSourcePickerDialog({
               onClearAllCaptures={handleClearAllCaptures}
               onCaptureRenamed={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
               onCapturePersistenceChanged={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
-              busConfig={selectedCaptureId ? deviceBusConfigMap.get(selectedCaptureId) : undefined}
+              busConfig={selectedCaptureId ? captureBusConfigMap.get(selectedCaptureId) : undefined}
               onBusConfigChange={(config) => {
                 if (selectedCaptureId) {
-                  setDeviceBusConfigMap((prev) => new Map(prev).set(selectedCaptureId, config));
+                  setCaptureBusConfigMap((prev) => new Map(prev).set(selectedCaptureId, config));
                 }
               }}
               isProbing={selectedCaptureId ? deviceProbeLoadingMap.get(selectedCaptureId) ?? false : false}

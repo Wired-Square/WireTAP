@@ -13,10 +13,11 @@ use crate::{
         reconfigure_session, register_subscriber, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
         stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
-        evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, set_source_polling, get_session_source_count,
+        evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, set_source_polling, get_session_next_output_bus,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
         SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, Protocol, TemporalMode,
+        bus_mapping::{apply_bus_overrides, BusOverride},
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusRangeSpec, PollGroup,
         MqttConfig, MqttSource,
@@ -1523,10 +1524,8 @@ pub async fn add_source_to_session_cmd(
         .await
         .map_err(|e| format!("Failed to load settings: {}", e))?;
 
-    // Determine next source index from existing configs (for auto-assigning output bus)
-    let existing_count = get_session_source_count(&session_id).await;
-
-    let source_config = resolve_source_config(source, existing_count, &settings)?;
+    let first_output_bus = get_session_next_output_bus(&session_id).await;
+    let source_config = resolve_source_configs(vec![source], &settings, first_output_bus)?.remove(0);
 
     // Validate it's a real-time device
     if !device_kinds::is_multi_source(&source_config.profile_kind) {
@@ -2224,65 +2223,128 @@ pub async fn probe_device(
 // Multi-Source Session Commands
 // ============================================================================
 
-/// Source configuration for multi-source session creation (TypeScript-friendly version)
+/// One source of a multi-source session, as the picker names it. Rust allocates
+/// its output buses; `overrides` carries what the user changed about them.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MultiSourceInput {
-    /// Profile ID for this source
     pub profile_id: String,
     /// Display name for this source (optional, defaults to profile name)
     #[cfg_attr(test, ts(optional))]
     pub display_name: Option<String>,
-    /// Bus mappings for this source
-    pub bus_mappings: Vec<BusMapping>,
+    #[cfg_attr(test, ts(optional))]
+    pub overrides: Option<Vec<BusOverride>>,
     /// Serial framing for this source, overriding the device profile. Flattened,
     /// so the wire shape stays the flat keys the frontend has always sent.
     #[serde(flatten)]
     pub serial: SerialOverrides,
 }
 
-/// Convert a MultiSourceInput to a SourceConfig, resolving profile name and kind from settings.
-/// `source_idx` is used for auto-assigning output bus numbers when no mappings are provided.
-fn resolve_source_config(
-    input: MultiSourceInput,
-    source_idx: usize,
-    settings: &AppSettings,
-) -> Result<SourceConfig, String> {
-    let profile = settings
-        .io_profiles
+/// What a multi-source session opened, and the buses Rust gave each source.
+#[derive(Debug, Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct MultiSourceSession {
+    pub capabilities: IOCapabilities,
+    pub bus_mappings: HashMap<String, Vec<BusMapping>>,
+}
+
+/// A multi-bus probe's bus count, for a profile that declares none of its own.
+fn cached_probed_bus_count(profile_id: &str) -> Option<u8> {
+    get_cached_probe(profile_id).filter(|p| p.is_multi_bus).map(|p| p.bus_count)
+}
+
+/// The buses a source opens with: what its profile declares, else as many as a
+/// probe counted, else its kind's default.
+fn source_bus_mappings(profile: &IOProfile, probed_bus_count: Option<u8>) -> Vec<BusMapping> {
+    match probed_bus_count.filter(|&n| n > 1 && !declares_buses(profile)) {
+        Some(count) => {
+            let mut mappings = io::bus_mapping::default_bus_mappings(count.min(io::gvret::MAX_BUSES));
+            for m in &mut mappings {
+                m.supported_protocols = supported_protocols_for_kind(&profile.kind).to_vec();
+            }
+            mappings
+        }
+        None => profile_bus_mappings(profile),
+    }
+}
+
+/// Lay each source's buses end to end from `first_output_bus`, then apply what
+/// the user overrode. Every bus is counted, ticked or not, so unticking one does
+/// not move the sources after it.
+pub fn allocate_output_buses<'a>(
+    sources: impl IntoIterator<Item = (&'a IOProfile, &'a [BusOverride])>,
+    first_output_bus: u8,
+    probed_bus_count: impl Fn(&str) -> Option<u8>,
+) -> Vec<Vec<BusMapping>> {
+    let mut next = first_output_bus;
+    sources
+        .into_iter()
+        .map(|(profile, overrides)| {
+            let mut mappings = offset_bus_mappings(source_bus_mappings(profile, probed_bus_count(&profile.id)), next);
+            next = next.saturating_add(mappings.len() as u8);
+            apply_bus_overrides(&mut mappings, overrides);
+            io::traits::normalise_bus_traits(&mut mappings, &profile.kind);
+            mappings
+        })
+        .collect()
+}
+
+fn allocate_inputs<'a>(
+    inputs: &[MultiSourceInput],
+    settings: &'a AppSettings,
+    first_output_bus: u8,
+) -> Result<Vec<(&'a IOProfile, Vec<BusMapping>)>, String> {
+    let profiles = inputs
         .iter()
-        .find(|p| p.id == input.profile_id)
-        .ok_or_else(|| format!("Profile '{}' not found", input.profile_id))?;
-    refuse_at_start(profile)?;
+        .map(|i| settings.profile(&i.profile_id))
+        .collect::<Result<Vec<_>, _>>()?;
+    let overrides = inputs.iter().map(|i| i.overrides.as_deref().unwrap_or_default());
+    let buses = allocate_output_buses(profiles.iter().copied().zip(overrides), first_output_bus, cached_probed_bus_count);
+    Ok(profiles.into_iter().zip(buses).collect())
+}
 
-    let display_name = input.display_name.unwrap_or_else(|| profile.name.clone());
-    let profile_kind = profile.kind.clone();
+/// Resolve the picker's sources against settings, allocating their output buses
+/// from `first_output_bus`.
+fn resolve_source_configs(
+    inputs: Vec<MultiSourceInput>,
+    settings: &AppSettings,
+    first_output_bus: u8,
+) -> Result<Vec<SourceConfig>, String> {
+    let allocated = allocate_inputs(&inputs, settings, first_output_bus)?;
+    for (profile, _) in &allocated {
+        refuse_at_start(profile)?;
+    }
+    Ok(inputs
+        .into_iter()
+        .zip(allocated)
+        .map(|(input, (profile, bus_mappings))| {
+            let mut config = SourceConfig {
+                profile_id: input.profile_id,
+                profile_kind: profile.kind.clone(),
+                display_name: input.display_name.unwrap_or_else(|| profile.name.clone()),
+                bus_mappings,
+                ..SourceConfig::default()
+            };
+            // A multi-source serial interface the picker left alone arrives with no
+            // framing either, and the broker reads this config the same way.
+            apply_serial_overrides(&mut config, profile, input.serial);
+            config
+        })
+        .collect())
+}
 
-    // Use provided bus mappings, or fall back to the profile's declared buses.
-    // A lone bus-0 guess here is what dropped a multi-bus device's other buses.
-    let mut bus_mappings = if input.bus_mappings.is_empty() {
-        let mappings = offset_bus_mappings(profile_bus_mappings(profile), source_idx as u8);
-        tlog!(
-            "[resolve_source_config] Source {} '{}' has no bus mappings, using {} declared bus(es)",
-            source_idx, display_name, mappings.len()
-        );
-        mappings
-    } else {
-        input.bus_mappings
-    };
-    io::traits::normalise_bus_traits(&mut bus_mappings, &profile_kind);
-
-    let mut config = SourceConfig {
-        profile_id: input.profile_id,
-        profile_kind,
-        display_name,
-        bus_mappings,
-        ..SourceConfig::default()
-    };
-    // A multi-source serial interface the picker left alone arrives with no
-    // framing either, and the broker reads this config the same way.
-    apply_serial_overrides(&mut config, profile, input.serial);
-    Ok(config)
+/// The buses `create_multi_source_session` would give these sources, for the
+/// picker to show before anything opens.
+#[tauri::command(rename_all = "snake_case")]
+pub fn preview_source_buses(
+    app: tauri::AppHandle,
+    sources: Vec<MultiSourceInput>,
+) -> Result<HashMap<String, Vec<BusMapping>>, String> {
+    let settings = settings::load_settings_sync(&app)?;
+    Ok(allocate_inputs(&sources, &settings, 0)?
+        .into_iter()
+        .map(|(profile, buses)| (profile.id.clone(), buses))
+        .collect())
 }
 
 /// Create a multi-source reader session that combines frames from multiple devices.
@@ -2301,7 +2363,7 @@ pub async fn create_multi_source_session(
     subscriber_id: Option<String>,
     app_name: Option<String>,
     modbus_polls: Option<String>,
-) -> Result<IOCapabilities, String> {
+) -> Result<MultiSourceSession, String> {
     if sources.is_empty() {
         return Err("At least one source is required".to_string());
     }
@@ -2311,12 +2373,7 @@ pub async fn create_multi_source_session(
         .map_err(|e| format!("Failed to load settings: {}", e))?;
 
     let parsed_polls = parse_modbus_polls(modbus_polls.as_deref())?;
-
-    // Convert MultiSourceInput to SourceConfig
-    let mut source_configs: Vec<SourceConfig> = Vec::with_capacity(sources.len());
-    for (source_idx, input) in sources.into_iter().enumerate() {
-        source_configs.push(resolve_source_config(input, source_idx, &settings)?);
-    }
+    let mut source_configs = resolve_source_configs(sources, &settings, 0)?;
 
     for config in &mut source_configs {
         attach_modbus_polls(config, &parsed_polls, settings.modbus_max_register_errors);
@@ -2364,6 +2421,7 @@ pub async fn create_multi_source_session(
         .map(|c| c.display_name.clone())
         .collect();
     let stored_configs = source_configs.clone();
+    let bus_mappings = source_configs.iter().map(|c| (c.profile_id.clone(), c.bus_mappings.clone())).collect();
     let reader = IOBroker::new(app.clone(), session_id.clone(), source_configs)?;
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
@@ -2404,7 +2462,7 @@ pub async fn create_multi_source_session(
         }
     }
 
-    Ok(result.capabilities)
+    Ok(MultiSourceSession { capabilities: result.capabilities, bus_mappings })
 }
 
 // ============================================================================
@@ -2985,9 +3043,8 @@ mod bus_mapping_tests {
     }
 
     // ── session creation ────────────────────────────────────────────────────
-    // resolve_source_config is the funnel every multi-source session goes
-    // through. What it does with an *empty* bus_mappings is what silently
-    // dropped a multi-bus device's extra buses.
+    // resolve_source_configs is the funnel every multi-source session goes
+    // through, and allocate_output_buses the one count of its output buses.
 
     fn settings_with(profiles: Vec<IOProfile>) -> AppSettings {
         let mut settings = AppSettings::default();
@@ -2995,44 +3052,40 @@ mod bus_mapping_tests {
         settings
     }
 
-    fn input_for(profile_id: &str, bus_mappings: serde_json::Value) -> MultiSourceInput {
-        serde_json::from_value(json!({
-            "profile_id": profile_id,
-            "display_name": null,
-            "bus_mappings": bus_mappings,
+    fn input_for(profile_id: &str, overrides: serde_json::Value) -> MultiSourceInput {
+        serde_json::from_value(json!({ "profile_id": profile_id, "overrides": overrides }))
+            .expect("MultiSourceInput should deserialise")
+    }
+
+    fn two_bus_gvret() -> IOProfile {
+        gvret(json!({
+            "interfaces": [
+                { "device_bus": 0, "enabled": true, "protocol": "can" },
+                { "device_bus": 1, "enabled": true, "protocol": "can" },
+            ]
         }))
-        .expect("MultiSourceInput should deserialise")
     }
 
-    fn resolve(profile: IOProfile, bus_mappings: serde_json::Value, source_idx: usize) -> SourceConfig {
+    fn resolve(profile: IOProfile, overrides: serde_json::Value, first_output_bus: u8) -> SourceConfig {
         let id = profile.id.clone();
-        let settings = settings_with(vec![profile]);
-        resolve_source_config(input_for(&id, bus_mappings), source_idx, &settings)
+        resolve_source_configs(vec![input_for(&id, overrides)], &settings_with(vec![profile]), first_output_bus)
             .expect("profile is present, so this resolves")
+            .remove(0)
+    }
+
+    fn output_buses(mappings: &[BusMapping]) -> Vec<u8> {
+        mappings.iter().map(|m| m.output_bus).collect()
     }
 
     #[test]
-    fn no_mappings_falls_back_to_every_bus_the_profile_declares() {
-        let config = resolve(
-            gvret(json!({
-                "interfaces": [
-                    { "device_bus": 0, "enabled": true, "protocol": "can" },
-                    { "device_bus": 1, "enabled": true, "protocol": "can" },
-                ]
-            })),
-            json!([]),
-            0,
-        );
-
+    fn a_source_opens_every_bus_the_profile_declares() {
+        let config = resolve(two_bus_gvret(), json!([]), 0);
         assert_eq!(config.bus_mappings.len(), 2, "a 2-bus device must not resolve to one bus");
-        assert_eq!(
-            config.bus_mappings.iter().map(|m| m.device_bus).collect::<Vec<_>>(),
-            vec![0, 1]
-        );
+        assert_eq!(config.bus_mappings.iter().map(|m| m.device_bus).collect::<Vec<_>>(), vec![0, 1]);
     }
 
     #[test]
-    fn no_mappings_keeps_framelink_interfaces_too() {
+    fn framelink_interfaces_are_kept_too() {
         // Regression: this path consulted a GVRET-only parser, so FrameLink fell
         // through to a hand-rolled single bus 0 even though its interfaces were
         // right there in the profile.
@@ -3047,57 +3100,76 @@ mod bus_mapping_tests {
             json!([]),
             0,
         );
-
         assert_eq!(config.bus_mappings.len(), 3);
         assert_eq!(config.bus_mappings[2].interface_id, "serial2");
     }
 
     #[test]
-    fn a_second_source_does_not_land_on_the_first_ones_buses() {
-        let config = resolve(
-            gvret(json!({
-                "interfaces": [
-                    { "device_bus": 0, "enabled": true, "protocol": "can" },
-                    { "device_bus": 1, "enabled": true, "protocol": "can" },
-                ]
-            })),
-            json!([]),
-            1,
-        );
-
-        assert_eq!(
-            config.bus_mappings.iter().map(|m| m.output_bus).collect::<Vec<_>>(),
-            vec![1, 2],
-            "source 1 starts at output bus 1, and its second bus follows on"
-        );
+    fn sources_are_laid_end_to_end_by_bus_count_not_source_index() {
+        let mut slcan = profile("slcan", json!({}));
+        slcan.id = "p-slcan".into();
+        let settings = settings_with(vec![two_bus_gvret(), slcan]);
+        let configs = resolve_source_configs(
+            vec![input_for("p-gvret_tcp", json!([])), input_for("p-slcan", json!([]))],
+            &settings,
+            0,
+        )
+        .unwrap();
+        assert_eq!(output_buses(&configs[0].bus_mappings), vec![0, 1]);
+        assert_eq!(output_buses(&configs[1].bus_mappings), vec![2], "source 1 starts after source 0's two buses");
     }
 
     #[test]
-    fn explicit_mappings_from_the_picker_win_untouched() {
-        // The picker resolves buses itself (probe included), so whatever it
-        // sends is authoritative — including a deliberate remap and a bus the
-        // user unticked for this session only.
+    fn a_source_added_to_a_session_starts_after_its_buses() {
+        assert_eq!(output_buses(&resolve(two_bus_gvret(), json!([]), 3).bus_mappings), vec![3, 4]);
+    }
+
+    #[test]
+    fn the_users_overrides_are_applied_over_the_allocation() {
         let config = resolve(
-            gvret(json!({
-                "interfaces": [
-                    { "device_bus": 0, "enabled": true, "protocol": "can" },
-                    { "device_bus": 1, "enabled": true, "protocol": "can" },
-                ]
-            })),
+            two_bus_gvret(),
             json!([
-                { "device_bus": 0, "enabled": true, "output_bus": 4 },
-                { "device_bus": 1, "enabled": false, "output_bus": 5 },
+                { "device_bus": 0, "output_bus": 4 },
+                { "device_bus": 1, "enabled": false },
+                { "device_bus": 7, "enabled": false },
             ]),
             0,
         );
-
-        assert_eq!(config.bus_mappings.len(), 2);
-        assert_eq!(config.bus_mappings[0].output_bus, 4);
+        assert_eq!(output_buses(&config.bus_mappings), vec![4, 1]);
         assert!(!config.bus_mappings[1].enabled);
     }
 
     #[test]
-    fn a_profile_that_declares_nothing_still_resolves_to_one_bus() {
+    fn a_gvret_bus_offers_no_protocol_but_classic_can() {
+        let probed = allocate_output_buses([(&gvret(json!({})), &[][..])], 0, |_| Some(2));
+        for bus in profile_bus_mappings(&two_bus_gvret()).iter().chain(&probed[0]) {
+            assert_eq!(bus.supported_protocols, vec![Protocol::Can], "the dropdown must not offer what runs as CAN");
+        }
+    }
+
+    #[test]
+    fn an_unticked_bus_still_holds_its_place() {
+        let gvret = two_bus_gvret();
+        let slcan = profile("slcan", json!({}));
+        let unticked = [BusOverride { device_bus: 1, enabled: Some(false), ..Default::default() }];
+        let buses = allocate_output_buses([(&gvret, &unticked[..]), (&slcan, &[][..])], 0, |_| None);
+        assert_eq!(output_buses(&buses[1]), vec![2]);
+    }
+
+    #[test]
+    fn a_probe_counts_the_buses_of_a_profile_that_declares_none() {
+        let bare = gvret(json!({ "host": "127.0.0.1", "port": "2323" }));
+        let buses = allocate_output_buses([(&bare, &[][..])], 0, |_| Some(3));
+        assert_eq!(output_buses(&buses[0]), vec![0, 1, 2]);
+        assert_eq!(buses[0][2].interface_id, "can2");
+
+        let declared = two_bus_gvret();
+        let buses = allocate_output_buses([(&declared, &[][..])], 0, |_| Some(3));
+        assert_eq!(buses[0].len(), 2, "what the profile declares outranks a probe");
+    }
+
+    #[test]
+    fn a_profile_that_declares_nothing_and_was_never_probed_opens_one_bus() {
         let config = resolve(gvret(json!({ "host": "127.0.0.1", "port": "2323" })), json!([]), 0);
         assert_eq!(config.bus_mappings.len(), 1);
         assert_eq!(config.bus_mappings[0].device_bus, 0);
@@ -3105,8 +3177,61 @@ mod bus_mapping_tests {
 
     #[test]
     fn an_unknown_profile_is_an_error_not_a_default_session() {
-        let settings = settings_with(vec![]);
-        assert!(resolve_source_config(input_for("io_missing", json!([])), 0, &settings).is_err());
+        assert!(resolve_source_configs(vec![input_for("io_missing", json!([]))], &settings_with(vec![]), 0).is_err());
+    }
+
+    /// The TypeScript assembly's answers, taken before it was deleted. Rust
+    /// matches each case except where the case names why it differs.
+    #[test]
+    fn rust_allocates_what_the_typescript_assembly_did_bar_its_named_bugs() {
+        let golden: serde_json::Value =
+            serde_json::from_str(include_str!("io/bus_mapping/ts-allocation-golden.json")).unwrap();
+        let profiles: Vec<IOProfile> = golden["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| {
+                let mut profile = profile(p["kind"].as_str().unwrap(), p["connection"].clone());
+                profile.id = p["id"].as_str().unwrap().into();
+                profile
+            })
+            .collect();
+        let probed = |id: &str| {
+            let probe = &golden["probes"][id];
+            probe["is_multi_bus"].as_bool().unwrap().then(|| probe["bus_count"].as_u64().unwrap() as u8)
+        };
+
+        for case in golden["cases"].as_array().unwrap() {
+            let name = case["name"].as_str().unwrap();
+            let ids: Vec<&str> = case["selection"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+            let overrides: Vec<Vec<BusOverride>> = ids
+                .iter()
+                .map(|id| serde_json::from_value(case["overrides"].get(*id).cloned().unwrap_or(json!([]))).unwrap())
+                .collect();
+            let sources = ids.iter().zip(&overrides).map(|(id, o)| (profiles.iter().find(|p| p.id == *id).unwrap(), o.as_slice()));
+            let ours = allocate_output_buses(sources, 0, probed);
+
+            for (id, buses) in ids.iter().zip(&ours) {
+                if let Some(rust) = case["differs"]["rust"].get(*id) {
+                    assert_eq!(json!(output_buses(buses)), *rust, "{name}: {id} output buses");
+                    continue;
+                }
+                let ts = case["ts"][*id].as_array().unwrap();
+                assert_eq!(buses.len(), ts.len(), "{name}: {id} bus count");
+                for (m, t) in buses.iter().zip(ts) {
+                    assert_eq!(m.output_bus as u64, t["output_bus"].as_u64().unwrap(), "{name}: {id}");
+                    assert_eq!(m.device_bus as u64, t["device_bus"].as_u64().unwrap(), "{name}: {id}");
+                    assert_eq!(m.enabled, t["enabled"].as_bool().unwrap(), "{name}: {id}");
+                    assert_eq!(m.interface_id, t["interface_id"].as_str().unwrap(), "{name}: {id}");
+                }
+                let protocols: Vec<serde_json::Value> = buses.iter().map(|m| json!(m.protocol)).collect();
+                let expected = case["differs"]["rust_protocol"]
+                    .get(*id)
+                    .cloned()
+                    .unwrap_or_else(|| json!(ts.iter().map(|m| m["protocol"].clone()).collect::<Vec<_>>()));
+                assert_eq!(json!(protocols), expected, "{name}: {id} protocols");
+            }
+        }
     }
 }
 

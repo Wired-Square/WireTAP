@@ -1,23 +1,16 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { BusMapping } from "./BusMapping";
+import type { BusOverride } from "./BusOverride";
 import type { FramingMode } from "./FramingMode";
 
 /**
- * Source configuration for multi-source session creation (TypeScript-friendly version)
+ * One source of a multi-source session, as the picker names it. Rust allocates
+ * its output buses; `overrides` carries what the user changed about them.
  */
-export type MultiSourceInput = { 
-/**
- * Profile ID for this source
- */
-profile_id: string, 
+export type MultiSourceInput = { profile_id: string, 
 /**
  * Display name for this source (optional, defaults to profile name)
  */
-display_name?: string, 
-/**
- * Bus mappings for this source
- */
-bus_mappings: Array<BusMapping>, 
+display_name?: string, overrides?: Array<BusOverride>, 
 /**
  * Framing encoding for serial sources (overrides profile settings if provided)
  */

@@ -25,13 +25,13 @@ import {
 
 // Re-export for backward compatibility
 export { isCaptureProfileId };
-import type { BusMapping, FramingMode, PlaybackPosition } from "../api/io";
+import type { BusOverride, FramingMode, PlaybackPosition } from "../api/io";
 import type { EventOwner } from "../api/captureEvents";
 import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
 import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
-import { useProfileBusStore, profileBusMappings, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
+import { useProfileBusStore, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { WINDOW_EVENTS } from "../events/registry";
 
@@ -77,7 +77,8 @@ export interface LoadOptions {
   modbusAllowBroadcast?: boolean;
   modbusAnyFunction?: boolean;
   busOverride?: number;
-  busMappings?: Map<string, BusMapping[]>;
+  /** What the user changed about each profile's buses, keyed by profile ID */
+  busOverrides?: Map<string, BusOverride[]>;
   /** Per-interface framing config (for serial profiles in multi-bus mode) */
   perInterfaceFraming?: Map<string, InterfaceFramingConfig>;
   /** Override session ID (for ingest mode where we need to set refs before async work) */
@@ -736,7 +737,7 @@ export function useIOSessionManager(
     opts: LoadOptions
   ) => {
     const {
-      busMappings,
+      busOverrides,
       framingEncoding,
       delimiter,
       maxFrameLength,
@@ -752,23 +753,6 @@ export function useIOSessionManager(
       sessionIdOverride,
     } = opts;
 
-    // Ensure every profile has bus mappings (fill defaults for any missing).
-    // Rust owns which buses a profile declares, so wait for that to be loaded
-    // rather than guessing a single bus 0 here.
-    await useProfileBusStore.getState().ensureLoaded();
-    const effectiveBusMappings = new Map(busMappings ?? []);
-    let nextOutputBus = 0;
-    for (const mappings of effectiveBusMappings.values()) {
-      for (const m of mappings) nextOutputBus = Math.max(nextOutputBus, m.output_bus + 1);
-    }
-    for (const profileId of profileIds) {
-      if (effectiveBusMappings.has(profileId)) continue;
-      const declared = profileBusMappings(profileId, nextOutputBus);
-      if (declared.length === 0) continue;
-      effectiveBusMappings.set(profileId, declared);
-      nextOutputBus += declared.length;
-    }
-
     const sessionId = sessionIdOverride ?? await sourcesSessionId(profileIds, emitRawBytes);
 
     const createOptions: CreateMultiSourceOptions = {
@@ -776,7 +760,7 @@ export function useIOSessionManager(
       subscriberId: session.subscriberId,
       appName,
       profileIds,
-      busMappings: effectiveBusMappings,
+      busOverrides,
       // Resolved at call time for the same reason busToSource is below: a
       // device registered moments ago is not in the prop array's closure yet.
       profileNames: new Map(profileIds.map((id) => [id, findProfile(id)?.name ?? id])),
@@ -804,13 +788,13 @@ export function useIOSessionManager(
     // Stamped first: registering here is what makes Rust destroy the session
     // this app is leaving.
     session.markSessionSwitch(sessionId);
-    await createAndStartMultiSourceSession(createOptions);
+    const { busMappings } = await createAndStartMultiSourceSession(createOptions);
 
     // Build output bus → source mapping. Names come from `findProfile`, not the
     // prop array: a device registered moments ago in the picker is not in that
     // closure yet, and the bus would be labelled with its raw id.
     const busToSource = new Map<number, BusSourceInfo>();
-    for (const [profileId, mappings] of effectiveBusMappings) {
+    for (const [profileId, mappings] of busMappings) {
       const profileName = findProfile(profileId)?.name ?? profileId;
       for (const mapping of mappings) {
         if (mapping.enabled) {
@@ -918,8 +902,6 @@ export function useIOSessionManager(
         onBeforeMultiWatch?.();
       }
 
-      // startMultiBusSession fills in any missing mappings from the profile's
-      // declared bus list, so a single profile needs nothing special here.
       await startMultiBusSession(profileIds, opts);
     }
 

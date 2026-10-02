@@ -17,7 +17,6 @@ import { listen } from "@tauri-apps/api/event";
 import {
   getProfileBusMappings,
   getSupportedProtocols,
-  offsetBusMappings,
   type BusMapping,
   type Protocol,
 } from "../api/io";
@@ -106,30 +105,14 @@ void listen(WINDOW_EVENTS.SETTINGS_CHANGED, () => {
 });
 
 /**
- * A profile's declared bus mappings, shifted onto an output bus range.
+ * A profile's declared bus mappings, output buses numbered from 0.
  *
  * Empty both before the cache loads and for a profile that declares no buses
  * at all — a GVRET saved before anyone pressed Probe carries only host and
  * port. Empty means "ask the device", not "one bus".
  */
-export function profileBusMappings(profileId: string, outputBusOffset = 0): BusMapping[] {
-  const declared = useProfileBusStore.getState().mappings.get(profileId);
-  return declared ? offsetBusMappings(declared, outputBusOffset) : [];
-}
-
-/**
- * The protocols a bus of this profile kind may be set to.
- *
- * Empty before the cache loads and for a kind with nothing to offer; fewer than
- * two entries means the choice is already made and no dropdown is drawn.
- *
- * The imperative read, for callers already inside a `getState()` flow. A React
- * component wants `useKindSupportedProtocols` instead — this one neither loads
- * the cache nor re-renders when it arrives.
- */
-export function kindSupportedProtocols(kind: string | undefined): Protocol[] {
-  if (!kind) return [];
-  return useProfileBusStore.getState().supportedProtocols.get(kind) ?? [];
+export function profileBusMappings(profileId: string): BusMapping[] {
+  return useProfileBusStore.getState().mappings.get(profileId) ?? [];
 }
 
 /**
@@ -202,7 +185,3 @@ export function isMultiBusProfile(profile: ProfileRef): boolean {
   return profileTraits(profile)?.multi_bus ?? false;
 }
 
-/** The protocol a single-bus profile's one bus carries. */
-export function busProtocol(profile: ProfileRef | undefined): Protocol {
-  return (profile && profileTraits(profile)?.bus_protocol) || "can";
-}

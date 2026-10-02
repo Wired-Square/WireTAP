@@ -1763,14 +1763,17 @@ pub async fn get_session_joiner_count(session_id: &str) -> usize {
     }
 }
 
-/// Get the number of source configs in a multi-source session.
-/// Returns 0 if the session doesn't exist or isn't a multi-source session.
-pub async fn get_session_source_count(session_id: &str) -> usize {
+/// The first output bus no source of this session has claimed, disabled buses included.
+pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
     let sessions = IO_SESSIONS.lock().await;
     sessions
         .get(session_id)
         .and_then(|s| s.source.broker_configs())
-        .map(|c| c.len())
+        .into_iter()
+        .flatten()
+        .flat_map(|c| c.bus_mappings)
+        .map(|m| m.output_bus.saturating_add(1))
+        .max()
         .unwrap_or(0)
 }
 

@@ -8,19 +8,8 @@
 // un-remapped), so only the graph and the bus selector ever showed the loss.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  offsetBusMappings,
-  probedBusMappings,
-  type ActiveSessionInfo,
-  type BusMapping,
-} from "../api/io";
-import {
-  useProfileBusStore,
-  profileBusMappings,
-  kindSupportedProtocols,
-  busProtocol,
-} from "../stores/profileBusStore";
-import { SERVED_KINDS, traits } from "./fixtures/profileTraits";
+import type { ActiveSessionInfo, BusMapping } from "../api/io";
+import { useProfileBusStore, profileBusMappings } from "../stores/profileBusStore";
 import { buildSessionGraph } from "../apps/session-manager/utils/layoutUtils";
 import type { SourceNodeData } from "../apps/session-manager/nodes/SourceNode";
 import type { SessionNodeData } from "../apps/session-manager/nodes/SessionNode";
@@ -68,25 +57,10 @@ const sourceData = (graph: ReturnType<typeof buildSessionGraph>, profileId: stri
 const sessionData = (graph: ReturnType<typeof buildSessionGraph>, sessionId: string) =>
   graph.nodes.find((n) => n.id === `session-${sessionId}`)?.data as SessionNodeData;
 
-describe("offsetBusMappings", () => {
-  const declared = [mapping(0, 0), mapping(1, 1)];
-
-  it("is identity at offset 0, reference included", () => {
-    expect(offsetBusMappings(declared, 0)).toBe(declared);
-  });
-
-  it("shifts output buses without touching device buses", () => {
-    const shifted = offsetBusMappings(declared, 2);
-    expect(shifted.map((m) => m.output_bus)).toEqual([2, 3]);
-    expect(shifted.map((m) => m.device_bus)).toEqual([0, 1]);
-  });
-});
-
 describe("profileBusStore accessors", () => {
   beforeEach(() => {
     useProfileBusStore.setState({
       mappings: new Map([["io_declared", [mapping(0, 0), mapping(1, 1)]]]),
-      supportedProtocols: new Map([["gvret_tcp", ["can", "canfd"]]]),
       loaded: true,
     });
   });
@@ -99,33 +73,6 @@ describe("profileBusStore accessors", () => {
     // Rust omits these, so the caller can prefer a live probe. Answering "one
     // bus" here is what let a stale guess outrank a probe that found two.
     expect(profileBusMappings("io_bare")).toEqual([]);
-  });
-
-  it("applies an output bus offset on read", () => {
-    expect(profileBusMappings("io_declared", 4).map((m) => m.output_bus)).toEqual([4, 5]);
-  });
-
-  it("offers no protocol options for a kind it has not heard of", () => {
-    expect(kindSupportedProtocols("io_nonesuch")).toEqual([]);
-    expect(kindSupportedProtocols(undefined)).toEqual([]);
-  });
-
-  it("reports the protocols a kind's bus may be set to", () => {
-    expect(kindSupportedProtocols("gvret_tcp")).toEqual(["can", "canfd"]);
-  });
-});
-
-describe("probedBusMappings", () => {
-  it("seeds a probed-but-unconfigured device with the kind's options", () => {
-    // A GVRET nobody has configured still needs a dropdown, so the options come
-    // from the kind rather than from a mapping that does not exist yet.
-    const seeded = probedBusMappings(2, 0, ["can", "canfd"]);
-
-    expect(seeded).toHaveLength(2);
-    expect(seeded[0].protocol).toBe("can");
-    expect(seeded[0].supported_protocols).toEqual(["can", "canfd"]);
-    expect(seeded.map((m) => m.output_bus)).toEqual([0, 1]);
-    expect(seeded.every((m) => m.traits === null)).toBe(true);
   });
 });
 
@@ -202,33 +149,5 @@ describe("buildSessionGraph — bus wiring", () => {
 
     const ids = graph.edges.map((e) => e.id);
     expect(ids).toEqual([...new Set(ids)]);
-  });
-});
-
-describe("busProtocol — the single-bus source's one protocol, as Rust serves it", () => {
-  const slcan = (id: string): IOProfile =>
-    ({ id, name: "CANable", kind: "slcan", connection: {} }) as unknown as IOProfile;
-
-  beforeEach(() => {
-    useProfileBusStore.setState({
-      kinds: SERVED_KINDS,
-      traits: new Map([["io_fd", traits({ protocols: ["can", "canfd"], bus_protocol: "canfd" })]]),
-    });
-  });
-
-  it("reads the profile's own answer", () => {
-    expect(busProtocol(slcan("io_fd"))).toBe("canfd");
-  });
-
-  it("reads the kind's answer for a profile saved since the table loaded", () => {
-    expect(busProtocol(slcan("io_new"))).toBe("can");
-    const modbus = { id: "io_2", name: "PLC", kind: "modbus_tcp", connection: {} };
-    expect(busProtocol(modbus as unknown as IOProfile)).toBe("modbus");
-  });
-
-  it("falls back to CAN for a kind Rust does not know, or no profile at all", () => {
-    const unknown = { id: "io_3", name: "?", kind: undefined, connection: {} };
-    expect(busProtocol(unknown as unknown as IOProfile)).toBe("can");
-    expect(busProtocol(undefined)).toBe("can");
   });
 });

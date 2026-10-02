@@ -12,6 +12,7 @@ import type { ModbusFramingSettings } from "../components/FramingOptionsPanel";
 import type { ActiveSessionInfo } from "../generated/ActiveSessionInfo";
 import type { AppInstanceInfo } from "../generated/AppInstanceInfo";
 import type { BusMapping } from "../generated/BusMapping";
+import type { BusOverride } from "../generated/BusOverride";
 import type { BytesTailResponse } from "../generated/BytesTailResponse";
 import type { CanTransmitFrame } from "../generated/CanTransmitFrame";
 import type { DeviceInfoPayload } from "../generated/DeviceInfoPayload";
@@ -29,6 +30,7 @@ import type { ModbusRangeSpec } from "../generated/ModbusRangeSpec";
 import type { ModbusRegisterType } from "../generated/ModbusRegisterType";
 import type { ModbusScanConfig } from "../generated/ModbusScanConfig";
 import type { MultiSourceInput } from "../generated/MultiSourceInput";
+import type { MultiSourceSession } from "../generated/MultiSourceSession";
 import type { PlaybackPosition } from "../generated/PlaybackPosition";
 import type { ProfileUsageInfo } from "../generated/ProfileUsageInfo";
 import type { Protocol } from "../generated/Protocol";
@@ -52,6 +54,7 @@ export type {
   ActiveSessionInfo,
   AppInstanceInfo,
   BusMapping,
+  BusOverride,
   BytesTailResponse,
   CanTransmitFrame,
   DeviceInfoPayload,
@@ -69,6 +72,7 @@ export type {
   ModbusRegisterType,
   ModbusScanConfig,
   MultiSourceInput,
+  MultiSourceSession,
   PlaybackPosition,
   ProfileUsageInfo,
   Protocol,
@@ -950,31 +954,6 @@ export async function probeDevice(profileId: string): Promise<DeviceProbeResult>
   return invoke("probe_device", { profile_id: profileId });
 }
 
-/**
- * Bus mappings for a device the profile hasn't described yet — probed, but
- * never configured in Settings, so `getProfileBusMappings` omits it.
- *
- * Carries no traits: Rust derives those from `protocol` when the session is
- * created. `supportedProtocols` comes from the per-kind table Rust serves via
- * `getSupportedProtocols`, so the dropdown offers the same options here as it
- * does for a configured device.
- */
-export function probedBusMappings(
-  busCount: number,
-  outputBusOffset: number = 0,
-  supportedProtocols: Protocol[] = []
-): BusMapping[] {
-  return Array.from({ length: busCount }, (_, i) => ({
-    device_bus: i,
-    enabled: true,
-    output_bus: outputBusOffset + i,
-    interface_id: `can${i}`,
-    protocol: supportedProtocols[0] ?? "can",
-    supported_protocols: supportedProtocols,
-    traits: null,
-  }));
-}
-
 // ============================================================================
 // Multi-Source Session API
 // ============================================================================
@@ -996,22 +975,12 @@ export interface CreateMultiSourceSessionOptions {
 }
 
 /**
- * Create a multi-source reader session that combines frames from multiple devices.
- *
- * This is used for multi-bus capture where frames from diverse sources (e.g., multiple
- * GVRET devices) are merged into a single stream. Each source can have its own bus
- * mappings to:
- * - Filter out disabled buses
- * - Remap device bus numbers to different output bus numbers
- *
- * The merged frames are sorted by timestamp and emitted as a single stream.
- *
- * @param options Session creation options including sources and their bus mappings
- * @returns The combined capabilities of all sources
+ * Create a multi-source reader session that merges frames from several devices.
+ * Rust allocates each source's output buses and applies its overrides.
  */
 export async function createMultiSourceSession(
   options: CreateMultiSourceSessionOptions
-): Promise<IOCapabilities> {
+): Promise<MultiSourceSession> {
   return invoke("create_multi_source_session", {
     session_id: options.sessionId,
     sources: options.sources,
@@ -1054,11 +1023,10 @@ export async function getSupportedProtocols(): Promise<Map<string, Protocol[]>> 
   return new Map(Object.entries(raw));
 }
 
-/** Shift a profile's declared mappings onto a session's output bus range. */
-export function offsetBusMappings(mappings: BusMapping[], outputBusOffset: number): BusMapping[] {
-  return outputBusOffset === 0
-    ? mappings
-    : mappings.map((m, i) => ({ ...m, output_bus: outputBusOffset + i }));
+/** The output buses `createMultiSourceSession` would give these sources, keyed by profile ID. */
+export async function previewSourceBuses(sources: MultiSourceInput[]): Promise<Map<string, BusMapping[]>> {
+  const raw: Record<string, BusMapping[]> = await invoke("preview_source_buses", { sources });
+  return new Map(Object.entries(raw));
 }
 
 // ============================================================================

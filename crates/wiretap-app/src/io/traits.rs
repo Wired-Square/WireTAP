@@ -112,7 +112,7 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
 ///
 /// The single protocol→traits derivation. Everything that builds a `BusMapping`
 /// goes through here rather than writing the struct out, and
-/// `resolve_source_config` re-derives with it on the way in — so a `traits` blob
+/// `normalise_bus_traits` re-derives with it on the way in — so a `traits` blob
 /// from the frontend can never contradict the protocol beside it. Seven copies
 /// of this match had accumulated across `sessions.rs` and `gvret/common.rs`
 /// before it existed.

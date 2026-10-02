@@ -165,24 +165,13 @@ export default function SessionManager() {
   const handleAddSourceConfirm = useCallback(async (profileId: string) => {
     if (!addSourceSessionId) return;
     try {
-      // Send the profile's real bus list. An empty array makes Rust fall back to
-      // its own enumeration without knowing which output buses this session has
-      // already spoken for, so offset past them here.
-      const usedOutputBuses = sessions
-        .find((s) => s.session_id === addSourceSessionId)
-        ?.broker_configs?.flatMap((c) => c.bus_mappings.map((m) => m.output_bus)) ?? [];
-      const offset = usedOutputBuses.length > 0 ? Math.max(...usedOutputBuses) + 1 : 0;
-
-      await addSourceToSession(addSourceSessionId, {
-        profile_id: profileId,
-        bus_mappings: profileBusMappings(profileId, offset),
-      });
+      await addSourceToSession(addSourceSessionId, { profile_id: profileId });
       setAddSourceSessionId(null);
       await fetchSessions();
     } catch (error) {
       console.error("[SessionManager] Failed to add source:", error);
     }
-  }, [addSourceSessionId, fetchSessions, sessions]);
+  }, [addSourceSessionId, fetchSessions]);
 
   const handleRemoveSource = useCallback(async (sessionId: string, profileId: string) => {
     try {
