@@ -45,6 +45,8 @@ vi.mock("../stores/sessionStore", async () => {
 });
 vi.mock("../stores/profileBusStore", () => ({
   useProfileBusStore: { getState: () => ({ ensureLoaded: async () => {} }) },
+  isMultiSourceCapable: () => true,
+  isRealtimeProfile: () => true,
   profileBusMappings: (_id: string, outputBus: number) => [
     { device_bus: 0, output_bus: outputBus, enabled: true, interface_id: "can0", protocol: "can", supported_protocols: [], traits: null },
   ],

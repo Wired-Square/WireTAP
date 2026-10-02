@@ -31,14 +31,12 @@ import {
   type GvretInterfaceConfig,
 } from "../../settings/appSettings";
 import { getPlatform } from "../../utils/platform";
-import { getAvailableProfileKinds, type Platform, type ProfileKind } from "../../utils/profileTraits";
 
-/** Platform flags and the profile kinds this platform can offer. */
+/** Platform flags, for the device blocks that word themselves per platform. */
 export interface PlatformInfo {
   isWindows: boolean;
   isLinux: boolean;
   isMacos: boolean;
-  availableKinds: ProfileKind[];
 }
 
 /** Resolve platform once; several device blocks branch on it. */
@@ -47,20 +45,18 @@ export function usePlatformInfo(): PlatformInfo {
     isWindows: false,
     isLinux: false,
     isMacos: false,
-    availableKinds: [],
   });
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      // One call settles all four — the flags are just this value compared.
+      // One call settles all three — the flags are just this value compared.
       const platform = await getPlatform();
       if (cancelled) return;
       setInfo({
         isWindows: platform === "windows",
         isLinux: platform === "linux",
         isMacos: platform === "macos",
-        availableKinds: getAvailableProfileKinds(platform as Platform),
       });
     })();
     return () => {

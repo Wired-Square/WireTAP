@@ -1,14 +1,17 @@
 // src/api/deviceKinds.ts
 //
-// What each device kind's connection map defaults and requires, from Rust's
-// `io::device_kinds` table.
+// What each device kind's connection map defaults and requires, and what each
+// kind and profile can do, from Rust's `io::device_kinds` table.
 
 import { invoke } from "@tauri-apps/api/core";
 import type { IOProfile } from "../settings/appSettings";
 import type { ProfileValidationError } from "../generated/ProfileValidationError";
 import type { ValidationCode } from "../generated/ValidationCode";
+import type { ProfileTraitsTable } from "../generated/ProfileTraitsTable";
+import type { ProfileTraits } from "../generated/ProfileTraits";
+import type { KindTraits } from "../generated/KindTraits";
 
-export type { ProfileValidationError, ValidationCode };
+export type { ProfileValidationError, ValidationCode, ProfileTraitsTable, ProfileTraits, KindTraits };
 
 export type ConnectionDefaults = Record<string, string | number | boolean>;
 
@@ -28,4 +31,14 @@ export function defaultConnectionForKind(kind: string): Promise<ConnectionDefaul
 /** Check a device against every saved and ad-hoc one; null when it is good. */
 export function validateIOProfile(profile: IOProfile): Promise<ProfileValidationError | null> {
   return invoke<ProfileValidationError | null>("validate_io_profile", { profile });
+}
+
+/** Every kind's traits in kind-picker order, and every saved or ad-hoc profile's. */
+export function listProfileTraits(): Promise<ProfileTraitsTable> {
+  return invoke<ProfileTraitsTable>("list_profile_traits");
+}
+
+/** Why these profiles cannot open as one session; null when they can. */
+export function validateSourceSelection(profiles: IOProfile[]): Promise<string | null> {
+  return invoke<string | null>("validate_source_selection", { profiles });
 }

@@ -9,7 +9,7 @@
 // from here (and re-export for their existing consumers), which breaks the old
 // import cycle between them and removes the duplicated type + default definitions.
 
-import { getTraitsForKind, type Protocol } from "../utils/profileTraits";
+import type { Protocol } from "../utils/profileTraits";
 
 // ============================================================================
 // Profile Kind Type
@@ -243,12 +243,6 @@ export type ConnectionFieldValue =
 
 /** @deprecated Use Protocol from profileTraits.ts instead */
 export type ReaderProtocol = Protocol;
-
-/** Check if a reader kind is realtime (hardware) vs historical (replay) */
-export function isReaderRealtime(kind: IOProfile["kind"]): boolean {
-  const traits = getTraitsForKind(kind);
-  return traits?.temporalMode === "realtime";
-}
 
 // ============================================================================
 // Enum-ish scalar types

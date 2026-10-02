@@ -3,7 +3,7 @@
 // Main Transmit app component with tabbed interface for CAN/Serial transmission.
 // Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback } from "react";
 import { Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTransmitStore, replaysInSession } from "../../stores/transmitStore";
@@ -12,8 +12,9 @@ import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
-import { useSettings, type IOProfile } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
+import { useTransmitCandidates } from "../../hooks/useTransmitCandidates";
 import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
@@ -38,48 +39,6 @@ import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
 // ============================================================================
-// Helper: Check if a profile can transmit
-// ============================================================================
-
-function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: string } {
-  // slcan in normal mode can transmit
-  if (p.kind === "slcan") {
-    if (p.connection?.silent_mode) {
-      return { canTransmit: false, reason: "Silent mode enabled" };
-    }
-    return { canTransmit: true };
-  }
-  // gvret_tcp and gvret_usb can transmit
-  if (p.kind === "gvret_tcp" || p.kind === "gvret_usb") {
-    return { canTransmit: true };
-  }
-  // gs_usb can transmit if not in listen-only mode
-  if (p.kind === "gs_usb") {
-    if (p.connection?.listen_only !== false) {
-      return { canTransmit: false, reason: "Listen-only mode" };
-    }
-    return { canTransmit: true };
-  }
-  // socketcan can transmit
-  if (p.kind === "socketcan") {
-    return { canTransmit: true };
-  }
-  // serial ports can transmit serial data
-  if (p.kind === "serial") {
-    return { canTransmit: true };
-  }
-  // virtual device supports loopback transmit
-  if (p.kind === "virtual") {
-    return { canTransmit: true };
-  }
-  // framelink supports CAN + serial transmit
-  if (p.kind === "framelink") {
-    return { canTransmit: true };
-  }
-  return { canTransmit: false, reason: "Not a transmit interface" }; // surfaced via translation in views
-}
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -89,27 +48,7 @@ function TransmitInner() {
   const { settings } = useSettings();
   const ioProfiles = useAllIOProfiles();
 
-  // Get all CAN/serial profiles that could potentially be used for transmit
-  const transmitProfiles = useMemo(
-    () =>
-      ioProfiles.filter((p) => {
-        if (p.kind === "slcan") return true;
-        if (p.kind === "gvret_tcp" || p.kind === "gvret_usb") return true;
-        if (p.kind === "gs_usb") return true;
-        if (p.kind === "socketcan") return true;
-        if (p.kind === "serial") return true;
-        if (p.kind === "virtual") return true;
-        if (p.kind === "framelink") return true;
-        return false;
-      }),
-    [ioProfiles]
-  );
-
-  // Map of profile ID to transmit status (for passing to dialog)
-  const transmitStatusMap = useMemo(
-    () => new Map(transmitProfiles.map((p) => [p.id, getTransmitStatus(p)])),
-    [transmitProfiles]
-  );
+  const { profiles: transmitProfiles, status: transmitStatusMap } = useTransmitCandidates(ioProfiles);
 
   // Store selectors
   const profiles = useTransmitStore((s) => s.profiles);

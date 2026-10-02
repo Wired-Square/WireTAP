@@ -56,28 +56,3 @@ export function generateLoadSessionId(): string {
   const shortId = Math.random().toString(16).slice(2, 8);
   return `load_${shortId}`;
 }
-
-// ============================================================================
-// Profile Traits - Re-exported from centralised module
-// ============================================================================
-
-export {
-  // Types
-  type TemporalMode,
-  type Protocol,
-  type ProfileTraits,
-  type TraitValidation,
-  type InterfaceTraits,
-  type Platform,
-  type ProfileKind,
-  // Functions
-  getProfileTraits,
-  getTraitsForKind,
-  isRealtimeProfile,
-  isMultiSourceCapable,
-  validateProfileSelection,
-  canTransmit,
-  isKindAvailableOnPlatform,
-  isProfileAvailableOnPlatform,
-  getAvailableProfileKinds,
-} from "../../utils/profileTraits";

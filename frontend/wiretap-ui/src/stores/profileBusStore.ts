@@ -1,6 +1,7 @@
 // src/stores/profileBusStore.ts
 //
-// Cache of the bus mappings each IO profile declares.
+// Cache of the bus mappings each IO profile declares, and of the traits Rust
+// serves for every kind and profile.
 //
 // Rust owns the enumeration (`sessions::profile_bus_mappings`) because it reads
 // the same `connection.interfaces` the readers do. This store fetches that once
@@ -10,7 +11,7 @@
 // Do not re-derive a profile's bus list anywhere else — a second implementation
 // in the frontend drifted out of step and shipped a 2-bus GVRET as a single bus.
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -20,6 +21,8 @@ import {
   type BusMapping,
   type Protocol,
 } from "../api/io";
+import { listProfileTraits, type KindTraits, type ProfileTraits } from "../api/deviceKinds";
+import type { IOProfile } from "../settings/appSettings";
 import { WINDOW_EVENTS } from "../events/registry";
 
 interface ProfileBusState {
@@ -27,6 +30,10 @@ interface ProfileBusState {
   mappings: Map<string, BusMapping[]>;
   /** profile kind → the protocols one of its buses may be set to */
   supportedProtocols: Map<string, Protocol[]>;
+  /** profileId → what the profile can do, read off its connection map */
+  traits: Map<string, ProfileTraits>;
+  /** every kind, in kind-picker order, as a profile with nothing configured */
+  kinds: KindTraits[];
   loaded: boolean;
 
   /** Fetch from Rust. Concurrent calls share one round trip. */
@@ -43,6 +50,8 @@ let inFlight: Promise<void> | null = null;
 export const useProfileBusStore = create<ProfileBusState>((set, get) => ({
   mappings: new Map(),
   supportedProtocols: new Map(),
+  traits: new Map(),
+  kinds: [],
   loaded: false,
 
   refresh: (): Promise<void> => {
@@ -57,9 +66,16 @@ export const useProfileBusStore = create<ProfileBusState>((set, get) => ({
     inFlight = Promise.all([
       getProfileBusMappings(),
       cached.size > 0 ? cached : getSupportedProtocols(),
+      listProfileTraits(),
     ])
-      .then(([mappings, supportedProtocols]) => {
-        set({ mappings, supportedProtocols, loaded: true });
+      .then(([mappings, supportedProtocols, table]) => {
+        set({
+          mappings,
+          supportedProtocols,
+          traits: new Map(Object.entries(table.profiles)),
+          kinds: table.kinds,
+          loaded: true,
+        });
       })
       .catch((error: unknown) => {
         console.error("[profileBusStore] Failed to load profile bus mappings:", error);
@@ -134,3 +150,59 @@ export function useKindSupportedProtocols(kind: string | undefined): Protocol[] 
 
 /** A stable empty array, so the hook's identity doesn't change per render. */
 const EMPTY_PROTOCOLS: Protocol[] = [];
+
+type TraitsSource = Pick<ProfileBusState, "traits" | "kinds">;
+type ProfileRef = Pick<IOProfile, "id"> & { kind?: string };
+
+function lookupTraits({ traits, kinds }: TraitsSource, profile: ProfileRef): ProfileTraits | undefined {
+  return traits.get(profile.id) ?? kinds.find((k) => k.kind === profile.kind);
+}
+
+/**
+ * A profile's traits, or its kind's for a profile saved since the cache loaded.
+ * Undefined before the cache loads and for a kind Rust does not know.
+ *
+ * The imperative read; a component wants `useProfileTraits`, which re-renders
+ * when the table lands.
+ */
+export function profileTraits(profile: ProfileRef): ProfileTraits | undefined {
+  return lookupTraits(useProfileBusStore.getState(), profile);
+}
+
+/** `profileTraits`, as a hook that loads the table and re-renders when it lands. */
+export function useProfileTraits(): (profile: ProfileRef) => ProfileTraits | undefined {
+  const traits = useProfileBusStore((s) => s.traits);
+  const kinds = useProfileBusStore((s) => s.kinds);
+  useEffect(() => {
+    void useProfileBusStore.getState().ensureLoaded();
+  }, []);
+  return useCallback((profile: ProfileRef) => lookupTraits({ traits, kinds }, profile), [traits, kinds]);
+}
+
+/** Every kind this build can open, in kind-picker order. */
+export function useAvailableKinds(): KindTraits[] {
+  const kinds = useProfileBusStore((s) => s.kinds);
+  useEffect(() => {
+    void useProfileBusStore.getState().ensureLoaded();
+  }, []);
+  return useMemo(() => kinds.filter((k) => k.available), [kinds]);
+}
+
+export const isRealtime = (traits: ProfileTraits | undefined) => traits?.temporal_mode === "realtime";
+
+export function isRealtimeProfile(profile: ProfileRef): boolean {
+  return isRealtime(profileTraits(profile));
+}
+
+export function isMultiSourceCapable(profile: ProfileRef): boolean {
+  return profileTraits(profile)?.multi_source ?? false;
+}
+
+export function isMultiBusProfile(profile: ProfileRef): boolean {
+  return profileTraits(profile)?.multi_bus ?? false;
+}
+
+/** The protocol a single-bus profile's one bus carries. */
+export function busProtocol(profile: ProfileRef | undefined): Protocol {
+  return (profile && profileTraits(profile)?.bus_protocol) || "can";
+}

@@ -98,18 +98,15 @@ pub fn get_usage(profile_id: &str) -> Option<ProfileUsage> {
     })
 }
 
-/// Profile kinds that require exclusive (single-handle) access
-const SINGLE_HANDLE_KINDS: &[&str] = &["slcan", "serial", "gs_usb"];
-
 /// Check if a profile can be used (not already in use by another session)
 ///
-/// For single-handle devices (slcan, serial, gs_usb), only one session is allowed.
+/// For single-handle kinds, only one session is allowed.
 /// For multi-handle devices (gvret_tcp, wiretap, etc.), multiple sessions are OK.
 ///
 /// Returns Ok(()) if the profile can be used, or an error message if it's in use.
 pub fn can_use_profile(profile_id: &str, profile_kind: &str) -> Result<(), String> {
     // Multi-handle profiles can always be used by multiple sessions
-    if !SINGLE_HANDLE_KINDS.contains(&profile_kind) {
+    if !crate::io::device_kinds::spec(profile_kind).is_some_and(|s| s.single_handle) {
         return Ok(());
     }
 
@@ -166,12 +163,6 @@ pub fn can_use_adapter(profile_id: &str, profiles: &[IOProfile], joining: &[&str
         ));
     }
     Ok(())
-}
-
-/// Check if a profile kind requires single-handle access
-#[allow(dead_code)]
-pub fn is_single_handle_kind(profile_kind: &str) -> bool {
-    SINGLE_HANDLE_KINDS.contains(&profile_kind)
 }
 
 #[cfg(test)]

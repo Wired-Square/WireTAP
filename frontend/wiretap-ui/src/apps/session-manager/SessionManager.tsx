@@ -21,7 +21,7 @@ import {
   type BusMapping,
 } from "../../api/io";
 import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
-import { useProfileBusStore, profileBusMappings } from "../../stores/profileBusStore";
+import { useProfileBusStore, profileBusMappings, isMultiSourceCapable } from "../../stores/profileBusStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useOpenAppsStore } from "../../stores/openAppsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -280,16 +280,13 @@ export default function SessionManager() {
     useSessionStore.getState().requestSessionJoin(appName, sessionId);
   }, []);
 
-  // Available profiles for add source dialog (realtime profiles not already in the session)
+  // Profiles the add-source dialog offers: ones that can join a session and are not in this one
   const addSourceSession = addSourceSessionId
     ? sessions.find((s) => s.session_id === addSourceSessionId)
     : null;
-  const realtimeKinds = new Set(["gvret_tcp", "gvret_usb", "slcan", "gs_usb", "socketcan", "serial", "mqtt", "modbus_tcp", "framelink", "virtual"]);
   const availableProfiles = addSourceSession
     ? profiles.filter(
-        (p) =>
-          realtimeKinds.has(p.kind) &&
-          !addSourceSession.source_profile_ids.includes(p.id)
+        (p) => isMultiSourceCapable(p) && !addSourceSession.source_profile_ids.includes(p.id)
       )
     : [];
 

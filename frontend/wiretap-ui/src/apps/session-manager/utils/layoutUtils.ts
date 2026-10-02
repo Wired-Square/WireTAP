@@ -3,6 +3,7 @@
 import type { Edge } from "@xyflow/react";
 import type { ActiveSessionInfo, AppInstanceInfo, BusMapping } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
+import { isRealtimeProfile } from "../../../stores/profileBusStore";
 import type { SourceNodeData } from "../nodes/SourceNode";
 import type { SessionNodeData } from "../nodes/SessionNode";
 import type { AppNodeData } from "../nodes/AppNode";
@@ -109,9 +110,7 @@ export function buildSessionGraph(
     .filter((p) => activeProfileIds.has(p.id))
     .sort((a, b) => (profileOutputBus.get(a.id) ?? 0) - (profileOutputBus.get(b.id) ?? 0));
   activeProfiles.forEach((profile, index) => {
-    const isRealtime = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp", "serial", "framelink", "virtual"].includes(
-      profile.kind
-    );
+    const isRealtime = isRealtimeProfile(profile);
     const deviceBusSet = profileDeviceBuses.get(profile.id);
     const outputBuses = deviceBusSet ? [...deviceBusSet].sort((a, b) => a - b) : undefined;
     const disabledBusSet = profileDisabledBuses.get(profile.id);

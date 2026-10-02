@@ -457,12 +457,9 @@ impl IOBroker {
         // Serial sources don't count for CAN transmit capability
         let session_traits = self.effective_session_traits();
         let routes = self.current_transmit_routes();
-        let has_can_transmit_routes = routes.values().any(|route| {
-            matches!(
-                route.profile_kind.as_str(),
-                "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "virtual" | "framelink"
-            )
-        });
+        let has_can_transmit_routes = routes
+            .values()
+            .any(|route| super::device_kinds::spec(&route.profile_kind).is_some_and(|s| s.can_tx));
 
         // The routed output buses are exactly the enabled ones, already deduped
         let mut buses: Vec<u8> = routes.keys().copied().collect();

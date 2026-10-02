@@ -87,31 +87,9 @@ pub struct RepeatStartedEvent {
     pub origin: String,
 }
 
-/// Kinds that support CAN transmit (platform-dependent)
-#[cfg(not(target_os = "ios"))]
-const CAN_TRANSMIT_KINDS: [&str; 6] = ["slcan", "gvret_tcp", "gvret_usb", "socketcan", "gs_usb", "virtual"];
-#[cfg(target_os = "ios")]
-const CAN_TRANSMIT_KINDS: [&str; 2] = ["gvret_tcp", "virtual"];
-
-/// Kinds that support serial transmit (not available on iOS)
-#[cfg(not(target_os = "ios"))]
-const SERIAL_TRANSMIT_KINDS: [&str; 1] = ["serial"];
-#[cfg(target_os = "ios")]
-const SERIAL_TRANSMIT_KINDS: [&str; 0] = [];
-
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/// Check if a profile kind supports CAN transmit
-fn supports_can_transmit(kind: &str) -> bool {
-    CAN_TRANSMIT_KINDS.contains(&kind)
-}
-
-/// Check if a profile kind supports serial transmit
-fn supports_serial_transmit(kind: &str) -> bool {
-    SERIAL_TRANSMIT_KINDS.contains(&kind)
-}
 
 /// Get capabilities for a profile kind
 fn get_capabilities_for_kind(kind: &str, profile: &IOProfile) -> WriterCapabilities {
@@ -197,21 +175,17 @@ pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<Transmi
     let mut profiles = Vec::new();
 
     for profile in &settings.io_profiles {
-        let supports_can = supports_can_transmit(&profile.kind);
-        let supports_serial = supports_serial_transmit(&profile.kind);
-
-        if supports_can || supports_serial {
-            let capabilities = get_capabilities_for_kind(&profile.kind, profile);
-
-            // Only include if actually capable of transmitting
-            if capabilities.can_transmit_can || capabilities.can_transmit_serial {
-                profiles.push(TransmitProfile {
-                    id: profile.id.clone(),
-                    name: profile.name.clone(),
-                    kind: profile.kind.clone(),
-                    capabilities,
-                });
-            }
+        if !crate::io::device_kinds::spec(&profile.kind).is_some_and(|s| s.available) {
+            continue;
+        }
+        let capabilities = get_capabilities_for_kind(&profile.kind, profile);
+        if capabilities.can_transmit_can || capabilities.can_transmit_serial {
+            profiles.push(TransmitProfile {
+                id: profile.id.clone(),
+                name: profile.name.clone(),
+                kind: profile.kind.clone(),
+                capabilities,
+            });
         }
     }
 

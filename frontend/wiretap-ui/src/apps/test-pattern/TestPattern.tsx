@@ -4,7 +4,7 @@
 // Uses the shared AppTopBar + IOSessionControls. Either initiator or responder
 // role, so two WireTAP instances can test against each other.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlaskConical, Play, Square, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -31,6 +31,7 @@ import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
+import { useTransmitCandidates } from "../../hooks/useTransmitCandidates";
 import { ioTestStart, ioTestStop } from "../../api/testPattern";
 import type {
   TestConfig,
@@ -63,37 +64,7 @@ export default function TestPattern() {
   const { settings } = useSettings();
   const ioProfiles = useAllIOProfiles();
 
-  // All profiles that could potentially be used — including non-transmit ones
-  // which will be shown greyed out with a reason.
-  const testProfiles = useMemo(
-    () =>
-      ioProfiles.filter((p) => {
-        const k = p.kind;
-        return ["slcan", "gvret_tcp", "gvret_usb", "gs_usb", "socketcan",
-                "serial", "virtual", "framelink"].includes(k);
-      }),
-    [ioProfiles],
-  );
-
-  // Map of profile ID → transmit status (greyed out with reason if can't transmit)
-  const transmitStatusMap = useMemo(
-    () => new Map(testProfiles.map((p) => {
-      const k = p.kind;
-      if (k === "slcan" && p.connection?.silent_mode) {
-        return [p.id, { canTransmit: false, reason: "Silent mode — cannot transmit" }];
-      }
-      if (k === "gs_usb" && p.connection?.listen_only !== false) {
-        return [p.id, { canTransmit: false, reason: "Listen-only mode — cannot transmit" }];
-      }
-      // Read-only sources
-      if (!["slcan", "gvret_tcp", "gvret_usb", "gs_usb", "socketcan",
-            "serial", "virtual", "framelink"].includes(k)) {
-        return [p.id, { canTransmit: false, reason: "Not a transmit interface" }];
-      }
-      return [p.id, { canTransmit: true }];
-    })),
-    [testProfiles],
-  );
+  const { profiles: testProfiles, status: transmitStatusMap } = useTransmitCandidates(ioProfiles);
 
   // Store state
   const mode = useTestPatternStore((s) => s.mode);

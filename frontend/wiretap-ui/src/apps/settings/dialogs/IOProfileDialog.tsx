@@ -22,6 +22,7 @@ import { baseQuantity, QTY_DATARATE } from "../../../api/framelinkAxes";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton, Checkbox } from "../../../components/forms";
 import IOConnectionFields from "../../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../../components/io/useConnectionProbe";
+import { useAvailableKinds } from "../../../stores/profileBusStore";
 import { borderDefault, spaceYDefault, caption, textMedium, textMuted } from "../../../styles";
 import { tlog } from "../../../api/settings";
 import { useCatalogList } from "../../../hooks/useCatalogList";
@@ -61,6 +62,7 @@ export default function IOProfileDialog({
   const { t } = useTranslation("settings");
   const catalogs = useCatalogList();
   const platform = usePlatformInfo();
+  const availableKinds = useAvailableKinds();
 
   // Check password storage status (only mqtt has a password field)
   const conn = profileForm.connection;
@@ -312,7 +314,7 @@ export default function IOProfileDialog({
               onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
             }
           >
-            {platform.availableKinds.map((kind) => (
+            {availableKinds.map(({ kind }) => (
               <option key={kind} value={kind}>
                 {t(`ioProfileDialog.kinds.${kind}`)}
               </option>

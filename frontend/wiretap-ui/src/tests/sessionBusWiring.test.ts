@@ -18,8 +18,9 @@ import {
   useProfileBusStore,
   profileBusMappings,
   kindSupportedProtocols,
+  busProtocol,
 } from "../stores/profileBusStore";
-import { busProtocol } from "../utils/profileTraits";
+import { SERVED_KINDS, traits } from "./fixtures/profileTraits";
 import { buildSessionGraph } from "../apps/session-manager/utils/layoutUtils";
 import type { SourceNodeData } from "../apps/session-manager/nodes/SourceNode";
 import type { SessionNodeData } from "../apps/session-manager/nodes/SessionNode";
@@ -204,25 +205,28 @@ describe("buildSessionGraph — bus wiring", () => {
   });
 });
 
-describe("busProtocol — the single-bus source's one protocol", () => {
-  const slcan = (connection: Record<string, unknown>): IOProfile =>
-    ({ id: "io_1", name: "CANable", kind: "slcan", connection }) as unknown as IOProfile;
+describe("busProtocol — the single-bus source's one protocol, as Rust serves it", () => {
+  const slcan = (id: string): IOProfile =>
+    ({ id, name: "CANable", kind: "slcan", connection: {} }) as unknown as IOProfile;
 
-  it("reads CAN FD off the device's own enable_fd", () => {
-    expect(busProtocol(slcan({ enable_fd: true }))).toBe("canfd");
+  beforeEach(() => {
+    useProfileBusStore.setState({
+      kinds: SERVED_KINDS,
+      traits: new Map([["io_fd", traits({ protocols: ["can", "canfd"], bus_protocol: "canfd" })]]),
+    });
   });
 
-  it("is classic CAN when FD is off", () => {
-    expect(busProtocol(slcan({ enable_fd: false }))).toBe("can");
-    expect(busProtocol(slcan({}))).toBe("can");
+  it("reads the profile's own answer", () => {
+    expect(busProtocol(slcan("io_fd"))).toBe("canfd");
   });
 
-  it("answers for a non-CAN kind too", () => {
+  it("reads the kind's answer for a profile saved since the table loaded", () => {
+    expect(busProtocol(slcan("io_new"))).toBe("can");
     const modbus = { id: "io_2", name: "PLC", kind: "modbus_tcp", connection: {} };
     expect(busProtocol(modbus as unknown as IOProfile)).toBe("modbus");
   });
 
-  it("falls back to CAN for a kind it has no traits for, or no profile at all", () => {
+  it("falls back to CAN for a kind Rust does not know, or no profile at all", () => {
     const unknown = { id: "io_3", name: "?", kind: undefined, connection: {} };
     expect(busProtocol(unknown as unknown as IOProfile)).toBe("can");
     expect(busProtocol(undefined)).toBe("can");

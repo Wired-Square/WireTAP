@@ -2,10 +2,11 @@
 
 import { Cable, Plus, Copy, Edit2, Trash2, Star, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { iconMd } from "../../../styles/spacing";
 import type { IOProfile } from "../stores/settingsStore";
-import { isReaderRealtime } from "../../../hooks/useSettings";
+import { useConnectionDefaults } from "../../../hooks/useConnectionDefaults";
+import type { ConnectionDefaults } from "../../../api/deviceKinds";
+import { useProfileTraits } from "../../../stores/profileBusStore";
 import { getIOKindLabel } from "../../../utils/ioKindLabel";
 import { displayProtocols, protocolLabel, protocolTone } from "../../../utils/profileTraits";
 import { PrimaryButton } from "../../../components/forms/DialogButtons";
@@ -40,13 +41,19 @@ type DataIOViewProps = {
 
 
 
-const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
-  const c: any = profile.connection || {};
+/** The saved connection over the kind's defaults, a blank field reading as unset. */
+function withDefaults(connection: object | undefined, defaults: ConnectionDefaults): any {
+  const set = Object.entries(connection ?? {}).filter(([, v]) => v !== "" && v != null);
+  return { ...defaults, ...Object.fromEntries(set) };
+}
+
+function ConnectionSummary({ profile }: { profile: IOProfile }) {
+  const { t } = useTranslation("settings");
+  const c = withDefaults(profile.connection, useConnectionDefaults(profile.kind));
   const s = (key: string) => t(`dataIO.summary.${key}`);
 
   if (profile.kind === "mqtt") {
-    const host = c.host || "localhost";
-    const port = c.port || "1883";
+    const { host, port } = c;
     const formats = c.formats || {};
 
     const enabledFormats = ["json", "savvycan", "decode"].filter(
@@ -67,8 +74,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   }
 
   if (profile.kind === "wiretap") {
-    const url = c.url || "http://localhost:8423";
-    const db = c.database || "wiretap";
+    const { url, database: db } = c;
     return (
       <div className="flex flex-wrap gap-2">
         <SummaryBadge label={s("url")} value={url} />
@@ -79,9 +85,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   }
 
   if (profile.kind === "gvret_tcp") {
-    const host = c.host || "192.168.1.100";
-    const port = c.port || "23";
-    const timeout = c.timeout || "5";
+    const { host, port, timeout } = c;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -94,8 +98,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
 
   if (profile.kind === "serial") {
     const port = c.port || s("notSet");
-    const baud = c.baud_rate || "115200";
-    const framing = c.framing_encoding || "raw";
+    const { baud_rate: baud, framing_encoding: framing } = c;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -108,15 +111,13 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
 
   if (profile.kind === "slcan") {
     const port = c.port || s("notSet");
-    const baudRate = c.baud_rate || 115200;
-    const bitrate = c.bitrate || 500000;
+    const { baud_rate: baudRate, bitrate, silent_mode: silent } = c;
     const bitrateLabel = bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`;
-    const silent = c.silent_mode ?? true;
 
     return (
       <div className="flex flex-wrap gap-2">
         <SummaryBadge label={s("port")} value={port} />
-        {baudRate !== 115200 && <SummaryBadge label={s("baud")} value={baudRate} />}
+        {Number(baudRate) !== 115200 && <SummaryBadge label={s("baud")} value={baudRate} />}
         <SummaryBadge label={s("bitrate")} value={bitrateLabel} />
         <SummaryBadge label={s("mode")} value={silent ? s("modeSilent") : s("modeActive")} />
       </div>
@@ -124,7 +125,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   }
 
   if (profile.kind === "socketcan") {
-    const iface = c.interface || "can0";
+    const iface = c.interface;
     const bitrate = c.bitrate ? parseInt(c.bitrate, 10) : null;
     const bitrateLabel = bitrate
       ? (bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`)
@@ -144,9 +145,8 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
 
   if (profile.kind === "gs_usb") {
     const deviceId = c.device_id || s("notSet");
-    const bitrate = c.bitrate || 500000;
+    const { bitrate, listen_only: listenOnly } = c;
     const bitrateLabel = bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`;
-    const listenOnly = c.listen_only ?? true;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -159,7 +159,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
 
   if (profile.kind === "gvret_usb") {
     const port = c.port || s("notSet");
-    const baudRate = c.baud_rate || "115200";
+    const baudRate = c.baud_rate;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -170,9 +170,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   }
 
   if (profile.kind === "modbus_tcp") {
-    const host = c.host || "localhost";
-    const port = c.port || "502";
-    const unitId = c.unit_id || "1";
+    const { host, port, unit_id: unitId } = c;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -184,8 +182,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   }
 
   if (profile.kind === "framelink") {
-    const host = c.host || "";
-    const port = c.port || "120";
+    const { host, port } = c;
     const deviceId = c.device_id || "";
     const interfaces = c.interfaces as Array<{ name: string; iface_type: number }> | undefined;
     return (
@@ -200,10 +197,10 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
 
   if (profile.kind === "virtual") {
     const interfaces: { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] =
-      c.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: c.frame_rate_hz || 10 }];
+      c.interfaces || [{ bus: 0, signal_generator: c.signal_generator, frame_rate_hz: c.frame_rate_hz }];
     const busCount = interfaces.length;
     const sigGenCount = interfaces.filter((i) => i.signal_generator !== false).length;
-    const loopback = c.loopback !== false;
+    const loopback = c.loopback;
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -235,7 +232,7 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
       {raw.length > 120 ? raw.slice(0, 120) + "…" : raw}
     </div>
   );
-};
+}
 
 export default function DataIOView({
   ioProfiles,
@@ -250,6 +247,7 @@ export default function DataIOView({
   onDiscardAdHocProfile,
 }: DataIOViewProps) {
   const { t } = useTranslation("settings");
+  const traitsOf = useProfileTraits();
 
   return (
     <div className={spaceYLarge}>
@@ -283,14 +281,14 @@ export default function DataIOView({
                   </Badge>
 
                   {/* Protocol badge(s) */}
-                  {displayProtocols(profile).map((protocol) => (
+                  {displayProtocols(traitsOf(profile)?.protocols).map((protocol) => (
                     <Badge key={protocol} tone={protocolTone(protocol)} size="lg">
                       {protocolLabel(protocol)}
                     </Badge>
                   ))}
 
                   {/* Realtime indicator */}
-                  {!isReaderRealtime(profile.kind) && (
+                  {traitsOf(profile)?.temporal_mode === "recorded" && (
                     <Badge tone="danger" size="lg">
                       {t("dataIO.badges.recorded")}
                     </Badge>
@@ -299,7 +297,7 @@ export default function DataIOView({
 
                 {/* Connection summary */}
                 <div className="mt-2">
-                  {renderConnectionSummary(profile, t)}
+                  <ConnectionSummary profile={profile} />
                 </div>
               </div>
 
@@ -367,7 +365,7 @@ export default function DataIOView({
                   <Badge tone="primary" size="lg">{getIOKindLabel(profile.kind)}</Badge>
                   <Badge size="lg">{t("dataIO.unsaved.badge")}</Badge>
                 </div>
-                <div className="mt-2">{renderConnectionSummary(profile, t)}</div>
+                <div className="mt-2"><ConnectionSummary profile={profile} /></div>
               </div>
 
               <div className={`flex items-center ${gapSmall}`}>

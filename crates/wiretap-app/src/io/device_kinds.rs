@@ -33,7 +33,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::io::FramingMode;
+use crate::io::{FramingMode, Protocol};
 use crate::settings::IOProfile;
 
 /// A default connection value. Kept as a small enum rather than
@@ -57,7 +57,7 @@ impl Val {
     }
 }
 
-/// What a device kind needs in its connection map.
+/// What a device kind needs in its connection map, and what it is.
 pub struct KindSpec {
     /// Values filled in when absent. A field with a default is never a required
     /// field — the two lists are disjoint.
@@ -65,7 +65,30 @@ pub struct KindSpec {
     /// Fields with no sensible default, rejected by `validate_profile` when
     /// missing or blank.
     pub required: &'static [&'static str],
+    /// Live traffic, as against an archive played back.
+    pub realtime: bool,
+    /// What the kind's buses carry unless its connection map says otherwise.
+    pub protocol: Protocol,
+    /// Whether a CAN bus of this kind transmits.
+    pub can_tx: bool,
+    /// Opens through `IOBroker`, and so can share a session with other sources.
+    pub multi_source: bool,
+    /// One session at a time holds the device.
+    pub single_handle: bool,
+    /// Whether this build can open it; must match the spawner's `cfg` arms.
+    pub available: bool,
 }
+
+const LIVE_CAN: KindSpec = KindSpec {
+    defaults: &[],
+    required: &[],
+    realtime: true,
+    protocol: Protocol::Can,
+    can_tx: true,
+    multi_source: true,
+    single_handle: false,
+    available: true,
+};
 
 // The virtual device declares some of its values per-interface inside a nested
 // `interfaces[]` array, which the table cannot reach. Naming them here keeps the
@@ -75,13 +98,78 @@ pub const VIRTUAL_SIGNAL_GENERATOR: bool = true;
 pub const VIRTUAL_FRAME_RATE_RANGE: (f64, f64) = (0.1, 1000.0);
 pub const VIRTUAL_BUS_COUNT_RANGE: (u8, u8) = (1, 8);
 
-/// Every kind the picker offers, its defaults and its required fields.
+/// Every kind the picker offers, in the order the kind pickers list them.
 static KINDS: &[(&str, KindSpec)] = &[
+    (
+        "framelink",
+        KindSpec {
+            defaults: &[("port", Val::Int(120)), ("timeout", Val::Float(5.0))],
+            required: &["host"],
+            ..LIVE_CAN
+        },
+    ),
+    (
+        "gs_usb",
+        KindSpec {
+            defaults: &[
+                ("bus", Val::Int(0)),
+                ("address", Val::Int(0)),
+                ("bitrate", Val::Int(500_000)),
+                ("sample_point", Val::Float(87.5)),
+                ("listen_only", Val::Bool(true)),
+                ("channel", Val::Int(0)),
+                ("enable_fd", Val::Bool(false)),
+                ("data_bitrate", Val::Int(2_000_000)),
+                ("data_sample_point", Val::Float(75.0)),
+            ],
+            single_handle: true,
+            // Linux drives these adapters through the kernel, as SocketCAN.
+            available: cfg!(any(target_os = "windows", target_os = "macos")),
+            ..LIVE_CAN
+        },
+    ),
+    (
+        "gvret_tcp",
+        KindSpec {
+            defaults: &[
+                ("host", Val::Str("192.168.1.100")),
+                ("port", Val::Int(23)),
+                ("timeout", Val::Float(5.0)),
+            ],
+            ..LIVE_CAN
+        },
+    ),
+    (
+        "gvret_usb",
+        KindSpec {
+            defaults: &[("baud_rate", Val::Int(115_200))],
+            required: &["port"],
+            available: cfg!(not(target_os = "ios")),
+            ..LIVE_CAN
+        },
+    ),
+    (
+        "modbus_tcp",
+        KindSpec {
+            defaults: &[
+                ("host", Val::Str("192.168.1.100")),
+                ("port", Val::Int(502)),
+                ("unit_id", Val::Int(1)),
+                ("timeout", Val::Float(5.0)),
+            ],
+            protocol: Protocol::Modbus,
+            can_tx: false,
+            ..LIVE_CAN
+        },
+    ),
     (
         "mqtt",
         KindSpec {
             defaults: &[("host", Val::Str("localhost")), ("port", Val::Int(1883))],
-            required: &[],
+            can_tx: false,
+            // Read by its own reader: the broker's spawner has no arm for it.
+            multi_source: false,
+            ..LIVE_CAN
         },
     ),
     (
@@ -96,31 +184,28 @@ static KINDS: &[(&str, KindSpec)] = &[
             // could only fire on a profile hand-edited to a blank url — where
             // falling back to the default is the better answer.
             required: &[],
+            realtime: false,
+            can_tx: false,
+            multi_source: false,
+            ..LIVE_CAN
         },
     ),
     (
-        "gvret_tcp",
+        "serial",
         KindSpec {
             defaults: &[
-                ("host", Val::Str("192.168.1.100")),
-                ("port", Val::Int(23)),
-                ("timeout", Val::Float(5.0)),
+                ("baud_rate", Val::Int(115_200)),
+                ("data_bits", Val::Int(8)),
+                ("stop_bits", Val::Int(1)),
+                ("parity", Val::Str("none")),
+                ("framing_encoding", Val::Str("raw")),
             ],
-            required: &[],
-        },
-    ),
-    (
-        "gvret_usb",
-        KindSpec {
-            defaults: &[("baud_rate", Val::Int(115_200))],
             required: &["port"],
-        },
-    ),
-    (
-        "framelink",
-        KindSpec {
-            defaults: &[("port", Val::Int(120)), ("timeout", Val::Float(5.0))],
-            required: &["host"],
+            protocol: Protocol::Serial,
+            can_tx: false,
+            single_handle: true,
+            available: cfg!(not(target_os = "ios")),
+            ..LIVE_CAN
         },
     ),
     (
@@ -140,23 +225,9 @@ static KINDS: &[(&str, KindSpec)] = &[
                 ("data_bitrate", Val::Int(2_000_000)),
             ],
             required: &["port"],
-        },
-    ),
-    (
-        "gs_usb",
-        KindSpec {
-            defaults: &[
-                ("bus", Val::Int(0)),
-                ("address", Val::Int(0)),
-                ("bitrate", Val::Int(500_000)),
-                ("sample_point", Val::Float(87.5)),
-                ("listen_only", Val::Bool(true)),
-                ("channel", Val::Int(0)),
-                ("enable_fd", Val::Bool(false)),
-                ("data_bitrate", Val::Int(2_000_000)),
-                ("data_sample_point", Val::Float(75.0)),
-            ],
-            required: &[],
+            single_handle: true,
+            available: cfg!(not(target_os = "ios")),
+            ..LIVE_CAN
         },
     ),
     (
@@ -169,32 +240,8 @@ static KINDS: &[(&str, KindSpec)] = &[
                 ("interface", Val::Str("can0")),
                 ("enable_fd", Val::Bool(false)),
             ],
-            required: &[],
-        },
-    ),
-    (
-        "modbus_tcp",
-        KindSpec {
-            defaults: &[
-                ("host", Val::Str("192.168.1.100")),
-                ("port", Val::Int(502)),
-                ("unit_id", Val::Int(1)),
-                ("timeout", Val::Float(5.0)),
-            ],
-            required: &[],
-        },
-    ),
-    (
-        "serial",
-        KindSpec {
-            defaults: &[
-                ("baud_rate", Val::Int(115_200)),
-                ("data_bits", Val::Int(8)),
-                ("stop_bits", Val::Int(1)),
-                ("parity", Val::Str("none")),
-                ("framing_encoding", Val::Str("raw")),
-            ],
-            required: &["port"],
+            available: cfg!(target_os = "linux"),
+            ..LIVE_CAN
         },
     ),
     (
@@ -207,7 +254,7 @@ static KINDS: &[(&str, KindSpec)] = &[
                 ("frame_rate_hz", Val::Float(VIRTUAL_FRAME_RATE_HZ)),
                 ("bus_count", Val::Int(1)),
             ],
-            required: &[],
+            ..LIVE_CAN
         },
     ),
 ];
@@ -233,6 +280,11 @@ pub fn kinds() -> impl Iterator<Item = &'static str> {
 pub fn spec(kind: &str) -> Option<&'static KindSpec> {
     let kind = canonical_kind(kind);
     KINDS.iter().find(|(k, _)| *k == kind).map(|(_, s)| s)
+}
+
+/// Whether a kind opens through `IOBroker`; false for one the table lacks.
+pub fn is_multi_source(kind: &str) -> bool {
+    spec(kind).is_some_and(|s| s.multi_source)
 }
 
 /// A kind's declared default for one field.

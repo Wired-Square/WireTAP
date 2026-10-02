@@ -5,7 +5,8 @@ import { sectionHeader, caption, captionMuted } from "../../styles/typography";
 import { borderDivider } from "../../styles";
 import type { IOProfile } from "../../hooks/useSettings";
 import TimeBoundsInput, { type TimeBounds } from "../../components/TimeBoundsInput";
-import { SPEED_OPTIONS, CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
+import { SPEED_OPTIONS, CSV_EXTERNAL_ID } from "./utils";
+import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
 import { Select } from "../../components/forms";
 
 type Props = {
@@ -30,12 +31,13 @@ export default function LoadOptions({
   onSpeedChange,
 }: Props) {
   const { t } = useTranslation("dialogs");
+  const traitsOf = useProfileTraits();
   // Don't show options if no source is checked, CSV is selected, or loading
   if (!checkedSourceId || checkedSourceId === CSV_EXTERNAL_ID || isLoading) {
     return null;
   }
 
-  const isCheckedRealtime = checkedProfile ? isRealtimeProfile(checkedProfile) : false;
+  const isCheckedRealtime = checkedProfile ? isRealtime(traitsOf(checkedProfile)) : false;
 
   return (
     <div className={borderDivider}>

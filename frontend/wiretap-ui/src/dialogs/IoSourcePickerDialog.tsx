@@ -6,8 +6,15 @@ import { emit, listen } from "@tauri-apps/api/event";
 import Dialog, { DialogBody } from "../components/Dialog";
 import { useSettings, type IOProfile } from "../hooks/useSettings";
 import { buildCatalogPath } from "../utils/catalogUtils";
-import { isMultiBusProfile, busProtocol } from "../utils/profileTraits";
-import { useProfileBusStore, profileBusMappings, kindSupportedProtocols } from "../stores/profileBusStore";
+import {
+  useProfileBusStore,
+  profileBusMappings,
+  kindSupportedProtocols,
+  isMultiBusProfile,
+  isRealtimeProfile,
+  busProtocol,
+} from "../stores/profileBusStore";
+import { validateSourceSelection } from "../api/deviceKinds";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
 import {
@@ -62,8 +69,6 @@ import {
   localToIsoWithOffset,
   CSV_EXTERNAL_ID,
   generateLoadSessionId,
-  isRealtimeProfile,
-  validateProfileSelection,
 } from "./io-source-picker";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import type { InterfaceFramingConfig } from "./io-source-picker";
@@ -1154,35 +1159,30 @@ export default function IoSourcePickerDialog({
   };
 
   // Handle toggling a multi-source-capable reader (for multi-bus mode)
-  const handleToggleReader = (readerId: string) => {
+  const handleToggleReader = async (readerId: string) => {
     const profile = readProfiles.find((p) => p.id === readerId);
     if (!profile) return;
 
-    setCheckedReaderIds((prev) => {
-      if (prev.includes(readerId)) {
-        // Unchecking - remove from list
-        const newList = prev.filter((id) => id !== readerId);
-        setValidationError(null);
-        return newList;
-      } else {
-        // Checking - validate compatibility first
-        const selectedProfiles = prev
-          .map((id) => readProfiles.find((p) => p.id === id))
-          .filter((p): p is IOProfile => p !== undefined);
+    if (checkedSourceIds.includes(readerId)) {
+      setCheckedReaderIds((prev) => prev.filter((id) => id !== readerId));
+      setValidationError(null);
+      return;
+    }
 
-        const validation = validateProfileSelection(selectedProfiles, profile);
-        if (!validation.valid) {
-          setValidationError(validation.error || "Incompatible selection");
-          return prev; // Don't add if validation fails
-        }
+    const selection = [...checkedSourceIds, readerId]
+      .map((id) => readProfiles.find((p) => p.id === id))
+      .filter((p): p is IOProfile => p !== undefined);
+    const error = await validateSourceSelection(selection).catch(String);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
 
-        setValidationError(null);
-        // Clear single-select reader when adding to multi-bus
-        setCheckedReaderId(null);
-        setSelectedCaptureId(null);
-        return [...prev, readerId];
-      }
-    });
+    setValidationError(null);
+    // Clear single-select reader when adding to multi-bus
+    setCheckedReaderId(null);
+    setSelectedCaptureId(null);
+    setCheckedReaderIds((prev) => (prev.includes(readerId) ? prev : [...prev, readerId]));
   };
 
   // Handle selecting an active multi-source session to join

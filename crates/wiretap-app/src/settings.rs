@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// `WINDOW_EVENTS.SETTINGS_CHANGED` in `src/events/registry.ts`.
 const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct IOProfile {
     pub id: String,
     pub name: String,

@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useSessionStore } from "../../../stores/sessionStore";
+import { useProfileBusStore, profileTraits } from "../../../stores/profileBusStore";
 import { useSessionLogStore } from "../stores/sessionLogStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import {
@@ -134,13 +135,10 @@ export function useSessionLogSubscription(): void {
         if (!isCurrentInstance()) return; // Check again after async
         // Cache the profile name for when the session is destroyed
         sessionProfileNameCache.set(p.session_id, profileName);
-        // Determine mode based on source type (realtime = Live, recorded = Playback)
-        let modeLabel = "";
-        if (p.source_type) {
-          const realtimeDevices = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp", "serial", "framelink", "virtual"];
-          const isRealtime = realtimeDevices.some((d) => p.source_type?.includes(d));
-          modeLabel = isRealtime ? " (Live)" : " (Playback)";
-        }
+        await useProfileBusStore.getState().ensureLoaded();
+        if (!isCurrentInstance()) return;
+        const live = p.source_profile_ids.some((id) => profileTraits({ id })?.temporal_mode === "realtime");
+        const modeLabel = live ? " (Live)" : " (Playback)";
         addEntryFn({
           eventType: "session-created",
           sessionId: p.session_id,

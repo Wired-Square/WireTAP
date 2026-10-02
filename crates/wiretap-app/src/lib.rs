@@ -1286,6 +1286,8 @@ pub fn run() {
             sessions::list_active_sessions,
             sessions::get_profile_bus_mappings,
             sessions::get_supported_protocols,
+            io::traits::list_profile_traits,
+            io::traits::validate_source_selection,
             sessions::generate_session_id,
             // Profile-to-session mapping API
             sessions::get_profiles_usage,

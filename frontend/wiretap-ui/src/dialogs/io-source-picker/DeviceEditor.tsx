@@ -24,7 +24,7 @@ import IOConnectionFields from "../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../components/io/useConnectionProbe";
 import { applyConnectionDefaults } from "../../settings/ioProfileForm";
 import { validateIOProfile } from "../../api/deviceKinds";
-import { getTraitsForKind } from "../../utils/profileTraits";
+import { isRealtime, useAvailableKinds } from "../../stores/profileBusStore";
 import type { IOProfile, ConnectionFieldValue, ProfileKindId } from "../../hooks/useSettings";
 import { Alert } from "../../components/Alert";
 
@@ -70,12 +70,10 @@ export default function DeviceEditor({
   // The editor opens from the Devices tab, and SourceList files a device by
   // `isRealtimeProfile`. Offering a recorded kind here would create a device
   // that immediately disappears into the Captures tab.
+  const availableKinds = useAvailableKinds();
   const creatableKinds = useMemo(
-    () =>
-      platform.availableKinds.filter(
-        (kind) => getTraitsForKind(kind)?.temporalMode === "realtime",
-      ),
-    [platform.availableKinds],
+    () => availableKinds.filter(isRealtime).map((k) => k.kind as ProfileKindId),
+    [availableKinds],
   );
 
   const updateConnectionField = useCallback((key: string, value: ConnectionFieldValue) => {

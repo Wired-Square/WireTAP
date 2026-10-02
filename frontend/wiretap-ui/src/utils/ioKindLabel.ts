@@ -1,36 +1,9 @@
 // src/utils/ioKindLabel.ts
-//
-// Human-readable labels for IO profile kind values.
 
-/**
- * Convert a profile `kind` value to a human-readable label.
- * e.g., "gvret_tcp" -> "GVRET TCP", "csv_file" -> "CSV File"
- */
+import i18n from "i18next";
+
+/** A profile kind's name, from the same table the device forms read. */
 export function getIOKindLabel(kind: string | undefined): string {
-  switch (kind) {
-    case "mqtt":
-      return "MQTT";
-    case "wiretap":
-      return "WireTAP Backend";
-    case "gvret_tcp":
-      return "GVRET TCP";
-    case "gvret_usb":
-      return "GVRET USB";
-    case "serial":
-      return "Serial";
-    case "slcan":
-      return "slcan";
-    case "socketcan":
-      return "SocketCAN";
-    case "gs_usb":
-      return "gs_usb";
-    case "modbus_tcp":
-      return "Modbus TCP";
-    case "virtual":
-      return "Virtual";
-    case "framelink":
-      return "FrameLink";
-    default:
-      return kind ?? "Unknown";
-  }
+  if (!kind) return "";
+  return i18n.t(`settings:ioProfileDialog.kinds.${kind}`, { defaultValue: kind });
 }

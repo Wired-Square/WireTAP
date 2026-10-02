@@ -115,6 +115,10 @@
     "saveSelectionSet": "Save selection set",
     "selectionSet": "Selection set"
   },
+  "transmitBlocked": {
+    "silent_mode": "Silent mode — cannot transmit",
+    "listen_only": "Listen-only mode — cannot transmit"
+  },
   "session": {
     "state": "State:",
     "type": "Type:",

@@ -3,7 +3,8 @@
 import { useTranslation } from "react-i18next";
 import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateCcw } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
-import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
+import { CSV_EXTERNAL_ID } from "./utils";
+import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
 import { isCaptureProfileId } from "../../hooks/useIOSessionManager";
 import { DialogFooter } from "../../components/Dialog";
 import { iconMd, iconSm } from "../../styles/spacing";
@@ -87,8 +88,9 @@ export default function ActionButtons({
   onCaptureConnectClick,
 }: Props) {
   const { t } = useTranslation("dialogs");
+  const traitsOf = useProfileTraits();
   const isCsvSelected = checkedSourceId === CSV_EXTERNAL_ID;
-  const isCheckedRealtime = checkedProfile ? isRealtimeProfile(checkedProfile) : false;
+  const isCheckedRealtime = checkedProfile ? isRealtime(traitsOf(checkedProfile)) : false;
 
   // Show release button when there's a selection that can be released
   const hasSelection = checkedSourceId !== null || isCaptureSelected || (multiSelectMode && multiSelectCount > 0);

@@ -25,7 +25,7 @@ const { useSettingsStore } = await import("../apps/settings/stores/settingsStore
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const platform = { isWindows: false, isLinux: false, isMacos: true, availableKinds: [] };
+const platform = { isWindows: false, isLinux: false, isMacos: true };
 const probedFields = {
   interfaces: [{ index: 0, iface_type: 1, name: "can0", type_name: "CAN" }],
   device_id: "FL-0042",

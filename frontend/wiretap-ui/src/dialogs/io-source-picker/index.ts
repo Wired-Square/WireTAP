@@ -20,10 +20,4 @@ export {
   SPEED_OPTIONS,
   CSV_EXTERNAL_ID,
   generateLoadSessionId,
-  isRealtimeProfile,
-  isMultiSourceCapable,
-  validateProfileSelection,
-  getProfileTraits,
 } from "./utils";
-
-export type { InterfaceTraits, TraitValidation } from "./utils";

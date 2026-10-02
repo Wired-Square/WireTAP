@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { IOProfile } from "../hooks/useSettings";
+import { servedTable } from "./fixtures/profileTraits";
 
 const invoke = vi.fn(async (cmd: string) => {
   switch (cmd) {
@@ -16,6 +17,8 @@ const invoke = vi.fn(async (cmd: string) => {
     case "get_profile_bus_mappings":
     case "get_supported_protocols":
       return {};
+    case "list_profile_traits":
+      return servedTable();
     default:
       return null;
   }

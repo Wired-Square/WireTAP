@@ -5,7 +5,8 @@ import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play, Lock, Plus
 import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
-import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
+import { CSV_EXTERNAL_ID } from "./utils";
+import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
 import TabStrip from "../../components/TabStrip";
 import type { SourceTab } from "./types";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
@@ -117,6 +118,8 @@ export default function SourceList({
   const { t } = useTranslation("dialogs");
   // All profiles are read profiles now (mode field removed), separate by type
   const readProfiles = ioProfiles;
+  const traitsOf = useProfileTraits();
+  const isRealtimeProfile = (p: IOProfile) => isRealtime(traitsOf(p));
   const realtimeProfiles = readProfiles.filter(isRealtimeProfile);
   const recordedProfiles = readProfiles.filter((p) => !isRealtimeProfile(p));
 
@@ -355,7 +358,7 @@ export default function SourceList({
       )}
       <Listbox className="pt-0">
         {realtimeProfiles.map((profile) => {
-          const canMultiSelect = allowMultiSelect && isMultiSourceCapable(profile);
+          const canMultiSelect = allowMultiSelect && !!traitsOf(profile)?.multi_source;
           const isProfileChecked = canMultiSelect
             ? checkedSourceIds.includes(profile.id)
             : checkedSourceId === profile.id;

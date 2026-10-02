@@ -31,9 +31,8 @@ import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
 import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
-import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
-import { isMultiSourceCapable } from "../utils/profileTraits";
-import { useProfileBusStore, profileBusMappings } from "../stores/profileBusStore";
+import { generateLoadSessionId } from "../dialogs/io-source-picker/utils";
+import { useProfileBusStore, profileBusMappings, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { WINDOW_EVENTS } from "../events/registry";
 
@@ -888,6 +887,7 @@ export function useIOSessionManager(
     profileIds: string[],
     opts: LoadOptions,
   ) => {
+    await useProfileBusStore.getState().ensureLoaded();
     const profiles = profileIds
       .map((id) => findProfile(id))
       .filter((p): p is IOProfile => p !== undefined);
@@ -1004,6 +1004,7 @@ export function useIOSessionManager(
     isLoadingRef.current = true;
     loadSessionIdRef.current = sessionId;
 
+    await useProfileBusStore.getState().ensureLoaded();
     const profiles = profileIds
       .map((id) => findProfile(id))
       .filter((p): p is IOProfile => p !== undefined);

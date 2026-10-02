@@ -62,7 +62,7 @@ describe("connection defaults from Rust", () => {
           profile={slcan({ port: "" })}
           onUpdateConnectionField={() => {}}
           probe={{} as ConnectionProbe}
-          platform={{ isWindows: false, isLinux: false, isMacos: true, availableKinds: [] }}
+          platform={{ isWindows: false, isLinux: false, isMacos: true }}
           canProbeByProfileId={false}
         />,
       ),

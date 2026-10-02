@@ -268,17 +268,6 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
     }
 }
 
-/// Map a profile kind to its output protocol family ("can" | "serial" | "modbus"
-/// | "unknown"). Used to pick a session-id prefix.
-fn protocol_for_kind(kind: &str) -> &'static str {
-    match kind {
-        "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "mqtt" | "framelink" | "virtual" => "can",
-        "serial" => "serial",
-        "modbus_tcp" | "modbus_rtu" => "modbus",
-        _ => "unknown",
-    }
-}
-
 /// A random 6-hex-char id suffix (matches the previous frontend scheme).
 fn random_hex6() -> String {
     use std::hash::{BuildHasher, Hasher};
@@ -328,36 +317,23 @@ pub(crate) fn session_id_prefix<'a>(
     profiles: impl IntoIterator<Item = &'a IOProfile>,
     emit_raw_bytes: Option<bool>,
 ) -> &'static str {
-    let mut protocol: Option<&str> = None;
+    let mut protocol: Option<Option<Protocol>> = None;
     let mut emits_bytes = false;
     for p in profiles {
-        let proto = protocol_for_kind(&p.kind);
-        if proto == "serial" {
+        let proto = device_kinds::spec(&p.kind).filter(|s| s.realtime).map(|s| s.protocol);
+        if proto == Some(Protocol::Serial) {
             emits_bytes |= device_kinds::resolve_serial_framing(p, None, emit_raw_bytes).1;
         }
-        if proto == "modbus" {
-            protocol = Some("modbus");
-            break;
+        if proto == Some(Protocol::Modbus) {
+            return "m";
         }
-        if protocol.is_none() {
-            protocol = Some(proto);
-        }
+        protocol.get_or_insert(proto);
     }
-    match protocol {
-        Some("modbus") => "m",
-        Some("serial") if emits_bytes => "b",
-        Some("can") | Some("serial") => "f",
+    match protocol.flatten() {
+        Some(Protocol::Serial) if emits_bytes => "b",
+        Some(Protocol::Can | Protocol::Serial) => "f",
         _ => "s",
     }
-}
-
-/// Check if a profile kind is a real-time device that can use IOBroker.
-/// These devices support the multi-source architecture for unified session handling.
-fn is_realtime_device(kind: &str) -> bool {
-    matches!(
-        kind,
-        "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp" | "virtual" | "framelink"
-    )
 }
 
 /// Session-level serial settings, as the picker sends them for one source.
@@ -399,7 +375,7 @@ fn create_source_config_from_profile(
     bus_override: Option<u8>,
     serial: SerialOverrides,
 ) -> Option<SourceConfig> {
-    if !is_realtime_device(&profile.kind) {
+    if !device_kinds::is_multi_source(&profile.kind) {
         return None;
     }
 
@@ -556,11 +532,7 @@ fn parse_virtual_interfaces(
 ) -> Option<Vec<BusMapping>> {
     let traffic_type = conn_str(profile, "traffic_type");
     let protocol = protocol_from_str(traffic_type.as_deref());
-    let prefix = match protocol {
-        Protocol::Modbus | Protocol::ModbusRtu => "modbus",
-        Protocol::Serial => "serial",
-        Protocol::Can | Protocol::CanFd => "can",
-    };
+    let prefix = interface_prefix(protocol);
 
     let buses: Vec<u8> = match profile
         .connection
@@ -597,6 +569,15 @@ fn parse_virtual_interfaces(
         .collect();
 
     (!mappings.is_empty()).then_some(mappings)
+}
+
+/// How a bus carrying this protocol is named, ahead of its number.
+fn interface_prefix(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Modbus | Protocol::ModbusRtu => "modbus",
+        Protocol::Serial => "serial",
+        Protocol::Can | Protocol::CanFd => "can",
+    }
 }
 
 /// Settings values arrive as either JSON numbers or strings, depending on
@@ -717,7 +698,6 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
         // read it — Rust answered per kind, so an FD-enabled slcan was *shown*
         // as FD-capable and *ran* as classic CAN.
         "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" => (0, "can0".to_string(), can_protocol_for(profile)),
-        "modbus_tcp" => (0, "modbus0".to_string(), Protocol::Modbus),
         "framelink" => {
             // Grouped profile with interfaces[] array
             if let Some(interfaces) = profile.connection.get("interfaces").and_then(|v| v.as_array()) {
@@ -737,7 +717,10 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
                 .unwrap_or(1) as u8;
             return vec![framelink_bus_mapping(iface_index, iface_type, output_bus)];
         }
-        _ => (0, "can0".to_string(), Protocol::Can),
+        kind => {
+            let protocol = device_kinds::spec(kind).map_or(Protocol::Can, |s| s.protocol);
+            (0, format!("{}0", interface_prefix(protocol)), protocol)
+        }
     };
 
     vec![BusMapping {
@@ -763,12 +746,11 @@ fn can_protocol_for(profile: &IOProfile) -> Protocol {
 /// the device reports its interfaces, borrowed rather than restated.
 fn framelink_bus_mapping(iface_index: u8, iface_type: u8, output_bus: u8) -> BusMapping {
     let protocol = io::framelink::reader::protocol_for_iface_type(iface_type);
-    let prefix = if protocol == Protocol::Serial { "serial" } else { "can" };
     BusMapping {
         device_bus: iface_index,
         output_bus,
         enabled: true,
-        interface_id: format!("{}{}", prefix, iface_index),
+        interface_id: format!("{}{}", interface_prefix(protocol), iface_index),
         supported_protocols: vec![protocol],
         ..BusMapping::default().with_protocol(protocol)
     }
@@ -835,7 +817,7 @@ pub async fn create_reader_session(
 
     // Create the appropriate reader based on profile kind
     // Real-time devices (gvret, slcan, gs_usb, socketcan) use IOBroker for unified handling
-    let is_realtime = is_realtime_device(&profile.kind);
+    let is_realtime = device_kinds::is_multi_source(&profile.kind);
     let reader: Box<dyn IOSource> = if is_realtime {
         // Use IOBroker for all real-time devices (unified path)
         let source_config = reader_source_config(
@@ -1306,7 +1288,7 @@ pub async fn resume_session_to_live(
             .find(|p| p.id == *profile_id)
             .ok_or_else(|| format!("Profile '{}' not found in settings", profile_id))?;
 
-        if !is_realtime_device(&profile.kind) {
+        if !device_kinds::is_multi_source(&profile.kind) {
             return Err(format!(
                 "Cannot resume to live for '{}' device type.",
                 profile.kind
@@ -1494,7 +1476,7 @@ pub async fn add_source_to_session_cmd(
     let source_config = resolve_source_config(source, existing_count, &settings)?;
 
     // Validate it's a real-time device
-    if !is_realtime_device(&source_config.profile_kind) {
+    if !device_kinds::is_multi_source(&source_config.profile_kind) {
         return Err(format!(
             "Profile '{}' has unsupported type '{}' for multi-source mode",
             source_config.profile_id, source_config.profile_kind
@@ -2289,29 +2271,17 @@ pub async fn create_multi_source_session(
 
     // Validate all profiles are real-time devices supported by IOBroker
     for (idx, config) in source_configs.iter().enumerate() {
-        if !is_realtime_device(&config.profile_kind) {
+        if !device_kinds::is_multi_source(&config.profile_kind) {
             return Err(format!(
-                "Profile '{}' has unsupported type '{}' for multi-source mode. \
-                Currently supported: gvret_tcp, gvret_usb, slcan, gs_usb, socketcan, serial, modbus_tcp, virtual",
+                "Profile '{}' has unsupported type '{}' for multi-source mode.",
                 config.profile_id, config.profile_kind
             ));
         }
 
-        // Platform-specific validation
-        #[cfg(target_os = "linux")]
-        if config.profile_kind == "gs_usb" {
+        if !device_kinds::spec(&config.profile_kind).is_some_and(|s| s.available) {
             return Err(format!(
-                "Profile '{}' uses gs_usb which on Linux should use SocketCAN interface. \
-                Configure a socketcan profile instead.",
-                config.profile_id
-            ));
-        }
-
-        #[cfg(not(target_os = "linux"))]
-        if config.profile_kind == "socketcan" {
-            return Err(format!(
-                "Profile '{}' uses socketcan which is only available on Linux.",
-                config.profile_id
+                "Profile '{}' uses {}, which this platform cannot open.",
+                config.profile_id, config.profile_kind
             ));
         }
 
@@ -2625,6 +2595,16 @@ mod bus_mapping_tests {
             preferred_catalog: None,
             ephemeral: false,
         }
+    }
+
+    /// The prefix reads the kind table's protocol; a recorded kind has none.
+    #[test]
+    fn session_id_prefixes_follow_the_kind_table() {
+        let p = |kind: &str| profile(kind, json!({}));
+        assert_eq!(session_id_prefix([&p("gvret_tcp")], None), "f");
+        assert_eq!(session_id_prefix([&p("serial")], None), "b");
+        assert_eq!(session_id_prefix([&p("gvret_tcp"), &p("modbus_tcp")], None), "m");
+        assert_eq!(session_id_prefix([&p("wiretap"), &p("gvret_tcp")], None), "s");
     }
 
     fn gvret(connection: serde_json::Value) -> IOProfile {

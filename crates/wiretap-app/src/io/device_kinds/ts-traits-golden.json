@@ -1,0 +1,1433 @@
+{
+  "kinds": {
+    "mqtt": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": false,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "wiretap": {
+      "temporalMode": "recorded",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": false,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": false,
+      "hasDeviceBuses": false
+    },
+    "gvret_tcp": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": true
+    },
+    "gvret_usb": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": true
+    },
+    "serial": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "serial"
+      ],
+      "canTransmit": false,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "slcan": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "socketcan": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "linux"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "gs_usb": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "modbus_tcp": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "modbus"
+      ],
+      "canTransmit": false,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": false
+    },
+    "virtual": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": true
+    },
+    "framelink": {
+      "temporalMode": "realtime",
+      "protocols": [
+        "can"
+      ],
+      "canTransmit": true,
+      "platforms": [
+        "windows",
+        "macos",
+        "linux",
+        "ios"
+      ],
+      "multiSource": true,
+      "hasDeviceBuses": true
+    }
+  },
+  "availableKinds": {
+    "windows": [
+      "framelink",
+      "gs_usb",
+      "gvret_tcp",
+      "gvret_usb",
+      "modbus_tcp",
+      "mqtt",
+      "wiretap",
+      "serial",
+      "slcan",
+      "virtual"
+    ],
+    "macos": [
+      "framelink",
+      "gs_usb",
+      "gvret_tcp",
+      "gvret_usb",
+      "modbus_tcp",
+      "mqtt",
+      "wiretap",
+      "serial",
+      "slcan",
+      "virtual"
+    ],
+    "linux": [
+      "framelink",
+      "gvret_tcp",
+      "gvret_usb",
+      "modbus_tcp",
+      "mqtt",
+      "wiretap",
+      "serial",
+      "slcan",
+      "socketcan",
+      "virtual"
+    ],
+    "ios": [
+      "framelink",
+      "gvret_tcp",
+      "modbus_tcp",
+      "mqtt",
+      "wiretap",
+      "virtual"
+    ]
+  },
+  "variants": [
+    {
+      "name": "mqtt",
+      "kind": "mqtt",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": false,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "wiretap",
+      "kind": "wiretap",
+      "connection": {},
+      "traits": {
+        "temporalMode": "recorded",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": false,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": false,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "gvret_tcp",
+      "kind": "gvret_tcp",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "can"
+    },
+    {
+      "name": "gvret_usb",
+      "kind": "gvret_usb",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "can"
+    },
+    {
+      "name": "serial",
+      "kind": "serial",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "serial"
+        ],
+        "canTransmit": false,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "serial"
+    },
+    {
+      "name": "slcan",
+      "kind": "slcan",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "socketcan",
+      "kind": "socketcan",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "gs_usb",
+      "kind": "gs_usb",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "modbus_tcp",
+      "kind": "modbus_tcp",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "modbus"
+        ],
+        "canTransmit": false,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "modbus"
+    },
+    {
+      "name": "virtual",
+      "kind": "virtual",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "framelink",
+      "kind": "framelink",
+      "connection": {},
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "slcan_fd",
+      "kind": "slcan",
+      "connection": {
+        "enable_fd": true
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "gs_usb_fd",
+      "kind": "gs_usb",
+      "connection": {
+        "enable_fd": true
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "socketcan_fd",
+      "kind": "socketcan",
+      "connection": {
+        "enable_fd": true
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": false
+      },
+      "multiBus": false,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "gvret_tcp_canfd_bus",
+      "kind": "gvret_tcp",
+      "connection": {
+        "interfaces": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "protocol": "can"
+          },
+          {
+            "device_bus": 1,
+            "enabled": true,
+            "protocol": "canfd"
+          }
+        ]
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "gvret_usb_canfd_bus",
+      "kind": "gvret_usb",
+      "connection": {
+        "interfaces": [
+          {
+            "device_bus": 0,
+            "enabled": true,
+            "protocol": "canfd"
+          }
+        ]
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "framelink_mixed",
+      "kind": "framelink",
+      "connection": {
+        "interfaces": [
+          {
+            "index": 0,
+            "iface_type": 1
+          },
+          {
+            "index": 1,
+            "iface_type": 2
+          },
+          {
+            "index": 2,
+            "iface_type": 3
+          }
+        ]
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd",
+          "serial"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "framelink_rs232",
+      "kind": "framelink",
+      "connection": {
+        "interfaces": [
+          {
+            "index": 0,
+            "iface_type": 4
+          }
+        ]
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "framelink_legacy_canfd",
+      "kind": "framelink",
+      "connection": {
+        "interface_index": 0,
+        "interface_type": 2
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "framelink_legacy_rs485",
+      "kind": "framelink",
+      "connection": {
+        "interface_index": 0,
+        "interface_type": 3
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "serial"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "serial"
+    },
+    {
+      "name": "framelink_legacy_rs232",
+      "kind": "framelink",
+      "connection": {
+        "interface_index": 0,
+        "interface_type": 4
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "can"
+    },
+    {
+      "name": "virtual_canfd",
+      "kind": "virtual",
+      "connection": {
+        "traffic_type": "canfd"
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can",
+          "canfd"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "canfd"
+    },
+    {
+      "name": "virtual_modbus",
+      "kind": "virtual",
+      "connection": {
+        "traffic_type": "modbus"
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "modbus"
+        ],
+        "canTransmit": false,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "modbus"
+    },
+    {
+      "name": "virtual_serial",
+      "kind": "virtual",
+      "connection": {
+        "traffic_type": "serial"
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "serial"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": false,
+      "busProtocol": "serial"
+    },
+    {
+      "name": "virtual_two_buses",
+      "kind": "virtual",
+      "connection": {
+        "interfaces": [
+          {
+            "bus": 0
+          },
+          {
+            "bus": 1
+          }
+        ]
+      },
+      "traits": {
+        "temporalMode": "realtime",
+        "protocols": [
+          "can"
+        ],
+        "canTransmit": true,
+        "platforms": [
+          "windows",
+          "macos",
+          "linux",
+          "ios"
+        ],
+        "multiSource": true,
+        "hasDeviceBuses": true
+      },
+      "multiBus": true,
+      "busProtocol": "can"
+    }
+  ],
+  "selections": [
+    {
+      "a": "mqtt",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "mqtt",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "mqtt",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "mqtt",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "mqtt",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "wiretap",
+      "b": "mqtt",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "gvret_tcp",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "gvret_usb",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "slcan",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "socketcan",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "gs_usb",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "virtual",
+      "valid": false
+    },
+    {
+      "a": "wiretap",
+      "b": "framelink",
+      "valid": false
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "gvret_tcp",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "gvret_usb",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "gvret_usb",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "gvret_usb",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "gvret_usb",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "serial",
+      "b": "mqtt",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "gvret_tcp",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "gvret_usb",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "serial",
+      "valid": true
+    },
+    {
+      "a": "serial",
+      "b": "slcan",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "socketcan",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "gs_usb",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "virtual",
+      "valid": false
+    },
+    {
+      "a": "serial",
+      "b": "framelink",
+      "valid": false
+    },
+    {
+      "a": "slcan",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "slcan",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "slcan",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "slcan",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "slcan",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "socketcan",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "socketcan",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "socketcan",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "socketcan",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "gs_usb",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "gs_usb",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "gs_usb",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "gs_usb",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "mqtt",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "gvret_tcp",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "gvret_usb",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "slcan",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "socketcan",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "gs_usb",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "modbus_tcp",
+      "valid": true
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "virtual",
+      "valid": false
+    },
+    {
+      "a": "modbus_tcp",
+      "b": "framelink",
+      "valid": false
+    },
+    {
+      "a": "virtual",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "virtual",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "virtual",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "virtual",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "virtual",
+      "b": "framelink",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "mqtt",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "wiretap",
+      "valid": false
+    },
+    {
+      "a": "framelink",
+      "b": "gvret_tcp",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "gvret_usb",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "serial",
+      "valid": false
+    },
+    {
+      "a": "framelink",
+      "b": "slcan",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "socketcan",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "gs_usb",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "modbus_tcp",
+      "valid": false
+    },
+    {
+      "a": "framelink",
+      "b": "virtual",
+      "valid": true
+    },
+    {
+      "a": "framelink",
+      "b": "framelink",
+      "valid": true
+    }
+  ]
+}
