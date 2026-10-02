@@ -25,7 +25,7 @@ import {
 
 // Re-export for backward compatibility
 export { isCaptureProfileId };
-import type { BusMapping, PlaybackPosition } from "../api/io";
+import type { BusMapping, FramingMode, PlaybackPosition } from "../api/io";
 import type { EventOwner } from "../api/captureEvents";
 import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
@@ -81,7 +81,7 @@ export interface LoadOptions {
   sourceAddressBytes?: number;
   sourceAddressEndianness?: "big" | "little";
   minFrameLength?: number;
-  framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
+  framingEncoding?: FramingMode;
   delimiter?: number[];
   maxFrameLength?: number;
   emitRawBytes?: boolean;

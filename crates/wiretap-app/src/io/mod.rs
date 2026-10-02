@@ -60,7 +60,7 @@ pub use modbus_tcp::{
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
 pub use broker::{IOBroker, SerialOverrides, SourceConfig};
-pub use types::ModbusRtuOptions;
+pub use types::{FramingMode, ModbusRtuOptions};
 pub use mqtt::{MqttConfig, MqttSource};
 
 // Error types

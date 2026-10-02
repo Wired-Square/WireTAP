@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Serial framing names mean one thing everywhere.** Raw was delimiter framing when framing a capture in Discovery and no framing at the port; Raw is now always the unframed bytes and Delimiter always delimiter framing. Saved serial devices load with the framing they had. A catalogue whose serial encoding is COBS or length-prefixed is now refused when its session starts, rather than running unframed, as WireTAP has no framer for either.
 - **A Modbus scan that fails or is cut short no longer ends as complete.** A scan that could not reach its device left its session stopped rather than in error, and a cancelled scan reported a clean finish. A failed scan now ends in error and a cancelled one as stopped.
 - **The repository dialog no longer offers to save a repository that is already saved.** Its Save button stayed enabled, and saving again replaced the saved entry with what the dialog held.
 - **Re-wiring a bus in the Session Manager keeps its protocol.** Dragging a CAN FD bus to a new mapping turned it into classic CAN. It now keeps the protocol it had.

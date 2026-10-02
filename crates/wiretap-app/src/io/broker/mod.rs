@@ -22,7 +22,7 @@ use super::bus_mapping::BusMapping;
 use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
-use super::types::{PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest};
+use super::types::{FramingMode, PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -172,13 +172,13 @@ fn data_streams(
             continue;
         }
         let (framing, raw_bytes) = match live.get(&idx) {
-            Some(req) => (req.encoding.as_str(), req.emit_raw_bytes),
+            Some(req) => (req.encoding, req.emit_raw_bytes),
             None => (
-                source.serial.framing_encoding.as_deref().unwrap_or("raw"),
+                source.serial.framing_encoding.unwrap_or_default(),
                 source.serial.emit_raw_bytes.unwrap_or(false),
             ),
         };
-        streams.rx_frames |= framing != "raw";
+        streams.rx_frames |= framing != FramingMode::Raw;
         streams.rx_bytes |= raw_bytes;
     }
     streams
@@ -233,8 +233,8 @@ impl IOBroker {
         // If framing is now on, the source starts producing frames. A session
         // that began bytes-only (Raw) has no frame capture, so those frames would
         // be dropped (and never streamed/decoded). Create one on demand — mirrors
-        // the `has_framing` branch in `start()`. (matches `framing_from_str`.)
-        let framing_on = matches!(req.encoding.as_str(), "slip" | "modbus_rtu" | "delimiter");
+        // the `has_framing` branch in `start()`.
+        let framing_on = req.encoding != FramingMode::Raw;
         if framing_on
             && capture_store::get_session_frame_capture_id(&self.session_id).is_none()
         {
@@ -1044,7 +1044,7 @@ mod tests {
         SourceConfig {
             profile_kind: "serial".into(),
             serial: SerialOverrides {
-                framing_encoding: Some(framing.into()),
+                framing_encoding: Some(FramingMode::named(framing)),
                 emit_raw_bytes: Some(emit_raw_bytes),
                 ..Default::default()
             },
@@ -1054,7 +1054,7 @@ mod tests {
 
     fn set_framing(encoding: &str, emit_raw_bytes: bool) -> SetFramingRequest {
         SetFramingRequest {
-            encoding: encoding.into(),
+            encoding: FramingMode::named(encoding),
             frame_id_start_byte: None,
             frame_id_bytes: None,
             frame_id_big_endian: true,

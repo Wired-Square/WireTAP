@@ -145,9 +145,9 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         }
         case 'delimiter':
           config = {
-            mode: 'raw',
-            delimiter: candidate.delimiterHex || '0A',
-            maxLength: 1024,
+            mode: 'delimiter',
+            delimiterHex: candidate.delimiterHex || '0A',
+            maxFrameLength: 1024,
           };
           suggestedMinLength = Math.max(4, candidate.minFrameLength);
           break;

@@ -47,6 +47,7 @@ import {
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
+  type FramingMode,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
@@ -282,7 +283,7 @@ export interface UseIOSessionResult {
       speed?: number;
       limit?: number;
       // Serial framing configuration
-      framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
+      framingEncoding?: FramingMode;
       delimiter?: number[];
       maxFrameLength?: number;
       // Modbus RTU framing settings, when framingEncoding is "modbus_rtu"
@@ -1069,7 +1070,7 @@ export function useIOSession(
         endTime?: string;
         speed?: number;
         limit?: number;
-        framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
+        framingEncoding?: FramingMode;
         delimiter?: number[];
         maxFrameLength?: number;
         frameIdStartByte?: number;

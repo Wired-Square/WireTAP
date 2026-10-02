@@ -35,7 +35,7 @@ import {
   type ActiveSessionInfo,
   type DeviceProbeResult,
   type ProfileUsageInfo,
-  type FramingEncoding,
+  type FramingMode,
   type ModbusRangeSpec,
 } from '../api/io';
 import { loadCatalog } from "../utils/catalogParser";
@@ -100,16 +100,9 @@ export interface LoadOptions {
 // Stable empty array to avoid re-renders when selectedIds is not provided
 const EMPTY_SELECTED_IDS: string[] = [];
 
-// Map a catalogue's serial `encoding` to the picker's framing dropdown value.
-// Only encodings the dropdown can represent are mapped (others leave framing as-is).
-const CATALOG_ENCODING_TO_FRAMING: Record<string, FramingEncoding> = {
-  slip: "slip",
-  raw: "raw",
-};
-
 function savedFraming(profile: IOProfile | undefined): InterfaceFramingConfig | undefined {
   const encoding = profile?.kind === "serial" ? profile.connection.framing_encoding : undefined;
-  return encoding ? { encoding: encoding as FramingEncoding } : undefined;
+  return encoding ? { encoding: encoding as FramingMode } : undefined;
 }
 
 type Props = {
@@ -318,7 +311,7 @@ export default function IoSourcePickerDialog({
   const [modbusPoll, setModbusPoll] = useState<ModbusPollConfigState>(DEFAULT_MODBUS_POLL_CONFIG);
   // Serial framing declared by the selected decoder's catalogue (drives the
   // framing dropdown for serial sources). Null when the decoder has no framing.
-  const [catalogSerialEncoding, setCatalogSerialEncoding] = useState<FramingEncoding | null>(null);
+  const [catalogSerialEncoding, setCatalogSerialEncoding] = useState<FramingMode | null>(null);
   // Serial profiles whose framing the user changed by hand — excluded from the
   // catalogue-driven framing sync so a manual choice isn't overwritten.
   const framingUserTouchedRef = useRef<Set<string>>(new Set());
@@ -608,7 +601,9 @@ export default function IoSourcePickerDialog({
     loadCatalog(selectedCatalogPath)
       .then((parsed) => {
         if (cancelled) return;
-        setCatalogSerialEncoding(CATALOG_ENCODING_TO_FRAMING[parsed.serialConfig?.encoding ?? ""] ?? null);
+        // Passed through whole: a catalogue framing no framer implements (COBS,
+        // length-prefixed) is refused by the backend rather than dropped here.
+        setCatalogSerialEncoding((parsed.serialConfig?.encoding as FramingMode | undefined) ?? null);
       })
       .catch(() => { if (!cancelled) setCatalogSerialEncoding(null); });
     return () => { cancelled = true; };

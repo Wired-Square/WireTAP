@@ -15,9 +15,7 @@ import { textSecondary, textPrimary, caption, captionMuted } from "../styles";
 import { cardClass } from "./Card";
 import { Button } from "./Button";
 import { Checkbox, Input } from "./forms";
-
-/** Framing mode/encoding type */
-export type FramingMode = "raw" | "slip" | "delimiter" | "modbus_rtu";
+import type { FramingMode } from "../api/io";
 
 /**
  * The Modbus RTU settings, declared once. `FramingPanelConfig` and the picker's

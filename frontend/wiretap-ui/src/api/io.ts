@@ -19,6 +19,7 @@ import type { DeviceProbeResult } from "../generated/DeviceProbeResult";
 import type { FcProbeConfig } from "../generated/FcProbeConfig";
 import type { FcProbeEntry } from "../generated/FcProbeEntry";
 import type { FcVerdict } from "../generated/FcVerdict";
+import type { FramingMode } from "../generated/FramingMode";
 import type { GvretDeviceInfo } from "../generated/GvretDeviceInfo";
 import type { InterfaceTraits } from "../generated/InterfaceTraits";
 import type { IOCapabilities } from "../generated/IOCapabilities";
@@ -57,6 +58,7 @@ export type {
   FcProbeConfig,
   FcProbeEntry,
   FcVerdict,
+  FramingMode,
   GvretDeviceInfo,
   InterfaceTraits,
   IOCapabilities,
@@ -108,11 +110,6 @@ export function getStateType(state: IOState): IOStateType {
 }
 
 /**
- * Framing encoding types for serial readers.
- */
-export type FramingEncoding = "slip" | "modbus_rtu" | "delimiter" | "raw";
-
-/**
  * Serial framing chosen for one device in the source picker, for one session.
  *
  * Declared here rather than in the picker because the store has to carry it to
@@ -124,7 +121,7 @@ export type FramingEncoding = "slip" | "modbus_rtu" | "delimiter" | "raw";
  */
 export interface InterfaceFramingConfig extends ModbusFramingSettings {
   /** Framing mode */
-  encoding: FramingEncoding;
+  encoding: FramingMode;
   /** Delimiter hex string for delimiter mode (e.g., "0D0A" for CRLF) */
   delimiterHex?: string;
   /** Max frame length for delimiter mode */
@@ -155,8 +152,7 @@ export interface CreateIOSessionOptions {
   useCapture?: boolean;
 
   // Serial framing configuration
-  /** Framing encoding for serial readers: "slip", "modbus_rtu", "delimiter", or "raw" */
-  framingEncoding?: FramingEncoding;
+  framingEncoding?: FramingMode;
   /** Delimiter byte sequence for delimiter-based framing (e.g., [0x0D, 0x0A] for CRLF) */
   delimiter?: number[];
   /** Maximum frame length for delimiter-based framing (default: 256) */
@@ -202,7 +198,7 @@ export interface CreateIOSessionOptions {
 
 /** The serial settings an options object carries, camelCase on the way to Rust's `SerialOverrides`. */
 interface SerialSettings {
-  framingEncoding?: string;
+  framingEncoding?: FramingMode;
   delimiter?: number[];
   maxFrameLength?: number;
   minFrameLength?: number;

@@ -1,20 +1,17 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
+import type { FramingMode } from "./FramingMode";
 import type { ModbusRtuOptions } from "./ModbusRtuOptions";
 
 /**
  * Per-interface framing configuration (overrides default for specific bus)
  */
-export type InterfaceFramingConfig = { 
+export type InterfaceFramingConfig = { mode: FramingMode, 
 /**
- * Framing mode: "raw", "slip", "modbus_rtu"
- */
-mode: "raw" | "slip" | "modbus_rtu", 
-/**
- * For raw mode: delimiter bytes as hex string (e.g., "0D0A")
+ * For delimiter mode: delimiter bytes as hex string (e.g., "0D0A")
  */
 delimiter?: string | null, 
 /**
- * For raw mode: max frame length before forced split
+ * For delimiter mode: max frame length before forced split
  */
 max_length?: number | null, 
 /**

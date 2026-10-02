@@ -1,5 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 import type { FrameIdConfig } from "./FrameIdConfig";
+import type { FramingMode } from "./FramingMode";
 import type { InterfaceFramingConfig } from "./InterfaceFramingConfig";
 import type { ModbusRtuOptions } from "./ModbusRtuOptions";
 
@@ -22,17 +23,13 @@ source_address_config?: FrameIdConfig | null,
 /**
  * Per-interface framing overrides (bus number -> config)
  */
-per_interface?: { [key in number]: InterfaceFramingConfig } | null, 
+per_interface?: { [key in number]: InterfaceFramingConfig } | null, mode: FramingMode, 
 /**
- * Framing mode: "raw", "slip", "modbus_rtu"
- */
-mode: "raw" | "slip" | "modbus_rtu", 
-/**
- * For raw mode: delimiter bytes as hex string (e.g., "0D0A")
+ * For delimiter mode: delimiter bytes as hex string (e.g., "0D0A")
  */
 delimiter?: string | null, 
 /**
- * For raw mode: max frame length before forced split
+ * For delimiter mode: max frame length before forced split
  */
 max_length?: number | null, 
 /**

@@ -1,5 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 import type { BusMapping } from "./BusMapping";
+import type { FramingMode } from "./FramingMode";
 
 /**
  * Source configuration for multi-source session creation (TypeScript-friendly version)
@@ -20,7 +21,7 @@ bus_mappings: Array<BusMapping>,
 /**
  * Framing encoding for serial sources (overrides profile settings if provided)
  */
-framing_encoding?: string | null, 
+framing_encoding?: FramingMode | null, 
 /**
  * Delimiter bytes for delimiter-based framing
  */

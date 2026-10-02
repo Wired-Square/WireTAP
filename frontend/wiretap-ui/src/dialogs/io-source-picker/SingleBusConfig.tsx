@@ -8,14 +8,14 @@ import { useTranslation } from "react-i18next";
 import { Loader2, AlertCircle, CheckCircle2, Bus, Layers, Lock } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
-import type { DeviceProbeResult, FramingEncoding, InterfaceFramingConfig } from "../../api/io";
+import type { DeviceProbeResult, FramingMode, InterfaceFramingConfig } from "../../api/io";
 import { ModbusRtuFields } from "../../components/FramingOptionsPanel";
 import { Checkbox, Input, Select } from "../../components/forms";
 
 export type { InterfaceFramingConfig } from "../../api/io";
 
 /** Framing mode keys for dropdown */
-const FRAMING_KEYS: { value: FramingEncoding; key: string }[] = [
+const FRAMING_KEYS: { value: FramingMode; key: string }[] = [
   { value: "raw", key: "raw" },
   { value: "delimiter", key: "delimiter" },
   { value: "slip", key: "slip" },
@@ -141,7 +141,7 @@ export default function SingleBusConfig({
   const framingSelect = (
     <Select
       value={effectiveFraming}
-      onChange={(e) => onFramingChange?.({ ...framingConfig, encoding: e.target.value as FramingEncoding })}
+      onChange={(e) => onFramingChange?.({ ...framingConfig, encoding: e.target.value as FramingMode })}
       disabled={configLocked}
       size={controlSize}
       className="w-auto"

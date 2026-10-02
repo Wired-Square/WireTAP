@@ -72,8 +72,9 @@ export default function TabBar({
     if (!framingConfig) return t("serial.framingLabel");
     switch (framingConfig.mode) {
       case 'slip': return t("serial.framingSlip");
-      case 'raw': return t("serial.framingDelimiter");
+      case 'delimiter': return t("serial.framingDelimiter");
       case 'modbus_rtu': return t("serial.framingModbus");
+      default: return t("serial.framingLabel");
     }
   };
 

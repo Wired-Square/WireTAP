@@ -33,6 +33,9 @@
 
 use std::collections::HashMap;
 
+use serde::Deserialize;
+
+use crate::io::FramingMode;
 use crate::settings::IOProfile;
 
 /// A default connection value. Kept as a small enum rather than
@@ -366,19 +369,20 @@ pub fn conn_u8_list(profile: &IOProfile, key: &str) -> Option<Vec<u8>> {
 /// dropped on the floor.
 pub fn resolve_serial_framing(
     profile: &IOProfile,
-    framing_override: Option<&str>,
+    framing_override: Option<FramingMode>,
     emit_raw_bytes_override: Option<bool>,
-) -> (String, bool) {
-    // `conn_str` falls through to the kind's declared default, so for a serial
-    // profile — the only kind that reaches here in practice — the last arm is
-    // unreachable and the table's `("framing_encoding", "raw")` decides.
-    let framing = framing_override
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .or_else(|| conn_str(profile, "framing_encoding"))
-        .unwrap_or_else(|| "raw".to_string());
-    let emit_raw_bytes = framing == "raw" || emit_raw_bytes_override.unwrap_or(false);
+) -> (FramingMode, bool) {
+    let framing = framing_override.unwrap_or_else(|| conn_framing(profile));
+    let emit_raw_bytes = framing == FramingMode::Raw || emit_raw_bytes_override.unwrap_or(false);
     (framing, emit_raw_bytes)
+}
+
+/// A profile's saved framing. Its spellings are the session's own, so a saved
+/// `"raw"` is no framing and `"delimiter"` is delimiter framing; a name that is
+/// not a framing falls through to the kind default like any other mis-shaped
+/// field.
+pub fn conn_framing(profile: &IOProfile) -> FramingMode {
+    conn(profile, "framing_encoding", |v| FramingMode::deserialize(v).ok()).unwrap_or_default()
 }
 
 /// The error a reader reports for a field it could not resolve. For a field the
@@ -772,7 +776,7 @@ mod tests {
         let mut profile = profile("serial");
         profile.connection.insert("port".to_string(), "/dev/ttyUSB0".into());
         let session = |framing: &str| SerialOverrides {
-            framing_encoding: Some(framing.to_string()),
+            framing_encoding: Some(FramingMode::named(framing)),
             ..Default::default()
         };
         assert!(parse_profile_for_source(&profile, &session("delimiter")).is_ok());
@@ -795,11 +799,11 @@ mod tests {
     fn a_framed_serial_profile_does_not_resolve_to_raw_bytes() {
         assert_eq!(
             resolve_serial_framing(&serial_profile("slip"), None, None),
-            ("slip".to_string(), false)
+            (FramingMode::Slip, false)
         );
         assert_eq!(
             resolve_serial_framing(&serial_profile("raw"), None, None),
-            ("raw".to_string(), true)
+            (FramingMode::Raw, true)
         );
     }
 
@@ -809,7 +813,7 @@ mod tests {
     fn an_unset_framing_falls_back_to_the_kind_default() {
         assert_eq!(
             resolve_serial_framing(&profile("serial"), None, None),
-            ("raw".to_string(), true)
+            (FramingMode::Raw, true)
         );
     }
 
@@ -818,21 +822,29 @@ mod tests {
     #[test]
     fn a_session_override_wins_over_the_profile() {
         assert_eq!(
-            resolve_serial_framing(&serial_profile("raw"), Some("modbus_rtu"), None),
-            ("modbus_rtu".to_string(), false)
+            resolve_serial_framing(&serial_profile("raw"), Some(FramingMode::ModbusRtu), None),
+            (FramingMode::ModbusRtu, false)
         );
         assert_eq!(
             resolve_serial_framing(&serial_profile("slip"), None, Some(true)),
-            ("slip".to_string(), true)
+            (FramingMode::Slip, true)
         );
     }
 
-    /// A cleared form field writes `""`, which must not read as a framing name.
+    /// Saved profiles were only ever written with the session's spellings, so
+    /// they load meaning what they meant: `raw` unframed, `delimiter` framed.
+    /// A cleared field or a name no framer has reads as the kind default.
     #[test]
-    fn a_blank_override_is_not_a_framing() {
-        assert_eq!(
-            resolve_serial_framing(&serial_profile("slip"), Some(""), None),
-            ("slip".to_string(), false)
-        );
+    fn a_saved_framing_loads_as_the_session_spelling() {
+        for (saved, mode) in [
+            ("raw", FramingMode::Raw),
+            ("delimiter", FramingMode::Delimiter),
+            ("slip", FramingMode::Slip),
+            ("modbus_rtu", FramingMode::ModbusRtu),
+            ("", FramingMode::Raw),
+            ("cobs", FramingMode::Raw),
+        ] {
+            assert_eq!(conn_framing(&serial_profile(saved)), mode, "{saved:?}");
+        }
     }
 }

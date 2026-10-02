@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::modbus_tcp::PollGroup;
-use crate::io::types::{ControlSender, TransmitSender};
+use crate::io::types::{ControlSender, FramingMode, TransmitSender};
 use crate::io::Protocol;
 
 /// The serial settings a session may override on one source, as the picker sends
@@ -24,7 +24,7 @@ use crate::io::Protocol;
 #[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
 pub struct SerialOverrides {
     /// Framing encoding for serial sources (overrides profile settings if provided)
-    pub framing_encoding: Option<String>,
+    pub framing_encoding: Option<FramingMode>,
     /// Delimiter bytes for delimiter-based framing
     pub delimiter: Option<Vec<u8>>,
     /// Maximum frame length for delimiter-based framing

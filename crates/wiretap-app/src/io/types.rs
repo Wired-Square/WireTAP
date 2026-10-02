@@ -175,6 +175,34 @@ fn refused_or_queued(answer: Option<Result<(), String>>) -> TransmitResult {
 // Control Types (live framing changes)
 // ============================================================================
 
+/// How a serial byte stream is cut into frames, in every path that frames one:
+/// the port, a live framing change and re-framing a capture. `Raw` is no
+/// framing, the bytes as read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum FramingMode {
+    #[default]
+    Raw,
+    Slip,
+    Delimiter,
+    ModbusRtu,
+}
+
+impl std::fmt::Display for FramingMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = serde_json::to_value(self).ok();
+        f.write_str(name.as_ref().and_then(serde_json::Value::as_str).unwrap_or_default())
+    }
+}
+
+#[cfg(test)]
+impl FramingMode {
+    pub(crate) fn named(name: &str) -> Self {
+        serde_json::from_value(serde_json::json!(name)).unwrap()
+    }
+}
+
 /// Everything a `ModbusRtuStream` needs, in one place.
 ///
 /// Threaded whole for the reason [`crate::io::SerialOverrides`] gives: these were
@@ -262,9 +290,7 @@ impl ModbusRtuOptions {
 /// platform; the serial reader rebuilds the `FramingEncoding`/`FrameIdConfig`.
 #[derive(Clone, Debug)]
 pub struct SetFramingRequest {
-    /// `slip` | `modbus_rtu` | `delimiter` | `raw` | … (anything not a real
-    /// framer resolves to raw, matching `parse_profile_for_source`).
-    pub encoding: String,
+    pub encoding: FramingMode,
     pub frame_id_start_byte: Option<i32>,
     pub frame_id_bytes: Option<u8>,
     pub frame_id_big_endian: bool,

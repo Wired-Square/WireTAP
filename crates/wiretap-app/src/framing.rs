@@ -43,7 +43,7 @@ pub use ios_stub::*;
 mod desktop {
     use crate::{
         capture_store,
-        io::FrameMessage,
+        io::{FrameMessage, FramingMode},
         io::serial::{DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer},
     };
 
@@ -51,12 +51,10 @@ mod desktop {
     #[derive(Clone, serde::Deserialize)]
     #[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
     pub struct InterfaceFramingConfig {
-        /// Framing mode: "raw", "slip", "modbus_rtu"
-        #[cfg_attr(test, ts(type = r#""raw" | "slip" | "modbus_rtu""#))]
-        pub mode: String,
-        /// For raw mode: delimiter bytes as hex string (e.g., "0D0A")
+        pub mode: FramingMode,
+        /// For delimiter mode: delimiter bytes as hex string (e.g., "0D0A")
         pub delimiter: Option<String>,
-        /// For raw mode: max frame length before forced split
+        /// For delimiter mode: max frame length before forced split
         pub max_length: Option<usize>,
         /// For modbus_rtu mode: the RTU settings. Re-framing has to agree with
         /// the live framer or the Framed tab changes on stop.
@@ -98,14 +96,14 @@ mod desktop {
 
     /// Build framing encoding from mode and options
     fn build_encoding(cfg: &InterfaceFramingConfig) -> Result<FramingEncoding, String> {
-        match cfg.mode.as_str() {
-            "slip" => Ok(FramingEncoding::Slip {
+        match cfg.mode {
+            FramingMode::Slip => Ok(FramingEncoding::Slip {
                 max_frame_len: cfg.max_length.unwrap_or(1024),
             }),
-            "modbus_rtu" => Ok(FramingEncoding::ModbusRtu(
+            FramingMode::ModbusRtu => Ok(FramingEncoding::ModbusRtu(
                 cfg.modbus.clone().unwrap_or_default(),
             )),
-            "raw" => {
+            FramingMode::Delimiter => {
                 let delimiter = match cfg.delimiter.as_deref() {
                     Some(hex) => {
                         wiretap_decode::hex::parse_bytes(hex).map_err(|e| e.to_string())?
@@ -118,7 +116,9 @@ mod desktop {
                     include_delimiter: false,
                 }))
             }
-            mode => Err(format!("Unknown framing mode: {}", mode)),
+            FramingMode::Raw => {
+                Err("Raw is the unframed byte stream; choose a framing to apply".to_string())
+            }
         }
     }
 
@@ -370,7 +370,7 @@ mod desktop {
         fn config(mode: &str) -> BackendFramingConfig {
             BackendFramingConfig {
                 framing: InterfaceFramingConfig {
-                    mode: mode.to_string(),
+                    mode: FramingMode::named(mode),
                     delimiter: None,
                     max_length: None,
                     modbus: None,
@@ -472,12 +472,12 @@ mod desktop {
         #[test]
         fn a_framing_that_frames_every_byte_is_refused() {
             let line = stamped(b"AB\nCD\n");
-            let mut empty = config("raw");
+            let mut empty = config("delimiter");
             empty.framing.delimiter = Some(String::new());
             let err = frame_messages(&line, &empty, None).unwrap_err();
             assert!(err.contains("delimiter"), "{err}");
 
-            for mode in ["raw", "slip"] {
+            for mode in ["delimiter", "slip"] {
                 let mut zero = config(mode);
                 zero.per_interface = Some([(0, InterfaceFramingConfig {
                     max_length: Some(0),
@@ -490,7 +490,24 @@ mod desktop {
 
         #[test]
         fn a_delimited_message_is_stamped_at_its_delimiter() {
-            assert_eq!(stamps(&stamped(b"AB\nCDE\n"), &config("raw")), vec![1_020, 1_060]);
+            assert_eq!(stamps(&stamped(b"AB\nCDE\n"), &config("delimiter")), vec![1_020, 1_060]);
+        }
+
+        /// `raw` once meant *delimiter on LF* here and *no framing* at the port.
+        /// It means no framing everywhere now, which leaves nothing to apply.
+        #[test]
+        fn raw_is_the_byte_stream_not_a_framing_to_apply() {
+            let err = frame_messages(&stamped(b"AB\n"), &config("raw"), None).unwrap_err();
+            assert!(err.contains("Raw"), "{err}");
+        }
+
+        #[test]
+        fn a_framing_no_framer_implements_is_refused_on_the_wire() {
+            for mode in ["cobs", "length_prefixed"] {
+                let wire = serde_json::json!({ "mode": mode });
+                let err = serde_json::from_value::<BackendFramingConfig>(wire).err().unwrap();
+                assert!(err.to_string().contains(mode), "{err}");
+            }
         }
     }
 }

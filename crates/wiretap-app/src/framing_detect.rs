@@ -38,7 +38,7 @@ mod desktop {
     use wiretap_catalog::framing_detect::{self, Candidate, Evidence, Framing};
 
     use crate::capture_store;
-    use crate::io::ModbusRtuOptions;
+    use crate::io::{FramingMode, ModbusRtuOptions};
 
     /// How much of the tail to analyse. Matches what the frontend used to fetch.
     const DEFAULT_SAMPLE_BYTES: usize = 100_000;
@@ -46,7 +46,7 @@ mod desktop {
     #[derive(Clone, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct FramingCandidate {
-        pub mode: &'static str,
+        pub mode: FramingMode,
         pub confidence: i32,
         pub notes: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,9 +121,9 @@ mod desktop {
 
     fn to_candidate(c: &Candidate) -> Option<FramingCandidate> {
         let (mode, delimiter) = match &c.framing {
-            Framing::Slip => ("slip", None),
-            Framing::ModbusRtu => ("modbus_rtu", None),
-            Framing::Delimiter { delimiter, .. } => ("delimiter", Some(delimiter.to_vec())),
+            Framing::Slip => (FramingMode::Slip, None),
+            Framing::ModbusRtu => (FramingMode::ModbusRtu, None),
+            Framing::Delimiter { delimiter, .. } => (FramingMode::Delimiter, Some(delimiter.to_vec())),
             _ => return None,
         };
         Some(FramingCandidate {
@@ -169,7 +169,7 @@ mod desktop {
         match candidates.first() {
             None => notes.push("No clear framing pattern detected".to_string()),
             Some(best) => {
-                let mode = best.mode.to_uppercase();
+                let mode = best.mode.to_string().to_uppercase();
                 let pct = best.confidence;
                 notes.push(match best.confidence {
                     80.. => format!("Strong {mode} framing detected ({pct}% confidence)"),
@@ -249,6 +249,7 @@ pub use desktop::*;
 #[cfg(all(test, not(target_os = "ios")))]
 mod tests {
     use super::desktop::detect;
+    use crate::io::FramingMode;
     use wiretap_catalog::ModbusRtuOptions;
     use wiretap_checksum::algorithms::crc16_modbus_checksum;
 
@@ -258,7 +259,7 @@ mod tests {
         let best = detect(&bytes, &ModbusRtuOptions::default())
             .best_candidate
             .unwrap();
-        assert_eq!(best.mode, "delimiter");
+        assert_eq!(best.mode, FramingMode::Delimiter);
         assert_eq!(best.delimiter_hex.as_deref(), Some("0D0A"));
         assert_eq!(best.notes.last().unwrap(), "CRLF delimiter: 19 frames");
     }
@@ -274,7 +275,7 @@ mod tests {
         let best = detect(&bytes, &ModbusRtuOptions::default())
             .best_candidate
             .unwrap();
-        assert_eq!(best.mode, "modbus_rtu");
+        assert_eq!(best.mode, FramingMode::ModbusRtu);
         assert_eq!(
             best.notes,
             [

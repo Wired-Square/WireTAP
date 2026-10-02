@@ -15,7 +15,7 @@ import {
   type BackendFramingConfig,
 } from '../api/capture';
 import type { PageSize } from '../utils/pageSize';
-import type { ModbusFramingSettings } from '../components/FramingOptionsPanel';
+import type { FramingPanelConfig } from '../components/FramingOptionsPanel';
 
 /** A single byte with timestamp for hex dump display */
 export type SerialBytesEntry = {
@@ -25,14 +25,8 @@ export type SerialBytesEntry = {
   bus?: number;
 };
 
-/** Framing configuration for client-side framing */
-export type FramingConfig = {
-  mode: 'raw' | 'modbus_rtu' | 'slip';
-  /** For raw mode: delimiter bytes (hex string like "0A" or "0D0A") */
-  delimiter?: string;
-  /** For raw mode: max frame length before forced split */
-  maxLength?: number;
-} & ModbusFramingSettings;
+/** Framing configuration for client-side framing; null is no framing */
+export type FramingConfig = FramingPanelConfig;
 
 /** Raw bytes view display mode */
 export type RawBytesDisplayMode = 'individual' | 'chunked';
@@ -268,8 +262,8 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     // Include frame ID and source extraction configs if set
     const backendConfig: BackendFramingConfig = {
       mode: framingConfig.mode,
-      delimiter: framingConfig.delimiter,
-      max_length: framingConfig.maxLength,
+      delimiter: framingConfig.delimiterHex,
+      max_length: framingConfig.maxFrameLength,
       modbus: {
         validate_crc: framingConfig.validateCrc,
         device_address: framingConfig.deviceAddress,

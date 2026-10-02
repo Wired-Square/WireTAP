@@ -381,7 +381,7 @@ fn apply_serial_overrides(
     }
     let (framing, emit_raw_bytes) = device_kinds::resolve_serial_framing(
         profile,
-        config.serial.framing_encoding.as_deref(),
+        config.serial.framing_encoding,
         config.serial.emit_raw_bytes,
     );
     config.serial.framing_encoding = Some(framing);

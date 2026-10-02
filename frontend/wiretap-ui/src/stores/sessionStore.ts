@@ -45,7 +45,7 @@ import {
   type CanTransmitFrame,
   type TransmitResult,
   type CreateIOSessionOptions,
-  type FramingEncoding,
+  type FramingMode,
   type MultiSourceInput,
   type BusMapping,
   type PlaybackPosition,
@@ -298,7 +298,7 @@ export interface CreateSessionOptions {
   /** Use the shared capture source */
   useCapture?: boolean;
   /** Framing encoding for serial readers */
-  framingEncoding?: FramingEncoding;
+  framingEncoding?: FramingMode;
   /** Delimiter bytes for delimiter-based framing */
   delimiter?: number[];
   /** Maximum frame length for delimiter-based framing */
@@ -2125,8 +2125,7 @@ export interface CreateMultiSourceOptions {
   busMappings?: Map<string, BusMapping[]>;
   /** Map of profile ID to display name */
   profileNames?: Map<string, string>;
-  /** Framing encoding for serial sources (e.g., "slip", "delimiter", "modbus_rtu", "raw") */
-  framingEncoding?: string;
+  framingEncoding?: FramingMode;
   /** Delimiter bytes for delimiter-based framing */
   delimiter?: number[];
   /** Maximum frame length for delimiter-based framing */

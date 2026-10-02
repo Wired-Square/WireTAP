@@ -28,7 +28,7 @@ use crate::io::FrameMessage;
 use super::framer::{
     residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
 };
-use super::utils::{framing_from_str, outage_message, probe_serial_presence, SerialSourceConfig};
+use super::utils::{framing_from_mode, outage_message, probe_serial_presence, SerialSourceConfig};
 
 /// How often the read loop looks at the stop flag and for a framing change.
 const POLL: Duration = Duration::from_millis(50);
@@ -330,7 +330,7 @@ impl LiveLine {
     /// next boundary in the new encoding.
     fn set_framing(&mut self, req: SetFramingRequest) {
         self.framer = Framer::new(
-            framing_from_str(&req.encoding, req.modbus.as_ref()),
+            framing_from_mode(req.encoding, req.modbus.as_ref()),
             self.line,
             self.catalog.as_deref(),
         );
@@ -908,7 +908,7 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
         assert!(line.read(b"hello\n", at(1)).is_empty());
 
         line.set_framing(SetFramingRequest {
-            encoding: "delimiter".to_string(),
+            encoding: crate::io::FramingMode::Delimiter,
             frame_id_start_byte: Some(0),
             frame_id_bytes: None,
             frame_id_big_endian: true,

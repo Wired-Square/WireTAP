@@ -292,7 +292,7 @@ pub async fn get_io_session_capabilities(session_id: String) -> Result<Option<IO
 #[allow(clippy::too_many_arguments)]
 pub async fn io_set_framing(
     session_id: String,
-    encoding: String,
+    encoding: crate::io::FramingMode,
     frame_id_start_byte: Option<i32>,
     frame_id_bytes: Option<u8>,
     frame_id_big_endian: Option<bool>,

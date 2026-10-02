@@ -5,7 +5,7 @@
 use wiretap_io::serial::{LineSettings, Parity, SerialError};
 
 use super::framer::{DelimiterOptions, FrameIdConfig, FramingEncoding};
-use crate::io::types::ModbusRtuOptions;
+use crate::io::types::{FramingMode, ModbusRtuOptions};
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
 use crate::io::error::{DevicePresence, IoError};
@@ -81,19 +81,18 @@ pub struct SerialSourceConfig {
     pub emit_raw_bytes: bool,
 }
 
-/// Build a [`FramingEncoding`] from an encoding name using defaults, for live
-/// framing changes that carry no profile context. Mirrors the `match` in
-/// [`parse_profile_for_source`] (anything that isn't a real framer → `Raw`).
-pub fn framing_from_str(encoding: &str, modbus: Option<&ModbusRtuOptions>) -> FramingEncoding {
-    match encoding {
-        "slip" => FramingEncoding::default(),
-        "modbus_rtu" => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
-        "delimiter" => FramingEncoding::Delimiter(DelimiterOptions {
+/// A [`FramingEncoding`] with default options, for live framing changes that
+/// carry no profile context.
+pub fn framing_from_mode(mode: FramingMode, modbus: Option<&ModbusRtuOptions>) -> FramingEncoding {
+    match mode {
+        FramingMode::Slip => FramingEncoding::default(),
+        FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
+        FramingMode::Delimiter => FramingEncoding::Delimiter(DelimiterOptions {
             delimiter: vec![0x0A],
             max_length: 1024,
             include_delimiter: false,
         }),
-        _ => FramingEncoding::Raw,
+        FramingMode::Raw => FramingEncoding::Raw,
     }
 }
 
@@ -169,9 +168,9 @@ pub fn parse_profile_for_source(
     // Session override, then profile, then the kind default — resolved by the
     // same function the broker uses to decide which captures to create, so the
     // port and the session cannot disagree about what is on the wire.
-    let (framing_encoding_str, emit_raw_bytes) = crate::io::device_kinds::resolve_serial_framing(
+    let (framing_mode, emit_raw_bytes) = crate::io::device_kinds::resolve_serial_framing(
         profile,
-        overrides.framing_encoding.as_deref(),
+        overrides.framing_encoding,
         overrides.emit_raw_bytes,
     );
 
@@ -179,11 +178,11 @@ pub fn parse_profile_for_source(
         .max_frame_length
         .or_else(|| conn_i64(profile, "max_frame_length").map(|n| n as usize))
         .unwrap_or(1024);
-    let framing_encoding = match framing_encoding_str.as_str() {
-        "slip" => FramingEncoding::Slip { max_frame_len },
+    let framing_encoding = match framing_mode {
+        FramingMode::Slip => FramingEncoding::Slip { max_frame_len },
         // Session override first, then the profile, then the default — the
         // picker's "Validate CRC" tick had no way through before and did nothing.
-        "modbus_rtu" => FramingEncoding::ModbusRtu(ModbusRtuOptions {
+        FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(ModbusRtuOptions {
             device_address: overrides
                 .modbus_device_address
                 .or_else(|| conn_i64(profile, "modbus_device_address").map(|n| n as u8)),
@@ -205,7 +204,7 @@ pub fn parse_profile_for_source(
                 .or_else(|| conn_bool(profile, "modbus_any_function"))
                 .unwrap_or(false),
         }),
-        "delimiter" => {
+        FramingMode::Delimiter => {
             let delimiter = overrides
                 .delimiter
                 .clone()
@@ -218,7 +217,7 @@ pub fn parse_profile_for_source(
                 include_delimiter,
             })
         }
-        "raw" | _ => FramingEncoding::Raw,
+        FramingMode::Raw => FramingEncoding::Raw,
     };
 
     let frame_id_config = extraction(
@@ -273,7 +272,7 @@ mod tests {
 
     #[test]
     fn a_slip_line_without_end_stops_growing_at_the_frame_cap() {
-        let mut framer = SerialFramer::new(framing_from_str("slip", None)).unwrap();
+        let mut framer = SerialFramer::new(framing_from_mode(FramingMode::Slip, None)).unwrap();
         framer.feed(&[0x55; 4096]);
         let released = framer.feed(&[wiretap_protocol::slip::END]);
         let longest = released.iter().map(|f| f.bytes.len()).max();
