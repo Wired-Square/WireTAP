@@ -5,7 +5,7 @@ use keepawake::{Builder as KeepAwakeBuilder, KeepAwake};
 use once_cell::sync::Lazy;
 
 #[cfg(not(target_os = "ios"))]
-use super::{roster::subscriber_count_for_session, session::IO_SESSIONS, IOState};
+use super::{roster::subscriber_count_for_session, session::each_idle_session, IOState};
 
 // ============================================================================
 // Wake Lock Management (prevents system sleep during active sessions)
@@ -69,11 +69,10 @@ pub(super) async fn update_wake_lock() {
     }
 
     // Check if any session is actively running with listeners
-    let sessions = IO_SESSIONS.lock().await;
-    let any_watched = sessions.iter().any(|(session_id, session)| {
+    let any_watched = each_idle_session(|session_id, session| {
         matches!(session.source.state(), IOState::Running) && subscriber_count_for_session(session_id) > 0
-    });
-    drop(sessions);
+    })
+    .contains(&true);
 
     // A capture that is actively recording keeps the machine awake even with no
     // UI subscribers. Otherwise closing or suspending the last panel drops the

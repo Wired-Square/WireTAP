@@ -4,9 +4,10 @@ use once_cell::sync::Lazy;
 use tauri::{AppHandle, Manager};
 
 use super::roster::{emit_open_apps_changed, subscriber_count_for_session, subscribers_for_session, APP_REGISTRY};
-use super::session::{destroy_session, emit_joiner_count_change, pause_session, IO_SESSIONS};
+use super::session::{
+    destroy_session, each_idle_session, emit_joiner_count_change, pause_suspended_session, session_states,
+};
 use super::wake::update_wake_lock;
-use super::IOState;
 
 /// Heartbeat timeout - listeners that haven't sent a heartbeat in this time are considered stale.
 /// Set to 30s (up from 10s) to tolerate WKWebView timer throttling during display sleep.
@@ -97,10 +98,9 @@ async fn check_webview_health() {
 
     // Check if any session is in the suspension grace period
     let any_suspended_long_enough = {
-        let sessions = IO_SESSIONS.lock().await;
         let now = std::time::Instant::now();
         let delay = std::time::Duration::from_secs(PROBE_START_DELAY_SECS);
-        sessions.values().any(|s| {
+        session_states().values().any(|s| {
             s.suspended_at
                 .map(|at| now.duration_since(at) > delay)
                 .unwrap_or(false)
@@ -267,10 +267,14 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
         emit_open_apps_changed();
     }
 
-    // Phase 2: Under the IO_SESSIONS lock, grace-destroy already-suspended sessions
-    // and suspend any session that just lost its last subscriber.
+    // Phase 2: grace-destroy already-suspended sessions and suspend any session that
+    // just lost its last subscriber.
+    let after_counts: Vec<_> = affected
+        .iter()
+        .map(|(sid, removed)| (sid, *removed, subscriber_count_for_session(sid)))
+        .collect();
     {
-        let mut sessions = IO_SESSIONS.lock().await;
+        let mut sessions = session_states();
 
         // Grace-period expiry for already-suspended sessions.
         for (session_id, session) in sessions.iter() {
@@ -299,10 +303,9 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
         }
 
         // Suspend sessions whose last subscriber just went stale.
-        for (sid, removed_count) in &affected {
+        for (sid, removed_count, after_count) in after_counts {
             let Some(session) = sessions.get_mut(sid) else { continue };
-            let after_count = subscriber_count_for_session(sid);
-            results.push((sid.clone(), *removed_count, after_count));
+            results.push((sid.clone(), removed_count, after_count));
 
             // Emit joiner count change (sync - no specific subscriber)
             emit_joiner_count_change(sid, after_count, None, None, None);
@@ -316,20 +319,20 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
                 session.suspended_at = Some(now);
 
                 // Pause the reader to stop frame emission (reduces IPC pressure
-                // while the WebView is throttled). Only pause if running.
-                if matches!(session.source.state(), IOState::Running) {
-                    sessions_to_pause.push(sid.clone());
-                }
+                // while the WebView is throttled).
+                sessions_to_pause.push(sid.clone());
             }
         }
     } // Lock released here
 
-    // Phase 2a: Pause suspended sessions (separate from lock to avoid holding it during async pause)
+    // Phase 2a: Pause suspended sessions, off the watchdog: one may be mid-open.
     for session_id in sessions_to_pause {
-        tlog!("[reader watchdog] Pausing suspended session '{}'", session_id);
-        if let Err(e) = pause_session(&session_id).await {
-            tlog!("[reader watchdog] Failed to pause session '{}': {}", session_id, e);
-        }
+        tauri::async_runtime::spawn(async move {
+            tlog!("[reader watchdog] Pausing suspended session '{}'", session_id);
+            if let Err(e) = pause_suspended_session(&session_id).await {
+                tlog!("[reader watchdog] Failed to pause session '{}': {}", session_id, e);
+            }
+        });
     }
 
     // Phase 2b: Destroy sessions that exceeded the grace period
@@ -403,15 +406,7 @@ fn get_rss_mb() -> Option<f64> {
 
 /// Log current session status (for debugging)
 async fn log_session_status() {
-    let sessions = IO_SESSIONS.lock().await;
-    let running_queries = crate::apiclient::running_queries().await;
-
-    if sessions.is_empty() && running_queries.is_empty() {
-        return; // Don't log if nothing active
-    }
-
-    tlog!("[session status] ========== Active Sessions ==========");
-    for (session_id, session) in sessions.iter() {
+    let lines = each_idle_session(|session_id, session| {
         let state = session.source.state().name();
         let subscribers = subscribers_for_session(session_id);
         let subscriber_ids: Vec<&str> = subscribers.iter().map(|s| s.subscriber_id.as_str()).collect();
@@ -420,20 +415,29 @@ async fn log_session_status() {
         } else {
             format!(", sources={:?}", session.source_names)
         };
-        let suspended = if let Some(at) = session.suspended_at {
-            format!(", SUSPENDED for {:?}", std::time::Instant::now().duration_since(at))
-        } else {
-            String::new()
+        let suspended = match session_states().get(session_id).and_then(|s| s.suspended_at) {
+            Some(at) => format!(", SUSPENDED for {:?}", at.elapsed()),
+            None => String::new(),
         };
-        tlog!(
-            "[session status]   '{}': state={}, listeners={} {:?}{}{}",
+        format!(
+            "'{}': state={}, listeners={} {:?}{}{}",
             session_id,
             state,
             subscriber_ids.len(),
             subscriber_ids,
             sources,
             suspended
-        );
+        )
+    });
+    let running_queries = crate::apiclient::running_queries().await;
+
+    if lines.is_empty() && running_queries.is_empty() {
+        return; // Don't log if nothing active
+    }
+
+    tlog!("[session status] ========== Active Sessions ==========");
+    for line in lines {
+        tlog!("[session status]   {}", line);
     }
     if !running_queries.is_empty() {
         tlog!("[session status] ---------- Running Queries -----------");

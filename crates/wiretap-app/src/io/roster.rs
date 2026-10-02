@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::Emitter;
 
-use super::session::{teardown_session_if_empty, IOSession, IO_SESSIONS};
+use super::session::{each_session, lock_session, session_states, teardown_session_if_empty, IOSession};
 use super::webview_health::APP_HANDLE;
 use super::{broker, IOCapabilities, IOState, SourceConfig};
 use crate::{capture_store, sessions};
@@ -21,7 +21,7 @@ use crate::{capture_store, sessions};
 // `subscribers_for_session` / `subscriber_count_for_session`.
 //
 // Lock discipline: APP_REGISTRY is a std Mutex held only for tiny critical
-// sections. NEVER hold it across `IO_SESSIONS.lock().await`. Mutating functions
+// sections. NEVER hold it across an await or while taking a session. Mutating functions
 // take the registry lock, mutate, drop the guard, THEN emit the roster broadcast
 // (which re-locks the registry) and run any async session teardown.
 
@@ -217,8 +217,8 @@ pub(super) fn detach_all_from_session(session_id: &str) {
         n
     };
     // Log and broadcast outside the lock — `tlog!` writes to stderr and an unbuffered
-    // file, and `APP_REGISTRY` is taken inside `register_subscriber`'s `IO_SESSIONS`
-    // critical section, so blocking here would extend the async session mutex.
+    // file, and `APP_REGISTRY` is taken inside `register_subscriber`'s session lock,
+    // so blocking here would extend it.
     if detached == 0 {
         return;
     }
@@ -286,21 +286,18 @@ pub fn emit_open_apps_changed() {
 
 /// Get the state of a reader session (None if session doesn't exist)
 pub async fn get_session_state(session_id: &str) -> Option<IOState> {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions.get(session_id).map(|s| s.source.state())
+    lock_session(session_id).await.ok().map(|s| s.source.state())
 }
 
 /// Get the capabilities of a session (None if session doesn't exist)
 pub async fn get_session_capabilities(session_id: &str) -> Option<IOCapabilities> {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions.get(session_id).map(|s| s.source.capabilities())
+    lock_session(session_id).await.ok().map(|s| s.source.capabilities())
 }
 
 /// Get the joiner count for a session (0 if session doesn't exist). Derived from
 /// the open-app registry (the count of attached app instances).
 pub async fn get_session_joiner_count(session_id: &str) -> usize {
-    let sessions = IO_SESSIONS.lock().await;
-    if sessions.contains_key(session_id) {
+    if session_exists(session_id).await {
         subscriber_count_for_session(session_id)
     } else {
         0
@@ -309,9 +306,9 @@ pub async fn get_session_joiner_count(session_id: &str) -> usize {
 
 /// The first output bus no source of this session has claimed, disabled buses included.
 pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions
-        .get(session_id)
+    lock_session(session_id)
+        .await
+        .ok()
         .and_then(|s| s.source.broker_configs())
         .into_iter()
         .flatten()
@@ -324,9 +321,8 @@ pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
 /// Get the stored source configs for a session (used for resume-to-live).
 /// Returns empty vec if session doesn't exist or has no stored configs.
 pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions
-        .get(session_id)
+    lock_session(session_id)
+        .await
         .map(|s| s.source_configs.clone())
         .unwrap_or_default()
 }
@@ -352,13 +348,12 @@ pub async fn touch_subscriber_heartbeats(session_ids: &[String]) {
 }
 
 pub async fn session_ids() -> HashSet<String> {
-    IO_SESSIONS.lock().await.keys().cloned().collect()
+    session_states().keys().cloned().collect()
 }
 
 /// Check if a session exists
 pub async fn session_exists(session_id: &str) -> bool {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions.contains_key(session_id)
+    session_states().contains_key(session_id)
 }
 
 /// Info about an active session (for listing)
@@ -414,19 +409,15 @@ pub struct ActiveSessionInfo {
 
 /// List all active sessions
 pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions
-        .iter()
-        .map(|(session_id, session)| describe_session(session_id, session))
-        .collect()
+    each_session(describe_session).await
 }
 
 /// One session's listing, or `None` when there is no such session.
 pub async fn session_info(session_id: &str) -> Option<ActiveSessionInfo> {
-    let sessions = IO_SESSIONS.lock().await;
-    sessions
-        .get(session_id)
-        .map(|session| describe_session(session_id, session))
+    lock_session(session_id)
+        .await
+        .ok()
+        .map(|session| describe_session(session_id, &session))
 }
 
 fn describe_session(session_id: &str, session: &IOSession) -> ActiveSessionInfo {
@@ -486,8 +477,7 @@ pub struct SubscriberInfo {
 /// Get all listeners for a session.
 /// Useful for debugging and for the frontend to understand session state.
 pub async fn get_session_subscribers(session_id: &str) -> Result<Vec<SubscriberInfo>, String> {
-    let sessions = IO_SESSIONS.lock().await;
-    if !sessions.contains_key(session_id) {
+    if !session_exists(session_id).await {
         return Err(format!("Session '{}' not found", session_id));
     }
     Ok(subscribers_for_session(session_id))

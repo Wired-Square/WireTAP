@@ -91,6 +91,13 @@ pub fn register_session_profile(session_id: &str, profile_id: &str) {
     registry().add(session_id, profile_id);
 }
 
+/// Register `profile_id` for a session about to be created, once a teardown in
+/// flight on the same id has released what the old session held.
+pub(super) async fn claim_session_profile(session_id: &str, profile_id: &str) {
+    crate::io::settle_session(session_id).await;
+    register_session_profile(session_id, profile_id);
+}
+
 /// Hold `profile_id` for `session_id` while `open` runs, so a second opener is
 /// refused meanwhile, and let it go again if `open` fails and the session did
 /// not already hold it.

@@ -1,10 +1,12 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
+use std::sync::{Arc, MutexGuard, PoisonError, RwLock};
+use std::time::Instant;
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, OwnedMutexGuard};
 
 use super::roster::{
     attach_app, current_session_of_app, detach_all_from_session, detach_app, other_instances_on_session,
@@ -36,9 +38,126 @@ pub struct IOSession {
     /// Original source configs for rebuilding the live reader on resume.
     /// Empty for non-multi-source sessions (recorded, buffer).
     pub source_configs: Vec<SourceConfig>,
+    /// Set by the teardown before it lets go of the session, so whoever was waiting
+    /// on the session finds it gone.
+    retired: bool,
+}
+
+/// Everything the process keeps for one session, so that forgetting a session is
+/// removing its entry. The profiles are the exception: they are keyed both ways
+/// in `sessions::tracking`.
+pub(super) struct SessionState {
+    io: Arc<Mutex<IOSession>>,
     /// When all listeners went stale. During this grace period the reader is paused
     /// but the session stays alive, allowing recovery after display sleep / App Nap.
-    pub suspended_at: Option<std::time::Instant>,
+    pub(super) suspended_at: Option<Instant>,
+    /// Updated during capture/recorded streaming, polled by the frontend.
+    playback_position: Option<PlaybackPosition>,
+    /// An error from before any subscriber registered, handed to the first one.
+    startup_error: Option<String>,
+}
+
+/// The session registry. Held only to find a session or touch its synchronous
+/// state, never across an await: a driver call holds its own session's lock
+/// instead, so a slow device open stalls only that session.
+static IO_SESSIONS: Lazy<std::sync::Mutex<HashMap<String, SessionState>>> = Lazy::new(Default::default);
+
+pub(super) fn session_states() -> MutexGuard<'static, HashMap<String, SessionState>> {
+    IO_SESSIONS.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn not_found(session_id: &str) -> String {
+    format!("Session '{}' not found", session_id)
+}
+
+/// The session, held for one operation. Operations on one session run one at a
+/// time; different sessions' run in parallel.
+pub(super) async fn lock_session(session_id: &str) -> Result<OwnedMutexGuard<IOSession>, String> {
+    let cell = session_states()
+        .get(session_id)
+        .map(|s| s.io.clone())
+        .ok_or_else(|| not_found(session_id))?;
+    let session = cell.lock_owned().await;
+    if session.retired {
+        return Err(not_found(session_id));
+    }
+    Ok(session)
+}
+
+/// Wait out whatever operation is running on the session, a teardown included.
+pub async fn settle_session(session_id: &str) {
+    let _ = lock_session(session_id).await;
+}
+
+fn with_state<R>(session_id: &str, f: impl FnOnce(&mut SessionState) -> R) -> Option<R> {
+    session_states().get_mut(session_id).map(f)
+}
+
+fn session_cells() -> Vec<(String, Arc<Mutex<IOSession>>)> {
+    session_states().iter().map(|(id, s)| (id.clone(), s.io.clone())).collect()
+}
+
+/// `f` over every session, waiting for any that is mid-operation.
+pub(super) async fn each_session<R>(mut f: impl FnMut(&str, &IOSession) -> R) -> Vec<R> {
+    let mut out = Vec::new();
+    for (id, cell) in session_cells() {
+        let session = cell.lock().await;
+        if !session.retired {
+            out.push(f(&id, &session));
+        }
+    }
+    out
+}
+
+/// `f` over every session not mid-operation: the watchdog's view, which must not
+/// wait on a slow device.
+pub(super) fn each_idle_session<R>(mut f: impl FnMut(&str, &IOSession) -> R) -> Vec<R> {
+    session_cells()
+        .into_iter()
+        .filter_map(|(id, cell)| {
+            let session = cell.try_lock().ok()?;
+            (!session.retired).then(|| f(&id, &session))
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+enum Transition {
+    Start,
+    Stop,
+    Pause,
+    Resume,
+}
+
+impl Transition {
+    fn reached(self, state: &IOState) -> bool {
+        matches!(
+            (self, state),
+            (Self::Start | Self::Resume, IOState::Running)
+                | (Self::Stop, IOState::Stopped)
+                | (Self::Pause, IOState::Paused)
+        )
+    }
+}
+
+/// Drive the source to `to` and emit the state change; a no-op when it is already there.
+async fn transition(session_id: &str, session: &mut IOSession, to: Transition) -> Result<IOState, String> {
+    let previous = session.source.state();
+    if to.reached(&previous) {
+        return Ok(previous);
+    }
+    let source = &mut session.source;
+    match to {
+        Transition::Start => source.start().await?,
+        Transition::Stop => source.stop().await?,
+        Transition::Pause => source.pause().await?,
+        Transition::Resume => source.resume().await?,
+    }
+    let current = session.source.state();
+    if previous != current {
+        emit_state_change(session_id, &previous, &current);
+    }
+    Ok(current)
 }
 
 /// Convert IOState to a simple string for TypeScript
@@ -72,20 +191,15 @@ fn emit_speed_change(session_id: &str, speed: f64) {
     crate::ws::dispatch::send_session_info(session_id, speed, 0xFFFF);
 }
 
-/// Global session manager
-pub(super) static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-/// If `session_id` has no attached subscribers left, extract and destroy it (same
-/// cascade as the last subscriber leaving). Otherwise emit the updated joiner count.
+/// If `session_id` has no attached subscribers left, destroy it (same cascade as
+/// the last subscriber leaving). Otherwise emit the updated joiner count.
 /// `reset` marks a deliberate move away from this session (see `destroy_session`);
 /// it rides the `destroyed` event so apps return to "No source" instead of adopting
 /// the orphaned capture.
 pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool) {
     let count = subscriber_count_for_session(session_id);
     if count == 0 {
-        let extracted = { IO_SESSIONS.lock().await.remove(session_id) };
-        if let Some(session) = extracted {
+        if let Ok(session) = lock_session(session_id).await {
             tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
             emit_joiner_count_change(session_id, 0, None, None, Some("left"));
             tear_down(session_id, session, Teardown::Destroy { reset }).await;
@@ -99,24 +213,12 @@ pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool) {
     // purpose because the session comes straight back under the same id.
 }
 
-/// Playback position cache — updated during capture/recorded streaming, polled by frontend
-static PLAYBACK_POSITIONS: Lazy<RwLock<HashMap<String, PlaybackPosition>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
-
 pub fn store_playback_position(session_id: &str, position: PlaybackPosition) {
-    if let Ok(mut positions) = PLAYBACK_POSITIONS.write() {
-        positions.insert(session_id.to_string(), position);
-    }
+    with_state(session_id, |s| s.playback_position = Some(position));
 }
 
 pub fn get_playback_position(session_id: &str) -> Option<PlaybackPosition> {
-    PLAYBACK_POSITIONS.read().ok().and_then(|p| p.get(session_id).cloned())
-}
-
-pub fn clear_playback_position(session_id: &str) {
-    if let Ok(mut positions) = PLAYBACK_POSITIONS.write() {
-        positions.remove(session_id);
-    }
+    session_states().get(session_id).and_then(|s| s.playback_position.clone())
 }
 
 /// Sessions that are currently closing (window close in progress)
@@ -127,38 +229,20 @@ static CLOSING_SESSIONS: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 // Startup Errors
 // ============================================================================
 
-/// Startup errors for sessions (errors that occurred before any subscriber registered).
-/// Uses RwLock (not async Mutex) so it can be set synchronously.
-/// The error is retrieved and cleared when the first subscriber registers.
-static STARTUP_ERRORS: Lazy<RwLock<HashMap<String, String>>> = Lazy::new(|| RwLock::new(HashMap::new()));
-
 /// Store a startup error for a session (called when error occurs with no listeners)
 pub fn store_startup_error(session_id: &str, error: String) {
-    if let Ok(mut errors) = STARTUP_ERRORS.write() {
-        tlog!("[reader] Storing session error for session '{}': {}", session_id, error);
-        errors.insert(session_id.to_string(), error);
-    }
+    tlog!("[reader] Storing session error for session '{}': {}", session_id, error);
+    with_state(session_id, |s| s.startup_error = Some(error));
 }
 
 /// Take (retrieve and remove) the startup error for a session
 pub fn take_startup_error(session_id: &str) -> Option<String> {
-    if let Ok(mut errors) = STARTUP_ERRORS.write() {
-        errors.remove(session_id)
-    } else {
-        None
-    }
+    with_state(session_id, |s| s.startup_error.take()).flatten()
 }
 
 /// Read the startup error without removing it (for signal-then-fetch polling)
 pub fn get_startup_error(session_id: &str) -> Option<String> {
-    STARTUP_ERRORS.read().ok().and_then(|e| e.get(session_id).cloned())
-}
-
-/// Clear any startup error for a session (called on session destroy)
-fn clear_startup_error(session_id: &str) {
-    if let Ok(mut errors) = STARTUP_ERRORS.write() {
-        errors.remove(session_id);
-    }
+    session_states().get(session_id).and_then(|s| s.startup_error.clone())
 }
 
 /// Mark a session as closing (sync version for use in window event handler)
@@ -211,14 +295,44 @@ pub async fn create_session(
     // Clear the closing flag in case this is a new session for a previously closed window
     clear_session_closing(&session_id);
 
-    let mut sessions = IO_SESSIONS.lock().await;
+    let capabilities = device.capabilities();
+    let source_type = device.source_type().to_string();
+    let state = device.state();
+    let app_for_event = app.clone();
 
-    // Check if session already exists - join it instead of overwriting
-    if let Some(existing) = sessions.get_mut(&session_id) {
+    // Join an existing session rather than overwrite it, once whatever it is doing
+    // has finished. One that a teardown retired meanwhile is gone: look again.
+    let existing = loop {
+        let cell = match session_states().entry(session_id.clone()) {
+            Entry::Occupied(entry) => entry.get().io.clone(),
+            Entry::Vacant(entry) => {
+                let io = Arc::new(Mutex::new(IOSession {
+                    source: device,
+                    app,
+                    source_names: source_names.unwrap_or_default(),
+                    source_configs,
+                    retired: false,
+                }));
+                entry.insert(SessionState {
+                    io,
+                    suspended_at: None,
+                    playback_position: None,
+                    startup_error: None,
+                });
+                break None;
+            }
+        };
+        let session = cell.lock_owned().await;
+        if !session.retired {
+            break Some(session);
+        }
+    };
+
+    if let Some(existing) = existing {
         let capabilities = existing.source.capabilities();
 
         // Clear suspension if the session was in the grace period
-        if existing.suspended_at.take().is_some() {
+        if with_state(&session_id, |s| s.suspended_at.take()).flatten().is_some() {
             tlog!(
                 "[reader] Session '{}' clearing suspension (new subscriber joining)",
                 session_id
@@ -245,9 +359,6 @@ pub async fn create_session(
         };
     }
 
-    // No existing session - create new one
-    let capabilities = device.capabilities();
-
     // Attach the creating subscriber to the registry (the per-session view is derived).
     if let Some(lid) = subscriber_id.clone() {
         let resolved_name = app_name.unwrap_or_else(|| lid.clone());
@@ -261,18 +372,6 @@ pub async fn create_session(
     }
 
     let subscriber_count = subscriber_count_for_session(&session_id).max(1);
-    let source_type = device.source_type().to_string();
-    let state = device.state();
-    let app_for_event = app.clone();
-    let session = IOSession {
-        source: device,
-        app,
-        source_names: source_names.unwrap_or_default(),
-        source_configs,
-        suspended_at: None,
-    };
-
-    sessions.insert(session_id.clone(), session);
 
     // Emit global session lifecycle event (to all windows)
     // Use get_session_profile_ids() to get actual profile IDs (not display names)
@@ -300,58 +399,18 @@ pub async fn create_session(
 /// Returns the confirmed state after the operation.
 pub async fn start_session(session_id: &str) -> Result<IOState, String> {
     tlog!("[reader] start_session('{}') called", session_id);
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| {
-            tlog!("[reader] start_session('{}') - session not found!", session_id);
-            format!("Session '{}' not found", session_id)
-        })?;
-
-    let previous = session.source.state();
-    tlog!("[reader] start_session('{}') - previous state: {:?}", session_id, previous);
-
-    // Idempotency: if already running, return success
-    if matches!(previous, IOState::Running) {
-        tlog!("[reader] start_session('{}') - already running, returning", session_id);
-        return Ok(previous);
-    }
-
-    tlog!("[reader] start_session('{}') - calling device.start()...", session_id);
-    session.source.start().await?;
-
-    let current = session.source.state();
-    tlog!("[reader] start_session('{}') - current state: {:?}", session_id, current);
-    if previous != current {
-        emit_state_change(session_id, &previous, &current);
-    }
-
+    let mut session = lock_session(session_id)
+        .await
+        .inspect_err(|e| tlog!("[reader] start_session: {}", e))?;
+    let current = transition(session_id, &mut session, Transition::Start).await?;
+    tlog!("[reader] start_session('{}') - state: {:?}", session_id, current);
     Ok(current)
 }
 
 /// Stop a reader session
 /// Returns the confirmed state after the operation.
 pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    let previous = session.source.state();
-
-    // Idempotency: if already stopped, return success
-    if matches!(previous, IOState::Stopped) {
-        return Ok(previous);
-    }
-
-    session.source.stop().await?;
-
-    let current = session.source.state();
-    if previous != current {
-        emit_state_change(session_id, &previous, &current);
-    }
-
-    Ok(current)
+    transition(session_id, &mut *lock_session(session_id).await?, Transition::Stop).await
 }
 
 /// Suspend a reader session - stops streaming, finalizes capture, session stays alive.
@@ -359,10 +418,7 @@ pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
 /// Use `resume_session_fresh` to start streaming again with a new capture.
 /// Returns the confirmed state after the operation.
 pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     let previous = session.source.state();
 
@@ -399,18 +455,14 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
 /// Steps: stop old device → swap device → optionally update metadata → optionally
 /// auto-start → emit `session-lifecycle` signal → emit state change.
 ///
-/// Takes `&mut HashMap` so callers can hold the IO_SESSIONS lock across the
-/// full operation (preventing double-lock).
-pub async fn replace_session_source(
-    sessions: &mut HashMap<String, IOSession>,
+/// Takes the session already locked, so a caller's checks and the swap are one
+/// operation on it.
+async fn replace_session_source(
+    session: &mut IOSession,
     session_id: &str,
     new_device: Box<dyn IOSource>,
     opts: ReplaceSourceOptions,
 ) -> Result<SourceReplacedPayload, String> {
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
     // 1. Stop old device (idempotent)
     let previous_state = session.source.state();
     if !matches!(previous_state, IOState::Stopped) {
@@ -436,7 +488,7 @@ pub async fn replace_session_source(
     }
 
     // 6. Clear suspension state
-    session.suspended_at = None;
+    with_state(session_id, |s| s.suspended_at = None);
 
     // 7. Optionally auto-start
     if opts.auto_start {
@@ -480,12 +532,12 @@ pub async fn replace_session_source(
 /// If no capture exists (e.g. stopped before any frames), falls back to a normal
 /// suspend.
 pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
+    let mut session = lock_session(session_id).await?;
 
     // A session already replaying has no realtime source to stop, and re-switching it
     // would restart playback from the beginning. The streaming-set lookup this replaced
     // refused that case by accident, having no capture to offer once one was finalised.
-    if sessions.get(session_id).is_some_and(|s| s.source.source_type() == CAPTURE_SOURCE_TYPE) {
+    if session.source.source_type() == CAPTURE_SOURCE_TYPE {
         return Err(format!("Session '{}' is already replaying a capture", session_id));
     }
 
@@ -494,14 +546,8 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
 
     // Stop the device first — stop() triggers emit_stream_ended which calls
     // finalize_capture(), so we must stop before looking up the capture.
-    // Scoped to release the mutable borrow before calling replace_session_source.
-    {
-        let session = sessions
-            .get_mut(session_id)
-            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-        if !matches!(session.source.state(), IOState::Stopped) {
-            session.source.stop().await?;
-        }
+    if !matches!(session.source.state(), IOState::Stopped) {
+        session.source.stop().await?;
     }
 
     // CaptureSource replays frames only, so a session that streamed bytes has nothing to
@@ -526,7 +572,7 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
         // Device is already stopped, so replace_session_source's stop is a no-op
         // replace_session_source emits session-lifecycle internally
         let result = replace_session_source(
-            &mut sessions,
+            &mut session,
             session_id,
             Box::new(new_reader),
             ReplaceSourceOptions {
@@ -560,14 +606,9 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
 /// A new capture is created by the device's start() method.
 /// Returns the confirmed state after the operation.
 pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     let previous = session.source.state();
-
-    // Must be stopped to resume with new capture
     if !matches!(previous, IOState::Stopped) {
         return Err(format!(
             "Session must be stopped to resume with new capture (current: {:?})",
@@ -579,14 +620,9 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     let caps = session.source.capabilities();
     crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &previous, &caps);
 
-    // Start the device - this will orphan old capture and create new one
-    // Recorded sources (the WireTAP backend, CSV, Capture) handle capture creation in start()
-    session.source.start().await?;
-
-    let current = session.source.state();
-    if previous != current {
-        emit_state_change(session_id, &previous, &current);
-    }
+    // Starting orphans the old capture and creates a new one. Recorded sources
+    // (the WireTAP backend, CSV, Capture) handle capture creation in start().
+    let current = transition(session_id, &mut session, Transition::Start).await?;
 
     tlog!(
         "[reader] resume_session_fresh('{}') - device started with fresh capture",
@@ -599,119 +635,59 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
 /// Pause a reader session
 /// Returns the confirmed state after the operation.
 pub async fn pause_session(session_id: &str) -> Result<IOState, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    transition(session_id, &mut *lock_session(session_id).await?, Transition::Pause).await
+}
 
-    let previous = session.source.state();
-
-    // Idempotency: if already paused, return success
-    if matches!(previous, IOState::Paused) {
-        return Ok(previous);
+/// Pause a session the watchdog suspended, unless a subscriber came back first.
+pub(super) async fn pause_suspended_session(session_id: &str) -> Result<IOState, String> {
+    let mut session = lock_session(session_id).await?;
+    let state = session.source.state();
+    let suspended = with_state(session_id, |s| s.suspended_at.is_some()).unwrap_or(false);
+    if !suspended || !matches!(state, IOState::Running) {
+        return Ok(state);
     }
-
-    session.source.pause().await?;
-
-    let current = session.source.state();
-    if previous != current {
-        emit_state_change(session_id, &previous, &current);
-    }
-
-    Ok(current)
+    transition(session_id, &mut session, Transition::Pause).await
 }
 
 /// Resume a reader session
 /// Returns the confirmed state after the operation.
 pub async fn resume_session(session_id: &str) -> Result<IOState, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    let previous = session.source.state();
-
-    // Idempotency: if already running, return success
-    if matches!(previous, IOState::Running) {
-        return Ok(previous);
-    }
-
-    session.source.resume().await?;
-
-    let current = session.source.state();
-    if previous != current {
-        emit_state_change(session_id, &previous, &current);
-    }
-
-    Ok(current)
+    transition(session_id, &mut *lock_session(session_id).await?, Transition::Resume).await
 }
 
 /// Enable or disable traffic generation for a virtual device session
 pub async fn set_session_traffic_enabled(session_id: &str, enabled: bool) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.set_traffic_enabled(enabled)
+    lock_session(session_id).await?.source.set_traffic_enabled(enabled)
 }
 
 /// Enable or disable signal generator for a specific bus
 pub async fn set_session_bus_traffic_enabled(session_id: &str, bus: u8, enabled: bool) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.set_bus_traffic_enabled(bus, enabled)
+    lock_session(session_id).await?.source.set_bus_traffic_enabled(bus, enabled)
 }
 
 /// Update signal generator cadence for a specific bus
 pub async fn set_session_bus_cadence(session_id: &str, bus: u8, frame_rate_hz: f64) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.set_bus_cadence(bus, frame_rate_hz)
+    lock_session(session_id).await?.source.set_bus_cadence(bus, frame_rate_hz)
 }
 
 /// Query per-bus signal generator states
 pub async fn get_session_virtual_bus_states(session_id: &str) -> Result<Vec<VirtualBusState>, String> {
-    let sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.virtual_bus_states()
+    lock_session(session_id).await?.source.virtual_bus_states()
 }
 
 /// Add a virtual bus generator to a running session
 pub async fn add_session_virtual_bus(session_id: &str, bus: u8, traffic_type: String, frame_rate_hz: f64) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.add_virtual_bus(bus, traffic_type, frame_rate_hz)
+    lock_session(session_id).await?.source.add_virtual_bus(bus, traffic_type, frame_rate_hz)
 }
 
 /// Remove a virtual bus generator from a running session
 pub async fn remove_session_virtual_bus(session_id: &str, bus: u8) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.remove_virtual_bus(bus)
+    lock_session(session_id).await?.source.remove_virtual_bus(bus)
 }
 
 /// Update speed for a reader session
 pub async fn update_session_speed(session_id: &str, speed: f64) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     session.source.set_speed(speed)?;
 
@@ -734,12 +710,9 @@ pub async fn update_session_time_range(
         end
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions.get_mut(session_id).ok_or_else(|| {
-        let err = format!("Session '{}' not found", session_id);
-        tlog!("[io] update_session_time_range: {}", err);
-        err
-    })?;
+    let mut session = lock_session(session_id)
+        .await
+        .inspect_err(|e| tlog!("[io] update_session_time_range: {}", e))?;
 
     let result = session.source.set_time_range(start, end);
     if let Err(ref e) = result {
@@ -762,12 +735,9 @@ pub async fn reconfigure_session(
         session_id, start, end
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions.get_mut(session_id).ok_or_else(|| {
-        let err = format!("Session '{}' not found", session_id);
-        tlog!("[io] reconfigure_session: {}", err);
-        err
-    })?;
+    let mut session = lock_session(session_id)
+        .await
+        .inspect_err(|e| tlog!("[io] reconfigure_session: {}", e))?;
 
     // Phase 1: Stop the old stream and update options (no new frames after this)
     session.source.prepare_reconfigure(start.clone(), end.clone()).await?;
@@ -796,32 +766,17 @@ pub async fn reconfigure_session(
 
 /// Seek to a specific timestamp in microseconds
 pub async fn seek_session(session_id: &str, timestamp_us: i64) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.seek(timestamp_us)
+    lock_session(session_id).await?.source.seek(timestamp_us)
 }
 
 /// Seek to a specific frame index (preferred for capture playback)
 pub async fn seek_session_by_frame(session_id: &str, frame_index: i64) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.seek_by_frame(frame_index)
+    lock_session(session_id).await?.source.seek_by_frame(frame_index)
 }
 
 /// Set playback direction (reverse = true for backwards playback)
 pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.source.set_direction(reverse)
+    lock_session(session_id).await?.source.set_direction(reverse)
 }
 
 /// Switch a session to capture replay mode.
@@ -865,9 +820,8 @@ pub async fn switch_to_capture_replay(app: &AppHandle, session_id: &str, speed: 
         speed,
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
     let result = replace_session_source(
-        &mut sessions,
+        &mut *lock_session(session_id).await?,
         session_id,
         Box::new(new_reader),
         ReplaceSourceOptions {
@@ -898,10 +852,9 @@ pub async fn resume_to_live_session(
         session_id
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
     // replace_session_source emits session-lifecycle internally
     let result = replace_session_source(
-        &mut sessions,
+        &mut *lock_session(session_id).await?,
         session_id,
         new_reader,
         ReplaceSourceOptions {
@@ -918,12 +871,11 @@ pub async fn resume_to_live_session(
 /// Destroy a reader session. `reset` marks a deliberate user destroy so the
 /// frontend resets to "No source" rather than the orphaned capture.
 pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String> {
-    let removed = { IO_SESSIONS.lock().await.remove(session_id) };
-    match removed {
-        Some(session) => tear_down(session_id, session, Teardown::Destroy { reset }).await,
+    match lock_session(session_id).await {
+        Ok(session) => tear_down(session_id, session, Teardown::Destroy { reset }).await,
         // Stale attachments and per-session state must go even if the session had
         // already been removed (see `detach_all_from_session`).
-        None => {
+        Err(_) => {
             detach_all_from_session(session_id);
             forget_session(session_id);
         }
@@ -938,14 +890,17 @@ enum Teardown {
     Reinitialise,
 }
 
-/// Stop a session already removed from `IO_SESSIONS`, clear its per-session state,
-/// then emit `destroyed`. The caller must not hold the `IO_SESSIONS` lock.
-async fn tear_down(session_id: &str, mut session: IOSession, how: Teardown) {
+/// Stop the session, forget it, then emit `destroyed`. It stays registered and
+/// locked until stopped, so a same-id create waits for the teardown instead of
+/// having its profiles released by it.
+async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, how: Teardown) {
     let destroying = matches!(how, Teardown::Destroy { .. });
     if destroying {
         detach_all_from_session(session_id);
     }
     let _ = session.source.stop().await;
+    session_states().remove(session_id);
+    session.retired = true;
     if destroying {
         // The frontend fetches the orphaned ids from the post-session cache when it
         // handles `destroyed`, so they are stored before it and outlive the session.
@@ -967,28 +922,23 @@ async fn tear_down(session_id: &str, mut session: IOSession, how: Teardown) {
     tlog!("[reader] Session '{}' destroyed", session_id);
 }
 
-/// Clear a session's per-session state, returning the profiles it held.
+/// Clear what a session holds outside its entry, returning the profiles it held.
 fn forget_session(session_id: &str) -> Vec<String> {
     clear_session_closing(session_id);
-    clear_startup_error(session_id);
-    clear_playback_position(session_id);
     sessions::release_session_profiles(session_id)
 }
 
-fn transmitting_session<'a>(
-    sessions: &'a HashMap<String, IOSession>,
+async fn transmitting_session(
     session_id: &str,
     payload: &TransmitPayload,
-) -> Result<&'a IOSession, String> {
+) -> Result<OwnedMutexGuard<IOSession>, String> {
     if matches!(payload, TransmitPayload::CanFrame(f) if f.is_brs && !f.is_fd) {
         return Err("A classic CAN frame does not support bit rate switch (BRS)".to_string());
     }
     if matches!(payload, TransmitPayload::CanFrame(f) if f.is_rtr && f.is_fd) {
         return Err("A CAN FD frame does not support remote request (RTR)".to_string());
     }
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let session = lock_session(session_id).await?;
 
     let caps = session.source.capabilities();
 
@@ -1007,11 +957,10 @@ fn transmitting_session<'a>(
 
 /// Transmit a payload through a session (unified)
 pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Result<TransmitResult, String> {
-    let sessions = IO_SESSIONS.lock().await;
     // Call device transmit — fire-and-forget for most devices.
     // Queues the frame into the device's transmit channel and returns
     // immediately. The lock is held only briefly for the channel send.
-    transmitting_session(&sessions, session_id, payload)?.source.transmit(payload)
+    transmitting_session(session_id, payload).await?.source.transmit(payload)
 }
 
 /// Transmit a CAN frame through a session (convenience wrapper)
@@ -1022,11 +971,8 @@ pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Resul
 /// [`transmit_frame`], waiting for room in the source's send queue instead of
 /// being refused by a full one. The wait holds no session lock.
 pub async fn transmit_frame_when_ready(session_id: &str, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
-    let pending = {
-        let sessions = IO_SESSIONS.lock().await;
-        let payload = TransmitPayload::CanFrame(frame.clone());
-        transmitting_session(&sessions, session_id, &payload)?.source.pending_can_transmit(frame)?
-    };
+    let payload = TransmitPayload::CanFrame(frame.clone());
+    let pending = transmitting_session(session_id, &payload).await?.source.pending_can_transmit(frame)?;
     pending.send_when_ready().await
 }
 
@@ -1041,13 +987,12 @@ pub async fn transmit_serial(session_id: &str, bytes: &[u8]) -> Result<TransmitR
 /// mappings once it has seen the device — where no command is on the stack to
 /// return the new set to. Silently does nothing if the session has since gone.
 pub async fn refresh_session_capabilities(session_id: &str) {
-    let sessions = IO_SESSIONS.lock().await;
-    let Some(session) = sessions.get(session_id) else {
+    let Ok(session) = lock_session(session_id).await else {
         return;
     };
     let capabilities = session.source.capabilities();
     let state = session.source.state();
-    drop(sessions);
+    drop(session);
 
     crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &capabilities);
 }
@@ -1063,14 +1008,11 @@ pub async fn set_framing(
     if let Some(options) = req.modbus.clone() {
         crate::ws::dispatch::set_serial_rtu_options(session_id, options);
     }
-    let sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let session = lock_session(session_id).await?;
     session.source.set_framing(req)?;
     let capabilities = session.source.capabilities();
     let state = session.source.state();
-    drop(sessions);
+    drop(session);
 
     crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &capabilities);
     Ok(capabilities)
@@ -1112,26 +1054,20 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
     let prev_session_id = current_session_of_app(subscriber_id);
 
     let result = {
-        let mut sessions = IO_SESSIONS.lock().await;
-        let now = std::time::Instant::now();
+        let mut session = lock_session(session_id).await?;
 
-        // Verify the session exists before attaching, and resume it if a heartbeat
-        // arrived while it was suspended (e.g. display woke up, App Nap ended).
-        let needs_resume = {
-            let session = sessions
-                .get_mut(session_id)
-                .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-            if let Some(suspended_at) = session.suspended_at.take() {
-                let suspended_for = now.duration_since(suspended_at);
+        // Resume the session if a heartbeat arrived while it was suspended (e.g.
+        // display woke up, App Nap ended).
+        let needs_resume = match with_state(session_id, |s| s.suspended_at.take()).flatten() {
+            Some(suspended_at) => {
                 tlog!(
                     "[reader] Session '{}' resuming from suspension (was suspended for {:?}, subscriber '{}' heartbeat)",
-                    session_id, suspended_for, subscriber_id
+                    session_id, suspended_at.elapsed(), subscriber_id
                 );
                 // Only resume if the device is paused (we paused it during suspension)
                 matches!(session.source.state(), IOState::Paused)
-            } else {
-                false
             }
+            None => false,
         };
 
         // Attach (idempotent — refreshes heartbeat / app_name / is_active). The
@@ -1149,24 +1085,10 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
         // exactly this, and used to be told "frames" or nothing at all.
         let (capture_id, capture_kind) = crate::capture_store::get_session_capture(session_id).unzip();
 
-        let session = sessions
-            .get_mut(session_id)
-            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-        // Resume from suspension if needed (the reader was paused when listeners went stale)
         if needs_resume {
-            let previous = session.source.state();
-            match session.source.resume().await {
-                Ok(()) => {
-                    let current = session.source.state();
-                    if previous != current {
-                        emit_state_change(session_id, &previous, &current);
-                    }
-                    tlog!("[reader] Session '{}' reader resumed successfully", session_id);
-                }
-                Err(e) => {
-                    tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e);
-                }
+            match transition(session_id, &mut session, Transition::Resume).await {
+                Ok(_) => tlog!("[reader] Session '{}' reader resumed successfully", session_id),
+                Err(e) => tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e),
             }
         }
 
@@ -1307,10 +1229,7 @@ pub async fn add_source_to_session(
     session_id: &str,
     new_source: SourceConfig,
 ) -> Result<IOCapabilities, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     // Get current source configs — only multi-source sessions support this
     let existing_configs = session.source.broker_configs()
@@ -1368,10 +1287,7 @@ pub async fn remove_source_from_session(
     session_id: &str,
     profile_id: &str,
 ) -> Result<IOCapabilities, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     // Get current source configs — only multi-source sessions support this
     let existing_configs = session.source.broker_configs()
@@ -1443,10 +1359,7 @@ pub async fn set_source_polling(
     profile_id: &str,
     polling: bool,
 ) -> Result<(), String> {
-    let sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let session = lock_session(session_id).await?;
 
     if polling {
         session.source.resume_source_polling(profile_id)?;
@@ -1478,10 +1391,7 @@ pub async fn update_source_bus_mappings(
     profile_id: &str,
     mut bus_mappings: Vec<BusMapping>,
 ) -> Result<IOCapabilities, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     // Only multi-source sessions support this
     let configs = session.source.broker_configs()
@@ -1529,10 +1439,7 @@ pub async fn reload_session_source(
     session_id: &str,
     profile_id: &str,
 ) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    let mut session = lock_session(session_id).await?;
 
     let mappings = session
         .source
@@ -1577,16 +1484,14 @@ pub async fn reinitialize_session_if_safe(
     session_id: &str,
     subscriber_id: &str,
 ) -> Result<ReinitializeResult, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-
     // Session doesn't exist - that's fine, caller can create a new one
-    if !sessions.contains_key(session_id) {
+    let Ok(session) = lock_session(session_id).await else {
         return Ok(ReinitializeResult {
             success: true,
             reason: None,
             other_subscribers: vec![],
         });
-    }
+    };
 
     // Check if this subscriber is the only one (derived from the open-app registry)
     let other_subscribers = other_instances_on_session(session_id, subscriber_id);
@@ -1602,10 +1507,7 @@ pub async fn reinitialize_session_if_safe(
         });
     }
 
-    if let Some(session) = sessions.remove(session_id) {
-        drop(sessions);
-        tear_down(session_id, session, Teardown::Reinitialise).await;
-    }
+    tear_down(session_id, session, Teardown::Reinitialise).await;
 
     tlog!(
         "[reader] Session '{}' reinitialized by subscriber '{}'",
@@ -1623,11 +1525,8 @@ pub async fn reinitialize_session_if_safe(
 /// When a subscriber detaches (stops receiving frames), set is_active to false.
 /// When they rejoin, set is_active to true.
 pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_active: bool) -> Result<(), String> {
-    {
-        let sessions = IO_SESSIONS.lock().await;
-        if !sessions.contains_key(session_id) {
-            return Err(format!("Session '{}' not found", session_id));
-        }
+    if !session_exists(session_id).await {
+        return Err(not_found(session_id));
     }
     // The subscriber lives in the open-app registry; verify it's attached to this session.
     if current_session_of_app(subscriber_id).as_deref() != Some(session_id) {
@@ -1701,5 +1600,34 @@ mod tests {
         sessions::register_session_profile("f_destroyed", "slcan-destroyed");
         tauri::async_runtime::block_on(destroy_session("f_destroyed", false)).unwrap();
         assert!(crate::profile_tracker::can_use_profile("slcan-destroyed", "slcan", None).is_ok());
+    }
+
+    #[test]
+    fn every_operation_on_a_missing_session_is_refused_as_not_found() {
+        let id = "f_never_created";
+        let not_found = "Session 'f_never_created' not found";
+        tauri::async_runtime::block_on(async {
+            assert_eq!(start_session(id).await.unwrap_err(), not_found);
+            assert_eq!(stop_session(id).await.unwrap_err(), not_found);
+            assert_eq!(suspend_session(id).await.unwrap_err(), not_found);
+            assert_eq!(pause_session(id).await.unwrap_err(), not_found);
+            assert_eq!(resume_session(id).await.unwrap_err(), not_found);
+            assert_eq!(resume_session_fresh(id).await.unwrap_err(), not_found);
+            assert_eq!(seek_session(id, 0).await.unwrap_err(), not_found);
+            assert_eq!(update_session_speed(id, 1.0).await.unwrap_err(), not_found);
+            assert_eq!(reconfigure_session(id, None, None).await.unwrap_err(), not_found);
+            assert_eq!(transmit_serial(id, &[0]).await.unwrap_err(), not_found);
+            assert!(super::super::get_session_state(id).await.is_none());
+            assert!(reinitialize_session_if_safe(id, "w_app").await.unwrap().success);
+        });
+    }
+
+    #[test]
+    fn a_missing_session_keeps_no_per_session_state() {
+        let id = "f_never_created_state";
+        store_startup_error(id, "boom".into());
+        store_playback_position(id, PlaybackPosition { timestamp_us: 1, frame_index: 1, frame_count: None });
+        assert_eq!(get_startup_error(id), None);
+        assert_eq!(get_playback_position(id).map(|p| p.frame_index), None);
     }
 }

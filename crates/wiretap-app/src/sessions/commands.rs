@@ -40,8 +40,8 @@ use super::source_config::{
     MultiSourceInput,
 };
 use super::tracking::{
-    cache_probe_result, clear_probe_cache, get_cached_probe, get_session_profile_ids, get_sessions_for_profile,
-    hold_profile_while, register_session_profile, register_session_profiles, restore_session_profiles,
+    cache_probe_result, claim_session_profile, clear_probe_cache, get_cached_probe, get_session_profile_ids,
+    get_sessions_for_profile, hold_profile_while, register_session_profiles, restore_session_profiles,
     unregister_session_profile,
 };
 
@@ -260,7 +260,7 @@ pub async fn create_reader_session(
     };
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
-    register_session_profile(&session_id, &profile_id_for_tracking);
+    claim_session_profile(&session_id, &profile_id_for_tracking).await;
 
     let result = create_session(app, session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
 
@@ -527,7 +527,7 @@ pub async fn create_capture_source_session(
         return Err("No data in capture. Please import a CSV file first.".to_string());
     }
 
-    register_session_profile(&session_id, &capture_id);
+    claim_session_profile(&session_id, &capture_id).await;
 
     let reader = CaptureSource::new(
         app.clone(),
@@ -561,7 +561,7 @@ pub async fn transition_to_capture_source(
         return Err("No data in capture for replay".to_string());
     }
 
-    register_session_profile(&session_id, &capture_id);
+    claim_session_profile(&session_id, &capture_id).await;
 
     let reader = CaptureSource::new(
         app.clone(),
@@ -1746,7 +1746,7 @@ pub async fn create_modbus_scan_session(
     }
 
     if let Some(pid) = &profile_id {
-        register_session_profile(&session_id, pid);
+        claim_session_profile(&session_id, pid).await;
     }
 
     let source = crate::io::ModbusScanSource::new(app.clone(), session_id.clone(), job);

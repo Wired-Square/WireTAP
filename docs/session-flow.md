@@ -935,11 +935,21 @@ read.
 
 ## 4. Rust session lifecycle
 
-A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
-[crates/wiretap-app/src/io/mod.rs](../crates/wiretap-app/src/io/mod.rs). Each session owns a
-`Box<dyn IOSource>` plus source config, profile bookkeeping, and capabilities. Its
-subscribers are **not** stored on it — they live in the global `APP_REGISTRY` (see
+A session is a `SessionState` in the global `IO_SESSIONS` map in
+[crates/wiretap-app/src/io/session.rs](../crates/wiretap-app/src/io/session.rs). It holds the
+session's `IOSession` (the `Box<dyn IOSource>` plus its source names and configs) behind a
+per-session lock, and beside it the session's synchronous state: the suspension stamp, the
+playback position and the startup error. Forgetting a session is removing its entry; only the
+profiles live elsewhere, in `sessions::tracking`. Its subscribers are **not** stored on it —
+they live in the global `APP_REGISTRY` (see
 [The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)).
+
+**Two locks.** `IO_SESSIONS` is a plain mutex held only to find a session or touch its
+synchronous state, never across an await. Every operation takes the session's own lock
+(`lock_session`) for its whole length, driver calls included, so operations on one session
+run one at a time while other sessions, the roster and the watchdog carry on. A slow device
+open stalls only the session it opens. The watchdog reads only sessions not mid-operation,
+and pauses a suspended session off its own loop.
 
 Every session eventually becomes a capture (or is torn down). Pause/Play control the
 live view; the three **exit controls** in the session menu each end it differently:
@@ -1111,9 +1121,12 @@ evicts and tears down all over again.
 
 **One teardown.** `destroy_session`, the last-subscriber path and
 `reinitialize_session_if_safe` all end in `tear_down`: detach the subscribers,
-stop the source and orphan its captures (a reinitialise keeps the first and last,
-since the session comes straight back under the same id), then release the session's profiles, closing
-flag, startup error and playback position, and only then emit `destroyed`. The
+stop the source, remove the session's entry and orphan its captures (a reinitialise keeps the first and last,
+since the session comes straight back under the same id), then release the session's profiles and closing
+flag, and only then emit `destroyed`. The session stays registered and locked until it is
+stopped, so a same-id create waits for the teardown and then creates afresh, and the
+creators register their profiles through `claim_session_profile`, which waits the same way,
+so a teardown can no longer release a profile its successor has just claimed. The
 profiles live in one registry (`sessions::tracking`), which the single-handle
 admission check (`profile_tracker::can_use_profile`) and the picker's "(in use)"
 both read, so a destroyed session can no longer hold a serial or slcan device.
@@ -1170,7 +1183,7 @@ it (marks it persistent). The Speed item is always present but disabled
 ### `replace_session_source` — the shared primitive
 
 All three transitions (stop→capture, capture→live, recorded→capture replay) go
-through [`replace_session_source`](../crates/wiretap-app/src/io/mod.rs):
+through [`replace_session_source`](../crates/wiretap-app/src/io/session.rs):
 
 1. Stop old device (idempotent — no-op if already stopped).
 2. Record old device type.
@@ -1181,9 +1194,8 @@ through [`replace_session_source`](../crates/wiretap-app/src/io/mod.rs):
 7. Emit a `session-lifecycle` scoped message containing the new state and
    capabilities so all subscribers pick up the change.
 
-It takes `&mut HashMap<String, IOSession>` rather than the lock itself, so
-callers can hold `IO_SESSIONS` across their full operation and avoid
-double-locking.
+It takes the session already locked, so a caller's checks and the swap are one
+operation on that session, and no other session waits on it.
 
 ---
 
@@ -1984,7 +1996,9 @@ polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
 
 | File | Role |
 |------|------|
-| [crates/wiretap-app/src/io/mod.rs](../crates/wiretap-app/src/io/mod.rs) | `IOSource` trait, `IOSession`, lifecycle, `replace_session_source`, heartbeat watchdog |
+| [crates/wiretap-app/src/io/mod.rs](../crates/wiretap-app/src/io/mod.rs) | `IOSource` trait and the emit surface the drivers call |
+| [crates/wiretap-app/src/io/session.rs](../crates/wiretap-app/src/io/session.rs) | `IOSession`, `SessionState`, the session locks, lifecycle, `replace_session_source`, `tear_down` |
+| [crates/wiretap-app/src/io/webview_health.rs](../crates/wiretap-app/src/io/webview_health.rs) | Heartbeat watchdog and WebView recovery |
 | [crates/wiretap-app/src/io/traits.rs](../crates/wiretap-app/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
 | [crates/wiretap-app/src/io/ephemeral.rs](../crates/wiretap-app/src/io/ephemeral.rs) | Ad-hoc device registry, overlaid onto `io_profiles` (see [Where a device lives](#where-a-device-lives--saved-and-ad-hoc-profiles)) |
 | [crates/wiretap-app/src/io/profiles.rs](../crates/wiretap-app/src/io/profiles.rs) | `reconfigure_device` — write a device's settings and reconnect it |
