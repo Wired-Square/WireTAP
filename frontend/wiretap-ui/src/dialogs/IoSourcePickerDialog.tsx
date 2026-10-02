@@ -57,6 +57,7 @@ import ModbusPollConfig, {
   type ModbusPollConfigState,
 } from "./io-source-picker/ModbusPollConfig";
 import { MODBUS_PROFILE_KIND, modbusConnectionOf } from "../utils/modbusProfiles";
+import { useConnectionDefaults } from "../hooks/useConnectionDefaults";
 import {
   localToIsoWithOffset,
   CSV_EXTERNAL_ID,
@@ -397,6 +398,7 @@ export default function IoSourcePickerDialog({
     [checkedSourceIds, checkedSourceId]
   );
   /** The Modbus source in that selection, if any — what the poll range applies to. */
+  const modbusDefaults = useConnectionDefaults(MODBUS_PROFILE_KIND);
   const modbusProfile = useMemo(
     () => selectedSourceIds
       .map((id) => readProfiles.find((p) => p.id === id))
@@ -974,7 +976,7 @@ export default function IoSourcePickerDialog({
     // The unit comes from the profile: the poll loop sets the slave per request,
     // so a spec without it reads unit 1 whatever the profile says.
     if (modbusProfile) {
-      const spec = pollSpecFor(modbusPoll, modbusConnectionOf(modbusProfile).unit_id);
+      const spec = pollSpecFor(modbusPoll, modbusConnectionOf(modbusProfile, modbusDefaults).unit_id);
       if (spec) opts.modbusRanges = spec;
     }
 
@@ -1137,12 +1139,6 @@ export default function IoSourcePickerDialog({
     setCheckedReaderId((prev) => (prev === profileId ? null : prev));
     setCheckedReaderIds((prev) => prev.filter((id) => id !== profileId));
   };
-
-  /** Names taken by existing devices, for the editor's duplicate check. */
-  const takenDeviceNames = useMemo(
-    () => new Set(readProfiles.map((p) => p.name)),
-    [readProfiles],
-  );
 
   // Handle time bounds change from TimeBoundsInput
   const handleTimeBoundsChange = useCallback((bounds: TimeBounds) => {
@@ -1764,7 +1760,6 @@ export default function IoSourcePickerDialog({
         {creatingDevice ? (
           <div className="max-h-[70vh] overflow-y-auto">
             <DeviceEditor
-              takenNames={takenDeviceNames}
               onCancel={() => setCreatingDevice(false)}
               onUseAdHoc={handleUseAdHocDevice}
               onSave={handleSaveDevice}

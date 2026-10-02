@@ -558,7 +558,9 @@
         "nameRequired": "Give the device a name.",
         "nameDuplicate": "Another device already has this name.",
         "portRequired": "Pick a serial port.",
-        "hostRequired": "A Modbus TCP device needs a host."
+        "hostRequired": "This device needs a host.",
+        "fieldRequired": "Fill in {{field}}.",
+        "fieldInvalid": "{{field}} has a value this device cannot use."
       },
       "discardFailedTitle": "Discard Failed",
       "discardFailed": "Could not discard this device."
@@ -587,7 +589,9 @@
       "nameRequired": "Give the device a name.",
       "nameDuplicate": "Another device already has this name.",
       "portRequired": "Pick a serial port.",
-      "hostRequired": "A Modbus TCP device needs a host."
+      "hostRequired": "This device needs a host.",
+      "fieldRequired": "Fill in {{field}}.",
+      "fieldInvalid": "{{field}} has a value this device cannot use."
     }
   }
 }

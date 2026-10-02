@@ -16,21 +16,22 @@ import {
   applyConnectionDefaults,
   newSavedProfileId,
   storeProfileSecrets,
-  validateProfileForm,
 } from '../../../../settings/ioProfileForm';
+import { validateIOProfile, type ValidationCode } from '../../../../api/deviceKinds';
 import { clearProfileProbeCache } from '../../../../api/ephemeralProfiles';
 import { withProbedFields } from '../../../../components/io/useConnectionProbe';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { useAdHocProfileStore } from '../../../../stores/adHocProfileStore';
 import { withAppError } from '../../../../utils/appError';
 
-/** Validation messages, matching `ProfileValidationError`. */
-const VALIDATION_MESSAGES = {
+const VALIDATION_MESSAGES: Record<ValidationCode, string> = {
   nameRequired: 'Profile name is required.',
   nameDuplicate: 'A profile with this name already exists. Please choose a unique name.',
   portRequired: 'Serial port is required. Please select a port from the dropdown.',
-  hostRequired: 'Host is required for Modbus TCP.',
-} as const;
+  hostRequired: 'Host is required.',
+  fieldRequired: 'Connection field "{field}" is required.',
+  fieldInvalid: 'Connection field "{field}" has a value the device cannot use.',
+};
 
 export function useIOProfileHandlers() {
   // Store selectors
@@ -139,17 +140,13 @@ export function useIOProfileHandlers() {
   const handleSaveProfile = async () => {
     const { editingProfileId, profileForm } = dialogPayload;
 
-    const takenNames = new Set(
-      profiles.filter((p) => p.id !== editingProfileId).map((p) => p.name)
-    );
-    const invalid = validateProfileForm(profileForm, takenNames);
+    const invalid = await validateIOProfile(profileForm);
     if (invalid) {
-      showAppError('Validation Error', VALIDATION_MESSAGES[invalid]);
+      showAppError('Validation Error', VALIDATION_MESSAGES[invalid.code].replace('{field}', invalid.field ?? ''));
       return;
     }
 
-    // Apply default connection values
-    const processedForm = applyConnectionDefaults(profileForm);
+    const processedForm = await applyConnectionDefaults(profileForm);
 
     // Determine the profile ID
     const profileId = editingProfileId || newSavedProfileId();

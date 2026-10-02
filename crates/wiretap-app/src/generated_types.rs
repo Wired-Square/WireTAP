@@ -73,6 +73,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.visit::<crate::settings::DirectoryValidation>();
+    r.visit::<crate::io::device_kinds::ProfileValidationError>();
     r.visit::<crate::captures::CandumpImportResult>();
     r.visit::<crate::captures::CsvImportResult>();
     r.visit::<crate::captures::PaginatedBytesResponse>();

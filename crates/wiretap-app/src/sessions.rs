@@ -856,20 +856,9 @@ pub async fn create_reader_session(
         match profile.kind.as_str() {
         "wiretap" => {
             let config = BackendApiConfig {
-                base_url: profile
-                    .connection
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "WireTAP backend URL is required".to_string())?
-                    .trim_end_matches('/')
-                    .to_string(),
+                base_url: req_str(&profile, "url")?.trim_end_matches('/').to_string(),
                 api_key: credentials::resolve_secret(&profile, "api_key").unwrap_or_default(),
-                database: profile
-                    .connection
-                    .get("database")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("wiretap")
-                    .to_string(),
+                database: req_str(&profile, "database")?,
                 protocol: crate::apiclient::archive_protocol(&profile.connection)?,
             };
 
@@ -903,22 +892,8 @@ pub async fn create_reader_session(
             Box::new(BackendApiSource::new(session_id.clone(), config, options))
         }
         "mqtt" => {
-            let host = profile
-                .connection
-                .get("host")
-                .and_then(|v| v.as_str())
-                .unwrap_or("localhost")
-                .to_string();
-
-            let port = profile
-                .connection
-                .get("port")
-                .and_then(|v| {
-                    v.as_str()
-                        .and_then(|s| s.parse().ok())
-                        .or_else(|| v.as_i64().map(|n| n as u16))
-                })
-                .unwrap_or(1883);
+            let host = req_str(&profile, "host")?;
+            let port = device_kinds::req_i64(&profile, "port")? as u16;
 
             let username = profile
                 .connection

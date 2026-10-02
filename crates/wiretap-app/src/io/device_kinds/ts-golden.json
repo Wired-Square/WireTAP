@@ -1,0 +1,59 @@
+{
+  "defaults": {
+    "mqtt": {
+      "host": "localhost",
+      "port": "1883"
+    },
+    "wiretap": {
+      "url": "http://localhost:8423",
+      "database": "wiretap"
+    },
+    "gvret_tcp": {
+      "host": "192.168.1.100",
+      "port": "23"
+    },
+    "gvret_usb": {},
+    "framelink": {
+      "port": "120"
+    },
+    "slcan": {
+      "baud_rate": "115200",
+      "bitrate": "500000",
+      "silent_mode": true
+    },
+    "gs_usb": {},
+    "socketcan": {
+      "interface": "can0"
+    },
+    "modbus_tcp": {
+      "host": "192.168.1.100",
+      "port": "502",
+      "unit_id": "1"
+    },
+    "serial": {
+      "baud_rate": "115200",
+      "data_bits": "8",
+      "stop_bits": "1",
+      "parity": "none"
+    },
+    "virtual": {}
+  },
+  "required": {
+    "mqtt": null,
+    "wiretap": null,
+    "gvret_tcp": null,
+    "gvret_usb": null,
+    "framelink": null,
+    "slcan": "portRequired",
+    "gs_usb": null,
+    "socketcan": null,
+    "modbus_tcp": "hostRequired",
+    "serial": "portRequired",
+    "virtual": null
+  },
+  "modbusTools": {
+    "host": "127.0.0.1",
+    "port": 502,
+    "unit_id": 1
+  }
+}

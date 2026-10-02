@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 import { NumberField, SelectField, TextField, FieldRow } from "./ModbusFields";
 import { MODBUS_SCAN_BOUNDS } from "./modbusScanDefaults";
 import type { ModbusTarget } from "./useModbusTarget";
-import { MODBUS_DEFAULT_CONNECTION } from "../../utils/modbusProfiles";
 
 type Props = {
   target: ModbusTarget;
@@ -28,7 +27,7 @@ type Props = {
 
 export default function ModbusConnectionFields({ target, showUnitId = true }: Props) {
   const { t } = useTranslation("discovery");
-  const { profiles, profileId, connection, setConnection, selectProfile } = target;
+  const { profiles, profileId, connection, setConnection, selectProfile, defaultHost } = target;
 
   return (
     <div className="space-y-3">
@@ -49,7 +48,7 @@ export default function ModbusConnectionFields({ target, showUnitId = true }: Pr
           label={t("modbusConnection.host")}
           value={connection.host}
           onChange={(host) => setConnection({ ...connection, host })}
-          placeholder={MODBUS_DEFAULT_CONNECTION.host}
+          placeholder={defaultHost}
         />
         <NumberField
           label={t("modbusConnection.port")}

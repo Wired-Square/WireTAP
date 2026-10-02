@@ -18,7 +18,8 @@ import IOConnectionFields from "../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../components/io/useConnectionProbe";
 import { PrimaryButton, SecondaryButton } from "../components/forms";
 import { reconfigureDevice } from "../api/ephemeralProfiles";
-import { applyConnectionDefaults, validateProfileForm } from "../settings/ioProfileForm";
+import { applyConnectionDefaults } from "../settings/ioProfileForm";
+import { validateIOProfile } from "../api/deviceKinds";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
@@ -97,10 +98,10 @@ function DeviceSettingsForm({
   const apply = useCallback(async () => {
     // The same defaults and rejections a device gets when it is created, so the
     // two surfaces cannot disagree about what a valid device is.
-    const resolved = applyConnectionDefaults(draft);
-    const invalid = validateProfileForm(resolved, new Set());
+    const resolved = await applyConnectionDefaults(draft);
+    const invalid = await validateIOProfile(resolved);
     if (invalid) {
-      setError(t(`deviceSettings.errors.${invalid}`));
+      setError(t(`deviceSettings.errors.${invalid.code}`, { field: invalid.field }));
       return;
     }
 

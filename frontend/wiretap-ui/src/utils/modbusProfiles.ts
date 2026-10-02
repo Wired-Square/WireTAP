@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import type { IOProfile } from "../settings/appSettings";
+import type { ConnectionDefaults } from "../api/deviceKinds";
 
 /** The profile kind that carries Modbus polling. */
 export const MODBUS_PROFILE_KIND = "modbus_tcp";
@@ -80,15 +81,8 @@ export interface ModbusConnection {
   unit_id: number;
 }
 
-/** What a Modbus address falls back to with no profile to read one off. */
-export const MODBUS_DEFAULT_CONNECTION: ModbusConnection = {
-  host: "127.0.0.1",
-  port: 502,
-  unit_id: 1,
-};
-
-/** What **Custom** means: no device named, but the fields with real defaults keep them. */
-export const MODBUS_BLANK_CONNECTION: ModbusConnection = { ...MODBUS_DEFAULT_CONNECTION, host: "" };
+/** What **Custom** means: no device named, but the protocol's own port and unit. */
+export const MODBUS_BLANK_CONNECTION: ModbusConnection = { host: "", port: 502, unit_id: 1 };
 
 /**
  * The Modbus session whose poller the top bar's switch drives.
@@ -104,13 +98,14 @@ export interface ModbusPollerRef {
   name: string;
 }
 
-/** Host/port/unit from a Modbus profile's connection map, with the usual defaults. */
+/** Host/port/unit from a Modbus profile's connection map, blanks read from the kind's `defaults`. */
 export function modbusConnectionOf(
-  profile: HasModbusConnection | undefined | null
+  profile: HasModbusConnection | undefined | null,
+  defaults: ConnectionDefaults,
 ): ModbusConnection {
   return {
-    host: String(profile?.connection?.host ?? MODBUS_DEFAULT_CONNECTION.host),
-    port: Number(profile?.connection?.port) || MODBUS_DEFAULT_CONNECTION.port,
-    unit_id: Number(profile?.connection?.unit_id) || MODBUS_DEFAULT_CONNECTION.unit_id,
+    host: String(profile?.connection?.host || defaults.host || ""),
+    port: Number(profile?.connection?.port) || Number(defaults.port),
+    unit_id: Number(profile?.connection?.unit_id) || Number(defaults.unit_id),
   };
 }

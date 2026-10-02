@@ -22,14 +22,13 @@ import {
 } from "../../components/forms";
 import IOConnectionFields from "../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../components/io/useConnectionProbe";
-import { applyConnectionDefaults, validateProfileForm } from "../../settings/ioProfileForm";
+import { applyConnectionDefaults } from "../../settings/ioProfileForm";
+import { validateIOProfile } from "../../api/deviceKinds";
 import { getTraitsForKind } from "../../utils/profileTraits";
 import type { IOProfile, ConnectionFieldValue, ProfileKindId } from "../../hooks/useSettings";
 import { Alert } from "../../components/Alert";
 
 export interface DeviceEditorProps {
-  /** Names already taken by existing devices, for the duplicate check. */
-  takenNames: Set<string>;
   onCancel: () => void;
   /** Connect using an ad-hoc device, registered for this run only. */
   onUseAdHoc: (profile: IOProfile) => Promise<void>;
@@ -45,7 +44,6 @@ function autoName(profile: IOProfile, kindLabel: string): string {
 }
 
 export default function DeviceEditor({
-  takenNames,
   onCancel,
   onUseAdHoc,
   onSave,
@@ -100,10 +98,10 @@ export default function DeviceEditor({
   const commit = useCallback(
     async (persist: boolean) => {
       // The draft with its name and per-kind defaults settled.
-      const resolved = applyConnectionDefaults({ ...draft, name: effectiveName } as IOProfile);
-      const invalid = validateProfileForm(resolved, takenNames);
+      const resolved = await applyConnectionDefaults({ ...draft, name: effectiveName } as IOProfile);
+      const invalid = await validateIOProfile(resolved);
       if (invalid) {
-        setError(t(`ioSourcePicker.deviceEditor.errors.${invalid}`));
+        setError(t(`ioSourcePicker.deviceEditor.errors.${invalid.code}`, { field: invalid.field }));
         return;
       }
       setError(null);
@@ -116,7 +114,7 @@ export default function DeviceEditor({
         setBusy(false);
       }
     },
-    [draft, effectiveName, takenNames, onSave, onUseAdHoc, t],
+    [draft, effectiveName, onSave, onUseAdHoc, t],
   );
 
   return (

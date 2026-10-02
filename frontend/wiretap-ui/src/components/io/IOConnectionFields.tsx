@@ -47,6 +47,7 @@ import type {
   VirtualInterfaceConfig,
 } from "../../settings/appSettings";
 import { isProfileKind } from "../../settings/appSettings";
+import { useConnectionDefaults } from "../../hooks/useConnectionDefaults";
 import { Button } from "../Button";
 import { Alert } from "../Alert";
 
@@ -88,10 +89,10 @@ function formatGigabytes(bytes: number): string {
 
 /** The 8N1 trio, identical for serial and for slcan's advanced options. */
 function SerialLineFields({
-  connection,
+  shown,
   onUpdateConnectionField,
 }: {
-  connection: { data_bits?: string; stop_bits?: string; parity?: string };
+  shown: (key: string) => string;
   onUpdateConnectionField: (key: string, value: ConnectionFieldValue) => void;
 }) {
   const { t } = useTranslation("settings");
@@ -100,7 +101,7 @@ function SerialLineFields({
       <FormField label={t("ioProfileDialog.serial.dataBits")} variant="default">
         <Select
           size="lg"
-          value={connection.data_bits || "8"}
+          value={shown("data_bits")}
           onChange={(e) => onUpdateConnectionField("data_bits", e.target.value)}
         >
           <option value="8">8</option>
@@ -112,7 +113,7 @@ function SerialLineFields({
       <FormField label={t("ioProfileDialog.serial.stopBits")} variant="default">
         <Select
           size="lg"
-          value={connection.stop_bits || "1"}
+          value={shown("stop_bits")}
           onChange={(e) => onUpdateConnectionField("stop_bits", e.target.value)}
         >
           <option value="1">1</option>
@@ -122,7 +123,7 @@ function SerialLineFields({
       <FormField label={t("ioProfileDialog.serial.parity")} variant="default">
         <Select
           size="lg"
-          value={connection.parity || "none"}
+          value={shown("parity")}
           onChange={(e) => onUpdateConnectionField("parity", e.target.value)}
         >
           <option value="none">{t("ioProfileDialog.serial.parityOptions.none")}</option>
@@ -218,6 +219,13 @@ export default function IOConnectionFields({
 }: IOConnectionFieldsProps) {
   const { t } = useTranslation("settings");
   const [slcanAdvancedOpen, setSlcanAdvancedOpen] = useState(false);
+  const defaults = useConnectionDefaults(profile.kind);
+
+  /** A field's value, or Rust's default for the kind while the field is blank. */
+  const shown = (key: string): string => {
+    const value = (profile.connection as Record<string, unknown>)[key];
+    return String(value === undefined || value === null || value === "" ? (defaults[key] ?? "") : value);
+  };
 
   // MQTT format edits are just a nested write into `formats`, so they derive
   // from the one connection setter rather than needing their own prop.
@@ -541,8 +549,8 @@ export default function IOConnectionFields({
   if (isProfileKind(profile, "virtual")) {
     const defaultIface: VirtualInterfaceConfig = {
       bus: 0,
-      signal_generator: true,
-      frame_rate_hz: 10,
+      signal_generator: defaults.signal_generator !== false,
+      frame_rate_hz: Number(defaults.frame_rate_hz),
     };
     const interfaces = profile.connection.interfaces || [defaultIface];
     const updateIface = (idx: number, patch: Partial<VirtualInterfaceConfig>) => {
@@ -560,7 +568,7 @@ export default function IOConnectionFields({
           <FormField label={t("ioProfileDialog.virtual.trafficType")} variant="default">
             <Select
               size="lg"
-              value={profile.connection.traffic_type || "can"}
+              value={shown("traffic_type")}
               onChange={(e) => onUpdateConnectionField("traffic_type", e.target.value)}
             >
               <option value="can">{t("ioProfileDialog.virtual.trafficTypes.can")}</option>
@@ -616,7 +624,7 @@ export default function IOConnectionFields({
               min="1"
               max="1000"
               step="1"
-              value={iface.frame_rate_hz || "10"}
+              value={iface.frame_rate_hz || String(defaults.frame_rate_hz ?? "")}
               onChange={(e) => updateIface(idx, { frame_rate_hz: parseFloat(e.target.value) || 0 })}
               placeholder="10"
               className="w-20"
@@ -654,7 +662,7 @@ export default function IOConnectionFields({
           <Input
             size="lg"
             type="number"
-            value={profile.connection.timeout || "5"}
+            value={shown("timeout")}
             onChange={(e) => onUpdateConnectionField("timeout", e.target.value)}
             placeholder={t("ioProfileDialog.gvret.timeoutPlaceholder")}
           />
@@ -687,7 +695,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.gvret.serialBaudRate")} variant="default">
           <BaudRateSelect
             size="lg"
-            value={profile.connection.baud_rate || "115200"}
+            value={shown("baud_rate")}
             onChange={(v) => onUpdateConnectionField("baud_rate", v)}
             defaultLabel={t("ioProfileDialog.gvret.baudDefault")}
           />
@@ -720,7 +728,7 @@ export default function IOConnectionFields({
           <Input
             size="lg"
             type="number"
-            value={profile.connection.timeout || "5"}
+            value={shown("timeout")}
             onChange={(e) => onUpdateConnectionField("timeout", e.target.value)}
             placeholder="5"
           />
@@ -774,13 +782,13 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.serial.baudRate")} variant="default">
           <BaudRateSelect
             size="lg"
-            value={profile.connection.baud_rate || "115200"}
+            value={shown("baud_rate")}
             onChange={(v) => onUpdateConnectionField("baud_rate", v)}
           />
         </FormField>
 
         <SerialLineFields
-          connection={profile.connection}
+          shown={shown}
           onUpdateConnectionField={onUpdateConnectionField}
         />
 
@@ -805,7 +813,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.slcan.serialBaudRate")} variant="default">
           <BaudRateSelect
             size="lg"
-            value={profile.connection.baud_rate || "115200"}
+            value={shown("baud_rate")}
             onChange={(v) => onUpdateConnectionField("baud_rate", v)}
             defaultLabel={t("ioProfileDialog.slcan.baudDefault")}
           />
@@ -828,7 +836,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.slcan.canBitrate")} variant="default">
           <Select
             size="lg"
-            value={profile.connection.bitrate || "500000"}
+            value={shown("bitrate")}
             onChange={(e) => onUpdateConnectionField("bitrate", e.target.value)}
           >
             {bitrateOptions(SLCAN_BITRATES)}
@@ -870,7 +878,7 @@ export default function IOConnectionFields({
               <FormField label={t("ioProfileDialog.slcan.dataPhaseBitrate")} variant="default">
                 <Select
                   size="lg"
-                  value={profile.connection.data_bitrate || "2000000"}
+                  value={shown("data_bitrate")}
                   onChange={(e) => onUpdateConnectionField("data_bitrate", e.target.value)}
                 >
                   {bitrateOptions(SLCAN_DATA_BITRATES)}
@@ -899,7 +907,7 @@ export default function IOConnectionFields({
             <div className="mt-3 space-y-3 pl-6">
               <p className={caption}>{t("ioProfileDialog.slcan.advancedHint")}</p>
               <SerialLineFields
-                connection={profile.connection}
+                shown={shown}
                 onUpdateConnectionField={onUpdateConnectionField}
               />
             </div>
@@ -920,7 +928,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.socketcan.interfaceName")} variant="default">
           <Input
             size="lg"
-            value={profile.connection.interface || "can0"}
+            value={shown("interface")}
             onChange={(e) => onUpdateConnectionField("interface", e.target.value)}
             placeholder={t("ioProfileDialog.socketcan.interfacePlaceholder")}
           />
@@ -1004,7 +1012,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.gsUsb.canBitrate")} variant="default">
           <Select
             size="lg"
-            value={profile.connection.bitrate || "500000"}
+            value={shown("bitrate")}
             onChange={(e) => onUpdateConnectionField("bitrate", e.target.value)}
           >
             {bitrateOptions(CAN_BITRATES)}
@@ -1014,7 +1022,7 @@ export default function IOConnectionFields({
         <FormField label={t("ioProfileDialog.gsUsb.samplePoint")} variant="default">
           <Select
             size="lg"
-            value={profile.connection.sample_point || "87.5"}
+            value={Number(shown("sample_point")).toFixed(1)}
             onChange={(e) => onUpdateConnectionField("sample_point", e.target.value)}
           >
             <option value="75.0">{t("ioProfileDialog.gsUsb.samplePoints.750")}</option>
@@ -1056,7 +1064,7 @@ export default function IOConnectionFields({
               <FormField label={t("ioProfileDialog.gsUsb.dataPhaseBitrate")} variant="default">
                 <Select
                   size="lg"
-                  value={profile.connection.data_bitrate || "2000000"}
+                  value={shown("data_bitrate")}
                   onChange={(e) => onUpdateConnectionField("data_bitrate", e.target.value)}
                 >
                   {bitrateOptions(CAN_FD_DATA_BITRATES)}
@@ -1066,7 +1074,7 @@ export default function IOConnectionFields({
               <FormField label={t("ioProfileDialog.gsUsb.dataPhaseSamplePoint")} variant="default">
                 <Select
                   size="lg"
-                  value={profile.connection.data_sample_point || "75.0"}
+                  value={Number(shown("data_sample_point")).toFixed(1)}
                   onChange={(e) => onUpdateConnectionField("data_sample_point", e.target.value)}
                 >
                   <option value="60.0">{t("ioProfileDialog.gsUsb.dataPhaseSamplePoints.600")}</option>
@@ -1082,7 +1090,7 @@ export default function IOConnectionFields({
         {platform.isLinux && profile.connection.interface && (
           <LinuxCanSetupHelper
             interfaceName={profile.connection.interface}
-            bitrate={parseInt(profile.connection.bitrate || "500000", 10)}
+            bitrate={parseInt(shown("bitrate"), 10)}
           />
         )}
 

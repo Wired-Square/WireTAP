@@ -1,84 +1,27 @@
 // src/settings/ioProfileForm.ts
 //
-// Shared IO profile form logic: per-kind connection defaults and validation.
-// Used by the Settings profile dialog and by the source picker's device editor,
-// so an ad-hoc device gets the same defaults and the same rejections as a saved
-// one.
+// Shared IO profile form logic, used by the Settings profile dialog and by the
+// source picker's device editor so an ad-hoc device is settled the same way as
+// a saved one.
 
 import { storeCredential, SECURE_FIELDS } from "../api/credentials";
-import type {
-  IOProfile,
-  ConnectionTypeMap,
-  MqttConnection,
-  WiretapConnection,
-  GvretTcpConnection,
-  SlcanConnection,
-  SocketcanConnection,
-  ModbusTcpConnection,
-  SerialConnection,
-  FrameLinkConnection,
-} from "./appSettings";
+import { defaultConnectionForKind } from "../api/deviceKinds";
+import type { IOProfile, ConnectionTypeMap } from "./appSettings";
 
 /**
- * Fill in the defaults a profile kind needs to connect at all. Mirrored by the
- * `.unwrap_or(...)` values the Rust readers apply, so a profile saved here and
- * one hand-edited into settings.json behave the same.
+ * Fill each field the kind defaults and the form left blank with Rust's value,
+ * spelled as the form writes it.
  */
-export function applyConnectionDefaults(profile: IOProfile): IOProfile {
-  switch (profile.kind) {
-    case "mqtt": {
-      const conn: MqttConnection = { ...profile.connection };
-      if (!conn.host) conn.host = "localhost";
-      if (!conn.port) conn.port = "1883";
-      return { ...profile, connection: conn };
+export async function applyConnectionDefaults(profile: IOProfile): Promise<IOProfile> {
+  const defaults = await defaultConnectionForKind(profile.kind);
+  const connection: Record<string, unknown> = { ...profile.connection };
+  for (const [key, value] of Object.entries(defaults)) {
+    const current = connection[key];
+    if (current === undefined || current === null || current === "") {
+      connection[key] = typeof value === "number" ? String(value) : value;
     }
-    case "wiretap": {
-      const conn: WiretapConnection = { ...profile.connection };
-      if (!conn.url) conn.url = "http://localhost:8423";
-      if (!conn.database) conn.database = "wiretap";
-      return { ...profile, connection: conn };
-    }
-    case "gvret_tcp": {
-      const conn: GvretTcpConnection = { ...profile.connection };
-      if (!conn.host) conn.host = "192.168.1.100";
-      if (!conn.port) conn.port = "23";
-      return { ...profile, connection: conn };
-    }
-    case "framelink": {
-      const conn: FrameLinkConnection = { ...profile.connection };
-      if (!conn.port) conn.port = "120";
-      return { ...profile, connection: conn };
-    }
-    case "slcan": {
-      const conn: SlcanConnection = { ...profile.connection };
-      if (!conn.baud_rate) conn.baud_rate = "115200";
-      if (!conn.bitrate) conn.bitrate = "500000";
-      if (conn.silent_mode === undefined) conn.silent_mode = true;
-      return { ...profile, connection: conn };
-    }
-    case "socketcan": {
-      const conn: SocketcanConnection = { ...profile.connection };
-      if (!conn.interface) conn.interface = "can0";
-      return { ...profile, connection: conn };
-    }
-    case "modbus_tcp": {
-      const conn: ModbusTcpConnection = { ...profile.connection };
-      if (!conn.host) conn.host = "192.168.1.100";
-      if (!conn.port) conn.port = "502";
-      if (!conn.unit_id) conn.unit_id = "1";
-      return { ...profile, connection: conn };
-    }
-    case "serial": {
-      const conn: SerialConnection = { ...profile.connection };
-      if (!conn.baud_rate) conn.baud_rate = "115200";
-      if (!conn.data_bits) conn.data_bits = "8";
-      if (!conn.stop_bits) conn.stop_bits = "1";
-      if (!conn.parity) conn.parity = "none";
-      return { ...profile, connection: conn };
-    }
-    default:
-      return profile;
   }
+  return { ...profile, connection } as IOProfile;
 }
 
 /**
@@ -118,31 +61,4 @@ export async function storeProfileSecrets(
  */
 export function newSavedProfileId(): string {
   return `io_${Date.now()}`;
-}
-
-/** Message keys for the failures `validateProfileForm` can report. */
-export type ProfileValidationError =
-  | "nameRequired"
-  | "nameDuplicate"
-  | "portRequired"
-  | "hostRequired";
-
-/**
- * Check a profile form before it is saved or connected. Returns the failure, or
- * null when it is good. `existingNames` is the set of names already taken by
- * *other* profiles.
- */
-export function validateProfileForm(
-  profile: IOProfile,
-  existingNames: Set<string>,
-): ProfileValidationError | null {
-  if (!profile.name.trim()) return "nameRequired";
-  if (existingNames.has(profile.name)) return "nameDuplicate";
-  if (profile.kind === "slcan" || profile.kind === "serial") {
-    if (!profile.connection.port) return "portRequired";
-  }
-  if (profile.kind === "modbus_tcp" && !profile.connection.host) {
-    return "hostRequired";
-  }
-  return null;
 }

@@ -19,9 +19,7 @@
 //!   values are meant to be written.
 //! - **The form seeds from this table**, via the `default_connection_for_kind`
 //!   command, rather than carrying its own copy. Pre-filling a form is
-//!   presentation and stays in TypeScript; the *values* do not. The command is
-//!   registered and `applyConnectionDefaults` has yet to call it — until it
-//!   does, `src/settings/ioProfileForm.ts` is still a second declaration.
+//!   presentation and stays in TypeScript; the *values* do not.
 //!
 //! Required fields are declared here too, so [`validate_profile`] can reject a
 //! device at the write path instead of at connect time.
@@ -419,6 +417,7 @@ pub fn req_bool(profile: &IOProfile, key: &str) -> Result<bool, String> {
 /// a compile error at every match, and so the frontend's translation map has a
 /// closed set to cover.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ValidationCode {
     NameRequired,
@@ -431,6 +430,7 @@ pub enum ValidationCode {
 
 /// A rejection: what was wrong, and which input to focus.
 #[derive(Debug, Clone, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProfileValidationError {
     pub code: ValidationCode,
     pub field: Option<String>,
@@ -738,6 +738,61 @@ mod tests {
         let mut p = profile("modbus_tcp");
         apply_defaults(&mut p);
         assert!(validate_profile(&p, &[]).is_ok());
+    }
+
+    /// The form's own TypeScript table, taken before it was deleted: every value
+    /// it filled in is this table's too. Where the two required different fields
+    /// this one stands, and the differences are listed here.
+    #[test]
+    fn the_retired_typescript_table_agrees_with_this_one() {
+        let golden: serde_json::Value =
+            serde_json::from_str(include_str!("device_kinds/ts-golden.json")).unwrap();
+        let text = |v: &serde_json::Value| v.as_str().map_or_else(|| v.to_string(), str::to_string);
+
+        for (kind, fields) in golden["defaults"].as_object().unwrap() {
+            for (key, value) in fields.as_object().unwrap() {
+                let ours = default_value(kind, key).map(|v| text(&v.to_json()));
+                assert_eq!(ours, Some(text(value)), "{kind}.{key}");
+            }
+        }
+
+        let rust_differs = [
+            ("gvret_usb", Some("portRequired")),
+            ("framelink", Some("hostRequired")),
+            ("modbus_tcp", None),
+        ];
+        for (kind, theirs) in golden["required"].as_object().unwrap() {
+            let ours = validate_profile(&profile(kind), &[])
+                .err()
+                .map(|e| serde_json::to_value(e.code).unwrap());
+            let expected = rust_differs
+                .iter()
+                .find(|(k, _)| k == kind)
+                .map_or_else(|| theirs.clone(), |(_, code)| serde_json::json!(code));
+            assert_eq!(ours.unwrap_or_default(), expected, "{kind}");
+        }
+
+        // The Modbus tools kept their own fallback address, 127.0.0.1 for the host.
+        let tools = &golden["modbusTools"];
+        for key in ["port", "unit_id"] {
+            assert_eq!(default_value("modbus_tcp", key).map(|v| v.to_json()), Some(tools[key].clone()), "{key}");
+        }
+        assert_eq!(default_value("modbus_tcp", "host"), Some(Val::Str("192.168.1.100")));
+    }
+
+    /// The MQTT and WireTAP backend readers used to restate these inline; they
+    /// read the table now, so a blank backend URL falls back to the default
+    /// rather than failing as "URL is required".
+    #[test]
+    fn a_blank_reader_field_reads_the_kind_default() {
+        let mut backend = profile("wiretap");
+        backend.connection.insert("url".to_string(), "".into());
+        assert_eq!(req_str(&backend, "url").unwrap(), "http://localhost:8423");
+        assert_eq!(req_str(&backend, "database").unwrap(), "wiretap");
+
+        let mqtt = profile("mqtt");
+        assert_eq!(req_str(&mqtt, "host").unwrap(), "localhost");
+        assert_eq!(req_i64(&mqtt, "port").unwrap(), 1883);
     }
 
     fn serial_profile(framing: &str) -> IOProfile {

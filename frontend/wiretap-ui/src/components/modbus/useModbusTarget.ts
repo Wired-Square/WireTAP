@@ -2,8 +2,10 @@
 
 import { useCallback } from "react";
 import { useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
+import { useConnectionDefaults } from "../../hooks/useConnectionDefaults";
 import {
   MODBUS_BLANK_CONNECTION,
+  MODBUS_PROFILE_KIND,
   modbusConnectionOf,
   useModbusProfiles,
   type ModbusConnection,
@@ -28,6 +30,7 @@ export function useModbusTarget() {
   const profiles = useModbusProfiles();
   const { profileId, connection } = useDiscoveryToolboxStore((s) => s.toolbox.modbusTarget);
   const updateModbusTarget = useDiscoveryToolboxStore((s) => s.updateModbusTarget);
+  const defaults = useConnectionDefaults(MODBUS_PROFILE_KIND);
 
   const setConnection = useCallback(
     (next: ModbusConnection) => updateModbusTarget({ connection: next }),
@@ -44,10 +47,10 @@ export function useModbusTarget() {
       const profile = id ? profiles.find((p) => p.id === id) : undefined;
       updateModbusTarget({
         profileId: id,
-        connection: profile ? modbusConnectionOf(profile) : MODBUS_BLANK_CONNECTION,
+        connection: profile ? modbusConnectionOf(profile, defaults) : MODBUS_BLANK_CONNECTION,
       });
     },
-    [profiles, updateModbusTarget]
+    [profiles, defaults, updateModbusTarget]
   );
 
   return {
@@ -56,6 +59,7 @@ export function useModbusTarget() {
     connection,
     setConnection,
     selectProfile,
+    defaultHost: String(defaults.host ?? ""),
     /** What to call the device on screen: the profile's name, else its address. */
     name: profiles.find((p) => p.id === profileId)?.name ?? `${connection.host}:${connection.port}`,
     /**
