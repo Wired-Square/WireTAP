@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   useDecoderStore,
   getDecodedFrames,
@@ -9,6 +9,11 @@ import {
 } from "../stores/decoderStore";
 import type { DecodedFrameMsg, DecodedSignalsEntry, DecodedTunnelMessage } from "../services/wsProtocol";
 import type { ParsedCatalog } from "../utils/catalogParser";
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+  emit: vi.fn(async () => {}),
+}));
 
 const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   frameId: 0x1a5,
