@@ -1,28 +1,8 @@
-use crate::profile_tracker;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
-use std::sync::Mutex;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use super::commands::DeviceProbeResult;
-
-/// Map of session_id -> profile_ids for tracking which profiles each reader session uses.
-/// Multi-source sessions can use multiple profiles, so we store a Vec.
-/// Used to unregister profile usage when a session is destroyed.
-pub(super) static SESSION_PROFILES: Lazy<Mutex<HashMap<String, Vec<String>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-/// Profiles a session was opened from, kept while a stopped source is swapped
-/// for its capture so the frontend can still name the source and return to live.
-static SESSION_ORIGIN_PROFILES: Lazy<Mutex<HashMap<String, Vec<String>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-/// Map of profile_id -> session_ids for tracking which sessions use each profile.
-/// This is the reverse of SESSION_PROFILES and is used to:
-/// 1. Show "(in use: sessionId)" indicator in IO picker
-/// 2. Lock reconfiguration when profile is in 2+ sessions
-/// 3. Prevent parallel sessions from exclusive-access devices
-pub(super) static PROFILE_SESSIONS: Lazy<Mutex<HashMap<String, std::collections::HashSet<String>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Cache of successful probe results by profile_id.
 /// When a device is probed successfully, the result is cached so subsequent probes
@@ -51,165 +31,137 @@ pub fn clear_probe_cache(profile_id: &str) {
     }
 }
 
-/// Track that a session is using a specific profile.
-/// For multi-source sessions, call this multiple times or use register_session_profiles.
-pub(super) fn register_session_profile(session_id: &str, profile_id: &str) {
-    // Update SESSION_PROFILES (session -> profiles)
-    if let Ok(mut map) = SESSION_PROFILES.lock() {
-        let profiles = map.entry(session_id.to_string()).or_insert_with(Vec::new);
-        if !profiles.contains(&profile_id.to_string()) {
+/// Which profiles each session holds, and the reverse. A single-handle device
+/// (slcan, serial, gs_usb) admits a second session only once its holder is released.
+#[derive(Default)]
+struct ProfileRegistry {
+    by_session: HashMap<String, Vec<String>>,
+    by_profile: HashMap<String, HashSet<String>>,
+    /// The profiles a session was opened from, kept while a stopped source is
+    /// swapped for its capture so the frontend can still name it and return to live.
+    origins: HashMap<String, Vec<String>>,
+}
+
+impl ProfileRegistry {
+    fn add(&mut self, session_id: &str, profile_id: &str) -> bool {
+        let profiles = self.by_session.entry(session_id.to_string()).or_default();
+        let added = !profiles.iter().any(|p| p == profile_id);
+        if added {
             profiles.push(profile_id.to_string());
         }
+        self.by_profile.entry(profile_id.to_string()).or_default().insert(session_id.to_string());
+        added
     }
 
-    // Update PROFILE_SESSIONS (profile -> sessions)
-    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
-        let sessions = map
-            .entry(profile_id.to_string())
-            .or_insert_with(std::collections::HashSet::new);
-        sessions.insert(session_id.to_string());
-    }
-}
-
-/// Track that a session is using multiple profiles (for multi-source sessions).
-pub(super) fn register_session_profiles(session_id: &str, profile_ids: &[String]) {
-    // Update SESSION_PROFILES (session -> profiles)
-    if let Ok(mut map) = SESSION_PROFILES.lock() {
-        map.insert(session_id.to_string(), profile_ids.to_vec());
-    }
-
-    // Update PROFILE_SESSIONS (profile -> sessions)
-    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
-        for profile_id in profile_ids {
-            let sessions = map
-                .entry(profile_id.clone())
-                .or_insert_with(std::collections::HashSet::new);
-            sessions.insert(session_id.to_string());
+    fn remove(&mut self, session_id: &str, profile_id: &str) {
+        if let Some(profiles) = self.by_session.get_mut(session_id) {
+            profiles.retain(|p| p != profile_id);
+        }
+        if let Some(sessions) = self.by_profile.get_mut(profile_id) {
+            sessions.remove(session_id);
+            if sessions.is_empty() {
+                self.by_profile.remove(profile_id);
+            }
         }
     }
-}
 
-/// Get and remove all profile_ids for a session (called during destroy).
-/// Returns all profiles that were registered for this session.
-/// Also cleans up the reverse mapping (PROFILE_SESSIONS).
-pub(super) fn take_session_profiles(session_id: &str) -> Vec<String> {
-    let profile_ids = SESSION_PROFILES
-        .lock()
-        .ok()
-        .and_then(|mut map| map.remove(session_id))
-        .unwrap_or_default();
-    forget_origin_profiles(session_id);
-
-    // Clean up reverse mapping
-    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
+    fn take(&mut self, session_id: &str) -> Vec<String> {
+        let profile_ids = self.by_session.remove(session_id).unwrap_or_default();
         for profile_id in &profile_ids {
-            if let Some(sessions) = map.get_mut(profile_id) {
-                sessions.remove(session_id);
-                // Remove the entry if no sessions remain
-                if sessions.is_empty() {
-                    map.remove(profile_id);
-                }
-            }
+            self.remove(session_id, profile_id);
         }
+        profile_ids
     }
 
-    profile_ids
+    fn set(&mut self, session_id: &str, profile_ids: &[String]) {
+        self.take(session_id);
+        for profile_id in profile_ids {
+            self.add(session_id, profile_id);
+        }
+    }
 }
 
-/// Replace all profile IDs for a session (e.g., swap device profiles for capture ID).
-/// Cleans up old reverse mappings and sets new ones.
-pub fn replace_session_profiles(session_id: &str, new_profile_ids: &[String]) {
-    // Remove old reverse mappings
-    if let Ok(map) = SESSION_PROFILES.lock() {
-        if let Some(old_ids) = map.get(session_id) {
-            if let Ok(mut rev) = PROFILE_SESSIONS.lock() {
-                for old_id in old_ids {
-                    if let Some(sessions) = rev.get_mut(old_id) {
-                        sessions.remove(session_id);
-                        if sessions.is_empty() {
-                            rev.remove(old_id);
-                        }
-                    }
-                }
-            }
-        }
-    }
+static PROFILE_REGISTRY: Lazy<Mutex<ProfileRegistry>> = Lazy::new(Mutex::default);
 
-    // Set new profile IDs
-    if let Ok(mut map) = SESSION_PROFILES.lock() {
-        map.insert(session_id.to_string(), new_profile_ids.to_vec());
-    }
+fn registry() -> MutexGuard<'static, ProfileRegistry> {
+    PROFILE_REGISTRY.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
-    // Add new reverse mappings
-    if let Ok(mut rev) = PROFILE_SESSIONS.lock() {
-        for id in new_profile_ids {
-            rev.entry(id.clone())
-                .or_insert_with(std::collections::HashSet::new)
-                .insert(session_id.to_string());
-        }
+pub fn register_session_profile(session_id: &str, profile_id: &str) {
+    registry().add(session_id, profile_id);
+}
+
+/// Hold `profile_id` for `session_id` while `open` runs, so a second opener is
+/// refused meanwhile, and let it go again if `open` fails and the session did
+/// not already hold it.
+pub(super) async fn hold_profile_while<T>(
+    session_id: &str,
+    profile_id: &str,
+    open: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    let added = registry().add(session_id, profile_id);
+    let opened = open.await;
+    if opened.is_err() && added {
+        unregister_session_profile(session_id, profile_id);
     }
+    opened
+}
+
+pub(super) fn register_session_profiles(session_id: &str, profile_ids: &[String]) {
+    registry().set(session_id, profile_ids);
+}
+
+pub(super) fn unregister_session_profile(session_id: &str, profile_id: &str) {
+    registry().remove(session_id, profile_id);
+}
+
+/// Release every profile a session holds, its origin included, returning the
+/// ones it held. The only unregister a teardown needs.
+pub fn release_session_profiles(session_id: &str) -> Vec<String> {
+    let mut registry = registry();
+    registry.origins.remove(session_id);
+    registry.take(session_id)
 }
 
 /// Swap a stopped source's profiles for its capture, remembering them as the origin.
 pub fn swap_session_profiles_for_capture(session_id: &str, capture_id: &str) {
-    let current = get_session_profile_ids(session_id);
-    if let Ok(mut map) = SESSION_ORIGIN_PROFILES.lock() {
-        map.entry(session_id.to_string()).or_insert(current);
-    }
-    replace_session_profiles(session_id, &[capture_id.to_string()]);
+    let mut registry = registry();
+    let current = registry.by_session.get(session_id).cloned().unwrap_or_default();
+    registry.origins.entry(session_id.to_string()).or_insert(current);
+    registry.set(session_id, &[capture_id.to_string()]);
 }
 
 /// Put a resumed source's profiles back in place of its capture.
 pub(super) fn restore_session_profiles(session_id: &str, profile_ids: &[String]) {
-    replace_session_profiles(session_id, profile_ids);
-    forget_origin_profiles(session_id);
-}
-
-fn forget_origin_profiles(session_id: &str) {
-    if let Ok(mut map) = SESSION_ORIGIN_PROFILES.lock() {
-        map.remove(session_id);
-    }
+    let mut registry = registry();
+    registry.set(session_id, profile_ids);
+    registry.origins.remove(session_id);
 }
 
 /// The profiles a session was opened from — its current profiles unless a
 /// stopped source has been swapped for its capture.
 pub fn get_session_origin_profile_ids(session_id: &str) -> Vec<String> {
-    SESSION_ORIGIN_PROFILES
-        .lock()
-        .ok()
-        .and_then(|map| map.get(session_id).cloned())
-        .unwrap_or_else(|| get_session_profile_ids(session_id))
+    let registry = registry();
+    registry
+        .origins
+        .get(session_id)
+        .or_else(|| registry.by_session.get(session_id))
+        .cloned()
+        .unwrap_or_default()
 }
 
-/// Get all profile IDs for a session (without removing them).
-/// Used for listing active sessions with their source profiles.
 pub fn get_session_profile_ids(session_id: &str) -> Vec<String> {
-    SESSION_PROFILES
-        .lock()
-        .ok()
-        .and_then(|map| map.get(session_id).cloned())
-        .unwrap_or_default()
+    registry().by_session.get(session_id).cloned().unwrap_or_default()
 }
 
-/// Get all session IDs that are using a specific profile.
-/// Used to show "(in use: sessionId)" in the IO picker.
+/// The sessions holding a profile — the picker's "(in use)" and the
+/// single-handle admission check both read it.
 pub fn get_sessions_for_profile(profile_id: &str) -> Vec<String> {
-    PROFILE_SESSIONS
-        .lock()
-        .ok()
-        .and_then(|map| map.get(profile_id).map(|s| s.iter().cloned().collect()))
+    registry()
+        .by_profile
+        .get(profile_id)
+        .map(|sessions| sessions.iter().cloned().collect())
         .unwrap_or_default()
-}
-
-/// Clean up profile tracking for a destroyed session.
-/// This should be called when a session is destroyed via unregister_subscriber
-/// (auto-destroy when last subscriber leaves), since that code path doesn't
-/// go through destroy_reader_session which normally handles this.
-pub fn cleanup_session_profiles(session_id: &str) {
-    let profile_ids = take_session_profiles(session_id);
-    for profile_id in profile_ids {
-        profile_tracker::unregister_usage_by_session(&profile_id, session_id);
-    }
 }
 
 #[cfg(test)]
@@ -233,10 +185,26 @@ mod origin_profile_tests {
     }
 
     #[test]
+    fn a_failed_open_lets_go_only_of_a_profile_it_took() {
+        let refused = || async { Err::<(), _>("refused".to_string()) };
+        let _ = tauri::async_runtime::block_on(hold_profile_while("f_failed_add", "slcan-new", refused()));
+        assert!(get_sessions_for_profile("slcan-new").is_empty());
+
+        register_session_profile("f_failed_add", "gvret-held");
+        let _ = tauri::async_runtime::block_on(hold_profile_while("f_failed_add", "gvret-held", refused()));
+        assert_eq!(get_sessions_for_profile("gvret-held"), ids(&["f_failed_add"]));
+
+        let opened = tauri::async_runtime::block_on(hold_profile_while("f_failed_add", "slcan-opened", async { Ok(()) }));
+        assert!(opened.is_ok());
+        assert_eq!(get_sessions_for_profile("slcan-opened"), ids(&["f_failed_add"]));
+        release_session_profiles("f_failed_add");
+    }
+
+    #[test]
     fn a_destroyed_session_forgets_its_origin() {
         register_session_profiles("s_gone", &ids(&["io_dev"]));
         swap_session_profiles_for_capture("s_gone", "cap1");
-        take_session_profiles("s_gone");
+        release_session_profiles("s_gone");
         assert!(get_session_origin_profile_ids("s_gone").is_empty());
     }
 }

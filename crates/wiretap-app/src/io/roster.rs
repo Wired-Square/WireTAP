@@ -379,7 +379,7 @@ pub struct ActiveSessionInfo {
     pub subscribers: Vec<SubscriberInfo>,
     /// For multi-source sessions: the source configurations
     pub broker_configs: Option<Vec<broker::SourceConfig>>,
-    /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
+    /// Profile IDs feeding this session (from the session profile registry)
     #[serde(default)]
     pub source_profile_ids: Vec<String>,
     /// Profiles the session was opened from; differs from `source_profile_ids`

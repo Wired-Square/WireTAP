@@ -38,7 +38,7 @@ subscribers: Array<SubscriberInfo>,
  */
 broker_configs: Array<SourceConfig> | null, 
 /**
- * Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
+ * Profile IDs feeding this session (from the session profile registry)
  */
 source_profile_ids: Array<string>, 
 /**

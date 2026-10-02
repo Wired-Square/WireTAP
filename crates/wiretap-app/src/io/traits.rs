@@ -309,7 +309,7 @@ pub fn selection_error(profiles: &[IOProfile]) -> Option<String> {
     profiles
         .iter()
         .enumerate()
-        .find_map(|(i, p)| crate::profile_tracker::can_use_adapter(&p.id, profiles, &ids[..i]).err())
+        .find_map(|(i, p)| crate::profile_tracker::can_use_adapter(&p.id, profiles, &ids[..i], None).err())
 }
 
 /// The source picker's check on a multi-source selection, with the profiles as

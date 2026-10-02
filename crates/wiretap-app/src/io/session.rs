@@ -88,7 +88,7 @@ pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool) {
         if let Some(session) = extracted {
             tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
             emit_joiner_count_change(session_id, 0, None, None, Some("left"));
-            destroy_extracted_session(session_id, session, reset).await;
+            tear_down(session_id, session, Teardown::Destroy { reset }).await;
         }
     } else if session_exists(session_id).await {
         emit_joiner_count_change(session_id, count, None, None, Some("left"));
@@ -514,10 +514,6 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
 
         // Domain-specific housekeeping before the swap
         capture_store::orphan_captures_for_session(session_id);
-        let profile_ids = sessions::get_session_profile_ids(session_id);
-        for profile_id in &profile_ids {
-            crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
-        }
         sessions::swap_session_profiles_for_capture(session_id, bid);
 
         let new_reader = CaptureSource::new(
@@ -922,42 +918,61 @@ pub async fn resume_to_live_session(
 /// Destroy a reader session. `reset` marks a deliberate user destroy so the
 /// frontend resets to "No source" rather than the orphaned capture.
 pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String> {
-    let removed = {
-        let mut sessions = IO_SESSIONS.lock().await;
-        sessions.remove(session_id)
-    };
-    // Lock released — perform slow operations outside the critical section
-    // Detach unconditionally: stale attachments must go even if the session had
-    // already been removed (see `detach_all_from_session`).
-    detach_all_from_session(session_id);
-    if let Some(mut session) = removed {
-        // Stop the reader first
-        let _ = session.source.stop().await;
-        // Orphan captures and store IDs in post-session cache before lifecycle event.
-        // The frontend fetches orphaned capture IDs via command when it handles "destroyed".
+    let removed = { IO_SESSIONS.lock().await.remove(session_id) };
+    match removed {
+        Some(session) => tear_down(session_id, session, Teardown::Destroy { reset }).await,
+        // Stale attachments and per-session state must go even if the session had
+        // already been removed (see `detach_all_from_session`).
+        None => {
+            detach_all_from_session(session_id);
+            forget_session(session_id);
+        }
+    }
+    Ok(())
+}
+
+enum Teardown {
+    Destroy { reset: bool },
+    /// The session comes straight back under the same id, so its subscribers stay
+    /// attached and its captures stay owned.
+    Reinitialise,
+}
+
+/// Stop a session already removed from `IO_SESSIONS`, clear its per-session state,
+/// then emit `destroyed`. The caller must not hold the `IO_SESSIONS` lock.
+async fn tear_down(session_id: &str, mut session: IOSession, how: Teardown) {
+    let destroying = matches!(how, Teardown::Destroy { .. });
+    if destroying {
+        detach_all_from_session(session_id);
+    }
+    let _ = session.source.stop().await;
+    if destroying {
+        // The frontend fetches the orphaned ids from the post-session cache when it
+        // handles `destroyed`, so they are stored before it and outlive the session.
         let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
         emit_capture_orphaned_as_changed(session_id, orphaned);
-        // Now emit lifecycle event
-        let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
-        emit_session_lifecycle(&session.app, SessionLifecyclePayload {
-            session_id: session_id.to_string(),
-            event_type: "destroyed".to_string(),
-            source_type: None,
-            state: None,
-            subscriber_count: 0,
-            source_profile_ids,
-            creator_subscriber_id: None,
-            reset,
-        });
     }
-    // Clear the closing flag now that the session is fully destroyed
+    let reset = matches!(how, Teardown::Destroy { reset: true });
+    let source_profile_ids = forget_session(session_id);
+    emit_session_lifecycle(&session.app, SessionLifecyclePayload {
+        session_id: session_id.to_string(),
+        event_type: "destroyed".to_string(),
+        source_type: None,
+        state: None,
+        subscriber_count: 0,
+        source_profile_ids,
+        creator_subscriber_id: None,
+        reset,
+    });
+    tlog!("[reader] Session '{}' destroyed", session_id);
+}
+
+/// Clear a session's per-session state, returning the profiles it held.
+fn forget_session(session_id: &str) -> Vec<String> {
     clear_session_closing(session_id);
-    // Clear any stored startup error
     clear_startup_error(session_id);
     clear_playback_position(session_id);
-    // Don't sweep_expired here — the orphaned capture IDs were just stored
-    // and need to survive long enough for the frontend to fetch them.
-    Ok(())
+    sessions::release_session_profiles(session_id)
 }
 
 fn transmitting_session<'a>(
@@ -1184,38 +1199,6 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
     }
 
     Ok(result)
-}
-
-/// Run the slow Phase-2 teardown for a session that has already been removed from
-/// IO_SESSIONS. The caller MUST have dropped the IO_SESSIONS lock first, since stopping
-/// the source and emitting lifecycle events can be slow. Shared by the two "last
-/// subscriber left" paths: an explicit unregister, and the one-subscriber-one-session
-/// eviction that fires when a subscriber registers on a different session.
-async fn destroy_extracted_session(session_id: &str, mut session: IOSession, reset: bool) {
-    let _ = session.source.stop().await;
-    // Nothing may still claim this session — see `detach_all_from_session`.
-    detach_all_from_session(session_id);
-    // Orphan captures and store IDs in post-session cache before lifecycle event.
-    let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
-    emit_capture_orphaned_as_changed(session_id, orphaned);
-    // Now emit lifecycle event
-    let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
-    emit_session_lifecycle(&session.app, SessionLifecyclePayload {
-        session_id: session_id.to_string(),
-        event_type: "destroyed".to_string(),
-        source_type: None,
-        state: None,
-        subscriber_count: 0,
-        source_profile_ids,
-        creator_subscriber_id: None,
-        reset,
-    });
-    // Clear any closing flag
-    clear_session_closing(session_id);
-    clear_playback_position(session_id);
-    // Clean up profile tracking (release single-handle device locks)
-    crate::sessions::cleanup_session_profiles(session_id);
-    tlog!("[reader] Session '{}' destroyed", session_id);
 }
 
 /// Unregister a subscriber from a session.
@@ -1619,23 +1602,10 @@ pub async fn reinitialize_session_if_safe(
         });
     }
 
-    // Safe to reinitialize - destroy the session
-    if let Some(mut session) = sessions.remove(session_id) {
-        // Emit lifecycle event before stopping
-        let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
-        emit_session_lifecycle(&session.app, SessionLifecyclePayload {
-            session_id: session_id.to_string(),
-            event_type: "destroyed".to_string(),
-            source_type: None,
-            state: None,
-            subscriber_count: 0,
-            source_profile_ids,
-            creator_subscriber_id: None,
-            reset: false,
-        });
-        let _ = session.source.stop().await;
+    if let Some(session) = sessions.remove(session_id) {
+        drop(sessions);
+        tear_down(session_id, session, Teardown::Reinitialise).await;
     }
-    clear_session_closing(session_id);
 
     tlog!(
         "[reader] Session '{}' reinitialized by subscriber '{}'",
@@ -1724,5 +1694,12 @@ mod tests {
         let refused = tauri::async_runtime::block_on(transmit_frame("no-such-session", &frame)).unwrap_err();
         assert_eq!(refused, "A CAN FD frame does not support remote request (RTR)");
         assert!(crate::transmit::is_permanent_error_pub(&refused));
+    }
+
+    #[test]
+    fn a_destroyed_session_releases_its_profiles() {
+        sessions::register_session_profile("f_destroyed", "slcan-destroyed");
+        tauri::async_runtime::block_on(destroy_session("f_destroyed", false)).unwrap();
+        assert!(crate::profile_tracker::can_use_profile("slcan-destroyed", "slcan", None).is_ok());
     }
 }

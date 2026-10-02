@@ -50,7 +50,7 @@ pub fn modbus_endpoint_str(profile: &crate::settings::IOProfile) -> String {
 /// settings file once.
 ///
 /// Call this **before** stopping the session. Stopping swaps a session's profile
-/// ids for its capture id (`replace_session_profiles` in `stop_and_switch_to_capture`),
+/// ids for its capture id (`swap_session_profiles_for_capture` in `stop_and_switch_to_capture`),
 /// so a stopped session resolves to a capture and no longer names its device.
 pub fn session_modbus_profile<'a>(
     settings: &'a crate::settings::AppSettings,

@@ -1094,8 +1094,8 @@ are the same entry.
 that can empty a session (`unregister_subscriber`, the attach-elsewhere move in
 `register_subscriber`, panel unmount via `unregister_app`, and window close via
 `prune_window_sessions`) calls the shared `teardown_session_if_empty`, which checks
-`subscriber_count_for_session == 0` and runs `destroy_extracted_session` (stop
-source, orphan capture, `session-lifecycle "destroyed"`). The attach-elsewhere move
+`subscriber_count_for_session == 0` and runs `tear_down` (stop source, orphan
+capture, clear the per-session state, `session-lifecycle "destroyed"`). The attach-elsewhere move
 is the backstop for a frontend leave that loses a race when an app switches sources
 — because the rule lives in Rust under the locks, no frontend timing can orphan a
 session.
@@ -1108,6 +1108,15 @@ go even when the session had already been removed. This is load-bearing, not
 hygiene: the subscriber count is *derived*, so a leftover entry reports a phantom
 subscriber, and it becomes the `prev_session_id` that the next `register_subscriber`
 evicts and tears down all over again.
+
+**One teardown.** `destroy_session`, the last-subscriber path and
+`reinitialize_session_if_safe` all end in `tear_down`: detach the subscribers,
+stop the source and orphan its captures (a reinitialise keeps the first and last,
+since the session comes straight back under the same id), then release the session's profiles, closing
+flag, startup error and playback position, and only then emit `destroyed`. The
+profiles live in one registry (`sessions::tracking`), which the single-handle
+admission check (`profile_tracker::can_use_profile`) and the picker's "(in use)"
+both read, so a destroyed session can no longer hold a serial or slcan device.
 
 **`reset` distinguishes a deliberate move from an external death.** It rides the
 `destroyed` event: `reset: false` tells apps to fall back to the session's orphaned

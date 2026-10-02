@@ -41,8 +41,8 @@ use super::source_config::{
 };
 use super::tracking::{
     cache_probe_result, clear_probe_cache, get_cached_probe, get_session_profile_ids, get_sessions_for_profile,
-    register_session_profile, register_session_profiles, restore_session_profiles, take_session_profiles,
-    PROFILE_SESSIONS, SESSION_PROFILES,
+    hold_profile_while, register_session_profile, register_session_profiles, restore_session_profiles,
+    unregister_session_profile,
 };
 
 /// Drop a profile's cached probe after its connection parameters changed.
@@ -149,8 +149,8 @@ pub async fn create_reader_session(
     refuse_at_start(&profile)?;
 
     // Check if this profile is already in use (for single-handle devices)
-    profile_tracker::can_use_profile(&profile.id, &profile.kind)?;
-    profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[])?;
+    profile_tracker::can_use_profile(&profile.id, &profile.kind, None)?;
+    profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[], None)?;
 
     // Anonymous usage telemetry: which source kind gets started (wiretap,
     // wiretap, and any MCP-driven kind all land here).
@@ -260,7 +260,6 @@ pub async fn create_reader_session(
     };
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
-    profile_tracker::register_usage(&profile_id_for_tracking, &session_id);
     register_session_profile(&session_id, &profile_id_for_tracking);
 
     let result = create_session(app, session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
@@ -511,15 +510,6 @@ pub async fn update_reader_direction(session_id: String, reverse: bool) -> Resul
 /// emitted `destroyed` lifecycle event.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn destroy_reader_session(session_id: String, reset: bool) -> Result<(), String> {
-    // Unregister profile usage for all profiles this session was using
-    let profile_ids = take_session_profiles(&session_id);
-    for profile_id in profile_ids {
-        profile_tracker::unregister_usage_by_session(&profile_id, &session_id);
-    }
-
-    // Capture orphaning is handled by destroy_session() which also emits
-    // the capture-changed signal. Don't orphan here to avoid a double-call
-    // that would cause destroy_session's emit to have an empty capture list.
     destroy_session(&session_id, reset).await
 }
 
@@ -653,13 +643,8 @@ pub async fn resume_session_to_live(
         .map_err(|e| format!("Failed to load settings: {}", e))?
         .io_profiles;
     for config in &configs {
-        crate::profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind)?;
-        crate::profile_tracker::can_use_adapter(&config.profile_id, &profiles, &[])?;
-    }
-
-    // Re-register profiles with the tracker
-    for config in &configs {
-        crate::profile_tracker::register_usage(&config.profile_id, &session_id);
+        crate::profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind, None)?;
+        crate::profile_tracker::can_use_adapter(&config.profile_id, &profiles, &[], None)?;
     }
 
     let profile_ids: Vec<String> = configs.iter().map(|c| c.profile_id.clone()).collect();
@@ -825,18 +810,11 @@ pub async fn add_source_to_session_cmd(
         ));
     }
 
-    // Check if profile is already in use by another session
-    profile_tracker::can_use_profile(&source_config.profile_id, &source_config.profile_kind)?;
-    profile_tracker::can_use_adapter(&source_config.profile_id, &settings.io_profiles, &[])?;
+    profile_tracker::can_use_profile(&source_config.profile_id, &source_config.profile_kind, None)?;
+    profile_tracker::can_use_adapter(&source_config.profile_id, &settings.io_profiles, &[], None)?;
 
-    // Register profile usage
     let profile_id = source_config.profile_id.clone();
-    profile_tracker::register_usage(&profile_id, &session_id);
-    register_session_profile(&session_id, &profile_id);
-
-    let capabilities = add_source_to_session(&app, &session_id, source_config).await?;
-
-    Ok(capabilities)
+    hold_profile_while(&session_id, &profile_id, add_source_to_session(&app, &session_id, source_config)).await
 }
 
 /// Remove an IO source from an existing multi-source session.
@@ -849,25 +827,7 @@ pub async fn remove_source_from_session_cmd(
     profile_id: String,
 ) -> Result<IOCapabilities, String> {
     let capabilities = remove_source_from_session(&app, &session_id, &profile_id).await?;
-
-    // Unregister profile tracking for the removed source
-    profile_tracker::unregister_usage_by_session(&profile_id, &session_id);
-
-    // Remove from session→profile mapping
-    if let Ok(mut map) = SESSION_PROFILES.lock() {
-        if let Some(profiles) = map.get_mut(&session_id) {
-            profiles.retain(|id| id != &profile_id);
-        }
-    }
-    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
-        if let Some(sessions) = map.get_mut(&profile_id) {
-            sessions.remove(&session_id);
-            if sessions.is_empty() {
-                map.remove(&profile_id);
-            }
-        }
-    }
-
+    unregister_session_profile(&session_id, &profile_id);
     Ok(capabilities)
 }
 
@@ -1584,9 +1544,9 @@ pub async fn create_multi_source_session(
         }
 
         // Check if profile is already in use
-        profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind)?;
+        profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind, Some(&session_id))?;
         let joining: Vec<&str> = source_configs[..idx].iter().map(|c| c.profile_id.as_str()).collect();
-        profile_tracker::can_use_adapter(&config.profile_id, &settings.io_profiles, &joining)?;
+        profile_tracker::can_use_adapter(&config.profile_id, &settings.io_profiles, &joining, Some(&session_id))?;
     }
 
     // Track all profiles for this session
@@ -1613,10 +1573,6 @@ pub async fn create_multi_source_session(
     let reader = IOBroker::new(app.clone(), session_id.clone(), source_configs)?;
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
-    for profile_id in &profile_ids {
-        profile_tracker::register_usage(profile_id, &session_id);
-    }
-    // Store all profiles for this session (needed for cleanup on destroy)
     register_session_profiles(&session_id, &profile_ids);
 
     // Anonymous usage telemetry: which source kinds get started (deduped so a
