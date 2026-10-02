@@ -1094,9 +1094,11 @@ pub fn run() {
             #[cfg(not(target_os = "ios"))]
             setup_desktop_menus(app)?;
 
+            io::set_app_handle(app.handle().clone());
+
             // Start the heartbeat watchdog to clean up stale session joiners
             // and probe WebView health (detects content process jettison on macOS)
-            io::start_heartbeat_watchdog(app.handle().clone());
+            io::start_heartbeat_watchdog(app.handle());
 
             // Start WebSocket binary transport server
             match ws::server::WsServer::start() {

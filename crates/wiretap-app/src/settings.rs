@@ -645,6 +645,13 @@ impl AppSettings {
     }
 }
 
+/// The saved profiles as a broker reads them: from the settings file as it is
+/// at each read.
+pub fn saved_profiles(app: &AppHandle) -> crate::io::ProfileLoader {
+    let app = app.clone();
+    std::sync::Arc::new(move || load_settings_sync(&app).map(|s| s.io_profiles))
+}
+
 /// The saved profile with this id, from the settings file as it is now.
 pub fn profile_by_id(app: &AppHandle, profile_id: &str) -> Result<IOProfile, String> {
     load_settings_sync(app)?.profile(profile_id).cloned()

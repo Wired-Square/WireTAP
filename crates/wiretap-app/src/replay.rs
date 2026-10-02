@@ -6,7 +6,6 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::AppHandle;
 use tokio::sync::watch;
 
 use crate::io::{self, CanTransmitFrame};
@@ -104,19 +103,6 @@ impl ReplaySchedule {
 /// Progress is pushed to the frontend as `ReplayState` WS messages.
 #[tauri::command]
 pub async fn io_start_replay(
-    _app: AppHandle,
-    session_id: String,
-    replay_id: String,
-    frames: Vec<ReplayFrame>,
-    speed: f64,
-    loop_replay: bool,
-) -> Result<(), String> {
-    start_replay(session_id, replay_id, frames, speed, loop_replay).await
-}
-
-/// Core replay implementation, callable without an `AppHandle`.
-/// Used by both the Tauri command above and the MCP `replay_capture` tool.
-pub async fn start_replay(
     session_id: String,
     replay_id: String,
     frames: Vec<ReplayFrame>,

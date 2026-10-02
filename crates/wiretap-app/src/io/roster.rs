@@ -2,10 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use tauri::Emitter;
 
 use super::session::{each_session, lock_session, session_states, teardown_session_if_empty, IOSession};
-use super::webview_health::APP_HANDLE;
 use super::{broker, IOCapabilities, IOState, SourceConfig};
 use crate::{capture_store, sessions};
 
@@ -278,9 +276,7 @@ pub async fn prune_window_sessions(window_label: &str) {
 /// mirroring `emit_session_lifecycle`. MUST be called WITHOUT holding APP_REGISTRY.
 pub fn emit_open_apps_changed() {
     let roster = list_open_apps();
-    if let Some(app) = APP_HANDLE.get() {
-        let _ = app.emit("open-apps-changed", &roster);
-    }
+    super::emit_to_windows("open-apps-changed", &roster);
     crate::ws::dispatch::send_open_apps_changed(&roster);
 }
 

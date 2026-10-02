@@ -5,7 +5,6 @@ use std::time::Instant;
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, OwnedMutexGuard};
 
 use super::roster::{
@@ -13,8 +12,8 @@ use super::roster::{
     session_exists, set_app_active, subscriber_count_for_session,
 };
 use super::{
-    emit_capture_orphaned_as_changed, emit_session_lifecycle, traits, types, BusMapping, CanTransmitFrame,
-    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, PlaybackPosition, ReplaceSourceOptions,
+    emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
+    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, PlaybackPosition, ProfileLoader, ReplaceSourceOptions,
     SessionLifecyclePayload, SourceConfig, SourceReplacedPayload, TransmitPayload, TransmitResult,
     VirtualBusState, CAPTURE_SOURCE_TYPE,
 };
@@ -32,7 +31,6 @@ use crate::{capture_store, sessions};
 /// `subscriber_count_for_session`. Only session-level state lives on the struct.
 pub struct IOSession {
     pub source: Box<dyn IOSource>,
-    pub app: AppHandle,
     /// Display names of the sources in this session (for logging)
     pub source_names: Vec<String>,
     /// Original source configs for rebuilding the live reader on resume.
@@ -284,7 +282,6 @@ pub struct CreateSessionResult {
 /// If a session with this ID already exists, joins the existing session instead.
 /// This prevents race conditions when multiple apps start simultaneously.
 pub async fn create_session(
-    app: AppHandle,
     session_id: String,
     device: Box<dyn IOSource>,
     subscriber_id: Option<String>,
@@ -298,7 +295,6 @@ pub async fn create_session(
     let capabilities = device.capabilities();
     let source_type = device.source_type().to_string();
     let state = device.state();
-    let app_for_event = app.clone();
 
     // Join an existing session rather than overwrite it, once whatever it is doing
     // has finished. One that a teardown retired meanwhile is gone: look again.
@@ -308,7 +304,6 @@ pub async fn create_session(
             Entry::Vacant(entry) => {
                 let io = Arc::new(Mutex::new(IOSession {
                     source: device,
-                    app,
                     source_names: source_names.unwrap_or_default(),
                     source_configs,
                     retired: false,
@@ -377,7 +372,7 @@ pub async fn create_session(
     // Use get_session_profile_ids() to get actual profile IDs (not display names)
     // Profile tracking is registered before create_session() is called
     let source_profile_ids = crate::sessions::get_session_profile_ids(&session_id);
-    emit_session_lifecycle(&app_for_event, SessionLifecyclePayload {
+    emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.clone(),
         event_type: "created".to_string(),
         source_type: Some(source_type),
@@ -531,7 +526,7 @@ async fn replace_session_source(
 ///
 /// If no capture exists (e.g. stopped before any frames), falls back to a normal
 /// suspend.
-pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+pub async fn stop_and_switch_to_capture(session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     let mut session = lock_session(session_id).await?;
 
     // A session already replaying has no realtime source to stop, and re-switching it
@@ -562,12 +557,7 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
         capture_store::orphan_captures_for_session(session_id);
         sessions::swap_session_profiles_for_capture(session_id, bid);
 
-        let new_reader = CaptureSource::new(
-            app.clone(),
-            session_id.to_string(),
-            bid.clone(),
-            speed,
-        );
+        let new_reader = CaptureSource::new(session_id.to_string(), bid.clone(), speed);
 
         // Device is already stopped, so replace_session_source's stop is a no-op
         // replace_session_source emits session-lifecycle internally
@@ -783,7 +773,7 @@ pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result
 /// This replaces the session's reader with a CaptureSource that reads from the session's
 /// owned capture. The session stays alive and all listeners remain connected.
 /// Use this after ingest completes to enable playback without destroying the session.
-pub async fn switch_to_capture_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+pub async fn switch_to_capture_replay(session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     // Get the frame capture this session streamed into
     let capture_id = crate::capture_store::get_session_frame_capture_id(session_id)
         .ok_or_else(|| {
@@ -813,12 +803,7 @@ pub async fn switch_to_capture_replay(app: &AppHandle, session_id: &str, speed: 
     let _ = crate::capture_store::mark_capture_active(&capture_id);
 
     // Create a new CaptureSource that reads from the session's capture
-    let new_reader = CaptureSource::new(
-        app.clone(),
-        session_id.to_string(),
-        capture_id,
-        speed,
-    );
+    let new_reader = CaptureSource::new(session_id.to_string(), capture_id, speed);
 
     let result = replace_session_source(
         &mut *lock_session(session_id).await?,
@@ -909,7 +894,7 @@ async fn tear_down(session_id: &str, mut session: OwnedMutexGuard<IOSession>, ho
     }
     let reset = matches!(how, Teardown::Destroy { reset: true });
     let source_profile_ids = forget_session(session_id);
-    emit_session_lifecycle(&session.app, SessionLifecyclePayload {
+    emit_session_lifecycle(SessionLifecyclePayload {
         session_id: session_id.to_string(),
         event_type: "destroyed".to_string(),
         source_type: None,
@@ -1155,7 +1140,6 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
 /// `label` names the snapshot in the capture list (e.g. "evicted", "review"). Returns the
 /// copied capture IDs and emits `subscriber-evicted` so the detached app switches to it.
 async fn detach_subscriber_to_capture_copy(
-    app: &AppHandle,
     session_id: &str,
     subscriber_id: &str,
     name_for_copy: impl Fn(&str) -> String,
@@ -1195,7 +1179,7 @@ async fn detach_subscriber_to_capture_copy(
         subscriber_id: String,
         capture_ids: Vec<String>,
     }
-    let _ = app.emit("subscriber-evicted", SubscriberEvictedPayload {
+    emit_to_windows("subscriber-evicted", SubscriberEvictedPayload {
         session_id: session_id.to_string(),
         subscriber_id: subscriber_id.to_string(),
         capture_ids: copied_capture_ids.clone(),
@@ -1210,22 +1194,22 @@ async fn detach_subscriber_to_capture_copy(
 
 /// Evict a subscriber from a session (Session Manager: forced removal), handing it a
 /// snapshot copy of the capture. See [`detach_subscriber_to_capture_copy`].
-pub async fn evict_session_subscriber(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
-    detach_subscriber_to_capture_copy(app, session_id, subscriber_id, |base| format!("{} (evicted)", base)).await
+pub async fn evict_session_subscriber(session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
+    detach_subscriber_to_capture_copy(session_id, subscriber_id, |base| format!("{} (evicted)", base)).await
 }
 
 /// Leave a session (user-initiated): the calling subscriber detaches and reviews a frozen
 /// snapshot of the capture, while the session keeps streaming for any remaining apps. The
 /// snapshot gets a unique "{name}_{n}" name so repeated leaves stay distinct.
-pub async fn leave_session_to_capture(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
-    detach_subscriber_to_capture_copy(app, session_id, subscriber_id, crate::capture_store::next_indexed_name).await
+pub async fn leave_session_to_capture(session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
+    detach_subscriber_to_capture_copy(session_id, subscriber_id, crate::capture_store::next_indexed_name).await
 }
 
 /// Add a new source to an existing multi-source session.
 /// Stops the current device, creates a new IOBroker with all sources (old + new),
 /// swaps it into the session, and restarts. Keeps the same session ID and listeners.
 pub async fn add_source_to_session(
-    app: &AppHandle,
+    profiles: ProfileLoader,
     session_id: &str,
     new_source: SourceConfig,
 ) -> Result<IOCapabilities, String> {
@@ -1265,7 +1249,7 @@ pub async fn add_source_to_session(
         .map(|c| c.display_name.clone())
         .collect();
 
-    let reader = IOBroker::new(app.clone(), session_id.to_string(), all_configs)?;
+    let reader = IOBroker::new(profiles, session_id.to_string(), all_configs)?;
     let capabilities = reader.capabilities();
 
     session.source = Box::new(reader);
@@ -1283,7 +1267,7 @@ pub async fn add_source_to_session(
 /// Stops the current device, creates a new IOBroker with the remaining sources
 /// (preserving their bus mappings), swaps it into the session, and restarts.
 pub async fn remove_source_from_session(
-    app: &AppHandle,
+    profiles: ProfileLoader,
     session_id: &str,
     profile_id: &str,
 ) -> Result<IOCapabilities, String> {
@@ -1332,7 +1316,7 @@ pub async fn remove_source_from_session(
         .map(|c| c.display_name.clone())
         .collect();
 
-    let reader = IOBroker::new(app.clone(), session_id.to_string(), remaining_configs)?;
+    let reader = IOBroker::new(profiles, session_id.to_string(), remaining_configs)?;
     let capabilities = reader.capabilities();
 
     session.source = Box::new(reader);
@@ -1367,19 +1351,16 @@ pub async fn set_source_polling(
         session.source.pause_source_polling(profile_id)?;
     }
 
-    emit_session_lifecycle(
-        &session.app,
-        SessionLifecyclePayload {
-            session_id: session_id.to_string(),
-            event_type: "updated".to_string(),
-            source_type: Some(session.source.source_type().to_string()),
-            state: None,
-            subscriber_count: subscriber_count_for_session(session_id),
-            source_profile_ids: sessions::get_session_profile_ids(session_id),
-            creator_subscriber_id: None,
-            reset: false,
-        },
-    );
+    emit_session_lifecycle(SessionLifecyclePayload {
+        session_id: session_id.to_string(),
+        event_type: "updated".to_string(),
+        source_type: Some(session.source.source_type().to_string()),
+        state: None,
+        subscriber_count: subscriber_count_for_session(session_id),
+        source_profile_ids: sessions::get_session_profile_ids(session_id),
+        creator_subscriber_id: None,
+        reset: false,
+    });
     Ok(())
 }
 
@@ -1620,6 +1601,80 @@ mod tests {
             assert!(super::super::get_session_state(id).await.is_none());
             assert!(reinitialize_session_if_safe(id, "w_app").await.unwrap().success);
         });
+    }
+
+    use super::super::test_source::{Gate, TestSource};
+    use std::time::Duration;
+
+    async fn open(session_id: &str, source: TestSource) -> CreateSessionResult {
+        let subscriber = Some(format!("{session_id}-app"));
+        create_session(session_id.into(), Box::new(source), subscriber, None, None, vec![]).await
+    }
+
+    async fn stalls<F: std::future::Future>(operation: F) -> bool {
+        tokio::time::timeout(Duration::from_millis(100), operation).await.is_err()
+    }
+
+    #[tokio::test]
+    async fn a_destroyed_session_leaves_nothing_behind() {
+        let id = "f_destroy_clears";
+        open(id, TestSource::new(id)).await;
+        sessions::register_session_profile(id, "p-destroy-clears");
+        store_startup_error(id, "boom".into());
+        let position = PlaybackPosition { timestamp_us: 1, frame_index: 1, frame_count: None };
+        store_playback_position(id, position);
+        with_state(id, |s| s.suspended_at = Some(Instant::now()));
+        CLOSING_SESSIONS.write().unwrap().insert(id.into());
+
+        destroy_session(id, false).await.unwrap();
+
+        assert!(!session_states().contains_key(id));
+        assert_eq!(current_session_of_app(&format!("{id}-app")), None);
+        assert!(sessions::get_session_profile_ids(id).is_empty());
+        assert!(!CLOSING_SESSIONS.read().unwrap().contains(id));
+
+        open(id, TestSource::new(id)).await;
+        assert_eq!(get_startup_error(id), None);
+        assert!(get_playback_position(id).is_none());
+        assert_eq!(with_state(id, |s| s.suspended_at.is_some()), Some(false));
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_slow_session_does_not_hold_up_another() {
+        let gate = Arc::new(Gate::default());
+        open("f_slow", TestSource::new("f_slow").slow_start(&gate)).await;
+        open("f_quick", TestSource::new("f_quick")).await;
+
+        let slow_start = tokio::spawn(start_session("f_slow"));
+        gate.entered().await;
+
+        let quick = tokio::time::timeout(Duration::from_secs(1), start_session("f_quick")).await;
+        assert_eq!(quick.expect("the quick session waited on the slow one"), Ok(IOState::Running));
+        assert!(stalls(stop_session("f_slow")).await, "one session's operations run one at a time");
+
+        gate.release();
+        assert_eq!(slow_start.await.unwrap(), Ok(IOState::Running));
+        destroy_session("f_slow", false).await.unwrap();
+        destroy_session("f_quick", false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_same_id_create_waits_out_the_teardown() {
+        let id = "f_recreated";
+        let gate = Arc::new(Gate::default());
+        open(id, TestSource::new(id).slow_stop(&gate)).await;
+        let teardown = tokio::spawn(destroy_session(id, false));
+        gate.entered().await;
+
+        let mut recreate = tokio::spawn(async move { open(id, TestSource::new(id)).await });
+        assert!(stalls(&mut recreate).await, "the create joined a session being torn down");
+
+        gate.release();
+        teardown.await.unwrap().unwrap();
+        assert!(recreate.await.unwrap().is_new);
+        assert!(session_states().contains_key(id));
+        destroy_session(id, false).await.unwrap();
     }
 
     #[test]

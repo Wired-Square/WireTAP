@@ -4,15 +4,13 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::AppHandle;
 use tokio::sync::mpsc;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 use super::spawner::run_source_reader;
 use super::types::{ControlChannels, SourceConfig, SourcePauseFlags, TransmitChannels};
-use super::{MergeCommand, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
-use crate::settings;
+use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::capture_store::{self, TimestampedByte};
 use crate::io::error::IoError;
 use crate::io::bus_mapping::BusMapping;
@@ -80,7 +78,7 @@ const BUS_LOG_INTERVAL_SECS: u64 = 5;
 
 /// Main merge task that spawns sub-readers and combines their frames/bytes
 pub(super) async fn run_merge_task(
-    app: AppHandle,
+    profiles: ProfileLoader,
     session_id: String,
     sources: Vec<SourceConfig>,
     _bytes_capture_id: Option<String>,
@@ -98,10 +96,10 @@ pub(super) async fn run_merge_task(
     source_pause_flags: SourcePauseFlags,
 ) {
     // Profiles for the initial spawn only — hot-adds re-read, since they exist
-    // to pick up a profile that has changed. Narrowed from the whole AppSettings
-    // and dropped after the loop so a long-lived session retains neither.
-    let io_profiles = match settings::load_settings(app.clone()).await {
-        Ok(s) => s.io_profiles,
+    // to pick up a profile that has changed. Dropped after the loop so a
+    // long-lived session does not retain them.
+    let io_profiles = match profiles() {
+        Ok(p) => p,
         Err(e) => {
             tlog!("[IOBroker] Failed to load settings: {}", e);
             emit_stream_ended(&session_id, StreamEndReason::Error, "IOBroker");
@@ -143,7 +141,6 @@ pub(super) async fn run_merge_task(
             &profile,
             source_stop,
             source_pause,
-            &app,
             &session_id,
             &stop_flag,
             &tx,
@@ -355,15 +352,14 @@ pub(super) async fn run_merge_task(
             // or baud rate is a remove-then-add of that source — so
             // the original copy would respawn the device on exactly
             // the settings the user just replaced.
-            let fresh = match settings::load_settings_sync(&app) {
-                Ok(s) => s,
+            let fresh = match profiles() {
+                Ok(p) => p,
                 Err(e) => {
                     tlog!("[IOBroker] Hot-add: failed to reload settings: {}", e);
                     continue;
                 }
             };
             let Some(profile) = fresh
-                .io_profiles
                 .into_iter()
                 .find(|p| p.id == source_config.profile_id)
             else {
@@ -386,7 +382,6 @@ pub(super) async fn run_merge_task(
                 &profile,
                 source_stop,
                 source_pause,
-                &app,
                 &session_id,
                 &stop_flag,
                 &tx,
@@ -488,14 +483,12 @@ fn spawn_source(
     profile: &crate::settings::IOProfile,
     source_stop: Arc<AtomicBool>,
     source_pause: Arc<AtomicBool>,
-    app: &AppHandle,
     session_id: &str,
     stop_flag: &Arc<AtomicBool>,
     tx: &mpsc::Sender<SourceMessage>,
     virtual_bus_controls: &VirtualBusControls,
     virtual_cmd_txs: &Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
 ) -> tokio::task::JoinHandle<()> {
-    let app_clone = app.clone();
     let session_id_clone = session_id.to_string();
     let stop_flag_clone = stop_flag.clone();
     let source_stop_clone = source_stop;
@@ -534,7 +527,6 @@ fn spawn_source(
         });
 
         run_source_reader(
-            app_clone,
             session_id_clone,
             index,
             profile,

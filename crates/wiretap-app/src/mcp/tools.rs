@@ -1036,7 +1036,7 @@ impl WireTapTools {
         let seq = REPLAY_SEQ.fetch_add(1, Ordering::Relaxed);
         let replay_id = format!("mcp-{}-{}", p.capture_id, seq);
         let count = replay_frames.len();
-        crate::replay::start_replay(
+        crate::replay::io_start_replay(
             p.session_id.clone(),
             replay_id.clone(),
             replay_frames,
@@ -1660,7 +1660,7 @@ mod tests {
 
     mod test_pattern {
         use super::super::{read_test_pattern_state, start_test_pattern};
-        use crate::io_test::tests::{attach, Wire};
+        use crate::io_test::tests::open_virtual_loopback;
         use crate::io_test::{io_test_stop, IOTestState, TestMode, TestRole, TestStatus};
         use crate::mcp::types::TestPatternStartParams;
         use std::time::{Duration, Instant};
@@ -1702,9 +1702,9 @@ mod tests {
             assert!(read_test_pattern_state("mcp-test-none").is_err());
         }
 
-        #[tokio::test]
+        #[tokio::test(flavor = "multi_thread")]
         async fn a_loopback_run_completes_through_the_wrappers() {
-            attach("mcp_tp_loopback", Wire::Loopback);
+            open_virtual_loopback("mcp_tp_loopback").await;
             let test_id = start_test_pattern(params(serde_json::json!({
                 "session_id": "mcp_tp_loopback",
                 "mode": "loopback",
@@ -1719,6 +1719,7 @@ mod tests {
             assert!(state.tx_count > 0);
             assert_eq!(state.rx_count, state.tx_count);
             assert_eq!((state.drops, state.duplicates, state.out_of_order), (0, 0, 0));
+            crate::io::destroy_session("mcp_tp_loopback", false).await.unwrap();
         }
 
         #[tokio::test]

@@ -59,7 +59,7 @@ pub use modbus_tcp::{
 };
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
-pub use broker::{IOBroker, SerialOverrides, SourceConfig};
+pub use broker::{IOBroker, ProfileLoader, SerialOverrides, SourceConfig};
 pub use types::{FramingMode, ModbusRtuOptions};
 pub use mqtt::{MqttConfig, MqttSource};
 
@@ -69,6 +69,8 @@ pub use error::IoError;
 
 mod roster;
 mod session;
+#[cfg(test)]
+pub(crate) mod test_source;
 mod wake;
 mod webview_health;
 pub use roster::*;
@@ -707,14 +709,28 @@ pub struct SessionLifecyclePayload {
     pub reset: bool,
 }
 
+/// Set once at startup. Without it the Tauri events go nowhere, as in a unit test.
+pub(super) static APP_HANDLE: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+pub fn set_app_handle(app: AppHandle) {
+    APP_HANDLE.set(app).ok();
+}
+
+/// Emit a Tauri event to every window.
+pub(crate) fn emit_to_windows<S: Serialize + Clone>(event: &str, payload: S) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit(event, payload);
+    }
+}
+
 /// Emit a global session lifecycle event to all windows.
 /// This event is NOT scoped to a session ID - it broadcasts to all windows.
-pub fn emit_session_lifecycle(app: &AppHandle, payload: SessionLifecyclePayload) {
+pub fn emit_session_lifecycle(payload: SessionLifecyclePayload) {
     tlog!(
         "[lifecycle_event] Emitting '{}' for session '{}' (profiles: {:?})",
         payload.event_type, payload.session_id, payload.source_profile_ids
     );
-    let _ = app.emit("session-lifecycle", &payload);
+    emit_to_windows("session-lifecycle", &payload);
     crate::ws::dispatch::send_session_lifecycle(&payload);
 }
 

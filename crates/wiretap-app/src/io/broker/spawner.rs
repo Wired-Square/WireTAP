@@ -5,7 +5,6 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
-use tauri::AppHandle;
 use tokio::sync::{mpsc, watch};
 use tokio::time::{Duration, interval};
 
@@ -48,7 +47,6 @@ use crate::io::gs_usb::run_source as run_gs_usb_source;
 /// one of those lists was silently dropped rather than rejected.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_source_reader(
-    _app: AppHandle,
     session_id: String,
     source_idx: usize,
     profile: IOProfile,

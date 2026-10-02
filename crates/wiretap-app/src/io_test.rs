@@ -62,22 +62,6 @@ const MAX_KEPT_ERRORS: usize = 16;
 /// accumulates them faster than anyone can read them.
 const MAX_KEPT_GAPS: usize = 100;
 
-/// Put one frame on the session's bus.
-///
-/// Every transmit in this module goes through here, so the tests can stand a
-/// bus up in process — a real session is reachable only through the global
-/// registry, whose entries hold an `AppHandle<Wry>` no headless test can make.
-async fn send(
-    session_id: &str,
-    payload: &TransmitPayload,
-) -> Result<crate::io::TransmitResult, String> {
-    #[cfg(test)]
-    if let Some(result) = tests::intercept(session_id, payload) {
-        return result;
-    }
-    io::session_transmit(session_id, payload).await
-}
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -552,7 +536,7 @@ impl RunStats {
         payload: &TransmitPayload,
         what: impl FnOnce() -> String,
     ) -> bool {
-        match send(session_id, payload).await {
+        match io::session_transmit(session_id, payload).await {
             Ok(result) if result.success => {
                 self.tx_count += 1;
                 true
@@ -734,7 +718,7 @@ impl<'a> Run<'a> {
     /// Send a control message. Control frames carry no sequence number, so they
     /// are not counted as test traffic and a failure is not the run's failure.
     async fn control(&self, c: Command) -> bool {
-        send(self.session_id, &self.config.message(Message::Control(c), self.run))
+        io::session_transmit(self.session_id, &self.config.message(Message::Control(c), self.run))
             .await
             .is_ok()
     }
@@ -993,7 +977,7 @@ impl<'a> Run<'a> {
                 };
                 let payload = config.message(msg, self.run);
 
-                let refused = match send(self.session_id, &payload).await {
+                let refused = match io::session_transmit(self.session_id, &payload).await {
                     Ok(result) if result.success => {
                         self.stats.tx_count += 1;
                         consecutive_failures = 0;
@@ -1258,23 +1242,21 @@ async fn run_responder(
 // Tests
 // ============================================================================
 //
-// The bus is stood up in process. A real session would be the honest thing to
-// run these against, but every entry point into one wants an `AppHandle<Wry>`
-// and `tauri::test::mock_app()` hands back an `AppHandle<MockRuntime>`, so no
-// headless test can build one. What `intercept` stands in for is a Virtual
-// Device with `loopback: true`, which copies a transmitted frame back as a
-// received one and does nothing else — and, in `Wire::Peer`, the crate's own
-// `Responder`, so a run is measured against the reply side of the contract
-// rather than against an echo of itself.
+// Every run goes through a real session in the registry. Loopback is a Virtual
+// Device; the far end of every other bus is a `TestSource` answering with the
+// crate's own `Responder`, so a run is measured against the reply side of the
+// contract rather than against an echo of itself. Either way the answer comes
+// back through the capture store's frame tap, as it does on a real bus.
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::io::test_source::TestSource;
+    use crate::io::{IOBroker, IOSource, ProfileLoader, SourceConfig, TransmitResult};
+    use std::sync::Arc;
 
-    /// What answers a transmit on a test session.
-    pub(crate) enum Wire {
-        /// Hands the frame straight back, as a Virtual Device's loopback does.
-        Loopback,
+    /// The far end of a test session's bus.
+    enum Wire {
         /// The crate's reply side: a peer on the far end of the bus.
         Peer(Responder),
         /// A peer whose echo is capped at eight bytes — a codec that read a
@@ -1288,11 +1270,32 @@ pub(crate) mod tests {
         Backlogged(Responder, u32),
     }
 
-    static WIRE: Lazy<StdMutex<HashMap<String, Wire>>> =
-        Lazy::new(|| StdMutex::new(HashMap::new()));
-
-    pub(crate) fn attach(session_id: &str, wire: Wire) {
-        WIRE.lock().unwrap().insert(session_id.to_string(), wire);
+    impl Wire {
+        /// What comes back for one transmitted frame; `None` is a full send queue.
+        fn answer(&mut self, tx: &CanTransmitFrame) -> Option<Vec<FrameMessage>> {
+            let reply =
+                |r: &mut Responder| r.on_frame(tx.frame_id, tx.is_extended, tx.is_fd, &tx.data, now_us());
+            Some(match self {
+                Wire::Backlogged(_, refusals)
+                    if *refusals > 0 && tx.frame_id == tp::ID_THROUGHPUT_TX =>
+                {
+                    *refusals -= 1;
+                    return None;
+                }
+                Wire::Peer(r) | Wire::Backlogged(r, _) => reply(r)
+                    .into_iter()
+                    .map(|r| received(r.arb_id, r.extended, r.fd, r.data))
+                    .collect(),
+                Wire::Truncating(r) => reply(r)
+                    .into_iter()
+                    .map(|mut r| {
+                        r.data.truncate(8);
+                        received(r.arb_id, r.extended, r.fd, r.data)
+                    })
+                    .collect(),
+                Wire::Deaf => Vec::new(),
+            })
+        }
     }
 
     fn received(arb_id: u32, extended: bool, fd: bool, data: Vec<u8>) -> FrameMessage {
@@ -1311,42 +1314,80 @@ pub(crate) mod tests {
         }
     }
 
-    /// Stand in for `io::session_transmit` on a session a test has attached a
-    /// wire to. `None` for any other session, so nothing else is affected.
-    pub(super) fn intercept(
-        session_id: &str,
-        payload: &TransmitPayload,
-    ) -> Option<Result<crate::io::TransmitResult, String>> {
-        let TransmitPayload::CanFrame(tx) = payload else { return None };
-        let back = {
-            let mut wires = WIRE.lock().ok()?;
-            match wires.get_mut(session_id)? {
-                Wire::Backlogged(_, refusals) if *refusals > 0 && tx.frame_id == tp::ID_THROUGHPUT_TX => {
-                    *refusals -= 1;
-                    let full = crate::io::TransmitResult::error("Transmit refused: send queue full".into());
-                    return Some(Ok(full));
+    async fn open_session(session_id: &str, source: Box<dyn IOSource>) {
+        crate::capture_db::use_in_memory_database();
+        io::create_session(session_id.into(), source, None, None, None, vec![]).await;
+        io::start_session(session_id).await.unwrap();
+    }
+
+    async fn open_wire(session_id: &str, wire: Wire) {
+        let wire = StdMutex::new(wire);
+        let far_end = TestSource::new(session_id).transmitting(move |session_id, payload| {
+            let TransmitPayload::CanFrame(tx) = payload else {
+                return TransmitResult::error("Not a CAN frame".into());
+            };
+            match wire.lock().unwrap().answer(tx) {
+                Some(back) => {
+                    crate::capture_store::append_frames_to_session(session_id, back);
+                    TransmitResult::success()
                 }
-                Wire::Peer(r) | Wire::Backlogged(r, _) => r
-                    .on_frame(tx.frame_id, tx.is_extended, tx.is_fd, &tx.data, now_us())
-                    .into_iter()
-                    .map(|r| received(r.arb_id, r.extended, r.fd, r.data))
-                    .collect(),
-                Wire::Loopback => {
-                    vec![received(tx.frame_id, tx.is_extended, tx.is_fd, tx.data.clone())]
-                }
-                Wire::Truncating(r) => r
-                    .on_frame(tx.frame_id, tx.is_extended, tx.is_fd, &tx.data, now_us())
-                    .into_iter()
-                    .map(|mut r| {
-                        r.data.truncate(8);
-                        received(r.arb_id, r.extended, r.fd, r.data)
-                    })
-                    .collect(),
-                Wire::Deaf => Vec::new(),
+                None => TransmitResult::error("Transmit refused: send queue full".into()),
             }
+        });
+        open_session(session_id, Box::new(far_end)).await;
+        crate::capture_store::create_session_capture(
+            session_id,
+            crate::capture_store::CaptureKind::Frames,
+            session_id.into(),
+        );
+    }
+
+    /// A running session on a Virtual Device, which answers every frame it is
+    /// sent with the same frame.
+    pub(crate) async fn open_virtual_loopback(session_id: &str) {
+        let profile = crate::settings::IOProfile {
+            id: format!("{session_id}-device"),
+            name: "Virtual loopback".into(),
+            kind: "virtual".into(),
+            connection: [
+                ("traffic_type".to_string(), serde_json::json!("can")),
+                ("loopback".to_string(), serde_json::json!(true)),
+                ("signal_generator".to_string(), serde_json::json!(false)),
+            ]
+            .into(),
+            preferred_catalog: None,
+            ephemeral: true,
         };
-        tap_test_frames(session_id, &back);
-        Some(Ok(crate::io::TransmitResult::success()))
+        let config = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            display_name: profile.name.clone(),
+            bus_mappings: crate::sessions::profile_bus_mappings(&profile),
+            ..Default::default()
+        };
+        let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
+        let broker = IOBroker::single_source(profiles, session_id.into(), config).unwrap();
+        open_session(session_id, Box::new(broker)).await;
+        await_transmit_ready(session_id).await;
+    }
+
+    /// The session reports running before its device has connected, and a
+    /// transmit until then is refused.
+    async fn await_transmit_ready(session_id: &str) {
+        let probe = CanTransmitFrame {
+            frame_id: 0x100,
+            data: vec![0; 8],
+            bus: 0,
+            is_extended: false,
+            is_fd: false,
+            is_brs: false,
+            is_rtr: false,
+        };
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !io::transmit_frame(session_id, &probe).await.is_ok_and(|r| r.success) {
+            assert!(Instant::now() < deadline, "the device never connected");
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
     }
 
     fn config(mode: TestMode, use_fd: bool) -> TestConfig {
@@ -1361,10 +1402,17 @@ pub(crate) mod tests {
         }
     }
 
-    async fn run(session_id: &str, wire: Wire, config: &TestConfig) -> IOTestState {
-        attach(session_id, wire);
+    async fn run_on(session_id: &str, config: &TestConfig) -> IOTestState {
         let cancel = AtomicBool::new(false);
-        Run::new(session_id, &Publish::new("test", config), config, &cancel).initiate().await
+        let publish = Publish::new("test", config);
+        let state = Run::new(session_id, &publish, config, &cancel).initiate().await;
+        io::destroy_session(session_id, false).await.unwrap();
+        state
+    }
+
+    async fn run(session_id: &str, wire: Wire, config: &TestConfig) -> IOTestState {
+        open_wire(session_id, wire).await;
+        run_on(session_id, config).await
     }
 
     /// The test the protocol exists for: every length code round-trips at
@@ -1434,9 +1482,10 @@ pub(crate) mod tests {
 
     /// Loopback echoes the ping request unchanged, so the reply *is* the
     /// request — no responder is in the exchange at all.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_loopback_echo_run_reports_no_drops() {
-        let state = run("test_echo_loop", Wire::Loopback, &config(TestMode::Loopback, false)).await;
+        open_virtual_loopback("test_echo_loop").await;
+        let state = run_on("test_echo_loop", &config(TestMode::Loopback, false)).await;
 
         assert!(state.tx_count > 0, "nothing was transmitted");
         assert_eq!(state.rx_count, state.tx_count, "every frame came back");

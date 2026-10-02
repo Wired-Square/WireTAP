@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
-use tauri::AppHandle;
 use tokio::sync::mpsc;
 
 /// Capacity for the async frame/bytes channel between source readers and the merge task.
@@ -77,6 +76,11 @@ pub enum VirtualBusCommand {
 /// Sender type for merge commands
 pub type MergeCmdTx = Arc<Mutex<Option<mpsc::UnboundedSender<MergeCommand>>>>;
 
+/// Reads the saved profiles: once when the broker starts, and again on every
+/// hot-add, which exists to pick up a profile that has changed.
+pub type ProfileLoader =
+    Arc<dyn Fn() -> Result<Vec<crate::settings::IOProfile>, String> + Send + Sync>;
+
 /// Sender type for virtual bus commands (one per virtual source)
 pub type VirtualCmdTx = mpsc::UnboundedSender<VirtualBusCommand>;
 
@@ -87,7 +91,7 @@ pub type VirtualCmdTx = mpsc::UnboundedSender<VirtualBusCommand>;
 /// Broker that sits between IO device producers and session consumers,
 /// routing frames and transmit requests across one or more sources.
 pub struct IOBroker {
-    app: AppHandle,
+    profiles: ProfileLoader,
     session_id: String,
     sources: Vec<SourceConfig>,
     state: IOState,
@@ -266,11 +270,11 @@ impl IOBroker {
     /// This is the preferred way to create sessions for real-time devices,
     /// as it uses the same code path as multi-device sessions.
     pub fn single_source(
-        app: AppHandle,
+        profiles: ProfileLoader,
         session_id: String,
         source: SourceConfig,
     ) -> Result<Self, String> {
-        Self::new(app, session_id, vec![source])
+        Self::new(profiles, session_id, vec![source])
     }
 
     /// Create a new IO broker
@@ -280,7 +284,7 @@ impl IOBroker {
     /// - Timeline sessions are limited to 1 interface
     /// - Protocols must be compatible (CAN + CAN-FD OK, but not CAN + Serial)
     pub fn new(
-        app: AppHandle,
+        profiles: ProfileLoader,
         session_id: String,
         sources: Vec<SourceConfig>,
     ) -> Result<Self, String> {
@@ -308,7 +312,7 @@ impl IOBroker {
         let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
 
         Ok(Self {
-            app,
+            profiles,
             session_id,
             sources,
             state: IOState::Stopped,
@@ -681,7 +685,7 @@ impl IOSource for IOBroker {
             channels.clear();
         }
 
-        let app = self.app.clone();
+        let profiles = self.profiles.clone();
         let session_id = self.session_id.clone();
         let sources = self.sources.clone();
         let stop_flag = self.stop_flag.clone();
@@ -734,7 +738,7 @@ impl IOSource for IOBroker {
             // invariant is "the task has returned ⇒ nothing is running".
             let _ended = ended;
             run_merge_task(
-                app,
+                profiles,
                 session_id,
                 sources,
                 bytes_capture_id,

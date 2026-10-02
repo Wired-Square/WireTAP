@@ -20,7 +20,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use tauri::AppHandle;
 use tokio::time::Duration;
 
 use crate::io::lifecycle::{SourceLifecycle, SourceLifecycleGuard};
@@ -131,7 +130,6 @@ where
 
 /// MQTT Source - receives CAN frames from an MQTT broker
 pub struct MqttSource {
-    app: AppHandle,
     session_id: String,
     config: MqttConfig,
     state: IOState,
@@ -143,9 +141,8 @@ pub struct MqttSource {
 }
 
 impl MqttSource {
-    pub fn new(app: AppHandle, session_id: String, config: MqttConfig) -> Self {
+    pub fn new(session_id: String, config: MqttConfig) -> Self {
         Self {
-            app,
             session_id,
             config,
             state: IOState::Stopped,
@@ -172,13 +169,11 @@ impl IOSource for MqttSource {
         self.state = IOState::Starting;
         self.cancel_flag.store(false, Ordering::Relaxed);
 
-        let app = self.app.clone();
         let session_id = self.session_id.clone();
         let config = self.config.clone();
         let cancel_flag = self.cancel_flag.clone();
 
         let handle = spawn_mqtt_stream(
-            app,
             session_id,
             config,
             cancel_flag,
@@ -235,7 +230,6 @@ impl IOSource for MqttSource {
 // ============================================================================
 
 fn spawn_mqtt_stream(
-    _app_handle: AppHandle,
     session_id: String,
     config: MqttConfig,
     cancel_flag: Arc<AtomicBool>,

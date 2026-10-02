@@ -33,9 +33,6 @@ const PROBE_START_DELAY_SECS: u64 = 15;
 /// At one ping per watchdog tick (5s), this is 30s of probing.
 const PROBE_MAX_MISSES: u64 = 6;
 
-/// App handle for the watchdog to access WebView windows.
-pub(super) static APP_HANDLE: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
-
 /// Root URL of the dashboard webview, captured once at startup while the content
 /// process is known-alive. Recovery navigates here instead of reading the live
 /// `webview.url()` getter: once macOS jettisons the content process, wry's getter
@@ -91,7 +88,7 @@ pub fn check_recovery_occurred() -> bool {
 /// Probe the WebView to determine if the content process is still alive.
 /// Called every watchdog tick while any session is suspended.
 async fn check_webview_health() {
-    let app = match APP_HANDLE.get() {
+    let app = match super::APP_HANDLE.get() {
         Some(a) => a,
         None => return,
     };
@@ -458,7 +455,7 @@ async fn log_session_status() {
 /// Start the heartbeat watchdog task.
 /// This runs in the background and periodically cleans up stale subscribers,
 /// probes WebView health, and logs session status.
-pub fn start_heartbeat_watchdog(app: AppHandle) {
+pub fn start_heartbeat_watchdog(app: &AppHandle) {
     // Capture the dashboard root URL once, now, while the content process is
     // alive — recovery reuses it instead of calling the live url() getter (which
     // panics on a jettisoned content process). This runs on the main thread
@@ -480,7 +477,6 @@ pub fn start_heartbeat_watchdog(app: AppHandle) {
         }
     }
 
-    APP_HANDLE.set(app).ok();
     tauri::async_runtime::spawn(async {
         let cleanup_interval = std::time::Duration::from_secs(HEARTBEAT_CHECK_INTERVAL_SECS);
         let status_interval = STATUS_LOG_INTERVAL_SECS / HEARTBEAT_CHECK_INTERVAL_SECS;

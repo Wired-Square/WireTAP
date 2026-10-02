@@ -29,7 +29,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, RwLock,
 };
-use tauri::AppHandle;
 
 use super::poll::FrameSink;
 use super::scanner::{
@@ -125,9 +124,7 @@ pub struct ModbusScanSource {
 }
 
 impl ModbusScanSource {
-    /// `app` is unused — kept so the constructor matches every other source in
-    /// the session-creation match arms.
-    pub fn new(_app: AppHandle, session_id: String, job: ScanJob) -> Self {
+    pub fn new(session_id: String, job: ScanJob) -> Self {
         Self {
             session_id,
             job,

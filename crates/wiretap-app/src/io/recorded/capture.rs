@@ -10,7 +10,6 @@ use std::sync::{
     Arc,
 };
 use std::time::Duration;
-use tauri::AppHandle;
 
 use super::base::{PlaybackControl, RecordedSourceState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
@@ -26,7 +25,6 @@ const NO_SEEK_FRAME: i64 = -1;
 
 /// Capture Source - streams frames from the SQLite-backed capture store
 pub struct CaptureSource {
-    app: AppHandle,
     /// Common recorded source state (control, state, session_id, task_handle)
     reader_state: RecordedSourceState,
     /// Seek target in microseconds. Set to NO_SEEK when no seek is pending.
@@ -43,7 +41,7 @@ pub struct CaptureSource {
 }
 
 impl CaptureSource {
-    pub fn new(app: AppHandle, session_id: String, capture_id: String, speed: f64) -> Self {
+    pub fn new(session_id: String, capture_id: String, speed: f64) -> Self {
         let buses = capture_store::get_capture_metadata(&capture_id)
             .map(|m| m.buses)
             .unwrap_or_default();
@@ -65,7 +63,6 @@ impl CaptureSource {
         }
 
         Self {
-            app,
             reader_state: RecordedSourceState::new(session_id, speed),
             seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
             seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
@@ -131,7 +128,6 @@ impl IOSource for CaptureSource {
 
         self.reader_state.prepare_start();
 
-        let app = self.app.clone();
         let session_id = self.reader_state.session_id.clone();
         let control = self.reader_state.control.clone();
         let seek_target_us = self.seek_target_us.clone();
@@ -139,7 +135,7 @@ impl IOSource for CaptureSource {
         let completed_flag = self.completed_flag.clone();
         let capture_id = self.capture_id.clone();
 
-        let handle = spawn_capture_stream(app, session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id);
+        let handle = spawn_capture_stream(session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id);
         self.reader_state.mark_running(handle);
 
         Ok(())
@@ -236,7 +232,6 @@ pub struct StepResult {
 }
 
 pub fn step_frame(
-    _app: &AppHandle,
     session_id: &str,
     capture_id: &str,
     current_frame_index: Option<usize>,
@@ -317,7 +312,6 @@ pub fn step_frame(
 
 /// Spawn a capture stream task
 fn spawn_capture_stream(
-    app_handle: AppHandle,
     session_id: String,
     control: PlaybackControl,
     seek_target_us: Arc<AtomicI64>,
@@ -326,7 +320,7 @@ fn spawn_capture_stream(
     capture_id: Option<String>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        run_capture_stream(app_handle, session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id).await;
+        run_capture_stream(session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id).await;
     })
 }
 
@@ -353,7 +347,6 @@ fn load_chunk(
 /// Handle a seek operation (frame-based or timestamp-based).
 /// Returns true if a seek was handled.
 fn handle_seek(
-    _app_handle: &AppHandle,
     session_id: &str,
     buf_id: &str,
     total_frames: usize,
@@ -475,7 +468,6 @@ fn handle_seek(
 }
 
 async fn run_capture_stream(
-    app_handle: AppHandle,
     session_id: String,
     control: PlaybackControl,
     seek_target_us: Arc<AtomicI64>,
@@ -578,7 +570,7 @@ async fn run_capture_stream(
 
         // Handle seek requests (frame-based and timestamp-based)
         if handle_seek(
-            &app_handle, &session_id, &buf_id, total_frames,
+            &session_id, &buf_id, total_frames,
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
             &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
@@ -867,7 +859,7 @@ async fn run_capture_stream(
 
         // Handle seek requests while paused at end
         if handle_seek(
-            &app_handle, &session_id, &buf_id, total_frames,
+            &session_id, &buf_id, total_frames,
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
             &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,

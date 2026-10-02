@@ -173,7 +173,7 @@ pub async fn create_reader_session(
         )?;
 
         Box::new(IOBroker::single_source(
-            app.clone(),
+            settings::saved_profiles(&app),
             session_id.clone(),
             source_config,
         )?)
@@ -248,7 +248,7 @@ pub async fn create_reader_session(
                 client_id: None,
             };
 
-            Box::new(MqttSource::new(app.clone(), session_id.clone(), config))
+            Box::new(MqttSource::new(session_id.clone(), config))
         }
         kind => {
             return Err(format!(
@@ -262,7 +262,7 @@ pub async fn create_reader_session(
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
     claim_session_profile(&session_id, &profile_id_for_tracking).await;
 
-    let result = create_session(app, session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
+    let result = create_session(session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
 
     // Auto-start the session after creation (only for real-time devices)
     // Playback sources should NOT auto-start because frames would be emitted
@@ -351,11 +351,10 @@ pub async fn suspend_reader_session(session_id: String) -> Result<IOState, Strin
 /// Emits `session-lifecycle` signal so all apps on the session refresh state.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn io_stop_and_switch_to_capture(
-    app: tauri::AppHandle,
     session_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
-    stop_and_switch_to_capture(&app, &session_id, speed.unwrap_or(1.0)).await
+    stop_and_switch_to_capture(&session_id, speed.unwrap_or(1.0)).await
 }
 
 /// Stop a session and switch it to capture replay, choosing the backend path from
@@ -364,23 +363,20 @@ pub async fn io_stop_and_switch_to_capture(
 /// position) then switch to capture replay. Owns the decision that used to live in
 /// the frontend `stopWatch`.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn session_stop_to_capture(
-    app: tauri::AppHandle,
-    session_id: String,
-) -> Result<(), String> {
+pub async fn session_stop_to_capture(session_id: String) -> Result<(), String> {
     let is_realtime = get_session_capabilities(&session_id)
         .await
         .map(|c| c.traits.temporal_mode == TemporalMode::Realtime)
         .unwrap_or(false);
 
     if is_realtime {
-        if let Err(e) = stop_and_switch_to_capture(&app, &session_id, 1.0).await {
+        if let Err(e) = stop_and_switch_to_capture(&session_id, 1.0).await {
             tlog!("[session_stop_to_capture] stop-and-switch failed ({}); suspending", e);
             suspend_session(&session_id).await?;
         }
     } else {
         suspend_session(&session_id).await?;
-        if let Err(e) = switch_to_capture_replay(&app, &session_id, 1.0).await {
+        if let Err(e) = switch_to_capture_replay(&session_id, 1.0).await {
             tlog!("[session_stop_to_capture] switch-to-capture-replay failed: {}", e);
         }
     }
@@ -518,7 +514,6 @@ pub async fn destroy_reader_session(session_id: String, reset: bool) -> Result<(
 /// `sourceProfileIds` and the session manager graph.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_capture_source_session(
-    app: tauri::AppHandle,
     session_id: String,
     capture_id: String,
     speed: Option<f64>,
@@ -530,7 +525,6 @@ pub async fn create_capture_source_session(
     claim_session_profile(&session_id, &capture_id).await;
 
     let reader = CaptureSource::new(
-        app.clone(),
         session_id.clone(),
         capture_id,
         speed.unwrap_or(0.0), // 0 = no limit by default
@@ -539,7 +533,7 @@ pub async fn create_capture_source_session(
     // Anonymous usage telemetry: user explicitly opened a capture for replay.
     crate::telemetry::emit_feature_usage("io_source_start", "capture");
 
-    let result = create_session(app, session_id, Box::new(reader), None, None, None, vec![]).await;
+    let result = create_session(session_id, Box::new(reader), None, None, None, vec![]).await;
     Ok(result.capabilities)
 }
 
@@ -548,7 +542,6 @@ pub async fn create_capture_source_session(
 /// the user wants to replay the captured frames.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn transition_to_capture_source(
-    app: tauri::AppHandle,
     session_id: String,
     capture_id: String,
     speed: Option<f64>,
@@ -563,14 +556,9 @@ pub async fn transition_to_capture_source(
 
     claim_session_profile(&session_id, &capture_id).await;
 
-    let reader = CaptureSource::new(
-        app.clone(),
-        session_id.clone(),
-        capture_id,
-        speed.unwrap_or(1.0),
-    );
+    let reader = CaptureSource::new(session_id.clone(), capture_id, speed.unwrap_or(1.0));
 
-    let result = create_session(app, session_id, Box::new(reader), None, None, None, vec![]).await;
+    let result = create_session(session_id, Box::new(reader), None, None, None, vec![]).await;
     Ok(result.capabilities)
 }
 
@@ -580,11 +568,10 @@ pub async fn transition_to_capture_source(
 /// Use this after ingest completes to enable playback controls.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn switch_session_to_capture_replay(
-    app: tauri::AppHandle,
     session_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
-    switch_to_capture_replay(&app, &session_id, speed.unwrap_or(1.0)).await
+    switch_to_capture_replay(&session_id, speed.unwrap_or(1.0)).await
 }
 
 /// Resume a session from capture playback back to live streaming.
@@ -653,13 +640,13 @@ pub async fn resume_session_to_live(
     // Build the new live reader
     let new_reader: Box<dyn IOSource> = if configs.len() == 1 {
         Box::new(IOBroker::single_source(
-            app.clone(),
+            settings::saved_profiles(&app),
             session_id.clone(),
             configs.into_iter().next().unwrap(),
         )?)
     } else {
         Box::new(IOBroker::new(
-            app.clone(),
+            settings::saved_profiles(&app),
             session_id.clone(),
             configs,
         )?)
@@ -675,7 +662,6 @@ pub async fn resume_session_to_live(
 /// If filter_selection is provided, skips frames it does not name.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn step_capture_frame(
-    app: tauri::AppHandle,
     session_id: String,
     capture_id: String,
     current_frame_index: Option<usize>,
@@ -684,7 +670,7 @@ pub async fn step_capture_frame(
     filter_selection: Option<Vec<crate::capture_store::ProtocolFrames>>,
 ) -> Result<Option<StepResult>, String> {
     let selection = crate::capture_store::FrameSelection::from_groups(filter_selection.unwrap_or_default());
-    step_frame(&app, &session_id, &capture_id, current_frame_index, current_timestamp_us, backward, &selection)
+    step_frame(&session_id, &capture_id, current_frame_index, current_timestamp_us, backward, &selection)
 }
 
 // Legacy heartbeat commands removed - use register_session_subscriber/unregister_session_subscriber instead
@@ -767,11 +753,10 @@ pub async fn prune_window_apps(window_label: String) {
 /// Used by the Session Manager to remove a listener without destroying the session.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn evict_session_subscriber_cmd(
-    app: tauri::AppHandle,
     session_id: String,
     subscriber_id: String,
 ) -> Result<Vec<String>, String> {
-    evict_session_subscriber(&app, &session_id, &subscriber_id).await
+    evict_session_subscriber(&session_id, &subscriber_id).await
 }
 
 /// Leave a session (user-initiated): the calling app detaches and reviews a frozen
@@ -779,11 +764,10 @@ pub async fn evict_session_subscriber_cmd(
 /// Returns the copied snapshot capture IDs (empty when there was nothing captured).
 #[tauri::command(rename_all = "snake_case")]
 pub async fn session_leave_to_capture(
-    app: tauri::AppHandle,
     session_id: String,
     subscriber_id: String,
 ) -> Result<Vec<String>, String> {
-    leave_session_to_capture(&app, &session_id, &subscriber_id).await
+    leave_session_to_capture(&session_id, &subscriber_id).await
 }
 
 /// Add a new IO source to an existing multi-source session.
@@ -814,7 +798,8 @@ pub async fn add_source_to_session_cmd(
     profile_tracker::can_use_adapter(&source_config.profile_id, &settings.io_profiles, &[], None)?;
 
     let profile_id = source_config.profile_id.clone();
-    hold_profile_while(&session_id, &profile_id, add_source_to_session(&app, &session_id, source_config)).await
+    let adding = add_source_to_session(settings::saved_profiles(&app), &session_id, source_config);
+    hold_profile_while(&session_id, &profile_id, adding).await
 }
 
 /// Remove an IO source from an existing multi-source session.
@@ -826,7 +811,8 @@ pub async fn remove_source_from_session_cmd(
     session_id: String,
     profile_id: String,
 ) -> Result<IOCapabilities, String> {
-    let capabilities = remove_source_from_session(&app, &session_id, &profile_id).await?;
+    let capabilities =
+        remove_source_from_session(settings::saved_profiles(&app), &session_id, &profile_id).await?;
     unregister_session_profile(&session_id, &profile_id);
     Ok(capabilities)
 }
@@ -1570,7 +1556,7 @@ pub async fn create_multi_source_session(
         .collect();
     let stored_configs = source_configs.clone();
     let bus_mappings = source_configs.iter().map(|c| (c.profile_id.clone(), c.bus_mappings.clone())).collect();
-    let reader = IOBroker::new(app.clone(), session_id.clone(), source_configs)?;
+    let reader = IOBroker::new(settings::saved_profiles(&app), session_id.clone(), source_configs)?;
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
     register_session_profiles(&session_id, &profile_ids);
@@ -1584,7 +1570,7 @@ pub async fn create_multi_source_session(
         }
     }
 
-    let result = create_session(app, session_id.clone(), Box::new(reader), subscriber_id, app_name, Some(source_display_names), stored_configs).await;
+    let result = create_session(session_id.clone(), Box::new(reader), subscriber_id, app_name, Some(source_display_names), stored_configs).await;
 
     // Auto-start the session if it's new OR if it exists but is stopped
     let should_start = if result.is_new {
@@ -1749,9 +1735,8 @@ pub async fn create_modbus_scan_session(
         claim_session_profile(&session_id, pid).await;
     }
 
-    let source = crate::io::ModbusScanSource::new(app.clone(), session_id.clone(), job);
+    let source = crate::io::ModbusScanSource::new(session_id.clone(), job);
     let result = create_session(
-        app,
         session_id,
         Box::new(source),
         subscriber_id,

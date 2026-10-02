@@ -202,7 +202,6 @@ pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<Transmi
 /// Transmit a CAN frame through an existing IO session
 #[tauri::command]
 pub async fn io_transmit_can_frame(
-    _app: AppHandle,
     session_id: String,
     frame: CanTransmitFrame,
 ) -> Result<crate::io::TransmitResult, String> {
@@ -234,7 +233,6 @@ pub async fn transmit_can(
 /// Transmit serial bytes through an IO session, framed as `framing` says
 #[tauri::command]
 pub async fn io_transmit_serial(
-    _app: AppHandle,
     session_id: String,
     bytes: Vec<u8>,
     framing: SerialFraming,

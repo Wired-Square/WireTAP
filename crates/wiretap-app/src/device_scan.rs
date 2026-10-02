@@ -313,7 +313,7 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
 /// reaching the frontend after the user has navigated to a connected-
 /// device page.
 #[tauri::command]
-pub async fn device_scan_stop(_app: AppHandle) -> Result<(), String> {
+pub async fn device_scan_stop() -> Result<(), String> {
     let mut state = STATE.lock().await;
     if let Some(handle) = state.heartbeat.take() {
         handle.abort();

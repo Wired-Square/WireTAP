@@ -124,8 +124,8 @@ pub async fn ble_scan_start(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn ble_scan_stop(app: AppHandle) -> Result<(), String> {
-    device_scan_stop(app).await
+pub async fn ble_scan_stop() -> Result<(), String> {
+    device_scan_stop().await
 }
 
 // ============================================================================
@@ -137,7 +137,7 @@ pub async fn ble_scan_stop(app: AppHandle) -> Result<(), String> {
 /// subsequent operation commands. Tear-down goes through
 /// `device_scan::release_device(device_id)`.
 #[tauri::command]
-pub async fn ble_connect(_app: AppHandle, device_id: String) -> Result<(), String> {
+pub async fn ble_connect(device_id: String) -> Result<(), String> {
     let id = canonical_device_id(device_id);
     let discovery = discovery_handle().await?;
     discovery
