@@ -37,6 +37,8 @@ export function useRepeatQueueEvents(): void {
         if (event.kind === "started") {
           store.addExternalRepeat(event);
           openPanel(TRANSMIT_PANEL_ID);
+        } else if (event.kind === "group_started") {
+          store.markGroupRepeating(event.group_id);
         } else {
           console.warn(
             `[Transmit] Repeat stopped for ${event.queue_id}: ${event.reason}`

@@ -14,7 +14,7 @@ import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/disco
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { getCaptureFramesPaginatedById } from "../api/capture";
-import type { ReplayFrame } from "../api/transmit";
+import { toReplayFrame, type ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
 import { Input, Select, Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
 import { Alert } from "../components/Alert";
@@ -123,18 +123,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const replayFrames = useMemo<ReplayFrame[]>(() => {
     if (!isOpen || rangeError || startIdx === null || endIdx === null || captureMode.enabled) return [];
     const buffer = getDiscoveryFrameBuffer();
-    return buffer.slice(startIdx - 1, endIdx).map((f) => ({
-      timestamp_us: f.timestamp_us,
-      frame: {
-        frame_id: f.frame_id,
-        data: [...f.bytes],
-        bus: f.bus ?? 0,
-        is_extended: f.is_extended,
-        is_fd: f.is_fd,
-        is_brs: false,
-        is_rtr: false,
-      },
-    }));
+    return buffer.slice(startIdx - 1, endIdx).map(toReplayFrame);
   }, [isOpen, startIdx, endIdx, rangeError, captureMode.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const frameCount = replayFrames.length;
@@ -177,18 +166,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
       if (captureMode.enabled && captureId) {
         const count = endIdx - startIdx + 1;
         const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, count);
-        frames = response.frames.map((f) => ({
-          timestamp_us: f.timestamp_us,
-          frame: {
-            frame_id: f.frame_id,
-            data: [...f.bytes],
-            bus: f.bus ?? 0,
-            is_extended: f.is_extended,
-            is_fd: f.is_fd,
-            is_brs: false,
-            is_rtr: false,
-          },
-        }));
+        frames = response.frames.map(toReplayFrame);
       } else {
         frames = replayFrames;
       }

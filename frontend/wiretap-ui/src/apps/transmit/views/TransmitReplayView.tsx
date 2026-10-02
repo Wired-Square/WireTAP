@@ -25,7 +25,7 @@ import {
   emptyStateHeading,
   emptyStateDescription,
 } from "../../../styles/typography";
-import { formatHumanUs } from "../../../utils/timeFormat";
+import { formatDeltaUs, formatHumanUs } from "../../../utils/timeFormat";
 import { Button } from "../../../components/Button";
 import { Table } from "../../../components/Table";
 
@@ -211,7 +211,7 @@ export default function TransmitReplayView({ useLocalTimezone, sessionId }: Tran
 
 function ReplayLogRow({ entry, useLocalTimezone, onRestart }: { entry: ReplayLogEntry; useLocalTimezone: boolean; onRestart?: () => void }) {
   const { t, i18n } = useTranslation("transmit");
-  const { kind, profileName, totalFrames, speed, loopReplay, framesSent, errorMessage, timestamp, pass } = entry;
+  const { kind, profileName, totalFrames, speed, loopReplay, framesSent, errorMessage, timestamp, pass, passDurationUs } = entry;
 
   const icon =
     kind === "started" ? <Play size={14} className={textDataCyan} /> :
@@ -231,9 +231,10 @@ function ReplayLogRow({ entry, useLocalTimezone, onRestart }: { entry: ReplayLog
 
   let details: string;
   if (kind === "started") {
+    const duration = formatDeltaUs(passDurationUs ?? 0);
     details = loopReplay
-      ? t("replay.details.startedLoop", { frames: fmt(totalFrames), speed })
-      : t("replay.details.started", { frames: fmt(totalFrames), speed });
+      ? t("replay.details.startedLoop", { frames: fmt(totalFrames), duration, speed })
+      : t("replay.details.started", { frames: fmt(totalFrames), duration, speed });
   } else if (kind === "completed") {
     details = t("replay.details.completed", { frames: fmt(totalFrames), speed });
   } else if (kind === "loopRestarted") {

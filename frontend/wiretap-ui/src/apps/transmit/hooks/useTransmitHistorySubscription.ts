@@ -7,9 +7,8 @@
 import { useEffect } from "react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { wsTransport } from "../../../services/wsTransport";
-import { MsgType, HEADER_SIZE, decodeTransmitUpdated } from "../../../services/wsProtocol";
-
-const sharedTextDecoder = new TextDecoder();
+import { MsgType, decodeTransmitUpdated, decodeWsJson } from "../../../services/wsProtocol";
+import type { ReplayState } from "../../../api/transmit";
 
 /**
  * Subscribes to transmit history events and updates the store.
@@ -23,7 +22,6 @@ const sharedTextDecoder = new TextDecoder();
  */
 export function useTransmitHistorySubscription(): void {
   const handleReplayLifecycle = useTransmitStore((s) => s.handleReplayLifecycle);
-  const updateReplayProgress = useTransmitStore((s) => s.updateReplayProgress);
 
   useEffect(() => {
     const unlistenFns: (() => void)[] = [];
@@ -41,14 +39,7 @@ export function useTransmitHistorySubscription(): void {
       unlistenFns.push(
         wsTransport.onGlobalMessage(MsgType.ReplayState, (_payload, raw) => {
           try {
-            const jsonBytes = new Uint8Array(raw, HEADER_SIZE);
-            const text = sharedTextDecoder.decode(jsonBytes);
-            const state = JSON.parse(text);
-            if (state.status === "running" && state.frames_sent > 0) {
-              updateReplayProgress(state);
-            } else {
-              handleReplayLifecycle(state);
-            }
+            handleReplayLifecycle(decodeWsJson<ReplayState>(raw));
           } catch {
             // Malformed payload — ignore
           }
@@ -59,5 +50,5 @@ export function useTransmitHistorySubscription(): void {
     return () => {
       for (const fn of unlistenFns) fn();
     };
-  }, [handleReplayLifecycle, updateReplayProgress]);
+  }, [handleReplayLifecycle]);
 }

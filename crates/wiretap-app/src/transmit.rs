@@ -87,6 +87,21 @@ pub struct RepeatStartedEvent {
     pub origin: String,
 }
 
+/// One session's run of frames within a repeat group.
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct RepeatGroupMember {
+    pub session_id: String,
+    pub frames: Vec<CanTransmitFrame>,
+}
+
+/// Announces a group repeat that started.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct RepeatGroupStartedEvent {
+    pub group_id: String,
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -368,7 +383,7 @@ struct IoRepeatTask {
     /// Cancel flag for the repeat loop
     cancel_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Task handle
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     handle: tauri::async_runtime::JoinHandle<()>,
 }
 
@@ -624,21 +639,20 @@ pub async fn io_start_serial_repeat_transmit(
 static IO_REPEAT_GROUPS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>> =
     Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
-/// Start repeat transmission for a group of CAN frames through an IO session.
-/// Frames are sent sequentially (A→B→C) with no delay between them, then the
-/// system waits for the interval before repeating the sequence.
+/// Start repeating a group of CAN frames, which may span sessions. Each cycle
+/// sends every member's frames in order with no delay between them, then waits
+/// for the interval. A permanent refusal on any member stops the whole group.
 #[tauri::command]
 pub async fn io_start_repeat_group(
-    session_id: String,
     group_id: String,
-    frames: Vec<CanTransmitFrame>,
+    members: Vec<RepeatGroupMember>,
     interval_ms: u64,
 ) -> Result<(), String> {
     if interval_ms < 1 {
         return Err("Interval must be at least 1ms".to_string());
     }
 
-    if frames.is_empty() {
+    if members.iter().all(|m| m.frames.is_empty()) {
         return Err("Group must contain at least one frame".to_string());
     }
 
@@ -647,26 +661,25 @@ pub async fn io_start_repeat_group(
 
     let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let cancel_flag_clone = cancel_flag.clone();
-    let session_id_clone = session_id.clone();
     let group_id_for_task = group_id.clone();
 
     let task_id = IO_REPEAT_TASK_COUNTER.fetch_add(1, Ordering::Relaxed);
     tlog!(
-        "[io_transmit] Starting group repeat task {} for group '{}', session '{}', {} frames, interval {}ms",
-        task_id, group_id, session_id, frames.len(), interval_ms
+        "[io_transmit] Starting group repeat task {} for group '{}', {} members, interval {}ms",
+        task_id, group_id, members.len(), interval_ms
     );
 
     let handle = tauri::async_runtime::spawn(async move {
         let mut throttle = SignalThrottle::new();
 
         // Write a CAN frame result to SQLite and throttle the UI notification.
-        let write_frame = |frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
+        let write_frame = |session_id: &str, frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
             let (success, error) = match result {
                 Ok(r) => (r.success, r.error.clone()),
                 Err(e) => (false, Some(e.clone())),
             };
             crate::transmit_history::write_entry(
-                &session_id_clone, "can",
+                session_id, "can",
                 Some(frame.frame_id as i64),
                 Some(frame.data.len() as i64),
                 &frame.data,
@@ -683,44 +696,42 @@ pub async fn io_start_repeat_group(
         };
 
         // Fire the first cycle immediately, then one cycle per interval
-        // (see io_start_repeat_transmit). All frames in a cycle are sent
-        // back-to-back; the interval spaces the cycles.
+        // (see io_start_repeat_transmit).
         let mut cadence = Cadence::new(interval_ms, cancel_flag_clone);
         'outer: while cadence.next().await.is_some() {
-            // Send all frames in sequence (no delays between them)
-            for frame in &frames {
-                // Transmit with retry for transient errors
-                let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-                let error = write_frame(frame, &result, &mut throttle);
+            for member in &members {
+                for frame in &member.frames {
+                    let (result, should_stop) = do_transmit(&member.session_id, frame).await;
+                    let error = write_frame(&member.session_id, frame, &result, &mut throttle);
 
-                // Stop on permanent errors (device gone, session invalid)
-                if should_stop {
-                    let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                    tlog!(
-                        "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
-                        group_id_for_task, reason
-                    );
-                    crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
-                        queue_id: group_id_for_task.clone(),
-                        reason,
-                    });
-                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-                    break 'outer;
+                    if should_stop {
+                        let reason = error.unwrap_or_else(|| "Permanent error".to_string());
+                        tlog!(
+                            "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
+                            group_id_for_task, reason
+                        );
+                        crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
+                            queue_id: group_id_for_task.clone(),
+                            reason,
+                        });
+                        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                        break 'outer;
+                    }
                 }
             }
         }
     });
 
-    // Store the task
-    let mut groups = IO_REPEAT_GROUPS.lock().await;
-    groups.insert(
-        group_id,
+    IO_REPEAT_GROUPS.lock().await.insert(
+        group_id.clone(),
         IoRepeatTask {
             cancel_flag,
             handle,
         },
     );
 
+    // Announced once the task is stored, so a stop the group prompts finds it.
+    crate::ws::dispatch::send_repeat_group_started(&RepeatGroupStartedEvent { group_id });
     Ok(())
 }
 
@@ -805,5 +816,85 @@ mod tests {
     #[test]
     fn a_refusal_from_a_missing_session_is_permanent_whatever_it_says() {
         assert!(tauri::async_runtime::block_on(super::transmit_refusal_is_permanent("f_gone", "queue full")));
+    }
+
+    mod group {
+        use super::super::{io_start_repeat_group, io_stop_repeat_group, RepeatGroupMember, IO_REPEAT_GROUPS};
+        use crate::io::test_source::TestSource;
+        use crate::io::{CanTransmitFrame, TransmitPayload, TransmitResult};
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+
+        type Sent = Arc<Mutex<Vec<(String, u32)>>>;
+
+        async fn open_recording(session_id: &str, sent: &Sent) {
+            let sent = sent.clone();
+            let source = TestSource::new(session_id).transmitting(move |session_id, payload| {
+                if let TransmitPayload::CanFrame(frame) = payload {
+                    sent.lock().unwrap().push((session_id.to_string(), frame.frame_id));
+                }
+                TransmitResult::success()
+            });
+            crate::io::create_session(session_id.into(), Box::new(source), None, None, None, vec![]).await;
+            crate::io::start_session(session_id).await.unwrap();
+        }
+
+        fn member(session_id: &str, ids: &[u32]) -> RepeatGroupMember {
+            RepeatGroupMember {
+                session_id: session_id.into(),
+                frames: ids
+                    .iter()
+                    .map(|&frame_id| CanTransmitFrame { frame_id, data: vec![0], bus: 0, is_extended: false, is_fd: false, is_brs: false, is_rtr: false })
+                    .collect(),
+            }
+        }
+
+        async fn until(mut done: impl FnMut() -> bool) {
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while !done() {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            })
+            .await
+            .expect("the group repeat never got there");
+        }
+
+        #[tokio::test]
+        async fn one_group_repeats_across_two_sessions_in_its_order() {
+            let sent = Sent::default();
+            open_recording("f_group_a", &sent).await;
+            open_recording("f_group_b", &sent).await;
+            let members = vec![member("f_group_a", &[1]), member("f_group_b", &[2]), member("f_group_a", &[3])];
+
+            io_start_repeat_group("g_two".into(), members, 10_000).await.unwrap();
+            until(|| sent.lock().unwrap().len() >= 3).await;
+            io_stop_repeat_group("g_two".into()).await.unwrap();
+
+            let a = |id| ("f_group_a".to_string(), id);
+            assert_eq!(*sent.lock().unwrap(), [a(1), ("f_group_b".to_string(), 2), a(3)]);
+            for id in ["f_group_a", "f_group_b"] {
+                crate::io::destroy_session(id, false).await.unwrap();
+            }
+        }
+
+        #[tokio::test]
+        async fn a_member_whose_session_is_gone_stops_the_whole_group() {
+            let sent = Sent::default();
+            open_recording("f_group_alive", &sent).await;
+            let members = vec![member("f_group_missing", &[1]), member("f_group_alive", &[2])];
+
+            io_start_repeat_group("g_gone".into(), members, 1).await.unwrap();
+            until(|| IO_REPEAT_GROUPS.try_lock().is_ok_and(|g| g["g_gone"].handle.inner().is_finished())).await;
+
+            assert!(sent.lock().unwrap().is_empty());
+            io_stop_repeat_group("g_gone".into()).await.unwrap();
+            crate::io::destroy_session("f_group_alive", false).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn a_group_with_no_frames_is_refused() {
+            let refused = io_start_repeat_group("g_empty".into(), vec![member("f_any", &[])], 10).await;
+            assert!(refused.is_err());
+        }
     }
 }

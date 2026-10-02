@@ -154,8 +154,8 @@
     "stopTooltip": "Stop this replay",
     "restartTooltipPast": "Restart this replay",
     "details": {
-      "startedLoop": "{{frames}} frames/pass · {{speed}}× · Loop",
-      "started": "{{frames}} frames · {{speed}}×",
+      "startedLoop": "{{frames}} frames/pass · {{duration}}/pass · {{speed}}× · Loop",
+      "started": "{{frames}} frames · {{duration}} · {{speed}}×",
       "completed": "{{frames}} frames · {{speed}}×",
       "loopRestarted": "Pass {{pass}} complete · {{framesSent}} cumulative · {{speed}}×",
       "stoppedByUser": "{{framesSent}} / {{frames}} frames · {{speed}}×",

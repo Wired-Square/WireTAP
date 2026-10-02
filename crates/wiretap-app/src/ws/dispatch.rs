@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use crate::capture_store::CaptureKind;
 use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
-use crate::transmit::{RepeatStartedEvent, RepeatStoppedEvent};
+use crate::transmit::{RepeatGroupStartedEvent, RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
 use crate::ws::server::ws_server;
 use crate::ws::decoded::{
@@ -1045,6 +1045,7 @@ pub fn send_replay_state(state: &crate::replay::ReplayState) {
 enum RepeatEventPayload<'a> {
     Started(&'a RepeatStartedEvent),
     Stopped(&'a RepeatStoppedEvent),
+    GroupStarted(&'a RepeatGroupStartedEvent),
 }
 
 fn send_repeat_event(payload: &RepeatEventPayload<'_>) {
@@ -1069,6 +1070,10 @@ pub fn send_repeat_started(event: &RepeatStartedEvent) {
 /// Announce a repeat transmit that stopped (agent stop or permanent error).
 pub fn send_repeat_stopped(event: &RepeatStoppedEvent) {
     send_repeat_event(&RepeatEventPayload::Stopped(event));
+}
+
+pub fn send_repeat_group_started(event: &RepeatGroupStartedEvent) {
+    send_repeat_event(&RepeatEventPayload::GroupStarted(event));
 }
 
 #[derive(serde::Serialize)]

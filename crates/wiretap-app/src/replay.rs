@@ -44,7 +44,6 @@ impl From<&io::FrameMessage> for ReplayFrame {
 /// Active replay task handle.
 struct ReplayTask {
     cancel: watch::Sender<bool>,
-    #[allow(dead_code)]
     handle: tauri::async_runtime::JoinHandle<()>,
 }
 
@@ -52,21 +51,45 @@ struct ReplayTask {
 static IO_REPLAY_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, ReplayTask>>> =
     Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
+/// What happened to a replay. `PassCompleted` is sent only when looping; a pass
+/// that ends the replay ends it as `Finished`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ReplayEvent {
+    Started,
+    Progress,
+    PassCompleted,
+    Finished,
+    Stopped,
+    Failed { error: String },
+}
+
 /// Snapshot of a replay's progress, pushed to the frontend over WS.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ReplayState {
-    pub status: String,
+    pub event: ReplayEvent,
     pub replay_id: String,
     pub session_id: String,
+    /// Frames sent since the replay started, over every pass.
     pub frames_sent: usize,
     pub total_frames: usize,
     pub speed: f64,
     pub loop_replay: bool,
     pub pass: usize,
+    /// How long one pass takes on the replay's schedule.
+    pub pass_duration_us: u64,
 }
 
 // Maximum inter-frame sleep to avoid hanging on large timestamp gaps (5 seconds).
 const MAX_SLEEP_US: u64 = 5_000_000;
+
+const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+
+fn scheduled_gap_us(delta_us: u64, speed: f64) -> u64 {
+    (((delta_us as f64) / speed).round() as u64).min(MAX_SLEEP_US)
+}
 
 /// When each frame of one replay pass is due, measured from the pass's start so
 /// the time a send takes is not added to the gap after it.
@@ -84,10 +107,115 @@ impl ReplaySchedule {
 
     async fn wait_for(&mut self, timestamp_us: u64) {
         if let Some(previous_us) = self.previous_us.replace(timestamp_us) {
-            let delta_us = timestamp_us.saturating_sub(previous_us);
-            self.due_us += (((delta_us as f64) / self.speed).round() as u64).min(MAX_SLEEP_US);
+            self.due_us += scheduled_gap_us(timestamp_us.saturating_sub(previous_us), self.speed);
         }
         tokio::time::sleep_until(self.start + tokio::time::Duration::from_micros(self.due_us)).await;
+    }
+}
+
+struct Replay {
+    replay_id: String,
+    session_id: String,
+    frames: Vec<ReplayFrame>,
+    speed: f64,
+    loop_replay: bool,
+    pass_duration_us: u64,
+}
+
+impl Replay {
+    fn new(session_id: String, replay_id: String, frames: Vec<ReplayFrame>, speed: f64, loop_replay: bool) -> Self {
+        let speed = speed.max(0.001);
+        let pass_duration_us = frames
+            .windows(2)
+            .map(|pair| scheduled_gap_us(pair[1].timestamp_us.saturating_sub(pair[0].timestamp_us), speed))
+            .sum();
+        Self { replay_id, session_id, frames, speed, loop_replay, pass_duration_us }
+    }
+
+    fn state(&self, event: ReplayEvent, frames_sent: usize, pass: usize) -> ReplayState {
+        ReplayState {
+            event,
+            replay_id: self.replay_id.clone(),
+            session_id: self.session_id.clone(),
+            frames_sent,
+            total_frames: self.frames.len(),
+            speed: self.speed,
+            loop_replay: self.loop_replay,
+            pass,
+            pass_duration_us: self.pass_duration_us,
+        }
+    }
+
+    /// Plays the frames until they end, the replay is cancelled or the device
+    /// refuses for good, reporting each step through `emit`.
+    async fn run(&self, mut cancelled: watch::Receiver<bool>, emit: impl Fn(&ReplayState)) {
+        let session_id = self.session_id.as_str();
+        let mut frames_sent = 0;
+        let mut frames_failed = 0;
+        let mut pass = 1;
+        let mut last_progress = std::time::Instant::now();
+        emit(&self.state(ReplayEvent::Started, 0, pass));
+
+        let end = 'outer: loop {
+            let mut schedule = ReplaySchedule::new(self.speed);
+            for replay_frame in &self.frames {
+                let frame = &replay_frame.frame;
+                let send = async {
+                    schedule.wait_for(replay_frame.timestamp_us).await;
+                    io::transmit_frame_when_ready(session_id, frame).await
+                };
+                let result = tokio::select! {
+                    _ = cancelled.wait_for(|stop| *stop) => break 'outer ReplayEvent::Stopped,
+                    result = send => result,
+                };
+
+                let (success, error) = match &result {
+                    Ok(r) => (r.success, r.error.clone()),
+                    Err(e) => (false, Some(e.clone())),
+                };
+                let is_permanent = match &result {
+                    Ok(r) => !r.success && r.error.as_deref().is_some_and(crate::transmit::is_permanent_error),
+                    Err(e) => crate::transmit::transmit_refusal_is_permanent(session_id, e).await,
+                };
+                crate::transmit_history::write_entry(
+                    session_id, "can",
+                    Some(frame.frame_id as i64),
+                    Some(frame.data.len() as i64),
+                    &frame.data,
+                    frame.bus as i64,
+                    frame.is_extended,
+                    frame.is_fd,
+                    success,
+                    error.as_deref(),
+                );
+                if is_permanent {
+                    let error = error.unwrap_or_else(|| "Device error".to_string());
+                    tlog!("[replay] Stopping replay '{}' due to permanent error: {}", self.replay_id, error);
+                    break 'outer ReplayEvent::Failed { error };
+                }
+                if success {
+                    frames_sent += 1;
+                } else {
+                    frames_failed += 1;
+                }
+
+                if last_progress.elapsed() >= PROGRESS_INTERVAL {
+                    emit(&self.state(ReplayEvent::Progress, frames_sent, pass));
+                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                    last_progress = std::time::Instant::now();
+                }
+            }
+
+            if !self.loop_replay {
+                break ReplayEvent::Finished;
+            }
+            emit(&self.state(ReplayEvent::PassCompleted, frames_sent, pass));
+            pass += 1;
+        };
+
+        tlog!("[replay] '{}' ended: {} sent, {} failed", self.replay_id, frames_sent, frames_failed);
+        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+        emit(&self.state(end, frames_sent, pass));
     }
 }
 
@@ -113,188 +241,25 @@ pub async fn io_start_replay(
         return Err("No frames to replay".to_string());
     }
 
-    let speed = speed.max(0.001); // Guard against zero/negative speed
-
-    // Stop any existing replay with the same ID
+    // The old run's last event goes out before this run's first.
     io_stop_replay(replay_id.clone()).await?;
 
-    let (cancel, mut cancelled_rx) = watch::channel(false);
-    let session_id_clone = session_id.clone();
-    let replay_id_for_task = replay_id.clone();
-
+    let (cancel, cancelled) = watch::channel(false);
+    let replay = Replay::new(session_id, replay_id.clone(), frames, speed, loop_replay);
     let handle = tauri::async_runtime::spawn(async move {
-        let total_frames = frames.len() as u64;
-        let mut frames_sent: u64 = 0;
-        let mut frames_failed: u64 = 0;
-        let mut cancelled = false;
-
-        // Notify frontend that replay has started
-        let initial_state = ReplayState {
-            status: "running".to_string(),
-            replay_id: replay_id_for_task.clone(),
-            session_id: session_id_clone.clone(),
-            frames_sent: 0,
-            total_frames: total_frames as usize,
-            speed,
-            loop_replay,
-            pass: 1,
-        };
-        crate::ws::dispatch::send_replay_state(&initial_state);
-
-        let mut last_progress = std::time::Instant::now();
-        const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
-        let mut pass: u64 = 1;
-
-        'outer: loop {
-            let mut schedule = ReplaySchedule::new(speed);
-            for replay_frame in &frames {
-                let frame = &replay_frame.frame;
-
-                // Transmit the frame. Writing to SQLite per frame is safe here because
-                // the write_entry mutex lock is held only for the INSERT (~microseconds).
-                let send = async {
-                    schedule.wait_for(replay_frame.timestamp_us).await;
-                    io::transmit_frame_when_ready(&session_id_clone, frame).await
-                };
-                let result = tokio::select! {
-                    _ = cancelled_rx.wait_for(|stop| *stop) => {
-                        cancelled = true;
-                        break 'outer;
-                    }
-                    result = send => result,
-                };
-
-                // Stop on permanent device errors
-                let is_permanent = match &result {
-                    Ok(r) => r.error.as_deref().is_some_and(crate::transmit::is_permanent_error) && !r.success,
-                    Err(e) => crate::transmit::transmit_refusal_is_permanent(&session_id_clone, e).await,
-                };
-                if is_permanent {
-                    let err_msg = match &result {
-                        Ok(r) => r.error.clone().unwrap_or_else(|| "Device error".to_string()),
-                        Err(e) => e.clone(),
-                    };
-                    // Write the failed frame to history before stopping
-                    crate::transmit_history::write_entry(
-                        &session_id_clone, "can",
-                        Some(frame.frame_id as i64),
-                        Some(frame.data.len() as i64),
-                        &frame.data,
-                        frame.bus as i64,
-                        frame.is_extended,
-                        frame.is_fd,
-                        false,
-                        Some(&err_msg),
-                    );
-                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-                    tlog!("[replay] Stopping replay '{}' due to permanent error: {}", replay_id_for_task, err_msg);
-                    let error_state = ReplayState {
-                        status: "error".to_string(),
-                        replay_id: replay_id_for_task.clone(),
-                        session_id: session_id_clone.clone(),
-                        frames_sent: frames_sent as usize,
-                        total_frames: total_frames as usize,
-                        speed,
-                        loop_replay,
-                        pass: pass as usize,
-                    };
-                    crate::ws::dispatch::send_replay_state(&error_state);
-                    return;
-                }
-
-                let (r_success, r_error) = match &result {
-                    Ok(r) => (r.success, r.error.clone()),
-                    Err(e) => (false, Some(e.clone())),
-                };
-                crate::transmit_history::write_entry(
-                    &session_id_clone, "can",
-                    Some(frame.frame_id as i64),
-                    Some(frame.data.len() as i64),
-                    &frame.data,
-                    frame.bus as i64,
-                    frame.is_extended,
-                    frame.is_fd,
-                    r_success,
-                    r_error.as_deref(),
-                );
-
-                match result {
-                    Ok(r) if r.success => frames_sent += 1,
-                    _ => frames_failed += 1,
-                }
-
-                // Throttled progress + history update (~250 ms)
-                if last_progress.elapsed() >= PROGRESS_INTERVAL {
-                    let progress_state = ReplayState {
-                        status: "running".to_string(),
-                        replay_id: replay_id_for_task.clone(),
-                        session_id: session_id_clone.clone(),
-                        frames_sent: frames_sent as usize,
-                        total_frames: total_frames as usize,
-                        speed,
-                        loop_replay,
-                        pass: pass as usize,
-                    };
-                    crate::ws::dispatch::send_replay_state(&progress_state);
-                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-                    last_progress = std::time::Instant::now();
-                }
-            }
-
-            if !loop_replay {
-                break;
-            }
-
-            // Notify frontend before beginning the next pass
-            let loop_state = ReplayState {
-                status: "running".to_string(),
-                replay_id: replay_id_for_task.clone(),
-                session_id: session_id_clone.clone(),
-                frames_sent: frames_sent as usize,
-                total_frames: total_frames as usize,
-                speed,
-                loop_replay,
-                pass: pass as usize,
-            };
-            crate::ws::dispatch::send_replay_state(&loop_state);
-            pass += 1;
-        }
-
-        tlog!("[replay] '{}' complete: {} sent, {} failed", replay_id_for_task, frames_sent, frames_failed);
-
-        // Final history update notification
-        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-
-        // Notify frontend of the final state
-        let final_state = ReplayState {
-            status: if cancelled { "stopped" } else { "completed" }.to_string(),
-            replay_id: replay_id_for_task.clone(),
-            session_id: session_id_clone.clone(),
-            frames_sent: frames_sent as usize,
-            total_frames: total_frames as usize,
-            speed,
-            loop_replay,
-            pass: pass as usize,
-        };
-        crate::ws::dispatch::send_replay_state(&final_state);
-
-        // Remove from active tasks map.
-        let mut tasks = IO_REPLAY_TASKS.lock().await;
-        tasks.remove(&replay_id_for_task);
+        replay.run(cancelled, crate::ws::dispatch::send_replay_state).await;
+        IO_REPLAY_TASKS.lock().await.remove(&replay.replay_id);
     });
-
-    let mut tasks = IO_REPLAY_TASKS.lock().await;
-    tasks.insert(replay_id.clone(), ReplayTask { cancel, handle });
-
+    IO_REPLAY_TASKS.lock().await.insert(replay_id, ReplayTask { cancel, handle });
     Ok(())
 }
 
-/// Stop an active replay by ID.
+/// Stop an active replay by ID, returning once it has reported its stop.
 #[tauri::command]
 pub async fn io_stop_replay(replay_id: String) -> Result<(), String> {
-    let mut tasks = IO_REPLAY_TASKS.lock().await;
-    if let Some(task) = tasks.remove(&replay_id) {
-        task.cancel.send_replace(true);
+    let task = IO_REPLAY_TASKS.lock().await.remove(&replay_id);
+    if let Some(task) = task {
+        stop(task).await;
     }
     Ok(())
 }
@@ -302,11 +267,16 @@ pub async fn io_stop_replay(replay_id: String) -> Result<(), String> {
 /// Stop all active replays.
 #[tauri::command]
 pub async fn io_stop_all_replays() -> Result<(), String> {
-    let mut tasks = IO_REPLAY_TASKS.lock().await;
-    for (_, task) in tasks.drain() {
-        task.cancel.send_replace(true);
+    let tasks: Vec<ReplayTask> = IO_REPLAY_TASKS.lock().await.drain().map(|(_, task)| task).collect();
+    for task in tasks {
+        stop(task).await;
     }
     Ok(())
+}
+
+async fn stop(task: ReplayTask) {
+    task.cancel.send_replace(true);
+    let _ = task.handle.await;
 }
 
 #[cfg(test)]
@@ -345,5 +315,98 @@ mod tests {
     async fn replay_caps_a_long_gap_in_the_capture() {
         let elapsed = replay_with_send_cost(&[0, 60_000_000], 1.0, Duration::ZERO).await;
         assert_eq!(elapsed, Duration::from_micros(MAX_SLEEP_US));
+    }
+
+    fn frames(timestamps_us: &[u64]) -> Vec<ReplayFrame> {
+        timestamps_us
+            .iter()
+            .map(|&timestamp_us| ReplayFrame {
+                timestamp_us,
+                frame: CanTransmitFrame { frame_id: 0x100, data: vec![1], bus: 0, is_extended: false, is_fd: false, is_brs: false, is_rtr: false },
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_pass_estimate_keeps_to_the_schedule() {
+        let replay = |speed| Replay::new("s".into(), "r".into(), frames(&[0, 10_000, 60_010_000]), speed, false);
+        assert_eq!(replay(1.0).pass_duration_us, 10_000 + MAX_SLEEP_US);
+        assert_eq!(replay(10.0).pass_duration_us, 1_000 + MAX_SLEEP_US);
+        assert_eq!(replay(0.0).pass_duration_us, 2 * MAX_SLEEP_US, "a speed of zero is floored, not divided by");
+    }
+
+    /// Runs a replay through `session_id`, cancelling it once `stop_when` holds
+    /// for the events so far, and returns every event but the progress ticks.
+    async fn events(
+        session_id: &str,
+        replay: Replay,
+        stop_when: impl Fn(&[ReplayState]) -> bool,
+    ) -> Vec<ReplayState> {
+        let (cancel, cancelled) = watch::channel(false);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let run = tokio::spawn(async move { replay.run(cancelled, move |s| { let _ = tx.send(s.clone()); }).await });
+        let mut seen = Vec::new();
+        while let Some(state) = rx.recv().await {
+            if state.event != ReplayEvent::Progress {
+                seen.push(state);
+            }
+            if stop_when(&seen) {
+                cancel.send_replace(true);
+            }
+        }
+        run.await.unwrap();
+        crate::io::destroy_session(session_id, false).await.ok();
+        seen
+    }
+
+    fn kinds(states: &[ReplayState]) -> Vec<(ReplayEvent, usize, usize)> {
+        states.iter().map(|s| (s.event.clone(), s.pass, s.frames_sent)).collect()
+    }
+
+    #[tokio::test]
+    async fn a_looping_replay_reports_each_pass_then_its_stop() {
+        let id = "f_replay_loop";
+        crate::io_test::tests::open_virtual_loopback(id).await;
+        let replay = Replay::new(id.into(), "r_loop".into(), frames(&[0, 0, 0]), 1.0, true);
+        let passes = |seen: &[ReplayState]| seen.iter().filter(|s| s.event == ReplayEvent::PassCompleted).count();
+        let seen = events(id, replay, |seen| passes(seen) >= 2).await;
+
+        let (last, passes_seen) = seen.split_last().unwrap();
+        assert_eq!(kinds(&passes_seen[..3]), [
+            (ReplayEvent::Started, 1, 0),
+            (ReplayEvent::PassCompleted, 1, 3),
+            (ReplayEvent::PassCompleted, 2, 6),
+        ]);
+        assert!(passes_seen[1..].iter().all(|s| s.event == ReplayEvent::PassCompleted));
+        assert_eq!(last.event, ReplayEvent::Stopped);
+        assert_eq!(last.pass, passes_seen.len());
+    }
+
+    #[tokio::test]
+    async fn a_stopped_replay_reports_its_start_then_its_stop() {
+        let id = "f_replay_stop";
+        crate::io_test::tests::open_virtual_loopback(id).await;
+        let replay = Replay::new(id.into(), "r_stop".into(), frames(&[0, 60_000_000]), 1.0, false);
+        let seen = events(id, replay, |seen| !seen.is_empty()).await;
+        let events: Vec<_> = seen.iter().map(|s| (s.event.clone(), s.pass)).collect();
+        assert_eq!(events, [(ReplayEvent::Started, 1), (ReplayEvent::Stopped, 1)]);
+        assert_eq!(seen[1].pass_duration_us, MAX_SLEEP_US);
+    }
+
+    #[tokio::test]
+    async fn a_replay_that_runs_out_reports_it_finished() {
+        let id = "f_replay_end";
+        crate::io_test::tests::open_virtual_loopback(id).await;
+        let replay = Replay::new(id.into(), "r_end".into(), frames(&[0, 0]), 1.0, false);
+        let seen = events(id, replay, |_| false).await;
+        assert_eq!(kinds(&seen), [(ReplayEvent::Started, 1, 0), (ReplayEvent::Finished, 1, 2)]);
+    }
+
+    #[tokio::test]
+    async fn a_replay_to_a_missing_session_fails_with_the_reason() {
+        let replay = Replay::new("f_replay_gone".into(), "r_gone".into(), frames(&[0]), 1.0, true);
+        let seen = events("f_replay_gone", replay, |_| false).await;
+        assert_eq!(seen.len(), 2);
+        assert!(matches!(&seen[1].event, ReplayEvent::Failed { error } if !error.is_empty()), "{:?}", seen[1].event);
     }
 }

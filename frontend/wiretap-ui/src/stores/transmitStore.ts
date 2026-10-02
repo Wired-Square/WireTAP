@@ -10,6 +10,8 @@ import {
   type TransmitProfile,
   type TransmitResult,
   type ReplayFrame,
+  type ReplayState,
+  type RepeatGroupMember,
   type RepeatStartedEvent,
   type SerialFraming,
   type SerialFramingMode,
@@ -28,8 +30,8 @@ import {
   // Replay
   ioStartReplay,
   ioStopReplay,
+  toTransmitFrame,
 } from "../api/transmit";
-import type { ReplayState } from "../api/io";
 
 import { useSessionStore, type Session } from "./sessionStore";
 import { resolveQueueItemSession } from "./transmitRowSession";
@@ -125,6 +127,8 @@ export interface ReplayLogEntry {
   errorMessage?: string;
   /** Loop pass number that just completed (for loopRestarted) */
   pass?: number;
+  /** How long one pass takes (for started) */
+  passDurationUs?: number;
 }
 
 // IOSessionConnection type removed - now using sessionStore for session management
@@ -237,8 +241,10 @@ export interface TransmitState {
   startRepeat: (queueId: string) => Promise<void>;
   /** Stop repeat for queue item */
   stopRepeat: (queueId: string) => Promise<void>;
-  /** Mark repeat as stopped (called by backend event, no API call needed) */
+  /** Mark a row or group stopped (called by backend event, no API call needed) */
   markRepeatStopped: (queueId: string) => void;
+  /** Mark a group repeating (called by the backend's group-started event) */
+  markGroupRepeating: (groupName: string) => void;
   /** Upsert a queue item for a repeat started outside the UI (e.g. an MCP agent) */
   addExternalRepeat: (ev: RepeatStartedEvent) => void;
   /** Stop all repeats */
@@ -279,13 +285,8 @@ export interface TransmitState {
   stopReplay: (replayId: string) => Promise<void>;
   /** Restart a replay from the beginning using its cached params */
   restartReplay: (replayId: string) => Promise<void>;
-  /** Called by `replay-lifecycle` signal — handles start, loop restart, completion, stop, and error */
+  /** Applies a replay's `ReplayState` push: its progress, its log and whether it is active */
   handleReplayLifecycle: (state: ReplayState) => void;
-  /** Called by `replay-progress` signal — updates frame count in the progress banner */
-  updateReplayProgress: (state: ReplayState) => void;
-  /** Add a replay lifecycle log entry */
-  addReplayLogEntry: (entry: Omit<ReplayLogEntry, "id">) => void;
-  /** Clear the replay log */
   /** Clear the session's replay log */
   clearReplayLog: (sessionId: string) => void;
 
@@ -330,6 +331,27 @@ type QueueRowSession = Pick<Session, "id" | "profileId" | "profileName">;
 
 const rowSessionId = (item: TransmitQueueItem) =>
   resolveQueueItemSession(item, useSessionStore.getState().sessions)?.id;
+
+const mintId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function patchRows(
+  queue: TransmitQueueItem[],
+  matches: (q: TransmitQueueItem) => boolean,
+  patch: Partial<TransmitQueueItem> | ((q: TransmitQueueItem) => Partial<TransmitQueueItem>)
+): TransmitQueueItem[] {
+  return queue.map((q) => (matches(q) ? { ...q, ...(typeof patch === "function" ? patch(q) : patch) } : q));
+}
+
+const byId = (queueId: string) => (q: TransmitQueueItem) => q.id === queueId;
+const inGroup = (groupName: string) => (q: TransmitQueueItem) => q.groupName === groupName;
+
+function groupStopped(state: TransmitState, groupName: string): Partial<TransmitState> {
+  const activeGroups = new Set(state.activeGroups);
+  activeGroups.delete(groupName);
+  return { activeGroups, queue: patchRows(state.queue, inGroup(groupName), { isRepeating: false }) };
+}
+
+const TERMINAL_LOG_KIND = { finished: "completed", stopped: "stoppedByUser", failed: "deviceError" } as const;
 
 function syncQueuedMarks(queue: TransmitQueueItem[], sessionIds: Iterable<string | undefined>) {
   const { sessions, setHasQueuedMessages } = useSessionStore.getState();
@@ -376,10 +398,9 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       await ioStopAllGroupRepeats().catch(() => {});
     }
 
-    // Update queue items to stopped state
     const state = get();
     set({
-      queue: state.queue.map((item) => ({ ...item, isRepeating: false })),
+      queue: patchRows(state.queue, () => true, { isRepeating: false }),
       activeGroups: new Set(),
     });
   },
@@ -517,7 +538,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     if (!frame) return;
 
     const item: TransmitQueueItem = {
-      id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: mintId("queue"),
       profileId: session.profileId,
       profileName: session.profileName,
       type: "can",
@@ -535,20 +556,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   addCanFramesBulk: (frames, session, intervalMs, groupName) => {
     const state = get();
     const newItems: TransmitQueueItem[] = frames.map((f) => ({
-      id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: mintId("queue"),
       profileId: session.profileId,
       profileName: session.profileName,
       sessionId: session.id,
       type: "can" as const,
-      canFrame: {
-        frame_id: f.frame_id,
-        data: f.bytes.slice(0, f.dlc),
-        bus: f.bus,
-        is_extended: f.is_extended,
-        is_fd: false,
-        is_brs: false,
-        is_rtr: false,
-      },
+      canFrame: toTransmitFrame({ ...f, bytes: f.bytes.slice(0, f.dlc) }),
       repeatIntervalMs: intervalMs ?? state.queueRepeatIntervalMs,
       isRepeating: false,
       enabled: true,
@@ -572,7 +585,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     if (rawBytes.length === 0) return;
 
     const item: TransmitQueueItem = {
-      id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: mintId("queue"),
       profileId: session.profileId,
       profileName: session.profileName,
       type: "serial",
@@ -669,12 +682,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         );
       }
 
-      // Update queue item
-      set({
-        queue: state.queue.map((q) =>
-          q.id === queueId ? { ...q, isRepeating: true } : q
-        ),
-      });
+      set({ queue: patchRows(state.queue, byId(queueId), { isRepeating: true }) });
     } catch (e) {
       set({ error: String(e) });
     }
@@ -688,12 +696,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     try {
       await ioStopRepeatTransmit(queueId);
 
-      // Update queue item
-      set({
-        queue: state.queue.map((q) =>
-          q.id === queueId ? { ...q, isRepeating: false } : q
-        ),
-      });
+      set({ queue: patchRows(state.queue, byId(queueId), { isRepeating: false }) });
     } catch (e) {
       set({ error: String(e) });
     }
@@ -703,24 +706,19 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   // No API call needed since backend already stopped
   markRepeatStopped: (queueId) => {
     const state = get();
-    // Check if it's a group - if so, remove from activeGroups too
-    const item = state.queue.find((q) => q.id === queueId);
-    if (item?.groupName) {
-      const newActiveGroups = new Set(state.activeGroups);
-      newActiveGroups.delete(item.groupName);
-      set({
-        activeGroups: newActiveGroups,
-        queue: state.queue.map((q) =>
-          q.groupName === item.groupName ? { ...q, isRepeating: false } : q
-        ),
-      });
-    } else {
-      set({
-        queue: state.queue.map((q) =>
-          q.id === queueId ? { ...q, isRepeating: false } : q
-        ),
-      });
-    }
+    set(
+      state.activeGroups.has(queueId)
+        ? groupStopped(state, queueId)
+        : { queue: patchRows(state.queue, byId(queueId), { isRepeating: false }) }
+    );
+  },
+
+  markGroupRepeating: (groupName) => {
+    const state = get();
+    set({
+      activeGroups: new Set([...state.activeGroups, groupName]),
+      queue: patchRows(state.queue, (q) => q.groupName === groupName && q.enabled && q.type === "can", { isRepeating: true }),
+    });
   },
 
   // Every repeat start is announced by the backend, the UI's own included. A row
@@ -744,11 +742,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     };
     set({
       queue: exists
-        ? state.queue.map((q) =>
-            q.id === queue_id
-              ? { ...q, isRepeating: true, repeatIntervalMs: interval_ms, sessionId: session_id }
-              : q
-          )
+        ? patchRows(state.queue, byId(queue_id), { isRepeating: true, repeatIntervalMs: interval_ms, sessionId: session_id })
         : [...state.queue, item],
     });
     useSessionStore.getState().setHasQueuedMessages(session_id, true);
@@ -766,19 +760,11 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       }
     }
 
-    // Update all items to not repeating
-    set({
-      queue: state.queue.map((q) => ({ ...q, isRepeating: false })),
-    });
+    set({ queue: patchRows(state.queue, () => true, { isRepeating: false }) });
   },
 
   updateQueueInterval: (queueId, intervalMs) => {
-    const state = get();
-    set({
-      queue: state.queue.map((q) =>
-        q.id === queueId ? { ...q, repeatIntervalMs: intervalMs } : q
-      ),
-    });
+    set({ queue: patchRows(get().queue, byId(queueId), { repeatIntervalMs: intervalMs }) });
   },
 
   toggleQueueEnabled: (queueId) => {
@@ -791,23 +777,14 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       ioStopRepeatTransmit(queueId).catch(() => {});
     }
 
-    set({
-      queue: state.queue.map((q) =>
-        q.id === queueId
-          ? { ...q, enabled: !q.enabled, isRepeating: false }
-          : q
-      ),
-    });
+    set({ queue: patchRows(state.queue, byId(queueId), { enabled: !item.enabled, isRepeating: false }) });
   },
 
   updateQueueItemBus: (queueId, bus) => {
-    const state = get();
     set({
-      queue: state.queue.map((q) =>
-        q.id === queueId && q.type === "can" && q.canFrame
-          ? { ...q, canFrame: { ...q.canFrame, bus } }
-          : q
-      ),
+      queue: patchRows(get().queue, (q) => q.id === queueId && q.type === "can" && !!q.canFrame, (q) => ({
+        canFrame: { ...q.canFrame!, bus },
+      })),
     });
   },
 
@@ -818,23 +795,18 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const oldSessionId = rowSessionId(item);
 
     set({
-      queue: state.queue.map((q) =>
-        q.id === queueId
-          ? { ...q, sessionId: session.id, profileId: session.profileId, profileName: session.profileName }
-          : q
-      ),
+      queue: patchRows(state.queue, byId(queueId), {
+        sessionId: session.id,
+        profileId: session.profileId,
+        profileName: session.profileName,
+      }),
     });
     syncQueuedMarks(get().queue, [oldSessionId, session.id]);
   },
 
   // Group Actions
   setItemGroup: (queueId, groupName) => {
-    const state = get();
-    set({
-      queue: state.queue.map((q) =>
-        q.id === queueId ? { ...q, groupName: groupName || undefined } : q
-      ),
-    });
+    set({ queue: patchRows(get().queue, byId(queueId), { groupName: groupName || undefined }) });
   },
 
   getGroupNames: () => {
@@ -871,7 +843,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     const { sessions } = useSessionStore.getState();
-    const itemsBySession = new Map<string, typeof groupItems>();
+    const members: RepeatGroupMember[] = [];
     for (const item of groupItems) {
       const session = resolveQueueItemSession(item, sessions);
       if (!session || session.lifecycleState !== "connected") {
@@ -882,31 +854,13 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         set({ error: `Session '${item.profileName}' does not support transmit` });
         return;
       }
-      itemsBySession.set(session.id, [...(itemsBySession.get(session.id) ?? []), item]);
+      const last = members[members.length - 1];
+      if (last?.session_id === session.id) last.frames.push(item.canFrame!);
+      else members.push({ session_id: session.id, frames: [item.canFrame!] });
     }
 
-    // Use interval from first item in group (applies to all sub-groups)
-    const intervalMs = groupItems[0].repeatIntervalMs;
-
     try {
-      for (const [sessionId, items] of itemsBySession) {
-        const frames = items.map((q) => q.canFrame!);
-        const subGroupName = itemsBySession.size > 1 ? `${groupName}:${sessionId}` : groupName;
-        await ioStartRepeatGroup(sessionId, subGroupName, frames, intervalMs);
-      }
-
-      // Mark group as active and items as repeating
-      const newActiveGroups = new Set(state.activeGroups);
-      newActiveGroups.add(groupName);
-
-      set({
-        activeGroups: newActiveGroups,
-        queue: state.queue.map((q) =>
-          q.groupName === groupName && q.enabled && q.type === "can"
-            ? { ...q, isRepeating: true }
-            : q
-        ),
-      });
+      await ioStartRepeatGroup(groupName, members, groupItems[0].repeatIntervalMs);
     } catch (e) {
       set({ error: String(e) });
     }
@@ -920,30 +874,8 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     try {
-      const { sessions } = useSessionStore.getState();
-      const sessionIds = new Set(
-        state.queue
-          .filter((q) => q.groupName === groupName && q.type === "can")
-          .flatMap((q) => [q.sessionId, resolveQueueItemSession(q, sessions)?.id])
-          .filter((id): id is string => id !== undefined)
-      );
-
-      // Stop the main group and any sub-groups (groupName:sessionId)
       await ioStopRepeatGroup(groupName);
-      for (const sessionId of sessionIds) {
-        await ioStopRepeatGroup(`${groupName}:${sessionId}`).catch(() => {});
-      }
-
-      // Remove group from active and mark items as not repeating
-      const newActiveGroups = new Set(state.activeGroups);
-      newActiveGroups.delete(groupName);
-
-      set({
-        activeGroups: newActiveGroups,
-        queue: state.queue.map((q) =>
-          q.groupName === groupName ? { ...q, isRepeating: false } : q
-        ),
-      });
+      set(groupStopped(state, groupName));
     } catch (e) {
       set({ error: String(e) });
     }
@@ -959,13 +891,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     try {
       await ioStopAllGroupRepeats();
 
-      // Clear all active groups and mark all grouped items as not repeating
-      set({
-        activeGroups: new Set(),
-        queue: state.queue.map((q) =>
-          q.groupName ? { ...q, isRepeating: false } : q
-        ),
-      });
+      set({ activeGroups: new Set(), queue: patchRows(state.queue, (q) => !!q.groupName, { isRepeating: false }) });
     } catch (e) {
       set({ error: String(e) });
     }
@@ -973,150 +899,53 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
   // Replay Actions
   startReplay: async (sessionId, replayId, frames, speed, loop) => {
-    const { sessions } = useSessionStore.getState();
-    const session = sessions[sessionId];
-    const profileName = session?.profileName ?? "Unknown";
     try {
       await ioStartReplay(sessionId, replayId, frames, speed, loop);
-      set((state) => {
-        const nextCache = new Map(state.replayCache);
-        nextCache.set(replayId, { sessionId, frames, speed, loop });
-        const nextProgress = new Map(state.replayProgress);
-        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName, sessionId });
-        const startedEntry: ReplayLogEntry = {
-          id: `replay-start-${replayId}`,
-          replayId,
-          sessionId,
-          profileName,
-          totalFrames: frames.length,
-          speed,
-          loopReplay: loop,
-          timestamp: Date.now(),
-          kind: "started",
-        };
-        return {
-          activeReplays: new Set([...state.activeReplays, replayId]),
-          replayProgress: nextProgress,
-          replayCache: nextCache,
-          replayLog: [startedEntry, ...state.replayLog],
-        };
-      });
+      set((state) => ({ replayCache: new Map(state.replayCache).set(replayId, { sessionId, frames, speed, loop }) }));
     } catch (e) {
       set({ error: String(e) });
     }
   },
 
   stopReplay: async (replayId) => {
-    try {
-      await ioStopReplay(replayId);
-      // Don't clear replayProgress here — handleReplayLifecycle will handle it
-      // when the backend fires the replay-lifecycle signal with status "stopped"
-      set((state) => {
-        const nextReplays = new Set(state.activeReplays);
-        nextReplays.delete(replayId);
-        return { activeReplays: nextReplays };
-      });
-    } catch (e) {
-      set({ error: String(e) });
-    }
+    await ioStopReplay(replayId).catch((e) => set({ error: String(e) }));
   },
 
   handleReplayLifecycle: (replayState) => {
-    const { replay_id: replayId, status, total_frames: totalFrames, frames_sent: framesSent, speed, loop_replay: loopReplay, pass } = replayState;
-    set((state) => {
-      if (status === "running") {
-        // Start or loop restart — update/initialise progress entry
-        const existing = state.replayProgress.get(replayId);
-        const nextProgress = new Map(state.replayProgress);
-        nextProgress.set(replayId, {
-          totalFrames,
-          framesSent: existing?.framesSent ?? 0,
-          speed,
-          loopReplay,
-          profileName: existing?.profileName ?? "",
-          sessionId: replayState.session_id,
-        });
-
-        if (!existing) {
-          // First "running" signal — treat as started (no log entry here; startReplay already adds one)
-          return {
-            activeReplays: new Set([...state.activeReplays, replayId]),
-            replayProgress: nextProgress,
-          };
-        }
-
-        // Subsequent "running" with pass > 1 means a loop restart
-        if (pass > 1) {
-          const last = state.replayLog.find(e => e.replayId === replayId && e.kind === "loopRestarted");
-          if (last?.pass === pass && last?.framesSent === framesSent) {
-            return { replayProgress: nextProgress };
-          }
-          const entry: ReplayLogEntry = {
-            id: `replay-loop-${replayId}-${pass}-${Date.now()}`,
-            replayId,
-            sessionId: existing.sessionId,
-            profileName: existing.profileName,
-            totalFrames,
-            speed,
-            loopReplay: true,
-            timestamp: Date.now(),
-            kind: "loopRestarted",
-            framesSent,
-            pass,
-          };
-          return { replayProgress: nextProgress, replayLog: [entry, ...state.replayLog] };
-        }
-
-        return { replayProgress: nextProgress };
-      }
-
-      // Terminal states: completed, stopped, error
-      const info = state.replayProgress.get(replayId);
-      const nextReplays = new Set(state.activeReplays);
-      nextReplays.delete(replayId);
-      const nextProgress = new Map(state.replayProgress);
-      nextProgress.delete(replayId);
-
-      if (!info) {
-        return { activeReplays: nextReplays, replayProgress: nextProgress };
-      }
-
-      let kind: ReplayLogKind;
-      if (status === "completed") kind = "completed";
-      else if (status === "stopped") kind = "stoppedByUser";
-      else kind = "deviceError";
-
-      const finalFramesSent = status === "completed" && !loopReplay ? totalFrames : framesSent;
-
-      const summaryEntry: ReplayLogEntry = {
-        id: `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        replayId,
-        sessionId: info.sessionId,
-        profileName: info.profileName,
-        totalFrames,
-        speed,
-        loopReplay,
-        timestamp: Date.now(),
-        kind,
-        framesSent: finalFramesSent,
-      };
-
-      return {
-        activeReplays: nextReplays,
-        replayProgress: nextProgress,
-        replayLog: [summaryEntry, ...state.replayLog],
-      };
-    });
-  },
-
-  updateReplayProgress: (replayState) => {
-    const { replay_id: replayId, frames_sent: framesSent } = replayState;
+    const { replay_id: replayId, session_id: sessionId, event, frames_sent: framesSent, total_frames: totalFrames, speed, loop_replay: loopReplay, pass } = replayState;
     set((state) => {
       const existing = state.replayProgress.get(replayId);
-      if (!existing) return {};
-      const next = new Map(state.replayProgress);
-      next.set(replayId, { ...existing, framesSent });
-      return { replayProgress: next };
+      const profileName = existing?.profileName ?? useSessionStore.getState().sessions[sessionId]?.profileName ?? "";
+      const replayProgress = new Map(state.replayProgress);
+      const activeReplays = new Set(state.activeReplays);
+      const log = (kind: ReplayLogKind, detail: Partial<ReplayLogEntry>) => [
+        { id: mintId("replay"), replayId, sessionId, profileName, totalFrames, speed, loopReplay, timestamp: Date.now(), kind, ...detail },
+        ...state.replayLog,
+      ];
+
+      switch (event.kind) {
+        case "started":
+          replayProgress.set(replayId, { totalFrames, framesSent, speed, loopReplay, profileName, sessionId });
+          activeReplays.add(replayId);
+          return { activeReplays, replayProgress, replayLog: log("started", { passDurationUs: replayState.pass_duration_us }) };
+        case "progress":
+          if (existing) replayProgress.set(replayId, { ...existing, framesSent });
+          return { replayProgress };
+        case "pass_completed":
+          if (existing) replayProgress.set(replayId, { ...existing, framesSent });
+          return { replayProgress, replayLog: log("loopRestarted", { framesSent, pass }) };
+        default:
+          replayProgress.delete(replayId);
+          activeReplays.delete(replayId);
+          return {
+            activeReplays,
+            replayProgress,
+            replayLog: log(TERMINAL_LOG_KIND[event.kind], {
+              framesSent,
+              errorMessage: event.kind === "failed" ? event.error : undefined,
+            }),
+          };
+      }
     });
   },
 
@@ -1124,39 +953,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const cached = get().replayCache.get(replayId);
     if (!cached) return;
     const { sessionId, frames, speed, loop } = cached;
-    try {
-      await ioStopReplay(replayId);
-      await ioStartReplay(sessionId, replayId, frames, speed, loop);
-      const { sessions } = useSessionStore.getState();
-      const profileName = sessions[sessionId]?.profileName ?? "Unknown";
-      set((state) => {
-        const nextProgress = new Map(state.replayProgress);
-        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName, sessionId });
-        const restartedEntry: ReplayLogEntry = {
-          id: `replay-restart-${replayId}-${Date.now()}`,
-          replayId,
-          sessionId,
-          profileName,
-          totalFrames: frames.length,
-          speed,
-          loopReplay: loop,
-          timestamp: Date.now(),
-          kind: "started",
-        };
-        return {
-          activeReplays: new Set([...state.activeReplays, replayId]),
-          replayProgress: nextProgress,
-          replayLog: [restartedEntry, ...state.replayLog],
-        };
-      });
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
-
-  addReplayLogEntry: (entry) => {
-    const id = `replay-log-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    set((state) => ({ replayLog: [{ ...entry, id }, ...state.replayLog] }));
+    await ioStartReplay(sessionId, replayId, frames, speed, loop).catch((e) => set({ error: String(e) }));
   },
 
   clearReplayLog: (sessionId) =>

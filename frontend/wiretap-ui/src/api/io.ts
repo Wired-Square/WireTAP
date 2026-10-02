@@ -983,17 +983,6 @@ export async function getOrphanedCaptureIds(
   return invoke("get_orphaned_capture_ids", { session_id: sessionId });
 }
 
-export interface ReplayState {
-  status: string;
-  replay_id: string;
-  session_id: string;
-  frames_sent: number;
-  total_frames: number;
-  speed: number;
-  loop_replay: boolean;
-  pass: number;
-}
-
 /** Fetch the most recent bytes from a capture (tail view). */
 export async function getCaptureBytesTail(
   captureId: string,

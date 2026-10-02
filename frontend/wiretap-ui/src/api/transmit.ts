@@ -5,9 +5,14 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { CanTransmitFrame } from "../generated/CanTransmitFrame";
+import type { FrameMessage } from "../generated/FrameMessage";
+import type { RepeatGroupMember } from "../generated/RepeatGroupMember";
+import type { RepeatGroupStartedEvent } from "../generated/RepeatGroupStartedEvent";
 import type { RepeatStartedEvent } from "../generated/RepeatStartedEvent";
 import type { RepeatStoppedEvent } from "../generated/RepeatStoppedEvent";
+import type { ReplayEvent } from "../generated/ReplayEvent";
 import type { ReplayFrame } from "../generated/ReplayFrame";
+import type { ReplayState } from "../generated/ReplayState";
 import type { SerialFraming } from "../generated/SerialFraming";
 import type { TransmitProfile } from "../generated/TransmitProfile";
 import type { TransmitResult } from "../generated/TransmitResult";
@@ -15,9 +20,12 @@ import type { WriterCapabilities } from "../generated/WriterCapabilities";
 
 export type {
   CanTransmitFrame,
+  RepeatGroupMember,
   RepeatStartedEvent,
   RepeatStoppedEvent,
+  ReplayEvent,
   ReplayFrame,
+  ReplayState,
   SerialFraming,
   TransmitProfile,
   TransmitResult,
@@ -40,7 +48,27 @@ export function serialFraming(mode: SerialFramingMode, delimiter: number[]): Ser
  */
 export type RepeatEvent =
   | ({ kind: "started" } & RepeatStartedEvent)
-  | ({ kind: "stopped" } & RepeatStoppedEvent);
+  | ({ kind: "stopped" } & RepeatStoppedEvent)
+  | ({ kind: "group_started" } & RepeatGroupStartedEvent);
+
+type ReceivedFrame = Pick<FrameMessage, "frame_id" | "bytes" | "is_extended"> & Partial<Pick<FrameMessage, "bus" | "is_fd">>;
+
+/** A received frame as a classic or FD data frame to send. */
+export function toTransmitFrame(f: ReceivedFrame): CanTransmitFrame {
+  return {
+    frame_id: f.frame_id,
+    data: [...f.bytes],
+    bus: f.bus ?? 0,
+    is_extended: f.is_extended,
+    is_fd: f.is_fd ?? false,
+    is_brs: false,
+    is_rtr: false,
+  };
+}
+
+export function toReplayFrame(f: ReceivedFrame & Pick<FrameMessage, "timestamp_us">): ReplayFrame {
+  return { timestamp_us: f.timestamp_us, frame: toTransmitFrame(f) };
+}
 
 // ============================================================================
 // Profile Query API
@@ -166,26 +194,15 @@ export async function ioStartSerialRepeatTransmit(
 // waits for the interval before repeating the sequence.
 
 /**
- * Start group repeat transmission through an IO session.
- * Frames are sent sequentially (A→B→C) with no delay between them,
- * then the system waits for the interval before repeating.
- * @param sessionId - IO session to use
- * @param groupId - Unique ID for this group (used to stop it later)
- * @param frames - CAN frames to transmit in sequence
- * @param intervalMs - Interval between complete sequences in milliseconds
+ * Start a group repeat, which may span sessions. Each cycle sends every
+ * member's frames in order with no delay between them, then waits the interval.
  */
 export async function ioStartRepeatGroup(
-  sessionId: string,
   groupId: string,
-  frames: CanTransmitFrame[],
+  members: RepeatGroupMember[],
   intervalMs: number
 ): Promise<void> {
-  return invoke("io_start_repeat_group", {
-    sessionId,
-    groupId,
-    frames,
-    intervalMs,
-  });
+  return invoke("io_start_repeat_group", { groupId, members, intervalMs });
 }
 
 /**

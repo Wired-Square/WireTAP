@@ -117,6 +117,9 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::catalog_share::registry::GitIdentity>();
     r.visit::<crate::capture_db::InventoryRow>();
     r.visit::<crate::replay::ReplayFrame>();
+    r.visit::<crate::replay::ReplayState>();
+    r.visit::<crate::transmit::RepeatGroupMember>();
+    r.visit::<crate::transmit::RepeatGroupStartedEvent>();
     r.visit::<crate::transmit::RepeatStartedEvent>();
     r.visit::<crate::transmit::RepeatStoppedEvent>();
     r.visit::<crate::transmit::SerialFraming>();

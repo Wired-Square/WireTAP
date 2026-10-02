@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) })
 import { invoke } from "@tauri-apps/api/core";
 import { useSessionStore, type Session } from "../stores/sessionStore";
 import { useTransmitStore, type TransmitQueueItem } from "../stores/transmitStore";
+import type { RepeatGroupMember } from "../api/transmit";
 
 const PROFILE_ID = "io_slcan";
 
@@ -43,33 +44,57 @@ beforeEach(() => {
   useTransmitStore.setState({ queue: [], activeGroups: new Set(), error: null });
 });
 
-const repeatGroupSessions = () =>
+const repeatGroupMembers = () =>
   vi.mocked(invoke).mock.calls
     .filter(([cmd]) => cmd === "io_start_repeat_group")
-    .map(([, args]) => (args as { sessionId: string }).sessionId);
+    .map(([, args]) => (args as { members: RepeatGroupMember[] }).members.map((m) => [m.session_id, m.frames.length]));
 
 describe("a group repeat transmits through its rows' sessions", () => {
   it("rows naming the second session on a shared profile repeat through that session", async () => {
     useTransmitStore.setState({ queue: [row("a", "second"), row("b", "second")] });
     await useTransmitStore.getState().startGroupRepeat("g");
-    expect(repeatGroupSessions()).toEqual(["second"]);
+    expect(repeatGroupMembers()).toEqual([[["second", 2]]]);
   });
 
-  it("rows naming two sessions on one profile repeat through each", async () => {
-    useTransmitStore.setState({ queue: [row("a", "first"), row("b", "second")] });
+  it("rows across sessions are one group, in queue order", async () => {
+    useTransmitStore.setState({ queue: [row("a", "first"), row("b", "second"), row("c", "first")] });
     await useTransmitStore.getState().startGroupRepeat("g");
-    expect(repeatGroupSessions()).toEqual(["first", "second"]);
+    expect(repeatGroupMembers()).toEqual([[["first", 1], ["second", 1], ["first", 1]]]);
   });
 });
 
-describe("stopping a group repeat", () => {
-  it("stops the sub-group of every session its rows repeated through", async () => {
+describe("a group repeat's state follows the backend", () => {
+  it("the group shows repeating when the backend says it started", async () => {
     useTransmitStore.setState({ queue: [row("a", "first"), row("b", "second")] });
     await useTransmitStore.getState().startGroupRepeat("g");
+    expect(useTransmitStore.getState().isGroupRepeating("g")).toBe(false);
+    useTransmitStore.getState().markGroupRepeating("g");
+    expect(useTransmitStore.getState().isGroupRepeating("g")).toBe(true);
+    expect(useTransmitStore.getState().queue.every((q) => q.isRepeating)).toBe(true);
+  });
+
+  it("stopping it stops the one group", async () => {
+    useTransmitStore.setState({ queue: [row("a", "first"), row("b", "second")] });
+    useTransmitStore.getState().markGroupRepeating("g");
     await useTransmitStore.getState().stopGroupRepeat("g");
     const stopped = vi.mocked(invoke).mock.calls
       .filter(([cmd]) => cmd === "io_stop_repeat_group")
       .map(([, args]) => (args as { groupId: string }).groupId);
-    expect(stopped).toEqual(expect.arrayContaining(["g:first", "g:second"]));
+    expect(stopped).toEqual(["g"]);
+    expect(useTransmitStore.getState().isGroupRepeating("g")).toBe(false);
+  });
+
+  it("a group the backend stopped on a device error shows stopped", () => {
+    useTransmitStore.setState({ queue: [row("a", "first"), row("b", "second")] });
+    useTransmitStore.getState().markGroupRepeating("g");
+    useTransmitStore.getState().markRepeatStopped("g");
+    expect(useTransmitStore.getState().isGroupRepeating("g")).toBe(false);
+    expect(useTransmitStore.getState().queue.some((q) => q.isRepeating)).toBe(false);
+  });
+
+  it("a grouped row repeating alone stops alone", () => {
+    useTransmitStore.setState({ queue: [{ ...row("a", "first"), isRepeating: true }, { ...row("b", "first"), isRepeating: true }] });
+    useTransmitStore.getState().markRepeatStopped("a");
+    expect(useTransmitStore.getState().queue.map((q) => q.isRepeating)).toEqual([false, true]);
   });
 });
