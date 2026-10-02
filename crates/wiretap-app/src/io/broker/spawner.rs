@@ -389,6 +389,12 @@ async fn run_virtual_reader(
                 .collect()
         });
 
+    // Loopback: transmitted frames are echoed back as received. Offered before
+    // `Connected`, since `start` returns on the first and a transmit may follow at once.
+    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
+    let _ = tx
+        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
+        .await;
     let _ = tx
         .send(SourceMessage::Connected(
             source_idx,
@@ -396,12 +402,6 @@ async fn run_virtual_reader(
             "virtual://internal".to_string(),
             None,
         ))
-        .await;
-
-    // Create transmit channel for loopback: transmitted frames are echoed back as received
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-    let _ = tx
-        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
 
     // Spawn loopback task: receives encoded frames and echoes them back via the merge channel

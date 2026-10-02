@@ -1677,6 +1677,73 @@ mod tests {
         destroy_session(id, false).await.unwrap();
     }
 
+    fn device(id: &str, kind: &str, connection: serde_json::Value) -> crate::settings::IOProfile {
+        crate::settings::IOProfile {
+            id: id.into(),
+            name: id.into(),
+            kind: kind.into(),
+            connection: serde_json::from_value(connection).unwrap(),
+            preferred_catalog: None,
+            ephemeral: true,
+        }
+    }
+
+    fn missing_port(id: &str) -> crate::settings::IOProfile {
+        device(id, "serial", serde_json::json!({ "port": "/dev/wiretap-no-such-port" }))
+    }
+
+    async fn open_broker(session_id: &str, devices: Vec<crate::settings::IOProfile>, profiles: ProfileLoader) {
+        crate::capture_db::use_in_memory_database();
+        let configs = devices
+            .iter()
+            .map(|p| SourceConfig {
+                profile_id: p.id.clone(),
+                profile_kind: p.kind.clone(),
+                display_name: p.name.clone(),
+                bus_mappings: sessions::profile_bus_mappings(p),
+                ..Default::default()
+            })
+            .collect();
+        let broker = IOBroker::new(profiles, session_id.into(), configs).unwrap();
+        create_session(session_id.into(), Box::new(broker), None, None, None, vec![]).await;
+    }
+
+    async fn open_saved(session_id: &str, devices: Vec<crate::settings::IOProfile>) {
+        let saved = devices.clone();
+        open_broker(session_id, devices, Arc::new(move || Ok(saved.clone()))).await;
+    }
+
+    #[tokio::test]
+    async fn a_source_refused_at_open_fails_the_start() {
+        let id = "f_refused_at_open";
+        open_saved(id, vec![missing_port("p-missing-port")]).await;
+
+        let refused = start_session(id).await.unwrap_err();
+        assert!(refused.contains("/dev/wiretap-no-such-port"), "{refused}");
+        assert_eq!(super::super::get_session_state(id).await, Some(IOState::Error(refused)));
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn unreadable_profiles_fail_the_start() {
+        let id = "f_unreadable_profiles";
+        let unreadable: ProfileLoader = Arc::new(|| Err("settings.json is corrupt".into()));
+        open_broker(id, vec![missing_port("p-unreadable")], unreadable).await;
+
+        assert_eq!(start_session(id).await.unwrap_err(), "settings.json is corrupt");
+        destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn one_source_refused_does_not_fail_a_start_another_source_made() {
+        let id = "f_one_of_two_refused";
+        let generator = device("p-serial-generator", "virtual", serde_json::json!({ "traffic_type": "serial" }));
+        open_saved(id, vec![missing_port("p-one-missing-port"), generator]).await;
+
+        assert_eq!(start_session(id).await, Ok(IOState::Running));
+        destroy_session(id, false).await.unwrap();
+    }
+
     #[test]
     fn a_missing_session_keeps_no_per_session_state() {
         let id = "f_never_created_state";

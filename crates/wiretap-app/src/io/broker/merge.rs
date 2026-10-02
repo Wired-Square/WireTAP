@@ -4,7 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -94,7 +94,9 @@ pub(super) async fn run_merge_task(
     fatal_error: Arc<Mutex<Option<String>>>,
     resolved_mappings: Arc<Mutex<HashMap<String, Vec<BusMapping>>>>,
     source_pause_flags: SourcePauseFlags,
+    started: oneshot::Sender<Result<(), String>>,
 ) {
+    let mut start = StartReport::new(started, 0..sources.len());
     // Profiles for the initial spawn only — hot-adds re-read, since they exist
     // to pick up a profile that has changed. Dropped after the loop so a
     // long-lived session does not retain them.
@@ -102,6 +104,7 @@ pub(super) async fn run_merge_task(
         Ok(p) => p,
         Err(e) => {
             tlog!("[IOBroker] Failed to load settings: {}", e);
+            start.send(Err(e));
             emit_stream_ended(&session_id, StreamEndReason::Error, "IOBroker");
             return;
         }
@@ -122,10 +125,9 @@ pub(super) async fn run_merge_task(
         let profile = match io_profiles.iter().find(|p| p.id == source_config.profile_id) {
             Some(p) => p.clone(),
             None => {
-                tlog!(
-                    "[IOBroker] Profile '{}' not found",
-                    source_config.profile_id
-                );
+                let error = format!("Profile '{}' not found", source_config.profile_id);
+                tlog!("[IOBroker] {}", error);
+                start.failed(index, error);
                 continue;
             }
         };
@@ -210,7 +212,10 @@ pub(super) async fn run_merge_task(
                                 .unwrap_or_else(|| format!("source {}", source_idx));
                             let error = IoError::DeviceDisconnected { device }.to_string();
                             last_source_error = Some(error.clone());
-                            emit_session_error(&session_id, error);
+                            emit_session_error(&session_id, error.clone());
+                            start.failed(source_idx, error);
+                        } else {
+                            start.ready(source_idx);
                         }
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
@@ -221,7 +226,8 @@ pub(super) async fn run_merge_task(
                             channels.remove(&source_idx);
                         }
                         last_source_error = Some(error.clone());
-                        emit_session_error(&session_id, error);
+                        emit_session_error(&session_id, error.clone());
+                        start.failed(source_idx, error);
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
                     }
@@ -229,12 +235,14 @@ pub(super) async fn run_merge_task(
                         tlog!("[IOBroker] Source {} interrupted: {}", source_idx, error);
                         interrupted.insert(source_idx);
                         emit_session_error(&session_id, error);
+                        start.ready(source_idx);
                     }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
                         tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.insert(source_idx, tx_sender);
                         }
+                        start.ready(source_idx);
                     }
                     Some(SourceMessage::ControlReady(source_idx, control_sender)) => {
                         tlog!("[IOBroker] Source {} control channel ready", source_idx);
@@ -245,6 +253,7 @@ pub(super) async fn run_merge_task(
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
                         tlog!("[IOBroker] Source {} connected: {} at {}", source_idx, device_type, address);
                         emit_device_connected(&session_id, &device_type, &address, bus_number);
+                        start.ready(source_idx);
                         // The session error left the frontend in its error state;
                         // the session never left its own, so send that again.
                         if interrupted.remove(&source_idx) {
@@ -469,7 +478,7 @@ pub(super) async fn run_merge_task(
     // reported at the time, via emit_session_error.
     if reason == StreamEndReason::Error {
         if let (Some(error), Ok(mut slot)) = (last_source_error, fatal_error.lock()) {
-            *slot = Some(error);
+            slot.get_or_insert(error);
         }
     }
     emit_stream_ended(&session_id, reason, "IOBroker");
@@ -556,6 +565,41 @@ fn stream_ended_reason(stopped: bool, had_error: bool) -> StreamEndReason {
     }
 }
 
+/// What `IOBroker::start` waits for: the first source to come up, or every
+/// source it began with failing. Hot-added sources are not waited on.
+struct StartReport {
+    reply: Option<oneshot::Sender<Result<(), String>>>,
+    waiting: std::collections::HashSet<usize>,
+    failures: Vec<String>,
+}
+
+impl StartReport {
+    fn new(reply: oneshot::Sender<Result<(), String>>, indices: impl IntoIterator<Item = usize>) -> Self {
+        Self { reply: Some(reply), waiting: indices.into_iter().collect(), failures: Vec::new() }
+    }
+
+    fn ready(&mut self, index: usize) {
+        if self.waiting.contains(&index) {
+            self.send(Ok(()));
+        }
+    }
+
+    fn failed(&mut self, index: usize, error: String) {
+        if self.waiting.remove(&index) {
+            self.failures.push(error);
+            if self.waiting.is_empty() {
+                self.send(Err(self.failures.join("; ")));
+            }
+        }
+    }
+
+    fn send(&mut self, outcome: Result<(), String>) {
+        if let Some(reply) = self.reply.take() {
+            let _ = reply.send(outcome);
+        }
+    }
+}
+
 /// The sources still running. A source that reports an error and then ends is
 /// counted out once, so it cannot end the session while another source is live.
 struct LiveSources(std::collections::HashSet<usize>);
@@ -617,11 +661,44 @@ impl PendingReadds {
 
 #[cfg(test)]
 mod tests {
-    use super::{stream_ended_reason, LiveSources, PendingReadds, StreamEndReason};
+    use super::{stream_ended_reason, LiveSources, PendingReadds, StartReport, StreamEndReason};
+    use tokio::sync::oneshot;
     use crate::io::broker::types::SourceConfig;
 
     fn config(profile_id: &str) -> SourceConfig {
         SourceConfig { profile_id: profile_id.to_string(), ..Default::default() }
+    }
+
+    fn start_report(sources: usize) -> (StartReport, oneshot::Receiver<Result<(), String>>) {
+        let (tx, rx) = oneshot::channel();
+        (StartReport::new(tx, 0..sources), rx)
+    }
+
+    #[test]
+    fn the_first_source_up_starts_the_session() {
+        let (mut report, mut outcome) = start_report(2);
+        report.failed(0, "COM5 is missing".into());
+        assert!(outcome.try_recv().is_err());
+        report.ready(1);
+        assert_eq!(outcome.try_recv(), Ok(Ok(())));
+    }
+
+    #[test]
+    fn a_start_fails_only_when_every_source_has() {
+        let (mut report, mut outcome) = start_report(2);
+        report.failed(0, "COM5 is missing".into());
+        report.failed(0, "COM5 is missing".into());
+        assert!(outcome.try_recv().is_err());
+        report.failed(1, "COM6 is missing".into());
+        assert_eq!(outcome.try_recv(), Ok(Err("COM5 is missing; COM6 is missing".into())));
+    }
+
+    #[test]
+    fn a_hot_added_source_does_not_settle_the_start() {
+        let (mut report, mut outcome) = start_report(1);
+        report.ready(1);
+        report.failed(1, "late".into());
+        assert!(outcome.try_recv().is_err());
     }
 
     #[test]

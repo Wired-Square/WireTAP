@@ -1368,26 +1368,6 @@ pub(crate) mod tests {
         let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
         let broker = IOBroker::single_source(profiles, session_id.into(), config).unwrap();
         open_session(session_id, Box::new(broker)).await;
-        await_transmit_ready(session_id).await;
-    }
-
-    /// The session reports running before its device has connected, and a
-    /// transmit until then is refused.
-    async fn await_transmit_ready(session_id: &str) {
-        let probe = CanTransmitFrame {
-            frame_id: 0x100,
-            data: vec![0; 8],
-            bus: 0,
-            is_extended: false,
-            is_fd: false,
-            is_brs: false,
-            is_rtr: false,
-        };
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while !io::transmit_frame(session_id, &probe).await.is_ok_and(|r| r.success) {
-            assert!(Instant::now() < deadline, "the device never connected");
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
     }
 
     fn config(mode: TestMode, use_fd: bool) -> TestConfig {

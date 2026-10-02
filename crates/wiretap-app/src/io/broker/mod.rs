@@ -11,10 +11,14 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 /// Capacity for the async frame/bytes channel between source readers and the merge task.
 const SOURCE_CHANNEL_CAPACITY: usize = 1024;
+
+/// Past the 5 s connect timeout a network profile defaults to, so a dead host
+/// fails the start; a source still connecting after this starts as `Running`.
+const START_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
@@ -730,6 +734,7 @@ impl IOSource for IOBroker {
             *tx_slot = Some(merge_cmd_tx);
         }
 
+        let (started_tx, started) = oneshot::channel();
         // Spawn the merge task that collects frames from all sources
         let merge_handle = tokio::spawn(async move {
             // Held for the task's life rather than set at the end: `run_merge_task`
@@ -754,11 +759,26 @@ impl IOSource for IOBroker {
                 fatal_error,
                 resolved_mappings,
                 source_pause_flags,
+                started_tx,
             )
             .await;
         });
 
         self.task_handles.push(merge_handle);
+        match tokio::time::timeout(START_SETTLE_TIMEOUT, started).await {
+            Ok(Ok(Err(error))) => {
+                if let Ok(mut slot) = self.fatal_error.lock() {
+                    *slot = Some(error.clone());
+                }
+                return Err(error);
+            }
+            Ok(_) => {}
+            Err(_) => tlog!(
+                "[IOBroker] Session '{}' still connecting after {:?}; reporting it running",
+                self.session_id,
+                START_SETTLE_TIMEOUT
+            ),
+        }
         self.state = IOState::Running;
 
         Ok(())
