@@ -82,14 +82,17 @@ pub fn resolve_secret(profile: &IOProfile, field: &str) -> Option<String> {
     }
 }
 
-/// Move a profile's secrets out of `connection` and into the keyring, leaving a
-/// `_<field>_stored` marker behind.
+/// Move a profile's secrets out of `connection` and into `store` (the keyring,
+/// via [`store_io_secret`]), leaving a `_<field>_stored` marker behind.
 ///
 /// Every path that writes a profile to settings.json must call this — a password
 /// left in `connection` would be serialised in plaintext. A field the caller did
 /// not supply is left alone, so an edit that never touched the password keeps
 /// the stored one rather than clearing it.
-pub fn split_secrets(profile: &mut IOProfile) -> Result<(), String> {
+pub fn split_secrets(
+    profile: &mut IOProfile,
+    mut store: impl FnMut(&str, &str) -> Result<(), String>,
+) -> Result<(), String> {
     for field in SECURE_FIELDS {
         let plaintext = profile
             .connection
@@ -99,13 +102,26 @@ pub fn split_secrets(profile: &mut IOProfile) -> Result<(), String> {
         profile.connection.remove(field);
 
         if let Some(value) = plaintext.filter(|v| !v.trim().is_empty()) {
-            set_secret(IO_PROFILE_SERVICE, &account_name(&profile.id, field), &value)?;
+            store(&account_name(&profile.id, field), &value)?;
             profile
                 .connection
                 .insert(format!("_{field}_stored"), serde_json::Value::Bool(true));
         }
     }
     Ok(())
+}
+
+/// Drop every `_<field>_stored` marker. A new profile id has nothing in the
+/// keyring, so a marker carried over from another profile would point at nothing.
+pub fn forget_stored_secrets(profile: &mut IOProfile) {
+    for field in SECURE_FIELDS {
+        profile.connection.remove(&format!("_{field}_stored"));
+    }
+}
+
+/// Store one IO-profile secret in the keyring, under the account `split_secrets` names.
+pub fn store_io_secret(account: &str, value: &str) -> Result<(), String> {
+    set_secret(IO_PROFILE_SERVICE, account, value)
 }
 
 // ── Service-parameterised core ───────────────────────────────────────────────

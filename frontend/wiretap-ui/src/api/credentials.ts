@@ -4,20 +4,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /**
- * Store a credential in the system keyring.
- * @param profileId - The IO profile ID (e.g., "io_1704067200000")
- * @param field - The credential field name (e.g., "password", "token")
- * @param value - The secret value to store
- */
-export async function storeCredential(
-  profileId: string,
-  field: string,
-  value: string
-): Promise<void> {
-  await invoke("store_credential", { profileId, field, value });
-}
-
-/**
  * Retrieve a credential from the system keyring.
  * @param profileId - The IO profile ID
  * @param field - The credential field name

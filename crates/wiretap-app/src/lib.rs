@@ -1355,16 +1355,17 @@ pub fn run() {
             io::gs_usb::get_can_setup_command,
             io::gs_usb::probe_gs_usb_device,
             // Ad-hoc devices (registered for this run, never written to settings)
-            io::ephemeral::register_ephemeral_profile,
             io::ephemeral::unregister_ephemeral_profile,
             io::ephemeral::list_ephemeral_profiles,
             // Profile lifecycle
+            io::profiles::create_device,
+            io::profiles::update_device,
+            io::profiles::save_ad_hoc_device,
             io::profiles::reconfigure_device,
             sessions::clear_profile_probe_cache,
-            // Per-kind connection defaults and validation — one declaration,
-            // which the form seeds from and the readers consume.
+            // Per-kind connection defaults — one declaration, which the form
+            // seeds from and the readers consume.
             io::device_kinds::default_connection_for_kind,
-            io::device_kinds::validate_io_profile,
             // Credential storage API
             credentials::store_credential,
             credentials::get_credential,

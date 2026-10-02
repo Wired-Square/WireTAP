@@ -8,7 +8,7 @@
 //! those call sites. `settings::save_settings` drops them again on the way out,
 //! so nothing here ever reaches disk.
 //!
-//! Ids are minted frontend-side as `adhoc_<epoch_ms>`, keeping them disjoint
+//! `io::profiles::create_device` mints their ids as `adhoc_<epoch_ms>`, disjoint
 //! from the `io_<epoch_ms>` ids saved profiles use.
 
 use once_cell::sync::Lazy;
@@ -69,27 +69,6 @@ pub fn unregister(profile_id: &str) -> Vec<IOProfile> {
 }
 
 // ── Tauri commands ───────────────────────────────────────────────────────────
-
-/// Add or replace an ad-hoc device. Rejects an id already used by a saved
-/// profile, since the overlay would silently drop it.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn register_ephemeral_profile(
-    app: tauri::AppHandle,
-    profile: IOProfile,
-) -> Result<Vec<IOProfile>, String> {
-    let settings = crate::settings::load_settings(app).await?;
-    if settings
-        .io_profiles
-        .iter()
-        .any(|p| p.id == profile.id && !p.ephemeral)
-    {
-        return Err(format!(
-            "'{}' is already the id of a saved profile",
-            profile.id
-        ));
-    }
-    Ok(register(profile))
-}
 
 /// Discard an ad-hoc device. Succeeds when there was nothing to discard, and
 /// refuses while a session still holds it — dropping it then would leave that

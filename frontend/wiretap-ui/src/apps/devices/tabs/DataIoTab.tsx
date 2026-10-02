@@ -13,14 +13,14 @@ import {
 } from "../../../styles";
 import { PrimaryButton } from "../../../components/forms";
 import { useDevicesStore } from "../stores/devicesStore";
-import { useSettingsStore } from "../../settings/stores/settingsStore";
+import { addDevice, deviceWriteMessage } from "../../../settings/devices";
 import { useDeviceConnection } from "../hooks/useDeviceConnection";
 import {
   framelinkProbeDevice,
   type FrameLinkProbeResult,
   type ProbeInterface,
 } from "../../../api/framelink";
-import type { IOProfile } from "../../../hooks/useSettings";
+import type { DeviceDraft } from "../../../api/ephemeralProfiles";
 import { Alert } from "../../../components/Alert";
 import { Card } from "../../../components/Card";
 
@@ -29,7 +29,6 @@ export default function DataIoTab() {
   const selectedDeviceName = useDevicesStore((s) => s.data.selectedDeviceName);
   const selectedAddress = useDevicesStore((s) => s.data.selectedAddress);
   const selectedFrameLinkPort = useDevicesStore((s) => s.data.selectedFrameLinkPort);
-  const addProfile = useSettingsStore((s) => s.addProfile);
 
   const { ensureIpFrameLink } = useDeviceConnection();
 
@@ -69,10 +68,9 @@ export default function DataIoTab() {
   const deviceLabel =
     probeResult?.device_id ?? selectedDeviceName ?? t("frameLink.fallbackName");
 
-  const handleAddProfile = () => {
+  const handleAddProfile = async () => {
     if (!probeResult) return;
-    const profile: IOProfile = {
-      id: `io_fl_${Date.now()}`,
+    const draft: DeviceDraft = {
       name: deviceLabel,
       kind: "framelink",
       connection: {
@@ -89,8 +87,12 @@ export default function DataIoTab() {
         })),
       },
     };
-    addProfile(profile);
-    setAdded(true);
+    try {
+      await addDevice(draft, true);
+      setAdded(true);
+    } catch (e) {
+      setProbeError(deviceWriteMessage(e, (invalid) => t(`dialogs:deviceSettings.errors.${invalid.code}`, { field: invalid.field })));
+    }
   };
 
   return (

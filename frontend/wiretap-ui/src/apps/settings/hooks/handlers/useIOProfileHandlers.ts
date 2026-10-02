@@ -12,13 +12,9 @@ import type {
   MqttConnection,
   ProfileKindId,
 } from '../../../../hooks/useSettings';
-import {
-  applyConnectionDefaults,
-  newSavedProfileId,
-  storeProfileSecrets,
-} from '../../../../settings/ioProfileForm';
-import { validateIOProfile, type ValidationCode } from '../../../../api/deviceKinds';
-import { clearProfileProbeCache } from '../../../../api/ephemeralProfiles';
+import { addDevice, deviceWriteMessage, uniqueName } from '../../../../settings/devices';
+import type { ProfileValidationError, ValidationCode } from '../../../../api/deviceKinds';
+import { saveAdHocDevice, updateDevice } from '../../../../api/ephemeralProfiles';
 import { withProbedFields } from '../../../../components/io/useConnectionProbe';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { useAdHocProfileStore } from '../../../../stores/adHocProfileStore';
@@ -33,6 +29,25 @@ const VALIDATION_MESSAGES: Record<ValidationCode, string> = {
   fieldInvalid: 'Connection field "{field}" has a value the device cannot use.',
 };
 
+/** The profile with each secret it keeps in the keyring filled back in. */
+async function withStoredSecrets(profile: IOProfile): Promise<IOProfile> {
+  const secrets: Record<string, string> = {};
+  const conn = profile.connection as Record<string, unknown>;
+  for (const field of SECURE_FIELDS) {
+    if (!conn[`_${field}_stored`]) continue;
+    try {
+      const value = await getCredential(profile.id, field);
+      if (value) secrets[field] = value;
+    } catch (error) {
+      console.error(`Failed to load ${field} from keyring:`, error);
+    }
+  }
+  return { ...profile, connection: { ...profile.connection, ...secrets } } as IOProfile;
+}
+
+const validationMessage = (invalid: ProfileValidationError) =>
+  VALIDATION_MESSAGES[invalid.code].replace('{field}', invalid.field ?? '');
+
 export function useIOProfileHandlers() {
   // Store selectors
   const profiles = useSettingsStore((s) => s.ioProfiles.profiles);
@@ -40,7 +55,6 @@ export function useIOProfileHandlers() {
   const dialogPayload = useSettingsStore((s) => s.ui.dialogPayload);
 
   // Store actions
-  const addProfile = useSettingsStore((s) => s.addProfile);
   const updateProfile = useSettingsStore((s) => s.updateProfile);
   const removeProfile = useSettingsStore((s) => s.removeProfile);
   const setDefaultReadProfile = useSettingsStore((s) => s.setDefaultReadProfile);
@@ -67,28 +81,7 @@ export function useIOProfileHandlers() {
   const handleEditIOProfile = async (id: string) => {
     const profile = profiles.find((p) => p.id === id);
     if (!profile) return;
-
-    // Load secure fields from keyring into a plain record, then merge back
-    const secretOverrides: Record<string, string> = {};
-    const conn = profile.connection as Record<string, unknown>;
-    for (const field of SECURE_FIELDS) {
-      if (conn[`_${field}_stored`]) {
-        try {
-          const value = await getCredential(id, field);
-          if (value) {
-            secretOverrides[field] = value;
-          }
-        } catch (error) {
-          console.error(`Failed to load ${field} from keyring:`, error);
-        }
-      }
-    }
-
-    const connectionWithSecrets = { ...profile.connection, ...secretOverrides };
-    setDialogPayload({
-      editingProfileId: id,
-      profileForm: { ...profile, connection: connectionWithSecrets } as IOProfile,
-    });
+    setDialogPayload({ editingProfileId: id, profileForm: await withStoredSecrets(profile) });
     openDialog('ioProfile');
   };
 
@@ -126,49 +119,35 @@ export function useIOProfileHandlers() {
     setDialogPayload({ ioProfileToDelete: null });
   };
 
-  // Duplicate a profile
-  const handleDuplicateIOProfile = (profile: IOProfile) => {
-    const copy: IOProfile = {
-      ...profile,
-      id: newSavedProfileId(),
-      name: `${profile.name} (Copy)`,
-    };
-    addProfile(copy);
+  const showWriteError = (title: string, e: unknown) =>
+    showAppError(title, deviceWriteMessage(e, validationMessage));
+
+  const takenNames = (exceptId?: string) =>
+    [...profiles, ...useAdHocProfileStore.getState().profiles]
+      .filter((p) => p.id !== exceptId)
+      .map((p) => p.name);
+
+  const handleDuplicateIOProfile = async (profile: IOProfile) => {
+    const copy = await withStoredSecrets(profile);
+    try {
+      await addDevice({ ...copy, name: uniqueName(`${profile.name} (Copy)`, takenNames()) }, true);
+    } catch (e) {
+      showWriteError('Duplicate Failed', e);
+    }
   };
 
-  // Save profile (create or update)
   const handleSaveProfile = async () => {
     const { editingProfileId, profileForm } = dialogPayload;
-
-    const invalid = await validateIOProfile(profileForm);
-    if (invalid) {
-      showAppError('Validation Error', VALIDATION_MESSAGES[invalid.code].replace('{field}', invalid.field ?? ''));
-      return;
-    }
-
-    const processedForm = await applyConnectionDefaults(profileForm);
-
-    // Determine the profile ID
-    const profileId = editingProfileId || newSavedProfileId();
-
-    // Secrets go to the keyring, never into settings.json.
-    let profileToSave: IOProfile;
     try {
-      profileToSave = await storeProfileSecrets(processedForm, profileId);
+      if (editingProfileId) {
+        updateProfile(editingProfileId, await updateDevice(profileForm));
+      } else {
+        await addDevice(profileForm, true);
+      }
     } catch (e) {
-      showAppError('Credential Error', 'Failed to securely store a credential.', String(e));
+      showWriteError('Could Not Save Profile', e);
       return;
     }
-
-    if (editingProfileId) {
-      updateProfile(editingProfileId, profileToSave);
-      // The id is unchanged but the device behind it may not be, so a cached
-      // probe would describe the old one.
-      await clearProfileProbeCache(editingProfileId);
-    } else {
-      addProfile(profileToSave);
-    }
-
     closeDialog('ioProfile');
   };
 
@@ -213,18 +192,15 @@ export function useIOProfileHandlers() {
   // Promote an ad-hoc device to a saved profile, then drop it from the
   // ephemeral registry so it appears once, in the saved list.
   const handleSaveAdHocProfile = async (profile: IOProfile) => {
-    const takenNames = new Set(profiles.map((p) => p.name));
-    let name = profile.name;
-    for (let n = 2; takenNames.has(name); n++) {
-      name = `${profile.name} (${n})`;
+    const name = uniqueName(profile.name, takenNames(profile.id));
+    let saved: IOProfile;
+    try {
+      saved = await saveAdHocDevice(profile.id, name);
+    } catch (e) {
+      showWriteError('Could Not Save Profile', e);
+      return;
     }
-    // An ad-hoc device keeps its secrets inline, since it never reaches disk.
-    // Saving it does, so they move to the keyring first.
-    const toSave = await storeProfileSecrets(
-      { ...profile, name } as IOProfile,
-      newSavedProfileId(),
-    );
-    addProfile(toSave);
+    useSettingsStore.getState().addProfile(saved);
     await withAppError('Discard Failed', 'Saved, but could not clear the unsaved copy.', () =>
       useAdHocProfileStore.getState().discard(profile.id)
     );

@@ -432,10 +432,12 @@ the reader took `.unwrap_or(false)`. `transmit.rs` had it right (`true`); the
 reader was the one that disagreed, which is why the symptom was an adapter
 ACKing on a bus the user believed it was only listening to.
 
-Still to come: `applyConnectionDefaults` and `validateProfileForm`
-([src/settings/ioProfileForm.ts](../frontend/wiretap-ui/src/settings/ioProfileForm.ts)) are to seed
-from the `default_connection_for_kind` and `validate_io_profile` commands rather
-than carry their own copies.
+The form seeds from `default_connection_for_kind`. Defaults are written into a
+profile when it is stored, and validation runs there too: every device write
+(`create_device`, `update_device`, `save_ad_hoc_device`, `reconfigure_device` in
+[`io::profiles`](../crates/wiretap-app/src/io/profiles.rs)) fills blanks with
+`apply_defaults` and checks `validate_profile` against every saved and ad-hoc
+device, rejecting with a `DeviceWriteError` the form translates.
 
 ---
 
@@ -492,8 +494,8 @@ this avoids.
 Two rules hold the design up, both enforced in Rust:
 
 - **A saved profile wins an id collision** (`overlay` skips an id already
-  present), and `register_ephemeral_profile` rejects a saved id up front so the
-  collision cannot be created by accident.
+  present), and `create_device` mints both kinds of id, each with its own prefix
+  and re-drawn past any id already in use, so the collision cannot be created.
 - **An ad-hoc device cannot be discarded while a session holds it** — the
   session would be left pointing at a profile nothing can resolve. The UI hides
   the affordance; `unregister_ephemeral_profile` enforces it against races.
@@ -514,7 +516,8 @@ Changing a device's connection parameters — bitrate, baud rate, 8N1, host, por
 ```
 reconfigure_device(profile_id, connection, session_id?)
         │
-        ├─ credentials::split_secrets     secrets → keyring, markers stay
+        ├─ apply_defaults, validate       blanks filled; refused as on create
+        ├─ credentials::split_secrets     saved profiles: secrets → keyring, markers stay
         ├─ write                          settings.json, or the ephemeral registry
         ├─ clear_probe_cache              the id is unchanged; the device may not be
         └─ reload_session_source          if a session is streaming it

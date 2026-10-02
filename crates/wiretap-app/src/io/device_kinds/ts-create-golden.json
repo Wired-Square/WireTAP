@@ -1,0 +1,406 @@
+{
+  "cases": [
+    {
+      "persist": true,
+      "draft": {
+        "name": "CANable",
+        "kind": "slcan",
+        "connection": {
+          "port": "/dev/tty.usb",
+          "bitrate": "",
+          "silent_mode": false
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "CANable",
+        "kind": "slcan",
+        "connection": {
+          "port": "/dev/tty.usb",
+          "bitrate": "500000",
+          "silent_mode": false,
+          "enable_fd": false,
+          "parity": "none",
+          "data_bitrate": "2000000",
+          "stop_bits": "1",
+          "baud_rate": "115200",
+          "data_bits": "8"
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "Broker",
+        "kind": "mqtt",
+        "connection": {
+          "host": "mqtt.local",
+          "username": "u",
+          "password": "hunter2"
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "Broker",
+        "kind": "mqtt",
+        "connection": {
+          "host": "mqtt.local",
+          "username": "u",
+          "port": "1883",
+          "_password_stored": true
+        }
+      },
+      "keychain": [
+        [
+          "password",
+          "hunter2"
+        ]
+      ]
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "Gateway",
+        "kind": "wiretap",
+        "connection": {
+          "url": "",
+          "api_key": ""
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "Gateway",
+        "kind": "wiretap",
+        "connection": {
+          "url": "http://localhost:8423",
+          "database": "wiretap"
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "Gateway key",
+        "kind": "wiretap",
+        "connection": {
+          "api_key": "k-123",
+          "token": "  "
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "Gateway key",
+        "kind": "wiretap",
+        "connection": {
+          "database": "wiretap",
+          "url": "http://localhost:8423",
+          "_api_key_stored": true
+        }
+      },
+      "keychain": [
+        [
+          "api_key",
+          "k-123"
+        ]
+      ]
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "candleLight",
+        "kind": "gs_usb",
+        "connection": {
+          "bus": "3",
+          "address": null
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "candleLight",
+        "kind": "gs_usb",
+        "connection": {
+          "bus": "3",
+          "address": "0",
+          "sample_point": "87.5",
+          "data_sample_point": "75",
+          "data_bitrate": "2000000",
+          "bitrate": "500000",
+          "listen_only": true,
+          "channel": "0",
+          "enable_fd": false
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "FrameLink",
+        "kind": "framelink",
+        "connection": {
+          "host": "10.0.0.9"
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "FrameLink",
+        "kind": "framelink",
+        "connection": {
+          "host": "10.0.0.9",
+          "timeout": "5",
+          "port": "120"
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "Virtual",
+        "kind": "virtual",
+        "connection": {}
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "Virtual",
+        "kind": "virtual",
+        "connection": {
+          "bus_count": "1",
+          "loopback": true,
+          "traffic_type": "can",
+          "signal_generator": true,
+          "frame_rate_hz": "10"
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": true,
+      "draft": {
+        "name": "Serial",
+        "kind": "serial",
+        "connection": {
+          "port": "/dev/ttyUSB0",
+          "framing_encoding": "slip"
+        }
+      },
+      "id_pattern": "^io_\\d+$",
+      "profile": {
+        "name": "Serial",
+        "kind": "serial",
+        "connection": {
+          "port": "/dev/ttyUSB0",
+          "framing_encoding": "slip",
+          "stop_bits": "1",
+          "baud_rate": "115200",
+          "parity": "none",
+          "data_bits": "8"
+        }
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "CANable",
+        "kind": "slcan",
+        "connection": {
+          "port": "/dev/tty.usb",
+          "bitrate": "",
+          "silent_mode": false
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "CANable",
+        "kind": "slcan",
+        "connection": {
+          "port": "/dev/tty.usb",
+          "bitrate": "500000",
+          "silent_mode": false,
+          "enable_fd": false,
+          "parity": "none",
+          "data_bitrate": "2000000",
+          "stop_bits": "1",
+          "baud_rate": "115200",
+          "data_bits": "8"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "Broker",
+        "kind": "mqtt",
+        "connection": {
+          "host": "mqtt.local",
+          "username": "u",
+          "password": "hunter2"
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "Broker",
+        "kind": "mqtt",
+        "connection": {
+          "host": "mqtt.local",
+          "username": "u",
+          "password": "hunter2",
+          "port": "1883"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "Gateway",
+        "kind": "wiretap",
+        "connection": {
+          "url": "",
+          "api_key": ""
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "Gateway",
+        "kind": "wiretap",
+        "connection": {
+          "url": "http://localhost:8423",
+          "api_key": "",
+          "database": "wiretap"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "Gateway key",
+        "kind": "wiretap",
+        "connection": {
+          "api_key": "k-123",
+          "token": "  "
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "Gateway key",
+        "kind": "wiretap",
+        "connection": {
+          "api_key": "k-123",
+          "token": "  ",
+          "database": "wiretap",
+          "url": "http://localhost:8423"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "candleLight",
+        "kind": "gs_usb",
+        "connection": {
+          "bus": "3",
+          "address": null
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "candleLight",
+        "kind": "gs_usb",
+        "connection": {
+          "bus": "3",
+          "address": "0",
+          "sample_point": "87.5",
+          "data_sample_point": "75",
+          "data_bitrate": "2000000",
+          "bitrate": "500000",
+          "listen_only": true,
+          "channel": "0",
+          "enable_fd": false
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "FrameLink",
+        "kind": "framelink",
+        "connection": {
+          "host": "10.0.0.9"
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "FrameLink",
+        "kind": "framelink",
+        "connection": {
+          "host": "10.0.0.9",
+          "timeout": "5",
+          "port": "120"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "Virtual",
+        "kind": "virtual",
+        "connection": {}
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "Virtual",
+        "kind": "virtual",
+        "connection": {
+          "bus_count": "1",
+          "loopback": true,
+          "traffic_type": "can",
+          "signal_generator": true,
+          "frame_rate_hz": "10"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    },
+    {
+      "persist": false,
+      "draft": {
+        "name": "Serial",
+        "kind": "serial",
+        "connection": {
+          "port": "/dev/ttyUSB0",
+          "framing_encoding": "slip"
+        }
+      },
+      "id_pattern": "^adhoc_\\d+$",
+      "profile": {
+        "name": "Serial",
+        "kind": "serial",
+        "connection": {
+          "port": "/dev/ttyUSB0",
+          "framing_encoding": "slip",
+          "stop_bits": "1",
+          "baud_rate": "115200",
+          "parity": "none",
+          "data_bits": "8"
+        },
+        "ephemeral": true
+      },
+      "keychain": []
+    }
+  ]
+}

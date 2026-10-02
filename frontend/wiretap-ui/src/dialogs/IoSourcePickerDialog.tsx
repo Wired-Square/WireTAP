@@ -72,10 +72,10 @@ import {
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import type { InterfaceFramingConfig } from "./io-source-picker";
 import { DeviceEditor } from "./io-source-picker";
-import { useAdHocProfileStore, newAdHocProfileId } from "../stores/adHocProfileStore";
+import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
-import { useSettingsStore } from "../apps/settings/stores/settingsStore";
-import { newSavedProfileId, storeProfileSecrets } from "../settings/ioProfileForm";
+import { addDevice } from "../settings/devices";
+import type { DeviceDraft } from "../api/ephemeralProfiles";
 import { withAppError } from "../utils/appError";
 
 /** Options passed when starting a load or connect operation */
@@ -377,10 +377,8 @@ export default function IoSourcePickerDialog({
   // Creating a device is a picker concern (it needs the kind, the name, and
   // the connect that follows). Editing one is not — that is the shared dialog.
   const [creatingDevice, setCreatingDevice] = useState(false);
-  const registerAdHocProfile = useAdHocProfileStore((s) => s.register);
   const openDeviceSettings = useDeviceEditorStore((s) => s.open);
   const discardAdHocProfile = useAdHocProfileStore((s) => s.discard);
-  const addSettingsProfile = useSettingsStore((s) => s.addProfile);
 
   // The sources about to start, whichever way they were picked. Single-select
   // keeps `checkedSourceId` and clears the array, so reading only the array
@@ -1054,23 +1052,9 @@ export default function IoSourcePickerDialog({
     onClose();
   };
 
-  /** Connect using an ad-hoc device: registered for this run, never persisted. */
-  const handleUseAdHocDevice = async (profile: IOProfile) => {
-    const adHocId = newAdHocProfileId();
-    await registerAdHocProfile({ ...profile, id: adHocId } as IOProfile);
-    await startDeviceSession(adHocId, null);
-  };
-
-  /** Persist the device to Settings, then connect to it. */
-  const handleSaveDevice = async (profile: IOProfile) => {
-    const profileId = newSavedProfileId();
-    // Secrets go to the keyring, never into settings.json.
-    addSettingsProfile(await storeProfileSecrets(profile, profileId));
-
-    // Flush past the store's save debounce: the backend re-reads settings.json
-    // when the session opens, so an unwritten profile would not be found.
-    await useSettingsStore.getState().saveSettings();
-    await startDeviceSession(profileId, null);
+  const handleCreateDevice = async (draft: DeviceDraft, persist: boolean) => {
+    const device = await addDevice(draft, persist);
+    await startDeviceSession(device.id, null);
   };
 
   const handleEditDevice = (profileId: string) => {
@@ -1639,8 +1623,7 @@ export default function IoSourcePickerDialog({
           <div className="max-h-[70vh] overflow-y-auto">
             <DeviceEditor
               onCancel={() => setCreatingDevice(false)}
-              onUseAdHoc={handleUseAdHocDevice}
-              onSave={handleSaveDevice}
+              onCreate={handleCreateDevice}
             />
           </div>
         ) : (

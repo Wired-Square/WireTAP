@@ -15,8 +15,8 @@
 //!   Read time, not write time: a default written into settings.json stops
 //!   being a default, and changing one in a later release would then apply only
 //!   to profiles created after the change — the drift this module exists to
-//!   kill. [`apply_defaults`] is for seeding a *new* profile's map, where the
-//!   values are meant to be written.
+//!   kill. [`apply_defaults`] is the exception: the device write path stores a
+//!   profile with its defaults, because the frontend reads the map directly.
 //! - **The form seeds from this table**, via the `default_connection_for_kind`
 //!   command, rather than carrying its own copy. Pre-filling a form is
 //!   presentation and stays in TypeScript; the *values* do not.
@@ -308,20 +308,30 @@ pub fn default_connection(kind: &str) -> HashMap<String, serde_json::Value> {
         .unwrap_or_default()
 }
 
-/// Fill in the values a kind needs to connect at all, leaving anything the
-/// caller supplied alone. Idempotent, and safe on an unknown kind.
+/// Fill each field the caller left absent, null or blank with the kind's
+/// default, numbers spelled as strings the way the form writes them. Idempotent,
+/// and safe on an unknown kind.
 ///
-/// For **seeding a new profile**, not for reading one: the accessors already
-/// fall back to the table, so a reader needs no materialisation, and a
-/// materialised map that reaches `save_settings` freezes today's defaults into
-/// the file.
+/// Only the device write path (`io::profiles`) calls this: a profile is stored
+/// with its defaults, because the frontend reads connection maps directly
+/// (P1-6). Readers here still go through the accessors.
 pub fn apply_defaults(profile: &mut IOProfile) {
     let Some(spec) = spec(&profile.kind) else {
         return;
     };
     for (key, val) in spec.defaults {
-        if !profile.connection.contains_key(*key) {
-            profile.connection.insert((*key).to_string(), val.to_json());
+        let blank = match profile.connection.get(*key) {
+            None | Some(serde_json::Value::Null) => true,
+            Some(serde_json::Value::String(s)) => s.is_empty(),
+            Some(_) => false,
+        };
+        if blank {
+            let form_value = match val {
+                Val::Int(n) => serde_json::Value::from(n.to_string()),
+                Val::Float(f) => serde_json::Value::from(f.to_string()),
+                _ => val.to_json(),
+            };
+            profile.connection.insert((*key).to_string(), form_value);
         }
     }
 }
@@ -583,19 +593,6 @@ pub fn default_connection_for_kind(kind: String) -> HashMap<String, serde_json::
     default_connection(&kind)
 }
 
-/// Check a device against the same rules the write path enforces.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn validate_io_profile(
-    app: tauri::AppHandle,
-    profile: IOProfile,
-) -> Result<Option<ProfileValidationError>, String> {
-    // No `apply_defaults` here: `defaults_and_required_are_disjoint` pins that a
-    // required field never has one, so it could only mutate a profile the caller
-    // is about to save.
-    let settings = crate::settings::load_settings(app).await?;
-    Ok(validate_profile(&profile, &settings.io_profiles).err())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,7 +677,7 @@ mod tests {
         apply_defaults(&mut p);
         assert_eq!(once, p.connection);
         assert_eq!(p.connection["bitrate"], serde_json::Value::from("250000"));
-        assert_eq!(p.connection["baud_rate"], serde_json::Value::from(115_200));
+        assert_eq!(p.connection["baud_rate"], serde_json::Value::from("115200"));
     }
 
     /// The values that had drifted between the two languages, pinned by name so

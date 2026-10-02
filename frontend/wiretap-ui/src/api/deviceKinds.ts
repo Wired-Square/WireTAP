@@ -28,11 +28,6 @@ export function defaultConnectionForKind(kind: string): Promise<ConnectionDefaul
   return defaults;
 }
 
-/** Check a device against every saved and ad-hoc one; null when it is good. */
-export function validateIOProfile(profile: IOProfile): Promise<ProfileValidationError | null> {
-  return invoke<ProfileValidationError | null>("validate_io_profile", { profile });
-}
-
 /** Every kind's traits in kind-picker order, and every saved or ad-hoc profile's. */
 export function listProfileTraits(): Promise<ProfileTraitsTable> {
   return invoke<ProfileTraitsTable>("list_profile_traits");

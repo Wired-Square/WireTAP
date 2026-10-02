@@ -22,18 +22,16 @@ import {
 } from "../../components/forms";
 import IOConnectionFields from "../../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../../components/io/useConnectionProbe";
-import { applyConnectionDefaults } from "../../settings/ioProfileForm";
-import { validateIOProfile } from "../../api/deviceKinds";
+import { deviceWriteMessage } from "../../settings/devices";
+import type { DeviceDraft } from "../../api/ephemeralProfiles";
 import { isRealtime, useAvailableKinds } from "../../stores/profileBusStore";
 import type { IOProfile, ConnectionFieldValue, ProfileKindId } from "../../hooks/useSettings";
 import { Alert } from "../../components/Alert";
 
 export interface DeviceEditorProps {
   onCancel: () => void;
-  /** Connect using an ad-hoc device, registered for this run only. */
-  onUseAdHoc: (profile: IOProfile) => Promise<void>;
-  /** Persist the device to Settings, then connect. */
-  onSave: (profile: IOProfile) => Promise<void>;
+  /** Create the device — saved to Settings when `persist`, else ad-hoc — then connect. */
+  onCreate: (draft: DeviceDraft, persist: boolean) => Promise<void>;
 }
 
 /** A readable default name, so an ad-hoc device needs no typing to connect. */
@@ -45,8 +43,7 @@ function autoName(profile: IOProfile, kindLabel: string): string {
 
 export default function DeviceEditor({
   onCancel,
-  onUseAdHoc,
-  onSave,
+  onCreate,
 }: DeviceEditorProps) {
   const { t } = useTranslation("dialogs");
   const platform = usePlatformInfo();
@@ -95,24 +92,18 @@ export default function DeviceEditor({
 
   const commit = useCallback(
     async (persist: boolean) => {
-      // The draft with its name and per-kind defaults settled.
-      const resolved = await applyConnectionDefaults({ ...draft, name: effectiveName } as IOProfile);
-      const invalid = await validateIOProfile(resolved);
-      if (invalid) {
-        setError(t(`ioSourcePicker.deviceEditor.errors.${invalid.code}`, { field: invalid.field }));
-        return;
-      }
       setError(null);
       setBusy(true);
       try {
-        await (persist ? onSave(resolved) : onUseAdHoc(resolved));
+        await onCreate({ ...draft, name: effectiveName }, persist);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(deviceWriteMessage(e, (invalid) =>
+          t(`ioSourcePicker.deviceEditor.errors.${invalid.code}`, { field: invalid.field })));
       } finally {
         setBusy(false);
       }
     },
-    [draft, effectiveName, onSave, onUseAdHoc, t],
+    [draft, effectiveName, onCreate, t],
   );
 
   return (

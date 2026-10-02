@@ -18,8 +18,7 @@ import IOConnectionFields from "../components/io/IOConnectionFields";
 import { useConnectionProbe, usePlatformInfo } from "../components/io/useConnectionProbe";
 import { PrimaryButton, SecondaryButton } from "../components/forms";
 import { reconfigureDevice } from "../api/ephemeralProfiles";
-import { applyConnectionDefaults } from "../settings/ioProfileForm";
-import { validateIOProfile } from "../api/deviceKinds";
+import { deviceWriteMessage } from "../settings/devices";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
@@ -77,11 +76,14 @@ function DeviceSettingsForm({
 
   // Laid over the stored connection, not the draft, so the draft's other edits
   // wait for Apply.
+  const describeWriteError = useCallback((e: unknown) => deviceWriteMessage(e, (invalid) =>
+    t(`deviceSettings.errors.${invalid.code}`, { field: invalid.field })), [t]);
+
   const persistProbe = useCallback((fields: Record<string, unknown>) => {
     reconfigureDevice(profile.id, { ...profile.connection, ...fields }).catch((e) =>
-      setError(e instanceof Error ? e.message : String(e)),
+      setError(describeWriteError(e)),
     );
-  }, [profile.id, profile.connection]);
+  }, [profile.id, profile.connection, describeWriteError]);
 
   const probe = useConnectionProbe({
     profile: draft,
@@ -96,30 +98,17 @@ function DeviceSettingsForm({
   });
 
   const apply = useCallback(async () => {
-    // The same defaults and rejections a device gets when it is created, so the
-    // two surfaces cannot disagree about what a valid device is.
-    const resolved = await applyConnectionDefaults(draft);
-    const invalid = await validateIOProfile(resolved);
-    if (invalid) {
-      setError(t(`deviceSettings.errors.${invalid.code}`, { field: invalid.field }));
-      return;
-    }
-
     setError(null);
     setBusy(true);
     try {
-      await reconfigureDevice(
-        profile.id,
-        resolved.connection as Record<string, unknown>,
-        sessionId,
-      );
+      await reconfigureDevice(profile.id, draft.connection as Record<string, unknown>, sessionId);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeWriteError(e));
     } finally {
       setBusy(false);
     }
-  }, [profile.id, draft, sessionId, onClose, t]);
+  }, [profile.id, draft, sessionId, onClose, describeWriteError]);
 
   return (
     <Dialog isOpen onClose={busy ? undefined : onClose} size="lg">

@@ -24,7 +24,6 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(async () => {}),
 }));
 
-const { applyConnectionDefaults } = await import("../settings/ioProfileForm");
 const { modbusConnectionOf } = await import("../utils/modbusProfiles");
 const { default: IOConnectionFields } = await import("../components/io/IOConnectionFields");
 
@@ -34,17 +33,6 @@ const slcan = (connection: Record<string, unknown>) =>
   ({ id: "", name: "CANable", kind: "slcan", connection }) as IOProfile;
 
 describe("connection defaults from Rust", () => {
-  it("fill only the blank fields, spelled as the form writes them", async () => {
-    const filled = await applyConnectionDefaults(slcan({ port: "/dev/tty.usb", bitrate: "", silent_mode: false }));
-    expect(filled.connection).toMatchObject({
-      port: "/dev/tty.usb",
-      baud_rate: "230400",
-      bitrate: "250000",
-      silent_mode: false,
-      parity: "none",
-    });
-  });
-
   it("give a Modbus profile without a host the table's host, not 127.0.0.1", () => {
     expect(modbusConnectionOf({ connection: {} }, served.modbus_tcp)).toEqual({
       host: "192.168.1.100",

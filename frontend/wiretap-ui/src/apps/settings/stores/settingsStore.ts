@@ -931,11 +931,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     scheduleSave(get().saveSettings);
   },
 
+  // Replaces by id: the rebase on the backend's write can land before the caller does.
   addProfile: (profile) => {
     set((state) => ({
       ioProfiles: {
         ...state.ioProfiles,
-        profiles: [...state.ioProfiles.profiles, profile],
+        profiles: [...state.ioProfiles.profiles.filter((p) => p.id !== profile.id), profile],
       },
     }));
     scheduleSave(get().saveSettings);
