@@ -600,66 +600,6 @@ export async function stepCaptureFrame(
 }
 
 /**
- * Payload sent when a session is suspended (stopped with capture available).
- */
-export interface SessionSuspendedPayload {
-  /** ID of the session's capture */
-  capture_id: string | null;
-  /** Number of items in the capture */
-  capture_count: number;
-  /** Capture kind: "frames" or "bytes" */
-  capture_kind: "frames" | "bytes" | null;
-  /** Time range of captured data [first_us, last_us] or null if empty */
-  time_range: [number, number] | null;
-}
-
-/**
- * Payload emitted when a realtime session is stopped and switched to capture replay.
- * All subscribers on the session receive this event and should transition to capture mode.
- */
-export interface SessionSwitchedToCapturePayload {
-  /** ID of the session's capture */
-  capture_id: string | null;
-  /** Number of items in the capture */
-  capture_count: number;
-  /** Capture kind: "frames" or "bytes" */
-  capture_kind: "frames" | "bytes" | null;
-  /** Time range of captured data [first_us, last_us] or null if empty */
-  time_range: [number, number] | null;
-  /** New capabilities after switching to CaptureSource */
-  capabilities: IOCapabilities;
-}
-
-/**
- * Payload sent when a session is resuming with a new capture.
- * Apps should clear their frame lists when receiving this event.
- */
-export interface SessionResumingPayload {
-  /** ID of the new capture being created */
-  new_capture_id: string;
-  /** ID of the old capture that was orphaned (available for standalone viewing) */
-  orphaned_capture_id: string | null;
-}
-
-/**
- * Payload sent when a session's source is replaced in-place.
- * The session ID and all subscribers are preserved.
- * Event name: session-source-replaced:{sessionId}
- */
-export interface SourceReplacedPayload {
-  /** Previous source type (e.g., "realtime", "capture") */
-  previous_source_type: string;
-  /** New source type */
-  new_source_type: string;
-  /** New capabilities after the swap */
-  capabilities: IOCapabilities;
-  /** New IO state after the swap */
-  state: string;
-  /** Context hint for the frontend ("capture", "live", "reinitialize") */
-  transition: string;
-}
-
-/**
  * Transition an existing session to use a capture for replay.
  * This is used after a streaming source (GVRET, the WireTAP backend) ends to replay captured frames.
  * @param sessionId The session ID

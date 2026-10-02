@@ -40,10 +40,6 @@ import {
   type IOCapabilities,
   type IOStateType,
   type StreamEndedInfo,
-  type SessionSuspendedPayload,
-  type SessionSwitchedToCapturePayload,
-  type SessionResumingPayload,
-  type SourceReplacedPayload,
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
@@ -52,7 +48,7 @@ import {
 import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
 import type { SessionLifecyclePayload } from "../generated/SessionLifecyclePayload";
-import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
+import type { AdhocSignalsMsg, DecodedSignalsEntry, SessionTransitionMsg } from "../services/wsProtocol";
 
 // ============================================================================
 // Local Session State Type
@@ -187,13 +183,11 @@ export interface UseIOSessionOptions {
   /** Callback when session is reconfigured (e.g., event jump) - apps should clear their state */
   onReconfigure?: () => void;
   /** Callback when session is suspended (stopped with capture available) */
-  onSuspended?: (payload: SessionSuspendedPayload) => void;
+  onSuspended?: (payload: SessionTransitionMsg) => void;
   /** Callback when session is stopped and switched to capture replay (all listeners transition) */
-  onSwitchedToCapture?: (payload: SessionSwitchedToCapturePayload) => void;
-  /** Callback when session is resuming with a new capture - apps should clear their frame lists */
-  onResuming?: (payload: SessionResumingPayload) => void;
-  /** Callback when the session's device is replaced in-place (caps/state change, listeners preserved) */
-  onSourceReplaced?: (payload: SourceReplacedPayload) => void;
+  onSwitchedToCapture?: (payload: SessionTransitionMsg) => void;
+  /** Callback when session is resuming or returning to live - apps should clear their frame lists */
+  onResuming?: (payload: SessionTransitionMsg) => void;
   /**
    * Callback when session is destroyed externally (e.g., from Session Manager or
    * last-subscriber auto-destroy). Never fires for a session this hook has moved
@@ -361,7 +355,6 @@ export function useIOSession(
     onSuspended,
     onSwitchedToCapture,
     onResuming,
-    onSourceReplaced,
     onDestroyed,
   } = options;
 
@@ -444,7 +437,6 @@ export function useIOSession(
     onSuspended,
     onSwitchedToCapture,
     onResuming,
-    onSourceReplaced,
     onDestroyed,
   });
   useEffect(() => {
@@ -461,10 +453,9 @@ export function useIOSession(
       onSuspended,
       onSwitchedToCapture,
       onResuming,
-      onSourceReplaced,
       onDestroyed,
     };
-  }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
+  }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onDestroyed]);
 
   // ---- Sync session store → localState ----
   // The session store receives WS push messages (SessionState, SessionLifecycle,
@@ -769,7 +760,6 @@ export function useIOSession(
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
           onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-          onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
         tlog.debug(`[useIOSession:${appName}] registerCallbacks completed`);
 
@@ -1167,7 +1157,6 @@ export function useIOSession(
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
           onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-          onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
 
         // Update local state after reinitialize
@@ -1271,7 +1260,6 @@ export function useIOSession(
         onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
         onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
         onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-        onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

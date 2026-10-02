@@ -70,4 +70,6 @@ export const STREAM_END_REASONS = ["complete", "disconnected", "error", "stopped
 
 export const SESSION_ERROR_SEVERITIES = ["fault", "routine"] as const;
 
+export const SESSION_TRANSITIONS = ["suspended", "switched_to_capture", "resuming", "returned_to_live", "capabilities_changed"] as const;
+
 export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";

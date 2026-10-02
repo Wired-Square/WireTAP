@@ -4,7 +4,7 @@
 // Uses DataView for zero-copy access to ArrayBuffer messages.
 
 import type { FrameMessage } from "../types/frame";
-import type { IOCapabilities, PlaybackPosition, StreamEndedInfo } from "../api/io";
+import type { IOCapabilities, IOStateType, PlaybackPosition, StreamEndedInfo } from "../api/io";
 import type { CaptureKind } from "../generated/CaptureKind";
 import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
 import { trackAlloc } from "./memoryDiag";
@@ -17,6 +17,7 @@ import {
   PROTOCOL_VERSION,
   SESSION_ERROR_SEVERITIES,
   SESSION_STATES,
+  SESSION_TRANSITIONS,
   STREAM_END_REASONS,
   StreamEndedFlags,
 } from "../generated/wireConstants";
@@ -421,32 +422,39 @@ export function decodeTransmitUpdated(payload: DataView): { count: number } {
   return { count: Number(payload.getBigInt64(0, true)) };
 }
 
-const sharedLifecycleDecoder = new TextDecoder();
+export type SessionTransition = (typeof SESSION_TRANSITIONS)[number];
 
-/** Decode scoped SessionLifecycle payload: state (u8) + capabilities (JSON). */
-export function decodeScopedSessionLifecycle(payload: DataView): {
-  stateType: string;
+/** A session's scoped SessionLifecycle message: what happened, and where it left the session. */
+export interface SessionTransitionMsg {
+  transition: SessionTransition;
+  state: IOStateType;
   capabilities: IOCapabilities | null;
-} {
-  if (payload.byteLength < 3) {
-    return { stateType: "stopped", capabilities: null };
-  }
+  /** The capture the session finished with, for a suspend or a switch to capture. */
+  capture_id: string | null;
+  capture_count: number;
+}
 
-  const stateByte = payload.getUint8(0);
-  const stateType = SESSION_STATES[stateByte] ?? "stopped";
-
-  const jsonLen = payload.getUint16(1, true);
+// Wire format (matches Rust encode_session_transition in ws/protocol.rs): state u8,
+// transition u8, length-prefixed capabilities JSON, length-prefixed capture id (empty
+// for none), capture count u32 LE. An unknown transition reads as capabilities_changed.
+export function decodeSessionTransition(payload: DataView): SessionTransitionMsg {
+  const state = (SESSION_STATES[payload.getUint8(0)] ?? "stopped") as IOStateType;
+  const transition = SESSION_TRANSITIONS[payload.getUint8(1)] ?? "capabilities_changed";
+  const [json, idOffset] = decodeLengthPrefixedStr(payload, 2);
+  const [captureId, countOffset] = decodeLengthPrefixedStr(payload, idOffset);
   let capabilities: IOCapabilities | null = null;
-  if (jsonLen > 0 && 3 + jsonLen <= payload.byteLength) {
-    const jsonBytes = new Uint8Array(payload.buffer, payload.byteOffset + 3, jsonLen);
-    try {
-      capabilities = JSON.parse(sharedLifecycleDecoder.decode(jsonBytes));
-    } catch {
-      // Malformed JSON
-    }
+  try {
+    capabilities = JSON.parse(json);
+  } catch {
+    // Malformed JSON
   }
-
-  return { stateType, capabilities };
+  return {
+    transition,
+    state,
+    capabilities,
+    capture_id: captureId || null,
+    capture_count: payload.getUint32(countOffset, true),
+  };
 }
 
 // ============================================================================

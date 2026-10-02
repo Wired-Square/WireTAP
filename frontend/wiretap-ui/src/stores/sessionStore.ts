@@ -38,10 +38,6 @@ import {
   type IOState,
   type InterfaceFramingConfig,
   type StreamEndedInfo,
-  type SessionSuspendedPayload,
-  type SessionSwitchedToCapturePayload,
-  type SessionResumingPayload,
-  type SourceReplacedPayload,
   type CanTransmitFrame,
   type TransmitResult,
   type CreateIOSessionOptions,
@@ -80,7 +76,9 @@ import {
   decodeFrameCounts,
   decodeByteCounts,
   decodeCaptureChanged,
-  decodeScopedSessionLifecycle,
+  decodeSessionTransition,
+  type SessionTransition,
+  type SessionTransitionMsg,
 } from "../services/wsProtocol";
 
 /** Stream-end reasons that mean something other than a plain stop. */
@@ -314,13 +312,11 @@ export interface SessionCallbacks {
   /** Called when session is reconfigured (e.g., event jump) - apps should clear state */
   onReconfigure?: (payload: SessionReconfiguredPayload) => void;
   /** Called when session is suspended (stopped with capture available) */
-  onSuspended?: (payload: SessionSuspendedPayload) => void;
+  onSuspended?: (payload: SessionTransitionMsg) => void;
   /** Called when session is stopped and switched to capture replay (all subscribers transition) */
-  onSwitchedToCapture?: (payload: SessionSwitchedToCapturePayload) => void;
-  /** Called when session is resuming with a new capture - apps should clear their frame lists */
-  onResuming?: (payload: SessionResumingPayload) => void;
-  /** Called when the session's device is replaced in-place (caps/state change, subscribers preserved) */
-  onSourceReplaced?: (payload: SourceReplacedPayload) => void;
+  onSwitchedToCapture?: (payload: SessionTransitionMsg) => void;
+  /** Called when session is resuming or returning to live - apps should clear their frame lists */
+  onResuming?: (payload: SessionTransitionMsg) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -503,6 +499,47 @@ function emptyCapture(id: string | null = null, owningSessionId: string | null =
     name: null,
     persistent: false,
   };
+}
+
+const TRANSITION_CALLBACK = {
+  suspended: "onSuspended",
+  switched_to_capture: "onSwitchedToCapture",
+  resuming: "onResuming",
+  returned_to_live: "onResuming",
+  capabilities_changed: null,
+} as const satisfies Record<SessionTransition, keyof SessionCallbacks | null>;
+
+/** What a pushed transition does to the session's entry, and which callback it fires. */
+export function sessionTransitionEffect(msg: SessionTransitionMsg, session: Session | undefined, sessionId: string) {
+  const updates: Partial<Session> = { ioState: msg.state };
+  if (msg.capabilities) updates.capabilities = msg.capabilities;
+  switch (msg.transition) {
+    case "resuming":
+    case "returned_to_live":
+      // A fresh run has a fresh capture; Rust re-pushes the counts and the byte capture id.
+      Object.assign(updates, {
+        stoppedExplicitly: false,
+        streamEndedReason: null,
+        frameCount: 0,
+        uniqueFrameCount: 0,
+        byteCount: 0,
+        bytesCaptureId: null,
+        capture: emptyCapture(null, sessionId),
+      });
+      break;
+    case "suspended":
+    case "switched_to_capture":
+      if (msg.capture_id) {
+        updates.capture = {
+          ...(session?.capture ?? emptyCapture(null, sessionId)),
+          available: msg.capture_count > 0,
+          id: msg.capture_id,
+          count: msg.capture_count,
+        };
+      }
+      break;
+  }
+  return { updates, callback: TRANSITION_CALLBACK[msg.transition] };
 }
 
 function invokeCallbacks<A extends unknown[]>(
@@ -729,104 +766,13 @@ async function setupSessionEventSubscribers(
       })
     );
 
-    // SessionLifecycle (0x08) — state + capabilities decoded from binary payload
+    // SessionLifecycle (0x08) — the transition Rust made, with the state and capabilities it left
     eventListeners.wsUnlistenFunctions.push(
       wsTransport.onSessionMessage(sessionId, MsgType.SessionLifecycle, (payload) => {
-        const { stateType, capabilities } = decodeScopedSessionLifecycle(payload);
-        const prevSession = useSessionStore.getState().sessions[sessionId];
-        const prevState = prevSession?.ioState;
-
-        const updates: Partial<Session> = { ioState: stateType as Session["ioState"] };
-        if (capabilities) {
-          updates.capabilities = capabilities;
-        }
-
-        const isNowRunning = stateType === "running" || stateType === "starting";
-        const wasStoppedOrPaused = prevState === "stopped" || prevState === "paused";
-        const isNowStopped = stateType === "stopped";
-
-        if (isNowRunning && wasStoppedOrPaused) {
-          updates.stoppedExplicitly = false;
-          updates.streamEndedReason = null;
-          // Restarting the same session id starts a fresh capture, so the counts and the
-          // byte capture id from the previous run are stale. Rust re-pushes both on its
-          // next signal; zero them meanwhile so nothing reads the old run's totals.
-          updates.frameCount = 0;
-          updates.uniqueFrameCount = 0;
-          updates.byteCount = 0;
-          updates.bytesCaptureId = null;
-          updates.capture = {
-            available: false,
-            id: null,
-            kind: null,
-            count: 0,
-            owningSessionId: sessionId,
-            startTimeUs: null,
-            endTimeUs: null,
-            name: null,
-            persistent: false,
-          };
-          updateSession(sessionId, updates);
-          invokeCallbacks(eventListeners, "onResuming", { new_capture_id: "", orphaned_capture_id: null });
-        } else if (isNowStopped && capabilities?.traits.temporal_mode === "capture") {
-          updateSession(sessionId, updates);
-          invokeCallbacks(eventListeners, "onSwitchedToCapture", {
-            capture_id: prevSession?.capture?.id ?? null,
-            capture_count: prevSession?.capture?.count ?? 0,
-            capture_kind: prevSession?.capture?.kind ?? null,
-            time_range: null,
-            capabilities,
-          });
-          // Refresh capture fields from backend — after a live→capture transition
-          // (e.g. stopAndSwitchToCapture), StreamEnded may not have landed yet or
-          // may have been clobbered by an intermediate `running` lifecycle blip
-          // that resets capture to zeros at line 619. Fetch fresh metadata so
-          // session.capture.count reflects reality for the tooltip/Tools button.
-          const captureId = prevSession?.capture?.id ?? null;
-          if (captureId) {
-            import("../api/capture").then(({ getCaptureMetadataById }) =>
-              getCaptureMetadataById(captureId).then((meta) => {
-                if (meta) {
-                  const currentSession = useSessionStore.getState().sessions[sessionId];
-                  if (currentSession) {
-                    updateSession(sessionId, {
-                      capture: {
-                        ...currentSession.capture,
-                        available: true,
-                        id: meta.id,
-                        kind: meta.kind,
-                        count: meta.count,
-                        startTimeUs: meta.start_time_us,
-                        endTimeUs: meta.end_time_us,
-                        name: meta.name,
-                        persistent: meta.persistent,
-                      },
-                    });
-                  }
-                }
-              }).catch(() => {/* ignore */})
-            );
-          }
-        } else if (isNowStopped) {
-          updateSession(sessionId, updates);
-          invokeCallbacks(eventListeners, "onSuspended", {
-            capture_id: prevSession?.capture?.id ?? null,
-            capture_count: prevSession?.capture?.count ?? 0,
-            capture_kind: prevSession?.capture?.kind ?? null,
-            time_range: null,
-          });
-        } else {
-          updateSession(sessionId, updates);
-          if (capabilities) {
-            invokeCallbacks(eventListeners, "onSourceReplaced", {
-              previous_source_type: "",
-              new_source_type: "",
-              capabilities,
-              state: stateType,
-              transition: "",
-            });
-          }
-        }
+        const msg = decodeSessionTransition(payload);
+        const { updates, callback } = sessionTransitionEffect(msg, useSessionStore.getState().sessions[sessionId], sessionId);
+        updateSession(sessionId, updates);
+        if (callback) invokeCallbacks(eventListeners, callback, msg);
       })
     );
   }

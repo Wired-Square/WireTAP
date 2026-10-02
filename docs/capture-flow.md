@@ -227,13 +227,16 @@ stop_and_switch_to_capture(session_id, speed)
             ...
         )
             └─ session continues on historical data; all listeners receive
-               a SessionLifecycle WS message with the new capabilities.
+               a SessionLifecycle WS message (switched_to_capture, with the
+               capture id, count and new capabilities).
 ```
 
 ### Resume to live
 
 A new `IOBroker` is built from the session's retained `source_configs`
-and swapped in via `replace_session_source(..., auto_start=true)`. The orphaned
+and swapped in via `replace_session_source(..., ReturnedToLive, ...)`, which sends
+`returned_to_live` and then starts it, so joined apps clear before the first live
+frame; a failed start follows as the error state. The orphaned
 historical capture remains in the registry and can be re-selected later from
 the source picker.
 

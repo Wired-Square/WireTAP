@@ -1235,7 +1235,7 @@ Per-session (channel 1..254):
 | `PlaybackPosition`  | 0x05 | timestamp_us / frame_index / frame_count |
 | `DeviceConnected`   | 0x06 | A source inside a multi-source session connected |
 | `CaptureChanged`    | 0x07 | Capture created/orphaned; frontend re-fetches |
-| `SessionLifecycle`  | 0x08 | State + capabilities inline; covers device-replaced, resuming, switched-to-capture |
+| `SessionLifecycle`  | 0x08 | The transition Rust made (`SESSION_TRANSITIONS`: suspended, switched_to_capture, resuming, returned_to_live, capabilities_changed), with the state, capabilities and the capture id + count it finished with |
 | `SessionInfo`       | 0x09 | Speed, subscriber count |
 | `Reconfigured`      | 0x0A | Session was reconfigured (time range, event jump) |
 | `DecodedSignals`    | 0x14 | JSON batch of decoded signals, pushed alongside `FrameData` when a catalogue is attached (see [§ Decoded-signal stream](#decoded-signal-stream)) |

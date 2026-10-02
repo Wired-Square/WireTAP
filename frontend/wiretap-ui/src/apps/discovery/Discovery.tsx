@@ -298,7 +298,7 @@ function DiscoveryInner() {
 
   // Handle session suspended (from any app sharing this session)
   // This fetches capture metadata and frame info so Discovery can show timeline controls
-  const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
+  const handleSessionSuspended = useCallback(async (payload: import("../../services/wsProtocol").SessionTransitionMsg) => {
     if (payload.capture_count > 0 && payload.capture_id) {
       const meta = await getCaptureMetadata(payload.capture_id);
       if (meta) {

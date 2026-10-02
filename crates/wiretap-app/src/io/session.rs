@@ -13,8 +13,8 @@ use super::roster::{
 };
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
-    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader, ReplaceSourceOptions,
-    SessionLifecyclePayload, SourceConfig, SourceReplacedPayload, TransmitPayload, TransmitResult,
+    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader,
+    SessionLifecyclePayload, SessionTransition, SessionTransitionPayload, SourceConfig, TransmitPayload, TransmitResult,
     VirtualBusState, CAPTURE_SOURCE_TYPE,
 };
 use crate::{capture_store, sessions};
@@ -161,6 +161,20 @@ async fn transition(session_id: &str, session: &mut IOSession, to: Transition) -
 /// Emit a state change event for a session
 fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
     crate::ws::dispatch::send_session_state(session_id, current);
+}
+
+fn emit_transition(session_id: &str, session: &IOSession, transition: SessionTransition, capture_id: Option<String>) {
+    let capture_count = capture_id.as_deref().map_or(0, capture_store::get_capture_count);
+    crate::ws::dispatch::send_session_transition(
+        session_id,
+        &SessionTransitionPayload {
+            transition,
+            state: session.source.state(),
+            capabilities: session.source.capabilities(),
+            capture_id,
+            capture_count,
+        },
+    );
 }
 
 /// Emit a joiner count change event for a session.
@@ -417,10 +431,9 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     // Stop the device (triggers emit_stream_ended which finalises the capture)
     session.source.stop().await?;
 
-    // Emit session-lifecycle signal with inline state + capabilities
     let current = session.source.state();
-    let caps = session.source.capabilities();
-    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &current, &caps);
+    let capture_id = capture_store::get_session_capture(session_id).map(|(id, _)| id);
+    emit_transition(session_id, &session, SessionTransition::Suspended, capture_id);
 
     if previous != current {
         emit_state_change(session_id, &previous, &current);
@@ -439,8 +452,9 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
 /// This is the low-level primitive for device swaps. Callers handle domain-specific
 /// logic (capture orchestration, profile tracking) before/after calling this.
 ///
-/// Steps: stop old device → swap device → optionally update metadata → optionally
-/// auto-start → emit `session-lifecycle` signal → emit state change.
+/// Stops the old source, swaps in the new one and emits the transition, then
+/// starts it when returning to live and emits the state it reached, a failed
+/// start included.
 ///
 /// Takes the session already locked, so a caller's checks and the swap are one
 /// operation on it.
@@ -448,65 +462,38 @@ async fn replace_session_source(
     session: &mut IOSession,
     session_id: &str,
     new_device: Box<dyn IOSource>,
-    opts: ReplaceSourceOptions,
-) -> Result<SourceReplacedPayload, String> {
-    // 1. Stop old device (idempotent)
+    transition: SessionTransition,
+    capture_id: Option<String>,
+) -> Result<IOCapabilities, String> {
     let previous_state = session.source.state();
     if !matches!(previous_state, IOState::Stopped) {
         let _ = session.source.stop().await;
     }
-
-    // 2. Record old device info
     let previous_source_type = session.source.source_type().to_string();
 
-    // 3. Get new device info before swap
-    let capabilities = new_device.capabilities();
-    let new_source_type = new_device.source_type().to_string();
-
-    // 4. Swap the device
     session.source = new_device;
-
-    // 5. Update metadata if provided
-    if let Some(names) = opts.source_names {
-        session.source_names = names;
-    }
-    if let Some(configs) = opts.source_configs {
-        session.source_configs = configs;
-    }
-
-    // 6. Clear suspension state
     with_state(session_id, |s| s.suspended_at = None);
 
-    // 7. Optionally auto-start
-    if opts.auto_start {
-        session.source.start().await?;
-    }
-
-    let current_state = session.source.state();
-
-    // 8. Build result payload (still returned to callers, just not emitted as event)
-    let payload = SourceReplacedPayload {
-        previous_source_type: previous_source_type.clone(),
-        new_source_type: new_source_type.clone(),
-        capabilities: capabilities.clone(),
-        state: current_state.clone(),
-        transition: opts.transition.clone(),
+    // Before the start, so a joined app clears its view ahead of the new source's frames.
+    let swapped_state = session.source.state();
+    emit_transition(session_id, session, transition, capture_id);
+    let started = match transition {
+        SessionTransition::ReturnedToLive => session.source.start().await,
+        _ => Ok(()),
     };
 
-    // 9. Emit session-lifecycle signal with inline state + capabilities
-    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &current_state, &capabilities);
-
-    // 10. Emit state change if different
-    if previous_state != current_state {
+    let current_state = session.source.state();
+    if previous_state != current_state || swapped_state != current_state {
         emit_state_change(session_id, &previous_state, &current_state);
     }
 
     tlog!(
-        "[io] replace_session_source('{}') {} → {} (transition: {}, state: {:?})",
-        session_id, previous_source_type, new_source_type, opts.transition, current_state
+        "[io] replace_session_source('{}') {} → {} ({:?}, state: {:?})",
+        session_id, previous_source_type, session.source.source_type(), transition, current_state
     );
 
-    Ok(payload)
+    started?;
+    Ok(session.source.capabilities())
 }
 
 /// Stop a realtime session and switch to capture replay atomically.
@@ -551,17 +538,12 @@ pub async fn stop_and_switch_to_capture(session_id: &str, speed: f64) -> Result<
         let new_reader = CaptureSource::new(session_id.to_string(), bid.clone(), speed);
 
         // Device is already stopped, so replace_session_source's stop is a no-op
-        // replace_session_source emits session-lifecycle internally
-        let result = replace_session_source(
+        let capabilities = replace_session_source(
             &mut session,
             session_id,
             Box::new(new_reader),
-            ReplaceSourceOptions {
-                transition: "capture".to_string(),
-                auto_start: false,
-                source_names: None,
-                source_configs: None,
-            },
+            SessionTransition::SwitchedToCapture,
+            Some(bid.clone()),
         ).await?;
 
         tlog!(
@@ -569,7 +551,7 @@ pub async fn stop_and_switch_to_capture(session_id: &str, speed: f64) -> Result<
             session_id, bid
         );
 
-        Ok(result.capabilities)
+        Ok(capabilities)
     } else {
         // No capture available (e.g., 0 frames received) — return error so
         // the frontend can fall back to a full leave/disconnect.
@@ -597,9 +579,8 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
         ));
     }
 
-    // Emit session-lifecycle signal with current state + capabilities before restart
-    let caps = session.source.capabilities();
-    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &previous, &caps);
+    // Before the start, so a joined app clears its view ahead of the new run's frames.
+    emit_transition(session_id, &session, SessionTransition::Resuming, None);
 
     // Starting orphans the old capture and creates a new one. Recorded sources
     // (the WireTAP backend, CSV, Capture) handle capture creation in start().
@@ -794,21 +775,15 @@ pub async fn switch_to_capture_replay(session_id: &str, speed: f64) -> Result<IO
     let _ = crate::capture_store::mark_capture_active(&capture_id);
 
     // Create a new CaptureSource that reads from the session's capture
-    let new_reader = CaptureSource::new(session_id.to_string(), capture_id, speed);
+    let new_reader = CaptureSource::new(session_id.to_string(), capture_id.clone(), speed);
 
-    let result = replace_session_source(
+    replace_session_source(
         &mut *lock_session(session_id).await?,
         session_id,
         Box::new(new_reader),
-        ReplaceSourceOptions {
-            transition: "capture".to_string(),
-            auto_start: false,
-            source_names: None,
-            source_configs: None,
-        },
-    ).await?;
-
-    Ok(result.capabilities)
+        SessionTransition::SwitchedToCapture,
+        Some(capture_id),
+    ).await
 }
 
 /// Resume a session from capture playback back to live streaming.
@@ -828,20 +803,13 @@ pub async fn resume_to_live_session(
         session_id
     );
 
-    // replace_session_source emits session-lifecycle internally
-    let result = replace_session_source(
+    replace_session_source(
         &mut *lock_session(session_id).await?,
         session_id,
         new_reader,
-        ReplaceSourceOptions {
-            transition: "live".to_string(),
-            auto_start: true,
-            source_names: None,
-            source_configs: None,
-        },
-    ).await?;
-
-    Ok(result.capabilities)
+        SessionTransition::ReturnedToLive,
+        None,
+    ).await
 }
 
 /// Destroy a reader session. `reset` marks a deliberate user destroy so the
@@ -966,11 +934,7 @@ pub async fn refresh_session_capabilities(session_id: &str) {
     let Ok(session) = lock_session(session_id).await else {
         return;
     };
-    let capabilities = session.source.capabilities();
-    let state = session.source.state();
-    drop(session);
-
-    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &capabilities);
+    emit_transition(session_id, &session, SessionTransition::CapabilitiesChanged, None);
 }
 
 /// Change serial framing on a running session in place (no device reconnect),
@@ -986,12 +950,8 @@ pub async fn set_framing(
     }
     let session = lock_session(session_id).await?;
     session.source.set_framing(req)?;
-    let capabilities = session.source.capabilities();
-    let state = session.source.state();
-    drop(session);
-
-    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &capabilities);
-    Ok(capabilities)
+    emit_transition(session_id, &session, SessionTransition::CapabilitiesChanged, None);
+    Ok(session.source.capabilities())
 }
 
 /// Result of registering a subscriber

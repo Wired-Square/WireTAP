@@ -127,7 +127,7 @@ export interface UseIOSessionManagerOptions {
   /** Callback when stream ends */
   onStreamEnded?: (payload: StreamEndedInfo) => void;
   /** Callback when session is suspended (stopped with capture available) */
-  onSuspended?: (payload: import("../api/io").SessionSuspendedPayload) => void;
+  onSuspended?: (payload: import("../services/wsProtocol").SessionTransitionMsg) => void;
   /** Callback when capture playback completes */
   onStreamComplete?: () => void;
   /** Callback when playback speed changes (from any subscriber on this session) */

@@ -24,9 +24,11 @@ function declaredCallbacks(): string[] {
   return [...block[1].matchAll(/^\s*(on[A-Za-z]+)\??:/gm)].map((m) => m[1]);
 }
 
-/** Callback names passed to `invokeCallbacks(…, "onX", …)` anywhere in the store. */
+/** Callback names passed to `invokeCallbacks(…, "onX", …)`, or through the transition table. */
 function dispatchedCallbacks(): string[] {
-  return [...SOURCE.matchAll(/invokeCallbacks\(\s*[^,]+,\s*"(on[A-Za-z]+)"/g)].map((m) => m[1]);
+  const direct = [...SOURCE.matchAll(/invokeCallbacks\(\s*[^,]+,\s*"(on[A-Za-z]+)"/g)].map((m) => m[1]);
+  const table = /const TRANSITION_CALLBACK = \{([\s\S]*?)\n\}/.exec(SOURCE)?.[1] ?? "";
+  return [...direct, ...[...table.matchAll(/"(on[A-Za-z]+)"/g)].map((m) => m[1])];
 }
 
 describe("sessionStore callback coverage", () => {

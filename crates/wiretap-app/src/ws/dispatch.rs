@@ -1119,34 +1119,22 @@ fn session_lifecycle_payload(payload: &crate::io::SessionLifecyclePayload) -> Ve
     )
 }
 
-/// Send scoped session-lifecycle signal with inline state + capabilities.
-/// Used for suspend, resume, switch-to-capture, and device-replaced transitions.
-pub fn send_session_lifecycle_scoped(
-    session_id: &str,
-    state: &crate::io::IOState,
-    capabilities: &crate::io::IOCapabilities,
-) {
-    let server = match ws_server() {
-        Some(s) => s,
-        None => return,
-    };
-    let channel = match server.channel_for_session(session_id) {
-        Some(c) => c,
-        None => return,
-    };
-
-    let state_byte = state.code();
-
-    let json_bytes = serde_json::to_vec(capabilities).unwrap_or_default();
-    let json_len = json_bytes.len() as u16;
-
-    let mut payload = Vec::with_capacity(1 + 2 + json_bytes.len());
-    payload.push(state_byte);
-    payload.extend_from_slice(&json_len.to_le_bytes());
-    payload.extend_from_slice(&json_bytes);
-
-    let msg = protocol::encode_message(MsgType::SessionLifecycle, channel, &payload);
+/// Send a session's transition on its own channel.
+pub fn send_session_transition(session_id: &str, payload: &crate::io::SessionTransitionPayload) {
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
+    let msg = protocol::encode_message(MsgType::SessionLifecycle, channel, &session_transition_payload(payload));
     server.send_to_channel(channel, msg);
+}
+
+fn session_transition_payload(payload: &crate::io::SessionTransitionPayload) -> Vec<u8> {
+    protocol::encode_session_transition(
+        payload.state.code(),
+        payload.transition.code(),
+        &serde_json::to_string(&payload.capabilities).unwrap_or_default(),
+        payload.capture_id.as_deref(),
+        payload.capture_count as u32,
+    )
 }
 
 #[cfg(test)]
@@ -1178,6 +1166,25 @@ mod tests {
         assert_eq!(running, [0, 1, 0, 3, 0, b'f', b'_', b'1', 2, IOState::Running.code()]);
         let destroyed = session_lifecycle_payload(&created(LifecycleEvent::Destroyed, None));
         assert_eq!(destroyed, [1, 1, 0, 3, 0, b'f', b'_', b'1', 0]);
+    }
+
+    #[test]
+    fn a_transition_carries_its_codes_capabilities_and_capture() {
+        use crate::io::{IOCapabilities, SessionTransition, SessionTransitionPayload};
+        let capabilities = IOCapabilities::realtime_can();
+        let json = serde_json::to_string(&capabilities).unwrap();
+        let bytes = session_transition_payload(&SessionTransitionPayload {
+            transition: SessionTransition::SwitchedToCapture,
+            state: IOState::Stopped,
+            capabilities,
+            capture_id: Some("c1".into()),
+            capture_count: 42,
+        });
+        let mut want = vec![IOState::Stopped.code(), SessionTransition::SwitchedToCapture.code()];
+        want.extend((json.len() as u16).to_le_bytes());
+        want.extend(json.as_bytes());
+        want.extend([2, 0, b'c', b'1', 42, 0, 0, 0]);
+        assert_eq!(bytes, want);
     }
 
     #[test]

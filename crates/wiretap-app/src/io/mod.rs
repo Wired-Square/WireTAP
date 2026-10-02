@@ -491,31 +491,34 @@ impl IOState {
     }
 }
 
-/// Options for replacing a session's device in-place.
-pub struct ReplaceSourceOptions {
-    /// Human-readable transition name ("capture", "live", "reinitialize")
-    pub transition: String,
-    /// Whether to auto-start the new device after swapping
-    pub auto_start: bool,
-    /// New source_names to set on the session (None = keep existing)
-    pub source_names: Option<Vec<String>>,
-    /// New source_configs to set on the session (None = keep existing)
-    pub source_configs: Option<Vec<SourceConfig>>,
+/// What happened to a session, as its scoped `SessionLifecycle` message says.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[repr(u8)]
+pub enum SessionTransition {
+    Suspended,
+    SwitchedToCapture,
+    /// Restarting with a fresh capture; sent before the source starts.
+    Resuming,
+    ReturnedToLive,
+    CapabilitiesChanged,
 }
 
-/// Payload emitted when a session's device is replaced in-place.
-#[derive(Clone, Debug, Serialize)]
-pub struct SourceReplacedPayload {
-    /// Previous device type (e.g., "realtime", "capture")
-    pub previous_source_type: String,
-    /// New device type
-    pub new_source_type: String,
-    /// New capabilities after the swap
-    pub capabilities: IOCapabilities,
-    /// New IO state after the swap
+impl SessionTransition {
+    /// This transition's byte in [`SESSION_TRANSITIONS`](crate::ws::protocol::SESSION_TRANSITIONS).
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+}
+
+/// A session's scoped `SessionLifecycle` message.
+pub struct SessionTransitionPayload {
+    pub transition: SessionTransition,
     pub state: IOState,
-    /// Context hint for the frontend ("capture", "live", "reinitialize")
-    pub transition: String,
+    pub capabilities: IOCapabilities,
+    /// The capture the session finished with, for a suspend or a switch to capture.
+    pub capture_id: Option<String>,
+    pub capture_count: usize,
 }
 
 /// Trait for all IO devices (CAN adapters, serial ports, replay sources, etc.)
