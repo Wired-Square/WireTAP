@@ -926,13 +926,13 @@ pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
 /// The copy is orphaned (no owning session) and available for standalone use.
 /// Returns the new capture ID.
 pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String, String> {
-    let source_metadata = {
+    let (source_metadata, unique_frames) = {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         let source = registry
             .captures
             .get(source_capture_id)
             .ok_or_else(|| format!("Capture '{}' not found", source_capture_id))?;
-        source.metadata.clone()
+        (source.metadata.clone(), source.unique_frames.clone())
     };
 
     // Create new capture entry in registry
@@ -966,7 +966,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
             metadata: metadata.clone(),
             owner_role: None,
             seen_buses,
-            unique_frames: HashMap::new(),
+            unique_frames,
         };
         registry.captures.insert(id.clone(), entry);
         (id, metadata)
@@ -1445,6 +1445,29 @@ mod tests {
         let entry = listed.iter().find(|c| c.id == id).expect("capture is listed");
         assert!(entry.owning_session_id.is_none());
         assert!(!entry.is_streaming, "nothing streams into an ingested capture");
+    }
+
+    #[test]
+    fn a_copy_keeps_the_frame_ids_its_source_saw() {
+        crate::capture_db::use_in_memory_database();
+        let source = create_standalone_capture(CaptureKind::Frames, "copied".to_string());
+        let frame = |frame_id| FrameMessage {
+            protocol: "can".into(),
+            timestamp_us: 1,
+            frame_id,
+            bus: 0,
+            dlc: 0,
+            bytes: Vec::new(),
+            is_extended: false,
+            is_fd: false,
+            source_address: None,
+            incomplete: None,
+            direction: None,
+        };
+        append_frames_to_capture(&source, vec![frame(0x100), frame(0x101), frame(0x100)]);
+
+        let copy = copy_capture(&source, "copy".to_string()).unwrap();
+        assert_eq!(get_capture_unique_count(&copy), 2);
     }
 
     /// Empty means "select everything" at every call site, so a group carrying no ids must
