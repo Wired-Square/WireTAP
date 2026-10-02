@@ -17,12 +17,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
-use tauri::Emitter;
 use wslib_ai_mcp::CancellationToken;
 use wslib_ai_mcp::http::{self, ConnectionObserver, HttpConfig};
 use wslib_ai_mcp::server::ToolServer;
 
 use tools::WireTapTools;
+use crate::io::session_log::{self, SessionLogEvent, Subject};
 
 /// The gates/port/token-presence the server was started with — reported to the
 /// settings UI so it can tell when the running server differs from the saved
@@ -120,7 +120,7 @@ pub fn start(
     let http_config = HttpConfig {
         bearer_token: (!token.is_empty()).then(|| token.clone()),
         allowed_origins: http::loopback_origins(port),
-        observer: Some(Arc::new(TauriConnectionObserver(app.clone()))),
+        observer: Some(Arc::new(SessionLogObserver)),
         ..HttpConfig::default()
     };
     let factory = move || {
@@ -154,25 +154,17 @@ pub fn stop() {
     }
 }
 
-/// Feeds the Session Manager log: `mcp-connection` events for the client the
-/// transport first sees and the one it judges gone.
-struct TauriConnectionObserver(tauri::AppHandle);
+/// Logs the client the transport first sees and the one it judges gone.
+struct SessionLogObserver;
 
-impl TauriConnectionObserver {
-    fn emit(&self, event: &str, session_id: &str) {
-        let _ = self.0.emit(
-            "mcp-connection",
-            serde_json::json!({ "event": event, "session_id": session_id }),
-        );
-    }
-}
-
-impl ConnectionObserver for TauriConnectionObserver {
+impl ConnectionObserver for SessionLogObserver {
     fn connected(&self, session_id: &str) {
-        self.emit("connected", session_id);
+        let client = session_id.to_string();
+        session_log::append(Subject { app_name: Some("mcp"), ..Subject::default() }, SessionLogEvent::McpConnected { client });
     }
 
     fn disconnected(&self, session_id: &str) {
-        self.emit("disconnected", session_id);
+        let client = session_id.to_string();
+        session_log::append(Subject { app_name: Some("mcp"), ..Subject::default() }, SessionLogEvent::McpDisconnected { client });
     }
 }

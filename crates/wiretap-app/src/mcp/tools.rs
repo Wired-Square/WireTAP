@@ -604,6 +604,14 @@ impl WireTapTools {
         ok_json(json!({ "available": true, "path": path.to_string_lossy(), "lines": tail }))
     }
 
+    #[tool(description = "Read the session log every window shows in Session Manager: typed entries (id, timestamp_ms, session_id, profile_ids, subscriber_id, app_name, event with a kind such as created, joined, left, state, transition, stream_ended, error, destroyed, device_probe, mcp_connected). The ring keeps the newest 500; pass after_id to read on from an earlier call.")]
+    async fn get_session_log(
+        &self,
+        Parameters(p): Parameters<SessionLogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        ok_json(crate::io::session_log::read(p.after_id, p.limit))
+    }
+
     #[tool(description = "List the decoder catalogs (TOML) in the decoder directory, with name, filename, path and git sync status.")]
     async fn list_catalogs(&self) -> Result<CallToolResult, McpError> {
         ok_json(crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?)

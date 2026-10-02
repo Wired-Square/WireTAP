@@ -100,6 +100,16 @@ pub struct TailLogParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct SessionLogParams {
+    /// Only entries with an id greater than this, to read on from an earlier call.
+    #[serde(default)]
+    pub after_id: Option<u64>,
+    /// At most this many of the newest matching entries (default all retained).
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct ReadCatalogParams {
     /// Catalog filename (e.g. `sungrow_shx.toml`) or display name, as listed by `list_catalogs`.
     pub name: String,

@@ -27,7 +27,7 @@ import { useOpenAppsStore } from "../../stores/openAppsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSessionManagerStore } from "./stores/sessionManagerStore";
 import { useSessionLogStore } from "./stores/sessionLogStore";
-import { useSessionLogSubscription } from "./hooks/useSessionLogSubscription";
+import { useSessionLogSync } from "./hooks/useSessionLogSync";
 import AppLayout from "../../components/AppLayout";
 import AppTabView, { type TabDefinition } from "../../components/AppTabView";
 import SessionTopBar from "./views/SessionTopBar";
@@ -46,8 +46,7 @@ export default function SessionManager() {
   const setIsRefreshing = useSessionManagerStore((s) => s.setIsRefreshing);
   const logEntryCount = useSessionLogStore((s) => s.entries.length);
 
-  // Initialise session log subscription
-  useSessionLogSubscription();
+  useSessionLogSync();
 
   // Read profiles from settingsStore (in-memory) so we see preferred_catalog
   // updates immediately, before the debounced save to backend completes.

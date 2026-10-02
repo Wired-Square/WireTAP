@@ -54,6 +54,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::RegisterSubscriberResult>();
     r.visit::<crate::io::ReinitializeResult>();
     r.visit::<crate::io::SessionLifecyclePayload>();
+    r.visit::<crate::io::session_log::SessionLogEntry>();
     r.visit::<crate::io::ScanJob>();
     r.visit::<crate::io::SerialOverrides>();
     r.visit::<crate::io::StepResult>();
@@ -160,6 +161,7 @@ fn wire_constants() -> String {
         names("SESSION_ERROR_SEVERITIES", &SESSION_ERROR_SEVERITIES),
         names("SESSION_TRANSITIONS", &SESSION_TRANSITIONS),
         names("SESSION_MODES", &SESSION_MODES),
+        format!("export const SESSION_LOG_CAPACITY = {};\n", crate::io::session_log::SESSION_LOG_CAPACITY),
         format!(
             "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
@@ -301,6 +303,16 @@ fn outputs_serialise_as_declared() {
         StreamEndReason::Paused,
     ]);
     assert_serialises_as_declared(&[LifecycleEvent::Created, LifecycleEvent::Destroyed, LifecycleEvent::Updated]);
+    use session_log::SessionLogEvent as Log;
+    assert_serialises_as_declared(&[
+        Log::Created { mode: SessionMode::Live, subscriber_count: 1 },
+        Log::State { state: IOState::Running },
+        Log::Transitioned { transition: SessionTransition::SwitchedToCapture, mode: SessionMode::Replaying },
+        Log::StreamEnded { reason: StreamEndReason::Paused, capture_count: None },
+        Log::DeviceConnected { source_type: "gvret_tcp".into(), address: "a".into(), bus: Some(0) },
+        Log::Reconfigured,
+        Log::Cleared,
+    ]);
     assert_serialises_as_declared(&[RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete]);
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;

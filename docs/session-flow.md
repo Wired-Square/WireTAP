@@ -1266,6 +1266,7 @@ Global (channel 0):
 | `TestPatternState`  | 0x0D | Test Pattern run state (counters, sweep rows, peer) — payload is the whole `IOTestState` |
 | `OpenAppsChanged`   | 0x17 | Open-app roster changed; clients re-fetch `list_open_apps` (see [§ The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)) |
 | `CatalogListChanged`| 0x18 | Decoder-catalogue list changed (mutation, decoder-dir change, or filesystem watcher); clients re-fetch `list_catalogs` from the warm backend cache (see [§ Catalogue list cache](#catalogue-list-cache)) |
+| `SessionLogAppended`| 0x1E | One `SessionLogEntry` (JSON) appended to the session log ring; clients catch up with `get_session_log(after_id)` (see [§ Session log](#session-log)) |
 
 Control frames: `Subscribe` / `Unsubscribe` / `SubscribeAck` / `SubscribeNack`,
 plus `Heartbeat` and `Auth`. Request/response RPC uses `Command` (0x20) /
@@ -1823,10 +1824,22 @@ Not everything is on WS. These remain Tauri-emitted:
 
 - `session-lifecycle` broadcast of created/destroyed (also mirrored on WS
   global channel).
-- `device-probe` — device discovery progress.
 - `subscriber-evicted` — when the watchdog kicks a stale subscriber.
 - `store:changed` — settings changes.
 - `menu-*` — native menu actions.
+
+### Session log
+
+The Session Manager's Log tab reads a process-wide ring in
+[io/session_log.rs](../crates/wiretap-app/src/io/session_log.rs) (500 entries).
+The emit helpers append to it where each thing happens — created, joined/left
+(only when the count moves), state, transition, speed, reconfigured, capture
+changed, stream ended, fault errors, device connected, destroyed — as do the
+device probe, the MCP transport's connect/disconnect, and a stats sampler on the
+Session Manager interval setting. Entries are typed with codes; the view words
+them. Every window and the MCP (`get_session_log`) see the same log, and a
+reload reads it back. A clear empties the ring for everyone and leaves a
+`cleared` entry, which tells each window to drop what it holds.
 
 ### post_session cache
 

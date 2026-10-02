@@ -1010,6 +1010,16 @@ pub fn send_capture_list_changed() {
     }
 }
 
+pub fn send_session_log_entry(entry: &crate::io::session_log::SessionLogEntry) {
+    if let Some(server) = ws_server() {
+        server.send_global(session_log_message(entry));
+    }
+}
+
+fn session_log_message(entry: &crate::io::session_log::SessionLogEntry) -> Vec<u8> {
+    protocol::encode_message(MsgType::SessionLogAppended, 0, &serde_json::to_vec(entry).unwrap_or_default())
+}
+
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
     let server = match ws_server() {
@@ -1174,6 +1184,32 @@ mod tests {
         assert_eq!(running, [0, 1, 0, 3, 0, b'f', b'_', b'1', 2, IOState::Running.code()]);
         let destroyed = session_lifecycle_payload(&created(LifecycleEvent::Destroyed, None));
         assert_eq!(destroyed, [1, 1, 0, 3, 0, b'f', b'_', b'1', 0]);
+    }
+
+    #[test]
+    fn a_session_log_entry_goes_out_globally_as_json() {
+        use crate::io::session_log::{SessionLogEntry, SessionLogEvent};
+        let entry = SessionLogEntry {
+            id: 9,
+            timestamp_ms: 1_700_000_000_000,
+            session_id: Some("f_1".into()),
+            profile_ids: vec!["p1".into()],
+            subscriber_id: Some("decoder_1".into()),
+            app_name: Some("decoder".into()),
+            event: SessionLogEvent::Joined { subscriber_count: 2 },
+        };
+        let message = session_log_message(&entry);
+        let header = protocol::Header::decode(&message).unwrap();
+        assert_eq!((header.msg_type, header.channel), (MsgType::SessionLogAppended, 0));
+        let body: serde_json::Value = serde_json::from_slice(&message[protocol::HEADER_SIZE..]).unwrap();
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "id": 9, "timestamp_ms": 1_700_000_000_000u64, "session_id": "f_1", "profile_ids": ["p1"],
+                "subscriber_id": "decoder_1", "app_name": "decoder",
+                "event": { "kind": "joined", "subscriber_count": 2 },
+            })
+        );
     }
 
     #[test]

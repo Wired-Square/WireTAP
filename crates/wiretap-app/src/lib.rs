@@ -1095,6 +1095,7 @@ pub fn run() {
             setup_desktop_menus(app)?;
 
             io::set_app_handle(app.handle().clone());
+            io::session_log::spawn_stats_sampler(app.handle().clone());
 
             // Start the heartbeat watchdog to clean up stale session joiners
             // and probe WebView health (detects content process jettison on macOS)
@@ -1282,6 +1283,8 @@ pub fn run() {
             sessions::probe_device,
             sessions::preview_source_buses,
             sessions::list_active_sessions,
+            sessions::get_session_log,
+            sessions::clear_session_log,
             sessions::get_profile_bus_mappings,
             sessions::get_supported_protocols,
             io::traits::list_profile_traits,

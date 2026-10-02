@@ -69,6 +69,7 @@ pub use error::IoError;
 
 mod roster;
 mod session;
+pub mod session_log;
 #[cfg(test)]
 pub(crate) mod test_source;
 mod wake;
@@ -86,6 +87,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
+use session_log::SessionLogEvent;
 use wslib_ai_mcp::rmcp::schemars::{self, JsonSchema};
 
 // ============================================================================
@@ -494,6 +496,7 @@ impl IOState {
 /// What happened to a session, as its scoped `SessionLifecycle` message says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[repr(u8)]
 pub enum SessionTransition {
     Suspended,
@@ -761,6 +764,16 @@ pub fn emit_session_lifecycle(payload: SessionLifecyclePayload) {
     EMITTED_LIFECYCLE.lock().unwrap().push(payload.clone());
     emit_to_windows("session-lifecycle", &payload);
     crate::ws::dispatch::send_session_lifecycle(&payload);
+    if payload.event_type == LifecycleEvent::Destroyed {
+        session_log::append(
+            session_log::Subject {
+                profile_ids: Some(payload.source_profile_ids),
+                subscriber_id: payload.subscriber_id.as_deref(),
+                ..session_log::Subject::session(&payload.session_id)
+            },
+            SessionLogEvent::Destroyed { reset: payload.reset },
+        );
+    }
 }
 
 #[cfg(test)]
@@ -775,6 +788,7 @@ pub fn emit_session_error(session_id: &str, error: String) {
     store_startup_error(session_id, error.clone());
     post_session::store_error(session_id, error.clone());
     crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Fault, &error);
+    session_log::append_for_session(session_id, SessionLogEvent::Error { message: error });
 }
 
 /// Report an error the source carries on through. Nothing is stored for a
@@ -854,7 +868,6 @@ pub fn emit_stream_ended(
         None => (None, None, 0, None, false),
     };
 
-    // Store in post-session cache for late-arriving fetches
     let stream_ended_info = post_session::StreamEndedInfo {
         reason,
         capture_available,
@@ -863,9 +876,7 @@ pub fn emit_stream_ended(
         count,
         time_range,
     };
-    post_session::store_stream_ended(session_id, stream_ended_info.clone());
-
-    crate::ws::dispatch::send_stream_ended(session_id, &stream_ended_info);
+    publish_stream_ended(session_id, stream_ended_info);
     session::note_roster_moved(session_id);
     tlog!(
         "[{}:{}] Stream ended (reason: {}, count: {})",
@@ -873,11 +884,20 @@ pub fn emit_stream_ended(
     );
 }
 
+/// Store a stream's end for late fetches, send it, and log it.
+pub fn publish_stream_ended(session_id: &str, info: post_session::StreamEndedInfo) {
+    let event = SessionLogEvent::StreamEnded { reason: info.reason, capture_count: info.capture_available.then_some(info.count) };
+    post_session::store_stream_ended(session_id, info.clone());
+    crate::ws::dispatch::send_stream_ended(session_id, &info);
+    session_log::append_for_session(session_id, event);
+}
+
 /// Emit capture-changed when session captures are created or orphaned. The
 /// message carries the session's frames capture id, so the frontend needs no
 /// round trip.
 pub fn emit_capture_changed(session_id: &str) {
     crate::ws::dispatch::send_capture_changed(session_id);
+    session_log::append_for_session(session_id, SessionLogEvent::CaptureChanged);
 }
 
 /// Orphan captures for a session and emit capture-changed.
@@ -902,28 +922,8 @@ pub fn emit_device_connected(session_id: &str, source_type: &str, address: &str,
         bus: bus_number,
     });
     crate::ws::dispatch::send_device_connected(session_id, source_type, address, bus_number);
-}
-
-/// Payload for device-probe event (global, not session-scoped)
-#[derive(Clone, Debug, Serialize)]
-pub struct DeviceProbePayload {
-    /// Profile ID that was probed
-    pub profile_id: String,
-    /// Device type (e.g., "gvret", "slcan", "gs_usb")
-    pub source_type: String,
-    /// Device address (e.g., "192.168.1.1:23", "/dev/ttyUSB0")
-    pub address: String,
-    /// Whether the probe was successful
-    pub success: bool,
-    /// Whether this was a cached result
-    pub cached: bool,
-    /// Number of buses available (on success)
-    pub bus_count: u8,
-    /// Error message (on failure)
-    pub error: Option<String>,
-}
-
-/// Emit device-probe event when a device probe completes (global event).
-pub fn emit_device_probe(app: &AppHandle, payload: DeviceProbePayload) {
-    let _ = app.emit("device-probe", payload);
+    session_log::append_for_session(
+        session_id,
+        SessionLogEvent::DeviceConnected { source_type: source_type.to_string(), address: address.to_string(), bus: bus_number },
+    );
 }

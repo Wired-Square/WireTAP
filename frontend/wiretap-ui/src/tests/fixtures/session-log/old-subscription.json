@@ -1,0 +1,138 @@
+[
+  {
+    "eventType": "session-created",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": "discovery_1",
+    "details": "Session created (Live)"
+  },
+  {
+    "eventType": "session-joined",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": "discovery_1",
+    "details": "discovery_1 joined (1 listeners)"
+  },
+  {
+    "eventType": "session-joined",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Listener joined (2 listeners)"
+  },
+  {
+    "eventType": "state-change",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "State: running"
+  },
+  {
+    "eventType": "session-left",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Listener left (1 listeners)"
+  },
+  {
+    "eventType": "state-change",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Session lifecycle event (state refreshed)"
+  },
+  {
+    "eventType": "session-reconfigured",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Session reconfigured"
+  },
+  {
+    "eventType": "buffer-changed",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Session buffers changed"
+  },
+  {
+    "eventType": "device-connected",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "gvret_tcp connected: 10.0.0.2:23 (bus 0)"
+  },
+  {
+    "eventType": "session-error",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Device unplugged"
+  },
+  {
+    "eventType": "stream-ended",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Reason: disconnected, capture: 12 items"
+  },
+  {
+    "eventType": "stream-complete",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Stream completed"
+  },
+  {
+    "eventType": "device-probe",
+    "sessionId": "p1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "gvret_tcp at 10.0.0.2:23: 2 bus(es)"
+  },
+  {
+    "eventType": "device-probe",
+    "sessionId": "p1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "gvret_tcp at 10.0.0.2:23: timed out (cached)"
+  },
+  {
+    "eventType": "mcp-connected",
+    "sessionId": null,
+    "profileId": null,
+    "profileName": null,
+    "appName": "mcp",
+    "details": "MCP client connected (abcdef12)"
+  },
+  {
+    "eventType": "mcp-disconnected",
+    "sessionId": null,
+    "profileId": null,
+    "profileName": null,
+    "appName": "mcp",
+    "details": "MCP client disconnected (abcdef12)"
+  },
+  {
+    "eventType": "session-destroyed",
+    "sessionId": "f_1",
+    "profileId": "p1",
+    "profileName": "Bench GVRET",
+    "appName": null,
+    "details": "Session destroyed"
+  }
+]

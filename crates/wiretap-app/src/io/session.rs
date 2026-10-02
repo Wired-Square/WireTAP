@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
@@ -12,6 +13,7 @@ use super::roster::{
     attach_app, current_session_of_app, detach_all_from_session, detach_app, other_instances_on_session,
     session_exists, set_app_active, subscriber_count_for_session, unpark_app, SessionSnapshot,
 };
+use super::session_log::{self, SessionLogEvent, Subject};
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
     CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader,
@@ -58,6 +60,8 @@ pub(super) struct SessionState {
     snapshot: SessionSnapshot,
     /// A roster push owed once the operation holding the session lets go.
     roster_moved: bool,
+    /// The subscriber count the session log last recorded, so a re-register logs nothing.
+    logged_subscribers: usize,
 }
 
 /// The session registry. Held only to find a session or touch its synchronous
@@ -274,41 +278,46 @@ async fn transition(session_id: &str, session: &mut IOSession, to: Transition) -
 fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
     crate::ws::dispatch::send_session_state(session_id, current);
     note_roster_moved(session_id);
+    session_log::append_for_session(session_id, SessionLogEvent::State { state: current.clone() });
 }
 
 fn emit_transition(session_id: &str, session: &IOSession, transition: SessionTransition, capture_id: Option<String>) {
     let capture_count = capture_id.as_deref().map_or(0, capture_store::get_capture_count);
+    let mode = session_mode(session_id, session);
     crate::ws::dispatch::send_session_transition(
         session_id,
         &SessionTransitionPayload {
             transition,
             state: session.source.state(),
             capabilities: session.source.capabilities(),
-            mode: session_mode(session_id, session),
+            mode,
             capture_id,
             capture_count,
         },
     );
     note_roster_moved(session_id);
+    session_log::append_for_session(session_id, SessionLogEvent::Transitioned { transition, mode });
 }
 
 /// Emit a joiner count change event for a session.
 /// Sends speed = -1.0 as a sentinel meaning "no speed update".
-pub(super) fn emit_joiner_count_change(
-    session_id: &str,
-    joiner_count: usize,
-    _subscriber_id: Option<&str>,
-    _app_name: Option<&str>,
-    _change: Option<&str>,
-) {
+pub(super) fn emit_joiner_count_change(session_id: &str, joiner_count: usize, subscriber_id: Option<&str>, app_name: Option<&str>) {
     crate::ws::dispatch::send_session_info(session_id, -1.0, joiner_count as u16);
     note_roster_moved(session_id);
+    let logged = with_state(session_id, |s| std::mem::replace(&mut s.logged_subscribers, joiner_count)).unwrap_or(joiner_count);
+    let event = match joiner_count.cmp(&logged) {
+        Ordering::Greater => SessionLogEvent::Joined { subscriber_count: joiner_count },
+        Ordering::Less => SessionLogEvent::Left { subscriber_count: joiner_count },
+        Ordering::Equal => return,
+    };
+    session_log::append(Subject { subscriber_id, app_name, ..Subject::session(session_id) }, event);
 }
 
 /// Emit a speed change event for a session.
 /// Sends subscriber_count = 0xFFFF as a sentinel meaning "no subscriber count update".
 fn emit_speed_change(session_id: &str, speed: f64) {
     crate::ws::dispatch::send_session_info(session_id, speed, 0xFFFF);
+    session_log::append_for_session(session_id, SessionLogEvent::Speed { speed });
 }
 
 /// If `session_id` has no attached subscribers left, destroy it (same cascade as
@@ -321,11 +330,11 @@ pub(super) async fn teardown_session_if_empty(session_id: &str, reset: bool, by:
     if count == 0 {
         if let Ok(session) = lock_session(session_id).await {
             tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
-            emit_joiner_count_change(session_id, 0, None, None, Some("left"));
+            emit_joiner_count_change(session_id, 0, by, None);
             tear_down(session_id, session, Teardown::Destroy { reset, by }).await;
         }
     } else if session_exists(session_id).await {
-        emit_joiner_count_change(session_id, count, None, None, Some("left"));
+        emit_joiner_count_change(session_id, count, by, None);
     }
     // Otherwise the count is phantom — subscribers still point at a session that is
     // gone. Don't broadcast a "left" for it, and don't detach either: this is also the
@@ -425,6 +434,7 @@ pub async fn create_session(
         retired: false,
     };
     let snapshot = SessionSnapshot::of(&session_id, &session);
+    let mode = session_mode(&session_id, &session);
 
     // Join an existing session rather than overwrite it, once whatever it is doing
     // has finished. One that a teardown retired meanwhile is gone: look again.
@@ -439,6 +449,7 @@ pub async fn create_session(
                     playback_position: None,
                     startup_error: None,
                     roster_moved: false,
+                    logged_subscribers: 0,
                 });
                 break None;
             }
@@ -466,7 +477,7 @@ pub async fn create_session(
         if let Some(lid) = &subscriber_id {
             let resolved_name = app_name.clone().unwrap_or_else(|| lid.clone());
             attach_app(lid, &resolved_name, &session_id);
-            emit_joiner_count_change(&session_id, subscriber_count_for_session(&session_id), Some(lid), Some(&resolved_name), Some("joined"));
+            emit_joiner_count_change(&session_id, subscriber_count_for_session(&session_id), Some(lid), Some(&resolved_name));
             tlog!(
                 "[reader] Session '{}' - subscriber '{}' joined existing session, total: {}",
                 session_id, lid, subscriber_count_for_session(&session_id)
@@ -481,9 +492,9 @@ pub async fn create_session(
     }
 
     // Attach the creating subscriber to the registry (the per-session view is derived).
-    if let Some(lid) = subscriber_id.clone() {
-        let resolved_name = app_name.unwrap_or_else(|| lid.clone());
-        attach_app(&lid, &resolved_name, &session_id);
+    let app_name = app_name.or_else(|| subscriber_id.clone());
+    if let (Some(lid), Some(name)) = (&subscriber_id, &app_name) {
+        attach_app(lid, name, &session_id);
         tlog!(
             "[reader] Session '{}' created with subscriber '{}', total: 1",
             session_id, lid
@@ -492,7 +503,13 @@ pub async fn create_session(
         tlog!("[reader] Session '{}' created with no initial subscriber", session_id);
     }
 
-    let subscriber_count = subscriber_count_for_session(&session_id).max(1);
+    let attached = subscriber_count_for_session(&session_id);
+    let subscriber_count = attached.max(1);
+    with_state(&session_id, |s| s.logged_subscribers = attached);
+    session_log::append(
+        Subject { subscriber_id: subscriber_id.as_deref(), app_name: app_name.as_deref(), ..Subject::session(&session_id) },
+        SessionLogEvent::Created { mode, subscriber_count: attached },
+    );
 
     // Emit global session lifecycle event (to all windows)
     // Use get_session_profile_ids() to get actual profile IDs (not display names)
@@ -829,6 +846,7 @@ pub async fn reconfigure_session(
     //   [stale frames from old stream] → [session-reconfigured] → [new frames]
     // The frontend clears stale frames when it receives this event.
     crate::ws::dispatch::send_reconfigured(session_id);
+    session_log::append_for_session(session_id, SessionLogEvent::Reconfigured);
 
     // Phase 2: Start the new stream (orphans old capture, creates new one)
     let result = session.source.complete_reconfigure().await;
@@ -1195,7 +1213,7 @@ pub async fn register_subscriber_from(
             "[reader] Session '{}' registered subscriber '{}', total: {}",
             session_id, subscriber_id, count
         );
-        emit_joiner_count_change(session_id, count, Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
+        emit_joiner_count_change(session_id, count, Some(subscriber_id), Some(&resolved_app_name));
 
         // Reporting the capture's real kind is what lets a joining app tell a raw
         // serial link from a CAN one — Discovery keys its serial view off exactly this.
@@ -1256,7 +1274,7 @@ async fn resume_if_suspended(session_id: &str, session: &mut IOSession, back: &s
 pub(super) async fn resume_reattached(session_id: &str) {
     let Ok(mut session) = lock_session(session_id).await else { return };
     resume_if_suspended(session_id, &mut session, "parked subscribers").await;
-    emit_joiner_count_change(session_id, subscriber_count_for_session(session_id), None, None, Some("joined"));
+    emit_joiner_count_change(session_id, subscriber_count_for_session(session_id), None, None);
 }
 
 /// Unregister a subscriber from a session.
@@ -1922,6 +1940,41 @@ mod tests {
         create_for("f_cause_external", Some("w_cause_other")).await;
         destroy_session("f_cause_external", false).await.unwrap();
         assert_eq!(last_destroyed("f_cause_external"), (false, None));
+    }
+
+    #[tokio::test]
+    async fn the_session_log_records_a_sessions_life_where_it_happens() {
+        use super::super::{emit_session_error, emit_stream_ended, StreamEndReason};
+        let id = "f_logged";
+        sessions::register_session_profile(id, "p-logged");
+        create_for(id, Some("w_logged_a")).await;
+        register_subscriber_from(None, id, "w_logged_b", Some("decoder")).await.unwrap();
+        register_subscriber_from(None, id, "w_logged_b", Some("decoder")).await.unwrap();
+        start_session(id).await.unwrap();
+        emit_session_error(id, "Device unplugged".into());
+        emit_stream_ended(id, StreamEndReason::Disconnected, "test");
+        unregister_subscriber(id, "w_logged_b").await.unwrap();
+        stop_session(id).await.unwrap();
+        unregister_subscriber(id, "w_logged_a").await.unwrap();
+
+        let log: Vec<_> = session_log::read(None, None).into_iter().filter(|e| e.session_id.as_deref() == Some(id)).collect();
+        let who = |e: &session_log::SessionLogEntry| (e.subscriber_id.clone(), e.app_name.clone());
+        let named = |s: &str, a: &str| (Some(s.to_string()), Some(a.to_string()));
+        assert_eq!(
+            log.iter().map(|e| (e.event.clone(), who(e))).collect::<Vec<_>>(),
+            [
+                (SessionLogEvent::Created { mode: SessionMode::Live, subscriber_count: 1 }, named("w_logged_a", "w_logged_a")),
+                (SessionLogEvent::Joined { subscriber_count: 2 }, named("w_logged_b", "decoder")),
+                (SessionLogEvent::State { state: IOState::Running }, (None, None)),
+                (SessionLogEvent::Error { message: "Device unplugged".into() }, (None, None)),
+                (SessionLogEvent::StreamEnded { reason: StreamEndReason::Disconnected, capture_count: None }, (None, None)),
+                (SessionLogEvent::Left { subscriber_count: 1 }, (Some("w_logged_b".into()), None)),
+                (SessionLogEvent::State { state: IOState::Stopped }, (None, None)),
+                (SessionLogEvent::Left { subscriber_count: 0 }, (Some("w_logged_a".into()), None)),
+                (SessionLogEvent::Destroyed { reset: false }, (Some("w_logged_a".into()), None)),
+            ]
+        );
+        assert!(log.iter().all(|e| e.profile_ids == ["p-logged"]));
     }
 
     #[tokio::test]

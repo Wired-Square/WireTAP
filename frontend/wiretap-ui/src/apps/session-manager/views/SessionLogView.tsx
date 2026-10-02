@@ -3,7 +3,7 @@
 // Log view component showing session events for development debugging.
 // Features filter bar, scrollable table, and auto-scroll.
 
-import { useEffect, useRef, useMemo, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Trash2,
@@ -19,11 +19,17 @@ import {
   useSessionLogStore,
   useFilteredEntries,
   useUniqueSessionIds,
-  EVENT_TYPE_LABELS,
-  EVENT_TYPE_BADGE,
-  ALL_EVENT_TYPES,
-  type SessionLogEventType,
+  describeEntry,
+  displayKind,
+  profileNames,
+  KIND_LABELS,
+  KIND_BADGE,
+  KIND_GROUPS,
+  ALL_KINDS,
+  type SessionLogKind,
 } from "../stores/sessionLogStore";
+import { clearSessionLog } from "../../../api/io";
+import { useSettingsStore } from "../../settings/stores/settingsStore";
 import {
   textSecondary,
   textMuted,
@@ -70,7 +76,7 @@ export default function SessionLogView() {
   const setFilter = useSessionLogStore((s) => s.setFilter);
   const setAutoScroll = useSessionLogStore((s) => s.setAutoScroll);
   const setShowProfileColumn = useSessionLogStore((s) => s.setShowProfileColumn);
-  const clearEntries = useSessionLogStore((s) => s.clearEntries);
+  const profiles = useSettingsStore((s) => s.ioProfiles.profiles);
   const totalCount = useSessionLogStore((s) => s.entries.length);
 
   // Copy state
@@ -79,12 +85,11 @@ export default function SessionLogView() {
   // Copy log entries to clipboard
   const handleCopy = useCallback(async () => {
     const lines = entries.map((entry) => {
-      const time = formatTime(entry.timestamp);
-      const event = EVENT_TYPE_LABELS[entry.eventType];
-      const session = entry.sessionId ?? "-";
-      const profile = entry.profileName ?? "-";
-      const details = entry.details;
-      return `${time}\t${event}\t${session}\t${profile}\t${details}`;
+      const time = formatTime(entry.timestamp_ms);
+      const event = KIND_LABELS[displayKind(entry.event)];
+      const session = entry.session_id ?? "-";
+      const profile = profileNames(entry, profiles) ?? "-";
+      return `${time}\t${event}\t${session}\t${profile}\t${describeEntry(entry)}`;
     });
     const header = "Time\tEvent\tSession\tProfile\tDetails";
     const text = [header, ...lines].join("\n");
@@ -96,7 +101,7 @@ export default function SessionLogView() {
     } catch (e) {
       console.error("Failed to copy log:", e);
     }
-  }, [entries]);
+  }, [entries, profiles]);
 
   // Auto-scroll to bottom when new entries arrive
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,80 +127,14 @@ export default function SessionLogView() {
     }
   }, [autoScroll, setAutoScroll]);
 
-  // Event type filter toggle
-  const toggleEventType = useCallback(
-    (eventType: SessionLogEventType) => {
-      const currentTypes = filter.eventTypes;
-      if (!currentTypes) {
-        // Currently showing all, create set with all except this one
-        const newSet = new Set(ALL_EVENT_TYPES);
-        newSet.delete(eventType);
-        setFilter({ eventTypes: newSet });
-      } else if (currentTypes.has(eventType)) {
-        // Remove from set
-        const newSet = new Set(currentTypes);
-        newSet.delete(eventType);
-        setFilter({ eventTypes: newSet.size === 0 ? null : newSet });
-      } else {
-        // Add to set
-        const newSet = new Set(currentTypes);
-        newSet.add(eventType);
-        // If all types selected, set to null (show all)
-        if (newSet.size === ALL_EVENT_TYPES.length) {
-          setFilter({ eventTypes: null });
-        } else {
-          setFilter({ eventTypes: newSet });
-        }
-      }
+  const toggleKind = useCallback(
+    (kind: SessionLogKind) => {
+      const kinds = new Set(filter.kinds ?? ALL_KINDS);
+      if (kinds.has(kind)) kinds.delete(kind);
+      else kinds.add(kind);
+      setFilter({ kinds: kinds.size === 0 || kinds.size === ALL_KINDS.length ? null : kinds });
     },
-    [filter.eventTypes, setFilter]
-  );
-
-  // Check if event type is active in filter
-  const isEventTypeActive = useCallback(
-    (eventType: SessionLogEventType): boolean => {
-      if (!filter.eventTypes) return true;
-      return filter.eventTypes.has(eventType);
-    },
-    [filter.eventTypes]
-  );
-
-  // Grouped event types for the filter dropdown
-  const eventTypeGroups = useMemo(
-    () => [
-      {
-        label: t("log.filter.groups.lifecycle"),
-        types: [
-          "session-created",
-          "session-joined",
-          "session-left",
-          "session-destroyed",
-        ] as SessionLogEventType[],
-      },
-      {
-        label: t("log.filter.groups.stream"),
-        types: [
-          "state-change",
-          "stream-ended",
-          "stream-complete",
-          "session-error",
-          "speed-changed",
-          "session-mode",
-        ] as SessionLogEventType[],
-      },
-      {
-        label: t("log.filter.groups.status"),
-        types: [
-          "session-reconfigured",
-          "session-stats",
-          "buffer-orphaned",
-          "buffer-created",
-          "device-connected",
-          "device-probe",
-        ] as SessionLogEventType[],
-      },
-    ],
-    [t]
+    [filter.kinds, setFilter]
   );
 
   return (
@@ -208,35 +147,35 @@ export default function SessionLogView() {
         <Button {...eventFilter.trigger} variant="outline" size="sm">
           <Filter className="w-3 h-3" />
           <span>{t("log.filter.events")}</span>
-          {filter.eventTypes && (
-            <Badge tone="primary" size="sm">{filter.eventTypes.size}</Badge>
+          {filter.kinds && (
+            <Badge tone="primary" size="sm">{filter.kinds.size}</Badge>
           )}
           <ChevronDown className="w-3 h-3" />
         </Button>
         <Popover {...eventFilter.popover} className="p-2 min-w-50">
-          {eventTypeGroups.map((group) => (
-            <div key={group.label} className="mb-2 last:mb-0">
+          {KIND_GROUPS.map((group) => (
+            <div key={group.key} className="mb-2 last:mb-0">
               <div className={`text-2xs uppercase font-medium ${textMuted} mb-1`}>
-                {group.label}
+                {t(`log.filter.groups.${group.key}`)}
               </div>
               <div className="flex flex-wrap gap-1">
-                {group.types.map((eventType) => (
+                {group.kinds.map((kind) => (
                   <Button
-                    key={eventType}
+                    key={kind}
                     variant="outline"
-                    tone={EVENT_TYPE_BADGE[eventType].tone}
+                    tone={KIND_BADGE[kind].tone}
                     size="xs"
-                    pressed={isEventTypeActive(eventType)}
-                    onClick={() => toggleEventType(eventType)}
+                    pressed={!filter.kinds || filter.kinds.has(kind)}
+                    onClick={() => toggleKind(kind)}
                   >
-                    {EVENT_TYPE_LABELS[eventType]}
+                    {KIND_LABELS[kind]}
                   </Button>
                 ))}
               </div>
             </div>
           ))}
           <Button
-            onClick={() => setFilter({ eventTypes: null })}
+            onClick={() => setFilter({ kinds: null })}
             variant="outline"
             size="sm"
             className="w-full mt-2"
@@ -327,7 +266,7 @@ export default function SessionLogView() {
 
         {/* Clear Button */}
         <IconButton
-          onClick={clearEntries}
+          onClick={() => void clearSessionLog()}
           tone="danger"
           size="sm"
           title={t("log.clearLog")}
@@ -361,32 +300,36 @@ export default function SessionLogView() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td className={`font-mono ${textMuted}`}>
-                    {formatTime(entry.timestamp)}
-                  </td>
-                  <td>
-                    <Badge size="sm" {...EVENT_TYPE_BADGE[entry.eventType]}>
-                      {EVENT_TYPE_LABELS[entry.eventType]}
-                    </Badge>
-                  </td>
-                  <td
-                    className={`font-mono ${textSecondary}`}
-                    title={entry.profileName ? t("log.profileTitle", { name: entry.profileName }) : undefined}
-                  >
-                    {truncateSessionId(entry.sessionId)}
-                  </td>
-                  {showProfileColumn && (
-                    <td className={textSecondary}>
-                      <span className="max-w-32.5 truncate block">
-                        {entry.profileName ?? "-"}
-                      </span>
+              {entries.map((entry) => {
+                const kind = displayKind(entry.event);
+                const profileName = profileNames(entry, profiles);
+                return (
+                  <tr key={entry.id}>
+                    <td className={`font-mono ${textMuted}`}>
+                      {formatTime(entry.timestamp_ms)}
                     </td>
-                  )}
-                  <td>{entry.details}</td>
-                </tr>
-              ))}
+                    <td>
+                      <Badge size="sm" {...KIND_BADGE[kind]}>
+                        {KIND_LABELS[kind]}
+                      </Badge>
+                    </td>
+                    <td
+                      className={`font-mono ${textSecondary}`}
+                      title={profileName ? t("log.profileTitle", { name: profileName }) : undefined}
+                    >
+                      {truncateSessionId(entry.session_id)}
+                    </td>
+                    {showProfileColumn && (
+                      <td className={textSecondary}>
+                        <span className="max-w-32.5 truncate block">
+                          {profileName ?? "-"}
+                        </span>
+                      </td>
+                    )}
+                    <td>{describeEntry(entry)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}

@@ -122,6 +122,8 @@ wire_enum! {
         // Global signal: the capture list changed (create, delete, rename, pin, owner,
         // orphan, finalise, copy, clear). The frontend reconciles via list_orphaned_captures.
         CaptureListChanged = 0x1D,
+        // Global: one entry appended to the session log, as JSON. Catch up with get_session_log.
+        SessionLogAppended = 0x1E,
         Command          = 0x20,
         CommandResponse  = 0x21,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.

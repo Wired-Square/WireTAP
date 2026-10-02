@@ -36,6 +36,7 @@ export const MsgType = {
   DecodedBacklog: 0x1b,
   AdhocSignals: 0x1c,
   CaptureListChanged: 0x1d,
+  SessionLogAppended: 0x1e,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,
@@ -74,5 +75,7 @@ export const SESSION_ERROR_SEVERITIES = ["fault", "routine"] as const;
 export const SESSION_TRANSITIONS = ["suspended", "switched_to_capture", "resuming", "returned_to_live", "capabilities_changed"] as const;
 
 export const SESSION_MODES = ["live", "recorded", "capture", "replaying"] as const;
+
+export const SESSION_LOG_CAPACITY = 500;
 
 export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";

@@ -317,7 +317,7 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
     } // Lock released here
 
     for (sid, _, after_count) in &results {
-        emit_joiner_count_change(sid, *after_count, None, None, None);
+        emit_joiner_count_change(sid, *after_count, None, None);
     }
 
     // Phase 2a: Pause suspended sessions, off the watchdog: one may be mid-open.

@@ -51,10 +51,6 @@ import type { StreamEndReason } from "../generated/StreamEndReason";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
 import { hexToBytes } from "../utils/byteUtils";
-import {
-  useSessionLogStore,
-  type SessionLogEventType,
-} from "../apps/session-manager/stores/sessionLogStore";
 import { wsTransport } from "../services/wsTransport";
 import {
   MsgType,
@@ -83,29 +79,6 @@ const IO_STATE_FOR_STREAM_END: Partial<Record<StreamEndReason, IOStateType>> = {
   paused: "paused",
   error: "error",
 };
-
-// ============================================================================
-// Session Logging Helper
-// ============================================================================
-
-/** Input for addSessionLog - same as LogEntry but without id/timestamp */
-interface SessionLogInput {
-  eventType: SessionLogEventType;
-  sessionId: string | null;
-  profileId: string | null;
-  profileName: string | null;
-  appName: string | null;
-  details: string;
-}
-
-/** Safely add a session log entry (no-op if store not mounted) */
-function addSessionLog(entry: SessionLogInput) {
-  try {
-    useSessionLogStore.getState().addEntry(entry);
-  } catch {
-    // Ignore if store not mounted yet
-  }
-}
 
 /** Whether Rust opened the session on a capture, as `open_session` and the roster report it. */
 export function isCaptureSession(state: SessionStore, sessionId?: string | null): boolean {
@@ -1449,16 +1422,6 @@ async function openNow(
   if (startProblem) {
     useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", startProblem);
   }
-  if (!opened.created) {
-    addSessionLog({
-      eventType: "session-joined",
-      sessionId,
-      profileId,
-      profileName,
-      appName,
-      details: `Joined existing session (${opened.subscriber_count} listeners, state: ${getStateType(opened.state)})`,
-    });
-  }
 
   const captureId = opened.capture_id;
   const existing = useSessionStore.getState().sessions[sessionId];
@@ -1549,15 +1512,6 @@ async function leaveNow(sessionId: string, subscriberId: string): Promise<void> 
   const eventListeners = getState()._eventListeners[sessionId];
   try {
     const remaining = await unregisterSessionSubscriber(sessionId, subscriberId);
-    const session = getState().sessions[sessionId];
-    addSessionLog({
-      eventType: "session-left",
-      sessionId,
-      profileId: session?.profileId ?? null,
-      profileName: session?.profileName ?? null,
-      appName: subscriberId,
-      details: `Left session (${remaining} listeners remaining)`,
-    });
     if (!eventListeners) return;
     eventListeners.callbacks.delete(subscriberId);
     eventListeners.registeredSubscribers.delete(subscriberId);

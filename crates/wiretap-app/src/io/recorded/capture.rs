@@ -842,8 +842,7 @@ async fn run_capture_stream(
         count: frame_count,
         time_range: None,
     };
-    post_session::store_stream_ended(&session_id, stream_ended_info.clone());
-    crate::ws::dispatch::send_stream_ended(&session_id, &stream_ended_info);
+    crate::io::publish_stream_ended(&session_id, stream_ended_info);
     let final_pos = if control.is_reverse() { frame_index } else { frame_index.saturating_sub(1) };
     tlog!(
         "[Capture:{}] Stream reached end of data, pausing at final position (frame_index: {})",
@@ -905,8 +904,7 @@ async fn run_capture_stream(
                 count: frame_count,
                 time_range: None,
             };
-            post_session::store_stream_ended(&session_id, stream_ended_info.clone());
-            crate::ws::dispatch::send_stream_ended(&session_id, &stream_ended_info);
+            crate::io::publish_stream_ended(&session_id, stream_ended_info);
             continue;
         }
 

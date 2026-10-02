@@ -15,7 +15,7 @@ use crate::{
         ModbusRangeSpec, PollGroup,
         IOBroker, SerialOverrides, SourceConfig,
         CanTransmitFrame, TransmitResult,
-        emit_device_probe, DeviceProbePayload,
+        session_log::{self, SessionLogEntry, SessionLogEvent, Subject},
         set_wake_settings as io_set_wake_settings,
     },
     profile_tracker,
@@ -113,6 +113,32 @@ pub fn get_supported_protocols() -> HashMap<String, Vec<Protocol>> {
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_reader_session_state(session_id: String) -> Result<Option<IOState>, String> {
     Ok(get_session_state(&session_id).await)
+}
+
+/// The session log after `after_id`, oldest first.
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_session_log(after_id: Option<u64>) -> Vec<SessionLogEntry> {
+    session_log::read(after_id, None)
+}
+
+/// Clear the session log for every window and the MCP.
+#[tauri::command(rename_all = "snake_case")]
+pub fn clear_session_log() {
+    session_log::clear();
+}
+
+fn log_probe(profile_id: &str, result: &DeviceProbeResult, cached: bool) {
+    session_log::append(
+        Subject { profile_ids: Some(vec![profile_id.to_string()]), ..Subject::default() },
+        SessionLogEvent::DeviceProbe {
+            source_type: result.source_type.clone(),
+            address: result.secondary_info.clone().unwrap_or_default(),
+            success: result.success,
+            cached,
+            bus_count: result.bus_count,
+            error: result.error.clone(),
+        },
+    );
 }
 
 /// List all active sessions (for discovering shareable sessions like multi-source)
@@ -775,15 +801,7 @@ pub async fn probe_device(
                 supports_fd: None,
                 error: None,
             };
-            emit_device_probe(&app, DeviceProbePayload {
-                profile_id: profile_id.clone(),
-                source_type: "capture".to_string(),
-                address: meta.id.clone(),
-                success: true,
-                cached: false,
-                bus_count,
-                error: None,
-            });
+            log_probe(&profile_id, &result, false);
             // Don't cache capture probes — metadata may change as data streams in
             return Ok(result);
         } else {
@@ -794,15 +812,7 @@ pub async fn probe_device(
     // Check cache first - if we have a successful probe result, return it immediately
     if let Some(cached) = get_cached_probe(&profile_id) {
         tlog!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
-        emit_device_probe(&app, DeviceProbePayload {
-            profile_id: profile_id.clone(),
-            source_type: cached.source_type.clone(),
-            address: cached.secondary_info.clone().unwrap_or_default(),
-            success: cached.success,
-            cached: true,
-            bus_count: cached.bus_count,
-            error: cached.error.clone(),
-        });
+        log_probe(&profile_id, &cached, true);
         return Ok(cached);
     }
 
@@ -1204,15 +1214,7 @@ pub async fn probe_device(
 
     // Emit probe result event (fresh probe, not cached)
     if let Ok(ref probe_result) = result {
-        emit_device_probe(&app, DeviceProbePayload {
-            profile_id: profile_id.clone(),
-            source_type: probe_result.source_type.clone(),
-            address: probe_result.secondary_info.clone().unwrap_or_default(),
-            success: probe_result.success,
-            cached: false,
-            bus_count: probe_result.bus_count,
-            error: probe_result.error.clone(),
-        });
+        log_probe(&profile_id, probe_result, false);
         // Cache successful probe results for future use
         cache_probe_result(&profile_id, probe_result);
     }

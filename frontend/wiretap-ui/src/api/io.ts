@@ -41,6 +41,7 @@ import type { ScanCompletePayload } from "../generated/ScanCompletePayload";
 import type { ScanJob } from "../generated/ScanJob";
 import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
 import type { SerialOverrides } from "../generated/SerialOverrides";
+import type { SessionLogEntry } from "../generated/SessionLogEntry";
 import type { SessionPurpose } from "../generated/SessionPurpose";
 import type { SessionRefusal } from "../generated/SessionRefusal";
 import type { SessionMode } from "../generated/SessionMode";
@@ -1002,4 +1003,14 @@ export async function getCaptureBytesTail(
     capture_id: captureId,
     tail_size: tailSize,
   });
+}
+
+/** The session log ring after `afterId` (all of it when omitted), oldest first. */
+export async function getSessionLog(afterId?: number): Promise<SessionLogEntry[]> {
+  return invoke("get_session_log", { after_id: afterId ?? null });
+}
+
+/** Clear the session log for every window and the MCP. */
+export async function clearSessionLog(): Promise<void> {
+  return invoke("clear_session_log");
 }
