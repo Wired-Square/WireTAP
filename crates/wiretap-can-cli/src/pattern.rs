@@ -108,6 +108,7 @@ impl Link for TaskLink {
                         return Err(error.to_string());
                     }
                 }
+                Ok(Some(_)) => {}
                 Ok(None) => return Err("the CAN task ended".to_owned()),
             }
         }

@@ -184,6 +184,7 @@ impl<'a> PortOutage<'a> {
                 driver(event)
             }
             CanEvent::Read(_) => driver(event),
+            _ => Ok(Vec::new()),
         }
     }
 }

@@ -269,6 +269,7 @@ async fn dump(
                     return Err(error.to_string());
                 }
             }
+            Some(_) => {}
             None => break,
         }
     }

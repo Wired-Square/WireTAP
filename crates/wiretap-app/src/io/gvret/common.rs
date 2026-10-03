@@ -232,6 +232,7 @@ impl Stream {
                 .into_iter()
                 .collect()),
             CanEvent::Disconnected { error, .. } => Err(error),
+            _ => Ok(Vec::new()),
         }
     }
 }
