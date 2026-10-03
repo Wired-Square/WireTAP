@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::AppHandle;
 
-use crate::io::device_kinds::conn_bool;
 use crate::io::periodic::Cadence;
 use crate::io::{self, CanTransmitFrame, IOCapabilities, SignalThrottle};
 use crate::settings::{load_settings, IOProfile};
@@ -26,10 +25,6 @@ use crate::settings::{load_settings, IOProfile};
 pub struct WriterCapabilities {
     pub can_transmit_can: bool,
     pub can_transmit_serial: bool,
-    pub supports_canfd: bool,
-    pub supports_extended_id: bool,
-    pub supports_rtr: bool,
-    pub available_buses: Vec<u8>,
 }
 
 /// Profile info with transmit capabilities
@@ -106,75 +101,12 @@ pub struct RepeatGroupStartedEvent {
 // Helper Functions
 // ============================================================================
 
-/// Get capabilities for a profile kind
-fn get_capabilities_for_kind(kind: &str, profile: &IOProfile) -> WriterCapabilities {
-    match kind {
-        "slcan" => {
-            // Silent mode means no transmit. The default is declared once, in
-            // `io::device_kinds`, and is listen-only for safety.
-            let silent_mode = conn_bool(profile, "silent_mode").unwrap_or(true);
-            let enable_fd = conn_bool(profile, "enable_fd").unwrap_or(false);
-
-            if silent_mode {
-                WriterCapabilities {
-                    can_transmit_can: false, // Can't transmit in silent mode
-                    can_transmit_serial: false,
-                    supports_canfd: false,
-                    supports_extended_id: true,
-                    supports_rtr: true,
-                    available_buses: vec![],
-                }
-            } else {
-                WriterCapabilities {
-                    can_transmit_can: true,
-                    can_transmit_serial: false,
-                    supports_canfd: enable_fd,
-                    supports_extended_id: true,
-                    supports_rtr: true,
-                    available_buses: vec![], // Single bus
-                }
-            }
-        }
-        "gvret_tcp" | "gvret_usb" => WriterCapabilities {
-            can_transmit_can: true,
-            can_transmit_serial: false,
-            supports_canfd: true,
-            supports_extended_id: true,
-            supports_rtr: false,
-            available_buses: vec![0, 1, 2, 3, 4], // Bus 0-4 (device-dependent)
-        },
-        "socketcan" => WriterCapabilities {
-            can_transmit_can: cfg!(target_os = "linux"),
-            can_transmit_serial: false,
-            supports_canfd: true,
-            supports_extended_id: true,
-            supports_rtr: true,
-            available_buses: vec![], // Single interface
-        },
-        "serial" => WriterCapabilities {
-            can_transmit_can: false,
-            can_transmit_serial: true,
-            supports_canfd: false,
-            supports_extended_id: false,
-            supports_rtr: false,
-            available_buses: vec![],
-        },
-        "virtual" => WriterCapabilities {
-            can_transmit_can: true,
-            can_transmit_serial: false,
-            supports_canfd: false,
-            supports_extended_id: true,
-            supports_rtr: false,
-            available_buses: vec![0, 1, 2, 3, 4, 5, 6, 7],
-        },
-        _ => WriterCapabilities {
-            can_transmit_can: false,
-            can_transmit_serial: false,
-            supports_canfd: false,
-            supports_extended_id: false,
-            supports_rtr: false,
-            available_buses: vec![],
-        },
+fn writer_capabilities(profile: &IOProfile) -> WriterCapabilities {
+    let traits = io::traits::profile_traits(profile);
+    let unblocked = traits.tx_blocked.is_none();
+    WriterCapabilities {
+        can_transmit_can: unblocked && traits.session.tx_frames,
+        can_transmit_serial: unblocked && traits.session.tx_bytes,
     }
 }
 
@@ -193,7 +125,7 @@ pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<Transmi
         if !crate::io::device_kinds::spec(&profile.kind).is_some_and(|s| s.available) {
             continue;
         }
-        let capabilities = get_capabilities_for_kind(&profile.kind, profile);
+        let capabilities = writer_capabilities(profile);
         if capabilities.can_transmit_can || capabilities.can_transmit_serial {
             profiles.push(TransmitProfile {
                 id: profile.id.clone(),
@@ -820,6 +752,28 @@ mod tests {
     #[test]
     fn a_refusal_from_a_missing_session_is_permanent_whatever_it_says() {
         assert!(tauri::async_runtime::block_on(super::transmit_refusal_is_permanent("f_gone", "queue full")));
+    }
+
+    #[test]
+    fn every_kind_whose_bus_transmits_is_offered_to_transmit() {
+        for kind in crate::io::device_kinds::kinds() {
+            let spec = crate::io::device_kinds::spec(kind).unwrap();
+            let profile = crate::settings::IOProfile {
+                kind: kind.to_string(),
+                connection: serde_json::from_value(serde_json::json!({ "silent_mode": false, "listen_only": false })).unwrap(),
+                ..Default::default()
+            };
+            let offered = super::writer_capabilities(&profile).can_transmit_can;
+            assert_eq!(offered, spec.can_tx, "{kind}");
+        }
+    }
+
+    #[test]
+    fn a_listen_only_profile_is_not_offered_to_transmit() {
+        for kind in ["slcan", "gs_usb"] {
+            let profile = crate::settings::IOProfile { kind: kind.to_string(), ..Default::default() };
+            assert!(!super::writer_capabilities(&profile).can_transmit_can, "{kind}");
+        }
     }
 
     mod group {
