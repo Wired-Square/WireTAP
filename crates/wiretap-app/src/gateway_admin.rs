@@ -331,17 +331,28 @@ pub async fn gateway_clear_assignment(
 
 /// Copy a catalogue the gateway stores into the decoder library, returning its path.
 #[tauri::command]
-pub async fn gateway_copy_catalogue(app: AppHandle, profile_id: String, blob_sha: String) -> Result<String, String> {
+pub async fn gateway_copy_catalogue(
+    app: AppHandle,
+    profile_id: String,
+    blob_sha: String,
+    name: Option<String>,
+) -> Result<String, String> {
     let stored = fetch_catalogue(&endpoint(&app, &profile_id).await?, &blob_sha).await?;
-    let filename = stored
+    let filename = copy_filename(&stored, name.as_deref());
+    crate::catalog::import_catalog(app, filename, stored.content).await
+}
+
+fn copy_filename(stored: &StoredCatalog, gateway_name: Option<&str>) -> String {
+    let safe = |n: &&str| !n.is_empty() && !n.contains(['/', '\\']) && !n.starts_with('.');
+    stored
         .provenance
         .path
         .as_deref()
         .and_then(|p| p.rsplit('/').next())
-        .filter(|n| !n.is_empty())
+        .filter(safe)
         .map(String::from)
-        .unwrap_or_else(|| format!("{}.toml", &stored.blob_sha[..stored.blob_sha.len().min(12)]));
-    crate::catalog::import_catalog(app, filename, stored.content).await
+        .or_else(|| gateway_name.filter(safe).map(|n| format!("{n}.toml")))
+        .unwrap_or_else(|| format!("{}.toml", &stored.blob_sha[..stored.blob_sha.len().min(12)]))
 }
 
 #[cfg(test)]
@@ -585,6 +596,20 @@ mod tests {
 
         let (ep, _served) = mock(403, &json!({ "error": "admin role required" }).to_string()).await;
         assert_eq!(list_daemons(&ep).await.unwrap_err(), "admin role required");
+    }
+
+    #[test]
+    fn a_copied_catalogue_is_named_by_its_path_then_its_name_then_its_hash() {
+        let stored = |path: Option<&str>| StoredCatalog {
+            blob_sha: A.into(),
+            content: String::new(),
+            provenance: Provenance { path: path.map(String::from), ..Default::default() },
+            created_at_us: 0,
+        };
+        assert_eq!(copy_filename(&stored(Some("cats/site.toml")), Some("sungrow-rs485")), "site.toml");
+        assert_eq!(copy_filename(&stored(None), Some("sungrow-rs485")), "sungrow-rs485.toml");
+        assert_eq!(copy_filename(&stored(None), Some("../escape")), format!("{}.toml", &A[..12]));
+        assert_eq!(copy_filename(&stored(None), None), format!("{}.toml", &A[..12]));
     }
 
     #[tokio::test]

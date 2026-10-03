@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ArchiveProtocol } from "../settings/appSettings";
 import type { AssignmentOutcome } from "../generated/AssignmentOutcome";
 import type { GatewayDaemon } from "../generated/GatewayDaemon";
+import type { CatalogueRef } from "../generated/CatalogueRef";
 
 export interface ApiDatabase {
   name: string;
@@ -119,8 +120,8 @@ export async function gatewayClearAssignment(
 }
 
 /** Copy a catalogue the gateway stores into the decoder library, returning its path. */
-export async function gatewayCopyCatalogue(profileId: string, blobSha: string): Promise<string> {
-  return invoke<string>("gateway_copy_catalogue", { profileId, blobSha });
+export async function gatewayCopyCatalogue(profileId: string, catalogue: CatalogueRef): Promise<string> {
+  return invoke<string>("gateway_copy_catalogue", { profileId, blobSha: catalogue.blobSha, name: catalogue.name });
 }
 
 export interface CaptureUploadProgress {

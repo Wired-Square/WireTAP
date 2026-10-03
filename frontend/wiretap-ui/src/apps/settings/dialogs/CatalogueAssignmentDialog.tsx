@@ -125,10 +125,10 @@ export default function CatalogueAssignmentDialog({ isOpen, profile, onClose }: 
     );
   };
 
-  const copy = (blobSha: string) => {
+  const copy = (catalogue: CatalogueRef) => {
     if (!profileId) return;
     return run(async () => {
-      const path = await gatewayCopyCatalogue(profileId, blobSha);
+      const path = await gatewayCopyCatalogue(profileId, catalogue);
       setNotice({ tone: "success", text: s("copied", { path }) });
     });
   };
@@ -166,7 +166,7 @@ export default function CatalogueAssignmentDialog({ isOpen, profile, onClose }: 
                   size="xs"
                   title={s("copy")}
                   disabled={busy}
-                  onClick={() => copy(device.assigned!.blobSha)}
+                  onClick={() => copy(device.assigned!)}
                 >
                   <Download className={iconSm} />
                 </IconButton>
