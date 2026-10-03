@@ -145,6 +145,16 @@ pub fn write_entry(
     }
 }
 
+#[cfg(test)]
+pub(crate) fn use_in_memory_database() {
+    let mut db = DB.lock().unwrap();
+    if db.is_none() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA_SQL).unwrap();
+        *db = Some(conn);
+    }
+}
+
 /// Count every row in the history table; its change is the `TransmitUpdated` signal.
 pub fn count() -> i64 {
     with_db(0, |conn| {

@@ -27,7 +27,7 @@ impl Gate {
     }
 }
 
-type OnTransmit = Box<dyn Fn(&str, &TransmitPayload) -> TransmitResult + Send + Sync>;
+type OnTransmit = Box<dyn Fn(&str, &TransmitPayload) -> Result<TransmitResult, String> + Send + Sync>;
 
 /// A CAN source that is whatever a test needs it to be.
 pub(crate) struct TestSource {
@@ -63,7 +63,13 @@ impl TestSource {
         mut self,
         on_transmit: impl Fn(&str, &TransmitPayload) -> TransmitResult + Send + Sync + 'static,
     ) -> Self {
-        self.on_transmit = Some(Box::new(on_transmit));
+        self.on_transmit = Some(Box::new(move |session_id, payload| Ok(on_transmit(session_id, payload))));
+        self
+    }
+
+    pub(crate) fn refusing(mut self, error: &str) -> Self {
+        let error = error.to_string();
+        self.on_transmit = Some(Box::new(move |_, _| Err(error.clone())));
         self
     }
 }
@@ -117,7 +123,7 @@ impl IOSource for TestSource {
             .on_transmit
             .as_ref()
             .ok_or("This test source does not transmit")?;
-        Ok(on_transmit(&self.session_id, payload))
+        on_transmit(&self.session_id, payload)
     }
 
     fn state(&self) -> IOState {
