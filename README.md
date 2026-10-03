@@ -46,7 +46,7 @@ CANable and CANable Pro devices support two firmware options that determine whic
 4. **CAN FD support** — The CANable Pro with candleLight firmware supports CAN FD natively via gs_usb. slcan has no standard CAN FD extension.
 5. **Cross-platform without drivers** — WireTAP's nusb integration means gs_usb works on macOS, Windows, and Linux without installing platform-specific drivers. On Linux, gs_usb devices also appear as native SocketCAN interfaces.
 
-To use gs_usb, flash your CANable with [candleLight firmware](https://github.com/candle-usb/candleLight_fw). See the [CANable Setup](../../wiki/CANable-Setup) wiki page for flashing instructions.
+To use gs_usb, flash your CANable with [Elmue's CANable 2.5 firmware](https://github.com/Elmue/CANable-2.5-firmware-Slcan-and-Candlelight), which is maintained and supports both slcan and candleLight (gs_usb) modes; upstream candleLight is no longer actively developed. Elmue's [firmware updater](https://netcult.ch/elmue/CANable%20Firmware%20Update/) flashes it, and the [CANable Setup](../../wiki/CANable-Setup) wiki page has more on flashing.
 
 ## Data Sources
 

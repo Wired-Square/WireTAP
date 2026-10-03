@@ -558,7 +558,7 @@
       "probingText": "Checking device...",
       "successText": "Device connected",
       "errorText": "Device not responding",
-      "supportHint": "Works with CANable, CANable Pro (candleLight firmware), and other gs_usb-compatible devices.",
+      "supportHint": "Works with CANable, CANable Pro and other gs_usb-compatible devices. For a CANable, Elmue's CANable 2.5 firmware is recommended over upstream candleLight.",
       "winNote": " WinUSB driver should install automatically.",
       "macNote": " macOS allows direct USB access - no driver needed.",
       "linuxNote": " On Linux, the kernel gs_usb driver exposes devices as SocketCAN interfaces."
