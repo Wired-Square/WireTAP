@@ -209,7 +209,7 @@ async fn fetch_catalogue(ep: &Endpoint, blob_sha: &str) -> Result<StoredCatalog,
 
 async fn put_assignment(ep: &Endpoint, body: &AssignCatalog) -> Result<AssignmentOutcome, String> {
     let url = format!("{}/v1/admin/assignments", ep.base_url);
-    outcome(http().put(url).bearer_auth(&ep.api_key).json(body)).await
+    outcome(request(http().put(url).bearer_auth(&ep.api_key).json(body)).await?).await
 }
 
 async fn delete_assignment(ep: &Endpoint, params: &UnassignParams) -> Result<AssignmentOutcome, String> {
@@ -222,13 +222,21 @@ async fn delete_assignment(ep: &Endpoint, params: &UnassignParams) -> Result<Ass
     if let Some(expected) = &params.expected {
         url.push_str(&format!("&expected={}", urlencoding(expected)));
     }
-    outcome(http().delete(url).bearer_auth(&ep.api_key)).await
+    let resp = request(http().delete(url).bearer_auth(&ep.api_key)).await?;
+    // A gateway before the change to an idempotent DELETE answers 404 when nothing is assigned.
+    if resp.status() == StatusCode::NOT_FOUND {
+        return Ok(AssignmentOutcome::Done { warnings: Vec::new() });
+    }
+    outcome(resp).await
+}
+
+async fn request(req: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
+    req.send().await.map_err(|e| format!("API request failed: {}", describe(&e)))
 }
 
 /// A 200 with no body is a `DELETE`'s 204; any other answer the admin API does
 /// not define comes back as its `error` text.
-async fn outcome(req: reqwest::RequestBuilder) -> Result<AssignmentOutcome, String> {
-    let resp = req.send().await.map_err(|e| format!("API request failed: {}", describe(&e)))?;
+async fn outcome(resp: reqwest::Response) -> Result<AssignmentOutcome, String> {
     let status = resp.status();
     let body = resp.bytes().await.map_err(|e| format!("API response failed: {}", describe(&e)))?;
     match status {
@@ -566,14 +574,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_clear_answers_204_and_other_failures_come_back_as_their_error() {
+    async fn a_clear_of_nothing_is_done_and_other_failures_come_back_as_their_error() {
         let params = UnassignParams { daemon_id: "d".into(), interface: "i".into(), expected: None };
         let (ep, served) = mock(204, "").await;
         assert_eq!(delete_assignment(&ep, &params).await.unwrap(), AssignmentOutcome::Done { warnings: vec![] });
         assert_eq!(served.await.unwrap().target, "/v1/admin/assignments?daemon_id=d&interface=i");
 
         let (ep, _served) = mock(404, &json!({ "error": "nothing is assigned there" }).to_string()).await;
-        assert_eq!(delete_assignment(&ep, &params).await.unwrap_err(), "nothing is assigned there");
+        assert_eq!(delete_assignment(&ep, &params).await.unwrap(), AssignmentOutcome::Done { warnings: vec![] });
 
         let (ep, _served) = mock(403, &json!({ "error": "admin role required" }).to_string()).await;
         assert_eq!(list_daemons(&ep).await.unwrap_err(), "admin role required");
