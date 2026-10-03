@@ -74,6 +74,14 @@ describe("the bus status chip", () => {
     expect(badges.map((b) => b.textContent)).toEqual(["No ACK", "Bus off"]);
     expect(badges[0].className).toContain("badge--warning");
     expect(badges[1].className).toContain("badge--danger");
-    expect(badges[0].getAttribute("title")).toBe("TEC 128 · REC 0");
+    expect(badges[0].getAttribute("title")).toBe("Error warning · TEC 128 · REC 0");
+  });
+
+  it("names a missing ACK as the cause even once the controller is error passive", () => {
+    useSessionStore.setState({ sessions: { f_1: session([{ ...noAck, state: "passive" }]) } });
+    const [badge] = render(<BusStatusBadges sessionId="f_1" />).querySelectorAll(".badge");
+    expect(badge.textContent).toBe("No ACK");
+    expect(badge.className).toContain("badge--danger");
+    expect(badge.getAttribute("title")).toBe("Error passive · TEC 128 · REC 0");
   });
 });

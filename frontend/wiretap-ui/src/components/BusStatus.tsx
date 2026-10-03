@@ -9,11 +9,17 @@ import FlashNotification from "./FlashNotification";
 
 const EMPTY: BusStatus[] = [];
 
-function chip(status: BusStatus): { key: string; tone: "warning" | "danger" } {
-  if (status.state === "bus_off") return { key: "busOff", tone: "danger" };
-  if (status.state === "passive") return { key: "passive", tone: "danger" };
-  if (status.no_ack) return { key: "noAck", tone: "warning" };
-  return { key: "warning", tone: "warning" };
+const STATE_KEYS: Record<BusStatus["state"], string | null> = {
+  active: null,
+  warning: "warning",
+  passive: "passive",
+  bus_off: "busOff",
+};
+
+function chip(status: BusStatus): { key: string; stateKey: string | null; tone: "warning" | "danger" } {
+  const stateKey = STATE_KEYS[status.state];
+  const tone = status.state === "passive" || status.state === "bus_off" ? "danger" : "warning";
+  return { key: status.no_ack ? "noAck" : (stateKey ?? "warning"), stateKey, tone };
 }
 
 export function BusStatusBadges({ sessionId }: { sessionId: string | null | undefined }) {
@@ -22,14 +28,15 @@ export function BusStatusBadges({ sessionId }: { sessionId: string | null | unde
   const multiBus = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.capabilities?.available_buses.length ?? 0 : 0) > 1);
 
   return buses.map((status) => {
-    const { key, tone } = chip(status);
+    const { key, stateKey, tone } = chip(status);
     const label = t(`busStatus.${key}`);
     const counters =
       status.tx_errors != null && status.rx_errors != null
         ? t("busStatus.counters", { tx: status.tx_errors, rx: status.rx_errors })
-        : undefined;
+        : null;
+    const title = [stateKey && t(`busStatus.${stateKey}`), counters].filter(Boolean).join(" · ") || undefined;
     return (
-      <Badge key={status.bus} tone={tone} title={counters} className="shrink-0">
+      <Badge key={status.bus} tone={tone} title={title} className="shrink-0">
         {multiBus ? t("busStatus.onBus", { bus: status.bus, label }) : label}
       </Badge>
     );
