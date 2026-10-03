@@ -37,6 +37,7 @@ export const MsgType = {
   AdhocSignals: 0x1c,
   CaptureListChanged: 0x1d,
   SessionLogAppended: 0x1e,
+  BusStatus: 0x1f,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,

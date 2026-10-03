@@ -14,6 +14,7 @@ use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls, 
 use crate::capture_store::{self, TimestampedByte};
 use crate::io::error::IoError;
 use crate::io::bus_mapping::BusMapping;
+use crate::io::bus_status::{BusStatusBoard, BusStatusMsg};
 use crate::io::types::SourceMessage;
 use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, take_startup_error, FrameMessage, SignalThrottle, StreamEndReason};
 
@@ -94,6 +95,7 @@ pub(super) async fn run_merge_task(
     fatal_error: Arc<Mutex<Option<String>>>,
     resolved_mappings: Arc<Mutex<HashMap<String, Vec<BusMapping>>>>,
     source_pause_flags: SourcePauseFlags,
+    bus_statuses: BusStatusBoard,
     started: oneshot::Sender<Result<(), String>>,
 ) {
     let mut start = StartReport::new(started, 0..sources.len());
@@ -219,6 +221,7 @@ pub(super) async fn run_merge_task(
                         }
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
+                        send_bus_status(&session_id, bus_statuses.forget_source(source_idx));
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} error: {}", source_idx, error);
@@ -230,6 +233,7 @@ pub(super) async fn run_merge_task(
                         start.failed(source_idx, error);
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
+                        send_bus_status(&session_id, bus_statuses.forget_source(source_idx));
                     }
                     Some(SourceMessage::Interrupted(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} interrupted: {}", source_idx, error);
@@ -253,6 +257,7 @@ pub(super) async fn run_merge_task(
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
                         tlog!("[IOBroker] Source {} connected: {} at {}", source_idx, device_type, address);
                         emit_device_connected(&session_id, &device_type, &address, bus_number);
+                        send_bus_status(&session_id, bus_statuses.forget_source(source_idx));
                         start.ready(source_idx);
                         // The session error left the frontend in its error state;
                         // the session never left its own, so send that again.
@@ -307,6 +312,13 @@ pub(super) async fn run_merge_task(
                                 crate::io::refresh_session_capabilities(&session_id).await;
                             });
                         }
+                    }
+                    Some(SourceMessage::BusState(source_idx, status, tx_dropped)) => {
+                        tlog!(
+                            "[IOBroker] Source {} bus {}: {:?}, no ACK {}, {} sends lost",
+                            source_idx, status.bus, status.state, status.no_ack, tx_dropped
+                        );
+                        send_bus_status(&session_id, Some(bus_statuses.report(source_idx, status, tx_dropped)));
                     }
                     None => {
                         // Channel closed
@@ -467,6 +479,7 @@ pub(super) async fn run_merge_task(
     for handle in source_handles {
         let _ = handle.await;
     }
+    send_bus_status(&session_id, bus_statuses.clear());
 
     // Emit stream ended. A run that lost every source to an error is not
     // "complete" — that reported a clean finish for a session which may never
@@ -482,6 +495,12 @@ pub(super) async fn run_merge_task(
         }
     }
     emit_stream_ended(&session_id, reason, "IOBroker");
+}
+
+fn send_bus_status(session_id: &str, msg: Option<BusStatusMsg>) {
+    if let Some(msg) = msg {
+        crate::ws::dispatch::send_session_json(session_id, crate::ws::protocol::MsgType::BusStatus, &msg);
+    }
 }
 
 /// Spawn a single source reader task. Creates a virtual command channel for virtual sources.

@@ -48,6 +48,8 @@ import {
 import { emptyCapture, reconcileKnownSessions } from "./sessionRoster";
 import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
+import type { BusStatus } from "../generated/BusStatus";
+import type { BusStatusMsg } from "../generated/BusStatusMsg";
 import type { CaptureMetadata } from "../api/capture";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
@@ -161,6 +163,8 @@ export interface Session {
   sourceType?: string;
   /** Profile IDs in this session whose polling is paused (Rust-authoritative). */
   pausedSourceProfileIds: string[];
+  /** Buses in trouble (Rust-authoritative); a bus not listed is active or unknown. */
+  busStatuses: BusStatus[];
   /**
    * Profiles the session was opened from (Rust-authoritative) — the source's,
    * even while it replays its capture after a stop. Empty until Rust reports it.
@@ -172,6 +176,14 @@ export interface Session {
   mode?: SessionMode;
   /** True when adopted from the backend roster (known-only, not UI-owned). */
   external?: boolean;
+}
+
+/** Sends a transmit timeout lost, summed per session and bus until dismissed. */
+export interface SendsLostNotice {
+  sessionId: string;
+  bus: number;
+  count: number;
+  noAck: boolean;
 }
 
 /** Options for creating a session */
@@ -252,6 +264,9 @@ export interface SessionStore {
   activeSessionId: string | null;
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
   _eventListeners: Record<string, SessionEventSubscribers>;
+  /** Sends lost that the toast has not yet been dismissed for */
+  sendsLost: SendsLostNotice[];
+  dismissSendsLost: () => void;
 
   // ---- Actions: Session Lifecycle ----
   /** Join the session, or create it from `options.sourceId` when nothing is under its id */
@@ -441,6 +456,22 @@ export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, 
   callbacks.get(subscriber)?.onDecoded?.(decoded, true);
 }
 
+/** Hold a BusStatus push's buses on the session, and toast the sends it lost. */
+export function applyBusStatus(sessionId: string, { buses, sends_lost }: BusStatusMsg) {
+  updateSession(sessionId, { busStatuses: buses });
+  if (!sends_lost) return;
+  const { bus, count } = sends_lost;
+  const noAck = buses.some((b) => b.bus === bus && b.no_ack);
+  useSessionStore.setState((s) => {
+    const held = s.sendsLost.find((n) => n.sessionId === sessionId && n.bus === bus);
+    return {
+      sendsLost: held
+        ? s.sendsLost.map((n) => (n === held ? { ...n, count: n.count + count, noAck } : n))
+        : [...s.sendsLost, { sessionId, bus, count, noAck }],
+    };
+  });
+}
+
 /** Route a session's WebSocket pushes to its callbacks and store entry. */
 function setupSessionEventSubscribers(sessionId: string, eventListeners: SessionEventSubscribers) {
   // Handlers registered before the channel is subscribed are queued by the transport.
@@ -608,6 +639,12 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
     })
   );
 
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.BusStatus, (_payload, raw) => {
+      applyBusStatus(sessionId, decodeWsJson<BusStatusMsg>(raw));
+    })
+  );
+
   // Reconfigured (0x0A) — signal-only, no payload to decode
   eventListeners.wsUnlistenFunctions.push(
     wsTransport.onSessionMessage(sessionId, MsgType.Reconfigured, () => {
@@ -651,6 +688,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   profileUsage: {},
   activeSessionId: null,
   _eventListeners: {},
+  sendsLost: [],
+  dismissSendsLost: () => set({ sendsLost: [] }),
   pendingJoins: {},
   appErrorDialog: {
     isOpen: false,
@@ -1480,6 +1519,7 @@ function newSession({ id, profileId, profileName }: Pick<Session, "id" | "profil
     catalogPath: null,
     bytesCaptureId: null,
     pausedSourceProfileIds: [],
+    busStatuses: [],
     originProfileIds: [],
   };
 }

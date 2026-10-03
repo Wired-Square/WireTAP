@@ -47,6 +47,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     };
     r.visit::<crate::io::GvretDeviceInfo>();
     r.visit::<crate::io::ActiveSessionInfo>();
+    r.visit::<crate::io::bus_status::BusStatusMsg>();
     r.visit::<crate::io::AppInstanceInfo>();
     r.visit::<crate::io::CanTransmitFrame>();
     r.visit::<crate::io::ModbusRangeSpec>();

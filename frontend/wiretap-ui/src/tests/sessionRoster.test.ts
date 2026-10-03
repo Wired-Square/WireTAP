@@ -29,6 +29,7 @@ const info = (sessionId: string, profileId = "io_x") =>
     capture_frame_count: null,
     is_streaming: true,
     paused_source_profile_ids: [],
+    bus_statuses: [],
   }) as unknown as ActiveSessionInfo;
 
 describe("reconcileKnownSessions", () => {
@@ -52,6 +53,7 @@ describe("reconcileKnownSessions", () => {
       // is not quietly asserting the opposite.
       sourceType: "framelink",
       pausedSourceProfileIds: [],
+      busStatuses: [],
       originProfileIds: ["io_x"],
       capture: {
         available: false, id: null, kind: null, count: 0, owningSessionId: null,
@@ -124,6 +126,16 @@ describe("reconcileKnownSessions", () => {
     const next = reconcileKnownSessions({ f_mcp1: owned }, [paused]);
     expect(next.f_mcp1).not.toBe(owned);
     expect(next.f_mcp1.pausedSourceProfileIds).toEqual(["io_x"]);
+  });
+
+  // A reconnect's roster is how a window that missed BusStatus pushes catches up.
+  it("rebuilds an entry when only its buses in trouble changed", () => {
+    const owned = ownedSession({ ioState: "running", subscriberCount: 1, capabilities: caps });
+    const offBus = { bus: 0, state: "bus_off", no_ack: false, tx_errors: null, rx_errors: null } as const;
+    const next = reconcileKnownSessions({ f_mcp1: owned }, [{ ...info("f_mcp1"), bus_statuses: [offBus] }]);
+    expect(next.f_mcp1).not.toBe(owned);
+    expect(next.f_mcp1.busStatuses).toEqual([offBus]);
+    expect(reconcileKnownSessions({}, [{ ...info("f_mcp2"), bus_statuses: [offBus] }]).f_mcp2.busStatuses).toEqual([offBus]);
   });
 
   // A panel that joined before the roster adopted the session was built without it.

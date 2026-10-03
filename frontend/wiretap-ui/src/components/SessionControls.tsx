@@ -18,6 +18,7 @@ import { isCaptureSession, useSessionStore } from "../stores/sessionStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
 import { Button } from "./Button";
+import { BusStatusBadges } from "./BusStatus";
 import { Input } from "./forms";
 import { Menu, MenuItem, MenuSeparator, Popover, usePopover } from "./Menu";
 
@@ -462,7 +463,7 @@ export function IOSessionControls({
   const detailVal = "font-medium text-primary";
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0 flex items-center gap-1">
       {/* Session chip — click opens the session menu (or the picker when no source) */}
       <SessionButton
         ioProfile={ioProfile}
@@ -477,6 +478,7 @@ export function IOSessionControls({
         title={hasSource ? "Session menu" : "Select source"}
         isCaptureMode={isCaptureMode}
       />
+      <BusStatusBadges sessionId={sessionId} />
 
       {/* Rename popover: a click outside commits, as a blur did; Escape cancels */}
       <Popover open={isRenaming} onClose={commitRename} anchorRef={menu.trigger.ref} className="p-2">

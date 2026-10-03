@@ -22,6 +22,7 @@ const START_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 
 use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::bus_mapping::BusMapping;
+use super::bus_status::{BusStatus, BusStatusBoard};
 use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
@@ -132,6 +133,8 @@ pub struct IOBroker {
     /// over a paused device. The map is shared with the merge task, which still
     /// creates the flags (a hot-added source gets one there).
     source_pause_flags: SourcePauseFlags,
+    /// Buses in trouble, written by the merge task and listed by the roster.
+    bus_statuses: BusStatusBoard,
     /// Derived session traits from all interfaces
     session_traits: InterfaceTraits,
     /// Per-bus signal generator controls for virtual sources (populated on start)
@@ -330,6 +333,7 @@ impl IOBroker {
             framing_overrides: Arc::new(Mutex::new(HashMap::new())),
             resolved_mappings: Arc::new(Mutex::new(HashMap::new())),
             source_pause_flags: Arc::new(Mutex::new(HashMap::new())),
+            bus_statuses: BusStatusBoard::default(),
             session_traits,
             virtual_bus_controls: Arc::new(Mutex::new(HashMap::new())),
             merge_cmd_tx: Arc::new(Mutex::new(None)),
@@ -726,6 +730,7 @@ impl IOSource for IOBroker {
             flags.clear();
         }
         let source_pause_flags = self.source_pause_flags.clone();
+        let bus_statuses = self.bus_statuses.clone();
         let ended = self.lifecycle.guard(IOState::Stopped);
 
         // Create command channel for hot source add/remove
@@ -759,6 +764,7 @@ impl IOSource for IOBroker {
                 fatal_error,
                 resolved_mappings,
                 source_pause_flags,
+                bus_statuses,
                 started_tx,
             )
             .await;
@@ -1054,6 +1060,10 @@ impl IOSource for IOBroker {
     fn resume_source_polling(&self, profile_id: &str) -> Result<(), String> {
         self.resume_source(profile_id)
     }
+
+    fn bus_statuses(&self) -> Vec<BusStatus> {
+        self.bus_statuses.buses()
+    }
 }
 
 #[cfg(test)]
@@ -1142,5 +1152,72 @@ mod tests {
         };
         assert!(virtual_device(Protocol::Serial).transmits_raw_bytes());
         assert!(!virtual_device(Protocol::Can).transmits_raw_bytes());
+    }
+}
+
+#[cfg(test)]
+mod bus_status_tests {
+    use super::*;
+    use crate::io::bus_status::BusErrorState;
+    use std::time::Duration;
+
+    fn virtual_device(session_id: &str) -> IOBroker {
+        let profile = crate::settings::IOProfile {
+            id: format!("{session_id}-device"),
+            name: "Virtual".into(),
+            kind: "virtual".into(),
+            connection: [
+                ("traffic_type".to_string(), serde_json::json!("can")),
+                ("signal_generator".to_string(), serde_json::json!(false)),
+            ]
+            .into(),
+            preferred_catalog: None,
+            ephemeral: true,
+        };
+        let config = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            display_name: profile.name.clone(),
+            bus_mappings: crate::sessions::profile_bus_mappings(&profile),
+            ..Default::default()
+        };
+        let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
+        IOBroker::single_source(profiles, session_id.into(), config).unwrap()
+    }
+
+    async fn settles(broker: &IOBroker, expected: &[BusStatus]) {
+        for _ in 0..100 {
+            if broker.bus_statuses() == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(broker.bus_statuses(), expected);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_bus_report_is_session_state_until_its_source_reconnects_or_the_session_stops() {
+        let mut broker = virtual_device("bus_status_held");
+        broker.start().await.unwrap();
+        let passive = BusStatus {
+            bus: 4,
+            state: BusErrorState::Passive,
+            no_ack: true,
+            tx_errors: Some(136),
+            rx_errors: None,
+        };
+        let report = || SourceMessage::BusState(0, passive.clone(), 3);
+
+        broker.tx.send(report()).await.unwrap();
+        settles(&broker, std::slice::from_ref(&passive)).await;
+
+        let reconnected = SourceMessage::Connected(0, "gs_usb".into(), "0:5".into(), Some(1));
+        broker.tx.send(reconnected).await.unwrap();
+        settles(&broker, &[]).await;
+
+        broker.tx.send(report()).await.unwrap();
+        settles(&broker, std::slice::from_ref(&passive)).await;
+        broker.stop().await.unwrap();
+        assert_eq!(broker.bus_statuses(), []);
     }
 }

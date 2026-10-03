@@ -127,20 +127,18 @@ pub(crate) fn gvret_protocols() -> Vec<Protocol> {
     crate::io::traits::supported_protocols_for_kind("gvret_tcp").to_vec()
 }
 
-/// Apply bus mappings to a frame, returning None if the bus is disabled
-pub fn apply_bus_mapping(frame: &mut FrameMessage, mappings: &[BusMapping]) -> bool {
-    // Find mapping for this device bus
-    if let Some(mapping) = mappings.iter().find(|m| m.device_bus == frame.bus) {
-        if mapping.enabled {
-            frame.bus = mapping.output_bus;
-            true
-        } else {
-            false // Bus is disabled, skip frame
-        }
-    } else {
-        // No mapping found, pass through unchanged
-        true
+/// The session bus a device bus is carried on: `None` when it is muted, and
+/// itself when no mapping names it.
+pub fn output_bus(device_bus: u8, mappings: &[BusMapping]) -> Option<u8> {
+    match mappings.iter().find(|m| m.device_bus == device_bus) {
+        Some(mapping) => mapping.enabled.then_some(mapping.output_bus),
+        None => Some(device_bus),
     }
+}
+
+/// Apply bus mappings to a frame, returning false if the bus is disabled
+pub fn apply_bus_mapping(frame: &mut FrameMessage, mappings: &[BusMapping]) -> bool {
+    output_bus(frame.bus, mappings).map(|bus| frame.bus = bus).is_some()
 }
 
 // ============================================================================

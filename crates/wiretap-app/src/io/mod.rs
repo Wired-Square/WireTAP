@@ -25,6 +25,7 @@ mod recorded;
 // Real-time drivers
 pub mod gs_usb; // pub for Tauri command access
 pub mod bus_mapping; // Device bus -> session bus, shared by every multi-bus driver
+pub mod bus_status;
 mod can_task; // Frames in and transmits out of a wiretap-io CAN task
 pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
@@ -654,6 +655,11 @@ pub trait IOSource: Send + Sync {
     /// what it had asked for, so two panels on one session disagreed and a
     /// webview reload came back claiming a paused device was polling.
     fn paused_source_profile_ids(&self) -> Vec<String> {
+        vec![]
+    }
+
+    /// The session's buses in trouble, as their devices last reported them.
+    fn bus_statuses(&self) -> Vec<bus_status::BusStatus> {
         vec![]
     }
 

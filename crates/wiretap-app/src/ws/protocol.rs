@@ -124,6 +124,9 @@ wire_enum! {
         CaptureListChanged = 0x1D,
         // Global: one entry appended to the session log, as JSON. Catch up with get_session_log.
         SessionLogAppended = 0x1E,
+        // A session's buses in trouble and the sends a transmit timeout lost, as JSON
+        // (`BusStatusMsg`). The whole list each time; the frontend replaces what it holds.
+        BusStatus        = 0x1F,
         Command          = 0x20,
         CommandResponse  = 0x21,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.

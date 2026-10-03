@@ -14,7 +14,7 @@ use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
 use super::{GsUsbDeviceInfo, GsUsbProbeResult};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
-    can_options, link_lost, mapped_frames, open_failed, serve, PROBE_TIMEOUT,
+    can_options, link_lost, mapped_bus_state, mapped_frames, open_failed, serve, PROBE_TIMEOUT,
 };
 use crate::io::error::IoError;
 use crate::io::types::SourceMessage;
@@ -116,6 +116,9 @@ fn on_event(
         CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
             .into_iter()
             .collect()),
+        CanEvent::Bus(state) => Ok(mapped_bus_state(source_idx, state, mappings)
+            .into_iter()
+            .collect()),
         CanEvent::Disconnected { error, .. } => Err(error),
         _ => Ok(Vec::new()),
     }
@@ -185,8 +188,9 @@ pub async fn run_source(
 mod tests {
     use super::*;
     use std::time::{Duration, UNIX_EPOCH};
-    use wiretap_io::can::{CanFrame, CanRead, Direction};
+    use wiretap_io::can::{BusState, CanFrame, CanRead, Direction, ErrorState};
 
+    use crate::io::bus_status::BusErrorState;
     use crate::io::can_task::can_frame;
     use crate::io::types::EndReason;
     use crate::io::CanTransmitFrame;
@@ -256,6 +260,27 @@ mod tests {
         };
         assert_eq!((frames[0].frame_id, frames[0].bus), (0x123, 4));
         assert_eq!(frames[0].timestamp_us, 1_000);
+    }
+
+    #[test]
+    fn bus_trouble_on_the_channel_lands_on_the_sessions_bus() {
+        let mut state = BusState::active(1);
+        state.state = ErrorState::Passive;
+        state.no_ack = true;
+        state.tx_dropped = 7;
+        state.tx_errors = Some(136);
+        let messages =
+            on_event(3, "0:5", 1, &on_channel(session_bus(4), 1), CanEvent::Bus(state)).unwrap();
+        let [SourceMessage::BusState(3, status, 7)] = messages.as_slice() else {
+            panic!("expected one BusState with seven sends lost");
+        };
+        assert_eq!((status.bus, status.state, status.no_ack), (4, BusErrorState::Passive, true));
+        assert_eq!((status.tx_errors, status.rx_errors), (Some(136), None));
+
+        let mut muted = on_channel(session_bus(4), 1);
+        muted[0].enabled = false;
+        let silent = on_event(3, "0:5", 1, &muted, CanEvent::Bus(BusState::active(1))).unwrap();
+        assert!(silent.is_empty(), "a muted bus reports nothing");
     }
 
     #[test]

@@ -1250,6 +1250,7 @@ Per-session (channel 1..254):
 | `FrameCounts`       | 0x16 | Live total + distinct-(bus,frame_id) unique counts, pushed on the frame cadence (see [§ Frame counts](#frame-counts)) |
 | `ByteCounts`        | 0x19 | Live raw-byte total + the session's byte-capture id, pushed on the byte cadence (see [§ Raw serial bytes](#raw-serial-bytes--counted-not-streamed)) |
 | `ModbusScanState`   | 0x1A | Discovery sweep progress + device identification, throttled to 2 Hz (see [§ Modbus discovery](#modbus-discovery)) |
+| `BusStatus`         | 0x1F | JSON `BusStatusMsg`: every bus in trouble (after bus mapping) and the sends a transmit timeout lost. The whole list each time; a source's buses drop on its `Connected` or end, all of them when the session stops. The roster carries the same list as `bus_statuses` |
 
 JSON-payload session messages go out through
 [`send_session_json`](../crates/wiretap-app/src/ws/dispatch.rs), which resolves the

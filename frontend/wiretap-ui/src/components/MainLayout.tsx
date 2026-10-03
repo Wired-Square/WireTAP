@@ -18,6 +18,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
 import { getStartupNotices, type StartupNotice } from "../api/appStatus";
 import FlashNotification from "./FlashNotification";
+import { SendsLostToasts } from "./BusStatus";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary } from "../styles/colourTokens";
 import "dockview-react/dist/styles/dockview.css";
@@ -646,6 +647,7 @@ export default function MainLayout() {
           />
         );
       })}
+      <SendsLostToasts />
     </div>
   );
 }

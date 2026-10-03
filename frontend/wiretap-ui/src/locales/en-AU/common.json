@@ -132,6 +132,18 @@
     "interfaceSettings": "Interface settings — {{name}}",
     "showEvents": "Show events"
   },
+  "busStatus": {
+    "noAck": "No ACK",
+    "warning": "Error warning",
+    "passive": "Error passive",
+    "busOff": "Bus off",
+    "onBus": "Bus {{bus}}: {{label}}",
+    "counters": "TEC {{tx}} · REC {{rx}}",
+    "sendsLost_one": "At least {{count}} send lost on bus {{bus}}",
+    "sendsLost_other": "At least {{count}} sends lost on bus {{bus}}",
+    "sendsLostNoAck_one": "At least {{count}} send lost on bus {{bus}} (no ACK)",
+    "sendsLostNoAck_other": "At least {{count}} sends lost on bus {{bus}} (no ACK)"
+  },
   "timezone": {
     "changeTooltip": "Click to change timezone"
   },

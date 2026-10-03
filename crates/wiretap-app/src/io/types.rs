@@ -86,6 +86,10 @@ pub enum SourceMessage {
     /// this once connected; the broker adopts it for `available_buses` and
     /// transmit routing so receive and transmit agree on the same set.
     MappingsResolved(usize, Vec<crate::io::bus_mapping::BusMapping>),
+    /// A bus's whole state on the session's bus, and the sends a transmit
+    /// timeout lost (source_index, status, tx_dropped).
+    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
+    BusState(usize, crate::io::bus_status::BusStatus, u32),
 }
 
 // ============================================================================

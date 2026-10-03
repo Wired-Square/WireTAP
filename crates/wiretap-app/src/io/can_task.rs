@@ -11,10 +11,12 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::sync::mpsc;
 use wiretap_io::can::{
-    CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, Direction, SendRefused,
+    BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, Direction,
+    SendRefused,
 };
 
-use crate::io::bus_mapping::{apply_bus_mappings_batch, BusMapping};
+use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
+use crate::io::bus_status::BusStatus;
 #[cfg(not(target_os = "ios"))]
 use crate::io::error::DevicePresence;
 use crate::io::error::IoError;
@@ -110,6 +112,24 @@ pub(crate) fn mapped_frames(
     (!frames.is_empty()).then(|| SourceMessage::Frames(source_idx, frames))
 }
 
+/// A bus's state on the session's bus; none when that bus is muted.
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
+pub(crate) fn mapped_bus_state(
+    source_idx: usize,
+    state: BusState,
+    mappings: &[BusMapping],
+) -> Option<SourceMessage> {
+    let bus = output_bus(state.bus, mappings)?;
+    let status = BusStatus {
+        bus,
+        state: state.state.into(),
+        no_ack: state.no_ack,
+        tx_errors: state.tx_errors,
+        rx_errors: state.rx_errors,
+    };
+    Some(SourceMessage::BusState(source_idx, status, state.tx_dropped))
+}
+
 pub(crate) fn open_failed(device: &str, error: CanError) -> String {
     match error {
         CanError::Open { source, .. } => {
@@ -183,7 +203,7 @@ impl<'a> PortOutage<'a> {
                 }
                 driver(event)
             }
-            CanEvent::Read(_) => driver(event),
+            CanEvent::Read(_) | CanEvent::Bus(_) => driver(event),
             _ => Ok(Vec::new()),
         }
     }

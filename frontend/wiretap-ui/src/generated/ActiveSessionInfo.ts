@@ -1,4 +1,5 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
+import type { BusStatus } from "./BusStatus";
 import type { CaptureKind } from "./CaptureKind";
 import type { IOCapabilities } from "./IOCapabilities";
 import type { IOState } from "./IOState";
@@ -79,6 +80,10 @@ catalog_path: string | null,
  * what it last asked for.
  */
 paused_source_profile_ids: Array<string>, 
+/**
+ * Buses in trouble (Rust-authoritative); a bus not listed is active or unknown.
+ */
+bus_statuses: Array<BusStatus>, 
 /**
  * Whether the picker offers the session to join
  */

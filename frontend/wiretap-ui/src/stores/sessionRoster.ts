@@ -73,6 +73,7 @@ export function reconcileKnownSessions(
         // Rust sorts this list, so comparing the joined form is a real
         // comparison rather than an accident of map iteration order.
         existing.pausedSourceProfileIds.join() !== paused.join() ||
+        JSON.stringify(existing.busStatuses) !== JSON.stringify(info.bus_statuses) ||
         existing.originProfileIds.join() !== origin.join() ||
         existing.sourceKind !== info.source_kind ||
         existing.mode !== info.mode ||
@@ -91,6 +92,7 @@ export function reconcileKnownSessions(
           catalogPath,
           sourceType: info.source_type,
           pausedSourceProfileIds: paused,
+          busStatuses: info.bus_statuses,
           originProfileIds: origin,
           sourceKind: info.source_kind,
           mode: info.mode,
@@ -129,6 +131,7 @@ export function reconcileKnownSessions(
       bytesCaptureId: null,
       sourceType: info.source_type,
       pausedSourceProfileIds: info.paused_source_profile_ids,
+      busStatuses: info.bus_statuses,
       originProfileIds: info.origin_profile_ids,
       sourceKind: info.source_kind,
       mode: info.mode,

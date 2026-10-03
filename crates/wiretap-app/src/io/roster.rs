@@ -7,6 +7,7 @@ use super::session::{
     read_session, resume_reattached, session_capture, session_mode, session_snapshot, session_snapshots,
     session_states, source_kind, teardown_session_if_empty, IOSession, SessionMode, SessionSourceKind,
 };
+use super::bus_status::BusStatus;
 use super::{broker, IOCapabilities, IOState, SourceConfig, TemporalMode, CAPTURE_SOURCE_TYPE};
 use crate::{capture_store, sessions};
 
@@ -451,6 +452,8 @@ pub struct ActiveSessionInfo {
     /// what it last asked for.
     #[serde(default)]
     pub paused_source_profile_ids: Vec<String>,
+    /// Buses in trouble (Rust-authoritative); a bus not listed is active or unknown.
+    pub bus_statuses: Vec<BusStatus>,
     /// Whether the picker offers the session to join
     pub joinable: bool,
 }
@@ -465,6 +468,7 @@ pub(super) struct SessionSnapshot {
     broker_configs: Option<Vec<broker::SourceConfig>>,
     mode: SessionMode,
     paused_source_profile_ids: Vec<String>,
+    bus_statuses: Vec<BusStatus>,
 }
 
 #[cfg(test)]
@@ -483,6 +487,7 @@ impl SessionSnapshot {
             broker_configs: session.source.broker_configs(),
             mode: session_mode(session_id, session),
             paused_source_profile_ids: session.source.paused_source_profile_ids(),
+            bus_statuses: session.source.bus_statuses(),
         }
     }
 
@@ -546,6 +551,7 @@ fn describe_session(session_id: &str, session: SessionSnapshot) -> ActiveSession
         is_streaming,
         catalog_path: crate::ws::dispatch::attached_catalog_path(session_id),
         paused_source_profile_ids: session.paused_source_profile_ids,
+        bus_statuses: session.bus_statuses,
         joinable,
     }
 }
@@ -608,6 +614,7 @@ mod tests {
             broker_configs: None,
             mode: SessionMode::Live,
             paused_source_profile_ids: vec![],
+            bus_statuses: vec![],
         }
     }
 
