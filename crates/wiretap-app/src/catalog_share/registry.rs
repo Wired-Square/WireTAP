@@ -587,6 +587,11 @@ impl Registry {
             .find(|c| c.repo_id == repo_id && filename_eq(&c.local_filename, filename))
     }
 
+    /// Every subscription of one local file, one per repository.
+    pub fn catalogs_for_file<'a>(&'a self, filename: &'a str) -> impl Iterator<Item = &'a CatalogEntry> {
+        self.catalogs.iter().filter(move |c| filename_eq(&c.local_filename, filename))
+    }
+
     pub fn catalog_by_id(&self, id: &str) -> Option<&CatalogEntry> {
         self.catalogs.iter().find(|c| c.id == id)
     }

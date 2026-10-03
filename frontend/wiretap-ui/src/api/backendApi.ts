@@ -7,6 +7,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ArchiveProtocol } from "../settings/appSettings";
+import type { AssignmentOutcome } from "../generated/AssignmentOutcome";
+import type { GatewayDaemon } from "../generated/GatewayDaemon";
 
 export interface ApiDatabase {
   name: string;
@@ -83,6 +85,42 @@ export async function apiImportCapture(
   create: boolean,
 ): Promise<number> {
   return invoke<number>("api_import_capture", { profileId, captureId, database, create });
+}
+
+/** Each daemon's devices, with what is assigned against what each is running. */
+export async function gatewayListDaemons(profileId: string): Promise<GatewayDaemon[]> {
+  return invoke<GatewayDaemon[]>("gateway_list_daemons", { profileId });
+}
+
+/** `expected` is the SHA shown as assigned, `""` for none; the gateway answers a conflict if it moved. */
+export async function gatewayAssignCatalogue(
+  profileId: string,
+  daemonId: string,
+  iface: string,
+  filename: string,
+  expected: string,
+): Promise<AssignmentOutcome> {
+  return invoke<AssignmentOutcome>("gateway_assign_catalogue", {
+    profileId,
+    daemonId,
+    interface: iface,
+    filename,
+    expected,
+  });
+}
+
+export async function gatewayClearAssignment(
+  profileId: string,
+  daemonId: string,
+  iface: string,
+  expected: string,
+): Promise<AssignmentOutcome> {
+  return invoke<AssignmentOutcome>("gateway_clear_assignment", { profileId, daemonId, interface: iface, expected });
+}
+
+/** Copy a catalogue the gateway stores into the decoder library, returning its path. */
+export async function gatewayCopyCatalogue(profileId: string, blobSha: string): Promise<string> {
+  return invoke<string>("gateway_copy_catalogue", { profileId, blobSha });
 }
 
 export interface CaptureUploadProgress {

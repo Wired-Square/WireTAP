@@ -68,9 +68,9 @@ static API_RUNNING: LazyLock<Mutex<HashMap<String, InFlight>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone)]
-struct Endpoint {
-    base_url: String,
-    api_key: String,
+pub(crate) struct Endpoint {
+    pub(crate) base_url: String,
+    pub(crate) api_key: String,
 }
 
 /// An in-flight query: what to DELETE to cancel it, and what to say about it.
@@ -133,7 +133,7 @@ pub struct ApiProfile {
 }
 
 impl ApiProfile {
-    fn endpoint(&self) -> Endpoint {
+    pub(crate) fn endpoint(&self) -> Endpoint {
         Endpoint { base_url: self.base_url.clone(), api_key: self.api_key.clone() }
     }
 
@@ -221,7 +221,7 @@ async fn get_url<T: DeserializeOwned>(url: String, api_key: &str) -> Result<T, S
     send(if api_key.is_empty() { req } else { req.bearer_auth(api_key) }).await
 }
 
-async fn send<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> Result<T, String> {
+pub(crate) async fn send<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> Result<T, String> {
     let resp = req
         .send()
         .await
@@ -768,7 +768,7 @@ pub struct ApiDatabase {
     pub size_bytes: i64,
 }
 
-async fn resolve_by_id(app: &tauri::AppHandle, profile_id: &str) -> Result<ApiProfile, String> {
+pub(crate) async fn resolve_by_id(app: &tauri::AppHandle, profile_id: &str) -> Result<ApiProfile, String> {
     let settings = crate::settings::load_settings(app.clone())
         .await
         .map_err(|e| format!("Failed to load settings: {e}"))?;

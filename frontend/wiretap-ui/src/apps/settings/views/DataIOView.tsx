@@ -1,6 +1,6 @@
 // ui/src/apps/settings/views/DataIOView.tsx
 
-import { Cable, Plus, Copy, Edit2, Trash2, Star, Save } from "lucide-react";
+import { Cable, Plus, Copy, Edit2, Trash2, Star, Save, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd } from "../../../styles/spacing";
 import type { IOProfile } from "../stores/settingsStore";
@@ -28,6 +28,8 @@ type DataIOViewProps = {
   onEditProfile: (profile: IOProfile) => void;
   onDeleteProfile: (id: string) => void;
   onDuplicateProfile: (profile: IOProfile) => void;
+  /** Open a WireTAP Backend profile's catalogue assignments. */
+  onAssignCatalogues: (profile: IOProfile) => void;
   defaultReadProfile: string | null;
   onToggleDefaultRead: (profileId: string) => void;
   /** Devices created ad-hoc in the source picker, listed apart from saved ones. */
@@ -240,6 +242,7 @@ export default function DataIOView({
   onEditProfile,
   onDeleteProfile,
   onDuplicateProfile,
+  onAssignCatalogues,
   defaultReadProfile,
   onToggleDefaultRead,
   adHocProfiles,
@@ -302,6 +305,14 @@ export default function DataIOView({
               </div>
 
               <div className={`flex items-center ${gapSmall}`}>
+                {profile.kind === "wiretap" && (
+                  <IconButton
+                    onClick={() => onAssignCatalogues(profile)}
+                    title={t("dataIO.actions.assignCatalogues")}
+                  >
+                    <BookOpen className={`${iconMd} ${textSecondary}`} />
+                  </IconButton>
+                )}
                 <IconButton
                   onClick={() => onToggleDefaultRead(profile.id)}
                   title={

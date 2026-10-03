@@ -307,7 +307,8 @@
       "unsetDefault": "Unset as default",
       "duplicate": "Duplicate profile",
       "edit": "Edit profile",
-      "delete": "Delete profile"
+      "delete": "Delete profile",
+      "assignCatalogues": "Catalogue assignments"
     },
     "badges": {
       "recorded": "Recorded"
@@ -354,6 +355,47 @@
     }
   },
   "dialogs": {
+    "catalogueAssignment": {
+      "title": "Catalogue Assignments",
+      "columns": {
+        "interface": "Interface",
+        "assigned": "Assigned",
+        "running": "Running",
+        "status": "Status"
+      },
+      "source": {
+        "assigned": "Assigned",
+        "local": "Local",
+        "none": "None"
+      },
+      "status": {
+        "unassigned": "Unassigned",
+        "applied": "Applied",
+        "pending": "Pending",
+        "refused": "Refused: {{reason}}"
+      },
+      "refusal": {
+        "hash_mismatch": "hash mismatch",
+        "did_not_parse": "did not parse",
+        "fetch_failed": "fetch failed",
+        "other": "other"
+      },
+      "notReported": "Not reported",
+      "noDaemons": "No daemon has connected to this gateway with a device it could assign.",
+      "assign": "Assign",
+      "clear": "Clear",
+      "copy": "Save a copy to the decoder library",
+      "refresh": "Refresh",
+      "pick": "Choose a catalogue from the decoder library for {{interface}} on {{daemon}}. The daemon reconnects that device's sessions to take it up.",
+      "confirmClear": "Clear the catalogue assigned to {{interface}} on {{daemon}}? The daemon reconnects that device's sessions and falls back to its own configuration.",
+      "emptyLibrary": "The decoder library has no catalogues.",
+      "assigned": "Assigned. The device shows Applied once its daemon reports it.",
+      "cleared": "Cleared.",
+      "copied": "Saved to {{path}}.",
+      "doneWithWarnings": "Done, with warnings:",
+      "rejected": "The gateway refused the catalogue:",
+      "conflict": "Someone else changed this assignment since it was shown. The list has been refreshed; check it and try again."
+    },
     "duplicateCatalog": {
       "title": "Duplicate Catalog",
       "newName": "New Name",

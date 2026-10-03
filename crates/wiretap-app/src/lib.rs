@@ -13,6 +13,7 @@ mod captures;
 mod catalog;
 mod catalog_share;
 mod apiclient;
+mod gateway_admin;
 mod dashboard;
 mod checksum_discovery;
 mod checksums;
@@ -1478,6 +1479,10 @@ pub fn run() {
             analysis::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
+            gateway_admin::gateway_list_daemons,
+            gateway_admin::gateway_assign_catalogue,
+            gateway_admin::gateway_clear_assignment,
+            gateway_admin::gateway_copy_catalogue,
             capture_events::capture_events_list,
             capture_events::capture_events_add,
             capture_events::capture_events_update,

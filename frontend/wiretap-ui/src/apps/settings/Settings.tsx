@@ -39,6 +39,7 @@ import ConfirmDeleteDialog from "../../dialogs/ConfirmDeleteDialog";
 import DuplicateCatalogDialog from "./dialogs/DuplicateCatalogDialog";
 import EditSelectionSetDialog from "./dialogs/EditSelectionSetDialog";
 import EditDashboardLayoutDialog from "./dialogs/EditDashboardLayoutDialog";
+import CatalogueAssignmentDialog from "./dialogs/CatalogueAssignmentDialog";
 import { useSettingsStore, type SettingsSection } from "./stores/settingsStore";
 import { useAdHocProfileStore } from "../../stores/adHocProfileStore";
 import { useSettingsForms } from "./hooks/useSettingsForms";
@@ -382,6 +383,7 @@ export default function Settings() {
               }
               onDeleteProfile={handlers.handleDeleteIOProfile}
               onDuplicateProfile={handlers.handleDuplicateIOProfile}
+              onAssignCatalogues={handlers.handleOpenCatalogueAssignment}
               adHocProfiles={adHocProfiles}
               onSaveAdHocProfile={handlers.handleSaveAdHocProfile}
               onDiscardAdHocProfile={handlers.handleDiscardAdHocProfile}
@@ -473,6 +475,12 @@ export default function Settings() {
         onUpdateProfileField={handlers.updateProfileField}
         onUpdateConnectionField={handlers.updateConnectionField}
         onPersistProbe={handlers.persistProbedFields}
+      />
+
+      <CatalogueAssignmentDialog
+        isOpen={dialogs.catalogueAssignment}
+        profile={dialogPayload.catalogueAssignmentProfile}
+        onClose={handlers.handleCloseCatalogueAssignment}
       />
 
       {/* Delete IO Profile Confirmation Dialog */}

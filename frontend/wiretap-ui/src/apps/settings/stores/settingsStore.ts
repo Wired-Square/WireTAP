@@ -99,7 +99,8 @@ type DialogName =
   | 'editSelectionSet'
   | 'deleteSelectionSet'
   | 'editDashboardLayout'
-  | 'deleteDashboardLayout';
+  | 'deleteDashboardLayout'
+  | 'catalogueAssignment';
 
 interface DialogPayload {
   editingProfileId: string | null;
@@ -112,6 +113,7 @@ interface DialogPayload {
   selectionSetToDelete: SelectionSet | null;
   dashboardLayoutToEdit: DashboardLayout | null;
   dashboardLayoutToDelete: DashboardLayout | null;
+  catalogueAssignmentProfile: IOProfile | null;
 }
 
 const initialDialogs: Record<DialogName, boolean> = {
@@ -124,6 +126,7 @@ const initialDialogs: Record<DialogName, boolean> = {
   deleteSelectionSet: false,
   editDashboardLayout: false,
   deleteDashboardLayout: false,
+  catalogueAssignment: false,
 };
 
 const initialDialogPayload: DialogPayload = {
@@ -137,6 +140,7 @@ const initialDialogPayload: DialogPayload = {
   selectionSetToDelete: null,
   dashboardLayoutToEdit: null,
   dashboardLayoutToDelete: null,
+  catalogueAssignmentProfile: null,
 };
 
 // Store state interface

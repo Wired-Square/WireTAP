@@ -213,6 +213,13 @@ export function useIOProfileHandlers() {
     );
   };
 
+  const handleOpenCatalogueAssignment = (profile: IOProfile) => {
+    setDialogPayload({ catalogueAssignmentProfile: profile });
+    openDialog('catalogueAssignment');
+  };
+
+  const handleCloseCatalogueAssignment = () => closeDialog('catalogueAssignment');
+
   // Toggle default read profile
   const toggleDefaultRead = (profileId: string) => {
     if (defaultReadProfile === profileId) {
@@ -237,6 +244,8 @@ export function useIOProfileHandlers() {
     updateConnectionField,
     persistProbedFields,
     toggleDefaultRead,
+    handleOpenCatalogueAssignment,
+    handleCloseCatalogueAssignment,
   };
 }
 

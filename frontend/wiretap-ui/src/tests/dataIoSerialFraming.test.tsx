@@ -31,6 +31,7 @@ describe("Data IO settings list", () => {
           onEditProfile={noop}
           onDeleteProfile={noop}
           onDuplicateProfile={noop}
+          onAssignCatalogues={noop}
           defaultReadProfile={null}
           onToggleDefaultRead={noop}
           adHocProfiles={[]}
