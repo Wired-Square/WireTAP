@@ -421,8 +421,9 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       }
     }
 
-    // BRS requires FD
-    if (updates.isFd === false) {
+    if (newEditor.isFd) {
+      newEditor.isRtr = false;
+    } else {
       newEditor.isBrs = false;
     }
 

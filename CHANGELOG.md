@@ -70,6 +70,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A fast replay no longer drops frames the adapter has no room for.** A replay faster than the bus could carry filled the adapter's send queue, and the frames it refused were recorded in History as "send queue full" and skipped, while the replay still reported success. Replay now waits for room and puts every frame on the bus, so at a high speed it runs at the bus's pace rather than the one asked for.
 - **A second window on a session no longer doubles the first window's Modbus tab.** Opening the Decoder in another window replayed every tunnelled Modbus exchange to each window already watching, so each one listed them twice. Only the window that opens it now receives the replay.
 - **The Dashboard no longer plots a session's history twice.** Loading a catalogue in the Dashboard or the Decoder added every value already received to the Dashboard's plots again, after the newest ones, so the latest reading went back in time and the statistics counted old values twice. Loading one in the Dashboard now redraws its history once, and loading one in the Decoder leaves the Dashboard alone.
+- **The Transmit editor no longer builds a remote CAN FD frame.** Turning on CAN FD with RTR already on kept the frame remote, so it was queued as one and refused at send; turning on CAN FD now clears RTR.
 
 ## [0.13.0] - 2026-09-29
 
