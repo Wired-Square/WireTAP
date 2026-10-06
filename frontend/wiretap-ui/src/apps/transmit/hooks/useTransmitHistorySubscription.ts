@@ -14,7 +14,7 @@ import type { ReplayState } from "../../../api/transmit";
  * Subscribes to transmit history events and updates the store.
  *
  * WebSocket handlers for:
- * - TransmitUpdated (0x0B): SQLite rows written — refetch count
+ * - TransmitUpdated (0x0B): history written or cleared — refetch count
  * - ReplayState (0x0C): Replay lifecycle/progress — full state in JSON payload
  *
  * Repeat-transmit lifecycle (MsgType.RepeatEvent) is handled window-globally by
@@ -26,12 +26,10 @@ export function useTransmitHistorySubscription(): void {
   useEffect(() => {
     const unlistenFns: (() => void)[] = [];
 
-    // WS: TransmitUpdated — count is inlined in the binary payload
     if (wsTransport.isConnected) {
       unlistenFns.push(
         wsTransport.onGlobalMessage(MsgType.TransmitUpdated, (payload) => {
-          const { count } = decodeTransmitUpdated(payload);
-          useTransmitStore.setState({ historyDbCount: count });
+          useTransmitStore.setState({ historyRevision: decodeTransmitUpdated(payload).revision });
         })
       );
 

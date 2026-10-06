@@ -154,12 +154,12 @@ export function useTransmitHistoryView(
   // --- Clear ---
   const clear = useCallback(async () => {
     if (!sessionId) return;
-    const remaining = await transmitHistoryClear(sessionId);
+    const revision = await transmitHistoryClear(sessionId);
     setRows([]);
     setCurrentPage(0);
     setTimeRange(null);
     setIsLive(true);
-    useTransmitStore.setState({ historyDbCount: remaining });
+    useTransmitStore.setState({ historyRevision: revision });
   }, [sessionId]);
 
   const totalPages = pageCount(totalCount, pageSize);

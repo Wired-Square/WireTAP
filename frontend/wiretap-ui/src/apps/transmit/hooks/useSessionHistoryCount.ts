@@ -4,7 +4,7 @@ import { transmitHistoryCount } from "../../../api/transmitHistory";
 
 /** The session's transmit history row count, refetched whenever any history is written. */
 export function useSessionHistoryCount(sessionId: string | null | undefined): number {
-  const historyDbCount = useTransmitStore((s) => s.historyDbCount);
+  const historyRevision = useTransmitStore((s) => s.historyRevision);
   const [counted, setCounted] = useState<{ sessionId: string; count: number } | null>(null);
 
   useEffect(() => {
@@ -14,7 +14,7 @@ export function useSessionHistoryCount(sessionId: string | null | undefined): nu
       .then((count) => { if (!cancelled) setCounted({ sessionId, count }); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [sessionId, historyDbCount]);
+  }, [sessionId, historyRevision]);
 
   return counted && counted.sessionId === sessionId ? counted.count : 0;
 }

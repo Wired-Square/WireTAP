@@ -418,10 +418,10 @@ export function decodeSubscribeNack(payload: DataView): {
   return { sessionId, error: new TextDecoder().decode(rest) };
 }
 
-/** Decode TransmitUpdated payload: i64 LE history count. */
-export function decodeTransmitUpdated(payload: DataView): { count: number } {
-  if (payload.byteLength < 8) return { count: 0 };
-  return { count: Number(payload.getBigInt64(0, true)) };
+/** Decode TransmitUpdated payload: i64 LE history revision. */
+export function decodeTransmitUpdated(payload: DataView): { revision: number } {
+  if (payload.byteLength < 8) return { revision: 0 };
+  return { revision: Number(payload.getBigInt64(0, true)) };
 }
 
 export type SessionTransition = (typeof SESSION_TRANSITIONS)[number];

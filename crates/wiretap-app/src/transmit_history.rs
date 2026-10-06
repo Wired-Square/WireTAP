@@ -11,6 +11,7 @@ use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Mutex;
 
 /// Global database connection, protected by a Mutex.
@@ -155,12 +156,11 @@ pub(crate) fn use_in_memory_database() {
     }
 }
 
-/// Count every row in the history table; its change is the `TransmitUpdated` signal.
-pub fn count() -> i64 {
-    with_db(0, |conn| {
-        conn.query_row("SELECT COUNT(*) FROM transmit_history", [], |r| r.get(0))
-            .unwrap_or(0)
-    })
+static REVISION: AtomicI64 = AtomicI64::new(0);
+
+/// The `TransmitUpdated` signal for a history write or clear: a row count can repeat, this cannot.
+pub fn next_revision() -> i64 {
+    REVISION.fetch_add(1, Ordering::Relaxed) + 1
 }
 
 fn with_db<T>(fallback: T, read: impl FnOnce(&Connection) -> T) -> T {
@@ -266,9 +266,9 @@ pub fn transmit_history_count(session_id: String) -> Result<i64, String> {
 #[tauri::command]
 pub fn transmit_history_clear(session_id: String) -> Result<i64, String> {
     with_db((), |conn| clear_session(conn, &session_id));
-    let remaining = count();
-    crate::ws::dispatch::send_transmit_updated(remaining);
-    Ok(remaining)
+    let revision = next_revision();
+    crate::ws::dispatch::send_transmit_updated(revision);
+    Ok(revision)
 }
 
 #[tauri::command]
@@ -308,6 +308,21 @@ mod tests {
         assert_eq!(session_offset_after(&conn, "mine", 10), 1);
         assert_eq!(session_count(&conn, "none"), 0);
         assert_eq!(session_time_range(&conn, "none"), None);
+    }
+
+    #[test]
+    fn a_clear_then_a_write_never_repeats_a_history_signal() {
+        use_in_memory_database();
+        let write = |session_id| {
+            write_entry(session_id, "can", Some(0x100), Some(1), &[1], 0, false, false, true, None);
+            next_revision()
+        };
+        let signals = [
+            write("signal_mine"),
+            transmit_history_clear("signal_mine".into()).unwrap(),
+            write("signal_agent"),
+        ];
+        assert!(signals[0] < signals[1] && signals[1] < signals[2], "signals repeated: {signals:?}");
     }
 
     #[test]

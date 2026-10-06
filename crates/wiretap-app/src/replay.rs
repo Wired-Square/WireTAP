@@ -201,7 +201,7 @@ impl Replay {
 
                 if last_progress.elapsed() >= PROGRESS_INTERVAL {
                     emit(&self.state(ReplayEvent::Progress, frames_sent, pass));
-                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
                     last_progress = std::time::Instant::now();
                 }
             }
@@ -214,7 +214,7 @@ impl Replay {
         };
 
         tlog!("[replay] '{}' ended: {} sent, {} failed", self.replay_id, frames_sent, frames_failed);
-        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
         emit(&self.state(end, frames_sent, pass));
     }
 }

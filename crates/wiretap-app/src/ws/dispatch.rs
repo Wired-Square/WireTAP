@@ -845,9 +845,9 @@ pub fn send_reconfigured(session_id: &str) {
     send_to_session(session_id, MsgType::Reconfigured, Vec::new);
 }
 
-/// Send transmit-updated signal with history count (global, channel 0).
-pub fn send_transmit_updated(count: i64) {
-    send_to_all(MsgType::TransmitUpdated, || count.to_le_bytes().to_vec());
+/// Send transmit-updated signal with the history revision (global, channel 0).
+pub fn send_transmit_updated(revision: i64) {
+    send_to_all(MsgType::TransmitUpdated, || revision.to_le_bytes().to_vec());
 }
 
 // ============================================================================

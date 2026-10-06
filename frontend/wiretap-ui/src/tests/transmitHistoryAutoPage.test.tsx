@@ -28,7 +28,7 @@ describe("Transmit history under an Auto page size", () => {
   afterEach(() => act(() => root.unmount()));
 
   it("counts the history before the table has measured, so the table can render and measure", async () => {
-    useTransmitStore.setState({ historyDbCount: 3 });
+    useTransmitStore.setState({ historyRevision: 3 });
     root = createRoot(document.createElement("div"));
     await act(async () => root.render(<Harness />));
     expect(totalCount).toBe(3);

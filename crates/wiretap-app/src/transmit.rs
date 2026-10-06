@@ -177,7 +177,7 @@ pub async fn transmit_can(
         success,
         error,
     );
-    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
     result
 }
 
@@ -202,7 +202,7 @@ pub async fn io_transmit_serial(
         success,
         error,
     );
-    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
     result
 }
 
@@ -403,7 +403,7 @@ pub async fn start_repeat_transmit(
                 error.as_deref(),
             );
             if throttle.should_signal("transmit-updated") {
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
             }
             (success, error)
         };
@@ -426,7 +426,7 @@ pub async fn start_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
                 break;
             }
         }
@@ -526,7 +526,7 @@ pub async fn io_start_serial_repeat_transmit(
                 error.as_deref(),
             );
             if throttle.should_signal("transmit-updated") {
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
             }
             error
         };
@@ -548,7 +548,7 @@ pub async fn io_start_serial_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
                 break;
             }
         }
@@ -630,7 +630,7 @@ pub async fn io_start_repeat_group(
                 error.as_deref(),
             );
             if throttle.should_signal("transmit-updated") {
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
             }
             error
         };
@@ -654,7 +654,7 @@ pub async fn io_start_repeat_group(
                             queue_id: group_id_for_task.clone(),
                             reason,
                         });
-                        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
+                        crate::ws::dispatch::send_transmit_updated(crate::transmit_history::next_revision());
                         break 'outer;
                     }
                 }

@@ -174,8 +174,8 @@ export interface TransmitState {
   // NOTE: IO session is now managed by sessionStore, accessed via useSessionStore
   /** Transmit queue */
   queue: TransmitQueueItem[];
-  /** Count of rows in the SQLite transmit history (updated by transmit-history-updated event) */
-  historyDbCount: number;
+  /** Changes on every transmit history write or clear (the TransmitUpdated signal) */
+  historyRevision: number;
   /** Active group repeats (group names currently repeating) */
   activeGroups: Set<string>;
 
@@ -360,7 +360,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   // ---- Initial State ----
   profiles: [],
   queue: [],
-  historyDbCount: 0,
+  historyRevision: 0,
   activeGroups: new Set(),
   activeReplays: new Set(),
   replayProgress: new Map(),

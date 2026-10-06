@@ -31,7 +31,7 @@ export async function transmitHistoryCount(sessionId: string): Promise<number> {
   return invoke("transmit_history_count", { sessionId });
 }
 
-/** Clears the session's history and resolves to the rows left in the whole database. */
+/** Clears the session's history and resolves to the history revision it signalled. */
 export async function transmitHistoryClear(sessionId: string): Promise<number> {
   return invoke("transmit_history_clear", { sessionId });
 }

@@ -40,7 +40,7 @@ beforeEach(() => {
     if (cmd === "transmit_history_query") return [historyRow];
     return null;
   });
-  useTransmitStore.setState({ historyDbCount: 20017 });
+  useTransmitStore.setState({ historyRevision: 20017 });
 });
 
 afterEach(() => act(() => root.unmount()));
