@@ -31,6 +31,7 @@ import {
   ioStartReplay,
   ioStopReplay,
   toTransmitFrame,
+  type ReceivedFrame,
 } from "../api/transmit";
 
 import { useSessionStore, type Session } from "./sessionStore";
@@ -229,7 +230,7 @@ export interface TransmitState {
   /** Add current CAN frame to queue */
   addCanToQueue: () => void;
   /** Add multiple CAN frames to queue (bulk, from Discovery) */
-  addCanFramesBulk: (frames: Array<{ frame_id: number; bytes: number[]; bus: number; is_extended: boolean; dlc: number }>, session: QueueRowSession, intervalMs?: number, groupName?: string) => void;
+  addCanFramesBulk: (frames: ReceivedFrame[], session: QueueRowSession, intervalMs?: number, groupName?: string) => void;
   /** Add current serial bytes to queue */
   addSerialToQueue: () => void;
   /** Remove item from queue */

@@ -30,12 +30,12 @@ impl From<&io::FrameMessage> for ReplayFrame {
             timestamp_us: f.timestamp_us,
             frame: CanTransmitFrame {
                 frame_id: f.frame_id,
-                data: f.bytes.clone(),
+                data: if f.is_rtr { vec![0; f.dlc.into()] } else { f.bytes.clone() },
                 bus: f.bus,
                 is_extended: f.is_extended,
                 is_fd: f.is_fd,
-                is_brs: false,
-                is_rtr: false,
+                is_brs: f.is_brs,
+                is_rtr: f.is_rtr,
             },
         }
     }
@@ -408,5 +408,19 @@ mod tests {
         let seen = events("f_replay_gone", replay, |_| false).await;
         assert_eq!(seen.len(), 2);
         assert!(matches!(&seen[1].event, ReplayEvent::Failed { error } if !error.is_empty()), "{:?}", seen[1].event);
+    }
+
+    #[test]
+    fn a_replayed_remote_frame_goes_out_as_a_remote_frame_for_its_length() {
+        let rtr = io::FrameMessage { protocol: "can".into(), frame_id: 0x123, dlc: 4, is_rtr: true, ..Default::default() };
+        let frame = ReplayFrame::from(&rtr).frame;
+        assert!(frame.is_rtr);
+        assert_eq!(frame.data, [0; 4]);
+    }
+
+    #[test]
+    fn a_replayed_fd_frame_keeps_its_bit_rate_switch() {
+        let fd = io::FrameMessage { protocol: "can".into(), dlc: 12, bytes: vec![1; 12], is_fd: true, is_brs: true, ..Default::default() };
+        assert!(ReplayFrame::from(&fd).frame.is_brs);
     }
 }

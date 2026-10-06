@@ -51,18 +51,19 @@ export type RepeatEvent =
   | ({ kind: "stopped" } & RepeatStoppedEvent)
   | ({ kind: "group_started" } & RepeatGroupStartedEvent);
 
-type ReceivedFrame = Pick<FrameMessage, "frame_id" | "bytes" | "is_extended"> & Partial<Pick<FrameMessage, "bus" | "is_fd">>;
+export type ReceivedFrame = Pick<FrameMessage, "frame_id" | "bytes" | "is_extended" | "dlc"> &
+  Partial<Pick<FrameMessage, "bus" | "is_fd" | "is_brs" | "is_rtr">>;
 
-/** A received frame as a classic or FD data frame to send. */
+/** A received frame to send as received; an RTR asks for its `dlc` in bytes, as the Transmit editor carries it. */
 export function toTransmitFrame(f: ReceivedFrame): CanTransmitFrame {
   return {
     frame_id: f.frame_id,
-    data: [...f.bytes],
+    data: f.is_rtr ? Array(f.dlc).fill(0) : [...f.bytes],
     bus: f.bus ?? 0,
     is_extended: f.is_extended,
     is_fd: f.is_fd ?? false,
-    is_brs: false,
-    is_rtr: false,
+    is_brs: f.is_brs ?? false,
+    is_rtr: f.is_rtr ?? false,
   };
 }
 

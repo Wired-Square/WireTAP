@@ -14,6 +14,7 @@ import {
   useDiscoveryFrameStore,
 } from "../stores/discoveryFrameStore";
 import { parseFrameKey } from "../utils/frameKey";
+import type { FrameMessage } from "../types/frame";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { Button } from "../components/Button";
@@ -89,18 +90,9 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
     // Build last-seen bytes for each matching numeric ID by scanning the buffer once (O(n))
     const matchingNumericSet = new Set(matchingIds.map(m => m.numId));
-    const lastSeenMap = new Map<
-      number,
-      { bytes: number[]; is_extended: boolean; dlc: number }
-    >();
+    const lastSeenMap = new Map<number, FrameMessage>();
     for (const f of getDiscoveryFrameBuffer()) {
-      if (matchingNumericSet.has(f.frame_id)) {
-        lastSeenMap.set(f.frame_id, {
-          bytes: f.bytes,
-          is_extended: f.is_extended,
-          dlc: f.dlc,
-        });
-      }
+      if (matchingNumericSet.has(f.frame_id)) lastSeenMap.set(f.frame_id, f);
     }
 
     const frames = matchingIds.map(({ fk, numId }) => {
@@ -113,6 +105,9 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
         bus,
         is_extended: seen?.is_extended ?? info?.isExtended ?? numId > 0x7ff,
         dlc,
+        is_fd: seen?.is_fd,
+        is_brs: seen?.is_brs,
+        is_rtr: seen?.is_rtr,
       };
     });
 
