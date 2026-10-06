@@ -1,6 +1,6 @@
 [package]
 name = "wiretap-can-cli"
-version = "0.1.0"
+version.workspace = true
 description = "can-utils work-alike for every WireTAP CAN transport."
 authors = ["Alex Ferrara"]
 edition = "2021"

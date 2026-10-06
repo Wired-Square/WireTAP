@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **`wiretap-can-cli` has the same version number as WireTAP.** `wiretap-can-cli --version` reports the version of the WireTAP it shipped with, instead of 0.1.0.
+
 ## [0.14.0] - 2026-10-06
 
 ### Added

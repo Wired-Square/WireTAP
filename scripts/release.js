@@ -268,7 +268,7 @@ async function main() {
     run('cargo check --manifest-path crates/wiretap-app/Cargo.toml');
 
     console.log('\nCommitting version bump...');
-    run('git add frontend/wiretap-ui/package.json Cargo.lock crates/wiretap-app/Cargo.toml crates/wiretap-app/tauri.conf.json CHANGELOG.md crates/wiretap-app/gen/apple/project.yml crates/wiretap-app/gen/apple/wiretap_iOS/Info.plist');
+    run('git add frontend/wiretap-ui/package.json Cargo.lock Cargo.toml crates/wiretap-app/tauri.conf.json CHANGELOG.md crates/wiretap-app/gen/apple/project.yml crates/wiretap-app/gen/apple/wiretap_iOS/Info.plist');
     run(`git commit -m "Bump version to ${newVersion}"`);
 
     // Create tag
