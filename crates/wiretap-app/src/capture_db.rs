@@ -716,6 +716,17 @@ pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
     Ok(count as usize)
 }
 
+/// The protocols other than CAN a capture holds, alphabetically.
+pub fn non_can_protocols(capture_id: &str) -> Result<Vec<String>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    conn.prepare_cached(
+        "SELECT DISTINCT protocol FROM frames WHERE capture_id = ?1 AND protocol != 'can' ORDER BY protocol",
+    )
+    .and_then(|mut stmt| stmt.query_map(params![capture_id], |row| row.get(0))?.collect())
+    .map_err(|e| format!("Failed to read capture protocols: {e}"))
+}
+
 /// Get unique frame info via aggregation query.
 pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     let guard = DB.lock().unwrap();

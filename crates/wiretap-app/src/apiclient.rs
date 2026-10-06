@@ -674,6 +674,20 @@ pub async fn events_delete(app: &tauri::AppHandle, profile_id: &str, id: &str) -
     parse::<Value>(resp).await.map(|_| ())
 }
 
+/// The import format carries CAN records only, so anything else would land in the archive as CAN.
+fn ensure_only_can(capture_id: &str) -> Result<(), String> {
+    use crate::capture_store::{get_capture_kind, CaptureKind};
+    let others = match get_capture_kind(capture_id) {
+        Some(CaptureKind::Frames) => crate::capture_db::non_can_protocols(capture_id)?,
+        Some(CaptureKind::Bytes) => vec!["raw bytes".into()],
+        None => return Err(format!("Capture not found: {capture_id}")),
+    };
+    if others.is_empty() {
+        return Ok(());
+    }
+    Err(format!("Only CAN frames can be sent to a backend; this capture holds {}", others.join(", ")))
+}
+
 /// Every frame goes as a CAN record, as the format has no other kind.
 fn import_body(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     let mut body = Vec::with_capacity(import::BODY_HEADER + frames.len() * 24);
@@ -720,6 +734,7 @@ pub async fn api_import_capture(
     if !wiretap_protocol::ingest::valid_database_name(&database) {
         return Err(format!("invalid database name '{database}'"));
     }
+    ensure_only_can(&capture_id)?;
 
     let mut offset = 0usize;
     let mut total = usize::MAX;
@@ -1124,5 +1139,23 @@ mod tests {
             uploaded(&import_body(&[classic])),
             vec![(1_767_225_600_000_000, false, CanFrame::data(1, 0x7FF, false, false, false, vec![1, 2, 3]))],
         );
+    }
+
+    #[test]
+    fn only_a_capture_of_can_frames_can_be_uploaded() {
+        use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
+        crate::capture_db::use_in_memory_database();
+        let frame = |protocol: &str| crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
+        let capture_of = |protocols: &[&str]| {
+            let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
+            append_frames_to_capture(&id, protocols.iter().map(|p| frame(p)).collect());
+            id
+        };
+
+        assert_eq!(ensure_only_can(&capture_of(&["can", "can"])), Ok(()));
+        let mixed = ensure_only_can(&capture_of(&["can", "modbus", "serial"])).unwrap_err();
+        assert!(mixed.contains("modbus") && mixed.contains("serial"), "{mixed}");
+        assert!(ensure_only_can(&capture_of(&["modbus_rtu"])).is_err());
+        assert!(ensure_only_can(&create_standalone_capture(CaptureKind::Bytes, "bytes".into())).is_err());
     }
 }
