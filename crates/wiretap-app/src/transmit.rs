@@ -189,17 +189,21 @@ pub async fn io_transmit_serial(
     framing: SerialFraming,
 ) -> Result<crate::io::TransmitResult, String> {
     let bytes = framing.frame(&bytes);
-    let result = io::transmit_serial(&session_id, &bytes).await?;
+    let result = io::transmit_serial(&session_id, &bytes).await;
+    let (success, error) = match &result {
+        Ok(r) => (r.success, r.error.as_deref()),
+        Err(e) => (false, Some(e.as_str())),
+    };
     crate::transmit_history::write_entry(
         &session_id, "serial",
         None, None,
         &bytes,
         0, false, false,
-        result.success,
-        result.error.as_deref(),
+        success,
+        error,
     );
     crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-    Ok(result)
+    result
 }
 
 /// Get IO session capabilities (includes transmit capabilities)
@@ -866,6 +870,22 @@ mod tests {
         let frame = crate::io::CanTransmitFrame { frame_id: 0x100, data: vec![1], bus: 0, is_extended: false, is_fd: false, is_brs: false, is_rtr: false };
 
         let refused = super::transmit_can(id, &frame).await.unwrap_err();
+
+        let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).unwrap();
+        assert_eq!(rows.len(), 1, "the refusal never reached the history");
+        assert!(!rows[0].success);
+        assert_eq!(rows[0].error_msg.as_deref(), Some(refused.as_str()));
+        crate::io::destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_refused_serial_send_reaches_history() {
+        crate::transmit_history::use_in_memory_database();
+        let id = "b_serial_channel_full";
+        let source = crate::io::test_source::TestSource::new(id).refusing("Serial transmit buffer full");
+        crate::io::create_session(id.into(), Box::new(source), None, None, None, vec![]).await;
+
+        let refused = super::io_transmit_serial(id.into(), vec![0x41], super::SerialFraming::Raw).await.unwrap_err();
 
         let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).unwrap();
         assert_eq!(rows.len(), 1, "the refusal never reached the history");
