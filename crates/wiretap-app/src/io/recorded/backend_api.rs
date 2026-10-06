@@ -235,19 +235,28 @@ impl CursorFetcher {
 }
 
 /// The row's `dlc` is the archive's CAN length code, and an older gateway serves
-/// no `len`, so the length comes from the payload instead.
+/// no `len`, so the length comes from the payload instead — but for an RTR,
+/// whose code is the length it asks for.
 fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<FrameMessage, String> {
     let bytes =
         hex::decode(&row.data_hex).map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
+    let dlc = if row.is_rtr {
+        wiretap_protocol::dlc_to_len(row.dlc as u8, false)
+    } else {
+        bytes.len()
+    };
     Ok(FrameMessage {
         protocol: frame_tag(protocol).to_string(),
         timestamp_us: row.ts_us as u64,
         frame_id: row.id,
         bus: row.bus,
-        dlc: bytes.len() as u16,
+        dlc: dlc as u16,
         bytes,
         is_extended: row.extended,
         is_fd: row.is_fd,
+        is_rtr: row.is_rtr,
+        is_brs: row.is_brs,
+        is_esi: row.is_esi,
         source_address: None,
         incomplete: None,
         direction: None,
@@ -516,6 +525,39 @@ mod tests {
         .unwrap();
         assert_eq!(frame.dlc, 64);
         assert_eq!(frame.bytes.len(), 64);
+    }
+
+    fn can_row(extra: serde_json::Value) -> FrameMessage {
+        let mut json = serde_json::json!({
+            "ts_us": 1, "id": 0x123, "extended": false, "dlc": 0, "is_fd": false,
+            "bus": 0, "dir": "rx", "data_hex": "",
+        });
+        json.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        frame_from_row(ArchiveProtocol::Can, row(json)).unwrap()
+    }
+
+    #[test]
+    fn a_remote_row_asks_for_its_length_code_with_no_payload() {
+        let frame = can_row(serde_json::json!({ "dlc": 4, "is_rtr": true }));
+        assert!(frame.is_rtr);
+        assert_eq!(frame.dlc, 4);
+        assert!(frame.bytes.is_empty());
+    }
+
+    #[test]
+    fn an_fd_row_keeps_its_brs_and_esi() {
+        let frame = can_row(serde_json::json!({
+            "dlc": 9, "is_fd": true, "is_brs": true, "is_esi": true, "data_hex": "00".repeat(12),
+        }));
+        assert!(frame.is_brs && frame.is_esi && !frame.is_rtr);
+        assert_eq!(frame.dlc, 12);
+    }
+
+    #[test]
+    fn a_row_from_an_older_gateway_has_no_flags() {
+        let frame = can_row(serde_json::json!({ "dlc": 2, "data_hex": "abcd" }));
+        assert!(!frame.is_rtr && !frame.is_brs && !frame.is_esi);
+        assert_eq!(frame.dlc, 2);
     }
 
     #[test]
