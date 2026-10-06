@@ -140,7 +140,7 @@ export default function CanFrameEditor() {
               onBlur={() => setFocusedByteIndex(null)}
               maxLength={2}
               mono
-              className="w-8 text-center uppercase"
+              className="w-10 text-center uppercase"
             />
           </div>
         );
@@ -149,7 +149,7 @@ export default function CanFrameEditor() {
       // Pad with empty cells to maintain grid alignment
       while (cells.length < bytesPerRow) {
         cells.push(
-          <div key={`empty-${row}-${cells.length}`} className="w-8 h-8" />
+          <div key={`empty-${row}-${cells.length}`} className="w-10 h-8" />
         );
       }
 
