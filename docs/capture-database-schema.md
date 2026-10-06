@@ -43,8 +43,8 @@ Stores CAN frames and framed serial messages. One row per frame received.
 | `timestamp_us` | INTEGER | NO | | Timestamp in microseconds. Source-dependent (device clock or import timestamp). |
 | `frame_id` | INTEGER | NO | | CAN arbitration ID (11- or 29-bit) or Modbus register, as unsigned 32-bit. **Not unique on its own** — identity is `(protocol, frame_id)`, since CAN `0x100` and Modbus register 256 are different frames. Filtered reads key on the pair. |
 | `bus` | INTEGER | NO | | Bus/interface number. `0` for single-bus sources. |
-| `dlc` | INTEGER | NO | | Data length code (0-8 for classic CAN, 0-64 for CAN FD). |
-| `payload` | BLOB | NO | | Raw frame payload bytes. Length may differ from `dlc` in some protocols. |
+| `dlc` | INTEGER | NO | | Length in bytes, not a length code (0-8 for classic CAN, 0-64 for CAN FD). An RTR's is the length it asks for. |
+| `payload` | BLOB | NO | | Raw frame payload bytes. Length may differ from `dlc` in some protocols, and is empty for an RTR. |
 | `is_extended` | INTEGER | NO | 0 | Boolean (0/1). `1` if the frame uses a 29-bit extended ID. |
 | `is_fd` | INTEGER | NO | 0 | Boolean (0/1). `1` if the frame is CAN FD. |
 | `is_rtr` | INTEGER | NO | 0 | Boolean (0/1). `1` for a CAN remote request; `dlc` is the length it asks for and `payload` is empty. Added in v5. |

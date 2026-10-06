@@ -440,6 +440,10 @@ fn latest_by_key(
                 "bytes": f.bytes,
                 "bus": f.bus,
                 "is_extended": f.is_extended,
+                "is_fd": f.is_fd,
+                "is_rtr": f.is_rtr,
+                "is_brs": f.is_brs,
+                "is_esi": f.is_esi,
                 "dlc": f.dlc,
                 "timestampUs": f.timestamp_us,
             });
@@ -725,7 +729,7 @@ impl WireTapTools {
     }
 
     #[tool(
-        description = "The last-seen payload of every frame id in a session's capture, keyed as Discovery keys them (\"can:256\", \"modbus:5013\"): bytes, bus, is_extended, dlc and timestampUs. Headless — no view needed. frame_ids restricts it to those keys."
+        description = "The last-seen payload of every frame id in a session's capture, keyed as Discovery keys them (\"can:256\", \"modbus:5013\"): bytes, bus, is_extended, is_fd, is_rtr, is_brs, is_esi, dlc (an RTR's is the length it asks for) and timestampUs. Headless — no view needed. frame_ids restricts it to those keys."
     )]
     async fn get_live_frame_map(
         &self,
@@ -1854,13 +1858,29 @@ bit_length = 8
             assert_eq!(map.keys().collect::<Vec<_>>(), ["can:256", "modbus:5013"]);
             assert_eq!(
                 map["can:256"],
-                json!({ "bytes": [9], "bus": 1, "is_extended": false, "dlc": 1, "timestampUs": 12 })
+                json!({
+                    "bytes": [9], "bus": 1, "is_extended": false, "is_fd": false, "is_rtr": false,
+                    "is_brs": false, "is_esi": false, "dlc": 1, "timestampUs": 12
+                })
             );
             assert_eq!(map["modbus:5013"]["dlc"], 2);
 
             let wanted: HashSet<String> = ["modbus:5013".to_string()].into();
             let map = latest_by_key(frames(), Some(&wanted));
             assert_eq!(map.keys().collect::<Vec<_>>(), ["modbus:5013"]);
+        }
+
+        #[test]
+        fn the_live_map_carries_a_frames_can_flags() {
+            let fd = FrameMessage { is_fd: true, is_brs: true, is_esi: true, ..frame("can", 1, 0, 1, vec![0; 12]) };
+            let rtr = FrameMessage { is_rtr: true, dlc: 4, ..frame("can", 2, 0, 2, vec![]) };
+            let map = latest_by_key(vec![fd, rtr], None);
+            let flags = |key: &str| {
+                ["is_fd", "is_rtr", "is_brs", "is_esi"].map(|f| map[key][f].as_bool())
+            };
+            assert_eq!(flags("can:1"), [Some(true), Some(false), Some(true), Some(true)]);
+            assert_eq!(flags("can:2"), [Some(false), Some(true), Some(false), Some(false)]);
+            assert_eq!(map["can:2"]["dlc"], 4);
         }
     }
 

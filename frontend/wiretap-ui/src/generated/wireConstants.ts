@@ -1,6 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const HEADER_SIZE = 4;
 
@@ -47,12 +47,20 @@ export const MsgType = {
 } as const;
 
 export const FrameType = {
-  Can: 0x0001,
-  CanFd: 0x0002,
-  Modbus: 0x0003,
-  Serial: 0x0004,
-  ModbusRtu: 0x0005,
+  Can: 0x01,
+  CanFd: 0x02,
+  Modbus: 0x03,
+  Serial: 0x04,
+  ModbusRtu: 0x05,
 } as const;
+
+export const CanFlags = {
+  CAN_RTR: 0x01,
+  CAN_BRS: 0x02,
+  CAN_ESI: 0x04,
+} as const;
+
+export const CAN_RTR_LEN_SHIFT = 4;
 
 export const IdFlags = {
   ID_ARB_MASK: 0x1fffffff,

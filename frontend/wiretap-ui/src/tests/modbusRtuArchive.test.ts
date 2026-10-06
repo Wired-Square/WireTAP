@@ -17,7 +17,7 @@ function envelope(frameType: number, bus: number, prefix: number | null, payload
   const view = new DataView(buf);
   view.setBigUint64(0, 1_789_162_108_768_476n, true);
   view.setUint8(8, bus);
-  view.setUint16(9, frameType, true);
+  view.setUint8(9, frameType);
   view.setUint32(11, prefixLen + payload.length, true);
   if (prefix !== null) view.setUint32(ENVELOPE_HEADER_SIZE, prefix, true);
   new Uint8Array(buf).set(payload, ENVELOPE_HEADER_SIZE + prefixLen);

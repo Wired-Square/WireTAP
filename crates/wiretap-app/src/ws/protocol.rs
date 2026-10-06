@@ -2,7 +2,7 @@
 
 use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
 
-pub const PROTOCOL_VERSION: u8 = 2;
+pub const PROTOCOL_VERSION: u8 = 3;
 pub const HEADER_SIZE: usize = 4;
 
 /// Named constants as a table, for the frontend's generated copy.
@@ -14,6 +14,13 @@ macro_rules! wire_table {
 
 // The CAN `id_flags` word's bits that `encode_frame_batch` sets.
 wire_table!(ID_FLAGS: u32 = [ID_ARB_MASK, ID_EXTENDED, ID_TX]);
+
+pub const CAN_RTR: u8 = 1 << 0;
+pub const CAN_BRS: u8 = 1 << 1;
+pub const CAN_ESI: u8 = 1 << 2;
+wire_table!(CAN_FLAGS: u8 = [CAN_RTR, CAN_BRS, CAN_ESI]);
+/// The `can_flags` bits above this hold an RTR's requested length in bytes (0–8).
+pub const CAN_RTR_LEN_SHIFT: u8 = 4;
 
 /// The state byte of `SessionState` and `SessionLifecycle` indexes this table.
 pub const SESSION_STATES: [&str; 5] = ["stopped", "starting", "running", "paused", "error"];
@@ -197,7 +204,7 @@ pub enum ProtocolError {
     InsufficientData { needed: usize, available: usize },
     UnsupportedVersion(u8),
     InvalidMsgType(u8),
-    InvalidFrameType(u16),
+    InvalidFrameType(u8),
 }
 
 // ============================================================================
@@ -205,20 +212,23 @@ pub enum ProtocolError {
 // ============================================================================
 
 wire_enum! {
-    pub enum FrameType: u16, InvalidFrameType {
-        Can    = 0x0001,
-        CanFd  = 0x0002,
-        Modbus = 0x0003,
-        Serial = 0x0004,
+    pub enum FrameType: u8, InvalidFrameType {
+        Can    = 0x01,
+        CanFd  = 0x02,
+        Modbus = 0x03,
+        Serial = 0x04,
         /// A whole Modbus RTU message; the 4-byte prefix is `unit << 8 | function`
-        ModbusRtu = 0x0005,
+        ModbusRtu = 0x05,
     }
 }
 
 // ============================================================================
 // Frame Envelope  (15-byte header + data)
 //
-// Layout: [timestamp_us: u64 LE][bus: u8][type: u16 LE][len: u32 LE][data: len bytes]
+// Layout: [timestamp_us: u64 LE][bus: u8][type: u8][can_flags: u8][len: u32 LE][data: len bytes]
+//
+// `can_flags` is zero for anything but CAN. Until protocol 3 the type and
+// flags bytes were one u16 type, so a frame without flags is the same bytes.
 // ============================================================================
 
 pub const ENVELOPE_HEADER_SIZE: usize = 15;
@@ -228,6 +238,7 @@ pub struct FrameEnvelope {
     pub timestamp_us: u64,
     pub bus: u8,
     pub frame_type: FrameType,
+    pub can_flags: u8,
     pub data: Vec<u8>,
 }
 
@@ -236,7 +247,8 @@ impl FrameEnvelope {
         let mut out = Vec::with_capacity(ENVELOPE_HEADER_SIZE + self.data.len());
         out.extend_from_slice(&self.timestamp_us.to_le_bytes());
         out.push(self.bus);
-        out.extend_from_slice(&(self.frame_type as u16).to_le_bytes());
+        out.push(self.frame_type as u8);
+        out.push(self.can_flags);
         out.extend_from_slice(&(self.data.len() as u32).to_le_bytes());
         out.extend_from_slice(&self.data);
         out
@@ -254,7 +266,8 @@ impl FrameEnvelope {
 
         let timestamp_us = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
         let bus          = bytes[8];
-        let frame_type   = FrameType::try_from(u16::from_le_bytes(bytes[9..11].try_into().unwrap()))?;
+        let frame_type   = FrameType::try_from(bytes[9])?;
+        let can_flags    = bytes[10];
         let len          = u32::from_le_bytes(bytes[11..15].try_into().unwrap()) as usize;
 
         let total = ENVELOPE_HEADER_SIZE + len;
@@ -266,7 +279,7 @@ impl FrameEnvelope {
         }
 
         let data = bytes[ENVELOPE_HEADER_SIZE..total].to_vec();
-        Ok((FrameEnvelope { timestamp_us, bus, frame_type, data }, total))
+        Ok((FrameEnvelope { timestamp_us, bus, frame_type, can_flags, data }, total))
     }
 }
 
@@ -611,7 +624,6 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     for frame in frames {
         let direction_tx = frame.direction.as_deref() == Some("tx");
 
-        // Same id_flags word for CAN 2.0 and CAN-FD (rtr/brs bit unset on the wire).
         let id_flags = (frame.frame_id & ID_ARB_MASK)
             | if frame.is_extended  { ID_EXTENDED } else { 0 }
             | if direction_tx       { ID_TX } else { 0 };
@@ -619,22 +631,23 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         // 4-byte LE prefix preceding the payload inside the envelope data:
         // CAN id_flags, Modbus register number or RTU unit/function word, none
         // for serial/raw.
-        let (frame_type, prefix) = if frame.is_fd || frame.protocol == "canfd" {
-            (FrameType::CanFd, Some(id_flags))
+        let (frame_type, can_flags, prefix) = if frame.is_fd || frame.protocol == "canfd" {
+            (FrameType::CanFd, can_flags(frame), Some(id_flags))
         } else if frame.protocol == "can" {
-            (FrameType::Can, Some(id_flags))
+            (FrameType::Can, can_flags(frame), Some(id_flags))
         } else if frame.protocol == "modbus" {
-            (FrameType::Modbus, Some(frame.frame_id))
+            (FrameType::Modbus, 0, Some(frame.frame_id))
         } else if frame.protocol == "modbus_rtu" {
-            (FrameType::ModbusRtu, Some(frame.frame_id))
+            (FrameType::ModbusRtu, 0, Some(frame.frame_id))
         } else {
-            (FrameType::Serial, None)
+            (FrameType::Serial, 0, None)
         };
 
         let data_len = prefix.map_or(0, |_| 4) + frame.bytes.len();
         out.extend_from_slice(&frame.timestamp_us.to_le_bytes());
         out.push(frame.bus);
-        out.extend_from_slice(&(frame_type as u16).to_le_bytes());
+        out.push(frame_type as u8);
+        out.push(can_flags);
         out.extend_from_slice(&(data_len as u32).to_le_bytes());
         if let Some(p) = prefix {
             out.extend_from_slice(&p.to_le_bytes());
@@ -642,6 +655,13 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         out.extend_from_slice(&frame.bytes);
     }
     out
+}
+
+fn can_flags(frame: &crate::io::FrameMessage) -> u8 {
+    if frame.is_rtr {
+        return CAN_RTR | (frame.dlc.min(8) as u8) << CAN_RTR_LEN_SHIFT;
+    }
+    (if frame.is_brs { CAN_BRS } else { 0 }) | if frame.is_esi { CAN_ESI } else { 0 }
 }
 
 // ============================================================================
@@ -801,13 +821,13 @@ mod tests {
     #[test]
     fn frame_type_round_trip() {
         for (name, frame_type) in FrameType::VARIANTS {
-            assert_eq!(FrameType::try_from(*frame_type as u16), Ok(*frame_type), "failed for {name}");
+            assert_eq!(FrameType::try_from(*frame_type as u8), Ok(*frame_type), "failed for {name}");
         }
     }
 
     #[test]
     fn invalid_frame_type_returns_error() {
-        assert_eq!(FrameType::try_from(0x00FFu16), Err(ProtocolError::InvalidFrameType(0x00FF)));
+        assert_eq!(FrameType::try_from(0xFFu8), Err(ProtocolError::InvalidFrameType(0xFF)));
     }
 
     // -----------------------------------------------------------------------
@@ -817,7 +837,7 @@ mod tests {
     #[test]
     fn envelope_round_trip_can() {
         let inner = vec![0x42, 0, 0, 0, 0xAA, 0xBB];
-        let env = FrameEnvelope { timestamp_us: 1_000_000, bus: 2, frame_type: FrameType::Can, data: inner };
+        let env = FrameEnvelope { timestamp_us: 1_000_000, bus: 2, frame_type: FrameType::Can, can_flags: 0, data: inner };
         let encoded = env.encode();
         assert_eq!(encoded.len(), ENVELOPE_HEADER_SIZE + 4 + 2);
         let (decoded, consumed) = FrameEnvelope::decode(&encoded).unwrap();
@@ -874,7 +894,7 @@ mod tests {
     #[test]
     fn envelope_serial_raw_bytes() {
         let raw = b"hello world".to_vec();
-        let env = FrameEnvelope { timestamp_us: 42, bus: 0, frame_type: FrameType::Serial, data: raw.clone() };
+        let env = FrameEnvelope { timestamp_us: 42, bus: 0, frame_type: FrameType::Serial, can_flags: 0, data: raw.clone() };
         let encoded = env.encode();
         let (decoded, _) = FrameEnvelope::decode(&encoded).unwrap();
         assert_eq!(decoded.frame_type, FrameType::Serial);
@@ -883,8 +903,8 @@ mod tests {
 
     #[test]
     fn multiple_envelopes_decoded_sequentially() {
-        let env1 = FrameEnvelope { timestamp_us: 100, bus: 0, frame_type: FrameType::Can, data: vec![1, 2, 3, 4] };
-        let env2 = FrameEnvelope { timestamp_us: 200, bus: 1, frame_type: FrameType::Serial, data: b"abc".to_vec() };
+        let env1 = FrameEnvelope { timestamp_us: 100, bus: 0, frame_type: FrameType::Can, can_flags: 0, data: vec![1, 2, 3, 4] };
+        let env2 = FrameEnvelope { timestamp_us: 200, bus: 1, frame_type: FrameType::Serial, can_flags: 0, data: b"abc".to_vec() };
 
         let mut batch = env1.encode();
         batch.extend_from_slice(&env2.encode());
@@ -949,6 +969,31 @@ mod tests {
         assert_eq!(env.frame_type, FrameType::CanFd);
         assert_eq!(id_flags(&env.data), 0x1FF | ID_TX);
         assert_eq!(&env.data[4..], &payload[..]);
+    }
+
+    #[test]
+    fn batch_rtr_carries_its_mark_and_requested_length_with_no_payload() {
+        let msg = crate::io::FrameMessage { is_rtr: true, dlc: 4, ..make_frame_message("can", false, 0x321, 0, vec![], None) };
+        let (env, _) = FrameEnvelope::decode(&encode_frame_batch(&[msg])).unwrap();
+        assert_eq!(env.frame_type, FrameType::Can);
+        assert_eq!(env.can_flags, CAN_RTR | 4 << CAN_RTR_LEN_SHIFT);
+        assert_eq!(env.data.len(), 4);
+    }
+
+    #[test]
+    fn batch_fd_frame_carries_brs_and_esi() {
+        let msg = crate::io::FrameMessage { is_brs: true, is_esi: true, ..make_frame_message("can", true, 0x10, 0, vec![0; 12], None) };
+        let (env, _) = FrameEnvelope::decode(&encode_frame_batch(&[msg])).unwrap();
+        assert_eq!(env.frame_type, FrameType::CanFd);
+        assert_eq!(env.can_flags, CAN_BRS | CAN_ESI);
+    }
+
+    #[test]
+    fn batch_classic_frame_bytes_are_the_previous_layout() {
+        let msg = make_frame_message("can", false, 0x123, 3, vec![0xAA], Some("rx"));
+        let mut want = 999u64.to_le_bytes().to_vec();
+        want.extend_from_slice(&[3, 0x01, 0x00, 5, 0, 0, 0, 0x23, 0x01, 0, 0, 0xAA]);
+        assert_eq!(encode_frame_batch(&[msg]), want);
     }
 
     #[test]

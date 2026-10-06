@@ -108,6 +108,12 @@ fn can_frame(f: &FrameMessage) -> Result<CanFrame, String> {
     if f.frame_id > max_id {
         return Err(format!("{:#X} is past the {id_kind} id range", f.frame_id));
     }
+    if f.is_rtr {
+        return match u8::try_from(f.dlc) {
+            Ok(dlc @ 0..=8) => Ok(CanFrame::remote(f.bus, f.frame_id, f.is_extended, dlc)),
+            _ => Err(format!("a remote frame asks for at most 8 bytes, not {}", f.dlc)),
+        };
+    }
     let data = payload(f);
     let (max_len, kind) = if f.is_fd {
         (64, "a CAN FD")
@@ -120,14 +126,16 @@ fn can_frame(f: &FrameMessage) -> Result<CanFrame, String> {
             data.len()
         ));
     }
-    Ok(CanFrame::data(
+    let mut frame = CanFrame::data(
         f.bus,
         f.frame_id,
         f.is_extended,
         f.is_fd,
-        false,
+        f.is_brs,
         data.to_vec(),
-    ))
+    );
+    frame.esi = f.is_esi;
+    Ok(frame)
 }
 
 fn row(f: &FrameMessage) -> savvycan::Row {
@@ -328,6 +336,23 @@ mod tests {
     }
 
     #[test]
+    fn a_remote_frame_exports_as_an_r_line_with_its_requested_length_and_imports_back() {
+        let rtr = FrameMessage { is_rtr: true, dlc: 4, ..can(0x123, false, false, 0) };
+        let log = encode(&[rtr], DumpFormat::Candump).unwrap();
+        assert!(log.contains(" can0 123#R4"), "{log}");
+        let import = parse_candump_files(&[temp_file("rtr.log", &log)]).unwrap();
+        let back = &import.frames[0];
+        assert_eq!((back.is_rtr, back.dlc, back.bytes.len()), (true, 4, 0));
+    }
+
+    #[test]
+    fn an_fd_frame_exports_its_brs_and_esi() {
+        let fd = FrameMessage { is_brs: true, is_esi: true, ..can(0x10, false, true, 2) };
+        let log = encode(&[fd], DumpFormat::Candump).unwrap();
+        assert!(log.contains(" can0 010##30000"), "{log}");
+    }
+
+    #[test]
     fn a_frame_the_format_cannot_carry_refuses_the_whole_export() {
         let mut serial = can(1, false, false, 3);
         serial.protocol = "serial".into();
@@ -356,6 +381,11 @@ mod tests {
                 DumpFormat::Csv,
                 can(1, false, true, 65),
                 "frame 2: 65 bytes is more than a CAN FD frame carries",
+            ),
+            (
+                DumpFormat::Candump,
+                FrameMessage { is_rtr: true, dlc: 9, ..can(1, false, false, 0) },
+                "frame 2: a remote frame asks for at most 8 bytes, not 9",
             ),
         ];
         for (format, bad, why) in cases {

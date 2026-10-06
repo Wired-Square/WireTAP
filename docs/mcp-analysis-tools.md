@@ -89,8 +89,9 @@ says the latest frames mean.
 
 ### `get_live_frame_map`
 The newest frame per identity in a session's capture, keyed as Discovery keys
-them — `"can:256"`, `"modbus:5013"` — each `{ bytes, bus, is_extended, dlc,
-timestampUs }`. `frame_ids` restricts it to those keys. A session with no frame
+them — `"can:256"`, `"modbus:5013"` — each `{ bytes, bus, is_extended, is_fd,
+is_rtr, is_brs, is_esi, dlc, timestampUs }`; an RTR's `dlc` is the length it asks
+for. `frame_ids` restricts it to those keys. A session with no frame
 capture is an error.
 
 ### `frame_inventory`
