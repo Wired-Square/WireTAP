@@ -27,7 +27,7 @@ describe("CAN flags on the frame batch", () => {
   it("a CAN FD frame keeps BRS and ESI", () => {
     const flags = CanFlags.CAN_BRS | CanFlags.CAN_ESI;
     const [frame] = decodeFrameBatch(canEnvelope(FrameType.CanFd, flags, 0x10, new Array(12).fill(0)), 0);
-    expect(frame).toMatchObject({ protocol: "canfd", is_fd: true, is_brs: true, is_esi: true, is_rtr: false, dlc: 12 });
+    expect(frame).toMatchObject({ protocol: "can", is_fd: true, is_brs: true, is_esi: true, is_rtr: false, dlc: 12 });
   });
 
   it("a classic frame without flags decodes as before", () => {

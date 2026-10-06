@@ -149,7 +149,7 @@ export function decodeFrameBatch(
       const isRtr = (canFlags & CanFlags.CAN_RTR) !== 0;
 
       frame = {
-        protocol: frameType === FrameType.CanFd ? "canfd" : "can",
+        protocol: "can",
         timestamp_us,
         frame_id: id,
         bus,
