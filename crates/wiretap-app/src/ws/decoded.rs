@@ -133,9 +133,13 @@ pub struct DecodedFrameMsg<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub checksum: Option<ChecksumVerdict>,
+    /// The payload length, or an RTR's requested length.
+    pub dlc: u16,
     pub frame_id: u32,
     pub header_fields: Vec<DecodedHeaderField>,
+    pub is_brs: bool,
     pub is_fd: bool,
+    pub is_rtr: bool,
     /// `frame_id` under the catalogue's `frame_id_mask`: the frame it decoded as.
     pub masked_frame_id: u32,
     /// Present only on a mirror frame, so absence means "not a mirror".
@@ -170,8 +174,11 @@ pub enum UnroutedKind {
 pub struct UnroutedFrameMsg<'a> {
     pub bus: u8,
     pub bytes: &'a [u8],
+    pub dlc: u16,
     pub frame_id: u32,
+    pub is_brs: bool,
     pub is_fd: bool,
+    pub is_rtr: bool,
     pub kind: UnroutedKind,
     pub protocol: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]

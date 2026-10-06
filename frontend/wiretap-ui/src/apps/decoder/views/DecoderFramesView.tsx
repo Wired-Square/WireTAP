@@ -23,6 +23,7 @@ import DecoderTunnelView from "./DecoderTunnelView";
 import { useDecoderStore, MAX_TUNNEL_TRANSACTIONS } from "../../../stores/decoderStore";
 import { useSettingsStore } from "../../../apps/settings/stores/settingsStore";
 import { useTransmitStore } from "../../../stores/transmitStore";
+import { canEditorFromDecoded, canEditorFromUnmatched } from "../canEditorFromDecoder";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
@@ -1180,14 +1181,7 @@ export default function DecoderFramesView({
         icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor({
-            frameId: frame.id.toString(16).toUpperCase(),
-            dlc: frame.len,
-            data: [...rawBytes],
-            isExtended: frame.isExtended ?? false,
-            isFd: decodedFrame?.isFd ?? false,
-            bus: frame.bus ?? 0,
-          });
+          useTransmitStore.getState().updateCanEditor(canEditorFromDecoded(frame, decodedFrame));
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           useTransmitStore.getState().setActiveTab("frame");
           openPanel("transmit");
@@ -1334,14 +1328,7 @@ export default function DecoderFramesView({
         icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor({
-            frameId: frame.frameId.toString(16).toUpperCase(),
-            dlc: frame.bytes.length,
-            data: [...frame.bytes],
-            isExtended,
-            isFd: frame.isFd ?? false,
-            bus: 0,
-          });
+          useTransmitStore.getState().updateCanEditor(canEditorFromUnmatched(frame));
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           useTransmitStore.getState().setActiveTab("frame");
           openPanel("transmit");

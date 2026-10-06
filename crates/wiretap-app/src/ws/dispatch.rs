@@ -442,8 +442,11 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
     DecodedSignalsEntry::Unrouted(UnroutedFrameMsg {
         bus: f.bus,
         bytes: &f.bytes,
+        dlc: f.dlc,
         frame_id: f.frame_id,
+        is_brs: f.is_brs,
         is_fd: f.is_fd,
+        is_rtr: f.is_rtr,
         kind,
         protocol: &f.protocol,
         source_address: f.source_address,
@@ -509,9 +512,12 @@ pub(crate) fn decode_entry<'a>(
             .and_then(|s| s.checksum.as_ref())
             .and_then(|c| crate::checksums::validate_serial_checksum(c, &f.bytes))
             .map(ChecksumVerdict::from),
+        dlc: f.dlc,
         frame_id: f.frame_id,
         header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
+        is_brs: f.is_brs,
         is_fd: f.is_fd,
+        is_rtr: f.is_rtr,
         masked_frame_id: masked_id,
         mirror: verdict.map(DecodedMirrorVerdict::from),
         selectors: decoded.selectors.into_iter().map(DecodedMuxSelector::from).collect(),
@@ -1760,17 +1766,25 @@ factor = 1e10
     }
 
     #[test]
-    fn decoded_and_unmatched_entries_carry_the_frames_fd_flag() {
+    fn decoded_and_unmatched_entries_carry_the_frames_can_flags_and_an_rtrs_requested_length() {
         let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
-        let fd = |id| FrameMessage { is_fd: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
-        let bytes = encode_decoded_batch("fd-flag", &[fd(0x18EF0042), fd(0x18EE0042)], &headered, None, None, true);
+        let fd = |id| FrameMessage { is_fd: true, is_brs: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
+        let rtr = |id| FrameMessage { is_rtr: true, dlc: 6, ..can(id, 0, vec![]) };
+        let frames = [fd(0x18EF0042), fd(0x18EE0042), rtr(0x18EF0042), rtr(0x18EE0042)];
+        let bytes = encode_decoded_batch("can-flags", &frames, &headered, None, None, true);
         let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
 
-        assert!(entries[0].get("kind").is_none(), "the first frame decodes");
-        assert_eq!(entries[1]["kind"], "unmatched");
-        for entry in &entries {
-            assert_eq!(entry["isFd"], true);
-        }
+        let seen: Vec<_> =
+            entries.iter().map(|e| serde_json::json!([e["kind"], e["isFd"], e["isBrs"], e["isRtr"], e["dlc"]])).collect();
+        assert_eq!(
+            seen,
+            [
+                serde_json::json!([null, true, true, false, 8]),
+                serde_json::json!(["unmatched", true, true, false, 8]),
+                serde_json::json!([null, false, false, true, 6]),
+                serde_json::json!(["unmatched", false, false, true, 6]),
+            ]
+        );
     }
 
     #[test]

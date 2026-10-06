@@ -6,6 +6,8 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) })
 import { useTransmitStore } from "../stores/transmitStore";
 import { canEditorFromFrame } from "../apps/discovery/components/frameContextMenuItems";
 import type { FrameRow } from "../apps/discovery/components";
+import { canEditorFromDecoded, canEditorFromUnmatched } from "../apps/decoder/canEditorFromDecoder";
+import type { DecodedFrame, UnmatchedFrame } from "../stores/decoderStore";
 
 const editor = () => useTransmitStore.getState();
 
@@ -30,5 +32,50 @@ describe("Discovery's Send to Transmit loads the frame as received", () => {
     editor().updateCanEditor({ isFd: true });
     editor().updateCanEditor(canEditorFromFrame(received({ is_fd: false })));
     expect(editor().buildCanFrame()).toMatchObject({ is_fd: false });
+  });
+
+  it("send to transmit keeps an FD frame's bit rate switch", () => {
+    editor().updateCanEditor(canEditorFromFrame(received({ is_fd: true, is_brs: true })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, is_brs: true });
+  });
+
+  it("send to transmit loads an RTR as a remote request for its length, with no data", () => {
+    editor().updateCanEditor({ data: [9, 9, 9, 9, 9, 9, 9, 9] });
+    editor().updateCanEditor(canEditorFromFrame(received({ is_rtr: true, dlc: 4, bytes: [] })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, is_fd: false, data: [0, 0, 0, 0] });
+  });
+});
+
+describe("the Decoder's Send to Transmit loads the frame as received", () => {
+  const detail = { id: 0x123, len: 8, signals: [] };
+  const decoded = (over: Partial<DecodedFrame>): DecodedFrame => ({
+    signals: [],
+    rawBytes: Array(8).fill(0x11),
+    headerFields: [],
+    dlc: 8,
+    ...over,
+  });
+  const unmatched = (over: Partial<UnmatchedFrame>): UnmatchedFrame => ({
+    frameId: 0x123,
+    bytes: Array(8).fill(0x11),
+    dlc: 8,
+    timestamp: 0,
+    ...over,
+  });
+
+  it("a decoded or unmatched FD frame keeps its bit rate switch", () => {
+    editor().updateCanEditor(canEditorFromDecoded(detail, decoded({ isFd: true, isBrs: true })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, is_brs: true });
+    editor().resetCanEditor();
+    editor().updateCanEditor(canEditorFromUnmatched(unmatched({ isFd: true, isBrs: true })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, is_brs: true });
+  });
+
+  it("a decoded or unmatched RTR arrives as a remote request for its received length", () => {
+    editor().updateCanEditor(canEditorFromDecoded(detail, decoded({ isRtr: true, dlc: 6, rawBytes: [] })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, data: Array(6).fill(0) });
+    editor().resetCanEditor();
+    editor().updateCanEditor(canEditorFromUnmatched(unmatched({ isRtr: true, dlc: 6, bytes: [] })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, data: Array(6).fill(0) });
   });
 });

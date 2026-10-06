@@ -71,6 +71,8 @@ export function canEditorFromFrame(frame: FrameRow): Partial<CanEditorState> {
     data: [...frame.bytes],
     isExtended: frame.is_extended ?? false,
     isFd: frame.is_fd ?? false,
+    isBrs: frame.is_brs ?? false,
+    isRtr: frame.is_rtr ?? false,
     bus: frame.bus ?? 0,
   };
 }

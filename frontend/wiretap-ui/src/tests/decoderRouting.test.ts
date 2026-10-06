@@ -7,7 +7,7 @@ import {
   getFilteredFrames,
   getTunnelTransactions,
 } from "../stores/decoderStore";
-import type { DecodedFrameMsg, DecodedSignalsEntry, DecodedTunnelMessage } from "../services/wsProtocol";
+import type { DecodedFrameMsg, DecodedSignalsEntry, DecodedTunnelMessage, UnroutedFrameMsg } from "../services/wsProtocol";
 import type { ParsedCatalog } from "../utils/catalogParser";
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -26,7 +26,24 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   bytes: [7, 0, 0, 0],
   sourceAddress: null,
   checksum: { extracted: 0x2a, calculated: 0x2a, valid: true },
+  dlc: 4,
   isFd: false,
+  isBrs: false,
+  isRtr: false,
+  ...over,
+});
+
+const unrouted = (over: Partial<UnroutedFrameMsg> = {}): UnroutedFrameMsg => ({
+  kind: "unmatched",
+  frameId: 0x2a5,
+  bus: 0,
+  t: 3_000_000,
+  bytes: [1, 2],
+  dlc: 2,
+  protocol: "can",
+  isFd: false,
+  isBrs: false,
+  isRtr: false,
   ...over,
 });
 
@@ -46,21 +63,25 @@ describe("decoderStore.applyDecodedBatch", () => {
     useDecoderStore.getState().setMinFrameLength(0);
   });
 
-  it("a decoded and an unmatched frame keep the received FD flag", () => {
-    apply([
-      decoded({ isFd: true }),
-      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1, 2], protocol: "can", isFd: true },
-    ]);
+  it("a decoded and an unmatched frame keep the received FD and BRS flags", () => {
+    apply([decoded({ isFd: true, isBrs: true }), unrouted({ isFd: true, isBrs: true })]);
 
-    expect(getDecodedFrames().peek(0x100)?.isFd).toBe(true);
-    expect(getUnmatchedFrames()[0].isFd).toBe(true);
+    expect(getDecodedFrames().peek(0x100)).toMatchObject({ isFd: true, isBrs: true, isRtr: false });
+    expect(getUnmatchedFrames()[0]).toMatchObject({ isFd: true, isBrs: true, isRtr: false });
+  });
+
+  it("a decoded and an unmatched RTR keep the length it asks for", () => {
+    apply([decoded({ isRtr: true, dlc: 6, bytes: [] }), unrouted({ isRtr: true, dlc: 6, bytes: [] })]);
+
+    expect(getDecodedFrames().peek(0x100)).toMatchObject({ isRtr: true, dlc: 6, rawBytes: [] });
+    expect(getUnmatchedFrames()[0]).toMatchObject({ isRtr: true, dlc: 6, bytes: [] });
   });
 
   it("routes each kind to its tab", () => {
     apply([
       decoded(),
-      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1, 2], protocol: "can", isFd: false },
-      { kind: "short", frameId: 0x01, bus: 1, t: 4_000_000, bytes: [1], protocol: "serial", isFd: false, sourceAddress: 9 },
+      unrouted(),
+      unrouted({ kind: "short", frameId: 0x01, bus: 1, t: 4_000_000, bytes: [1], dlc: 1, protocol: "serial", sourceAddress: 9 }),
     ]);
 
     const frame = getDecodedFrames().peek(0x100);
@@ -68,10 +89,10 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(frame?.checksum?.valid).toBe(true);
     expect(frame?.signals[0]).toMatchObject({ name: "Level", timestamp: 2, mirrorMismatch: true });
     expect(getUnmatchedFrames()).toEqual([
-      { frameId: 0x2a5, bytes: [1, 2], timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false },
+      { frameId: 0x2a5, bytes: [1, 2], dlc: 2, timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false, isBrs: false, isRtr: false },
     ]);
     expect(getFilteredFrames()).toEqual([
-      { frameId: 0x01, bytes: [1], timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, reason: "too_short" },
+      { frameId: 0x01, bytes: [1], dlc: 1, timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, isBrs: false, isRtr: false, reason: "too_short" },
     ]);
   });
 
@@ -93,7 +114,7 @@ describe("decoderStore.applyDecodedBatch", () => {
     useDecoderStore.getState().setMinFrameLength(3);
     apply([
       decoded({ bytes: [1, 2] }),
-      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can", isFd: false },
+      unrouted({ bytes: [1], dlc: 1 }),
       decoded({ t: 4_000_000 }),
     ]);
     expect(getFilteredFrames()).toMatchObject([
@@ -114,7 +135,7 @@ describe("decoderStore.applyDecodedBatch", () => {
   });
 
   it("replaces the Modbus rows with an attach's backlog rather than adding to them", () => {
-    apply([decoded({ tunnel: [tunnelMessage] }), { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can", isFd: false }]);
+    apply([decoded({ tunnel: [tunnelMessage] }), unrouted({ bytes: [1], dlc: 1 })]);
     const backlog = [decoded({ tunnel: [tunnelMessage] })];
     useDecoderStore.getState().applyDecodedBatch(backlog, true);
     useDecoderStore.getState().applyDecodedBatch(backlog, true);
