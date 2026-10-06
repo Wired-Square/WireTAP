@@ -1185,6 +1185,7 @@ export default function DecoderFramesView({
             dlc: frame.len,
             data: [...rawBytes],
             isExtended: frame.isExtended ?? false,
+            isFd: decodedFrame?.isFd ?? false,
             bus: frame.bus ?? 0,
           });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
@@ -1338,6 +1339,7 @@ export default function DecoderFramesView({
             dlc: frame.bytes.length,
             data: [...frame.bytes],
             isExtended,
+            isFd: frame.isFd ?? false,
             bus: 0,
           });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);

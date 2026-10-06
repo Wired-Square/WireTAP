@@ -26,6 +26,7 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   bytes: [7, 0, 0, 0],
   sourceAddress: null,
   checksum: { extracted: 0x2a, calculated: 0x2a, valid: true },
+  isFd: false,
   ...over,
 });
 
@@ -45,11 +46,21 @@ describe("decoderStore.applyDecodedBatch", () => {
     useDecoderStore.getState().setMinFrameLength(0);
   });
 
+  it("a decoded and an unmatched frame keep the received FD flag", () => {
+    apply([
+      decoded({ isFd: true }),
+      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1, 2], protocol: "can", isFd: true },
+    ]);
+
+    expect(getDecodedFrames().peek(0x100)?.isFd).toBe(true);
+    expect(getUnmatchedFrames()[0].isFd).toBe(true);
+  });
+
   it("routes each kind to its tab", () => {
     apply([
       decoded(),
-      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1, 2], protocol: "can" },
-      { kind: "short", frameId: 0x01, bus: 1, t: 4_000_000, bytes: [1], protocol: "serial", sourceAddress: 9 },
+      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1, 2], protocol: "can", isFd: false },
+      { kind: "short", frameId: 0x01, bus: 1, t: 4_000_000, bytes: [1], protocol: "serial", isFd: false, sourceAddress: 9 },
     ]);
 
     const frame = getDecodedFrames().peek(0x100);
@@ -57,10 +68,10 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(frame?.checksum?.valid).toBe(true);
     expect(frame?.signals[0]).toMatchObject({ name: "Level", timestamp: 2, mirrorMismatch: true });
     expect(getUnmatchedFrames()).toEqual([
-      { frameId: 0x2a5, bytes: [1, 2], timestamp: 3, sourceAddress: undefined, protocol: "can" },
+      { frameId: 0x2a5, bytes: [1, 2], timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false },
     ]);
     expect(getFilteredFrames()).toEqual([
-      { frameId: 0x01, bytes: [1], timestamp: 4, sourceAddress: 9, protocol: "serial", reason: "too_short" },
+      { frameId: 0x01, bytes: [1], timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, reason: "too_short" },
     ]);
   });
 
@@ -82,7 +93,7 @@ describe("decoderStore.applyDecodedBatch", () => {
     useDecoderStore.getState().setMinFrameLength(3);
     apply([
       decoded({ bytes: [1, 2] }),
-      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can" },
+      { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can", isFd: false },
       decoded({ t: 4_000_000 }),
     ]);
     expect(getFilteredFrames()).toMatchObject([
@@ -103,7 +114,7 @@ describe("decoderStore.applyDecodedBatch", () => {
   });
 
   it("replaces the Modbus rows with an attach's backlog rather than adding to them", () => {
-    apply([decoded({ tunnel: [tunnelMessage] }), { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can" }]);
+    apply([decoded({ tunnel: [tunnelMessage] }), { kind: "unmatched", frameId: 0x2a5, bus: 0, t: 3_000_000, bytes: [1], protocol: "can", isFd: false }]);
     const backlog = [decoded({ tunnel: [tunnelMessage] })];
     useDecoderStore.getState().applyDecodedBatch(backlog, true);
     useDecoderStore.getState().applyDecodedBatch(backlog, true);

@@ -443,6 +443,7 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
         bus: f.bus,
         bytes: &f.bytes,
         frame_id: f.frame_id,
+        is_fd: f.is_fd,
         kind,
         protocol: &f.protocol,
         source_address: f.source_address,
@@ -510,6 +511,7 @@ pub(crate) fn decode_entry<'a>(
             .map(ChecksumVerdict::from),
         frame_id: f.frame_id,
         header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
+        is_fd: f.is_fd,
         masked_frame_id: masked_id,
         mirror: verdict.map(DecodedMirrorVerdict::from),
         selectors: decoded.selectors.into_iter().map(DecodedMuxSelector::from).collect(),
@@ -1754,6 +1756,20 @@ factor = 1e10
     fn decode_entry_reads_as_the_same_json_value() {
         let value = golden_mirror_entry(|entry| serde_json::to_value(entry).unwrap());
         assert_eq!(value.to_string(), GOLDEN.lines().nth(1).unwrap());
+    }
+
+    #[test]
+    fn decoded_and_unmatched_entries_carry_the_frames_fd_flag() {
+        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let fd = |id| FrameMessage { is_fd: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
+        let bytes = encode_decoded_batch("fd-flag", &[fd(0x18EF0042), fd(0x18EE0042)], &headered, None, None, true);
+        let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
+
+        assert!(entries[0].get("kind").is_none(), "the first frame decodes");
+        assert_eq!(entries[1]["kind"], "unmatched");
+        for entry in &entries {
+            assert_eq!(entry["isFd"], true);
+        }
     }
 
     #[test]

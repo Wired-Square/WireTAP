@@ -10,7 +10,7 @@ export type DecodedFrameMsg = { bus: number,
 /**
  * The payload this decode came from, for a byte row per mux case.
  */
-bytes: Array<number>, checksum?: ChecksumVerdict, frameId: number, headerFields: Array<DecodedHeaderField>, 
+bytes: Array<number>, checksum?: ChecksumVerdict, frameId: number, headerFields: Array<DecodedHeaderField>, isFd: boolean, 
 /**
  * `frame_id` under the catalogue's `frame_id_mask`: the frame it decoded as.
  */

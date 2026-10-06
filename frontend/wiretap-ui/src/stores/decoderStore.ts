@@ -36,6 +36,7 @@ function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFr
     timestamp,
     sourceAddress: msg.sourceAddress ?? undefined,
     protocol: "kind" in msg ? msg.protocol : undefined,
+    isFd: msg.isFd,
   };
 }
 
@@ -153,6 +154,7 @@ export type DecodedFrame = {
   tunnelBytes?: Map<TunnelTransaction['direction'], number[]>;
   /** The serial catalogue's checksum over `rawBytes`. */
   checksum?: ChecksumValidationResult;
+  isFd?: boolean;
 };
 
 export type FrameMetadata = {
@@ -175,6 +177,7 @@ export type UnmatchedFrame = {
   sourceAddress?: number;
   /** What produced the frame — a `modbus_rtu` id reads as unit/function, not as a CAN id. */
   protocol?: string;
+  isFd?: boolean;
 };
 
 /** Filtered frame (too short or matched by ID filter) */
@@ -708,6 +711,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         rawBytesByMux,
         tunnelBytes,
         checksum: msg.checksum,
+        isFd: msg.isFd,
       };
       _decoded.set(id, decodedFrame);
 
