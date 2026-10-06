@@ -80,6 +80,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Transmit editor no longer builds a remote CAN FD frame.** Turning on CAN FD with RTR already on kept the frame remote, so it was queued as one and refused at send; turning on CAN FD now clears RTR.
 - **Send to Transmit keeps a frame's CAN FD, BRS and RTR marks.** A CAN FD frame sent to Transmit from Discovery or the Decoder could arrive as a classic frame, and one longer than 8 bytes then carried an impossible length until FD was toggled off and on. The editor now takes the frame's FD and bit-rate switch flags as received, whatever its length, and a classic frame clears a leftover FD setting. A remote frame arrives as a remote request for the length it asks for.
 - **Backend captures stored by an earlier version show their CAN FD lengths.** A CAN FD frame streamed from a WireTAP Backend archive was stored with its length code, so Discovery's length column and frame list read 15 for a 64-byte frame. Such captures now read each frame's length from its payload, with nothing to re-import.
+- **A received remote frame no longer blanks its frame in the Decoder.** A remote request for a catalogued id used to replace the frame's bytes with nothing and decode its signals as zero. A remote frame carries no data, so it is no longer decoded: it is listed under Unmatched with its RTR mark, and MCP `get_decoded_signals` leaves it out.
 
 ## [0.13.0] - 2026-09-29
 

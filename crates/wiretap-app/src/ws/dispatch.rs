@@ -455,7 +455,8 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
 }
 
 /// One frame's entry in the `DecodedSignals` payload, or `None` when the
-/// catalogue says nothing about it. Shared by the live stream and the MCP
+/// catalogue says nothing about it or it is a remote request, which carries no
+/// data to decode. Shared by the live stream and the MCP
 /// `get_decoded_signals` tool, so both describe a frame alike.
 pub(crate) fn decode_entry<'a>(
     catalog: &'a wiretap_catalog::Catalog,
@@ -463,6 +464,9 @@ pub(crate) fn decode_entry<'a>(
     verdict: Option<&'a wiretap_catalog::MirrorVerdict>,
     tunnel_messages: &'a [TunnelMessage],
 ) -> Option<DecodedFrameMsg<'a>> {
+    if f.is_rtr {
+        return None;
+    }
     // decode_by_id applies frame_id_mask, looks up the frame, decodes
     // signals/mux, and extracts header fields (CAN id / serial bytes).
     // Defaulted, not skipped, when the catalogue has no frame for this id:
@@ -1423,6 +1427,15 @@ bit_length = 8
         assert!(backlog[0].get("kind").is_none());
     }
 
+    #[test]
+    fn a_remote_frame_does_not_decode_signals() {
+        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let rtr = FrameMessage { is_rtr: true, dlc: 8, ..can(0x1A5, 10, vec![]) };
+        let decoded = decode_entry(&catalog, &rtr, None, &[]).map(|e| serde_json::to_value(e).unwrap());
+        assert_eq!(decoded, None);
+        assert_eq!(entries(&catalog, &[rtr], true)[0]["kind"], "unmatched");
+    }
+
     const SERIAL: &str = r#"
 [meta]
 name = "serial"
@@ -1781,7 +1794,7 @@ factor = 1e10
             [
                 serde_json::json!([null, true, true, false, 8]),
                 serde_json::json!(["unmatched", true, true, false, 8]),
-                serde_json::json!([null, false, false, true, 6]),
+                serde_json::json!(["unmatched", false, false, true, 6]),
                 serde_json::json!(["unmatched", false, false, true, 6]),
             ]
         );

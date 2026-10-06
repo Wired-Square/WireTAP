@@ -2,16 +2,15 @@ import type { CanEditorState } from "../../stores/transmitStore";
 import type { DecodedFrame, UnmatchedFrame } from "../../stores/decoderStore";
 import type { FrameDetail } from "../../types/decoder";
 
-/** The Transmit editor loaded with a decoded frame, at its catalogue length unless it is an RTR. */
+/** The Transmit editor loaded with a decoded frame, at its catalogue length. */
 export function canEditorFromDecoded(frame: FrameDetail, decoded: DecodedFrame | undefined): Partial<CanEditorState> {
   return {
     frameId: frame.id.toString(16).toUpperCase(),
-    dlc: decoded?.isRtr ? decoded.dlc : frame.len,
+    dlc: frame.len,
     data: [...(decoded?.rawBytes ?? [])],
     isExtended: frame.isExtended ?? false,
     isFd: decoded?.isFd ?? false,
     isBrs: decoded?.isBrs ?? false,
-    isRtr: decoded?.isRtr ?? false,
     bus: frame.bus ?? 0,
   };
 }

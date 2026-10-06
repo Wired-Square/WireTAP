@@ -71,10 +71,7 @@ describe("the Decoder's Send to Transmit loads the frame as received", () => {
     expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, is_brs: true });
   });
 
-  it("a decoded or unmatched RTR arrives as a remote request for its received length", () => {
-    editor().updateCanEditor(canEditorFromDecoded(detail, decoded({ isRtr: true, dlc: 6, rawBytes: [] })));
-    expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, data: Array(6).fill(0) });
-    editor().resetCanEditor();
+  it("an unmatched RTR arrives as a remote request for its received length", () => {
     editor().updateCanEditor(canEditorFromUnmatched(unmatched({ isRtr: true, dlc: 6, bytes: [] })));
     expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, data: Array(6).fill(0) });
   });
