@@ -35,7 +35,7 @@ import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMe
 import { formatFrameId } from "../../../utils/frameIds";
 import { protocolLabel } from "../../../utils/profileTraits";
 import { openPanel } from "../../../utils/windowCommunication";
-import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
+import { canEditorFromFrame, frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
@@ -439,13 +439,7 @@ function DiscoveryFramesView({
         icon: <Send />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor({
-            frameId: frame.frame_id.toString(16).toUpperCase(),
-            dlc: frame.dlc,
-            data: [...frame.bytes],
-            isExtended: frame.is_extended ?? false,
-            bus: frame.bus ?? 0,
-          });
+          useTransmitStore.getState().updateCanEditor(canEditorFromFrame(frame));
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           useTransmitStore.getState().setActiveTab("frame");
           openPanel("transmit");

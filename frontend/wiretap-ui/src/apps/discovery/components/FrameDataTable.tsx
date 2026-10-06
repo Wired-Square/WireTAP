@@ -39,6 +39,7 @@ export interface FrameRow {
   /** Protocol that produced this frame (e.g. "can", "modbus", "serial"). Defaults to "can". */
   protocol: string;
   is_extended?: boolean;
+  is_fd?: boolean;
   source_address?: number;
   dlc: number;
   bytes: number[];

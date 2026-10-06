@@ -12,6 +12,7 @@ import { Calculator, ClipboardCopy, Copy } from "lucide-react";
 import type { TFunction } from "i18next";
 import type { ContextMenuItem } from "../../../components/ContextMenu";
 import type { FrameRow } from "./FrameDataTable";
+import type { CanEditorState } from "../../../stores/transmitStore";
 import { byteToHex, bytesToHex } from "../../../utils/byteUtils";
 import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
 
@@ -59,5 +60,17 @@ export function frameInspectMenuItem(frame: FrameRow, t: TFunction): ContextMenu
     label: t("contextMenu.inspect"),
     icon: <Calculator />,
     onClick: () => sendHexDataToCalculator(bytesToHex(frame.bytes)),
+  };
+}
+
+/** The Transmit editor loaded with this frame, as received. */
+export function canEditorFromFrame(frame: FrameRow): Partial<CanEditorState> {
+  return {
+    frameId: frame.frame_id.toString(16).toUpperCase(),
+    dlc: frame.dlc,
+    data: [...frame.bytes],
+    isExtended: frame.is_extended ?? false,
+    isFd: frame.is_fd ?? false,
+    bus: frame.bus ?? 0,
   };
 }
