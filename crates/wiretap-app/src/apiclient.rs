@@ -590,7 +590,7 @@ fn oldest_first(resp: PayloadsResponse) -> Vec<Vec<u8>> {
 // Capture import — push a local SQLite capture to the backend
 // ---------------------------------------------------------------------------
 
-use wiretap_protocol::{import, ingest::record_id_flags};
+use wiretap_protocol::{can::CanFrame, import};
 
 const IMPORT_PAGE: usize = 50_000;
 
@@ -674,6 +674,23 @@ pub async fn events_delete(app: &tauri::AppHandle, profile_id: &str, id: &str) -
     parse::<Value>(resp).await.map(|_| ())
 }
 
+/// Every frame goes as a CAN record, as the format has no other kind.
+fn import_body(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
+    let mut body = Vec::with_capacity(import::BODY_HEADER + frames.len() * 24);
+    import::encode_header_into(&mut body);
+    for f in frames {
+        let frame = if f.is_rtr {
+            CanFrame::remote(f.bus, f.frame_id, f.is_extended, wiretap_protocol::payload_dlc(f.dlc as usize, false))
+        } else {
+            let mut frame = CanFrame::data(f.bus, f.frame_id, f.is_extended, f.is_fd, f.is_brs, f.bytes.clone());
+            frame.esi = f.is_esi;
+            frame
+        };
+        import::encode_record_into(&mut body, f.timestamp_us as i64, &frame, f.direction.as_deref() == Some("tx"));
+    }
+    body
+}
+
 /// Upload a local SQLite capture's frames to a backend capture database.
 /// Pages through the capture and POSTs chunks so memory stays bounded;
 /// emits `capture-upload-progress` events for the UI.
@@ -716,11 +733,7 @@ pub async fn api_import_capture(
         if frames.is_empty() {
             break;
         }
-        let mut body = Vec::with_capacity(frames.len() * 24);
-        for f in &frames {
-            let id_flags = record_id_flags(f.frame_id, f.is_extended, f.is_fd, f.direction.as_deref() == Some("tx"));
-            import::encode_record_into(&mut body, f.timestamp_us as i64, id_flags, f.bus, &f.bytes);
-        }
+        let body = import_body(&frames);
 
         let url = format!(
             "{}/v1/db/{}/import{}",
@@ -1040,5 +1053,76 @@ mod tests {
         };
         assert!(pattern(Protocol::Can).get("protocol").is_none());
         assert_eq!(pattern(Protocol::Modbus)["protocol"], "modbus");
+    }
+
+    fn uploaded(body: &[u8]) -> Vec<(i64, bool, CanFrame)> {
+        let mut at = import::parse_header(body).unwrap().expect("a whole header");
+        let mut records = Vec::new();
+        while let Some((record, consumed)) = import::parse_record(&body[at..]).unwrap() {
+            at += consumed;
+            let wiretap_protocol::ingest::RecordFields::Can { transmitted, .. } = record.fields() else {
+                unreachable!("an import record is CAN")
+            };
+            records.push((record.ts_us, transmitted, record.into_can()));
+        }
+        assert_eq!(at, body.len(), "trailing bytes");
+        records
+    }
+
+    #[test]
+    fn an_upload_keeps_an_rtrs_length_code_and_fd_brs_esi() {
+        let rtr = crate::io::FrameMessage {
+            protocol: "can".into(),
+            timestamp_us: 1,
+            frame_id: 0x123,
+            dlc: 6,
+            is_rtr: true,
+            ..Default::default()
+        };
+        let fd = crate::io::FrameMessage {
+            protocol: "can".into(),
+            timestamp_us: 2,
+            frame_id: 0x1234_5678,
+            bus: 2,
+            dlc: 12,
+            bytes: vec![7; 12],
+            is_extended: true,
+            is_fd: true,
+            is_brs: true,
+            is_esi: true,
+            direction: Some("tx".into()),
+            ..Default::default()
+        };
+        let mut esi = CanFrame::data(2, 0x1234_5678, true, true, true, vec![7; 12]);
+        esi.esi = true;
+        assert_eq!(
+            uploaded(&import_body(&[rtr, fd])),
+            vec![(1, false, CanFrame::remote(0, 0x123, false, 6)), (2, true, esi)],
+        );
+    }
+
+    #[test]
+    fn every_upload_body_starts_with_the_import_header() {
+        let page = |ts| crate::io::FrameMessage { protocol: "can".into(), timestamp_us: ts, ..Default::default() };
+        for body in [import_body(&[page(1)]), import_body(&[page(2)])] {
+            assert_eq!(import::parse_header(&body), Ok(Some(import::BODY_HEADER)));
+        }
+    }
+
+    #[test]
+    fn an_uploaded_classic_frame_is_unchanged() {
+        let classic = crate::io::FrameMessage {
+            protocol: "can".into(),
+            timestamp_us: 1_767_225_600_000_000,
+            frame_id: 0x7FF,
+            bus: 1,
+            dlc: 3,
+            bytes: vec![1, 2, 3],
+            ..Default::default()
+        };
+        assert_eq!(
+            uploaded(&import_body(&[classic])),
+            vec![(1_767_225_600_000_000, false, CanFrame::data(1, 0x7FF, false, false, false, vec![1, 2, 3]))],
+        );
     }
 }
