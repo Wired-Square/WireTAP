@@ -353,6 +353,7 @@ mod desktop {
                 source_address,
                 incomplete: incomplete.then_some(true),
                 direction: None,
+                ..Default::default()
             }
         };
 

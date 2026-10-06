@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader};
 use wiretap_protocol::can::Direction;
 use wiretap_protocol::candump::{self, Line};
 
+use crate::io::can_task::received_frame;
 use crate::io::FrameMessage;
 
 const REPORTED_SKIPS: usize = 100;
@@ -90,22 +91,13 @@ pub(crate) fn interface_bus(interface: &str) -> u8 {
     interface[name.len()..].parse().unwrap_or(0)
 }
 
-/// RTR, BRS and ESI are dropped until `FrameMessage` carries them, as the live
-/// adapter does; a received frame has no direction, as live.
+/// A received frame has no direction, as live.
 fn frame_message(line: Line) -> FrameMessage {
-    let frame = line.frame;
     FrameMessage {
-        protocol: "can".to_string(),
         timestamp_us: line.ts_us,
-        frame_id: frame.arb_id,
         bus: interface_bus(&line.interface),
-        dlc: frame.data.len() as u16,
-        bytes: frame.data,
-        is_extended: frame.extended,
-        is_fd: frame.fd,
-        source_address: None,
-        incomplete: None,
         direction: (line.direction == Some(Direction::Tx)).then(|| "tx".to_string()),
+        ..received_frame(line.frame)
     }
 }
 
@@ -199,6 +191,26 @@ mod tests {
         let path = temp_log("none.log", "not a log\n");
         let error = parse_candump_files(&[path]).unwrap_err();
         assert!(error.starts_with("No line is a candump frame"), "{error}");
+    }
+
+    #[test]
+    fn a_remote_line_keeps_its_requested_length_and_an_fd_line_its_brs_and_esi() {
+        let path = temp_log(
+            "rtr-fd.log",
+            "(1.000000) can0 123#R5\n(2.000000) can0 456##3AABB\n",
+        );
+        let frames = parse_candump_files(&[path]).unwrap().frames;
+        let flags: Vec<_> = frames
+            .iter()
+            .map(|f| (f.is_rtr, f.is_fd, f.is_brs, f.is_esi, f.dlc, f.bytes.len()))
+            .collect();
+        assert_eq!(
+            flags,
+            [
+                (true, false, false, false, 5, 0),
+                (false, true, true, true, 2, 2)
+            ]
+        );
     }
 
     #[test]

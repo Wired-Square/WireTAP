@@ -312,16 +312,14 @@ mod tests {
         assert!(muted.is_empty());
     }
 
-    /// `FrameMessage` has no RTR flag, so a remote request arrives as an empty
-    /// data frame, as it did before the library read it.
     #[test]
-    fn a_remote_request_arrives_as_an_empty_frame() {
+    fn a_remote_request_arrives_flagged_with_its_requested_length() {
         let remote = vec![read(CanFrame::remote(0, 0x123, false, 3))];
         let messages = on_event(3, "p", &[mapping(true, 0)], CanEvent::Read(remote)).unwrap();
         let [SourceMessage::Frames(3, frames)] = messages.as_slice() else {
             panic!("expected one Frames");
         };
-        assert_eq!((frames[0].dlc, frames[0].bytes.len()), (0, 0));
+        assert_eq!((frames[0].is_rtr, frames[0].dlc, frames[0].bytes.len()), (true, 3, 0));
     }
 
     #[test]

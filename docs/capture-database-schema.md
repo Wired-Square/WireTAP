@@ -47,6 +47,9 @@ Stores CAN frames and framed serial messages. One row per frame received.
 | `payload` | BLOB | NO | | Raw frame payload bytes. Length may differ from `dlc` in some protocols. |
 | `is_extended` | INTEGER | NO | 0 | Boolean (0/1). `1` if the frame uses a 29-bit extended ID. |
 | `is_fd` | INTEGER | NO | 0 | Boolean (0/1). `1` if the frame is CAN FD. |
+| `is_rtr` | INTEGER | NO | 0 | Boolean (0/1). `1` for a CAN remote request; `dlc` is the length it asks for and `payload` is empty. Added in v5. |
+| `is_brs` | INTEGER | NO | 0 | Boolean (0/1). `1` if a CAN FD frame switched bit rate. Added in v5. |
+| `is_esi` | INTEGER | NO | 0 | Boolean (0/1). `1` if a CAN FD frame's sender was error passive. Added in v5. |
 | `source_address` | INTEGER | YES | NULL | J1939 source address, if applicable. |
 | `incomplete` | INTEGER | YES | NULL | Boolean (0/1). `1` if the frame is an incomplete ISO-TP reassembly. |
 | `direction` | TEXT | YES | NULL | `tx` or `rx`, if the device reports direction. |

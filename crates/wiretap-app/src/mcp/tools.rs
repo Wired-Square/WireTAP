@@ -1772,6 +1772,7 @@ mod tests {
                 source_address: None,
                 incomplete: None,
                 direction: None,
+                ..Default::default()
             }
         }
 

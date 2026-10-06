@@ -531,6 +531,7 @@ pub fn parse_csv_with_mapping(
             source_address: None,
             incomplete: None,
             direction,
+            ..Default::default()
         });
     }
 

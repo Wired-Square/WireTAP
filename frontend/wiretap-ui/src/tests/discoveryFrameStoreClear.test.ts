@@ -28,6 +28,9 @@ const frame = (id: number, ts: number): FrameMessage => ({
   bytes: [1, 0, 0, 0, 0x7b],
   is_extended: false,
   is_fd: false,
+  is_rtr: false,
+  is_brs: false,
+  is_esi: false,
 });
 
 /** addFrames buffers on a trailing timeout — advance past it to land the flush. */

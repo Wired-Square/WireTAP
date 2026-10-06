@@ -319,6 +319,7 @@ impl LiveLine {
                     source_address,
                     incomplete: frame.incomplete.then_some(true),
                     direction: None,
+                    ..Default::default()
                 };
                 apply_bus_mapping(&mut msg, &self.bus_mappings).then_some(msg)
             })

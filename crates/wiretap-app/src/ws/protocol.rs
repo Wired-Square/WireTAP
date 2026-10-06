@@ -916,6 +916,7 @@ mod tests {
             source_address: None,
             incomplete: None,
             direction: direction.map(|s| s.to_string()),
+            ..Default::default()
         }
     }
 

@@ -96,7 +96,7 @@ use wslib_ai_mcp::rmcp::schemars::{self, JsonSchema};
 // ============================================================================
 
 /// Parsed frame message - the main data structure emitted by all readers
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FrameMessage {
     pub protocol: String, // e.g., "can", "modbus", "serial"
@@ -111,6 +111,13 @@ pub struct FrameMessage {
     pub is_extended: bool,
     #[serde(default)]
     pub is_fd: bool,
+    /// A remote request: `dlc` is the length it asks for, and `bytes` is empty.
+    #[serde(default)]
+    pub is_rtr: bool,
+    #[serde(default)]
+    pub is_brs: bool,
+    #[serde(default)]
+    pub is_esi: bool,
     /// Source address (for protocols like J1939, TWC that embed sender ID in frame)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[cfg_attr(test, ts(optional))]

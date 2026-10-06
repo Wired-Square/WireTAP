@@ -322,6 +322,7 @@ fn spawn_mqtt_stream(
                                     source_address: None,
                                     incomplete: None,
                                     direction: Some("rx".to_string()),
+                                    ..Default::default()
                                 };
 
                                 // Buffer frame for replay

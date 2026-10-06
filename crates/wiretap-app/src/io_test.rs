@@ -1311,6 +1311,7 @@ pub(crate) mod tests {
             source_address: None,
             incomplete: None,
             direction: Some("rx".into()),
+            ..Default::default()
         }
     }
 

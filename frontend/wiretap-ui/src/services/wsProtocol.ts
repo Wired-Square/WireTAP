@@ -152,6 +152,9 @@ export function decodeFrameBatch(
         bytes: Array.from(new Uint8Array(buf, dataStart + 4, payloadLen)),
         is_extended: isExtended,
         is_fd: frameType === FrameType.CanFd,
+        is_rtr: false,
+        is_brs: false,
+        is_esi: false,
         direction: directionTx ? "tx" : undefined,
       };
     } else if (frameType === FrameType.Modbus || frameType === FrameType.ModbusRtu) {
@@ -169,6 +172,9 @@ export function decodeFrameBatch(
         bytes: Array.from(new Uint8Array(buf, dataStart + 4, payloadLen)),
         is_extended: false,
         is_fd: false,
+        is_rtr: false,
+        is_brs: false,
+        is_esi: false,
       };
     } else {
       // Serial and anything else — raw bytes, no frame_id
@@ -181,6 +187,9 @@ export function decodeFrameBatch(
         bytes: Array.from(new Uint8Array(buf, dataStart, len)),
         is_extended: false,
         is_fd: false,
+        is_rtr: false,
+        is_brs: false,
+        is_esi: false,
       };
     }
 

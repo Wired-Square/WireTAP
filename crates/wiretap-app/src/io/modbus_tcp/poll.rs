@@ -40,6 +40,7 @@ pub fn modbus_frame(frame_id: u32, device_address: u8, bytes: Vec<u8>) -> FrameM
         source_address: None,
         incomplete: None,
         direction: Some("rx".to_string()),
+        ..Default::default()
     }
 }
 

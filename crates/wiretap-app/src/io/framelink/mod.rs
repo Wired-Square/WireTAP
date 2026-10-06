@@ -86,7 +86,8 @@ pub fn convert_stream_frame(
     match &sf.metadata {
         FrameMetadata::Can { can_id, dlc, flags } => {
             let is_extended = (flags & 1) != 0;
-            let is_fd = iface_type == IFACE_CANFD;
+            let is_rtr = (flags & 2) != 0;
+            let is_fd = (flags & 4) != 0 || iface_type == IFACE_CANFD;
 
             // Find bus mapping for this interface index
             let output_bus = bus_mappings
@@ -103,9 +104,11 @@ pub fn convert_stream_frame(
                 bytes: sf.data.clone(),
                 is_extended,
                 is_fd,
+                is_rtr,
                 source_address: None,
                 incomplete: None,
                 direction: Some("rx".to_string()),
+                ..Default::default()
             })
         }
         FrameMetadata::Rs485 { .. } => {
@@ -126,6 +129,7 @@ pub fn convert_stream_frame(
                 source_address: None,
                 incomplete: None,
                 direction: Some("rx".to_string()),
+                ..Default::default()
             })
         }
         FrameMetadata::Unknown { .. } => {
@@ -367,7 +371,33 @@ fn default_signal_meta(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use framelink::protocol::types;
+
+    fn received_can(flags: u8, dlc: u8, data: Vec<u8>) -> FrameMessage {
+        let sf = StreamFrame {
+            timestamp_us: 0,
+            iface_index: 0,
+            metadata: FrameMetadata::Can { can_id: 0x123, dlc, flags },
+            data,
+        };
+        let iface_types = HashMap::from([(0, types::IFACE_CAN)]);
+        convert_stream_frame(&sf, &[BusMapping::default()], &iface_types).unwrap()
+    }
+
+    #[test]
+    fn a_received_rtr_keeps_its_flag_and_requested_length() {
+        let f = received_can(0x02, 4, vec![]);
+        assert!(f.is_rtr);
+        assert_eq!(f.dlc, 4);
+        assert!(f.bytes.is_empty());
+        assert!(!received_can(0x00, 1, vec![0]).is_rtr);
+    }
+
+    #[test]
+    fn the_fd_flag_bit_marks_a_frame_fd() {
+        assert!(received_can(0x04, 12, vec![0; 12]).is_fd);
+    }
 
     /// `src/api/framelinkAxes.ts` hand-mirrors identity-tuple codes so the
     /// frontend can pick a control from structured values rather than sniffing

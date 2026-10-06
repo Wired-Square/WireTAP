@@ -251,6 +251,7 @@ fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<Frame
         source_address: None,
         incomplete: None,
         direction: None,
+        ..Default::default()
     })
 }
 

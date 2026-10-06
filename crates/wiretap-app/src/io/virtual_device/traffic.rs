@@ -96,6 +96,7 @@ pub(crate) fn frame(
         source_address: None,
         incomplete: None,
         direction: Some("rx".to_string()),
+        ..Default::default()
     })
 }
 

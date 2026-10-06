@@ -136,6 +136,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "capture_events",
         step: MigrationStep::Sql(include_str!("../migrations/0004_capture_events.sql")),
     },
+    Migration {
+        version: 5,
+        name: "frames_can_flags",
+        step: MigrationStep::Sql(include_str!("../migrations/0005_frames_can_flags.sql")),
+    },
 ];
 
 fn schema_version(conn: &Connection) -> Result<i64, String> {
@@ -143,8 +148,12 @@ fn schema_version(conn: &Connection) -> Result<i64, String> {
         .map_err(|e| format!("Failed to read schema version: {}", e))
 }
 
-/// Apply every migration newer than the database's stamped version.
 fn run_migrations(conn: &mut Connection) -> Result<(), String> {
+    apply_migrations(conn, MIGRATIONS)
+}
+
+/// Apply every migration newer than the database's stamped version.
+fn apply_migrations(conn: &mut Connection, migrations: &[Migration]) -> Result<(), String> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
              version INTEGER PRIMARY KEY,
@@ -155,7 +164,7 @@ fn run_migrations(conn: &mut Connection) -> Result<(), String> {
     .map_err(|e| format!("Failed to create schema_migrations table: {}", e))?;
 
     let current = schema_version(conn)?;
-    for m in MIGRATIONS {
+    for m in migrations {
         if m.version <= current {
             continue;
         }
@@ -346,8 +355,6 @@ fn sweep_non_persistent_with_conn(conn: &Connection) -> Result<(), String> {
 
 fn row_to_frame(row: &rusqlite::Row) -> rusqlite::Result<FrameMessage> {
     let payload: Vec<u8> = row.get("payload")?;
-    let is_extended: i32 = row.get("is_extended")?;
-    let is_fd: i32 = row.get("is_fd")?;
     let source_address: Option<i64> = row.get("source_address")?;
     let incomplete: Option<i32> = row.get("incomplete")?;
 
@@ -358,8 +365,11 @@ fn row_to_frame(row: &rusqlite::Row) -> rusqlite::Result<FrameMessage> {
         bus: row.get::<_, i64>("bus")? as u8,
         dlc: row.get::<_, i64>("dlc")? as u16,
         bytes: payload,
-        is_extended: is_extended != 0,
-        is_fd: is_fd != 0,
+        is_extended: row.get("is_extended")?,
+        is_fd: row.get("is_fd")?,
+        is_rtr: row.get("is_rtr")?,
+        is_brs: row.get("is_brs")?,
+        is_esi: row.get("is_esi")?,
         source_address: source_address.map(|v| v as u16),
         incomplete: incomplete.map(|v| v != 0),
         direction: row.get("direction")?,
@@ -389,36 +399,42 @@ pub fn insert_frames(capture_id: &str, frames: &[FrameMessage]) -> Result<(), St
         .transaction()
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-    {
-        let mut stmt = tx
-            .prepare_cached(
-                "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            )
-            .map_err(|e| format!("Failed to prepare statement: {}", e))?;
-
-        for frame in frames {
-            stmt.execute(params![
-                capture_id,
-                &frame.protocol,
-                frame.timestamp_us as i64,
-                frame.frame_id as i64,
-                frame.bus as i64,
-                frame.dlc as i64,
-                &frame.bytes,
-                frame.is_extended as i32,
-                frame.is_fd as i32,
-                frame.source_address.map(|v| v as i64),
-                frame.incomplete.map(|v| v as i32),
-                &frame.direction,
-            ])
-            .map_err(|e| format!("Failed to insert frame: {}", e))?;
-        }
-    }
+    insert_frame_rows(&tx, capture_id, frames)?;
 
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
+    Ok(())
+}
+
+fn insert_frame_rows(conn: &Connection, capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare_cached(
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, is_rtr, is_brs, is_esi, source_address, incomplete, direction)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+        )
+        .map_err(|e| format!("Failed to prepare statement: {}", e))?;
+
+    for frame in frames {
+        stmt.execute(params![
+            capture_id,
+            &frame.protocol,
+            frame.timestamp_us as i64,
+            frame.frame_id as i64,
+            frame.bus as i64,
+            frame.dlc as i64,
+            &frame.bytes,
+            frame.is_extended,
+            frame.is_fd,
+            frame.is_rtr,
+            frame.is_brs,
+            frame.is_esi,
+            frame.source_address.map(|v| v as i64),
+            frame.incomplete.map(|v| v as i32),
+            &frame.direction,
+        ])
+        .map_err(|e| format!("Failed to insert frame: {}", e))?;
+    }
     Ok(())
 }
 
@@ -475,8 +491,8 @@ pub fn get_frames_paginated(
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3",
+            &format!("SELECT {FRAME_COLUMNS}
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3"),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -558,10 +574,10 @@ fn get_frames_paginated_filtered_with_conn(
     Ok((frames, rowids, total))
 }
 
-/// Column list for every `SELECT` feeding `row_to_frame_with_rowid`. Kept in one place
-/// because the mapper reads by position — a mismatch is a runtime error, not a build one.
+/// Column list for every `SELECT` feeding `row_to_frame`. Kept in one place because a
+/// column the mapper reads and the query omits is a runtime error, not a build one.
 const FRAME_COLUMNS: &str =
-    "rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction";
+    "rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, is_rtr, is_brs, is_esi, source_address, incomplete, direction";
 
 /// Restrict a frame query to a selection: the identity pair rather than the bare
 /// id — CAN 0x100 and Modbus register 256 are different frames — and, for a
@@ -1096,8 +1112,8 @@ fn copy_capture_data_with_conn(conn: &mut Connection, source_id: &str, dest_id: 
 
     let frame_count = tx
         .execute(
-            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
-             SELECT ?2, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, is_rtr, is_brs, is_esi, source_address, incomplete, direction)
+             SELECT ?2, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, is_rtr, is_brs, is_esi, source_address, incomplete, direction
              FROM frames WHERE capture_id = ?1 ORDER BY rowid",
             params![source_id, dest_id],
         )
@@ -1156,32 +1172,7 @@ pub fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(),
     tx.execute("DELETE FROM frames WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to clear frames: {}", e))?;
 
-    {
-        let mut stmt = tx
-            .prepare_cached(
-                "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            )
-            .map_err(|e| format!("Failed to prepare: {}", e))?;
-
-        for frame in frames {
-            stmt.execute(params![
-                capture_id,
-                &frame.protocol,
-                frame.timestamp_us as i64,
-                frame.frame_id as i64,
-                frame.bus as i64,
-                frame.dlc as i64,
-                &frame.bytes,
-                frame.is_extended as i32,
-                frame.is_fd as i32,
-                frame.source_address.map(|v| v as i64),
-                frame.incomplete.map(|v| v as i32),
-                &frame.direction,
-            ])
-            .map_err(|e| format!("Failed to insert frame: {}", e))?;
-        }
-    }
+    insert_frame_rows(&tx, capture_id, frames)?;
 
     tx.commit()
         .map_err(|e| format!("Failed to commit: {}", e))?;
@@ -1196,8 +1187,8 @@ pub fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE capture_id = ?1 ORDER BY rowid",
+            &format!("SELECT {FRAME_COLUMNS}
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid"),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -1225,12 +1216,12 @@ pub fn get_latest_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> 
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
+            &format!("SELECT {FRAME_COLUMNS}
              FROM frames
              WHERE rowid IN (
                  SELECT MAX(rowid) FROM frames WHERE capture_id = ?1 GROUP BY protocol, frame_id
              )
-             ORDER BY frame_id",
+             ORDER BY frame_id"),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -1261,8 +1252,8 @@ pub fn read_frame_chunk(
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE capture_id = ?1 AND rowid > ?2 ORDER BY rowid ASC LIMIT ?3",
+            &format!("SELECT {FRAME_COLUMNS}
+             FROM frames WHERE capture_id = ?1 AND rowid > ?2 ORDER BY rowid ASC LIMIT ?3"),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -1291,8 +1282,8 @@ pub fn read_frame_chunk_reverse(
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE capture_id = ?1 AND rowid < ?2 ORDER BY rowid DESC LIMIT ?3",
+            &format!("SELECT {FRAME_COLUMNS}
+             FROM frames WHERE capture_id = ?1 AND rowid < ?2 ORDER BY rowid DESC LIMIT ?3"),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -1361,8 +1352,8 @@ pub fn get_frame_at_index(
 
     let result = conn
         .query_row(
-            "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT 1 OFFSET ?2",
+            &format!("SELECT {FRAME_COLUMNS}
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT 1 OFFSET ?2"),
             params![capture_id, index as i64],
             |row| row_to_frame_with_rowid(row),
         )
@@ -2413,12 +2404,72 @@ mod tests {
                 (2, "frames_capture_rowid_index".to_string()),
                 (3, "frames_fid_protocol_index".to_string()),
                 (4, "capture_events".to_string()),
+                (5, "frames_can_flags".to_string()),
             ]
         );
         assert!(has_column(&conn, "frames", "capture_id").unwrap());
         assert!(has_column(&conn, "capture_metadata", "persistent").unwrap());
         assert!(has_column(&conn, "capture_metadata", "buses").unwrap());
         assert!(has_column(&conn, "capture_events", "duration_us").unwrap());
+    }
+
+    fn flagged_can_frames() -> Vec<FrameMessage> {
+        let can = |frame_id, dlc, bytes| FrameMessage {
+            protocol: "can".into(),
+            frame_id,
+            dlc,
+            bytes,
+            ..Default::default()
+        };
+        vec![
+            FrameMessage { is_rtr: true, ..can(0x100, 6, vec![]) },
+            FrameMessage { is_fd: true, is_brs: true, is_esi: true, ..can(0x101, 2, vec![1, 2]) },
+            can(0x102, 1, vec![3]),
+        ]
+    }
+
+    fn can_flags(frames: &[FrameMessage]) -> Vec<(bool, bool, bool, bool, u16)> {
+        frames.iter().map(|f| (f.is_rtr, f.is_fd, f.is_brs, f.is_esi, f.dlc)).collect()
+    }
+
+    #[test]
+    fn a_frame_keeps_rtr_brs_and_esi_through_insert_select_and_copy() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+        insert_frame_rows(&conn, "c1", &flagged_can_frames()).unwrap();
+        copy_capture_data_with_conn(&mut conn, "c1", "c2").unwrap();
+
+        for capture in ["c1", "c2"] {
+            let (frames, _, _) =
+                get_frames_paginated_filtered_with_conn(&conn, capture, 0, 10, &whole("can")).unwrap();
+            assert_eq!(
+                can_flags(&frames),
+                [
+                    (true, false, false, false, 6),
+                    (false, true, true, true, 2),
+                    (false, false, false, false, 1)
+                ],
+                "{capture}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_v4_database_migrates_to_v5_with_its_frames_unflagged() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&mut conn, &MIGRATIONS[..4]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_fd)
+             VALUES ('c1', 'can', 1, 256, 0, 2, x'AABB', 1);",
+        )
+        .unwrap();
+
+        run_migrations(&mut conn).unwrap();
+
+        assert_eq!(version_of(&conn), 5);
+        let (frames, _, _) =
+            get_frames_paginated_filtered_with_conn(&conn, "c1", 0, 10, &whole("can")).unwrap();
+        assert_eq!(can_flags(&frames), [(false, true, false, false, 2)]);
     }
 
     fn event_count(conn: &Connection, capture_id: &str) -> i64 {

@@ -108,6 +108,9 @@ function addHexBytes(frames: CaptureFrame[]): FrameWithHex[] {
     bytes: f.bytes,
     is_extended: f.is_extended,
     is_fd: f.is_fd,
+    is_rtr: f.is_rtr,
+    is_brs: f.is_brs,
+    is_esi: f.is_esi,
     source_address: f.source_address,
     hexBytes: f.bytes.map((b) => b.toString(16).padStart(2, "0").toUpperCase()),
   }));

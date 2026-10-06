@@ -14,6 +14,7 @@ use wiretap_io::can::{
     BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, Direction,
     SendRefused,
 };
+use wiretap_protocol::dlc_to_len;
 
 use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
 use crate::io::bus_status::BusStatus;
@@ -51,19 +52,33 @@ pub(crate) fn frame_message(read: CanRead) -> FrameMessage {
         ..
     } = read;
     FrameMessage {
-        protocol: "can".to_string(),
         timestamp_us: at
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_micros() as u64),
+        direction: (direction == Direction::Tx).then(|| "tx".to_string()),
+        ..received_frame(frame)
+    }
+}
+
+/// On the device's own bus, with no time or direction.
+pub(crate) fn received_frame(frame: CanFrame) -> FrameMessage {
+    let dlc = if frame.rtr {
+        dlc_to_len(frame.dlc(), false)
+    } else {
+        frame.data.len()
+    };
+    FrameMessage {
+        protocol: "can".to_string(),
         frame_id: frame.arb_id,
         bus: frame.bus,
-        dlc: frame.data.len() as u16,
-        is_fd: frame.fd,
+        dlc: dlc as u16,
         is_extended: frame.extended,
+        is_fd: frame.fd,
+        is_rtr: frame.rtr,
+        is_brs: frame.brs,
+        is_esi: frame.esi,
         bytes: frame.data,
-        source_address: None,
-        incomplete: None,
-        direction: (direction == Direction::Tx).then(|| "tx".to_string()),
+        ..Default::default()
     }
 }
 
@@ -356,6 +371,23 @@ mod tests {
         assert!(f.is_extended && f.is_fd);
         assert_eq!(f.direction, None);
         assert_eq!(f.protocol, "can");
+    }
+
+    #[test]
+    fn a_received_rtr_keeps_its_requested_length_with_no_payload() {
+        let f = frame_message(read(CanFrame::remote(0, 0x123, false, 6), Direction::Rx, 0));
+        assert!(f.is_rtr);
+        assert_eq!(f.dlc, 6);
+        assert!(f.bytes.is_empty());
+    }
+
+    #[test]
+    fn a_received_fd_frame_keeps_brs_and_esi() {
+        let mut frame = CanFrame::data(0, 0x123, false, true, true, vec![0; 64]);
+        frame.esi = true;
+        let f = frame_message(read(frame, Direction::Rx, 0));
+        assert_eq!((f.is_fd, f.is_brs, f.is_esi, f.is_rtr), (true, true, true, false));
+        assert_eq!(f.dlc, 64);
     }
 
     #[test]

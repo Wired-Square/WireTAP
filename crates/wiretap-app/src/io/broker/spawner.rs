@@ -442,6 +442,7 @@ async fn run_virtual_reader(
                             source_address: None,
                             incomplete: None,
                             direction: Some("rx".to_string()),
+                            ..Default::default()
                         };
                         if apply_bus_mapping(&mut frame, &echo_mappings) {
                             let _ = tx_loopback.blocking_send(SourceMessage::Frames(source_idx, vec![frame]));

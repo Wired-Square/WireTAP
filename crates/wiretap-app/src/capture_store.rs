@@ -1497,6 +1497,7 @@ mod tests {
             source_address: None,
             incomplete: None,
             direction: None,
+            ..Default::default()
         };
         append_frames_to_capture(&source, vec![frame(0x100), frame(0x101), frame(0x100)]);
 
@@ -1524,6 +1525,7 @@ mod tests {
             source_address: None,
             incomplete: None,
             direction: None,
+            ..Default::default()
         };
         let session = "f_capture_list_pushes";
 
