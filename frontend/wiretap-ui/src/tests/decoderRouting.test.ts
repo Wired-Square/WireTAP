@@ -29,7 +29,6 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   dlc: 4,
   isFd: false,
   isBrs: false,
-  isRtr: false,
   ...over,
 });
 
@@ -66,14 +65,13 @@ describe("decoderStore.applyDecodedBatch", () => {
   it("a decoded and an unmatched frame keep the received FD and BRS flags", () => {
     apply([decoded({ isFd: true, isBrs: true }), unrouted({ isFd: true, isBrs: true })]);
 
-    expect(getDecodedFrames().peek(0x100)).toMatchObject({ isFd: true, isBrs: true, isRtr: false });
+    expect(getDecodedFrames().peek(0x100)).toMatchObject({ isFd: true, isBrs: true });
     expect(getUnmatchedFrames()[0]).toMatchObject({ isFd: true, isBrs: true, isRtr: false });
   });
 
-  it("a decoded and an unmatched RTR keep the length it asks for", () => {
-    apply([decoded({ isRtr: true, dlc: 6, bytes: [] }), unrouted({ isRtr: true, dlc: 6, bytes: [] })]);
+  it("an unmatched RTR keeps the length it asks for", () => {
+    apply([unrouted({ isRtr: true, dlc: 6, bytes: [] })]);
 
-    expect(getDecodedFrames().peek(0x100)).toMatchObject({ isRtr: true, dlc: 6, rawBytes: [] });
     expect(getUnmatchedFrames()[0]).toMatchObject({ isRtr: true, dlc: 6, bytes: [] });
   });
 

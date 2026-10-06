@@ -39,7 +39,7 @@ function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFr
     protocol: "kind" in msg ? msg.protocol : undefined,
     isFd: msg.isFd,
     isBrs: msg.isBrs,
-    isRtr: msg.isRtr,
+    isRtr: "kind" in msg && msg.isRtr,
   };
 }
 
@@ -160,7 +160,6 @@ export type DecodedFrame = {
   dlc?: number;
   isFd?: boolean;
   isBrs?: boolean;
-  isRtr?: boolean;
 };
 
 export type FrameMetadata = {
@@ -723,7 +722,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         dlc: msg.dlc,
         isFd: msg.isFd,
         isBrs: msg.isBrs,
-        isRtr: msg.isRtr,
       };
       _decoded.set(id, decodedFrame);
 

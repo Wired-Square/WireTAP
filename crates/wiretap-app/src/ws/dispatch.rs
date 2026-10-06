@@ -521,7 +521,6 @@ pub(crate) fn decode_entry<'a>(
         header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
         is_brs: f.is_brs,
         is_fd: f.is_fd,
-        is_rtr: f.is_rtr,
         masked_frame_id: masked_id,
         mirror: verdict.map(DecodedMirrorVerdict::from),
         selectors: decoded.selectors.into_iter().map(DecodedMuxSelector::from).collect(),
@@ -1428,6 +1427,12 @@ bit_length = 8
     }
 
     #[test]
+    fn a_decoded_frame_carries_no_rtr_flag() {
+        let value = golden_mirror_entry(|entry| serde_json::to_value(entry).unwrap());
+        assert!(value.get("isRtr").is_none(), "{value}");
+    }
+
+    #[test]
     fn a_remote_frame_does_not_decode_signals() {
         let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
         let rtr = FrameMessage { is_rtr: true, dlc: 8, ..can(0x1A5, 10, vec![]) };
@@ -1792,7 +1797,7 @@ factor = 1e10
         assert_eq!(
             seen,
             [
-                serde_json::json!([null, true, true, false, 8]),
+                serde_json::json!([null, true, true, null, 8]),
                 serde_json::json!(["unmatched", true, true, false, 8]),
                 serde_json::json!(["unmatched", false, false, true, 6]),
                 serde_json::json!(["unmatched", false, false, true, 6]),
