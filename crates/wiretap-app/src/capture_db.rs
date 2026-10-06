@@ -363,7 +363,7 @@ fn row_to_frame(row: &rusqlite::Row) -> rusqlite::Result<FrameMessage> {
         timestamp_us: row.get::<_, i64>("timestamp_us")? as u64,
         frame_id: row.get::<_, i64>("frame_id")? as u32,
         bus: row.get::<_, i64>("bus")? as u8,
-        dlc: row.get::<_, i64>("dlc")? as u16,
+        dlc: (row.get::<_, i64>("dlc")? as u16).max(payload.len() as u16),
         bytes: payload,
         is_extended: row.get("is_extended")?,
         is_fd: row.get("is_fd")?,
@@ -574,6 +574,10 @@ fn get_frames_paginated_filtered_with_conn(
     Ok((frames, rowids, total))
 }
 
+/// Backend captures stored before `2c4fb97e` hold a CAN FD length code in `dlc`, always
+/// below the payload's length; an RTR's `dlc` is its requested length. `row_to_frame` agrees.
+const STORED_LENGTH: &str = "MAX(dlc, length(payload))";
+
 /// Column list for every `SELECT` feeding `row_to_frame`. Kept in one place because a
 /// column the mapper reads and the query omits is a runtime error, not a build one.
 const FRAME_COLUMNS: &str =
@@ -716,12 +720,17 @@ pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
 pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
+    get_frame_info_with_conn(conn, capture_id)
+}
 
+fn get_frame_info_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     let mut stmt = conn
         .prepare_cached(
-            "SELECT protocol, frame_id, MAX(dlc) as max_dlc, MIN(bus) as bus, MAX(is_extended) as is_extended,
-                    (MIN(dlc) != MAX(dlc)) as has_dlc_mismatch
-             FROM frames WHERE capture_id = ?1 GROUP BY protocol, frame_id",
+            &format!(
+                "SELECT protocol, frame_id, MAX({STORED_LENGTH}) as max_dlc, MIN(bus) as bus, MAX(is_extended) as is_extended,
+                        (MIN({STORED_LENGTH}) != MAX({STORED_LENGTH})) as has_dlc_mismatch
+                 FROM frames WHERE capture_id = ?1 GROUP BY protocol, frame_id",
+            ),
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -804,9 +813,9 @@ fn frame_inventory_with_conn(
     start_us: Option<i64>,
     end_us: Option<i64>,
 ) -> Result<Vec<InventoryRow>, String> {
-    let mut sql = String::from(
+    let mut sql = format!(
         "SELECT protocol, frame_id, is_extended, COUNT(*) AS cnt, \
-         MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc \
+         MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX({STORED_LENGTH}) AS max_dlc \
          FROM frames WHERE capture_id = ?1",
     );
     let mut bind: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(capture_id.to_string())];
@@ -2470,6 +2479,28 @@ mod tests {
         let (frames, _, _) =
             get_frames_paginated_filtered_with_conn(&conn, "c1", 0, 10, &whole("can")).unwrap();
         assert_eq!(can_flags(&frames), [(false, true, false, false, 2)]);
+    }
+
+    #[test]
+    fn a_stored_length_code_reads_as_the_payload_length_and_an_rtr_keeps_its_requested_length() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_fd, is_rtr)
+             VALUES ('c1', 'can', 1, 256, 0, 15, ?1, 1, 0), ('c1', 'can', 2, 257, 0, 6, x'', 0, 1)",
+            params![vec![0u8; 64]],
+        )
+        .unwrap();
+
+        let (frames, _, _) =
+            get_frames_paginated_filtered_with_conn(&conn, "c1", 0, 10, &whole("can")).unwrap();
+        assert_eq!(frames.iter().map(|f| f.dlc).collect::<Vec<_>>(), [64, 6]);
+
+        let info = get_frame_info_with_conn(&conn, "c1").unwrap();
+        assert_eq!(info.iter().map(|i| (i.max_dlc, i.has_dlc_mismatch)).collect::<Vec<_>>(), [(64, false), (6, false)]);
+
+        let inventory = frame_inventory_with_conn(&conn, "c1", None, None).unwrap();
+        assert_eq!(inventory.iter().map(|r| r.max_dlc).collect::<Vec<_>>(), [64, 6]);
     }
 
     fn event_count(conn: &Connection, capture_id: &str) -> i64 {
