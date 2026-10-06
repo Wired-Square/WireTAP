@@ -10,7 +10,6 @@ import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
 import type { SessionMode } from "../generated/SessionMode";
 import { trackAlloc } from "./memoryDiag";
 import {
-  CAN_RTR_LEN_SHIFT,
   CanFlags,
   ENVELOPE_HEADER_SIZE,
   FrameType,
@@ -109,7 +108,7 @@ export function encodeHeartbeat(): ArrayBuffer {
  *   [0..8)   timestamp_us  u64 LE
  *   [8]      bus           u8
  *   [9]      frame_type    u8
- *   [10]     can_flags     u8 (CanFlags; an RTR's requested length above CAN_RTR_LEN_SHIFT)
+ *   [10]     can_flags     u8 (CanFlags; an RTR's payload is its requested length in zero bytes)
  *   [11..15) len           u32 LE (total data bytes, including id_flags for CAN)
  *
  * timestamp_us is u64 but Number is safe up to 2^53 (~285 years of microseconds).
@@ -141,26 +140,23 @@ export function decodeFrameBatch(
 
     if (frameType === FrameType.Can || frameType === FrameType.CanFd) {
       if (len < 4) continue;
-      const idFlags = view.getUint32(dataStart, true);
-      const id = idFlags & IdFlags.ID_ARB_MASK;
-      const isExtended = (idFlags & IdFlags.ID_EXTENDED) !== 0;
-      const directionTx = (idFlags & IdFlags.ID_TX) !== 0;
+      const id = view.getUint32(dataStart, true) & IdFlags.ID_ARB_MASK;
       const payloadLen = len - 4;
-      const isRtr = (canFlags & CanFlags.CAN_RTR) !== 0;
+      const isRtr = (canFlags & CanFlags.RTR) !== 0;
 
       frame = {
         protocol: "can",
         timestamp_us,
         frame_id: id,
         bus,
-        dlc: isRtr ? canFlags >> CAN_RTR_LEN_SHIFT : payloadLen,
-        bytes: Array.from(new Uint8Array(buf, dataStart + 4, payloadLen)),
-        is_extended: isExtended,
-        is_fd: frameType === FrameType.CanFd,
+        dlc: payloadLen,
+        bytes: isRtr ? [] : Array.from(new Uint8Array(buf, dataStart + 4, payloadLen)),
+        is_extended: (canFlags & CanFlags.EXT) !== 0,
+        is_fd: (canFlags & CanFlags.FD) !== 0,
         is_rtr: isRtr,
-        is_brs: (canFlags & CanFlags.CAN_BRS) !== 0,
-        is_esi: (canFlags & CanFlags.CAN_ESI) !== 0,
-        direction: directionTx ? "tx" : undefined,
+        is_brs: (canFlags & CanFlags.BRS) !== 0,
+        is_esi: (canFlags & CanFlags.ESI) !== 0,
+        direction: canFlags & CanFlags.TX ? "tx" : undefined,
       };
     } else if (frameType === FrameType.Modbus || frameType === FrameType.ModbusRtu) {
       // Modbus: first 4 bytes are frame_id in LE — a register number for a

@@ -1,5 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+use wiretap_protocol::can::{CanFlags, CanFrame};
 use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
 
 pub const PROTOCOL_VERSION: u8 = 3;
@@ -14,13 +15,6 @@ macro_rules! wire_table {
 
 // The CAN `id_flags` word's bits that `encode_frame_batch` sets.
 wire_table!(ID_FLAGS: u32 = [ID_ARB_MASK, ID_EXTENDED, ID_TX]);
-
-pub const CAN_RTR: u8 = 1 << 0;
-pub const CAN_BRS: u8 = 1 << 1;
-pub const CAN_ESI: u8 = 1 << 2;
-wire_table!(CAN_FLAGS: u8 = [CAN_RTR, CAN_BRS, CAN_ESI]);
-/// The `can_flags` bits above this hold an RTR's requested length in bytes (0–8).
-pub const CAN_RTR_LEN_SHIFT: u8 = 4;
 
 /// The state byte of `SessionState` and `SessionLifecycle` indexes this table.
 pub const SESSION_STATES: [&str; 5] = ["stopped", "starting", "running", "paused", "error"];
@@ -227,7 +221,8 @@ wire_enum! {
 //
 // Layout: [timestamp_us: u64 LE][bus: u8][type: u8][can_flags: u8][len: u32 LE][data: len bytes]
 //
-// `can_flags` is zero for anything but CAN. Until protocol 3 the type and
+// `can_flags` is the frame's `CanFlags`, zero for anything but CAN, and an RTR's
+// payload is its requested length in zero bytes. Until protocol 3 the type and
 // flags bytes were one u16 type, so a frame without flags is the same bytes.
 // ============================================================================
 
@@ -619,7 +614,7 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     // FrameEnvelope intermediates. Worst case per frame: envelope
     // header + 4-byte id/register prefix + payload.
     let mut out = Vec::with_capacity(
-        frames.iter().map(|f| ENVELOPE_HEADER_SIZE + 4 + f.bytes.len()).sum(),
+        frames.iter().map(|f| ENVELOPE_HEADER_SIZE + 4 + f.bytes.len().max(f.dlc as usize)).sum(),
     );
     for frame in frames {
         let direction_tx = frame.direction.as_deref() == Some("tx");
@@ -632,9 +627,9 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         // CAN id_flags, Modbus register number or RTU unit/function word, none
         // for serial/raw.
         let (frame_type, can_flags, prefix) = if frame.is_fd || frame.protocol == "canfd" {
-            (FrameType::CanFd, can_flags(frame), Some(id_flags))
+            (FrameType::CanFd, can_flags(frame, true, direction_tx), Some(id_flags))
         } else if frame.protocol == "can" {
-            (FrameType::Can, can_flags(frame), Some(id_flags))
+            (FrameType::Can, can_flags(frame, false, direction_tx), Some(id_flags))
         } else if frame.protocol == "modbus" {
             (FrameType::Modbus, 0, Some(frame.frame_id))
         } else if frame.protocol == "modbus_rtu" {
@@ -643,7 +638,8 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
             (FrameType::Serial, 0, None)
         };
 
-        let data_len = prefix.map_or(0, |_| 4) + frame.bytes.len();
+        let rtr_len = (can_flags & CanFlags::RTR.0 != 0).then(|| frame.dlc.min(8) as usize);
+        let data_len = prefix.map_or(0, |_| 4) + rtr_len.unwrap_or(frame.bytes.len());
         out.extend_from_slice(&frame.timestamp_us.to_le_bytes());
         out.push(frame.bus);
         out.push(frame_type as u8);
@@ -652,16 +648,19 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         if let Some(p) = prefix {
             out.extend_from_slice(&p.to_le_bytes());
         }
-        out.extend_from_slice(&frame.bytes);
+        match rtr_len {
+            Some(len) => out.resize(out.len() + len, 0),
+            None => out.extend_from_slice(&frame.bytes),
+        }
     }
     out
 }
 
-fn can_flags(frame: &crate::io::FrameMessage) -> u8 {
-    if frame.is_rtr {
-        return CAN_RTR | (frame.dlc.min(8) as u8) << CAN_RTR_LEN_SHIFT;
-    }
-    (if frame.is_brs { CAN_BRS } else { 0 }) | if frame.is_esi { CAN_ESI } else { 0 }
+fn can_flags(frame: &crate::io::FrameMessage, fd: bool, transmitted: bool) -> u8 {
+    let mut can = CanFrame::data(frame.bus, frame.frame_id, frame.is_extended, fd, frame.is_brs, Vec::new());
+    can.rtr = frame.is_rtr;
+    can.esi = frame.is_esi;
+    CanFlags::of(&can, transmitted).0
 }
 
 // ============================================================================
@@ -968,16 +967,17 @@ mod tests {
         let (env, _) = FrameEnvelope::decode(&batch).unwrap();
         assert_eq!(env.frame_type, FrameType::CanFd);
         assert_eq!(id_flags(&env.data), 0x1FF | ID_TX);
+        assert_eq!(env.can_flags, CanFlags::FD.0 | CanFlags::TX.0);
         assert_eq!(&env.data[4..], &payload[..]);
     }
 
     #[test]
-    fn batch_rtr_carries_its_mark_and_requested_length_with_no_payload() {
+    fn batch_rtr_carries_its_requested_length_as_zero_payload_bytes() {
         let msg = crate::io::FrameMessage { is_rtr: true, dlc: 4, ..make_frame_message("can", false, 0x321, 0, vec![], None) };
         let (env, _) = FrameEnvelope::decode(&encode_frame_batch(&[msg])).unwrap();
         assert_eq!(env.frame_type, FrameType::Can);
-        assert_eq!(env.can_flags, CAN_RTR | 4 << CAN_RTR_LEN_SHIFT);
-        assert_eq!(env.data.len(), 4);
+        assert_eq!(env.can_flags, CanFlags::RTR.0);
+        assert_eq!(env.data, [0x21, 0x03, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
@@ -985,7 +985,21 @@ mod tests {
         let msg = crate::io::FrameMessage { is_brs: true, is_esi: true, ..make_frame_message("can", true, 0x10, 0, vec![0; 12], None) };
         let (env, _) = FrameEnvelope::decode(&encode_frame_batch(&[msg])).unwrap();
         assert_eq!(env.frame_type, FrameType::CanFd);
-        assert_eq!(env.can_flags, CAN_BRS | CAN_ESI);
+        assert_eq!(env.can_flags, CanFlags::FD.0 | CanFlags::BRS.0 | CanFlags::ESI.0);
+    }
+
+    #[test]
+    fn batch_can_flags_byte_is_the_frames_can_flags() {
+        let ext_tx = crate::io::FrameMessage { is_extended: true, ..make_frame_message("can", false, 0x1234, 0, vec![1], Some("tx")) };
+        let fd_by_protocol = make_frame_message("canfd", false, 0x10, 0, vec![1], None);
+        let classic_brs = crate::io::FrameMessage { is_brs: true, is_esi: true, ..make_frame_message("can", false, 0x10, 0, vec![1], None) };
+        let batch = encode_frame_batch(&[ext_tx, fd_by_protocol, classic_brs]);
+        let (e1, n1) = FrameEnvelope::decode(&batch).unwrap();
+        let (e2, n2) = FrameEnvelope::decode(&batch[n1..]).unwrap();
+        let (e3, _) = FrameEnvelope::decode(&batch[n1 + n2..]).unwrap();
+        assert_eq!(e1.can_flags, CanFlags::EXT.0 | CanFlags::TX.0);
+        assert_eq!(e2.can_flags, CanFlags::FD.0);
+        assert_eq!(e3.can_flags, 0, "a classic frame has no BRS or ESI");
     }
 
     #[test]

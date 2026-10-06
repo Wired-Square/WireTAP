@@ -8,11 +8,13 @@ vi.mock("../services/memoryDiag", () => ({ trackAlloc: vi.fn() }));
 import { useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
 import { decodeFrameBatch, ENVELOPE_HEADER_SIZE, FrameType } from "../services/wsProtocol";
 import { groupKeysByProtocol } from "../utils/frameKey";
+import { CanFlags } from "../generated/wireConstants";
 
 function canEnvelope(frameType: number, id: number, payloadLen: number): ArrayBuffer {
   const buf = new ArrayBuffer(ENVELOPE_HEADER_SIZE + 4 + payloadLen);
   const view = new DataView(buf);
   view.setUint8(9, frameType);
+  view.setUint8(10, frameType === FrameType.CanFd ? CanFlags.FD : 0);
   view.setUint32(11, 4 + payloadLen, true);
   view.setUint32(ENVELOPE_HEADER_SIZE, id, true);
   return buf;

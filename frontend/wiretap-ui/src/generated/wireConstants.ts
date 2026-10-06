@@ -55,12 +55,13 @@ export const FrameType = {
 } as const;
 
 export const CanFlags = {
-  CAN_RTR: 0x01,
-  CAN_BRS: 0x02,
-  CAN_ESI: 0x04,
+  RTR: 0x01,
+  BRS: 0x02,
+  ESI: 0x04,
+  EXT: 0x08,
+  FD: 0x10,
+  TX: 0x20,
 } as const;
-
-export const CAN_RTR_LEN_SHIFT = 4;
 
 export const IdFlags = {
   ID_ARB_MASK: 0x1fffffff,
