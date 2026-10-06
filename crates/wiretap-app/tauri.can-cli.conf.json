@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/wiretap-can-cli"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/nsis-hooks.nsh"
+      }
+    }
+  }
+}

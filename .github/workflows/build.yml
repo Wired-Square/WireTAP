@@ -25,6 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release view "${{ github.ref_name }}" > /dev/null 2>&1 && exit 0
           gh release create "${{ github.ref_name }}" \
             --draft \
             --title "WireTAP ${{ github.ref_name }}" \
@@ -39,8 +40,10 @@ jobs:
         include:
           - platform: macos-latest
             target: aarch64-apple-darwin
+            label: Apple-Silicon
           - platform: macos-latest
             target: x86_64-apple-darwin
+            label: Intel
           - platform: ubuntu-latest
             target: x86_64-unknown-linux-gnu
           - platform: ubuntu-24.04-arm
@@ -107,6 +110,8 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
+          APPLE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
         run: |
           CERT_PATH=$RUNNER_TEMP/certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -115,6 +120,10 @@ jobs:
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "" $KEYCHAIN_PATH
           security import $CERT_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          if [ -n "$APPLE_INSTALLER_CERTIFICATE" ]; then
+            echo -n "$APPLE_INSTALLER_CERTIFICATE" | base64 --decode -o $RUNNER_TEMP/installer.p12
+            security import $RUNNER_TEMP/installer.p12 -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          fi
           security set-key-partition-list -S apple-tool:,apple: -k "" $KEYCHAIN_PATH
           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain-db
 
@@ -123,7 +132,12 @@ jobs:
         run: |
           echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
           echo "APPLE_PASSWORD=${{ secrets.APPLE_NOTARY_PASSWORD }}" >> $GITHUB_ENV
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=${{ vars.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+
+      - name: Build wiretap-can-cli sidecar
+        if: runner.os != 'Linux'
+        run: bash scripts/build-can-cli-sidecar.sh ${{ matrix.target }}
+        shell: bash
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -133,16 +147,17 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
           TAURI_APP_PATH: ${{ github.workspace }}/crates/wiretap-app
           TAURI_FRONTEND_PATH: ${{ github.workspace }}/frontend/wiretap-ui
         with:
-          args: --target ${{ matrix.target }}
-          # Release is pre-created by create-release job; tauri-action finds it and uploads assets
+          args: --target ${{ matrix.target }} ${{ runner.os == 'macOS' && '--bundles app' || '' }} ${{ runner.os != 'Linux' && format('--config {0}/crates/wiretap-app/tauri.can-cli.conf.json', github.workspace) || '' }}
+          # Release is pre-created by create-release job; tauri-action finds it and uploads assets.
+          # macOS ships only the pkg, which a later step uploads.
           tagName: ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && runner.os != 'macOS'
 
       - name: Build Tauri app (no release)
         uses: tauri-apps/tauri-action@v0
@@ -152,12 +167,32 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
           TAURI_APP_PATH: ${{ github.workspace }}/crates/wiretap-app
           TAURI_FRONTEND_PATH: ${{ github.workspace }}/frontend/wiretap-ui
         with:
-          args: --target ${{ matrix.target }}
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          args: --target ${{ matrix.target }} ${{ runner.os == 'macOS' && '--bundles app' || '' }} ${{ runner.os != 'Linux' && format('--config {0}/crates/wiretap-app/tauri.can-cli.conf.json', github.workspace) || '' }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') || runner.os == 'macOS' }}
+
+      - name: Build macOS installer package
+        if: runner.os == 'macOS'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bundle=target/${{ matrix.target }}/release/bundle
+          app=$bundle/macos/WireTAP.app
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
+          pkg=$bundle/pkg/WireTAP_${version}_${{ matrix.label }}.pkg
+          mkdir -p "$bundle/pkg"
+          export APPLE_INSTALLER_IDENTITY=$(security find-identity -v | sed -n 's/.*"\(Developer ID Installer: .*\)"/\1/p' | head -1)
+          bash scripts/macos-pkg.sh "$app" "$pkg"
+          if [ -n "$APPLE_INSTALLER_IDENTITY" ] && [ -n "${APPLE_ID:-}" ]; then
+            xcrun notarytool submit "$pkg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$pkg"
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            gh release upload "${{ github.ref_name }}" "$pkg" --clobber
+          fi
 
       - name: Build wiretap-can-cli
         run: cargo build --release -p wiretap-can-cli --target ${{ matrix.target }}

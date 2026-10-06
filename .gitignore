@@ -53,3 +53,6 @@ docs/local/
 
 # Obsidian vault app config (docs live in the Google Drive vault, not here)
 .obsidian/
+
+# wiretap-can-cli sidecar, built by scripts/build-can-cli-sidecar.sh
+/crates/wiretap-app/binaries/

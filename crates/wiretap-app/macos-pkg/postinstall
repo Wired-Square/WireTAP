@@ -1,0 +1,6 @@
+#!/bin/sh
+# $3 is the target volume; /usr/local/bin can be absent on Apple Silicon.
+set -e
+bin_dir="${3%/}/usr/local/bin"
+mkdir -p "$bin_dir"
+ln -sf /Applications/WireTAP.app/Contents/MacOS/wiretap-can-cli "$bin_dir/wiretap-can-cli"
