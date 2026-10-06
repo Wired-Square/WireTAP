@@ -421,6 +421,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       }
     }
 
+    if (newEditor.dlc > 8) newEditor.isFd = true;
     if (newEditor.isFd) {
       newEditor.isRtr = false;
     } else {

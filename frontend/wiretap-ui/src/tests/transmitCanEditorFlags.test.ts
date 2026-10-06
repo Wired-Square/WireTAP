@@ -25,4 +25,9 @@ describe("the CAN editor builds only frames the wire can carry", () => {
     editor().updateCanEditor({ isFd: false });
     expect(editor().buildCanFrame()).toMatchObject({ is_fd: false, is_brs: false });
   });
+
+  it("a frame over eight bytes is FD", () => {
+    editor().updateCanEditor({ dlc: 12, data: Array(12).fill(0xaa) });
+    expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, data: Array(12).fill(0xaa) });
+  });
 });
