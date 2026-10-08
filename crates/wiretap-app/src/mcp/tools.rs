@@ -415,8 +415,7 @@ fn signal_key(s: &Value) -> (Option<i64>, &str) {
     )
 }
 
-/// Discovery's live map: the newest frame per `protocol:id` key, in the
-/// `LastFrameData` shape plus its stamp.
+/// The newest frame per `protocol:id` key: its bytes, bus, flags, length and stamp.
 fn latest_by_key(
     frames: Vec<FrameMessage>,
     wanted: Option<&HashSet<String>>,

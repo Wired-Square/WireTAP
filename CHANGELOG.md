@@ -8,6 +8,7 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Each release has one installer per platform, named for it, and every one carries `wiretap-can-cli`.** Download `WireTAP_<version>_macOS_arm64.pkg` or `_macOS_x64.pkg` on a Mac, `_Windows_x64.exe` on Windows, or the `_Linux_x64` / `_Linux_arm64` `.deb` or AppImage on Linux. The `.deb` installs `wiretap-can-cli` on PATH. The separate `wiretap-can-cli` downloads and the `.rpm` packages are gone.
 - **`wiretap-can-cli` has the same version number as WireTAP.** `wiretap-can-cli --version` reports the version of the WireTAP it shipped with, instead of 0.1.0.
+- **Discovery no longer keeps its own copy of a live stream.** Long runs at high frame rates no longer slow the window down. The frame picker, Replay, Add to Transmit, export and the Filtered tab now read the session's capture, so they cover everything since the stream started (or was last cleared), not only what Discovery was holding. The Discovery History Buffer setting now sets how many recent frames Frame Order and Payload Changes analyse on a live stream.
 
 ### Fixed
 

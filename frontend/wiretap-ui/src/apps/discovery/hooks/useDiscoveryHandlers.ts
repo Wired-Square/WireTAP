@@ -40,7 +40,8 @@ export interface UseDiscoveryHandlersParams {
   captureModeTotalFrames: number;
 
   // Frame state
-  frames: FrameMessage[];
+  /** Frames in the capture being shown. */
+  liveFrameCount: number;
   framedData: FrameMessage[];
   framedCaptureId: string | null;
   frameInfoMap: Map<string, any>;
@@ -187,7 +188,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
 
   // Export handlers
   const exportHandlers = useDiscoveryExportHandlers({
-    frames: params.frames,
+    liveFrameCount: params.liveFrameCount,
     framedData: params.framedData,
     framedCaptureId: params.framedCaptureId,
     activeCaptureId: params.activeCaptureId,

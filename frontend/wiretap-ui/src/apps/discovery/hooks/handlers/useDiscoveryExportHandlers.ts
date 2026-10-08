@@ -5,13 +5,13 @@
 import { useCallback } from "react";
 import type { FrameMessage } from "../../../../stores/discoveryStore";
 import type { ExportFormat, ExportDataMode } from "../../../../dialogs/ExportFramesDialog";
-import { exportFrameDump, type FrameDumpSource, type TimestampedByte } from "../../../../api/capture";
+import { exportFrameDump, type TimestampedByte } from "../../../../api/capture";
 import { useSessionStore } from "../../../../stores/sessionStore";
 import { withAppError } from "../../../../utils/appError";
 
 export interface UseDiscoveryExportHandlersParams {
   // State
-  frames: FrameMessage[];
+  liveFrameCount: number;
   framedData: FrameMessage[];
   framedCaptureId: string | null;
   activeCaptureId: string | null;
@@ -40,7 +40,7 @@ export interface UseDiscoveryExportHandlersParams {
 }
 
 export function useDiscoveryExportHandlers({
-  frames,
+  liveFrameCount,
   framedData,
   framedCaptureId,
   activeCaptureId,
@@ -96,12 +96,18 @@ export function useDiscoveryExportHandlers({
           content instanceof Uint8Array ? Array.from(content, (b) => String.fromCharCode(b)).join("") : content,
         );
       } else {
-        const source: FrameDumpSource =
+        const capture = (captureId: string, count: number) => ({ captureId, count });
+        const source =
           captureModeEnabled && activeCaptureId
-            ? { captureId: activeCaptureId }
+            ? capture(activeCaptureId, captureModeTotalFrames)
             : isSerialMode && framedCaptureId && backendFrameCount > 0
-              ? { captureId: framedCaptureId }
-              : { frames: isSerialMode && framedData.length > 0 ? framedData : frames };
+              ? capture(framedCaptureId, backendFrameCount)
+              : isSerialMode && framedData.length > 0
+                ? { frames: framedData }
+                : activeCaptureId
+                  ? capture(activeCaptureId, liveFrameCount)
+                  : null;
+        if (!source) return;
 
         if (format === "csv" || format === "candump") {
           await exportFrameDump(source, format, selectedPath);
@@ -109,8 +115,7 @@ export function useDiscoveryExportHandlers({
           const framesToExport =
             "frames" in source
               ? source.frames
-              : (await getCaptureFramesPaginatedById(source.captureId, 0, captureModeEnabled ? captureModeTotalFrames : backendFrameCount))
-                  .frames;
+              : (await getCaptureFramesPaginatedById(source.captureId, 0, source.count)).frames;
           const { exportToJson } = await import("../../../../utils/frameDump");
           await saveCatalog(selectedPath, exportToJson(framesToExport));
         }
@@ -128,7 +133,7 @@ export function useDiscoveryExportHandlers({
     activeCaptureId,
     backendFrameCount,
     framedData,
-    frames,
+    liveFrameCount,
     getCaptureBytesPaginated,
     getCaptureFramesPaginatedById,
     pickFileToSave,

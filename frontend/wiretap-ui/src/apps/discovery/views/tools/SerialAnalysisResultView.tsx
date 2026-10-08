@@ -37,7 +37,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
   const setMinFrameLength = useDiscoveryStore((s) => s.setMinFrameLength);
   const resetFraming = useDiscoveryStore((s) => s.resetFraming);
   const setSerialConfig = useDiscoveryStore((s) => s.setSerialConfig);
-  const frames = useDiscoveryStore((s) => s.frames);
+  const seenIds = useDiscoveryStore((s) => s.seenIds);
   const framedData = useDiscoveryStore((s) => s.framedData);
 
   // Track which candidate was applied (by index)
@@ -160,11 +160,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
   };
 
   // Count unique frame IDs in current data
-  const getUniqueIdCount = () => {
-    const dataToCheck = frames.length > 0 ? frames : framedData;
-    const uniqueIds = new Set(dataToCheck.map(f => f.frame_id));
-    return uniqueIds.size;
-  };
+  const getUniqueIdCount = () => seenIds.size || new Set(framedData.map(f => f.frame_id)).size;
 
   if (!framingResults && !payloadResults) {
     return (

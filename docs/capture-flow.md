@@ -482,8 +482,10 @@ Two consequences worth knowing before changing it:
   what happens once the page size can change under a fixed anchor (see § Auto
   rows-per-page) or once the window is clamped against the end of the capture.
 
-Discovery still keeps `_frameBuffer` in memory, but only for analysis, replay,
-bulk-add and the MCP live frame map — not for rendering the frames table.
+Discovery keeps no copy of the stream. Its frame picker is the capture's inventory,
+which Rust pushes (`FrameInventory`, see session-flow.md § Frame inventory); analysis,
+replay, export and the Filtered tab page the capture, and bulk-add and the Modbus scan
+table read `get_capture_latest_frames`.
 
 ### Auto rows-per-page
 

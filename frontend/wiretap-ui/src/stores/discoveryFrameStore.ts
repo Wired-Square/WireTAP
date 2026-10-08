@@ -1,73 +1,14 @@
 // ui/src/stores/discoveryFrameStore.ts
 //
-// Frame data and selection state for Discovery app.
-// Handles frame buffer, frame info map, and selection.
+// Frame picker and selection state for Discovery. The frames themselves live in the
+// session's capture; the picker is the capture's inventory, which Rust pushes.
 
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
-import { trackAlloc } from '../services/memoryDiag';
 import type { CaptureFrameInfo } from '../api/capture';
 import type { FrameMessage } from '../types/frame';
-import { frameKey, keyOf, parseFrameKey } from '../utils/frameKey';
+import { frameKey, parseFrameKey } from '../utils/frameKey';
 import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
-
-// Frame buffer for throttling UI updates
-let pendingFrames: FrameMessage[] = [];
-let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-// 500ms (2Hz) — fast enough for human perception, avoids overwhelming GC with
-// transient object allocations from Zustand selectors and React reconciliation.
-const FLUSH_INTERVAL_MS = 500;
-// Allow the frame buffer to temporarily overshoot maxBuffer by this many frames
-// before compacting. This avoids O(100k) splice every flush — compaction happens
-// once every few minutes instead of on every flush, reducing GC pressure.
-const COMPACT_THRESHOLD = 10_000;
-
-// Mutable frame buffer — avoids creating a new 100k-element array on every
-// flush, which caused JSC GC pressure that froze the main thread after
-// ~30 min of streaming. Components subscribe to `frameVersion` for reactivity
-// and read from this buffer via `getDiscoveryFrameBuffer()`.
-let _frameBuffer: FrameMessage[] = [];
-
-/** Direct access to the mutable frame buffer. Read-only. */
-export function getDiscoveryFrameBuffer(): FrameMessage[] {
-  return _frameBuffer;
-}
-
-export type LastFrameData = {
-  bytes: number[];
-  bus: number;
-  is_extended: boolean;
-  dlc: number;
-};
-
-// Last observed frame data per frame ID — updated on every flush (last-writer-wins).
-// Used by bulk-add to Transmit queue so we don't need to scan the full buffer at click time.
-// Keyed by composite frame key (e.g. "can:256", "modbus:5013").
-let _lastFrameDataMap: Map<string, LastFrameData> = new Map();
-
-/** Direct access to the last-seen frame data map (keyed by composite frame key). Read-only. */
-export function getLastFrameDataMap(): Map<string, LastFrameData> {
-  return _lastFrameDataMap;
-}
-
-/**
- * Drop every frame held outside Zustand and cancel any pending flush.
- *
- * All three module-level caches are reset together — clearing the buffer while leaving
- * `_lastFrameDataMap` behind leaves bulk-add reporting frames from a session that is
- * already gone.
- *
- * Callers own the accompanying `set()`; nothing here touches store state.
- */
-function resetBuffers(): void {
-  pendingFrames = [];
-  _frameBuffer = [];
-  _lastFrameDataMap = new Map();
-  if (flushTimeout !== null) {
-    clearTimeout(flushTimeout);
-    flushTimeout = null;
-  }
-}
 
 /**
  * Picker state for "nothing discovered yet".
@@ -92,9 +33,29 @@ export type FrameInfo = {
   protocol: string;
 };
 
+function toFrameInfo(info: CaptureFrameInfo): FrameInfo {
+  return {
+    len: info.max_dlc,
+    isExtended: info.is_extended,
+    bus: info.bus,
+    lenMismatch: info.has_dlc_mismatch,
+    protocol: info.protocol,
+  };
+}
+
+function sameFrameInfo(a: FrameInfo | undefined, b: FrameInfo): boolean {
+  return !!a && a.len === b.len && a.isExtended === b.isExtended && a.bus === b.bus
+    && a.lenMismatch === b.lenMismatch && a.protocol === b.protocol;
+}
+
+/** A newly seen key is selected unless an active selection set leaves it out. */
+function autoSelects(fk: string, activeSelectionSetSelectedIds: Set<string> | null): boolean {
+  return !activeSelectionSetSelectedIds || activeSelectionSetSelectedIds.has(fk);
+}
+
 interface DiscoveryFrameState {
-  // Frame data (actual frames live in _frameBuffer, not in state — see module comment)
   // All Map/Set keys are composite frame keys (e.g. "can:256", "modbus:5013").
+  /** Bumped to repaint what reads the capture: a clear, a refresh while frozen, an unfreeze. */
   frameVersion: number;
   frameInfoMap: Map<string, FrameInfo>;
   selectedFrames: Set<string>;
@@ -111,12 +72,15 @@ interface DiscoveryFrameState {
 
   // Actions - Stream timing
   setStreamStartTimeUs: (timeUs: number | null) => void;
+  noteStreamStart: (frames: FrameMessage[]) => void;
 
   // Actions - Data management
-  addFrames: (newFrames: FrameMessage[], maxBuffer: number, skipFramePicker?: boolean, activeSelectionSetSelectedIds?: Set<string> | null) => void;
   clearAll: () => void;
-  setFrames: (frames: FrameMessage[]) => void;
-  rebuildFramePickerFromBuffer: (activeSelectionSetSelectedIds?: Set<string> | null) => void;
+  mergeFrameInfo: (
+    frameInfo: Iterable<CaptureFrameInfo>,
+    activeSelectionSetSelectedIds?: Set<string> | null,
+    dropped?: string[],
+  ) => void;
 
   // Actions - Frame selection
   toggleFrameSelection: (id: string, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
@@ -147,149 +111,20 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   // Stream timing actions
   setStreamStartTimeUs: (timeUs) => set({ streamStartTimeUs: timeUs }),
 
-  // Data management actions
-  addFrames: (newFrames, maxBuffer, skipFramePicker = false, activeSelectionSetSelectedIds = null) => {
-    pendingFrames.push(...newFrames);
-
-    if (flushTimeout === null) {
-      flushTimeout = setTimeout(() => {
-        flushTimeout = null;
-        const framesToProcess = pendingFrames;
-        pendingFrames = [];
-        try {
-
-        if (framesToProcess.length === 0) return;
-
-        const { frameInfoMap, seenIds, selectedFrames, streamStartTimeUs, frameVersion } = get();
-
-        if (streamStartTimeUs === null && framesToProcess.length > 0) {
-          // Use a loop instead of Math.min(...spread) to avoid stack overflow
-          // risk if a large batch accumulates during a GC pause
-          let earliestTs = framesToProcess[0].timestamp_us;
-          for (let i = 1; i < framesToProcess.length; i++) {
-            if (framesToProcess[i].timestamp_us < earliestTs) {
-              earliestTs = framesToProcess[i].timestamp_us;
-            }
-          }
-          set({ streamStartTimeUs: earliestTs });
-        }
-
-        // Mutate buffer in place — avoids creating a new 100k array every flush.
-        // Only compact when overshooting by COMPACT_THRESHOLD instead of splicing
-        // every flush, which would mean O(100k) element shifts twice a second.
-        _frameBuffer.push(...framesToProcess);
-        trackAlloc("frameBuffer.push", framesToProcess.length * 300);
-        trackAlloc("frameBuffer.size", _frameBuffer.length * 300);
-        if (_frameBuffer.length > maxBuffer + COMPACT_THRESHOLD) {
-          _frameBuffer = _frameBuffer.slice(-maxBuffer);
-        }
-
-        // Keep last-seen data per frame ID (last-writer-wins, no allocation overhead)
-        for (const f of framesToProcess) {
-          _lastFrameDataMap.set(keyOf(f), {
-            bytes: f.bytes,
-            bus: f.bus ?? 0,
-            is_extended: f.is_extended,
-            dlc: f.dlc,
-          });
-        }
-
-        const stateUpdate: Partial<DiscoveryFrameState> = {
-          frameVersion: get().renderFrozen ? frameVersion : frameVersion + 1,
-        };
-
-        // Skip frame picker updates if requested (e.g., serial mode before framing is accepted)
-        if (!skipFramePicker) {
-          const newlyDiscovered: string[] = [];
-          for (const f of framesToProcess) {
-            const fk = keyOf(f);
-            if (!seenIds.has(fk)) {
-              newlyDiscovered.push(fk);
-            }
-          }
-
-          if (newlyDiscovered.length > 0) {
-            const nextSeenIds = new Set(seenIds);
-            const nextSelectedFrames = new Set(selectedFrames);
-            newlyDiscovered.forEach((fk) => {
-              nextSeenIds.add(fk);
-              // When a selection set is active, only auto-select frames that are in the set
-              if (activeSelectionSetSelectedIds) {
-                if (activeSelectionSetSelectedIds.has(fk)) {
-                  nextSelectedFrames.add(fk);
-                }
-              } else {
-                nextSelectedFrames.add(fk);
-              }
-            });
-            trackAlloc("frameStore.newSet", nextSeenIds.size * 60);
-            stateUpdate.seenIds = nextSeenIds;
-            stateUpdate.selectedFrames = nextSelectedFrames;
-          }
-
-          // Update frame info map
-          let frameInfoChanged = newlyDiscovered.length > 0;
-
-          if (!frameInfoChanged) {
-            for (const f of framesToProcess) {
-              const current = frameInfoMap.get(keyOf(f));
-              if (current) {
-                const newLen = Math.max(current.len, f.dlc);
-                const lenMismatch = current.lenMismatch || current.len !== f.dlc;
-                if (current.len !== newLen || current.lenMismatch !== lenMismatch) {
-                  frameInfoChanged = true;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (frameInfoChanged) {
-            const nextFrameInfoMap = new Map(frameInfoMap);
-
-            for (const f of framesToProcess) {
-              const fk = keyOf(f);
-              const current = nextFrameInfoMap.get(fk);
-              const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
-              const newBus = current?.bus ?? f.bus;
-              const newExtended = current?.isExtended ?? f.is_extended;
-              const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
-              const protocol = current?.protocol ?? f.protocol ?? 'can';
-
-              if (
-                !current ||
-                current.len !== newLen ||
-                current.isExtended !== newExtended ||
-                current.bus !== newBus ||
-                current.lenMismatch !== lenMismatch ||
-                current.protocol !== protocol
-              ) {
-                nextFrameInfoMap.set(fk, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
-              }
-            }
-
-            trackAlloc("frameStore.newMap", nextFrameInfoMap.size * 100);
-            stateUpdate.frameInfoMap = nextFrameInfoMap;
-          }
-        }
-
-        set(stateUpdate);
-        } catch (e) {
-          console.error('[discoveryFrameStore] flush error:', e);
-        }
-      }, FLUSH_INTERVAL_MS);
-    }
+  noteStreamStart: (frames) => {
+    if (get().streamStartTimeUs !== null || frames.length === 0) return;
+    let earliest = frames[0].timestamp_us;
+    for (const f of frames) if (f.timestamp_us < earliest) earliest = f.timestamp_us;
+    set({ streamStartTimeUs: earliest });
   },
 
   /**
-   * Clear frames and picker in a single store write.
+   * Clear the picker in a single store write.
    *
-   * The single clear. It was previously two actions, and every teardown called both —
-   * two store writes mean a render in between where the rows still exist but the picker
-   * already reads 0/0.
+   * Two store writes mean a render in between where the rows still exist but the
+   * picker already reads 0/0.
    */
   clearAll: () => {
-    resetBuffers();
     set({
       ...emptyPicker(),
       frameVersion: get().frameVersion + 1,
@@ -297,68 +132,42 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     });
   },
 
-  setFrames: (frames) => {
-    _frameBuffer = frames;
-    set({ frameVersion: get().frameVersion + 1 });
-    get().rebuildFramePickerFromBuffer();
-  },
+  /**
+   * Take a live session's inventory into the picker: rows replace their own keys, and a
+   * key seen for the first time is selected as it arrives. What the user deselected,
+   * and a selection set's placeholders, stay as they are; `dropped` keys go.
+   */
+  mergeFrameInfo: (frameInfo, activeSelectionSetSelectedIds = null, dropped = []) => {
+    const { frameInfoMap, seenIds, selectedFrames } = get();
+    let nextFrameInfoMap: Map<string, FrameInfo> | null = null;
+    let nextSeenIds: Set<string> | null = null;
+    let nextSelectedFrames: Set<string> | null = null;
 
-  rebuildFramePickerFromBuffer: (activeSelectionSetSelectedIds = null) => {
-    const frames = _frameBuffer;
-    if (frames.length === 0) return;
+    for (const fk of dropped.filter((fk) => seenIds.has(fk))) {
+      (nextFrameInfoMap ??= new Map(frameInfoMap)).delete(fk);
+      (nextSeenIds ??= new Set(seenIds)).delete(fk);
+      (nextSelectedFrames ??= new Set(selectedFrames)).delete(fk);
+    }
 
-    tlog.debug(`[discoveryFrameStore] Building frame picker from ${frames.length} frames`);
-
-    const nextSeenIds = new Set<string>();
-    const nextFrameInfoMap = new Map<string, FrameInfo>();
-    const nextSelectedFrames = new Set<string>();
-    _lastFrameDataMap = new Map();
-
-    for (const f of frames) {
-      const fk = keyOf(f);
-      // Rebuild last-seen data map (last-writer-wins as we iterate forward)
-      _lastFrameDataMap.set(fk, {
-        bytes: f.bytes,
-        bus: f.bus ?? 0,
-        is_extended: f.is_extended,
-        dlc: f.dlc,
-      });
-      if (!nextSeenIds.has(fk)) {
-        nextSeenIds.add(fk);
-        if (activeSelectionSetSelectedIds) {
-          if (activeSelectionSetSelectedIds.has(fk)) {
-            nextSelectedFrames.add(fk);
-          }
-        } else {
-          nextSelectedFrames.add(fk);
-        }
+    for (const row of frameInfo) {
+      const fk = frameKey(row.protocol, row.frame_id);
+      const info = toFrameInfo(row);
+      if (!sameFrameInfo(frameInfoMap.get(fk), info)) {
+        (nextFrameInfoMap ??= new Map(frameInfoMap)).set(fk, info);
       }
-
-      const current = nextFrameInfoMap.get(fk);
-      const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
-      const newBus = current?.bus ?? f.bus;
-      const newExtended = current?.isExtended ?? f.is_extended;
-      const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
-      const protocol = current?.protocol ?? f.protocol ?? 'can';
-
-      if (
-        !current ||
-        current.len !== newLen ||
-        current.isExtended !== newExtended ||
-        current.bus !== newBus ||
-        current.lenMismatch !== lenMismatch ||
-        current.protocol !== protocol
-      ) {
-        nextFrameInfoMap.set(fk, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
+      if (!seenIds.has(fk)) {
+        (nextSeenIds ??= new Set(seenIds)).add(fk);
+        if (autoSelects(fk, activeSelectionSetSelectedIds)) {
+          (nextSelectedFrames ??= new Set(selectedFrames)).add(fk);
+        }
       }
     }
 
-    tlog.debug(`[discoveryFrameStore] Found ${nextSeenIds.size} unique frame IDs`);
-
+    if (!nextFrameInfoMap && !nextSeenIds) return;
     set({
-      seenIds: nextSeenIds,
-      frameInfoMap: nextFrameInfoMap,
-      selectedFrames: nextSelectedFrames,
+      ...(nextFrameInfoMap && { frameInfoMap: nextFrameInfoMap }),
+      ...(nextSeenIds && { seenIds: nextSeenIds }),
+      ...(nextSelectedFrames && { selectedFrames: nextSelectedFrames }),
     });
   },
 
@@ -460,9 +269,9 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   },
 
   /**
-   * One-shot repaint for everything gated on `frameVersion` while frozen — the frame
-   * picker, the Filtered tab, the serial views. The frames table is fed by the capture
-   * query instead, so the Refresh button drives both.
+   * One-shot repaint for everything gated on `frameVersion` while frozen — the Filtered
+   * tab, the serial views. The frames table is fed by the capture query instead, so the
+   * Refresh button drives both.
    */
   refreshFrozenView: () => {
     set({ frameVersion: get().frameVersion + 1 });
@@ -471,7 +280,6 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   // Capture mode actions
   enableCaptureMode: (totalFrames) => {
     tlog.debug(`[discoveryFrameStore] Enabling capture mode with ${totalFrames} frames`);
-    resetBuffers();
     set({
       captureMode: { enabled: true, totalFrames },
       frameVersion: get().frameVersion + 1,
@@ -497,16 +305,10 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     for (const info of frameInfoList) {
       const fk = frameKey(info.protocol, info.frame_id);
       nextSeenIds.add(fk);
-      if (!activeSelectionSetSelectedIds || activeSelectionSetSelectedIds.has(fk)) {
+      if (autoSelects(fk, activeSelectionSetSelectedIds)) {
         nextSelectedFrames.add(fk);
       }
-      nextFrameInfoMap.set(fk, {
-        len: info.max_dlc,
-        isExtended: info.is_extended,
-        bus: info.bus,
-        lenMismatch: info.has_dlc_mismatch,
-        protocol: info.protocol,
-      });
+      nextFrameInfoMap.set(fk, toFrameInfo(info));
     }
 
     set({

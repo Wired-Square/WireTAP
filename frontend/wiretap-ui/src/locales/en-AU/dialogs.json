@@ -137,8 +137,6 @@
       "startEnd": "Start must be ≤ End"
     },
     "noFrames": "No frames in capture.",
-    "selectedSummary_one": "{{count}} frame selected",
-    "selectedSummary_other": "{{count}} frames selected",
     "spanSummary_one": "{{count}} frame spanning {{span}}",
     "spanSummary_other": "{{count}} frames spanning {{span}}",
     "spanAtSpeed": " · {{adjusted}} at {{speed}}×",
