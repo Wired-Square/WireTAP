@@ -445,6 +445,7 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
         dlc: f.dlc,
         frame_id: f.frame_id,
         is_brs: f.is_brs,
+        is_esi: f.is_esi,
         is_extended: f.is_extended,
         is_fd: f.is_fd,
         is_rtr: f.is_rtr,
@@ -521,6 +522,7 @@ pub(crate) fn decode_entry<'a>(
         frame_id: f.frame_id,
         header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
         is_brs: f.is_brs,
+        is_esi: f.is_esi,
         is_extended: f.is_extended,
         is_fd: f.is_fd,
         masked_frame_id: masked_id,
@@ -1816,6 +1818,16 @@ factor = 1e10
             .map(|e| e["isExtended"].clone())
             .collect();
         assert_eq!(seen, [true, true]);
+    }
+
+    #[test]
+    fn decoded_and_unmatched_entries_carry_the_frames_esi_flag() {
+        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let esi = |id| FrameMessage { is_fd: true, is_esi: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
+        let bytes = encode_decoded_batch("can-esi", &[esi(0x18EF0042), esi(0x18EE0042)], &headered, None, None, true);
+        let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
+        let seen: Vec<_> = entries.iter().map(|e| serde_json::json!([e["kind"], e["isEsi"]])).collect();
+        assert_eq!(seen, [serde_json::json!([null, true]), serde_json::json!(["unmatched", true])]);
     }
 
     #[test]

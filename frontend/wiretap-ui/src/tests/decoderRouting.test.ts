@@ -30,6 +30,7 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   isExtended: false,
   isFd: false,
   isBrs: false,
+  isEsi: false,
   ...over,
 });
 
@@ -44,6 +45,7 @@ const unrouted = (over: Partial<UnroutedFrameMsg> = {}): UnroutedFrameMsg => ({
   isExtended: false,
   isFd: false,
   isBrs: false,
+  isEsi: false,
   isRtr: false,
   ...over,
 });
@@ -71,6 +73,14 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(getUnmatchedFrames()[0]).toMatchObject({ isFd: true, isBrs: true, isRtr: false });
   });
 
+  it("an unmatched and an id-filtered frame keep the received ESI flag", () => {
+    useDecoderStore.getState().setFrameIdFilter("1A5");
+    apply([unrouted({ isFd: true, isEsi: true }), decoded({ isFd: true, isEsi: true })]);
+
+    expect(getUnmatchedFrames()[0]).toMatchObject({ isEsi: true });
+    expect(getFilteredFrames()[0]).toMatchObject({ isEsi: true, reason: "id_filter" });
+  });
+
   it("an unmatched RTR keeps the length it asks for", () => {
     apply([unrouted({ isRtr: true, dlc: 6, bytes: [] })]);
 
@@ -89,10 +99,10 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(frame?.checksum?.valid).toBe(true);
     expect(frame?.signals[0]).toMatchObject({ name: "Level", timestamp: 2, mirrorMismatch: true });
     expect(getUnmatchedFrames()).toEqual([
-      { frameId: 0x2a5, bytes: [1, 2], dlc: 2, timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false, isBrs: false, isRtr: false, isExtended: false, bus: 0 },
+      { frameId: 0x2a5, bytes: [1, 2], dlc: 2, timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false, isBrs: false, isEsi: false, isRtr: false, isExtended: false, bus: 0 },
     ]);
     expect(getFilteredFrames()).toEqual([
-      { frameId: 0x01, bytes: [1], dlc: 1, timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, isBrs: false, isRtr: false, isExtended: false, bus: 1, reason: "too_short" },
+      { frameId: 0x01, bytes: [1], dlc: 1, timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, isBrs: false, isEsi: false, isRtr: false, isExtended: false, bus: 1, reason: "too_short" },
     ]);
   });
 

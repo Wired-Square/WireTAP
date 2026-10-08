@@ -13,7 +13,6 @@ import { formatHumanUs, TIME_COLUMN_CHARS } from '../../../utils/timeFormat';
 import type { TimeDisplayFormat } from '../../../types/common';
 import {
   bgDataView,
-  textMuted,
   textSecondary,
   textDataTertiary,
   textDataYellow,
@@ -26,7 +25,7 @@ import {
 import { emptyStateContainer, emptyStateText } from '../../../styles/typography';
 import { IconButton } from '../../../components/Button';
 import { Table } from '../../../components/Table';
-import { Badge } from '../../../components/Badge';
+import { CanFlagBadges, RemoteRequest } from '../../../components/CanFlagMarks';
 
 /** Height of the spacer below the rows, in px. */
 const RESERVED_PX = 32;
@@ -158,15 +157,6 @@ function DefaultBytes({ frame }: { frame: FrameRow }) {
       protocol={frame.protocol}
       className={frame.incomplete ? textDataOrange : textDataGreen}
     />
-  );
-}
-
-function CanFlagBadges({ frame }: { frame: FrameRow }) {
-  return (
-    <>
-      {frame.is_brs && <Badge size="sm" tone="cyan" className="ml-2" title="Bit rate switch">BRS</Badge>}
-      {frame.is_esi && <Badge size="sm" tone="warning" className="ml-2" title="Error state indicator: the sender is error passive">ESI</Badge>}
-    </>
   );
 }
 
@@ -404,7 +394,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 <td className={textSecondary}>{frame.dlc}</td>
                 <td>
                   {frame.is_rtr ? (
-                    <span className={textMuted}>{`Remote request for ${frame.dlc} ${frame.dlc === 1 ? 'byte' : 'bytes'}`}</span>
+                    <RemoteRequest dlc={frame.dlc} />
                   ) : showAscii ? (
                     <>
                       {/* Two non-breaking units with one space between them, so the only
@@ -422,7 +412,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                   ) : (
                     renderBytes ? renderBytes(frame) : <DefaultBytes frame={frame} />
                   )}
-                  <CanFlagBadges frame={frame} />
+                  <CanFlagBadges brs={frame.is_brs} esi={frame.is_esi} />
                 </td>
               </tr>
             );

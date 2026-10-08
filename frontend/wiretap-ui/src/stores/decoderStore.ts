@@ -39,6 +39,7 @@ function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFr
     protocol: "kind" in msg ? msg.protocol : undefined,
     isFd: msg.isFd,
     isBrs: msg.isBrs,
+    isEsi: msg.isEsi,
     isRtr: "kind" in msg && msg.isRtr,
     isExtended: msg.isExtended,
     bus: msg.bus,
@@ -190,6 +191,7 @@ export type UnmatchedFrame = {
   dlc?: number;
   isFd?: boolean;
   isBrs?: boolean;
+  isEsi?: boolean;
   isRtr?: boolean;
   isExtended?: boolean;
   bus?: number;

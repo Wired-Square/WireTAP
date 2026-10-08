@@ -17,6 +17,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Quitting WireTAP stops every open session first.** A CAN adapter such as a gs_usb or PEAK device is now stopped as the app quits, rather than left on the bus until it is unplugged. A device that does not stop within a few seconds no longer holds up the quit.
 - **The Dashboard's bit-change heatmap shows every byte of a CAN FD frame.** It used to draw only bytes 0–7, so changes in bytes 8–63 were counted but never shown. The panel now grows a row per byte of the longest payload seen, and a classic frame keeps its eight rows.
 - **A Dashboard list panel shows "—" for a signal that has never had a value.** It used to read 0.000, the same as a real zero, for a signal with no samples yet, such as one whose value the catalogue refuses to scale. A real zero still reads 0.000.
+- **The Decoder's Unmatched and Filtered tabs mark remote requests and the BRS and ESI flags.** A remote request now reads "Remote request for N bytes" rather than an empty `[0]` row, and a CAN FD frame shows BRS and ESI badges, as Discovery does. MCP `get_decoded_signals` now reports `isEsi` beside `isBrs` on each entry.
 
 ## [0.14.0] - 2026-10-06
 
