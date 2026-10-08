@@ -44,7 +44,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   void dataVersion;
   const values = panel.signals.map((sig) => {
     const key = `${sig.frameId}:${sig.signalName}`;
-    return seriesBuffers.get(key)?.latestValue ?? 0;
+    return seriesBuffers.get(key)?.latestValue;
   });
 
   const { minValue, maxValue } = panel;
@@ -61,8 +61,8 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
 
   const rings = panel.signals.map((sig, i) => {
     const radius = GAUGE_OUTER_RADIUS - i * (stroke + ARC_GAP);
-    const value = values[i] ?? 0;
-    const clamped = Math.max(minValue, Math.min(maxValue, value));
+    const value = values[i];
+    const clamped = Math.max(minValue, Math.min(maxValue, value ?? minValue));
     const pct = range > 0 ? (clamped - minValue) / range : 0;
     const valueAngle = GAUGE_START_ANGLE + GAUGE_SWEEP * pct;
     return { sig, radius, value, pct, valueAngle, stroke };
@@ -74,9 +74,8 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
 
   // Display selected signal's value in the centre
   const primaryIdx = Math.min(panel.primarySignalIndex ?? 0, Math.max(0, signalCount - 1));
-  const primaryValue = values[primaryIdx] ?? 0;
   const primarySignal = panel.signals[primaryIdx];
-  const displayValue = formatValue(primaryValue);
+  const displayValue = formatValue(values[primaryIdx]);
 
   if (signalCount === 0) {
     return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;

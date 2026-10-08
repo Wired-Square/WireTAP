@@ -446,7 +446,8 @@ export function IOSessionControls({
   });
 
   const showPlay = (isPaused || isStopped) && !!onPlay;
-  const showPause = isStreaming && !isPaused && !!onPause;
+  const canPause = useSessionStore((s) => !!sessionId && !!s.sessions[sessionId]?.capabilities?.can_pause);
+  const showPause = canPause && isStreaming && !isPaused && !!onPause;
   const showSpeed = hasSource && !!onOpenSpeedPicker;
   const showEvents = hasSource && !!sessionId;
   const showRename = !!captureMetadata?.id && !!onRenameCapture;
@@ -571,7 +572,11 @@ export function IOSessionControls({
             onClick={onOpenIoSessionPicker}
             disabled={changeSourceDisabled}
             icon={<ArrowRightLeft />}
-            title={changeSourceDisabled ? "Pause or disconnect to change source" : undefined}
+            title={
+              changeSourceDisabled
+                ? canPause ? "Pause or disconnect to change source" : "Stop or leave the session to change source"
+                : undefined
+            }
           >
             Change source
           </MenuItem>

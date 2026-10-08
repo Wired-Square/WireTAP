@@ -76,7 +76,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
             strokeWidth={2}
             paintOrder="stroke"
           >
-            {Number.isFinite(value) ? formatValue(value) : "—"}{sig.unit ? ` ${sig.unit}` : ""}
+            {formatValue(value)}{sig.unit ? ` ${sig.unit}` : ""}
           </text>
         )}
       </svg>

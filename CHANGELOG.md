@@ -18,6 +18,9 @@ All notable changes to WireTAP will be documented in this file.
 - **The Dashboard's bit-change heatmap shows every byte of a CAN FD frame.** It used to draw only bytes 0–7, so changes in bytes 8–63 were counted but never shown. The panel now grows a row per byte of the longest payload seen, and a classic frame keeps its eight rows.
 - **A Dashboard list panel shows "—" for a signal that has never had a value.** It used to read 0.000, the same as a real zero, for a signal with no samples yet, such as one whose value the catalogue refuses to scale. A real zero still reads 0.000.
 - **The Decoder's Unmatched and Filtered tabs mark remote requests and the BRS and ESI flags.** A remote request now reads "Remote request for N bytes" rather than an empty `[0]` row, and a CAN FD frame shows BRS and ESI badges, as Discovery does. MCP `get_decoded_signals` now reports `isEsi` beside `isBrs` on each entry.
+- **The session menu offers Pause only where the session can pause.** A live session, which cannot pause, used to offer Pause and then ignore it, leaving the session running. Pause now shows only for a session that can pause, such as a capture replay, and the greyed Change source on a live session says to stop or leave the session instead.
+- **A Dashboard gauge shows "—" and an empty arc for a signal that has never had a value.** It used to read 0.000 and draw the arc to zero, the same as a real zero. A real zero still reads 0.000.
+- **Level-bar, rotary and icon-state tooltips show "—" for a signal that has never had a value.** They used to read NaN.
 
 ## [0.14.0] - 2026-10-06
 
