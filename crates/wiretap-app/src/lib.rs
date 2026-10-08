@@ -1602,6 +1602,12 @@ pub fn run() {
     });
 
     builder
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_, event| {
+            // macOS's Quit ends the loop with no ExitRequested, so this is the one event every quit reaches.
+            if let tauri::RunEvent::Exit = event {
+                tauri::async_runtime::block_on(io::stop_all_sessions(std::time::Duration::from_secs(3)));
+            }
+        });
 }

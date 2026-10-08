@@ -14,6 +14,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Apps that open the same device at once share one session.** At startup, apps with the same default source each opened a session of their own, and on a USB adapter only one app can hold, the others were refused as in use. They now open one session between them, as an app opening the source later already did.
 - **The Decoder's Send to Transmit loads the frame as it was received.** A decoded frame keeps its received id and length rather than the catalogue's, so a J1939 frame keeps its source address, and both decoded and unmatched frames keep their extended id flag and bus, where an unmatched frame used to guess extended from the id and go to bus 0. MCP `get_decoded_signals` now reports `isExtended` on every frame.
 - **A capture the backend cannot take no longer leaves an empty database behind.** Uploading to a new database now checks the capture first and creates the database only once it is accepted, so a capture holding anything but CAN frames is refused with nothing created.
+- **Quitting WireTAP stops every open session first.** A CAN adapter such as a gs_usb or PEAK device is now stopped as the app quits, rather than left on the bus until it is unplugged. A device that does not stop within a few seconds no longer holds up the quit.
 
 ## [0.14.0] - 2026-10-06
 
