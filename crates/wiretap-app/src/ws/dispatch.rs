@@ -445,6 +445,7 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
         dlc: f.dlc,
         frame_id: f.frame_id,
         is_brs: f.is_brs,
+        is_extended: f.is_extended,
         is_fd: f.is_fd,
         is_rtr: f.is_rtr,
         kind,
@@ -520,6 +521,7 @@ pub(crate) fn decode_entry<'a>(
         frame_id: f.frame_id,
         header_fields: decoded.header_fields.into_iter().map(DecodedHeaderField::from).collect(),
         is_brs: f.is_brs,
+        is_extended: f.is_extended,
         is_fd: f.is_fd,
         masked_frame_id: masked_id,
         mirror: verdict.map(DecodedMirrorVerdict::from),
@@ -1803,6 +1805,17 @@ factor = 1e10
                 serde_json::json!(["unmatched", false, false, true, 6]),
             ]
         );
+    }
+
+    #[test]
+    fn decoded_and_unmatched_entries_carry_the_frames_id_format() {
+        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let extended = |id| FrameMessage { is_extended: true, ..can(id, 0, vec![7; 8]) };
+        let seen: Vec<_> = entries(&catalog, &[extended(0x1A5), extended(0x2A5)], true)
+            .iter()
+            .map(|e| e["isExtended"].clone())
+            .collect();
+        assert_eq!(seen, [true, true]);
     }
 
     #[test]
