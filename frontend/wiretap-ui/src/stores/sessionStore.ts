@@ -50,6 +50,9 @@ import type { FrameMessage } from "../types/frame";
 import type { StreamEndReason } from "../generated/StreamEndReason";
 import type { BusStatus } from "../generated/BusStatus";
 import type { BusStatusMsg } from "../generated/BusStatusMsg";
+import type { CaptureFrameInfo } from "../generated/CaptureFrameInfo";
+import type { FrameInventoryMsg } from "../generated/FrameInventoryMsg";
+import { frameKey } from "../utils/frameKey";
 import type { CaptureMetadata } from "../api/capture";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
@@ -165,6 +168,8 @@ export interface Session {
   pausedSourceProfileIds: string[];
   /** Buses in trouble (Rust-authoritative); a bus not listed is active or unknown. */
   busStatuses: BusStatus[];
+  /** Each frame identity in the session's capture and its rollup, by frame key (Rust-authoritative). */
+  frameInventory?: ReadonlyMap<string, CaptureFrameInfo>;
   /**
    * Profiles the session was opened from (Rust-authoritative) — the source's,
    * even while it replays its capture after a stop. Empty until Rust reports it.
@@ -420,6 +425,7 @@ export function sessionTransitionEffect(msg: SessionTransitionMsg, session: Sess
         byteCount: 0,
         bytesCaptureId: null,
         capture: emptyCapture(null, sessionId),
+        frameInventory: undefined,
       });
       break;
     case "suspended":
@@ -454,6 +460,15 @@ function invokeCallbacks<A extends unknown[]>(
 export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, payload: DataView) {
   const { subscriber, decoded } = decodeDecodedBacklog(payload);
   callbacks.get(subscriber)?.onDecoded?.(decoded, true);
+}
+
+export function applyFrameInventory(
+  held: ReadonlyMap<string, CaptureFrameInfo> | undefined,
+  { reset, rows }: FrameInventoryMsg,
+): ReadonlyMap<string, CaptureFrameInfo> {
+  const next = new Map(reset ? [] : held);
+  for (const row of rows) next.set(frameKey(row.protocol, row.frame_id), row);
+  return next;
 }
 
 /** Hold a BusStatus push's buses on the session, and toast the sends it lost. */
@@ -635,7 +650,14 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
         decodeCaptureChanged(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)) || null;
       const current = useSessionStore.getState().sessions[sessionId];
       if (!current || current.capture.id === captureId) return;
-      updateSession(sessionId, { capture: emptyCapture(captureId, captureId ? sessionId : null) });
+      updateSession(sessionId, { capture: emptyCapture(captureId, captureId ? sessionId : null), frameInventory: undefined });
+    })
+  );
+
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.FrameInventory, (_payload, raw) => {
+      const held = useSessionStore.getState().sessions[sessionId]?.frameInventory;
+      updateSession(sessionId, { frameInventory: applyFrameInventory(held, decodeWsJson<FrameInventoryMsg>(raw)) });
     })
   );
 

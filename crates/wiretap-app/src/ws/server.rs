@@ -731,7 +731,11 @@ pub(crate) mod outbox {
         Channel(u8),
     }
 
-    static SENT: OnceLock<Mutex<mpsc::UnboundedReceiver<ServerCommand>>> = OnceLock::new();
+    type Sent = (Recipient, Vec<u8>);
+
+    /// The queue and what was read off it for another test: tests run in parallel, so one
+    /// test's read must not drop the messages another is about to ask for.
+    static SENT: OnceLock<Mutex<(mpsc::UnboundedReceiver<ServerCommand>, Vec<Sent>)>> = OnceLock::new();
 
     pub(crate) fn subscribe(session_id: &str, channel: u8) {
         SENT.get_or_init(|| {
@@ -740,25 +744,26 @@ pub(crate) mod outbox {
                 WS_SERVER.set(WsServer { port: 0, token: String::new(), tx }).is_ok(),
                 "no real server runs under test"
             );
-            Mutex::new(rx)
+            Mutex::new((rx, Vec::new()))
         });
         CHANNEL_MAP.write().unwrap().insert(session_id.to_string(), channel);
     }
 
     /// Every message sent so far on `channel` of type `kind`: its recipient and payload.
-    pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<(Recipient, Vec<u8>)> {
-        let mut rx = SENT.get().expect("subscribe first").lock().unwrap();
-        let mut out = Vec::new();
+    pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<Sent> {
+        let mut guard = SENT.get().expect("subscribe first").lock().unwrap();
+        let (rx, unread) = &mut *guard;
         while let Ok(cmd) = rx.try_recv() {
-            let (recipient, data) = match cmd {
-                ServerCommand::SendToConn { conn_id, data } => (Recipient::Conn(conn_id), data),
-                ServerCommand::SendToChannel { channel, data } => (Recipient::Channel(channel), data),
-                _ => continue,
-            };
-            if Header::decode(&data).is_ok_and(|h| h.channel == channel && h.msg_type == kind) {
-                out.push((recipient, data[HEADER_SIZE..].to_vec()));
+            match cmd {
+                ServerCommand::SendToConn { conn_id, data } => unread.push((Recipient::Conn(conn_id), data)),
+                ServerCommand::SendToChannel { channel, data } => unread.push((Recipient::Channel(channel), data)),
+                _ => {}
             }
         }
-        out
+        let (wanted, rest): (Vec<Sent>, Vec<Sent>) = std::mem::take(unread)
+            .into_iter()
+            .partition(|(_, data)| Header::decode(data).is_ok_and(|h| h.channel == channel && h.msg_type == kind));
+        *unread = rest;
+        wanted.into_iter().map(|(recipient, data)| (recipient, data[HEADER_SIZE..].to_vec())).collect()
     }
 }

@@ -40,6 +40,7 @@ export const MsgType = {
   BusStatus: 0x1f,
   Command: 0x20,
   CommandResponse: 0x21,
+  FrameInventory: 0x22,
   BridgeRequest: 0x30,
   BridgeResponse: 0x31,
   Heartbeat: 0xfe,

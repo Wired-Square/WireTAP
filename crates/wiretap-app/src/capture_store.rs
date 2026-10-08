@@ -15,6 +15,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::sync::RwLock;
 
 use crate::capture_db;
+use crate::capture_inventory::FrameInventory;
 use crate::io::FrameMessage;
 
 // ============================================================================
@@ -126,21 +127,9 @@ struct NamedCapture {
     owner_role: Option<CaptureRole>,
     /// In-memory set for efficient bus tracking during streaming
     seen_buses: HashSet<u8>,
-    /// Distinct frame ids per protocol seen during streaming, for a cheap O(1)
-    /// unique-frame count. Populated on append only — empty for DB-hydrated
-    /// captures (their live "unique" display uses a different path).
-    unique_frames: HashMap<String, HashSet<u32>>,
-}
-
-/// Record a frame's identity in the unique-frame index. Clones the protocol only the
-/// first time each one is seen, so the streaming path stays allocation-free.
-#[inline]
-fn note_unique_frame(unique: &mut HashMap<String, HashSet<u32>>, frame: &FrameMessage) {
-    if let Some(ids) = unique.get_mut(&frame.protocol) {
-        ids.insert(frame.frame_id);
-    } else {
-        unique.insert(frame.protocol.clone(), HashSet::from([frame.frame_id]));
-    }
+    /// Each identity seen during streaming and its rollup. Populated on append only —
+    /// empty for DB-hydrated captures (their live "unique" display uses a different path).
+    inventory: FrameInventory,
 }
 
 /// A protocol and the frame ids selected under it.
@@ -207,10 +196,10 @@ impl FrameSelection {
     /// True when every frame the capture has seen is selected, so the filter can be
     /// skipped entirely. Discovery auto-selects each id it discovers, making this the
     /// common case.
-    pub fn covers(&self, unique: &HashMap<String, HashSet<u32>>) -> bool {
-        unique.iter().all(|(protocol, ids)| {
+    pub fn covers(&self, inventory: &FrameInventory) -> bool {
+        inventory.ids().all(|(protocol, mut ids)| {
             self.whole.contains(protocol)
-                || self.ids.get(protocol).is_some_and(|selected| ids.is_subset(selected))
+                || self.ids.get(protocol).is_some_and(|selected| ids.all(|id| selected.contains(id)))
         })
     }
 
@@ -394,7 +383,7 @@ fn create_capture_internal(
         metadata: metadata.clone(),
         owner_role: owner.map(|(_, role)| role),
         seen_buses: HashSet::new(),
-        unique_frames: HashMap::new(),
+        inventory: FrameInventory::default(),
     };
     registry.captures.insert(id.clone(), capture);
 
@@ -509,7 +498,7 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
             cap.metadata.end_time_us = None;
             cap.metadata.buses = Vec::new();
             cap.seen_buses.clear();
-            cap.unique_frames.clear();
+            cap.inventory.clear();
         } else {
             return Err(format!("Capture '{}' not found", id));
         }
@@ -655,7 +644,7 @@ pub fn hydrate_from_db() {
             },
             owner_role: None, // no owner, so no role
             seen_buses,
-            unique_frames: HashMap::new(),
+            inventory: FrameInventory::default(),
         };
 
         // Persist if we changed anything (backfilled buses or orphaned)
@@ -949,13 +938,13 @@ pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
 /// The copy is orphaned (no owning session) and available for standalone use.
 /// Returns the new capture ID.
 pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String, String> {
-    let (source_metadata, unique_frames) = {
+    let (source_metadata, inventory) = {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         let source = registry
             .captures
             .get(source_capture_id)
             .ok_or_else(|| format!("Capture '{}' not found", source_capture_id))?;
-        (source.metadata.clone(), source.unique_frames.clone())
+        (source.metadata.clone(), source.inventory.clone())
     };
 
     // Create new capture entry in registry
@@ -989,7 +978,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
             metadata: metadata.clone(),
             owner_role: None,
             seen_buses,
-            unique_frames,
+            inventory,
         };
         registry.captures.insert(id.clone(), entry);
         (id, metadata)
@@ -1040,11 +1029,10 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
             cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
             cap.metadata.count += new_frames.len();
 
-            // Track distinct buses and distinct (bus, frame_id) keys
             let prev_len = cap.seen_buses.len();
             for f in &new_frames {
                 cap.seen_buses.insert(f.bus);
-                note_unique_frame(&mut cap.unique_frames, f);
+                cap.inventory.record(f);
             }
             if cap.seen_buses.len() != prev_len {
                 let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
@@ -1082,12 +1070,11 @@ pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
             cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
             cap.metadata.count = new_frames.len();
 
-            // Reset and rebuild bus + unique-frame tracking
             cap.seen_buses.clear();
-            cap.unique_frames.clear();
+            cap.inventory.clear();
             for f in &new_frames {
                 cap.seen_buses.insert(f.bus);
-                note_unique_frame(&mut cap.unique_frames, f);
+                cap.inventory.record(f);
             }
             let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
             sorted.sort();
@@ -1226,7 +1213,7 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
                 // Discovery auto-selects every id it discovers, so the common case is a
                 // selection that excludes nothing. Recognising that takes the cheap path
                 // instead of filtering by every id in the capture.
-                let covers = selection.covers(&b.unique_frames);
+                let covers = selection.covers(&b.inventory);
                 (b.metadata.count, b.metadata.end_time_us, covers)
             }
             _ => return TailResponse::empty(),
@@ -1254,7 +1241,7 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
 }
 
 /// Frame info extracted from a capture
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CaptureFrameInfo {
     /// Frame identity is (protocol, frame_id) — CAN 0x100 and Modbus register 256
@@ -1442,8 +1429,18 @@ pub fn get_capture_unique_count(id: &str) -> usize {
     registry
         .captures
         .get(id)
-        .map(|b| b.unique_frames.values().map(HashSet::len).sum())
+        .map(|b| b.inventory.len())
         .unwrap_or(0)
+}
+
+/// The capture's inventory rows that changed since the last take, or all of them.
+pub fn take_frame_inventory(id: &str, everything: bool) -> Vec<CaptureFrameInfo> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    registry
+        .captures
+        .get_mut(id)
+        .map(|b| b.inventory.take_unsent(everything))
+        .unwrap_or_default()
 }
 
 /// Get the kind of a specific capture.
@@ -1461,11 +1458,14 @@ mod tests {
         entries.iter().map(|(protocol, ids)| ProtocolFrames::ids(*protocol, ids.to_vec())).collect()
     }
 
-    fn unique(entries: &[(&str, &[u32])]) -> HashMap<String, HashSet<u32>> {
-        entries
-            .iter()
-            .map(|(protocol, ids)| (protocol.to_string(), ids.iter().copied().collect()))
-            .collect()
+    fn unique(entries: &[(&str, &[u32])]) -> FrameInventory {
+        let mut inventory = FrameInventory::default();
+        for (protocol, ids) in entries {
+            for &frame_id in *ids {
+                inventory.record(&FrameMessage { protocol: protocol.to_string(), frame_id, ..Default::default() });
+            }
+        }
+        inventory
     }
 
     /// A capture with no owning session — what MCP ingest creates — is owned by

@@ -87,6 +87,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::captures::PaginatedBytesResponse>();
     r.visit::<crate::captures::PaginatedFramesResponse>();
     r.visit::<crate::capture_store::CaptureFrameInfo>();
+    r.visit::<crate::capture_inventory::FrameInventoryMsg>();
     r.visit::<crate::capture_store::TailResponse>();
     r.visit::<crate::io::CsvColumnMapping>();
     r.visit::<crate::io::CsvPreview>();

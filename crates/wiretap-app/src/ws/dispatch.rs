@@ -10,7 +10,8 @@ use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
 use crate::transmit::{RepeatGroupStartedEvent, RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
-use crate::ws::server::ws_server;
+use crate::capture_inventory::FrameInventoryMsg;
+use crate::ws::server::{ws_server, WsServer};
 use crate::ws::decoded::{
     ChecksumVerdict, DecodedFrameMsg, DecodedHeaderField, DecodedMirrorVerdict, DecodedMuxSelector,
     DecodedSignalValue, DecodedSignalsEntry, UnroutedFrameMsg, UnroutedKind,
@@ -626,6 +627,7 @@ pub fn send_new_frames(session_id: &str) {
     let unique = crate::capture_store::get_capture_unique_count(&capture_id);
     let counts = protocol::encode_frame_counts(total as u64, unique as u32);
     server.send_to_channel(channel, protocol::encode_message(MsgType::FrameCounts, channel, &counts));
+    send_frame_inventory(server, channel, &capture_id, false);
 
     // Update offset — use total as a ceiling so we never fall behind a cleared capture.
     let next = new_offset.max(total);
@@ -659,15 +661,32 @@ pub fn send_new_bytes(session_id: &str) {
     server.send_to_channel(channel, protocol::encode_message(MsgType::ByteCounts, channel, &counts));
 }
 
-/// Reset frame offset for a session to the current capture length.
-/// Called on subscribe so that only frames arriving after subscription are sent.
-pub fn reset_frame_offset(session_id: &str) {
-    let count = crate::capture_store::get_session_frame_capture_id(session_id)
-        .map(|id| crate::capture_store::get_capture_count(&id))
-        .unwrap_or(0);
+/// Push the capture's inventory rows that changed since the last push; `reset` sends
+/// every row, for a reader that holds nothing yet or holds a cleared capture's rows.
+fn send_frame_inventory(server: &WsServer, channel: u8, capture_id: &str, reset: bool) {
+    let rows = crate::capture_store::take_frame_inventory(capture_id, reset);
+    if rows.is_empty() && !reset {
+        return;
+    }
+    let Ok(payload) = serde_json::to_vec(&FrameInventoryMsg { reset, rows }) else { return };
+    server.send_to_channel(channel, protocol::encode_message(MsgType::FrameInventory, channel, &payload));
+}
 
+/// Reset frame offset for a session to the current capture length, and send its whole
+/// inventory. Called on subscribe so that only frames arriving after subscription are sent.
+pub fn reset_frame_offset(session_id: &str) {
+    let capture_id = crate::capture_store::get_session_frame_capture_id(session_id);
+    let count = capture_id.as_deref().map(crate::capture_store::get_capture_count).unwrap_or(0);
+
+    let lock = delivery_lock(session_id);
+    let _delivering = lock.lock();
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {
         offsets.insert(session_id.to_string(), count);
+    }
+    if let (Some(server), Some(capture_id)) = (ws_server(), capture_id) {
+        if let Some(channel) = server.channel_for_session(session_id) {
+            send_frame_inventory(server, channel, &capture_id, true);
+        }
     }
 
     reset_decode_state(session_id);
@@ -1685,6 +1704,48 @@ bit_length = 8
         assert_eq!(payload[..2], [0, 14]);
         assert_eq!(&payload[2..16], b"main_dashboard");
         assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&payload[16..]).is_ok_and(|d| !d.is_empty()));
+    }
+
+    #[test]
+    fn the_inventory_is_sent_whole_on_subscribe_then_only_as_it_changes() {
+        use crate::ws::server::outbox;
+        const CHANNEL: u8 = 202;
+        let session = "frame-inventory-push";
+        crate::capture_db::use_in_memory_database();
+        let capture = crate::capture_store::create_session_capture(
+            session,
+            crate::capture_store::CaptureKind::Frames,
+            session.to_string(),
+        );
+        let inventories = || -> Vec<FrameInventoryMsg> {
+            outbox::sent(CHANNEL, MsgType::FrameInventory)
+                .into_iter()
+                .map(|(_, payload)| serde_json::from_slice(&payload).expect("FrameInventoryMsg JSON"))
+                .collect()
+        };
+        let ids = |msg: &FrameInventoryMsg| msg.rows.iter().map(|r| r.frame_id).collect::<Vec<_>>();
+
+        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 1, vec![0; 8]), can(0x101, 2, vec![0; 8])]);
+        outbox::subscribe(session, CHANNEL);
+        reset_frame_offset(session);
+        let [whole] = inventories().try_into().expect("one inventory on subscribe");
+        assert!(whole.reset);
+        assert_eq!(ids(&whole), [0x100, 0x101]);
+
+        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3, vec![0; 8]), can(0x101, 4, vec![0; 4])]);
+        send_new_frames(session);
+        let [delta] = inventories().try_into().expect("one delta");
+        assert!(!delta.reset);
+        assert_eq!(ids(&delta), [0x101]);
+        assert!(delta.rows[0].has_dlc_mismatch);
+
+        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 5, vec![0; 8])]);
+        send_new_frames(session);
+        assert!(inventories().is_empty(), "nothing changed, nothing sent");
+
+        crate::capture_store::clear_capture(&capture).expect("clear");
+        let [cleared] = inventories().try_into().expect("one inventory on clear");
+        assert_eq!(cleared, FrameInventoryMsg { reset: true, rows: Vec::new() });
     }
 
     const HEADERED: &str = r#"

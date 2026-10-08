@@ -9,6 +9,7 @@ mod ble_provision;
 mod capture_db;
 mod capture_events;
 mod capturequery;
+mod capture_inventory;
 mod capture_store;
 mod captures;
 mod catalog;
