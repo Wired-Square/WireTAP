@@ -11,9 +11,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(async () => {}),
 }));
 
-let reply: (args: { session_id: string; subscriber_id: string }) => OpenedSession | Promise<OpenedSession>;
+type Reply = Omit<OpenedSession, "session_id"> & { session_id?: string };
+let reply: (args: { session_id: string | null; subscriber_id: string }) => Reply | Promise<Reply>;
 const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
-  if (cmd === "open_session") return reply(args as { session_id: string; subscriber_id: string });
+  if (cmd === "open_session") {
+    const request = args as { session_id: string | null; subscriber_id: string };
+    return { session_id: request.session_id, ...(await reply(request)) };
+  }
   if (cmd === "unregister_session_subscriber") return 0;
   return null;
 });
@@ -26,7 +30,7 @@ const { isSessionNotFound } = await import("../api/io");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const opened = (overrides: Partial<OpenedSession> = {}): OpenedSession => ({
+const opened = (overrides: Partial<OpenedSession> = {}): Reply => ({
   created: true,
   start_error: null,
   startup_error: null,
@@ -82,6 +86,16 @@ describe("opening a session", () => {
 
     expect(useSessionStore.getState().appErrorDialog).toMatchObject({ isOpen: true, details: refused });
     expect(useSessionStore.getState().sessions.f_open).toMatchObject({ ioState: "error", errorMessage: refused });
+  });
+
+  it("opens a source under the session Rust names, and records it there", async () => {
+    reply = () => opened({ session_id: "f_named" });
+
+    const session = await useSessionStore.getState().openSession(null, "Bench", "discovery_1", "discovery", { sourceId: "p-dev" });
+
+    expect(invoke.mock.calls.find(([cmd]) => cmd === "open_session")?.[1]).toMatchObject({ session_id: null, opts: { source_id: "p-dev" } });
+    expect(session).toMatchObject({ id: "f_named", lifecycleState: "connected" });
+    expect(useSessionStore.getState()._eventListeners.f_named?.registeredSubscribers.has("discovery_1")).toBe(true);
   });
 
   it("refuses an id with nothing behind it as not found, and keeps nothing for it", async () => {

@@ -27,7 +27,7 @@ vi.mock("../hooks/useIOSession", () => ({
       captureStartTimeUs: null,
       reinitialize: vi.fn(async () => {}),
       leave: vi.fn(async () => {}),
-      rejoin: vi.fn(async () => {}),
+      rejoin: vi.fn(async (sessionId: string | null, sourceId?: string) => sessionId ?? `opened:${sourceId}`),
     };
   },
 }));
@@ -51,7 +51,6 @@ vi.mock("../stores/profileBusStore", () => ({
 vi.mock("../api/io", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/io")>()),
   generateSessionId: vi.fn(async (purpose: SessionPurpose) => mintedFor(purpose)),
-  resolveSourceSession: vi.fn(async (sourceId: string) => `resolved:${sourceId}`),
   setSessionSubscriberActive: vi.fn(async () => {}),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -127,7 +126,7 @@ describe("useIOSessionManager source switching", () => {
   });
 
   it("opens a picked source under the session Rust names for it, never under the source's own id", async () => {
-    expect(await run((m) => m.selectProfile(virtualDevice.id))).toBe("resolved:walk-v");
+    expect(await run((m) => m.selectProfile(virtualDevice.id))).toBe("opened:walk-v");
   });
 
   it("opens the default source the same way", async () => {
@@ -135,7 +134,7 @@ describe("useIOSessionManager source switching", () => {
     defaultSourceId = virtualDevice.id;
     root = createRoot(document.createElement("div"));
     await act(async () => root.render(<Harness />));
-    expect(manager.current.effectiveSessionId).toBe("resolved:walk-v");
+    expect(manager.current.effectiveSessionId).toBe("opened:walk-v");
   });
 
   it("returns to no source when the picker is skipped after a multi-source session", async () => {

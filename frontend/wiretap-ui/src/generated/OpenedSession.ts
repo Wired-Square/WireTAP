@@ -9,7 +9,7 @@ import type { SessionSourceKind } from "./SessionSourceKind";
 /**
  * The session an open joined or created, and how the start it made went.
  */
-export type OpenedSession = { created: boolean, 
+export type OpenedSession = { session_id: string, created: boolean, 
 /**
  * Why the start this open made failed. The session stays, in its error state.
  */

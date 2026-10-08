@@ -1291,7 +1291,6 @@ pub fn run() {
             io::traits::list_profile_traits,
             io::traits::validate_source_selection,
             sessions::generate_session_id,
-            sessions::resolve_source_session,
             // Profile-to-session mapping API
             sessions::get_profiles_usage,
             // Signal-then-fetch query commands

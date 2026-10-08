@@ -160,8 +160,8 @@ export interface UseIOSessionResult {
   reinitialize: (sessionId: string, profileId: string, options?: CreateSessionOptions) => Promise<void>;
   /** Switch to capture replay mode (after stream ends with capture data) */
   switchToCaptureReplay: (speed?: number) => Promise<void>;
-  /** Join a session, or open it from `sourceId` when nothing is under its id */
-  rejoin: (sessionId: string, sourceId?: string) => Promise<void>;
+  /** Join a session, or open it from `sourceId` when nothing is under its id; a null id opens the source's own session. Resolves to the session joined, or null when refused */
+  rejoin: (sessionId: string | null, sourceId?: string) => Promise<string | null>;
   /** Transmit a CAN frame (only if capabilities.traits.tx_frames is true) */
   transmitFrame: (frame: CanTransmitFrame) => Promise<TransmitResult>;
 }
@@ -527,20 +527,22 @@ export function useIOSession(
     [effectiveSessionId, switchToCapture]
   );
 
-  const rejoin = useCallback(async (targetSessionId: string, sourceId?: string) => {
+  const rejoin = useCallback(async (targetSessionId: string | null, sourceId?: string) => {
     try {
-      await openSession(targetSessionId, sourceId ?? effectiveProfileName, subscriberIdRef.current, appName, { sourceId });
+      const { id } = await openSession(targetSessionId, sourceId ?? effectiveProfileName, subscriberIdRef.current, appName, { sourceId });
 
       // Mark subscriber as active in Rust so it receives frames again
       try {
-        await setSessionSubscriberActive(targetSessionId, subscriberIdRef.current, true);
+        await setSessionSubscriberActive(id, subscriberIdRef.current, true);
       } catch {
         // Ignore - subscriber may already be active
       }
 
-      registerCallbacks(targetSessionId, subscriberIdRef.current, forwarding);
+      registerCallbacks(id, subscriberIdRef.current, forwarding);
+      return id;
     } catch (e) {
       callbacksRef.current.onError?.(messageOf(e));
+      return null;
     }
   }, [appName, effectiveProfileName, openSession, registerCallbacks, forwarding]);
 

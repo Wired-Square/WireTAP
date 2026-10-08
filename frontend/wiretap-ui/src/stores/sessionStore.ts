@@ -269,9 +269,9 @@ export interface SessionStore {
   dismissSendsLost: () => void;
 
   // ---- Actions: Session Lifecycle ----
-  /** Join the session, or create it from `options.sourceId` when nothing is under its id */
+  /** Join the session, or create it from `options.sourceId` when nothing is under its id; a null id opens the source's own session */
   openSession: (
-    sessionId: string,
+    sessionId: string | null,
     profileName: string,
     subscriberId: string,
     appName: string,
@@ -702,7 +702,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   // ---- Session Lifecycle ----
   openSession: (sessionId, profileName, subscriberId, appName, options = {}) =>
     inOrder(subscriberId, () => openNow(sessionId, profileName, subscriberId, appName, options)).then(
-      () => get().sessions[sessionId]
+      (opened) => get().sessions[opened.session_id]
     ),
 
   holdSession: (sessionId, profileName, subscriberId, appName) => {
@@ -1385,22 +1385,23 @@ function dropSessionListeners(sessionId: string) {
 }
 
 /**
- * Open the session in one `open_session` call and record what Rust reports. The
- * channel is subscribed first, so a source the open starts loses no frames.
+ * Open the session in one `open_session` call and record what Rust reports. A
+ * known id's channel is subscribed first; frames wait in the capture until a
+ * channel exists, so a late subscription loses none either.
  */
 async function openNow(
-  sessionId: string,
+  requestedId: string | null,
   profileName: string,
   subscriberId: string,
   appName: string,
   options: CreateSessionOptions
 ): Promise<OpenedSession> {
-  const listeners = ensureSessionListeners(sessionId);
-  await listeners.subscribed;
+  const requested = requestedId === null ? null : ensureSessionListeners(requestedId);
+  await requested?.subscribed;
 
   let opened: OpenedSession;
   try {
-    opened = await openSessionCommand(sessionId, subscriberId, appName, {
+    opened = await openSessionCommand(requestedId, subscriberId, appName, {
       source_id: options.sourceId,
       sources: options.sources,
       start_time: options.startTime,
@@ -1413,10 +1414,11 @@ async function openNow(
       connect_only: options.skipAutoStart,
     });
   } catch (e) {
-    if (listeners.registeredSubscribers.size === 0) dropSessionListeners(sessionId);
+    if (!requested) throw e;
+    if (requested.registeredSubscribers.size === 0) dropSessionListeners(requested.sessionId);
     if (!isSessionNotFound(e)) {
-      updateSessionOrCreate(sessionId, {
-        id: sessionId,
+      updateSessionOrCreate(requested.sessionId, {
+        id: requested.sessionId,
         profileId: options.sourceId ?? "",
         profileName,
         lifecycleState: "error",
@@ -1427,6 +1429,9 @@ async function openNow(
     throw e;
   }
 
+  const sessionId = opened.session_id;
+  const listeners = requested ?? ensureSessionListeners(sessionId);
+  await listeners.subscribed;
   listeners.registeredSubscribers.add(subscriberId);
   const startProblem = opened.start_error ?? opened.startup_error;
   if (startProblem) {

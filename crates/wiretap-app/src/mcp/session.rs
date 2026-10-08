@@ -131,7 +131,7 @@ pub async fn open(
         connect_only: Some(true),
         ..Default::default()
     };
-    let opened = crate::sessions::open_from(&app, &sid, &subscriber_for(&sid), Some("mcp"), opts)
+    let opened = crate::sessions::open_from(&app, Some(&sid), &subscriber_for(&sid), Some("mcp"), opts)
         .await
         .map_err(|e| e.to_string())?;
     let capabilities = opened.registration.capabilities;
