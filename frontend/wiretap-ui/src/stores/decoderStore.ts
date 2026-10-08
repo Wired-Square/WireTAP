@@ -40,6 +40,8 @@ function unroutedFrame(msg: DecodedSignalsEntry, timestamp: number): UnmatchedFr
     isFd: msg.isFd,
     isBrs: msg.isBrs,
     isRtr: "kind" in msg && msg.isRtr,
+    isExtended: msg.isExtended,
+    bus: msg.bus,
   };
 }
 
@@ -157,9 +159,12 @@ export type DecodedFrame = {
   tunnelBytes?: Map<TunnelTransaction['direction'], number[]>;
   /** The serial catalogue's checksum over `rawBytes`. */
   checksum?: ChecksumValidationResult;
+  frameId?: number;
   dlc?: number;
   isFd?: boolean;
   isBrs?: boolean;
+  isExtended?: boolean;
+  bus?: number;
 };
 
 export type FrameMetadata = {
@@ -186,6 +191,8 @@ export type UnmatchedFrame = {
   isFd?: boolean;
   isBrs?: boolean;
   isRtr?: boolean;
+  isExtended?: boolean;
+  bus?: number;
 };
 
 /** Filtered frame (too short or matched by ID filter) */
@@ -719,9 +726,12 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         rawBytesByMux,
         tunnelBytes,
         checksum: msg.checksum,
+        frameId: msg.frameId,
         dlc: msg.dlc,
         isFd: msg.isFd,
         isBrs: msg.isBrs,
+        isExtended: msg.isExtended,
+        bus: msg.bus,
       };
       _decoded.set(id, decodedFrame);
 

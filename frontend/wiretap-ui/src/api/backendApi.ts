@@ -64,11 +64,6 @@ export async function apiListDatabases(profileId: string): Promise<ApiDatabase[]
   return invoke<ApiDatabase[]>("api_list_databases", { profileId });
 }
 
-/** Create a new capture database on the backend (admin key required). */
-export async function apiCreateDatabase(profileId: string, name: string): Promise<void> {
-  await invoke("api_create_database", { profileId, name });
-}
-
 /** Probe backend connectivity ("Test connection"). */
 export async function apiTestConnection(profileId: string): Promise<boolean> {
   return invoke<boolean>("api_test_connection", { profileId });

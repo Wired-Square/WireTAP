@@ -71,6 +71,25 @@ describe("the Decoder's Send to Transmit loads the frame as received", () => {
     expect(editor().buildCanFrame()).toMatchObject({ is_fd: true, is_brs: true });
   });
 
+  it("a decoded frame is sent at its received length, not the catalogue's", () => {
+    editor().updateCanEditor(canEditorFromDecoded(detail, decoded({ rawBytes: [1, 2, 3, 4], dlc: 4 })));
+    expect(editor().buildCanFrame()).toMatchObject({ data: [1, 2, 3, 4] });
+  });
+
+  it("a decoded frame is sent with its received id, not the catalogue's masked one", () => {
+    const masked = { id: 0x18ef0000, len: 8, signals: [], isExtended: true };
+    editor().updateCanEditor(canEditorFromDecoded(masked, decoded({ frameId: 0x18ef0042, isExtended: true })));
+    expect(editor().buildCanFrame()).toMatchObject({ frame_id: 0x18ef0042 });
+  });
+
+  it("a decoded or unmatched frame keeps its received id format and bus", () => {
+    editor().updateCanEditor(canEditorFromDecoded(detail, decoded({ isExtended: true, bus: 2 })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_extended: true, bus: 2 });
+    editor().resetCanEditor();
+    editor().updateCanEditor(canEditorFromUnmatched(unmatched({ isExtended: true, bus: 1 })));
+    expect(editor().buildCanFrame()).toMatchObject({ is_extended: true, bus: 1 });
+  });
+
   it("an unmatched RTR arrives as a remote request for its received length", () => {
     editor().updateCanEditor(canEditorFromUnmatched(unmatched({ isRtr: true, dlc: 6, bytes: [] })));
     expect(editor().buildCanFrame()).toMatchObject({ is_rtr: true, data: Array(6).fill(0) });

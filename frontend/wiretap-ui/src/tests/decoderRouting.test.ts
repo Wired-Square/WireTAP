@@ -27,6 +27,7 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   sourceAddress: null,
   checksum: { extracted: 0x2a, calculated: 0x2a, valid: true },
   dlc: 4,
+  isExtended: false,
   isFd: false,
   isBrs: false,
   ...over,
@@ -40,6 +41,7 @@ const unrouted = (over: Partial<UnroutedFrameMsg> = {}): UnroutedFrameMsg => ({
   bytes: [1, 2],
   dlc: 2,
   protocol: "can",
+  isExtended: false,
   isFd: false,
   isBrs: false,
   isRtr: false,
@@ -87,10 +89,10 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(frame?.checksum?.valid).toBe(true);
     expect(frame?.signals[0]).toMatchObject({ name: "Level", timestamp: 2, mirrorMismatch: true });
     expect(getUnmatchedFrames()).toEqual([
-      { frameId: 0x2a5, bytes: [1, 2], dlc: 2, timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false, isBrs: false, isRtr: false },
+      { frameId: 0x2a5, bytes: [1, 2], dlc: 2, timestamp: 3, sourceAddress: undefined, protocol: "can", isFd: false, isBrs: false, isRtr: false, isExtended: false, bus: 0 },
     ]);
     expect(getFilteredFrames()).toEqual([
-      { frameId: 0x01, bytes: [1], dlc: 1, timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, isBrs: false, isRtr: false, reason: "too_short" },
+      { frameId: 0x01, bytes: [1], dlc: 1, timestamp: 4, sourceAddress: 9, protocol: "serial", isFd: false, isBrs: false, isRtr: false, isExtended: false, bus: 1, reason: "too_short" },
     ]);
   });
 

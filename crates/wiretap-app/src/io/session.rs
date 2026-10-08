@@ -551,6 +551,18 @@ pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
     transition(session_id, &mut *lock_session(session_id).await?, Transition::Stop).await
 }
 
+/// Stop every open session, so no device is left on its bus when the app quits.
+pub async fn stop_all_sessions(timeout: std::time::Duration) {
+    stop_sessions(session_cells().into_iter().map(|(id, _)| id).collect(), timeout).await;
+}
+
+async fn stop_sessions(session_ids: Vec<String>, timeout: std::time::Duration) {
+    let stops = futures::future::join_all(session_ids.iter().map(|id| stop_session(id)));
+    if tokio::time::timeout(timeout, stops).await.is_err() {
+        tlog!("[reader] stop_all_sessions: gave up on a session still stopping after {timeout:?}");
+    }
+}
+
 /// Suspend a reader session - stops streaming, finalizes capture, session stays alive.
 /// The capture remains owned by the session and all joined apps can view it.
 /// Use `resume_session_fresh` to start streaming again with a new capture.
@@ -1812,6 +1824,29 @@ mod tests {
         assert_eq!(slow_start.await.unwrap(), Ok(IOState::Running));
         destroy_session("f_slow", false).await.unwrap();
         destroy_session("f_quick", false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn stopping_for_exit_stops_every_session_and_waits_out_no_wedged_one() {
+        let gate = Arc::new(Gate::default());
+        let ids = ["f_exit_a", "f_exit_b", "f_exit_wedged"];
+        open(ids[0], TestSource::new(ids[0])).await;
+        open(ids[1], TestSource::new(ids[1])).await;
+        open(ids[2], TestSource::new(ids[2]).slow_stop(&gate)).await;
+        for id in ids {
+            start_session(id).await.unwrap();
+        }
+
+        let stopping = stop_sessions(ids.map(String::from).to_vec(), Duration::from_millis(100));
+        tokio::time::timeout(Duration::from_secs(1), stopping).await.expect("a wedged stop held up the exit");
+        for id in &ids[..2] {
+            assert_eq!(super::super::session_info(id).await.map(|r| r.state), Some(IOState::Stopped), "{id}");
+        }
+
+        gate.release();
+        for id in ids {
+            destroy_session(id, false).await.unwrap();
+        }
     }
 
     #[tokio::test]
