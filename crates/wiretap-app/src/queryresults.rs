@@ -34,13 +34,21 @@ pub fn differing_byte_indices(a: &[u8], b: &[u8], compare: Option<&BTreeSet<usiz
         .collect()
 }
 
-/// Normalise the frontend's `compare_byte_indices` argument into a lookup set.
-/// An empty list is treated as "no restriction", so a caller that has no
-/// catalogue loaded behaves exactly as before.
-pub fn compare_index_set(indices: Option<Vec<u8>>) -> Option<BTreeSet<usize>> {
-    indices
-        .filter(|v| !v.is_empty())
-        .map(|v| v.into_iter().map(usize::from).collect())
+/// The bytes a mirror validation compares: the mirror frame's inherited bytes in
+/// the catalogue at `catalog_path`. `None` — the whole payload — when no
+/// catalogue is given or the frame inherits nothing.
+pub fn mirror_compare_set(
+    catalog_path: Option<&str>,
+    mirror_frame_id: u32,
+) -> Result<Option<BTreeSet<usize>>, String> {
+    let Some(path) = catalog_path else { return Ok(None) };
+    let text = std::fs::read_to_string(path).map_err(|e| format!("Failed to read catalog file: {e}"))?;
+    let catalog = wiretap_catalog::Catalog::parse(&text).map_err(|e| e.to_string())?;
+    let id = wiretap_catalog::decode::frame_id_mask(&catalog).map_or(mirror_frame_id, |m| mirror_frame_id & m);
+    Ok(catalog
+        .frame(id)
+        .map(wiretap_catalog::mirror::inherited_byte_indices)
+        .filter(|set| !set.is_empty()))
 }
 
 /// Compute per-mux-case statistics from grouped payloads.
@@ -182,5 +190,75 @@ pub fn compute_mux_statistics(
         mux_byte,
         total_frames,
         cases,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(serde::Deserialize)]
+    struct InheritedCase {
+        name: String,
+        signals: serde_json::Value,
+        expected: Vec<usize>,
+    }
+
+    #[test]
+    fn inherited_bytes_match_the_query_golden() {
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../frontend/wiretap-ui/src/tests/fixtures/analysis/inheritedBytes.json"
+        );
+        let cases: Vec<InheritedCase> =
+            serde_json::from_str(&std::fs::read_to_string(fixture).expect("fixture")).expect("cases");
+        for case in cases {
+            let frame: wiretap_catalog::Frame = serde_json::from_value(serde_json::json!({
+                "key": "0x100", "frameId": 0x100, "protocol": "can", "length": 8, "signals": case.signals,
+            }))
+            .expect("frame");
+            let indices: Vec<usize> = wiretap_catalog::mirror::inherited_byte_indices(&frame).into_iter().collect();
+            assert_eq!(indices, case.expected, "{}", case.name);
+        }
+    }
+
+    const MASKED_MIRROR: &str = r#"
+[meta]
+name = "masked"
+[meta.can]
+frame_id_mask = 0xFFF
+[frame.can."0x705"]
+length = 8
+[[frame.can."0x705".signals]]
+name = "current"
+start_bit = 0
+bit_length = 16
+[[frame.can."0x705".signals]]
+name = "end_stop"
+start_bit = 16
+bit_length = 8
+[frame.can."0x005"]
+length = 8
+mirror_of = "0x705"
+[[frame.can."0x005".signals]]
+name = "local_end_stop"
+start_bit = 16
+bit_length = 8
+"#;
+
+    #[test]
+    fn mirror_compare_set_reads_the_catalogue_at_the_path() {
+        let dir = std::env::temp_dir().join(format!("wiretap-mirror-compare-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("masked.toml");
+        std::fs::write(&path, MASKED_MIRROR).unwrap();
+        let path = path.to_str();
+
+        assert_eq!(mirror_compare_set(path, 0x7005).unwrap(), Some(BTreeSet::from([0, 1])));
+        assert_eq!(mirror_compare_set(path, 0x705).unwrap(), None, "a source inherits nothing");
+        assert_eq!(mirror_compare_set(path, 0x123).unwrap(), None, "not in the catalogue");
+        assert_eq!(mirror_compare_set(None, 0x005).unwrap(), None);
+        assert!(mirror_compare_set(Some("/nonexistent/catalogue.toml"), 0x005).is_err());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

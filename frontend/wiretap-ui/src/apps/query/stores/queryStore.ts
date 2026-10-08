@@ -44,7 +44,6 @@ import {
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
-import { inheritedByteIndices } from "../../../utils/mirrorBytes";
 
 export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult, InventoryRow };
 
@@ -231,24 +230,6 @@ export interface QueuedQuery {
   timeBounds?: QueryTimeBounds;
   /** Result limit for this query */
   resultLimit: number;
-}
-
-/**
- * Payload bytes a mirror validation query should compare — the mirror frame's
- * inherited bytes, so the query agrees with the Decoder's live Match/Mismatch
- * badge instead of flagging a byte the catalogue deliberately overrides.
- * Returns an empty list (i.e. compare the whole payload) when no catalogue is
- * loaded or the frame is not a mirror.
- */
-function mirrorCompareBytes(catalog: ParsedCatalog | null, mirrorFrameId: number): number[] {
-  if (!catalog) return [];
-  // Mask first, as the live path does — a catalogue keyed by message type only
-  // would otherwise never match and silently fall back to the whole payload.
-  const mask = catalog.protocol === 'can'
-    ? catalog.canConfig?.frame_id_mask
-    : catalog.serialConfig?.frame_id_mask;
-  const frame = catalog.frames.get(mask !== undefined ? mirrorFrameId & mask : mirrorFrameId);
-  return frame ? inheritedByteIndices(frame.signals) : [];
 }
 
 /** Format frame ID with leading zeros (3 digits for standard, 8 for extended) */
@@ -636,7 +617,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
               startTimeUs,
               endTimeUs,
               resultLimit,
-              mirrorCompareBytes(get().parsedCatalog, queryParams.mirrorFrameId),
+              get().catalogPath,
             );
             results = response.results;
             stats = response.stats;
@@ -804,7 +785,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
               endTime,
               resultLimit,
               nextQuery.id,
-              mirrorCompareBytes(get().parsedCatalog, queryParams.mirrorFrameId),
+              get().catalogPath,
             );
             results = response.results;
             stats = response.stats;

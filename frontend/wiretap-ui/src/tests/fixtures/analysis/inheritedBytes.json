@@ -1,0 +1,8 @@
+[
+  { "name": "two inherited bytes", "signals": [{ "startBit": 0, "bitLength": 8, "inherited": true }, { "startBit": 8, "bitLength": 8, "inherited": true }], "expected": [0, 1] },
+  { "name": "an override is not compared", "signals": [{ "startBit": 0, "bitLength": 16, "inherited": true }, { "startBit": 16, "bitLength": 16 }], "expected": [0, 1] },
+  { "name": "a signal straddling a byte boundary covers both", "signals": [{ "startBit": 4, "bitLength": 12, "inherited": true }], "expected": [0, 1] },
+  { "name": "a frame that is not a mirror compares nothing", "signals": [{ "startBit": 0, "bitLength": 8 }], "expected": [] },
+  { "name": "a signal without a span is skipped", "signals": [{ "bitLength": 8, "inherited": true }, { "startBit": 8, "inherited": true }, { "startBit": 16, "bitLength": 0, "inherited": true }], "expected": [] },
+  { "name": "indices are distinct and ascending", "signals": [{ "startBit": 56, "bitLength": 8, "inherited": true }, { "startBit": 0, "bitLength": 4, "inherited": true }, { "startBit": 4, "bitLength": 4, "inherited": true }], "expected": [0, 7] }
+]
