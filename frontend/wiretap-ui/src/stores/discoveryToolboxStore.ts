@@ -41,6 +41,16 @@ export type ChecksumScanSource = CaptureSelection | { frames: FrameMessage[] };
 
 export type CaptureSelection = { captureId: string; selection: ProtocolFrames[] };
 
+/** Payload Changes reads the session's capture whenever it has one, the sample
+ *  MCP `get_discovery_analysis` reads. Serial frames are framed on the client. */
+export function changesCapture(
+  isSerialMode: boolean,
+  captureId: string | null,
+  selection: ProtocolFrames[]
+): CaptureSelection | undefined {
+  return !isSerialMode && captureId ? { captureId, selection } : undefined;
+}
+
 /** The `ToolboxState` slot each tool writes its output into. */
 export type ToolResultKey =
   | 'messageOrderResults'

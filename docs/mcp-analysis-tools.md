@@ -142,8 +142,8 @@ The same profile for every frame of a session's capture: `session_id` (required)
 optional `frame_ids` as Discovery's keys (`"can:256"`). Each frame reads its most
 recent 5000 payloads. Without `frame_ids` the first 64 frames of the capture's
 inventory are profiled and the rest counted in `skippedFrames`. A session with no
-frame capture is an error. Discovery's Payload Changes reads a capture through the
-same code, so the panel and an agent describe it alike.
+frame capture is an error. Discovery's Payload Changes reads the session's capture
+through the same code, live or not, so the panel and an agent describe it alike.
 
 ### `frame_checksum_scan`
 Finds checksums across every frame id in the source, or the `frame_ids` you name.

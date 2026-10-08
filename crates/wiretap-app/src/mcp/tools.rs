@@ -26,7 +26,8 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
-use crate::analysis::QuerySource;
+use crate::analysis::PayloadSource;
+use crate::payload_source::{resolve, Capture, QuerySource};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -90,7 +91,7 @@ impl WireTapTools {
 
 /// Convert an optional RFC3339 time bound to capture-timeline microseconds.
 fn us(s: &Option<String>) -> Option<i64> {
-    s.as_deref().and_then(crate::analysis::iso_to_micros)
+    s.as_deref().and_then(crate::payload_source::iso_to_micros)
 }
 
 /// Widen an optional row limit to the i64 the capture engines take.
@@ -682,15 +683,9 @@ impl WireTapTools {
             .collect::<Result<Vec<_>, _>>()
             .map_err(err)?;
         let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
-        let profiles = crate::analysis::byte_profiles(
-            &self.app,
-            &QuerySource::Capture(capture_id.clone()),
-            &crate::analysis::ScanFilter::Selection(FrameSelection::from_groups(groups)),
-            crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT,
-            max_frames,
-        )
-        .await
-        .map_err(err)?;
+        let profiles = crate::byte_roles::changes_profiles(&Capture(&capture_id), groups, max_frames)
+            .await
+            .map_err(err)?;
         ok_json(json!({
             "captureId": capture_id,
             "frameCount": profiles.frames.len(),
@@ -753,8 +748,10 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameInventoryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
-        let rows = crate::analysis::frame_inventory(&self.app, &src, p.start_time, p.end_time)
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let rows = src
+            .reader(&self.app)
+            .inventory(p.start_time.as_deref(), p.end_time.as_deref())
             .await
             .map_err(err)?;
         ok_json(json!({ "frames": rows.len(), "inventory": rows }))
@@ -765,10 +762,9 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteProfileParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let profile = crate::analysis::byte_profile(
-            &self.app,
-            &src,
+            &src.reader(&self.app),
             p.protocol.as_deref(),
             p.frame_id,
             p.is_extended,
@@ -786,7 +782,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ChecksumScanParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         // Every field named rather than `..Default::default()`: an option added
         // to the crate must be a build failure here, not a setting silently
         // unreachable from MCP.
@@ -799,7 +795,7 @@ impl WireTapTools {
         };
         let filter = crate::analysis::ScanFilter::Ids(p.frame_ids.unwrap_or_default());
         let result =
-            crate::analysis::checksum_scan(&self.app, &src, &filter, p.sample_limit, options)
+            crate::analysis::checksum_scan(&src.reader(&self.app), &filter, p.sample_limit, options)
                 .await
                 .map_err(err)?;
         ok_json(result)
@@ -810,15 +806,18 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<CatalogCoverageParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let entry = crate::catalog::find_catalog(&self.app, &p.catalog).await.map_err(err)?;
+        let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
+        let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| err(e.to_string()))?;
         let report = crate::analysis::catalog_coverage(
-            &self.app,
-            &src,
-            &p.catalog,
+            &src.reader(&self.app),
+            &entry.name,
+            &catalog,
             p.include_byte_roles,
             p.sample_limit,
-            p.start_time,
-            p.end_time,
+            p.start_time.as_deref(),
+            p.end_time.as_deref(),
         )
         .await
         .map_err(err)?;
@@ -832,7 +831,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_byte_changes(
                     self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended,
@@ -851,7 +850,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_frame_changes(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, p.limit, None,
@@ -869,7 +868,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_distribution(
                     self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended, p.start_time, p.end_time, None,
@@ -887,7 +886,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<GapQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_gap_analysis(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.gap_threshold_ms,
@@ -906,7 +905,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrequencyQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_frequency(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.bucket_size_ms,
@@ -925,7 +924,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_first_last(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, None,
@@ -943,7 +942,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<MuxQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_mux_statistics(
                     self.app.clone(), pid, p.frame_id, p.mux_selector_byte, p.is_extended,

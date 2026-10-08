@@ -7,12 +7,12 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use tauri::AppHandle;
 use wiretap_analysis::{serial_structure, SerialStructure};
 
-use crate::analysis::{FrameByteProfile, QuerySource, ScanFilter};
+use crate::analysis::{byte_profiles, ByteProfiles, FrameByteProfile, PayloadSource, ScanFilter};
 use crate::capture_store::{FrameSelection, ProtocolFrames};
 use crate::checksum_discovery::{DiscoveryFrame, DEFAULT_SAMPLE_LIMIT};
+use crate::payload_source::Capture;
 
 /// Where the Changes view's payloads come from: a capture Rust reads itself, or
 /// the frames the frontend holds when nothing has written them to one.
@@ -25,25 +25,23 @@ pub enum ProfileSource {
 
 /// Profile each frame's most recent `DEFAULT_SAMPLE_LIMIT` payloads.
 #[tauri::command]
-pub async fn profile_bytes_cmd(
-    app: AppHandle,
-    source: ProfileSource,
-) -> Result<Vec<FrameByteProfile>, String> {
+pub async fn profile_bytes_cmd(source: ProfileSource) -> Result<Vec<FrameByteProfile>, String> {
     match source {
         ProfileSource::Capture { capture_id, selection } => {
-            let filter = ScanFilter::Selection(FrameSelection::from_groups(selection));
-            let profiles = crate::analysis::byte_profiles(
-                &app,
-                &QuerySource::Capture(capture_id),
-                &filter,
-                DEFAULT_SAMPLE_LIMIT,
-                usize::MAX,
-            )
-            .await?;
-            Ok(profiles.frames)
+            Ok(changes_profiles(&Capture(&capture_id), selection, usize::MAX).await?.frames)
         }
         ProfileSource::Frames { frames } => Ok(profile_frames(frames, DEFAULT_SAMPLE_LIMIT as usize)),
     }
+}
+
+/// The Changes view's sample, shared with MCP `get_discovery_analysis`.
+pub async fn changes_profiles(
+    source: &impl PayloadSource,
+    selection: Vec<ProtocolFrames>,
+    max_frames: usize,
+) -> Result<ByteProfiles, String> {
+    let filter = ScanFilter::Selection(FrameSelection::from_groups(selection));
+    byte_profiles(source, &filter, DEFAULT_SAMPLE_LIMIT, max_frames).await
 }
 
 /// Group `frames` by identity in first-seen order and profile each group's most
@@ -98,6 +96,26 @@ mod tests {
         let keys: Vec<_> = profiles.iter().map(|p| (p.protocol.as_deref(), p.frame_id)).collect();
         assert_eq!(keys, vec![(Some("can"), 0x200), (Some("can"), 0x100), (Some("modbus"), 0x200)]);
         assert_eq!(profiles[0].profile.sample_count, 2);
+    }
+
+    #[tokio::test]
+    async fn the_changes_sample_is_each_frames_most_recent_default_limit() {
+        let mut source = crate::analysis::memory::MemorySource::default();
+        for i in 0..DEFAULT_SAMPLE_LIMIT + 1000 {
+            source.push("can", 0x100, false, i.to_be_bytes().to_vec());
+        }
+        source.push("modbus", 0x100, false, vec![0]);
+
+        let profiles =
+            changes_profiles(&source, vec![ProtocolFrames::ids("can", vec![0x100])], usize::MAX)
+                .await
+                .unwrap();
+
+        assert_eq!(profiles.frames.len(), 1, "the selection's protocol, not every 0x100");
+        let profile = &profiles.frames[0].profile;
+        assert_eq!(profile.sample_count, DEFAULT_SAMPLE_LIMIT as usize);
+        assert_eq!(profile.columns[2].stats.min, 0x03, "starts at frame 1000 = 0x03E8");
+        assert_eq!(source.asked.lock().unwrap()[0].2, crate::analysis::Sampling::Recent);
     }
 
     /// The newest run, in order: a counter keeps its step and its direction.

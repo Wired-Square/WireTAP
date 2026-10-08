@@ -12,7 +12,7 @@
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer, type FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './discoveryUIStore';
 import { useDiscoverySerialStore, withSerialIds } from './discoverySerialStore';
-import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
+import { useDiscoveryToolboxStore, changesCapture } from './discoveryToolboxStore';
 import type { CaptureFrameInfo } from '../api/capture';
 import type { FrameMessage } from '../types/frame';
 import { keyOf, groupKeysByProtocol } from '../utils/frameKey';
@@ -577,7 +577,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           await toolboxStore.runChangesAnalysis(
             selectedFrameData,
             frameInfoMap,
-            captureMode.enabled && sessionCaptureId ? { captureId: sessionCaptureId, selection } : undefined
+            changesCapture(isSerialMode, sessionCaptureId, selection)
           );
           break;
       }

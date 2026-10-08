@@ -2,6 +2,7 @@
 pub(crate) mod logging;
 mod adhoc;
 mod analysis;
+mod payload_source;
 mod byte_roles;
 mod app_registry;
 mod ble_provision;
@@ -1474,7 +1475,7 @@ pub fn run() {
             apiclient::api_list_databases,
             apiclient::api_test_connection,
             apiclient::api_probe_backend,
-            analysis::query_frame_inventory,
+            payload_source::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
             gateway_admin::gateway_list_daemons,
