@@ -50,15 +50,15 @@ packageJson.version = newVersion;
 writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
 console.log(`  ✓ frontend/wiretap-ui/package.json`);
 
-// Update Cargo.toml
-const cargoTomlPath = join(tauriDir, 'Cargo.toml');
+// Update the workspace Cargo.toml, whose version every crate inherits
+const cargoTomlPath = join(rootDir, 'Cargo.toml');
 let cargoToml = readFileSync(cargoTomlPath, 'utf8');
 cargoToml = cargoToml.replace(
   /^version = "[^"]+"/m,
   `version = "${newVersion}"`
 );
 writeFileSync(cargoTomlPath, cargoToml);
-console.log(`  ✓ crates/wiretap-app/Cargo.toml`);
+console.log(`  ✓ Cargo.toml`);
 
 // Update tauri.conf.json
 const tauriConfPath = join(tauriDir, 'tauri.conf.json');
