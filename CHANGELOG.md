@@ -16,6 +16,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A capture the backend cannot take no longer leaves an empty database behind.** Uploading to a new database now checks the capture first and creates the database only once it is accepted, so a capture holding anything but CAN frames is refused with nothing created.
 - **Quitting WireTAP stops every open session first.** A CAN adapter such as a gs_usb or PEAK device is now stopped as the app quits, rather than left on the bus until it is unplugged. A device that does not stop within a few seconds no longer holds up the quit.
 - **The Dashboard's bit-change heatmap shows every byte of a CAN FD frame.** It used to draw only bytes 0–7, so changes in bytes 8–63 were counted but never shown. The panel now grows a row per byte of the longest payload seen, and a classic frame keeps its eight rows.
+- **A Dashboard list panel shows "—" for a signal that has never had a value.** It used to read 0.000, the same as a real zero, for a signal with no samples yet, such as one whose value the catalogue refuses to scale. A real zero still reads 0.000.
 
 ## [0.14.0] - 2026-10-06
 

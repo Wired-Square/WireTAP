@@ -21,8 +21,7 @@ export default function ListPanel({ panel }: Props) {
   void dataVersion;
   const signalValues = panel.signals.map((sig) => {
     const key = `${sig.frameId}:${sig.signalName}`;
-    const series = seriesBuffers.get(key);
-    return { key, value: series?.latestValue ?? 0 };
+    return { key, value: seriesBuffers.get(key)?.latestValue };
   });
 
   const numericValues = signalValues.map((v) => v.value);

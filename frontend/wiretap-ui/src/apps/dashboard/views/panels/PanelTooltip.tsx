@@ -13,7 +13,7 @@ import type { AppSettings } from "../../../../hooks/useSettings";
 interface PanelTooltipProps {
   signals: SignalRef[];
   /** Parallel array matching signals — latest value per signal */
-  values: number[];
+  values: (number | undefined)[];
   settings: AppSettings | null;
   /** Show a colour dot per signal (uses signal.colour). Default: false */
   showColourDot?: boolean;
@@ -111,7 +111,7 @@ export default function PanelTooltip({
                   />
                 )}
                 <span style={{ marginLeft: "auto", paddingLeft: 8, fontFamily: "ui-monospace, monospace", fontWeight: 500 }}>
-                  {formatValue(values[i] ?? 0)}
+                  {formatValue(values[i])}
                 </span>
                 {sig.unit && <span className={textMuted} style={{ fontSize: 10 }}>{sig.unit}</span>}
               </div>
