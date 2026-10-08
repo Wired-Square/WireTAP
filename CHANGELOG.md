@@ -9,6 +9,10 @@ All notable changes to WireTAP will be documented in this file.
 - **Each release has one installer per platform, named for it, and every one carries `wiretap-can-cli`.** Download `WireTAP_<version>_macOS_arm64.pkg` or `_macOS_x64.pkg` on a Mac, `_Windows_x64.exe` on Windows, or the `_Linux_x64` / `_Linux_arm64` `.deb` or AppImage on Linux. The `.deb` installs `wiretap-can-cli` on PATH. The separate `wiretap-can-cli` downloads and the `.rpm` packages are gone.
 - **`wiretap-can-cli` has the same version number as WireTAP.** `wiretap-can-cli --version` reports the version of the WireTAP it shipped with, instead of 0.1.0.
 
+### Fixed
+
+- **Apps that open the same device at once share one session.** At startup, apps with the same default source each opened a session of their own, and on a USB adapter only one app can hold, the others were refused as in use. They now open one session between them, as an app opening the source later already did.
+
 ## [0.14.0] - 2026-10-06
 
 ### Added

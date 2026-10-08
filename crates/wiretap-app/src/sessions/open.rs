@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::Arc;
+
+use once_cell::sync::Lazy;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +15,7 @@ use crate::io::{
 use crate::settings::{self, AppSettings, IOProfile};
 use crate::{capture_store, credentials, profile_tracker};
 
+use super::ids::session_for_source;
 use super::source_config::{attach_modbus_polls, parse_modbus_polls, reader_source_config, resolve_source_configs, MultiSourceInput};
 use super::tracking::{claim_session_profile, register_session_profiles};
 
@@ -49,6 +53,7 @@ pub struct OpenSessionOptions {
 #[derive(Debug, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct OpenedSession {
+    pub session_id: String,
     #[serde(flatten)]
     pub registration: RegisterSubscriberResult,
     pub created: bool,
@@ -92,43 +97,74 @@ impl std::fmt::Display for SessionRefusal {
 
 /// Join the session under `session_id`, or create it from `opts` and start it,
 /// then register the subscriber. One call, so nothing can land between the
-/// create, the start and the registration.
+/// create, the start and the registration. Without a `session_id`, the session
+/// is the one open on `opts.source_id` alone, else a new one.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn open_session(
     app: tauri::AppHandle,
-    session_id: String,
+    session_id: Option<String>,
     subscriber_id: String,
     app_name: Option<String>,
     opts: OpenSessionOptions,
 ) -> Result<OpenedSession, SessionRefusal> {
-    open_from(&app, &session_id, &subscriber_id, app_name.as_deref(), opts).await
+    open_from(&app, session_id.as_deref(), &subscriber_id, app_name.as_deref(), opts).await
 }
 
 /// `open_session` without a webview. A subscriber is on one session at a time, so
 /// the one it leaves is torn down if this empties it.
 pub async fn open_from(
     app: &tauri::AppHandle,
-    session_id: &str,
+    session_id: Option<&str>,
     subscriber_id: &str,
     app_name: Option<&str>,
     mut opts: OpenSessionOptions,
 ) -> Result<OpenedSession, SessionRefusal> {
     let connect_only = opts.connect_only.unwrap_or(false);
     let replaces = opts.sources.is_some();
+    let source_id = opts.source_id.clone();
     let named = (subscriber_id.to_string(), app_name.map(str::to_string));
-    let create = async {
+    let create = |session_id: String| async move {
         match opts.sources.take() {
-            Some(sources) => create_from_sources(app, session_id, sources, opts.modbus_polls.take(), named).await,
+            Some(sources) => create_from_sources(app, &session_id, sources, opts.modbus_polls.take(), named).await,
             None => {
                 let settings = settings::load_settings(app.clone()).await?;
-                match source_of(&settings, session_id, opts.source_id.take())? {
-                    Source::Capture(capture_id) => create_from_capture(session_id, capture_id, opts.speed, named).await,
-                    Source::Profile(profile) => create_from_profile(app, &settings, session_id, profile, opts, named).await,
+                match source_of(&settings, &session_id, opts.source_id.take())? {
+                    Source::Capture(capture_id) => create_from_capture(&session_id, capture_id, opts.speed, named).await,
+                    Source::Profile(profile) => create_from_profile(app, &settings, &session_id, profile, opts, named).await,
                 }
             }
         }
     };
-    open_or_join(session_id, subscriber_id, app_name, connect_only, replaces, create).await
+    match (session_id, source_id) {
+        (Some(id), _) => open_or_join(id, subscriber_id, app_name, connect_only, replaces, create(id.to_string())).await,
+        (None, Some(source_id)) if !replaces => {
+            let settings = settings::load_settings(app.clone()).await?;
+            open_source(&source_id, &settings, subscriber_id, app_name, connect_only, create).await
+        }
+        _ => Err(SessionRefusal::NotFound { message: "No session id, and no single source to open".into() }),
+    }
+}
+
+/// Opens of one source queue here, so the second joins the session the first made.
+static SOURCE_OPENS: Lazy<std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = Lazy::new(Default::default);
+
+fn source_open_lock(source_id: &str) -> Arc<tokio::sync::Mutex<()>> {
+    SOURCE_OPENS.lock().unwrap_or_else(|e| e.into_inner()).entry(source_id.to_string()).or_default().clone()
+}
+
+/// Open `source_id` under the session open on it alone, else under a new one.
+async fn open_source<F: Future<Output = Result<Created, SessionRefusal>>>(
+    source_id: &str,
+    settings: &AppSettings,
+    subscriber_id: &str,
+    app_name: Option<&str>,
+    connect_only: bool,
+    create: impl FnOnce(String) -> F,
+) -> Result<OpenedSession, SessionRefusal> {
+    let lock = source_open_lock(source_id);
+    let _opening = lock.lock().await;
+    let session_id = session_for_source(source_id, settings).await;
+    open_or_join(&session_id, subscriber_id, app_name, connect_only, false, create(session_id.clone())).await
 }
 
 /// A session `open_or_join` made, before its start.
@@ -159,6 +195,7 @@ pub(super) async fn open_or_join(
     let registered = register_subscriber_from(leaving, session_id, subscriber_id, app_name).await;
     let registration = refused_on(session_id, registered).await?;
     Ok(OpenedSession {
+        session_id: session_id.to_string(),
         registration,
         created: created.is_some(),
         start_error,
@@ -356,7 +393,6 @@ mod tests {
     use super::*;
     use crate::io::test_source::{Gate, TestSource};
     use crate::io::{destroy_session, IOState, SessionMode, SessionSourceKind, SourceConfig};
-    use std::sync::Arc;
     use std::time::Duration;
 
     fn create_test_source(session_id: &str) -> impl Future<Output = Result<Created, SessionRefusal>> + '_ {
@@ -386,6 +422,29 @@ mod tests {
         assert_eq!(opened.registration.source_kind, SessionSourceKind::Device);
         assert_eq!(opened.registration.mode, SessionMode::Live);
         destroy_session(id, false).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn concurrent_opens_of_one_source_end_in_one_session() {
+        let source = "p-open-concurrent";
+        let settings = AppSettings::default();
+        let create = |id: String| async move {
+            tokio::task::yield_now().await;
+            super::super::register_session_profile(&id, source);
+            create_test_source(&id).await
+        };
+        let opened = futures::future::join_all(
+            ["concurrent-a", "concurrent-b", "concurrent-c"]
+                .map(|subscriber| open_source(source, &settings, subscriber, None, false, create)),
+        )
+        .await;
+
+        let ids: std::collections::BTreeSet<String> = opened.into_iter().map(|o| o.unwrap().session_id).collect();
+        let subscribers: Vec<usize> = ids.iter().map(|id| crate::io::subscriber_count_for_session(id)).collect();
+        for id in &ids {
+            destroy_session(id, false).await.unwrap();
+        }
+        assert_eq!(subscribers, [3], "{ids:?}");
     }
 
     #[tokio::test]

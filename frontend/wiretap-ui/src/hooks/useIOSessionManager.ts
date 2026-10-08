@@ -27,7 +27,7 @@ import type { EventOwner } from "../api/captureEvents";
 import { eventOwnerForSession } from "../utils/captureEvents";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, resolveSourceSession, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { useProfileBusStore, isRealtimeProfile, isMultiSourceCapable } from "../stores/profileBusStore";
 import { useAdHocProfileStore } from "../stores/adHocProfileStore";
 import { WINDOW_EVENTS } from "../events/registry";
@@ -926,8 +926,8 @@ export function useIOSessionManager(
     ]
   );
 
-  // The one place an app turns a saved profile or capture into a session: Rust names
-  // the session already on it, or a new one to open it under.
+  // The one place an app turns a saved profile or capture into a session: Rust opens it
+  // under the session already on it, or a new one, in the same call.
   const selectProfile = useCallback(async (sourceId: string | null) => {
     setMultiBusProfiles([]);
     if (!sourceId) {
@@ -938,9 +938,8 @@ export function useIOSessionManager(
     if (profile?.kind === "wiretap" && profile.connection?.default_speed) {
       setPlaybackSpeedProp?.(parseFloat(profile.connection.default_speed));
     }
-    const sessionId = await resolveSourceSession(sourceId);
-    await session.rejoin(sessionId, sourceId);
-    setIoProfile(sessionId);
+    const sessionId = await session.rejoin(null, sourceId);
+    if (sessionId) setIoProfile(sessionId);
   }, [session, findProfile, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
 
   // The default source is an initial selection only: settings reload on every save

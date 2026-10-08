@@ -216,10 +216,11 @@ async function sessionCommand<T>(command: string, args: Record<string, unknown>)
 
 /**
  * Join the session, or create it from `opts` and start it, then register the
- * subscriber — one round trip. Rejects with a `SessionCommandError`.
+ * subscriber — one round trip. Without a session id, Rust opens `opts.source_id`
+ * under the session already on it, else a new one. Rejects with a `SessionCommandError`.
  */
 export async function openSession(
-  sessionId: string,
+  sessionId: string | null,
   subscriberId: string,
   appName: string,
   opts: OpenSessionOptions,
@@ -865,11 +866,6 @@ export async function listOpenApps(): Promise<AppInstanceInfo[]> {
 /** Mint a session id. Rust picks the prefix; nothing classifies a session by it. */
 export async function generateSessionId(purpose: SessionPurpose): Promise<string> {
   return invoke("generate_session_id", { purpose });
-}
-
-/** The session to open a saved profile or capture under: the one already on it, else a new id. */
-export async function resolveSourceSession(sourceId: string): Promise<string> {
-  return invoke("resolve_source_session", { source_id: sourceId });
 }
 
 // ============================================================================

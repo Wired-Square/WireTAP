@@ -31,7 +31,7 @@ use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
 use super::open::{refused_on, SessionRefusal};
-use super::ids::{mint_session_id, session_for_source, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
+use super::ids::{mint_session_id, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
 use super::source_config::{
     allocate_inputs, create_source_config_from_profile, declared_bus_mappings, resolve_source_configs,
     MultiSourceInput,
@@ -68,13 +68,6 @@ pub async fn generate_session_id(
         SessionPurpose::ModbusScan => MODBUS_SCAN_SESSION_PREFIX,
     };
     Ok(mint_session_id(prefix).await)
-}
-
-/// The session to open a saved profile or capture under: the one already on it, else a new id.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn resolve_source_session(app: tauri::AppHandle, source_id: String) -> Result<String, String> {
-    let settings = settings::load_settings(app).await?;
-    Ok(session_for_source(&source_id, &settings).await)
 }
 
 /// Bus mappings every IO profile declares, keyed by profile id.
