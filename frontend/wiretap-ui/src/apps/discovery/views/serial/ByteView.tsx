@@ -36,43 +36,6 @@ interface ByteViewProps {
   byteCount: number;
 }
 
-/** Chunk bytes by time gap - bytes within gapUs of each other are grouped */
-interface ByteChunk {
-  bytes: number[];
-  timestampUs: number; // Timestamp of first byte in chunk
-  bus?: number; // Bus of first byte in chunk
-}
-
-function chunkBytesByGap(entries: SerialBytesEntry[], gapUs: number): ByteChunk[] {
-  const chunks: ByteChunk[] = [];
-  let currentChunk: ByteChunk | null = null;
-  let lastTimestamp = 0;
-
-  for (const entry of entries) {
-    if (currentChunk === null) {
-      // Start first chunk
-      currentChunk = { bytes: [entry.byte], timestampUs: entry.timestampUs, bus: entry.bus };
-      lastTimestamp = entry.timestampUs;
-    } else if (entry.timestampUs - lastTimestamp <= gapUs) {
-      // Within gap threshold, add to current chunk
-      currentChunk.bytes.push(entry.byte);
-      lastTimestamp = entry.timestampUs;
-    } else {
-      // Gap exceeded, start new chunk
-      chunks.push(currentChunk);
-      currentChunk = { bytes: [entry.byte], timestampUs: entry.timestampUs, bus: entry.bus };
-      lastTimestamp = entry.timestampUs;
-    }
-  }
-
-  // Push final chunk
-  if (currentChunk !== null) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks;
-}
-
 export default function ByteView({ viewConfig, autoScroll = true, displayTimeFormat = 'human', useLocalTimezone = false, isStreaming = false, bytesCaptureId, byteCount }: ByteViewProps) {
   const { t } = useTranslation("discovery");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +51,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
   // Local pagination state (only used when not streaming)
   const [currentPage, setCurrentPage] = useState(0);
   const [backendBytes, setBackendBytes] = useState<SerialBytesEntry[]>([]);
+  const [chunkStarts, setChunkStarts] = useState<number[]>([]);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
   // Time range for timeline scrubber (from buffer metadata)
@@ -145,9 +109,12 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
   // in the deps it would tear down and rebuild this effect twice a second, so the
   // coalescing flags below would reset each time and never actually coalesce anything.
   const refetchRef = useRef<(() => void) | null>(null);
+  // Floored for Rust's integer gap; timestamps are whole microseconds, so the split is the same.
+  const chunkGapUs = viewConfig.displayMode === 'chunked' ? Math.floor(viewConfig.chunkGapUs) : null;
   useEffect(() => {
     if (!hasBytes || !bytesCaptureId) {
       setBackendBytes([]);
+      setChunkStarts([]);
       return;
     }
 
@@ -164,9 +131,9 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
       setIsLoadingPage(true);
 
       try {
-        const bytes = isStreaming
-          ? (await getCaptureBytesTail(bytesCaptureId, pageSize)).bytes
-          : (await getCaptureBytesPaginated(bytesCaptureId, currentPage * pageSize, pageSize)).bytes;
+        const { bytes, chunk_starts } = isStreaming
+          ? await getCaptureBytesTail(bytesCaptureId, pageSize, chunkGapUs)
+          : await getCaptureBytesPaginated(bytesCaptureId, currentPage * pageSize, pageSize, chunkGapUs);
         if (!isMounted) return;
 
         setBackendBytes(bytes.map((b: TimestampedByte) => ({
@@ -174,10 +141,12 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
           timestampUs: b.timestamp_us,
           bus: b.bus,
         })));
+        setChunkStarts(chunk_starts);
       } catch (error) {
         if (!isMounted) return;
         console.error('Failed to fetch bytes from capture:', error);
         setBackendBytes([]);
+        setChunkStarts([]);
       } finally {
         inFlight = false;
         setIsLoadingPage(false);
@@ -191,7 +160,7 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
       isMounted = false;
       refetchRef.current = null;
     };
-  }, [hasBytes, bytesCaptureId, isStreaming, currentPage, pageSize]);
+  }, [hasBytes, bytesCaptureId, isStreaming, currentPage, pageSize, chunkGapUs]);
 
   const prevByteCountRef = useRef(byteCount);
   useEffect(() => {
@@ -254,31 +223,25 @@ export default function ByteView({ viewConfig, autoScroll = true, displayTimeFor
         prevTimestampUs = entry.timestampUs;
       }
     } else {
-      // Chunked mode: group bytes by time gap
-      const chunks = chunkBytesByGap(displayEntries, viewConfig.chunkGapUs);
-      for (const chunk of chunks) {
-        // Split chunk into lines of 16 bytes each
-        for (let i = 0; i < chunk.bytes.length; i += 16) {
-          const lineBytes = chunk.bytes.slice(i, Math.min(i + 16, chunk.bytes.length));
-          const hex = lineBytes.map(byteToHex).join(' ');
-          const ascii = lineBytes.map(byteToAscii).join('');
-
+      chunkStarts.forEach((start, k) => {
+        const chunk = displayEntries.slice(start, chunkStarts[k + 1] ?? displayEntries.length);
+        const first = chunk[0];
+        for (let i = 0; i < chunk.length; i += 16) {
+          const lineBytes = chunk.slice(i, i + 16).map((entry) => entry.byte);
           result.push({
-            timestamp: i === 0 ? formatTime(chunk.timestampUs, prevTimestampUs) : '',
-            timestampUs: i === 0 ? chunk.timestampUs : null,
-            bus: i === 0 ? (chunk.bus ?? null) : null,
-            hex: hex.padEnd(47, ' '), // 16 bytes * 2 + 15 spaces = 47 chars
-            ascii,
+            timestamp: i === 0 ? formatTime(first.timestampUs, prevTimestampUs) : '',
+            timestampUs: i === 0 ? first.timestampUs : null,
+            bus: i === 0 ? (first.bus ?? null) : null,
+            hex: lineBytes.map(byteToHex).join(' ').padEnd(47, ' '), // 16 bytes * 2 + 15 spaces = 47 chars
+            ascii: lineBytes.map(byteToAscii).join(''),
           });
-          if (i === 0) {
-            prevTimestampUs = chunk.timestampUs;
-          }
         }
-      }
+        prevTimestampUs = first.timestampUs;
+      });
     }
 
     return result;
-  }, [displayEntries, viewConfig.displayMode, viewConfig.chunkGapUs, formatTime]);
+  }, [displayEntries, chunkStarts, viewConfig.displayMode, formatTime]);
 
   // Handle page size change
   const handlePageSizeChange = useCallback((newSize: PageSize) => {

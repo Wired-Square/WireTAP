@@ -4,4 +4,8 @@ import type { TimestampedByte } from "./TimestampedByte";
 /**
  * Response for tail-mode byte capture queries
  */
-export type BytesTailResponse = { bytes: Array<TimestampedByte>, total_count: number, };
+export type BytesTailResponse = { bytes: Array<TimestampedByte>, total_count: number, 
+/**
+ * Indices into `bytes` where an idle-gap chunk begins; empty unless a gap was asked for.
+ */
+chunk_starts: Array<number>, };

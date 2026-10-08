@@ -987,11 +987,13 @@ export async function getOrphanedCaptureIds(
 /** Fetch the most recent bytes from a capture (tail view). */
 export async function getCaptureBytesTail(
   captureId: string,
-  tailSize: number
+  tailSize: number,
+  chunkGapUs: number | null = null,
 ): Promise<BytesTailResponse> {
   return invoke("get_capture_bytes_tail", {
     capture_id: captureId,
     tail_size: tailSize,
+    chunk_gap_us: chunkGapUs,
   });
 }
 

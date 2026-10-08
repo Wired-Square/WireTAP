@@ -50,6 +50,27 @@ pub struct PaginatedBytesResponse {
     pub total_count: usize,
     pub offset: usize,
     pub limit: usize,
+    /// Indices into `bytes` where an idle-gap chunk begins; empty unless a gap was asked for.
+    pub chunk_starts: Vec<usize>,
+}
+
+/// Where each chunk starts: a byte more than `gap_us` after the byte before it opens one.
+fn chunk_starts(bytes: &[TimestampedByte], gap_us: Option<u64>) -> Vec<usize> {
+    let Some(gap_us) = gap_us else { return Vec::new() };
+    (0..bytes.len())
+        .filter(|&i| i == 0 || bytes[i].timestamp_us.saturating_sub(bytes[i - 1].timestamp_us) > gap_us)
+        .collect()
+}
+
+fn bytes_page(capture_id: &str, offset: usize, limit: usize, chunk_gap_us: Option<u64>) -> PaginatedBytesResponse {
+    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(capture_id, offset, limit);
+    PaginatedBytesResponse {
+        chunk_starts: chunk_starts(&bytes, chunk_gap_us),
+        bytes,
+        total_count,
+        offset,
+        limit,
+    }
 }
 
 // ============================================================================
@@ -505,14 +526,9 @@ pub async fn get_capture_bytes_paginated(
     capture_id: String,
     offset: usize,
     limit: usize,
+    chunk_gap_us: Option<u64>,
 ) -> Result<PaginatedBytesResponse, String> {
-    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&capture_id, offset, limit);
-    Ok(PaginatedBytesResponse {
-        bytes,
-        total_count,
-        offset,
-        limit,
-    })
+    Ok(bytes_page(&capture_id, offset, limit, chunk_gap_us))
 }
 
 /// Get the total byte count from a capture
@@ -528,13 +544,7 @@ pub async fn get_capture_bytes_paginated_by_id(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedBytesResponse, String> {
-    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&capture_id, offset, limit);
-    Ok(PaginatedBytesResponse {
-        bytes,
-        total_count,
-        offset,
-        limit,
-    })
+    Ok(bytes_page(&capture_id, offset, limit, None))
 }
 
 /// Find the byte offset at or after the given timestamp in a byte capture.
@@ -568,6 +578,8 @@ pub async fn search_capture_frames(
 pub struct BytesTailResponse {
     pub bytes: Vec<TimestampedByte>,
     pub total_count: usize,
+    /// Indices into `bytes` where an idle-gap chunk begins; empty unless a gap was asked for.
+    pub chunk_starts: Vec<usize>,
 }
 
 /// Get the most recent bytes from a capture (tail view for serial discovery).
@@ -576,9 +588,15 @@ pub struct BytesTailResponse {
 /// capture: the rows come from a `ORDER BY rowid DESC LIMIT n` tail and the total
 /// from the registry's O(1) counter.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_capture_bytes_tail(capture_id: String, tail_size: usize) -> BytesTailResponse {
+pub async fn get_capture_bytes_tail(
+    capture_id: String,
+    tail_size: usize,
+    chunk_gap_us: Option<u64>,
+) -> BytesTailResponse {
+    let bytes = capture_store::get_capture_bytes_tail(&capture_id, tail_size);
     BytesTailResponse {
-        bytes: capture_store::get_capture_bytes_tail(&capture_id, tail_size),
+        chunk_starts: chunk_starts(&bytes, chunk_gap_us),
+        bytes,
         total_count: capture_store::get_capture_count(&capture_id),
     }
 }
@@ -606,4 +624,42 @@ pub async fn set_capture_persistent(capture_id: String, persistent: bool) -> Res
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_orphaned_captures() -> Vec<CaptureMetadata> {
     capture_store::list_orphaned_captures()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ChunkCase {
+        name: String,
+        gap_us: u64,
+        timestamps: Vec<u64>,
+        expected_starts: Vec<usize>,
+    }
+
+    #[test]
+    fn chunk_starts_match_the_byte_view_golden() {
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../frontend/wiretap-ui/src/tests/fixtures/analysis/byteChunks.json"
+        );
+        let cases: Vec<ChunkCase> =
+            serde_json::from_str(&std::fs::read_to_string(fixture).expect("fixture")).expect("cases");
+        for case in cases {
+            let bytes: Vec<TimestampedByte> = case
+                .timestamps
+                .iter()
+                .map(|&timestamp_us| TimestampedByte { byte: 0, timestamp_us, bus: 0 })
+                .collect();
+            assert_eq!(chunk_starts(&bytes, Some(case.gap_us)), case.expected_starts, "{}", case.name);
+        }
+    }
+
+    #[test]
+    fn no_gap_means_no_chunks() {
+        let bytes = [TimestampedByte { byte: 0, timestamp_us: 0, bus: 0 }];
+        assert!(chunk_starts(&bytes, None).is_empty());
+    }
 }
