@@ -59,7 +59,7 @@ export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
           </>
         )}
         <text x={50} y={vertical ? 99 : 30} textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="600" fontFamily="ui-monospace, monospace">
-          {Number.isFinite(value) ? formatValue(value) : "—"}
+          {formatValue(value)}
           {sig.unit ? ` ${sig.unit}` : ""}
         </text>
       </svg>

@@ -3,9 +3,9 @@
 // Shared formatting helpers for dashboard panels, tooltips, measurement overlays, and CSV export.
 
 /** Format a numeric value for display with adaptive decimal precision.
- *  Handles null/undefined by returning "—". */
+ *  A missing or non-finite value reads "—". */
 export function formatValue(v: number | null | undefined): string {
-  if (v == null) return "—";
+  if (v == null || !Number.isFinite(v)) return "—";
   const abs = Math.abs(v);
   if (abs >= 10_000) return v.toFixed(0);
   if (abs >= 1_000) return v.toFixed(1);
