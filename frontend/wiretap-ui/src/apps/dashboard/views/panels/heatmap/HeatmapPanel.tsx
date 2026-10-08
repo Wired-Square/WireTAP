@@ -19,14 +19,13 @@ function cellColour(count: number, maxCount: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-const GRID_ROWS = 8; // bytes
+const CLASSIC_ROWS = 8;
 const GRID_COLS = 8; // bits
 const CELL_SIZE = 20;
 const GAP = 2;
 const LABEL_W = 24;
 const LABEL_H = 16;
 const SVG_W = LABEL_W + GRID_COLS * (CELL_SIZE + GAP);
-const SVG_H = LABEL_H + GRID_ROWS * (CELL_SIZE + GAP);
 
 export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
   const svgElRef = useRef<SVGSVGElement>(null);
@@ -53,21 +52,17 @@ export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
   const counts = entry?.counts;
   const totalFrames = entry?.totalFrames ?? 0;
 
-  // Find max count for normalisation
-  let maxCount = 0;
-  if (counts) {
-    for (let i = 0; i < 64; i++) {
-      if (counts[i] > maxCount) maxCount = counts[i];
-    }
-  }
+  const gridRows = Math.max(CLASSIC_ROWS, (counts?.length ?? 0) / 8);
+  const svgH = LABEL_H + gridRows * (CELL_SIZE + GAP);
+  const maxCount = counts ? Math.max(0, ...counts) : 0;
 
   return (
     <div className="flex items-center justify-center h-full p-2">
       <svg
         ref={svgElRef}
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        viewBox={`0 0 ${SVG_W} ${svgH}`}
         className="w-full h-full"
-        style={{ maxWidth: SVG_W * 2, maxHeight: SVG_H * 2 }}
+        style={{ maxWidth: SVG_W * 2, maxHeight: svgH * 2 }}
       >
         {/* Column labels (bit positions, MSB left) */}
         {Array.from({ length: GRID_COLS }, (_, bit) => {
@@ -89,7 +84,7 @@ export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
         })}
 
         {/* Grid cells */}
-        {Array.from({ length: GRID_ROWS }, (_, byteIdx) => (
+        {Array.from({ length: gridRows }, (_, byteIdx) => (
           <g key={`row-${byteIdx}`}>
             {/* Row label */}
             <text
