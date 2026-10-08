@@ -13,7 +13,6 @@ import Input from "../components/forms/Input";
 import Select from "../components/forms/Select";
 import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
 import {
-  apiCreateDatabase,
   apiImportCapture,
   apiListDatabases,
   type ApiDatabase,
@@ -105,12 +104,7 @@ export default function SendCaptureToBackendDialog({
     setError("");
     setPhase("uploading");
     try {
-      if (newDatabase && database) {
-        await apiCreateDatabase(profileId, database).catch(() => {
-          // create=true on import also auto-creates; ignore "already exists"
-        });
-      }
-      const count = await apiImportCapture(profileId, captureId, database, true);
+      const count = await apiImportCapture(profileId, captureId, database, newDatabase);
       setImported(count);
       setPhase("done");
     } catch (e) {

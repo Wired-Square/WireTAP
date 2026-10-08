@@ -731,10 +731,27 @@ pub async fn api_import_capture(
         return Err("Target profile is not a WireTAP backend profile".into());
     }
     let api = resolve(&profile)?;
-    if !wiretap_protocol::ingest::valid_database_name(&database) {
+    import_capture(&api, &capture_id, &database, create, |progress| {
+        let _ = app.emit("capture-upload-progress", progress);
+    })
+    .await
+}
+
+async fn import_capture(
+    api: &ApiProfile,
+    capture_id: &str,
+    database: &str,
+    create: bool,
+    progress: impl Fn(ImportProgress),
+) -> Result<u64, String> {
+    if !wiretap_protocol::ingest::valid_database_name(database) {
         return Err(format!("invalid database name '{database}'"));
     }
-    ensure_only_can(&capture_id)?;
+    ensure_only_can(capture_id)?;
+    if create {
+        // The import's own `?create=true` stays the fallback for a key that may not create.
+        let _ = create_database(api, database).await;
+    }
 
     let mut offset = 0usize;
     let mut total = usize::MAX;
@@ -743,7 +760,7 @@ pub async fn api_import_capture(
 
     while offset < total {
         let (frames, _indices, count) =
-            crate::capture_store::get_capture_frames_paginated(&capture_id, offset, IMPORT_PAGE);
+            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE);
         total = count;
         if frames.is_empty() {
             break;
@@ -768,21 +785,10 @@ pub async fn api_import_capture(
 
         offset += frames.len();
         first = false;
-        let _ = app.emit(
-            "capture-upload-progress",
-            ImportProgress {
-                capture_id: capture_id.clone(),
-                sent: offset,
-                total,
-                done: false,
-            },
-        );
+        progress(ImportProgress { capture_id: capture_id.to_string(), sent: offset, total, done: false });
     }
 
-    let _ = app.emit(
-        "capture-upload-progress",
-        ImportProgress { capture_id, sent: offset, total: offset, done: true },
-    );
+    progress(ImportProgress { capture_id: capture_id.to_string(), sent: offset, total: offset, done: true });
     Ok(imported_total)
 }
 
@@ -828,13 +834,7 @@ async fn list_databases(base_url: &str, api_key: &str) -> Result<Vec<ApiDatabase
 }
 
 /// Create a new capture database on the backend (admin key required).
-#[tauri::command]
-pub async fn api_create_database(
-    app: tauri::AppHandle,
-    profile_id: String,
-    name: String,
-) -> Result<(), String> {
-    let api = resolve_by_id(&app, &profile_id).await?;
+async fn create_database(api: &ApiProfile, name: &str) -> Result<(), String> {
     let req = HTTP.post(format!("{}/v1/databases", api.base_url)).bearer_auth(&api.api_key).json(&json!({ "name": name }));
     send::<Value>(req).await.map(|_| ())
 }
@@ -1157,5 +1157,66 @@ mod tests {
         assert!(mixed.contains("modbus") && mixed.contains("serial"), "{mixed}");
         assert!(ensure_only_can(&capture_of(&["modbus_rtu"])).is_err());
         assert!(ensure_only_can(&create_standalone_capture(CaptureKind::Bytes, "bytes".into())).is_err());
+    }
+
+    /// A gateway on 127.0.0.1 that answers every request with success and records its request line.
+    async fn recording_gateway() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = requests.clone();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = Vec::new();
+                let head_end = loop {
+                    let mut chunk = [0u8; 4096];
+                    let n = sock.read(&mut chunk).await.unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                    if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                        break i + 4;
+                    }
+                };
+                let head = String::from_utf8_lossy(&buf[..head_end]).to_string();
+                let length: usize = head
+                    .lines()
+                    .find_map(|l| l.split_once(':').filter(|(k, _)| k.eq_ignore_ascii_case("content-length")))
+                    .map_or(0, |(_, v)| v.trim().parse().unwrap());
+                while buf.len() < head_end + length {
+                    let mut chunk = [0u8; 4096];
+                    let n = sock.read(&mut chunk).await.unwrap();
+                    buf.extend_from_slice(&chunk[..n]);
+                }
+                let line = head.lines().next().unwrap();
+                seen.lock().unwrap().push(line.rsplit_once(' ').unwrap().0.to_string());
+                let body = r#"{"created":"x","imported":1,"elapsed_ms":0}"#;
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                sock.write_all(reply.as_bytes()).await.unwrap();
+            }
+        });
+        (base_url, requests)
+    }
+
+    #[tokio::test]
+    async fn a_new_database_is_created_only_for_a_capture_that_can_be_sent() {
+        use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
+        crate::capture_db::use_in_memory_database();
+        let capture_of = |protocol: &str| {
+            let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
+            let frame = crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
+            append_frames_to_capture(&id, vec![frame]);
+            id
+        };
+        let (base_url, requests) = recording_gateway().await;
+        let gateway = ApiProfile { base_url, ..api(Protocol::Can) };
+
+        assert!(import_capture(&gateway, &capture_of("modbus"), "fresh", true, |_| {}).await.is_err());
+        assert!(requests.lock().unwrap().is_empty(), "{:?}", requests.lock().unwrap());
+
+        import_capture(&gateway, &capture_of("can"), "fresh", true, |_| {}).await.unwrap();
+        assert_eq!(*requests.lock().unwrap(), ["POST /v1/databases", "POST /v1/db/fresh/import?create=true"]);
     }
 }
