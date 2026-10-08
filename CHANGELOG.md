@@ -15,6 +15,9 @@ All notable changes to WireTAP will be documented in this file.
 - **The Decoder's Send to Transmit loads the frame as it was received.** A decoded frame keeps its received id and length rather than the catalogue's, so a J1939 frame keeps its source address, and both decoded and unmatched frames keep their extended id flag and bus, where an unmatched frame used to guess extended from the id and go to bus 0. MCP `get_decoded_signals` now reports `isExtended` on every frame.
 - **A capture the backend cannot take no longer leaves an empty database behind.** Uploading to a new database now checks the capture first and creates the database only once it is accepted, so a capture holding anything but CAN frames is refused with nothing created.
 - **Quitting WireTAP stops every open session first.** A CAN adapter such as a gs_usb or PEAK device is now stopped as the app quits, rather than left on the bus until it is unplugged. A device that does not stop within a few seconds no longer holds up the quit.
+- **The Dashboard's bit-change heatmap shows every byte of a CAN FD frame.** It used to draw only bytes 0–7, so changes in bytes 8–63 were counted but never shown. The panel now grows a row per byte of the longest payload seen, and a classic frame keeps its eight rows.
+- **A Dashboard list panel shows "—" for a signal that has never had a value.** It used to read 0.000, the same as a real zero, for a signal with no samples yet, such as one whose value the catalogue refuses to scale. A real zero still reads 0.000.
+- **The Decoder's Unmatched and Filtered tabs mark remote requests and the BRS and ESI flags.** A remote request now reads "Remote request for N bytes" rather than an empty `[0]` row, and a CAN FD frame shows BRS and ESI badges, as Discovery does. MCP `get_decoded_signals` now reports `isEsi` beside `isBrs` on each entry.
 
 ## [0.14.0] - 2026-10-06
 

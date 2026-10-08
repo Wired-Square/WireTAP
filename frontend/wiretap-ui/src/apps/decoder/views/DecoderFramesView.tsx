@@ -13,6 +13,7 @@ import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
 import { protocolLabel, MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
 import MessageBytes from "../../../components/MessageBytes";
+import { CanFlagBadges, RemoteRequest } from "../../../components/CanFlagMarks";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
 import type { TimelineMarkers } from "../../../components/TimelineScrubber";
@@ -309,7 +310,7 @@ const MIN_FLASH_INTERVAL = 500;
 
 /** A Modbus signal's register, as "13019" or a span "13021–13022". */
 /** One raw frame as the Unmatched and Filtered lists show it; extras (a reason, a button) ride as children. */
-function RawFrameRow({
+export function RawFrameRow({
   frame,
   displayFrameIdFormat,
   showAscii,
@@ -341,11 +342,18 @@ function RawFrameRow({
       {frame.sourceAddress !== undefined && (
         <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
       )}
-      <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-      <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
-      {showAscii && (
-        <span className={`${textDataYellow} text-xs font-mono`}>{frame.bytes.map(byteToAscii).join('')}</span>
+      {frame.isRtr ? (
+        <span className="flex-1"><RemoteRequest dlc={frame.dlc} /></span>
+      ) : (
+        <>
+          <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
+          <span className="flex-1"><MessageBytes bytes={frame.bytes} protocol={frame.protocol} className={textDataPrimary} /></span>
+          {showAscii && (
+            <span className={`${textDataYellow} text-xs font-mono`}>{frame.bytes.map(byteToAscii).join('')}</span>
+          )}
+        </>
       )}
+      <CanFlagBadges brs={frame.isBrs} esi={frame.isEsi} />
       {children}
     </div>
   );

@@ -137,6 +137,7 @@ pub struct DecodedFrameMsg<'a> {
     pub frame_id: u32,
     pub header_fields: Vec<DecodedHeaderField>,
     pub is_brs: bool,
+    pub is_esi: bool,
     pub is_extended: bool,
     pub is_fd: bool,
     /// `frame_id` under the catalogue's `frame_id_mask`: the frame it decoded as.
@@ -176,6 +177,7 @@ pub struct UnroutedFrameMsg<'a> {
     pub dlc: u16,
     pub frame_id: u32,
     pub is_brs: bool,
+    pub is_esi: bool,
     pub is_extended: bool,
     pub is_fd: bool,
     pub is_rtr: bool,
