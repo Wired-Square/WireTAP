@@ -10,9 +10,8 @@ vi.mock("../stores/discoveryUIStore", () => ({
 }));
 
 import { useDiscoveryToolboxStore } from "../stores/discoveryToolboxStore";
-import type { FrameMessage } from "../types/frame";
 
-const frames: FrameMessage[] = [{ protocol: "can", timestamp_us: 0, frame_id: 0x100, bus: 0, dlc: 1, bytes: [1], is_extended: false, is_fd: false, is_rtr: false, is_brs: false, is_esi: false }];
+const source = { captureId: "c1", selection: [] };
 
 const refuse = (command: string) =>
   invoke.mockImplementation(async (cmd: string) => {
@@ -23,8 +22,15 @@ describe("a failed analysis command", () => {
   beforeEach(() => invoke.mockReset());
 
   it("leaves Payload Changes not running", async () => {
-    refuse("profile_bytes_cmd");
-    const result = await useDiscoveryToolboxStore.getState().runChangesAnalysis(frames, new Map());
+    refuse("payload_changes_cmd");
+    const result = await useDiscoveryToolboxStore.getState().runChangesAnalysis(source, new Map());
+    expect(result).toBeNull();
+    expect(useDiscoveryToolboxStore.getState().toolbox.isRunning).toBe(false);
+  });
+
+  it("leaves Frame Order not running", async () => {
+    refuse("frame_order_cmd");
+    const result = await useDiscoveryToolboxStore.getState().runMessageOrderAnalysis(source, new Map());
     expect(result).toBeNull();
     expect(useDiscoveryToolboxStore.getState().toolbox.isRunning).toBe(false);
   });

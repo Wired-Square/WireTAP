@@ -141,6 +141,10 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::flashers::EspFlashOptions>();
     r.visit::<crate::flashers::FlasherProgress>();
     r.visit::<crate::flashers::Stm32FlashOptions>();
+    r.visit::<crate::analysis::ProtocolOrder>();
+    r.visit::<crate::analysis::OrderStart>();
+    r.visit::<crate::byte_roles::ProtocolMirrors>();
+    r.visit::<crate::analysis_ts::ByteNotes>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -427,6 +431,7 @@ fn inputs_accept_the_declared_minimum() {
     use serde_json::json;
     assert_accepts_declared_minimum::<crate::sessions::MultiSourceInput>(json!({ "profile_id": "p" }));
     assert_accepts_declared_minimum::<crate::io::ModbusRangeSpec>(json!({ "ranges": [] }));
+    assert_accepts_declared_minimum::<crate::analysis::OrderStart>(json!({ "frameId": 1, "isExtended": false }));
     assert_accepts_declared_minimum::<crate::io::ModbusRange>(json!({ "end": 2, "register_type": "holding", "start": 1 }));
     assert_accepts_declared_minimum::<FcProbeConfig>(json!({}));
     assert_accepts_declared_minimum::<ModbusScanConfig>(json!({
@@ -437,4 +442,244 @@ fn inputs_accept_the_declared_minimum() {
         "end_unit_id": 2, "inter_request_delay_ms": 0, "register_type": "coil",
         "start_unit_id": 1, "test_register": 0,
     }));
+}
+
+#[test]
+fn analysis_results_serialise_as_declared() {
+    use crate::analysis_ts as ts;
+    use wiretap_analysis::order::BurstFlag;
+    use wiretap_analysis::*;
+
+    let frame = |bus, id, ms: u64, payload: &[u8]| TimedFrame {
+        bus,
+        key: FrameKey::new(id, false),
+        timestamp_us: ms * 1000,
+        payload: payload.to_vec(),
+    };
+    let mut frames = Vec::new();
+    for i in 0..12u8 {
+        let t = i as u64 * 100;
+        frames.push(frame(0, 0x10, t, &[i]));
+        frames.push(frame(0, 0x11, t + 10, &[i]));
+        frames.push(frame(0, 0x20, t + 20, &[i % 4, i]));
+        frames.push(frame(0, 0x20, t + 70, &[(i + 2) % 4, i]));
+        frames.push(frame(1, 0x10, t + 30, &[i]));
+        if i % 2 == 0 {
+            for (n, len) in [1usize, 2, 1].into_iter().enumerate() {
+                frames.push(frame(0, 0x30, t + 40 + n as u64 * 2, &vec![0x80; len]));
+            }
+        }
+    }
+    frames.sort_by_key(|f| f.timestamp_us);
+    let order = serde_json::to_value(analyse_order(&frames, None)).unwrap();
+    assert_declared::<ts::OrderAnalysis>(&order);
+    let bus = &order["buses"][0];
+    assert_declared::<ts::BusOrder>(bus);
+    for (key, check) in [
+        ("patterns", assert_declared::<ts::CyclePattern> as fn(&serde_json::Value)),
+        ("intervalGroups", assert_declared::<ts::IntervalGroup>),
+        ("startCandidates", assert_declared::<ts::StartCandidate>),
+        ("mux", assert_declared::<ts::MuxTiming>),
+        ("bursts", assert_declared::<ts::BurstTiming>),
+    ] {
+        assert!(each(bus, key).next().is_some(), "no {key} to check");
+        each(bus, key).for_each(check);
+    }
+    each(bus, "patterns").for_each(|p| assert_declared::<ts::FrameKey>(&p["start"]));
+    each(bus, "mux").for_each(|m| assert_declared::<ts::MuxSelector>(&m["selector"]));
+    assert!(each(&order, "multiBus").next().is_some());
+    each(&order, "multiBus").for_each(assert_declared::<ts::MultiBusFrame>);
+    for flag in [BurstFlag::VariableLength, BurstFlag::BurstPattern, BurstFlag::RequestResponse] {
+        assert_declared::<ts::BurstFlag>(&serde_json::to_value(flag).unwrap());
+    }
+
+    let stream = |offset: u64| -> Vec<TimedPayload> {
+        (0..5u8).map(|i| TimedPayload { timestamp_us: i as u64 * 100_000 + offset, payload: vec![i] }).collect()
+    };
+    let streams = BTreeMap::from([(FrameKey::new(1, false), stream(0)), (FrameKey::new(2, true), stream(1000))]);
+    let groups = mirror_groups(&streams, DEFAULT_MIRROR_WINDOW_US);
+    assert_eq!(groups.len(), 1);
+    assert_declared::<ts::MirrorGroup>(&serde_json::to_value(&groups[0]).unwrap());
+
+    let pattern = MultiBytePattern {
+        start: 1,
+        len: 2,
+        kind: PatternKind::Sensor16,
+        endianness: Some(Endianness::Big),
+        rollover: false,
+        correlated_rollover: true,
+        slow_upper_bytes: false,
+        range: Some((3, 900)),
+        sample_text: None,
+    };
+    let notes = ByteNotes {
+        frame: vec![
+            ByteNote::NoSamples,
+            ByteNote::Endianness { endianness: Endianness::Mixed, pattern_count: 2 },
+            ByteNote::VaryingLength { min: 1, max: 8 },
+            ByteNote::Burst { mux: true },
+            ByteNote::Identical { sample_count: 3, payload: vec![1] },
+            ByteNote::Multiplexed { selector: MuxSelector::TwoByte, cases: vec![1, 258] },
+            ByteNote::CaseSummary { value: 1, counters: 1, statics: 0 },
+            ByteNote::Statics { bytes: vec![StaticByte { position: 0, value: 0x1F }] },
+            ByteNote::Counter {
+                position: 1,
+                direction: Direction::Down,
+                step: 2,
+                rollover: true,
+                looping: Some(Loop { min: 0, max: 9, modulo: 10 }),
+            },
+            ByteNote::Sensor { position: 2, trend: Trend::Increasing, strength: 0.5, min: 0, max: 15 },
+            ByteNote::Pattern(pattern),
+            ByteNote::VaryingValues { count: 2 },
+        ],
+        cases: vec![MuxCaseNotes { value: 1, notes: vec![] }],
+    };
+    let json = serde_json::to_value(&notes).unwrap();
+    assert_declared::<ts::ByteNotes>(&json);
+    each(&json, "cases").for_each(assert_declared::<ts::MuxCaseNotes>);
+    for note in each(&json, "frame") {
+        let mut note = note.clone();
+        if note["code"] == "pattern" {
+            note.as_object_mut().unwrap().remove("code");
+            assert_declared::<ts::MultiBytePattern>(&note);
+        } else {
+            assert_declared::<ts::ByteNote>(&note);
+        }
+    }
+}
+
+/// The lib's byte notes for each `byteNotes.json` profile, the codes the
+/// frontend's note renderer is tested against.
+#[test]
+fn byte_note_codes_fixture_is_the_libs_answer() {
+    use serde_json::Value;
+    use wiretap_analysis::*;
+    use wiretap_checksum::columns::ColumnStats;
+
+    fn n(v: &Value) -> usize {
+        v.as_u64().unwrap() as usize
+    }
+    fn list<T>(v: &Value, f: impl Fn(&Value) -> T) -> Vec<T> {
+        v.as_array().map_or(vec![], |a| a.iter().map(f).collect())
+    }
+    fn endianness(v: &Value) -> Option<Endianness> {
+        v.as_str().map(|s| match s {
+            "little" => Endianness::Little,
+            "big" => Endianness::Big,
+            _ => Endianness::Mixed,
+        })
+    }
+    fn column(c: &Value) -> ByteColumn {
+        let role = match c["role"].as_str().unwrap() {
+            "static" => ByteRole::Static { value: n(&c["value"]) as u8 },
+            "counter" => ByteRole::Counter {
+                direction: if c["direction"] == "up" { Direction::Up } else { Direction::Down },
+                step: n(&c["step"]) as u8,
+                rollover: c["rollover"].as_bool().unwrap(),
+                looping: c["looping"].as_object().map(|l| Loop {
+                    min: n(&l["min"]) as u8,
+                    max: n(&l["max"]) as u8,
+                    modulo: n(&l["modulo"]) as u16,
+                }),
+            },
+            "sensor" => ByteRole::Sensor {
+                trend: match c["trend"].as_str().unwrap() {
+                    "increasing" => Trend::Increasing,
+                    "decreasing" => Trend::Decreasing,
+                    _ => Trend::Mixed,
+                },
+                strength: c["strength"].as_f64().unwrap(),
+                rollover: c["rollover"].as_bool().unwrap(),
+            },
+            "value" => ByteRole::Value,
+            _ => ByteRole::Unknown,
+        };
+        let stats = ColumnStats {
+            position: c["position"].as_i64().unwrap() as i32,
+            distinct_values: n(&c["distinctValues"]),
+            min: n(&c["min"]) as u8,
+            max: n(&c["max"]) as u8,
+            constant_value: c["constantValue"].as_u64().map(|v| v as u8),
+            changes: n(&c["changes"]),
+            transitions: n(&c["transitions"]),
+            entropy_bits: c["entropyBits"].as_f64().unwrap(),
+            sample_count: n(&c["sampleCount"]),
+        };
+        ByteColumn { stats, role }
+    }
+    fn pattern(p: &Value) -> MultiBytePattern {
+        MultiBytePattern {
+            start: n(&p["start"]),
+            len: n(&p["len"]),
+            kind: match p["kind"].as_str().unwrap() {
+                "counter16" => PatternKind::Counter16,
+                "sensor16" => PatternKind::Sensor16,
+                "sensor32" => PatternKind::Sensor32,
+                _ => PatternKind::Text,
+            },
+            endianness: endianness(&p["endianness"]),
+            rollover: p["rollover"].as_bool().unwrap(),
+            correlated_rollover: p["correlatedRollover"].as_bool().unwrap(),
+            slow_upper_bytes: p["slowUpperBytes"].as_bool().unwrap(),
+            range: p["range"].as_array().map(|r| (n(&r[0]) as u32, n(&r[1]) as u32)),
+            sample_text: p["sampleText"].as_str().map(String::from),
+        }
+    }
+    fn profile(p: &Value) -> ByteProfile {
+        let mux = &p["mux"];
+        ByteProfile {
+            sample_count: n(&p["sampleCount"]),
+            min_len: n(&p["minLen"]),
+            max_len: n(&p["maxLen"]),
+            identical: p["identical"].as_array().map(|b| b.iter().map(|b| n(b) as u8).collect()),
+            analysed_from: n(&p["analysedFrom"]),
+            columns: list(&p["columns"], column),
+            patterns: list(&p["patterns"], pattern),
+            endianness: endianness(&p["endianness"]),
+            mux: mux.as_object().map(|_| MuxAnalysis {
+                detection: MuxDetection {
+                    selector: if mux["detection"]["selector"] == "twoByte" {
+                        MuxSelector::TwoByte
+                    } else {
+                        MuxSelector::OneByte
+                    },
+                    occurrences: mux["detection"]["occurrences"]
+                        .as_object()
+                        .unwrap()
+                        .iter()
+                        .map(|(k, v)| (k.parse().unwrap(), n(v)))
+                        .collect(),
+                },
+                cases: list(&mux["cases"], |c| MuxCase {
+                    value: n(&c["value"]) as u16,
+                    sample_count: n(&c["sampleCount"]),
+                    columns: list(&c["columns"], column),
+                    patterns: list(&c["patterns"], pattern),
+                }),
+            }),
+        }
+    }
+
+    let dir = out_dir().join("../tests/fixtures/analysis");
+    let fixture: Value = serde_json::from_str(&fs::read_to_string(dir.join("byteNotes.json")).unwrap()).unwrap();
+    let codes: BTreeMap<String, ByteNotes> = list(&fixture["cases"], |c| {
+        let input = &c["input"];
+        (
+            c["name"].as_str().unwrap().to_string(),
+            byte_notes(&profile(&input["profile"]), input["isBurstFrame"].as_bool().unwrap()),
+        )
+    })
+    .into_iter()
+    .collect();
+    let want = format!("{}\n", serde_json::to_string_pretty(&codes).unwrap());
+    let path = dir.join("byteNoteCodes.json");
+    if fs::read_to_string(&path).ok().as_deref() == Some(want.as_str()) {
+        return;
+    }
+    fs::write(&path, want).unwrap();
+    assert!(
+        std::env::var_os("WIRETAP_GEN_TYPES").is_some(),
+        "byteNoteCodes.json was stale and has been rewritten; commit it"
+    );
 }

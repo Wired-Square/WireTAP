@@ -6,21 +6,24 @@
 //   - byte_profile(s)   — per-byte roles, patterns and mux cases
 //   - checksum_scan     — what explains each frame id, if anything
 //   - catalog_coverage  — diff a catalog against a source + confidence rollup
+//   - message_order     — per protocol and bus, over a `FrameSource`'s timed frames
 //
 // Most of these serve the MCP read tools and need no view open. `checksum_scan`
 // and `byte_profiles` serve the Discovery panels as well, which is what stops
 // the two from giving different answers about one capture.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 
-use serde::Serialize;
-use wiretap_analysis::{profile_bytes, ByteProfile};
+use serde::{Deserialize, Serialize};
+use wiretap_analysis::{analyse_order, profile_bytes, ByteProfile, FrameKey, OrderAnalysis, TimedFrame};
 use wiretap_catalog::model::Confidence;
 
 use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_db::InventoryRow;
+use crate::capture_store::FrameSelection;
+use crate::io::FrameMessage;
 
 /// One frame's byte profile, as the Changes view and the MCP tools report it.
 #[derive(Debug, Clone, Serialize)]
@@ -237,6 +240,75 @@ pub async fn byte_profiles(
         ));
     }
     Ok(ByteProfiles { skipped_frames: rows.len().saturating_sub(max_frames), frames })
+}
+
+/// A store of recorded frames with their timing: a selection's frames, oldest
+/// first, the newest `newest` of them when given.
+pub trait FrameSource: Sync {
+    fn frames(
+        &self,
+        selection: &FrameSelection,
+        newest: Option<usize>,
+    ) -> impl Future<Output = Result<Vec<FrameMessage>, String>> + Send;
+}
+
+/// One protocol's message order.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ProtocolOrder {
+    pub protocol: String,
+    #[cfg_attr(test, ts(as = "crate::analysis_ts::OrderAnalysis"))]
+    pub order: OrderAnalysis,
+}
+
+/// The frame a cycle is walked from, in place of the likeliest start ids; under
+/// every protocol when none is named.
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct OrderStart {
+    #[serde(default)]
+    #[cfg_attr(test, ts(optional))]
+    pub protocol: Option<String>,
+    pub frame_id: u32,
+    pub is_extended: bool,
+}
+
+/// Each protocol's frames as message order reads them, oldest first.
+pub fn timed_by_protocol(frames: Vec<FrameMessage>) -> BTreeMap<String, Vec<TimedFrame>> {
+    let mut by_protocol: BTreeMap<String, Vec<TimedFrame>> = BTreeMap::new();
+    for f in frames {
+        by_protocol.entry(f.protocol).or_default().push(TimedFrame {
+            bus: f.bus,
+            key: FrameKey::new(f.frame_id, f.is_extended),
+            timestamp_us: f.timestamp_us,
+            payload: f.bytes,
+        });
+    }
+    for frames in by_protocol.values_mut() {
+        frames.sort_by_key(|f| f.timestamp_us);
+    }
+    by_protocol
+}
+
+/// Message order per protocol over a source's selected frames. The one
+/// implementation behind Discovery's Frame Order and the MCP `get_frame_order`.
+pub async fn message_order(
+    source: &impl FrameSource,
+    selection: &FrameSelection,
+    newest: Option<usize>,
+    start: Option<&OrderStart>,
+) -> Result<Vec<ProtocolOrder>, String> {
+    let frames = source.frames(selection, newest).await?;
+    Ok(timed_by_protocol(frames)
+        .into_iter()
+        .map(|(protocol, frames)| {
+            let start = start
+                .filter(|s| s.protocol.as_ref().is_none_or(|p| *p == protocol))
+                .map(|s| FrameKey::new(s.frame_id, s.is_extended));
+            ProtocolOrder { order: analyse_order(&frames, start), protocol }
+        })
+        .collect())
 }
 
 /// Frame ids fetched before a batch is analysed. Bounds resident payloads while
@@ -514,13 +586,36 @@ pub(crate) mod memory {
     /// Frames in arrival order. `Recent` reads the tail, `Spread` strides the lot.
     #[derive(Default)]
     pub struct MemorySource {
-        frames: Vec<(String, u32, bool, Vec<u8>)>,
+        frames: Vec<FrameMessage>,
         pub asked: Mutex<Vec<(u32, Option<bool>, Sampling)>>,
     }
 
     impl MemorySource {
+        /// A bus-0 frame stamped with its arrival index.
         pub fn push(&mut self, protocol: &str, frame_id: u32, is_extended: bool, bytes: Vec<u8>) {
-            self.frames.push((protocol.into(), frame_id, is_extended, bytes));
+            let timestamp_us = self.frames.len() as u64;
+            self.push_at(protocol, 0, frame_id, is_extended, timestamp_us, bytes);
+        }
+
+        pub fn push_at(
+            &mut self,
+            protocol: &str,
+            bus: u8,
+            frame_id: u32,
+            is_extended: bool,
+            timestamp_us: u64,
+            bytes: Vec<u8>,
+        ) {
+            self.frames.push(FrameMessage {
+                protocol: protocol.into(),
+                timestamp_us,
+                frame_id,
+                bus,
+                dlc: bytes.len() as u16,
+                bytes,
+                is_extended,
+                ..Default::default()
+            });
         }
     }
 
@@ -531,16 +626,16 @@ pub(crate) mod memory {
             _: Option<&str>,
         ) -> Result<Vec<InventoryRow>, String> {
             let mut rows: Vec<InventoryRow> = Vec::new();
-            for (t, (protocol, id, ext, bytes)) in self.frames.iter().enumerate() {
-                let t = t as i64;
+            for f in &self.frames {
+                let t = f.timestamp_us as i64;
                 match rows.iter_mut().find(|r| {
-                    r.protocol == *protocol && r.frame_id == *id && r.is_extended == *ext
+                    r.protocol == f.protocol && r.frame_id == f.frame_id && r.is_extended == f.is_extended
                 }) {
                     Some(row) => {
                         row.count += 1;
                         row.last_us = t;
                     }
-                    None => rows.push(InventoryRow::new(protocol, *id, *ext, 1, t, t, bytes.len() as u16)),
+                    None => rows.push(InventoryRow::new(&f.protocol, f.frame_id, f.is_extended, 1, t, t, f.dlc)),
                 }
             }
             Ok(rows)
@@ -551,12 +646,12 @@ pub(crate) mod memory {
             let matching: Vec<Vec<u8>> = self
                 .frames
                 .iter()
-                .filter(|(protocol, id, ext, _)| {
-                    *id == q.frame_id
-                        && q.protocol.is_none_or(|p| p == protocol)
-                        && q.is_extended.is_none_or(|e| e == *ext)
+                .filter(|f| {
+                    f.frame_id == q.frame_id
+                        && q.protocol.is_none_or(|p| p == f.protocol)
+                        && q.is_extended.is_none_or(|e| e == f.is_extended)
                 })
-                .map(|f| f.3.clone())
+                .map(|f| f.bytes.clone())
                 .collect();
             let limit = q.limit as usize;
             Ok(match q.sampling {
@@ -566,6 +661,23 @@ pub(crate) mod memory {
                     matching.into_iter().step_by(step).collect()
                 }
             })
+        }
+    }
+
+    impl FrameSource for MemorySource {
+        async fn frames(
+            &self,
+            selection: &FrameSelection,
+            newest: Option<usize>,
+        ) -> Result<Vec<FrameMessage>, String> {
+            let selected: Vec<FrameMessage> = self
+                .frames
+                .iter()
+                .filter(|f| selection.is_empty() || selection.contains(&f.protocol, f.frame_id))
+                .cloned()
+                .collect();
+            let skip = newest.map_or(0, |n| selected.len().saturating_sub(n));
+            Ok(selected[skip..].to_vec())
         }
     }
 }

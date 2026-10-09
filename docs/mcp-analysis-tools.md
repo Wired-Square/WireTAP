@@ -64,7 +64,7 @@ Every analysis tool takes **exactly one** of:
 Backend time bounds are RFC3339 strings (`start_time` / `end_time`); for captures
 they are converted to the capture's microsecond timeline automatically.
 
-The live tools (`get_discovery_analysis`, `get_decoded_signals`,
+The live tools (`get_discovery_analysis`, `get_frame_order`, `get_decoded_signals`,
 `get_live_frame_map`) take a `session_id` instead and read that session's frame
 capture. Every read tool is **headless**: it reads the data store directly, so no
 window need be open. Only `open_app` and the DOM tools drive the window.
@@ -144,6 +144,29 @@ recent 5000 payloads. Without `frame_ids` the first 64 frames of the capture's
 inventory are profiled and the rest counted in `skippedFrames`. A session with no
 frame capture is an error. Discovery's Payload Changes reads the session's capture
 through the same code, live or not, so the panel and an agent describe it alike.
+
+Each frame also carries `notes` — what the profile says, as codes
+(`{ frame: [{ code, … }], cases: [{ value, notes }] }`: `endianness`,
+`varyingLength`, `burst`, `identical`, `multiplexed`, `caseSummary`, `statics`,
+`counter`, `sensor`, `pattern`, `varyingValues`, `noSamples`) — and `burst`, set
+when message order finds it sent in bursts. `mirrors` lists, per protocol, the
+groups of ids carrying one changing payload together (`keys`, `sampleCount`,
+`matchPercentage`, `samplePayload`). Bursts and mirrors read the capture's newest
+`newest` frames with their timing, 100000 by default (Discovery's default live
+window); pass a larger `newest` to read more of a long capture. `framesRead` says
+how many were read.
+
+### `get_frame_order`
+Message order of a session's capture, the answer Discovery's Frame Order shows:
+`{ captureId, protocols: [{ protocol, order }] }`. Each `order` holds the
+capture-wide counts, one schedule per bus (`buses`: interval groups, start-id
+candidates, cycle patterns, mux and burst timing) and the ids seen on more than
+one bus (`multiBus`). Gaps and periods never cross buses, and a standard and an
+extended id are different frames. It reads the capture's newest `newest` frames,
+100000 by default (Discovery's default live window); pass a larger `newest` to read
+more of a long capture. Optional `frame_ids`, and
+`start_frame_id` (with `start_is_extended`, and `start_protocol` to name one
+protocol) to walk cycles from one id instead of the likeliest.
 
 ### `frame_checksum_scan`
 Finds checksums across every frame id in the source, or the `frame_ids` you name.

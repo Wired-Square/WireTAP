@@ -1,12 +1,18 @@
 // ui/src/api/byteRoles.ts
 //
-// Byte roles and serial structure, classified in Rust by `wiretap_analysis`.
-// Payloads are read oldest first and contiguous: a capture by Rust itself, or
-// the frames the frontend holds when nothing has written them to one.
+// Byte roles, Payload Changes and serial structure, classified in Rust by
+// `wiretap_analysis` over a capture Rust reads itself.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { ColumnStats, DiscoveryFrame } from "./checksums";
+import type { ColumnStats } from "./checksums";
+import type { ByteNotes } from "../generated/ByteNotes";
+import type { Endianness } from "../generated/Endianness";
+import type { MultiBytePattern } from "../generated/MultiBytePattern";
+import type { MuxSelector } from "../generated/MuxSelector";
+import type { ProtocolMirrors } from "../generated/ProtocolMirrors";
 import type { ProtocolFrames } from "../utils/frameKey";
+
+export type { Endianness, MultiBytePattern };
 
 export type ByteRole =
   | { role: "static"; value: number }
@@ -24,20 +30,6 @@ export type ByteRole =
 /** A front-addressed column: `position` ≥ 0, and `sampleCount` the payloads that reach it. */
 export type ByteColumn = ColumnStats & ByteRole;
 
-export type Endianness = "little" | "big" | "mixed";
-
-export interface MultiBytePattern {
-  start: number;
-  len: number;
-  kind: "counter16" | "sensor16" | "sensor32" | "text";
-  endianness: "little" | "big" | null;
-  rollover: boolean;
-  correlatedRollover: boolean;
-  slowUpperBytes: boolean;
-  range: [number, number] | null;
-  sampleText: string | null;
-}
-
 export interface MuxCase {
   value: number;
   sampleCount: number;
@@ -48,7 +40,7 @@ export interface MuxCase {
 export interface MuxAnalysis {
   detection: {
     /** `twoByte` keys a case as `byte0 * 256 + byte1`. */
-    selector: "oneByte" | "twoByte";
+    selector: MuxSelector;
     occurrences: Record<string, number>;
   };
   cases: MuxCase[];
@@ -74,15 +66,29 @@ export interface FrameByteProfile extends ByteProfile {
   frameIdHex: string;
 }
 
-export type ByteProfileSource =
-  | { captureId: string; selection: ProtocolFrames[] }
-  | { frames: DiscoveryFrame[] };
+/** One frame as Payload Changes reports it. */
+export interface ChangesFrame extends FrameByteProfile {
+  notes: ByteNotes;
+  /** Message order finds it sent in bursts. */
+  burst: boolean;
+}
 
-/** Profile each frame's most recent 5000 payloads. */
-export async function profileBytes(source: ByteProfileSource): Promise<FrameByteProfile[]> {
-  const wire =
-    "captureId" in source ? { capture_id: source.captureId, selection: source.selection } : source;
-  return invoke<FrameByteProfile[]>("profile_bytes_cmd", { source: wire });
+export interface PayloadChanges {
+  /** The frames read for mirrors and bursts. */
+  frameCount: number;
+  frames: ChangesFrame[];
+  skippedFrames: number;
+  mirrors: ProtocolMirrors[];
+}
+
+/** Each selected frame profiled over its most recent 5000 payloads; mirrors and
+ *  bursts over the newest `newest` frames, or the whole capture. */
+export async function payloadChanges(
+  captureId: string,
+  selection: ProtocolFrames[],
+  newest?: number,
+): Promise<PayloadChanges> {
+  return invoke<PayloadChanges>("payload_changes_cmd", { capture_id: captureId, selection, newest });
 }
 
 export type CandidateReason =

@@ -38,6 +38,11 @@ export function formatProtocolFrameId(
   return protocol === "modbus_rtu" ? formatModbusRtuId(id, mode) : formatFrameId(id, mode, isExtended);
 }
 
+/** A Rust analysis key (`{ frameId, isExtended }`) under its protocol, in hex. */
+export function formatFrameKey(protocol: string, key: { frameId: number; isExtended: boolean }): string {
+  return formatProtocolFrameId(protocol, key.frameId, "hex", key.isExtended);
+}
+
 /**
  * Format a frame id for an editable text field: bare value with no "0x" prefix
  * or padding (the field's label already states the radix). Hex is upper-cased.

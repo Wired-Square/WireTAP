@@ -83,6 +83,11 @@ export function formatMs(ms: number): string {
   return `${ms.toFixed(1)}ms`;
 }
 
+/** `formatMs`, or a dash for a period that was never seen. */
+export function formatOptionalMs(ms: number | null): string {
+  return ms === null ? "—" : formatMs(ms);
+}
+
 // ============================================================================
 // Common HTML styles for reports
 // ============================================================================

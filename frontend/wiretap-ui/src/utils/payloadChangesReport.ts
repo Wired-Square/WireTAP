@@ -1,27 +1,94 @@
 // ui/src/utils/payloadChangesReport.ts
 // Report generation for Payload Changes analysis
 
+import i18n from "i18next";
 import type { ChangesResult } from "../stores/discoveryStore";
+import type { ByteColumn, ChangesFrame, MultiBytePattern } from "../api/byteRoles";
 import { type ExportFormat, DARK_THEME_STYLES, PRINT_THEME_STYLES } from "./reportExport";
-import { formatFrameId } from "./frameIds";
-import type { MultiBytePattern, PayloadAnalysisResult } from "./analysis/payloadAnalysis";
+import { formatFrameKey } from "./frameIds";
+import { caseNoteLines, frameNoteLines } from "./analysis/byteNoteText";
 
-const byteRange = (p: MultiBytePattern) => `byte[${p.startByte}:${p.startByte + p.length - 1}]`;
+const byteRange = (p: MultiBytePattern) => `byte[${p.start}:${p.start + p.len - 1}]`;
+
+const hexPayload = (bytes: number[]) => bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+const caseLabel = (value: number) => `0x${value.toString(16).toUpperCase()}`;
+
+/** One frame as the report prints it, its notes worded. */
+type Row = {
+  frame: ChangesFrame;
+  id: string;
+  varyingLength: boolean;
+  notes: string[];
+  cases: { value: number; sampleCount: number; patterns: MultiBytePattern[]; notes: string[] }[];
+};
+
+function rows(results: ChangesResult): Row[] {
+  const t = i18n.t.bind(i18n);
+  return [...results.frames]
+    .sort((a, b) => a.frameId - b.frameId)
+    .map((frame) => {
+      const selector = frame.mux?.detection.selector;
+      return {
+        frame,
+        id: formatFrameKey(frame.protocol ?? "can", frame),
+        varyingLength: frame.minLen !== frame.maxLen,
+        notes: frameNoteLines(t, frame.notes.frame, selector),
+        cases: (frame.mux?.cases ?? []).map((c) => ({
+          value: c.value,
+          sampleCount: c.sampleCount,
+          patterns: c.patterns,
+          notes: caseNoteLines(t, frame.notes.cases.find((n) => n.value === c.value)?.notes ?? [], selector!),
+        })),
+      };
+    });
+}
+
+/** Each mirror group with its ids formatted under its protocol. */
+function mirrors(results: ChangesResult) {
+  return results.mirrors.flatMap(({ protocol, groups }) =>
+    groups.map((group) => ({ ...group, ids: group.keys.map((k) => formatFrameKey(protocol, k)) }))
+  );
+}
+
+function summary(results: ChangesResult, all: Row[]) {
+  return {
+    identicalCount: all.filter(r => r.frame.identical !== null).length,
+    varyingLengthCount: all.filter(r => r.varyingLength).length,
+    muxCount: all.filter(r => r.frame.mux !== null).length,
+    burstCount: all.filter(r => r.frame.burst).length,
+    mirrorCount: mirrors(results).length,
+  };
+}
 
 /**
  * Each pattern with the label it prints under. A mux frame's come from its cases:
  * its top-level ones span every case, so printing both would print them twice.
  */
-function labelledPatterns(result: PayloadAnalysisResult): { label: string; pattern: MultiBytePattern }[] {
-  if (!result.muxCaseAnalyses) {
-    return result.multiBytePatterns.map((pattern) => ({ label: byteRange(pattern), pattern }));
+function labelledPatterns(row: Row): { label: string; pattern: MultiBytePattern }[] {
+  if (!row.frame.mux) {
+    return row.frame.patterns.map((pattern) => ({ label: byteRange(pattern), pattern }));
   }
-  return result.muxCaseAnalyses.flatMap((c) =>
-    c.multiBytePatterns.map((pattern) => ({
-      label: `case 0x${c.muxValue.toString(16).toUpperCase()} ${byteRange(pattern)}`,
-      pattern,
-    }))
+  return row.cases.flatMap((c) =>
+    c.patterns.map((pattern) => ({ label: `case ${caseLabel(c.value)} ${byteRange(pattern)}`, pattern }))
   );
+}
+
+/** Each role's text mark, and its glyph and class in the HTML byte row. */
+const ROLE_MARKS: Record<ByteColumn['role'], { mark: string; glyph: string; cls: string }> = {
+  static: { mark: '#', glyph: '█', cls: 'role-static' },
+  counter: { mark: '^', glyph: '▲', cls: 'role-counter' },
+  sensor: { mark: '~', glyph: '≈', cls: 'role-sensor' },
+  value: { mark: '?', glyph: '?', cls: 'role-value' },
+  unknown: { mark: ' ', glyph: '?', cls: 'role-value' },
+};
+
+function patternDetails(pattern: MultiBytePattern): string {
+  const details: string[] = [];
+  if (pattern.endianness) details.push(`${pattern.endianness} endian`);
+  if (pattern.rollover) details.push('rollover');
+  if (pattern.sampleText) details.push(`"${pattern.sampleText}"`);
+  return details.join(', ');
 }
 
 /**
@@ -50,122 +117,94 @@ function generateTextReport(results: ChangesResult): string {
   const lines: string[] = [];
   const divider = "═".repeat(70);
   const thinDivider = "─".repeat(70);
+  const all = rows(results);
+  const counts = summary(results, all);
 
-  // Header
   lines.push(divider);
   lines.push("  CAN PAYLOAD ANALYSIS REPORT");
   lines.push(divider);
   lines.push("");
 
-  // Summary
   lines.push("SUMMARY");
   lines.push(thinDivider);
-  lines.push(`  Total Frames Analyzed: ${results.frameCount.toLocaleString()}`);
-  lines.push(`  Unique Frame IDs:      ${results.uniqueFrameIds}`);
+  lines.push(`  Total Frames Analysed: ${results.frameCount.toLocaleString()}`);
+  lines.push(`  Unique Frame IDs:      ${all.length}`);
   lines.push("");
 
-  // Quick stats
-  const identicalCount = results.analysisResults.filter(r => r.isIdentical).length;
-  const varyingLengthCount = results.analysisResults.filter(r => r.hasVaryingLength).length;
-  const muxCount = results.analysisResults.filter(r => r.isMuxFrame).length;
-  const burstCount = results.analysisResults.filter(r => r.isBurstFrame).length;
-  const mirrorCount = results.mirrorGroups?.length ?? 0;
-
-  if (mirrorCount > 0) lines.push(`  Mirror Groups:       ${mirrorCount}`);
-  if (identicalCount > 0) lines.push(`  Identical Frames:    ${identicalCount}`);
-  if (varyingLengthCount > 0) lines.push(`  Varying Length:      ${varyingLengthCount}`);
-  if (muxCount > 0) lines.push(`  Multiplexed:         ${muxCount}`);
-  if (burstCount > 0) lines.push(`  Burst Frames:        ${burstCount}`);
+  if (counts.mirrorCount > 0) lines.push(`  Mirror Groups:       ${counts.mirrorCount}`);
+  if (counts.identicalCount > 0) lines.push(`  Identical Frames:    ${counts.identicalCount}`);
+  if (counts.varyingLengthCount > 0) lines.push(`  Varying Length:      ${counts.varyingLengthCount}`);
+  if (counts.muxCount > 0) lines.push(`  Multiplexed:         ${counts.muxCount}`);
+  if (counts.burstCount > 0) lines.push(`  Burst Frames:        ${counts.burstCount}`);
   lines.push("");
 
-  // Mirror Groups Section
-  if (results.mirrorGroups && results.mirrorGroups.length > 0) {
+  const groups = mirrors(results);
+  if (groups.length > 0) {
     lines.push("MIRROR FRAMES");
     lines.push(thinDivider);
     lines.push("  These frame IDs transmit identical payloads that change together:");
     lines.push("");
-
-    for (const group of results.mirrorGroups) {
-      const ids = group.frameIds.map(id => formatFrameId(id)).join(" <-> ");
-      lines.push(`  ${ids}`);
-      lines.push(`    Match rate: ${group.matchPercentage}% (${group.sampleCount} matching pairs)`);
-      if (group.samplePayload) {
-        const hex = group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-        lines.push(`    Sample:     ${hex}`);
-      }
+    for (const group of groups) {
+      lines.push(`  ${group.ids.join(" <-> ")}`);
+      lines.push(`    Match rate: ${group.matchPercentage}% (${group.sampleCount} paired samples)`);
+      lines.push(`    Sample:     ${hexPayload(group.samplePayload)}`);
       lines.push("");
     }
   }
 
-  // Individual Frame Analysis
   lines.push("FRAME ANALYSIS");
   lines.push(divider);
 
-  const sortedResults = [...results.analysisResults].sort((a, b) => a.frameId - b.frameId);
-
-  for (const result of sortedResults) {
+  for (const row of all) {
+    const { frame } = row;
     lines.push("");
-    lines.push(`+-- Frame ${formatFrameId(result.frameId)} ` + "-".repeat(50));
-    lines.push(`|  Samples: ${result.sampleCount}`);
+    lines.push(`+-- Frame ${row.id} ` + "-".repeat(50));
+    lines.push(`|  Samples: ${frame.sampleCount}`);
 
-    // Flags
     const flags: string[] = [];
-    if (result.isIdentical) flags.push("Identical");
-    if (result.hasVaryingLength && result.lengthRange) {
-      flags.push(`Length ${result.lengthRange.min}-${result.lengthRange.max}`);
-    }
-    if (result.isMuxFrame) flags.push("Multiplexed");
-    if (result.isBurstFrame) flags.push("Burst");
-
+    if (frame.identical) flags.push("Identical");
+    if (row.varyingLength) flags.push(`Length ${frame.minLen}-${frame.maxLen}`);
+    if (frame.mux) flags.push("Multiplexed");
+    if (frame.burst) flags.push("Burst");
     if (flags.length > 0) {
       lines.push(`|  Flags:   ${flags.join(", ")}`);
     }
 
-    // Byte analysis visualization
-    if (result.byteStats.length > 0) {
+    if (frame.columns.length > 0) {
       lines.push("|");
       lines.push("|  Byte Analysis:");
-      const byteRow = result.byteStats.map((s) => {
-        const role = s.role === 'static' ? '#' : s.role === 'counter' ? '^' : s.role === 'sensor' ? '~' : s.role === 'value' ? '?' : ' ';
-        return role;
-      }).join('');
-      lines.push(`|  [${byteRow}]`);
+      lines.push(`|  [${frame.columns.map(c => ROLE_MARKS[c.role].mark).join('')}]`);
       lines.push(`|   #=static  ^=counter  ~=sensor  ?=value`);
     }
 
-    // Multi-byte patterns; a mux frame's print in its cases' notes
-    if (!result.isMuxFrame && result.multiBytePatterns.length > 0) {
+    // A mux frame's patterns print in its cases' notes
+    if (!frame.mux && frame.patterns.length > 0) {
       lines.push("|");
       lines.push("|  Detected Patterns:");
-      for (const pattern of result.multiBytePatterns) {
-        const range = byteRange(pattern);
-        let desc = pattern.pattern;
+      for (const pattern of frame.patterns) {
+        let desc: string = pattern.kind;
         if (pattern.endianness) desc += ` (${pattern.endianness})`;
-        if (pattern.rolloverDetected) desc += " +rollover";
+        if (pattern.rollover) desc += " +rollover";
         if (pattern.sampleText) desc += ` "${pattern.sampleText}"`;
-        lines.push(`|    ${range}: ${desc}`);
+        lines.push(`|    ${byteRange(pattern)}: ${desc}`);
       }
     }
 
-    // Notes
-    if (result.notes.length > 0) {
+    if (row.notes.length > 0) {
       lines.push("|");
       lines.push("|  Notes:");
-      for (const note of result.notes) {
+      for (const note of row.notes) {
         lines.push(`|    - ${note}`);
       }
     }
 
-    // Mux cases
-    if (result.muxCaseAnalyses && result.muxCaseAnalyses.length > 0) {
+    if (row.cases.length > 0) {
       lines.push("|");
       lines.push("|  Mux Cases:");
-      for (const muxCase of result.muxCaseAnalyses) {
-        lines.push(`|    Case 0x${muxCase.muxValue.toString(16).toUpperCase()}: ${muxCase.sampleCount} samples`);
-        if (muxCase.notes && muxCase.notes.length > 0) {
-          for (const note of muxCase.notes) {
-            lines.push(`|      ${note}`);
-          }
+      for (const muxCase of row.cases) {
+        lines.push(`|    Case ${caseLabel(muxCase.value)}: ${muxCase.sampleCount} samples`);
+        for (const note of muxCase.notes) {
+          lines.push(`|      ${note}`);
         }
       }
     }
@@ -185,8 +224,27 @@ function generateTextReport(results: ChangesResult): string {
 // Markdown Report Generation
 // ============================================================================
 
+function roleDetails(c: ByteColumn): string {
+  switch (c.role) {
+    case 'static':
+      return `Value: 0x${c.value.toString(16).toUpperCase().padStart(2, '0')}`;
+    case 'counter':
+      return c.looping
+        ? `Looping ${c.looping.min}–${c.looping.max} (mod ${c.looping.modulo}), step=${c.step}`
+        : `Step: ${c.step}`;
+    case 'sensor':
+      return `Trend: ${c.trend}`;
+    case 'value':
+      return `${c.distinctValues} unique values`;
+    default:
+      return "";
+  }
+}
+
 function generateMarkdownReport(results: ChangesResult): string {
   const lines: string[] = [];
+  const all = rows(results);
+  const counts = summary(results, all);
 
   lines.push("# CAN Bus Payload Analysis Report");
   lines.push("");
@@ -195,146 +253,105 @@ function generateMarkdownReport(results: ChangesResult): string {
   lines.push("| Metric | Value |");
   lines.push("|--------|-------|");
   lines.push(`| Total Frames | ${results.frameCount.toLocaleString()} |`);
-  lines.push(`| Unique Frame IDs | ${results.uniqueFrameIds} |`);
-
-  const identicalCount = results.analysisResults.filter(r => r.isIdentical).length;
-  const varyingLengthCount = results.analysisResults.filter(r => r.hasVaryingLength).length;
-  const muxCount = results.analysisResults.filter(r => r.isMuxFrame).length;
-  const burstCount = results.analysisResults.filter(r => r.isBurstFrame).length;
-  const mirrorCount = results.mirrorGroups?.length ?? 0;
-
-  if (mirrorCount > 0) lines.push(`| Mirror Groups | ${mirrorCount} |`);
-  if (identicalCount > 0) lines.push(`| Identical Payload Frames | ${identicalCount} |`);
-  if (varyingLengthCount > 0) lines.push(`| Variable Length Frames | ${varyingLengthCount} |`);
-  if (muxCount > 0) lines.push(`| Multiplexed Frames | ${muxCount} |`);
-  if (burstCount > 0) lines.push(`| Burst Pattern Frames | ${burstCount} |`);
+  lines.push(`| Unique Frame IDs | ${all.length} |`);
+  if (counts.mirrorCount > 0) lines.push(`| Mirror Groups | ${counts.mirrorCount} |`);
+  if (counts.identicalCount > 0) lines.push(`| Identical Payload Frames | ${counts.identicalCount} |`);
+  if (counts.varyingLengthCount > 0) lines.push(`| Variable Length Frames | ${counts.varyingLengthCount} |`);
+  if (counts.muxCount > 0) lines.push(`| Multiplexed Frames | ${counts.muxCount} |`);
+  if (counts.burstCount > 0) lines.push(`| Burst Pattern Frames | ${counts.burstCount} |`);
   lines.push("");
 
-  // Mirror Groups
-  if (results.mirrorGroups && results.mirrorGroups.length > 0) {
+  const groups = mirrors(results);
+  if (groups.length > 0) {
     lines.push("## Mirror Frame Groups");
     lines.push("");
     lines.push("Mirror frames are different CAN IDs that transmit identical payloads changing in unison.");
     lines.push("This often indicates redundant/backup signals or re-transmitted data.");
     lines.push("");
-
-    for (let i = 0; i < results.mirrorGroups.length; i++) {
-      const group = results.mirrorGroups[i];
+    groups.forEach((group, i) => {
       lines.push(`### Group ${i + 1}`);
       lines.push("");
-      lines.push(`- **Frame IDs**: ${group.frameIds.map(id => formatFrameId(id)).join(", ")}`);
+      lines.push(`- **Frame IDs**: ${group.ids.join(", ")}`);
       lines.push(`- **Match Rate**: ${group.matchPercentage}%`);
-      lines.push(`- **Matching Pairs**: ${group.sampleCount}`);
-      if (group.samplePayload) {
-        const hex = group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-        lines.push(`- **Sample Payload**: \`${hex}\``);
-      }
+      lines.push(`- **Paired Samples**: ${group.sampleCount}`);
+      lines.push(`- **Sample Payload**: \`${hexPayload(group.samplePayload)}\``);
       lines.push("");
-    }
+    });
   }
 
-  // Frame Details
   lines.push("## Frame Analysis Details");
   lines.push("");
 
-  const sortedResults = [...results.analysisResults].sort((a, b) => a.frameId - b.frameId);
-
-  for (const result of sortedResults) {
-    lines.push(`### Frame ${formatFrameId(result.frameId)}`);
+  for (const row of all) {
+    const { frame } = row;
+    lines.push(`### Frame ${row.id}`);
     lines.push("");
-
-    // Metadata table
     lines.push("| Property | Value |");
     lines.push("|----------|-------|");
-    lines.push(`| Samples | ${result.sampleCount} |`);
-    lines.push(`| Identical | ${result.isIdentical ? 'Yes' : 'No'} |`);
-    if (result.hasVaryingLength && result.lengthRange) {
-      lines.push(`| Length Range | ${result.lengthRange.min}-${result.lengthRange.max} bytes |`);
+    lines.push(`| Samples | ${frame.sampleCount} |`);
+    lines.push(`| Identical | ${frame.identical ? 'Yes' : 'No'} |`);
+    if (row.varyingLength) {
+      lines.push(`| Length Range | ${frame.minLen}-${frame.maxLen} bytes |`);
     }
-    lines.push(`| Multiplexed | ${result.isMuxFrame ? 'Yes' : 'No'} |`);
-    lines.push(`| Burst Pattern | ${result.isBurstFrame ? 'Yes' : 'No'} |`);
+    lines.push(`| Multiplexed | ${frame.mux ? 'Yes' : 'No'} |`);
+    lines.push(`| Burst Pattern | ${frame.burst ? 'Yes' : 'No'} |`);
     lines.push("");
 
-    // Byte roles
-    if (result.byteStats.length > 0) {
+    if (frame.columns.length > 0) {
       lines.push("**Byte Roles:**");
       lines.push("");
       lines.push("| Byte | Role | Details |");
       lines.push("|------|------|---------|");
-
-      for (const stat of result.byteStats) {
-        let details = "";
-        if (stat.role === 'static' && stat.staticValue !== undefined) {
-          details = `Value: 0x${stat.staticValue.toString(16).toUpperCase().padStart(2, '0')}`;
-        } else if (stat.role === 'counter') {
-          if (stat.isLoopingCounter && stat.loopingRange && stat.loopingModulo) {
-            details = `Looping ${stat.loopingRange.min}–${stat.loopingRange.max} (mod ${stat.loopingModulo}), step=${stat.counterStep}`;
-          } else {
-            details = stat.counterStep ? `Step: ${stat.counterStep}` : "";
-          }
-        } else if (stat.role === 'sensor' && stat.sensorTrend) {
-          details = `Trend: ${stat.sensorTrend}`;
-        } else if (stat.role === 'value') {
-          details = `${stat.distinctCount} unique values`;
-        }
-        lines.push(`| ${stat.byteIndex} | ${stat.role} | ${details} |`);
+      for (const c of frame.columns) {
+        lines.push(`| ${c.position} | ${c.role} | ${roleDetails(c)} |`);
       }
       lines.push("");
     }
 
-    // Multi-byte patterns; a mux frame's are under Per-Case Analysis
-    if (!result.isMuxFrame && result.multiBytePatterns.length > 0) {
+    // A mux frame's patterns are under Per-Case Analysis
+    if (!frame.mux && frame.patterns.length > 0) {
       lines.push("**Multi-Byte Patterns:**");
       lines.push("");
-      for (const pattern of result.multiBytePatterns) {
-        const range = byteRange(pattern);
-        let desc = `\`${pattern.pattern}\``;
+      for (const pattern of frame.patterns) {
+        let desc = `\`${pattern.kind}\``;
         if (pattern.endianness) desc += ` (${pattern.endianness} endian)`;
-        if (pattern.rolloverDetected) desc += " - rollover detected";
-        if (pattern.minValue !== undefined && pattern.maxValue !== undefined) {
-          desc += ` - range: ${pattern.minValue} to ${pattern.maxValue}`;
-        }
+        if (pattern.rollover) desc += " - rollover detected";
+        if (pattern.range) desc += ` - range: ${pattern.range[0]} to ${pattern.range[1]}`;
         if (pattern.sampleText) desc += ` - text: "${pattern.sampleText}"`;
-        lines.push(`- **${range}**: ${desc}`);
+        lines.push(`- **${byteRange(pattern)}**: ${desc}`);
       }
       lines.push("");
     }
 
-    // Mux info
-    if (result.isMuxFrame && result.muxInfo) {
+    if (frame.mux) {
       lines.push("**Multiplexing:**");
       lines.push("");
-      lines.push(`- Selector: byte[${result.muxInfo.selectorByte}]`);
-      lines.push(`- Values: ${result.muxInfo.selectorValues.map(v => `0x${v.toString(16).toUpperCase()}`).join(", ")}`);
-      if (result.muxInfo.isTwoByte) lines.push("- Type: 2-byte selector");
+      lines.push(`- Selector: ${frame.mux.detection.selector === 'twoByte' ? 'byte[0:1]' : 'byte[0]'}`);
+      lines.push(`- Values: ${frame.mux.cases.map(c => caseLabel(c.value)).join(", ")}`);
+      if (frame.mux.detection.selector === 'twoByte') lines.push("- Type: 2-byte selector");
       lines.push("");
 
-      if (result.muxCaseAnalyses && result.muxCaseAnalyses.length > 0) {
+      if (row.cases.length > 0) {
         lines.push("**Per-Case Analysis:**");
         lines.push("");
-        for (const muxCase of result.muxCaseAnalyses) {
-          lines.push(`#### Case 0x${muxCase.muxValue.toString(16).toUpperCase()} (${muxCase.sampleCount} samples)`);
+        for (const muxCase of row.cases) {
+          lines.push(`#### Case ${caseLabel(muxCase.value)} (${muxCase.sampleCount} samples)`);
           lines.push("");
-          if (muxCase.multiBytePatterns && muxCase.multiBytePatterns.length > 0) {
-            for (const pattern of muxCase.multiBytePatterns) {
-              lines.push(`- ${byteRange(pattern)}: ${pattern.pattern}` + (pattern.endianness ? ` (${pattern.endianness})` : ""));
-            }
+          for (const pattern of muxCase.patterns) {
+            lines.push(`- ${byteRange(pattern)}: ${pattern.kind}` + (pattern.endianness ? ` (${pattern.endianness})` : ""));
           }
-          if (muxCase.notes && muxCase.notes.length > 0) {
-            for (const note of muxCase.notes) {
-              lines.push(`- ${note}`);
-            }
+          for (const note of muxCase.notes) {
+            lines.push(`- ${note}`);
           }
           lines.push("");
         }
       }
     }
 
-    // Notes
-    if (result.notes.length > 0) {
+    if (row.notes.length > 0) {
       lines.push("**Analysis Notes:**");
       lines.push("");
-      for (const note of result.notes) {
+      for (const note of row.notes) {
         lines.push(`- ${note}`);
       }
       lines.push("");
@@ -348,19 +365,134 @@ function generateMarkdownReport(results: ChangesResult): string {
 }
 
 // ============================================================================
-// HTML Report Generation (Screen Optimized)
+// HTML Report Generation
 // ============================================================================
 
+type HtmlTheme = { themeStyles: string; additionalStyles: string; card: string; containerOpen: string; containerClose: string; preamble: string };
+
+function frameFlags(row: Row): string {
+  const flags: string[] = [];
+  if (row.frame.identical) flags.push('<span class="badge badge-identical">Identical</span>');
+  if (row.varyingLength) flags.push(`<span class="badge badge-varying">${row.frame.minLen}-${row.frame.maxLen} bytes</span>`);
+  if (row.frame.mux) flags.push('<span class="badge badge-mux">Mux</span>');
+  if (row.frame.burst) flags.push('<span class="badge badge-burst">Burst</span>');
+  return flags.join('');
+}
+
+function frameHtml(row: Row, card: string): string {
+  const { frame } = row;
+  let html = `
+    <div class="${card}">
+      <div class="frame-header">
+        <span class="frame-id">${row.id}</span>
+        <span class="samples">${frame.sampleCount} samples</span>
+        ${frameFlags(row)}
+      </div>
+`;
+
+  if (frame.columns.length > 0) {
+    const byteRow = frame.columns.map(c => `<span class="${ROLE_MARKS[c.role].cls}">${ROLE_MARKS[c.role].glyph}</span>`).join('');
+    html += `
+      <div class="byte-viz">
+        [${byteRow}]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+`;
+  }
+
+  const patterns = labelledPatterns(row);
+  if (patterns.length > 0) {
+    html += `
+      <h3>Detected Patterns</h3>
+      <table>
+        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
+${patterns.map(({ label, pattern }) => `        <tr><td><code>${label}</code></td><td>${pattern.kind}</td><td>${patternDetails(pattern)}</td></tr>`).join('\n')}
+      </table>
+`;
+  }
+
+  if (row.notes.length > 0) {
+    html += `
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        ${row.notes.map(n => `<li>${n}</li>`).join('\n        ')}
+      </ul>
+`;
+  }
+
+  return html + `    </div>\n`;
+}
+
+function htmlReport(results: ChangesResult, theme: HtmlTheme): string {
+  const all = rows(results);
+  const counts = summary(results, all);
+  const groups = mirrors(results);
+
+  let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAN Payload Analysis Report</title>
+  <style>
+${theme.themeStyles}
+${theme.additionalStyles}
+  </style>
+</head>
+<body>
+  ${theme.containerOpen}
+    <h1>CAN Payload Analysis Report</h1>
+    ${theme.preamble}
+    <div class="summary-grid">
+      <div class="summary-card stat-item"><div class="value">${results.frameCount.toLocaleString()}</div><div class="label">Total Frames</div></div>
+      <div class="summary-card stat-item"><div class="value">${all.length}</div><div class="label">Unique IDs</div></div>
+      ${counts.mirrorCount > 0 ? `<div class="summary-card stat-item"><div class="value">${counts.mirrorCount}</div><div class="label">Mirror Groups</div></div>` : ''}
+      ${counts.muxCount > 0 ? `<div class="summary-card stat-item"><div class="value">${counts.muxCount}</div><div class="label">Multiplexed</div></div>` : ''}
+    </div>
+
+    <div class="badge-row" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0;">
+      ${counts.mirrorCount > 0 ? '<span class="badge badge-mirror">Mirror Groups</span>' : ''}
+      ${counts.identicalCount > 0 ? '<span class="badge badge-identical">Identical</span>' : ''}
+      ${counts.varyingLengthCount > 0 ? '<span class="badge badge-varying">Varying Length</span>' : ''}
+      ${counts.muxCount > 0 ? '<span class="badge badge-mux">Multiplexed</span>' : ''}
+      ${counts.burstCount > 0 ? '<span class="badge badge-burst">Burst</span>' : ''}
+    </div>
+`;
+
+  if (groups.length > 0) {
+    html += `
+    <h2>Mirror Frame Groups</h2>
+    <p>These frame IDs transmit identical payloads that change together.</p>
+`;
+    for (const group of groups) {
+      html += `
+    <div class="mirror-card no-break">
+      <div class="mirror-ids">${group.ids.join(' ↔ ')}</div>
+      <div>Match rate: ${group.matchPercentage}% (${group.sampleCount} paired samples) · Sample: <code>${hexPayload(group.samplePayload)}</code></div>
+    </div>
+`;
+    }
+  }
+
+  html += `
+    <h2>Frame Analysis</h2>
+${all.map((row) => frameHtml(row, theme.card)).join('')}
+    <div class="footer">
+      Generated by WireTAP
+    </div>
+  ${theme.containerClose}
+</body>
+</html>`;
+
+  return html;
+}
+
 function generateHtmlReport(results: ChangesResult): string {
-  const identicalCount = results.analysisResults.filter(r => r.isIdentical).length;
-  const varyingLengthCount = results.analysisResults.filter(r => r.hasVaryingLength).length;
-  const muxCount = results.analysisResults.filter(r => r.isMuxFrame).length;
-  const burstCount = results.analysisResults.filter(r => r.isBurstFrame).length;
-  const mirrorCount = results.mirrorGroups?.length ?? 0;
-
-  const sortedResults = [...results.analysisResults].sort((a, b) => a.frameId - b.frameId);
-
-  // Additional styles specific to payload changes report
   const additionalStyles = `
     .badge-mirror { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
     .badge-identical { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
@@ -406,165 +538,17 @@ function generateHtmlReport(results: ChangesResult): string {
     .mirror-ids { font-family: monospace; font-weight: bold; color: #f472b6; }
 `;
 
-  let html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CAN Payload Analysis Report</title>
-  <style>
-${DARK_THEME_STYLES}
-${additionalStyles}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>CAN Payload Analysis Report</h1>
-
-    <div class="summary-grid">
-      <div class="summary-card">
-        <div class="value">${results.frameCount.toLocaleString()}</div>
-        <div class="label">Total Frames</div>
-      </div>
-      <div class="summary-card">
-        <div class="value">${results.uniqueFrameIds}</div>
-        <div class="label">Unique IDs</div>
-      </div>
-      ${mirrorCount > 0 ? `<div class="summary-card"><div class="value">${mirrorCount}</div><div class="label">Mirror Groups</div></div>` : ''}
-      ${muxCount > 0 ? `<div class="summary-card"><div class="value">${muxCount}</div><div class="label">Multiplexed</div></div>` : ''}
-    </div>
-
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0;">
-      ${mirrorCount > 0 ? '<span class="badge badge-mirror">Mirror Groups</span>' : ''}
-      ${identicalCount > 0 ? '<span class="badge badge-identical">Identical</span>' : ''}
-      ${varyingLengthCount > 0 ? '<span class="badge badge-varying">Varying Length</span>' : ''}
-      ${muxCount > 0 ? '<span class="badge badge-mux">Multiplexed</span>' : ''}
-      ${burstCount > 0 ? '<span class="badge badge-burst">Burst</span>' : ''}
-    </div>
-`;
-
-  // Mirror Groups
-  if (results.mirrorGroups && results.mirrorGroups.length > 0) {
-    html += `
-    <h2>Mirror Frame Groups</h2>
-    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-      These frame IDs transmit identical payloads that change together.
-    </p>
-`;
-    for (const group of results.mirrorGroups) {
-      const ids = group.frameIds.map(id => formatFrameId(id)).join(' ↔ ');
-      const hex = group.samplePayload?.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') || '';
-      html += `
-    <div class="mirror-card">
-      <div class="mirror-ids">${ids}</div>
-      <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
-        Match rate: ${group.matchPercentage}% (${group.sampleCount} pairs)
-        ${hex ? `<br>Sample: <code>${hex}</code>` : ''}
-      </div>
-    </div>
-`;
-    }
-  }
-
-  // Frame Analysis
-  html += `
-    <h2>Frame Analysis</h2>
-`;
-
-  for (const result of sortedResults) {
-    const flags: string[] = [];
-    if (result.isIdentical) flags.push('<span class="badge badge-identical">Identical</span>');
-    if (result.hasVaryingLength && result.lengthRange) {
-      flags.push(`<span class="badge badge-varying">${result.lengthRange.min}-${result.lengthRange.max} bytes</span>`);
-    }
-    if (result.isMuxFrame) flags.push('<span class="badge badge-mux">Mux</span>');
-    if (result.isBurstFrame) flags.push('<span class="badge badge-burst">Burst</span>');
-
-    html += `
-    <div class="frame-card">
-      <div class="frame-header">
-        <span class="frame-id">${formatFrameId(result.frameId)}</span>
-        <span class="samples">${result.sampleCount} samples</span>
-        ${flags.join('')}
-      </div>
-`;
-
-    // Byte visualization
-    if (result.byteStats.length > 0) {
-      const byteRow = result.byteStats.map(s => {
-        const cls = s.role === 'static' ? 'role-static' : s.role === 'counter' ? 'role-counter' : s.role === 'sensor' ? 'role-sensor' : 'role-value';
-        const char = s.role === 'static' ? '█' : s.role === 'counter' ? '▲' : s.role === 'sensor' ? '≈' : '?';
-        return `<span class="${cls}">${char}</span>`;
-      }).join('');
-      html += `
-      <div class="byte-viz">
-        [${byteRow}]
-        <div class="legend">
-          <span class="role-static">█ static</span> &nbsp;
-          <span class="role-counter">▲ counter</span> &nbsp;
-          <span class="role-sensor">≈ sensor</span> &nbsp;
-          <span class="role-value">? value</span>
-        </div>
-      </div>
-`;
-    }
-
-    // Multi-byte patterns
-    const patterns = labelledPatterns(result);
-    if (patterns.length > 0) {
-      html += `
-      <h3>Detected Patterns</h3>
-      <table>
-        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
-`;
-      for (const { label: range, pattern } of patterns) {
-        let details = '';
-        if (pattern.endianness) details += pattern.endianness + ' endian';
-        if (pattern.rolloverDetected) details += (details ? ', ' : '') + 'rollover';
-        if (pattern.sampleText) details += (details ? ', ' : '') + `"${pattern.sampleText}"`;
-        html += `        <tr><td><code>${range}</code></td><td>${pattern.pattern}</td><td>${details}</td></tr>\n`;
-      }
-      html += `      </table>\n`;
-    }
-
-    // Notes
-    if (result.notes.length > 0) {
-      html += `
-      <h3>Notes</h3>
-      <ul class="notes-list">
-        ${result.notes.map(n => `<li>${n}</li>`).join('\n        ')}
-      </ul>
-`;
-    }
-
-    html += `    </div>\n`;
-  }
-
-  html += `
-    <div class="footer">
-      Generated by WireTAP
-    </div>
-  </div>
-</body>
-</html>`;
-
-  return html;
+  return htmlReport(results, {
+    themeStyles: DARK_THEME_STYLES,
+    additionalStyles,
+    card: 'frame-card',
+    containerOpen: '<div class="container">',
+    containerClose: '</div>',
+    preamble: '',
+  });
 }
 
-// ============================================================================
-// PDF-Ready Report Generation (Print Optimized)
-// ============================================================================
-
 function generatePdfReadyReport(results: ChangesResult): string {
-  const identicalCount = results.analysisResults.filter(r => r.isIdentical).length;
-  const varyingLengthCount = results.analysisResults.filter(r => r.hasVaryingLength).length;
-  const muxCount = results.analysisResults.filter(r => r.isMuxFrame).length;
-  const burstCount = results.analysisResults.filter(r => r.isBurstFrame).length;
-  const mirrorCount = results.mirrorGroups?.length ?? 0;
-
-  const sortedResults = [...results.analysisResults].sort((a, b) => a.frameId - b.frameId);
-
-  // Additional print-specific styles
   const additionalStyles = `
     .badge-mirror { background: #fce7f3; color: #be185d; }
     .badge-identical { background: #f1f5f9; color: #475569; }
@@ -635,151 +619,14 @@ function generatePdfReadyReport(results: ChangesResult): string {
     }
 `;
 
-  let html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CAN Payload Analysis Report</title>
-  <style>
-${PRINT_THEME_STYLES}
-${additionalStyles}
-  </style>
-</head>
-<body>
-  <h1>CAN Payload Analysis Report</h1>
-
-  <div class="print-instructions">
+  return htmlReport(results, {
+    themeStyles: PRINT_THEME_STYLES,
+    additionalStyles,
+    card: 'frame-card no-break',
+    containerOpen: '',
+    containerClose: '',
+    preamble: `<div class="print-instructions">
     <strong>To save as PDF:</strong> Use your browser's Print function (Ctrl+P / Cmd+P) and select "Save as PDF" as the destination.
-  </div>
-
-  <div class="summary-box">
-    <div class="summary-grid">
-      <div class="stat-item">
-        <div class="value">${results.frameCount.toLocaleString()}</div>
-        <div class="label">Total Frames</div>
-      </div>
-      <div class="stat-item">
-        <div class="value">${results.uniqueFrameIds}</div>
-        <div class="label">Unique IDs</div>
-      </div>
-      ${mirrorCount > 0 ? `<div class="stat-item"><div class="value">${mirrorCount}</div><div class="label">Mirror Groups</div></div>` : ''}
-      ${muxCount > 0 ? `<div class="stat-item"><div class="value">${muxCount}</div><div class="label">Multiplexed</div></div>` : ''}
-    </div>
-
-    <div class="badge-row">
-      ${mirrorCount > 0 ? '<span class="badge badge-mirror">Mirror Groups</span>' : ''}
-      ${identicalCount > 0 ? '<span class="badge badge-identical">Identical</span>' : ''}
-      ${varyingLengthCount > 0 ? '<span class="badge badge-varying">Varying Length</span>' : ''}
-      ${muxCount > 0 ? '<span class="badge badge-mux">Multiplexed</span>' : ''}
-      ${burstCount > 0 ? '<span class="badge badge-burst">Burst</span>' : ''}
-    </div>
-  </div>
-`;
-
-  // Mirror Groups
-  if (results.mirrorGroups && results.mirrorGroups.length > 0) {
-    html += `
-  <h2>Mirror Frame Groups</h2>
-  <p style="font-size: 9pt; color: var(--text-secondary); margin-bottom: 8pt;">
-    These frame IDs transmit identical payloads that change together.
-  </p>
-`;
-    for (const group of results.mirrorGroups) {
-      const ids = group.frameIds.map(id => formatFrameId(id)).join(' ↔ ');
-      const hex = group.samplePayload?.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ') || '';
-      html += `
-  <div class="mirror-card no-break">
-    <div class="mirror-ids">${ids}</div>
-    <div style="font-size: 8pt; color: #9d174d; margin-top: 4pt;">
-      Match rate: ${group.matchPercentage}% (${group.sampleCount} pairs)
-      ${hex ? `&nbsp;|&nbsp; Sample: <code>${hex}</code>` : ''}
-    </div>
-  </div>
-`;
-    }
-  }
-
-  // Frame Analysis
-  html += `
-  <h2>Frame Analysis</h2>
-`;
-
-  for (const result of sortedResults) {
-    const flags: string[] = [];
-    if (result.isIdentical) flags.push('<span class="badge badge-identical">Identical</span>');
-    if (result.hasVaryingLength && result.lengthRange) {
-      flags.push(`<span class="badge badge-varying">${result.lengthRange.min}-${result.lengthRange.max} bytes</span>`);
-    }
-    if (result.isMuxFrame) flags.push('<span class="badge badge-mux">Mux</span>');
-    if (result.isBurstFrame) flags.push('<span class="badge badge-burst">Burst</span>');
-
-    html += `
-  <div class="frame-card no-break">
-    <div class="frame-header">
-      <span class="frame-id">${formatFrameId(result.frameId)}</span>
-      <span class="samples">${result.sampleCount} samples</span>
-      ${flags.join('')}
-    </div>
-`;
-
-    // Byte visualization
-    if (result.byteStats.length > 0) {
-      const byteRow = result.byteStats.map(s => {
-        const cls = s.role === 'static' ? 'role-static' : s.role === 'counter' ? 'role-counter' : s.role === 'sensor' ? 'role-sensor' : 'role-value';
-        const char = s.role === 'static' ? '█' : s.role === 'counter' ? '▲' : s.role === 'sensor' ? '≈' : '?';
-        return `<span class="${cls}">${char}</span>`;
-      }).join('');
-      html += `
-    <div class="byte-viz">
-      [${byteRow}]
-      <div class="legend">
-        <span class="role-static">█ static</span> &nbsp;
-        <span class="role-counter">▲ counter</span> &nbsp;
-        <span class="role-sensor">≈ sensor</span> &nbsp;
-        <span class="role-value">? value</span>
-      </div>
-    </div>
-`;
-    }
-
-    // Multi-byte patterns
-    const patterns = labelledPatterns(result);
-    if (patterns.length > 0) {
-      html += `
-    <h3>Detected Patterns</h3>
-    <table>
-      <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
-`;
-      for (const { label: range, pattern } of patterns) {
-        let details = '';
-        if (pattern.endianness) details += pattern.endianness + ' endian';
-        if (pattern.rolloverDetected) details += (details ? ', ' : '') + 'rollover';
-        if (pattern.sampleText) details += (details ? ', ' : '') + `"${pattern.sampleText}"`;
-        html += `      <tr><td><code>${range}</code></td><td>${pattern.pattern}</td><td>${details}</td></tr>\n`;
-      }
-      html += `    </table>\n`;
-    }
-
-    // Notes
-    if (result.notes.length > 0) {
-      html += `
-    <h3>Notes</h3>
-    <ul class="notes-list">
-      ${result.notes.map(n => `<li>${n}</li>`).join('\n      ')}
-    </ul>
-`;
-    }
-
-    html += `  </div>\n`;
-  }
-
-  html += `
-  <div class="footer">
-    Generated by WireTAP
-  </div>
-</body>
-</html>`;
-
-  return html;
+  </div>`,
+  });
 }

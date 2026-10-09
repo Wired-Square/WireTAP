@@ -335,6 +335,19 @@ fn parse_frame_key(key: &str) -> Result<(&str, u32), String> {
         .ok_or_else(|| format!("Bad frame key '{key}' — expected protocol:id, e.g. \"can:256\""))
 }
 
+/// The frames an MCP analysis reads: the newest `newest`, or the panel's live
+/// window, Discovery's default history buffer.
+fn analysis_window(newest: Option<usize>) -> usize {
+    newest.unwrap_or(crate::settings::default_discovery_history_buffer() as usize)
+}
+
+fn frame_key_groups(keys: Option<Vec<String>>) -> Result<Vec<ProtocolFrames>, String> {
+    keys.unwrap_or_default()
+        .iter()
+        .map(|key| parse_frame_key(key).map(|(protocol, id)| ProtocolFrames::ids(protocol, vec![id])))
+        .collect()
+}
+
 /// The session's frame capture, which the live tools read.
 fn session_frame_capture(session_id: &str) -> Result<String, McpError> {
     crate::capture_store::get_session_frame_capture_id(session_id).ok_or_else(|| {
@@ -668,29 +681,43 @@ impl WireTapTools {
             .and_then(ok_json)
     }
 
-    #[tool(description = "Per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux cases) of a session's frame capture, each frame over its most recent 5000 payloads. Headless — no view needed. Without frame_ids the first 64 frames are profiled and the rest counted in skippedFrames.")]
+    #[tool(description = "Per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux cases, and the notes Discovery shows as codes) of a session's frame capture, each frame over its most recent 5000 payloads, with mirror groups (ids carrying one changing payload together) and each frame's burst flag over the capture's newest `newest` frames (default 100000, Discovery's default live window; pass a larger newest to read more of a long capture). Headless — no view needed. Without frame_ids the first 64 frames are profiled and the rest counted in skippedFrames.")]
     async fn get_discovery_analysis(
         &self,
         Parameters(p): Parameters<SessionAnalysisParams>,
     ) -> Result<CallToolResult, McpError> {
         let capture_id = session_frame_capture(&p.session_id)?;
-        let groups = p
-            .frame_ids
-            .unwrap_or_default()
-            .iter()
-            .map(|key| parse_frame_key(key).map(|(protocol, id)| ProtocolFrames::ids(protocol, vec![id])))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(err)?;
+        let groups = frame_key_groups(p.frame_ids).map_err(err)?;
         let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
-        let profiles = crate::byte_roles::changes_profiles(&Capture(&capture_id), groups, max_frames)
+        let changes = crate::byte_roles::payload_changes(&Capture(&capture_id), groups, Some(analysis_window(p.newest)), max_frames)
             .await
             .map_err(err)?;
         ok_json(json!({
             "captureId": capture_id,
-            "frameCount": profiles.frames.len(),
-            "skippedFrames": profiles.skipped_frames,
-            "frames": profiles.frames,
+            "frameCount": changes.frames.len(),
+            "framesRead": changes.frame_count,
+            "skippedFrames": changes.skipped_frames,
+            "frames": changes.frames,
+            "mirrors": changes.mirrors,
         }))
+    }
+
+    #[tool(description = "Message order of a session's frame capture, per protocol and per bus: interval groups, start-id candidates, cycle patterns (the order frames follow a start id), mux and burst timing, and the ids seen on more than one bus. The same answer as Discovery's Frame Order. Headless. Optional frame_ids (\"can:256\") restrict it, newest sets how many of the capture's newest frames are read (default 100000, Discovery's default live window; pass a larger value to read more of a long capture), and start_frame_id (with start_is_extended, and start_protocol to name one protocol) walks cycles from that id.")]
+    async fn get_frame_order(
+        &self,
+        Parameters(p): Parameters<FrameOrderParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let selection = FrameSelection::from_groups(frame_key_groups(p.frame_ids).map_err(err)?);
+        let start = p.start_frame_id.map(|frame_id| crate::analysis::OrderStart {
+            protocol: p.start_protocol,
+            frame_id,
+            is_extended: p.start_is_extended,
+        });
+        let orders = crate::analysis::message_order(&Capture(&capture_id), &selection, Some(analysis_window(p.newest)), start.as_ref())
+            .await
+            .map_err(err)?;
+        ok_json(json!({ "captureId": capture_id, "protocols": orders }))
     }
 
     #[tool(
@@ -1601,10 +1628,16 @@ fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOSt
 
 #[cfg(test)]
 mod tests {
-    use super::{modbus_write_json, parse_frame_key, scan_status};
+    use super::{analysis_window, modbus_write_json, parse_frame_key, scan_status};
     use crate::io::IOState;
     use std::time::Duration;
     use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
+
+    #[test]
+    fn an_analysis_reads_discoverys_default_window_unless_told_otherwise() {
+        assert_eq!(analysis_window(None), 100_000);
+        assert_eq!(analysis_window(Some(5_000_000)), 5_000_000);
+    }
 
     #[test]
     fn a_frame_key_is_protocol_and_decimal_id() {

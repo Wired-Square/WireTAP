@@ -120,7 +120,7 @@ function MetaSection({ knowledge, t }: MetaSectionProps) {
         {meta.defaultInterval !== null && (
           <div className="text-2xs text-muted pt-1">
             {t("decoderInfo.meta.basedOnGroup", {
-              count: knowledge.intervalGroups.find(g => g.intervalMs === meta.defaultInterval)?.frameIds.length ?? 0,
+              count: knowledge.intervalGroups.find(g => g.intervalMs === meta.defaultInterval)?.keys.length ?? 0,
             })}
           </div>
         )}

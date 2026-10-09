@@ -5,8 +5,10 @@
 
 use tauri::AppHandle;
 
-use crate::analysis::{PayloadQuery, PayloadSource, Sampling};
+use crate::analysis::{FrameSource, PayloadQuery, PayloadSource, Sampling};
 use crate::capture_db::InventoryRow;
+use crate::capture_store::FrameSelection;
+use crate::io::FrameMessage;
 
 /// Where a query runs: a SQLite capture or a WireTAP backend profile.
 pub enum QuerySource {
@@ -66,6 +68,35 @@ impl PayloadSource for Capture<'_> {
             Sampling::Recent => crate::capture_db::tail_frame_payloads,
         };
         read(self.0, q.protocol, q.frame_id, q.is_extended, q.limit)
+    }
+}
+
+/// Frames read a page at a time, so a whole capture is never one query.
+const FRAME_PAGE: usize = 50_000;
+
+impl FrameSource for Capture<'_> {
+    async fn frames(
+        &self,
+        selection: &FrameSelection,
+        newest: Option<usize>,
+    ) -> Result<Vec<FrameMessage>, String> {
+        if let Some(n) = newest {
+            return Ok(crate::capture_store::get_capture_frames_tail(self.0, n, selection).frames);
+        }
+        let mut frames = Vec::new();
+        loop {
+            let (page, _, total) = crate::capture_store::get_capture_frames_paginated_filtered(
+                self.0,
+                frames.len(),
+                FRAME_PAGE,
+                selection,
+            );
+            let done = page.is_empty() || frames.len() + page.len() >= total;
+            frames.extend(page);
+            if done {
+                return Ok(frames);
+            }
+        }
     }
 }
 

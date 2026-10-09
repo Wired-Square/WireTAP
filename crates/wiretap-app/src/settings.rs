@@ -282,7 +282,7 @@ fn default_session_manager_stats_interval() -> u32 {
 fn default_graph_buffer_size() -> u32 {
     10_000 // samples per signal in graph ring buffers
 }
-fn default_discovery_history_buffer() -> u32 {
+pub(crate) fn default_discovery_history_buffer() -> u32 {
     100_000 // frames retained in Discovery history
 }
 fn default_query_result_limit() -> u32 {

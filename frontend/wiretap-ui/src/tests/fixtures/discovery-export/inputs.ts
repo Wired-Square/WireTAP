@@ -31,7 +31,7 @@ const oneLevelMux: MuxKnowledge = {
       {
         caseValue: 1,
         signals: [{ name: "speed kph", startBit: 16, bitLength: 16, source: "user", confidence: "medium" }],
-        multiBytePatterns: [{ startByte: 4, length: 2, pattern: "counter16", correlatedRollover: true }],
+        multiBytePatterns: [{ start: 4, len: 2, kind: "counter16", endianness: null, rollover: false, correlatedRollover: true, slowUpperBytes: false, range: null, sampleText: null }],
       },
     ],
   ]),
@@ -58,7 +58,7 @@ export const knowledgeCanFrames: ExportFrameWithKnowledge[] = [
       signals: [
         { name: "rpm", startBit: 16, bitLength: 16, source: "user", confidence: "high", endianness: "little" },
       ],
-      multiBytePatterns: [{ startByte: 4, length: 2, pattern: "sensor16", endianness: "little" }],
+      multiBytePatterns: [{ start: 4, len: 2, kind: "sensor16", endianness: "little", rollover: false, correlatedRollover: false, slowUpperBytes: false, range: null, sampleText: null }],
     }),
   },
   { id: 0x200, len: 8, knowledge: knowledge(0x200, 8, { mux: oneLevelMux, intervalMs: 100 }) },

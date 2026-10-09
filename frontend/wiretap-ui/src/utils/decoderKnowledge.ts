@@ -1,10 +1,17 @@
 // ui/src/utils/decoderKnowledge.ts
 // Accumulated knowledge about decoder structure from analysis tools
 
-import type { MultiplexedFrame, BurstFrame, MultiBusFrame, IntervalGroup } from './analysis/messageOrderAnalysis';
-import type { MultiBytePattern, MuxCaseAnalysis } from './analysis/payloadAnalysis';
+import type { TFunction } from 'i18next';
+import type { BurstTiming } from '../generated/BurstTiming';
+import type { IntervalGroup } from '../generated/IntervalGroup';
+import type { MultiBusFrame } from '../generated/MultiBusFrame';
+import type { MultiBytePattern } from '../generated/MultiBytePattern';
+import type { MuxTiming } from '../generated/MuxTiming';
+import type { ProtocolOrder } from '../generated/ProtocolOrder';
+import type { ChangesFrame } from '../api/byteRoles';
 import type { SerialFrameConfig } from './frameExport';
 import { resolveByteIndexSync } from './analysis/checksums';
+import { frameNoteLines } from './analysis/byteNoteText';
 
 // ============================================================================
 // Types for accumulated decoder knowledge
@@ -101,8 +108,8 @@ export type DecoderKnowledge = {
 
   // Raw analysis results for reference
   intervalGroups: IntervalGroup[];
-  multiplexedFrames: MultiplexedFrame[];
-  burstFrames: BurstFrame[];
+  multiplexedFrames: MuxTiming[];
+  burstFrames: BurstTiming[];
   multiBusFrames: MultiBusFrame[];
 
   // Tracking
@@ -157,14 +164,14 @@ export function initializeFrameKnowledge(
 /**
  * Build mux knowledge from detected multiplexed frame
  */
-export function buildMuxKnowledge(mux: MultiplexedFrame): MuxKnowledge {
-  const isTwoByte = mux.selectorByte === -1;
+export function buildMuxKnowledge(mux: MuxTiming): MuxKnowledge {
+  const isTwoByte = mux.selector === 'twoByte';
 
   return {
-    selectorByte: mux.selectorByte,
-    selectorStartBit: isTwoByte ? 0 : mux.selectorByte * 8,
+    selectorByte: isTwoByte ? -1 : 0,
+    selectorStartBit: 0,
     selectorBitLength: isTwoByte ? 16 : 8,
-    cases: mux.selectorValues,
+    cases: Object.keys(mux.occurrences).map(Number),
     isTwoByte,
     source: 'message-order-analysis',
   };
@@ -256,7 +263,7 @@ export function createDefaultSignalsForFrame(
     for (const pattern of multiBytePatterns) {
       // Skip if any bytes in this pattern are already claimed
       let anyByteClaimed = false;
-      for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
+      for (let i = pattern.start; i < pattern.start + pattern.len; i++) {
         if (claimedBytes.has(i)) {
           anyByteClaimed = true;
           break;
@@ -268,21 +275,21 @@ export function createDefaultSignalsForFrame(
       const signalName = generatePatternSignalName(pattern);
       const signal: SignalKnowledge = {
         name: signalName,
-        startBit: pattern.startByte * 8,
-        bitLength: pattern.length * 8,
+        startBit: pattern.start * 8,
+        bitLength: pattern.len * 8,
         source: 'payload-analysis',
         confidence: pattern.correlatedRollover ? 'high' : 'medium',
       };
 
       // Add endianness if different from default
-      if (pattern.endianness && pattern.endianness !== defaultEndianness) {
+      if ((pattern.endianness === 'little' || pattern.endianness === 'big') && pattern.endianness !== defaultEndianness) {
         signal.endianness = pattern.endianness;
       }
 
       generatedSignals.push(signal);
 
       // Mark these bytes as claimed
-      for (let i = pattern.startByte; i < pattern.startByte + pattern.length; i++) {
+      for (let i = pattern.start; i < pattern.start + pattern.len; i++) {
         claimedBytes.add(i);
       }
     }
@@ -314,19 +321,13 @@ export function createDefaultSignalsForFrame(
  * Generate a signal name from a multi-byte pattern
  */
 function generatePatternSignalName(pattern: MultiBytePattern): string {
-  const byteRange = `${pattern.startByte}_${pattern.startByte + pattern.length - 1}`;
+  const byteRange = `${pattern.start}_${pattern.start + pattern.len - 1}`;
 
-  switch (pattern.pattern) {
+  switch (pattern.kind) {
     case 'counter16':
-      return `counter_${byteRange}`;
-    case 'counter32':
       return `counter_${byteRange}`;
     case 'sensor16':
       return `sensor_${byteRange}`;
-    case 'value16':
-      return `value_${byteRange}`;
-    case 'value32':
-      return `value_${byteRange}`;
     default:
       return `data_${byteRange}`;
   }
@@ -342,7 +343,7 @@ export function determineDefaultInterval(groups: IntervalGroup[]): number | null
   // Find group with most frames
   let largestGroup = groups[0];
   for (const group of groups) {
-    if (group.frameIds.length > largestGroup.frameIds.length) {
+    if (group.keys.length > largestGroup.keys.length) {
       largestGroup = group;
     }
   }
@@ -351,28 +352,23 @@ export function determineDefaultInterval(groups: IntervalGroup[]): number | null
 }
 
 /**
- * Update decoder knowledge with message order analysis results
+ * Update decoder knowledge with message order analysis results, every protocol
+ * and bus folded onto the bare frame id the knowledge is keyed by.
  */
 export function updateKnowledgeFromMessageOrder(
   knowledge: DecoderKnowledge,
-  results: {
-    intervalGroups: IntervalGroup[];
-    multiplexedFrames: MultiplexedFrame[];
-    burstFrames: BurstFrame[];
-    multiBusFrames: MultiBusFrame[];
-  }
+  orders: ProtocolOrder[]
 ): DecoderKnowledge {
   const newKnowledge = { ...knowledge };
   newKnowledge.frames = new Map(knowledge.frames);
 
-  // Store raw results
-  newKnowledge.intervalGroups = results.intervalGroups;
-  newKnowledge.multiplexedFrames = results.multiplexedFrames;
-  newKnowledge.burstFrames = results.burstFrames;
-  newKnowledge.multiBusFrames = results.multiBusFrames;
+  const buses = orders.flatMap((o) => o.order.buses);
+  newKnowledge.intervalGroups = buses.flatMap((b) => b.intervalGroups);
+  newKnowledge.multiplexedFrames = buses.flatMap((b) => b.mux);
+  newKnowledge.burstFrames = buses.flatMap((b) => b.bursts);
+  newKnowledge.multiBusFrames = orders.flatMap((o) => o.order.multiBus);
 
-  // Update meta with default interval
-  const defaultInterval = determineDefaultInterval(results.intervalGroups);
+  const defaultInterval = determineDefaultInterval(newKnowledge.intervalGroups);
   if (defaultInterval !== null) {
     newKnowledge.meta = {
       ...newKnowledge.meta,
@@ -380,63 +376,40 @@ export function updateKnowledgeFromMessageOrder(
     };
   }
 
-  // Update frame intervals from interval groups
-  for (const group of results.intervalGroups) {
-    for (const frameId of group.frameIds) {
-      let frame = newKnowledge.frames.get(frameId);
-      if (frame) {
-        frame = { ...frame, intervalMs: group.intervalMs };
-        newKnowledge.frames.set(frameId, frame);
-      }
-    }
+  const update = (frameId: number, change: Partial<FrameKnowledge>) => {
+    const frame = newKnowledge.frames.get(frameId);
+    if (frame) newKnowledge.frames.set(frameId, { ...frame, ...change });
+  };
+
+  for (const group of newKnowledge.intervalGroups) {
+    for (const key of group.keys) update(key.frameId, { intervalMs: group.intervalMs });
   }
 
-  // Update frames with mux knowledge
-  for (const mux of results.multiplexedFrames) {
-    let frame = newKnowledge.frames.get(mux.frameId);
-    if (frame) {
-      frame = {
-        ...frame,
-        mux: buildMuxKnowledge(mux),
-        intervalMs: mux.muxPeriodMs,  // Use true mux period
-      };
-      newKnowledge.frames.set(mux.frameId, frame);
-    }
+  for (const mux of newKnowledge.multiplexedFrames) {
+    update(mux.frameId, { mux: buildMuxKnowledge(mux), intervalMs: mux.muxPeriodMs ?? mux.interMessageMs });
   }
 
-  // Update frames with burst knowledge
-  for (const burst of results.burstFrames) {
-    let frame = newKnowledge.frames.get(burst.frameId);
-    if (frame) {
-      frame = {
-        ...frame,
-        isBurst: true,
-        burstInfo: {
-          burstCount: burst.burstCount,
-          burstPeriodMs: burst.burstPeriodMs,
-          interMessageMs: burst.interMessageMs,
-          flags: burst.flags,
-        },
-        intervalMs: burst.burstPeriodMs,  // Use burst period as interval
-      };
-      newKnowledge.frames.set(burst.frameId, frame);
-    }
+  for (const burst of newKnowledge.burstFrames) {
+    update(burst.frameId, {
+      isBurst: true,
+      burstInfo: {
+        burstCount: burst.framesPerBurst,
+        burstPeriodMs: burst.burstPeriodMs,
+        interMessageMs: burst.interMessageMs,
+        flags: burst.flags,
+      },
+      intervalMs: burst.burstPeriodMs,
+    });
   }
 
-  // Update frames with multi-bus knowledge
-  for (const multiBus of results.multiBusFrames) {
-    let frame = newKnowledge.frames.get(multiBus.frameId);
-    if (frame) {
-      frame = {
-        ...frame,
-        isMultiBus: true,
-        multiBusInfo: {
-          buses: multiBus.buses,
-          countPerBus: multiBus.countPerBus,
-        },
-      };
-      newKnowledge.frames.set(multiBus.frameId, frame);
-    }
+  for (const multiBus of newKnowledge.multiBusFrames) {
+    update(multiBus.frameId, {
+      isMultiBus: true,
+      multiBusInfo: {
+        buses: Object.keys(multiBus.framesPerBus).map(Number),
+        countPerBus: multiBus.framesPerBus as Record<number, number>,
+      },
+    });
   }
 
   newKnowledge.analysisRun = true;
@@ -490,72 +463,50 @@ export function addNotesToFrameKnowledge(
 }
 
 /**
- * Mux info from payload analysis (simplified version)
- */
-type PayloadMuxInfo = {
-  selectorByte: number;
-  selectorValues: number[];
-  isTwoByte: boolean;
-};
-
-/**
- * Update knowledge from payload analysis results (from Changes tool)
+ * Update knowledge from Payload Changes, its notes worded by `t`.
  */
 export function updateKnowledgeFromPayloadAnalysis(
   knowledge: DecoderKnowledge,
-  analysisResults: Array<{
-    frameId: number;
-    notes: string[];
-    muxInfo?: PayloadMuxInfo;
-    multiBytePatterns?: MultiBytePattern[];
-    muxCaseAnalyses?: MuxCaseAnalysis[];
-    inferredEndianness?: 'little' | 'big' | 'mixed';
-  }>
+  frames: ChangesFrame[],
+  t: TFunction
 ): DecoderKnowledge {
   let updatedKnowledge = { ...knowledge };
   updatedKnowledge.frames = new Map(knowledge.frames);
 
-  for (const result of analysisResults) {
+  for (const result of frames) {
     const frame = updatedKnowledge.frames.get(result.frameId);
     if (frame) {
-      // Update notes
-      const existingNotes = new Set(frame.notes);
-      for (const note of result.notes) {
-        existingNotes.add(note);
-      }
-
-      // Build updated frame
+      const notes = frameNoteLines(t, result.notes.frame, result.mux?.detection.selector);
       const updatedFrame: FrameKnowledge = {
         ...frame,
-        notes: Array.from(existingNotes),
+        notes: Array.from(new Set([...frame.notes, ...notes])),
       };
 
       // Store mux info if detected and not already present from message-order analysis
-      if (result.muxInfo && !frame.mux) {
+      if (result.mux && !frame.mux) {
+        const isTwoByte = result.mux.detection.selector === 'twoByte';
         updatedFrame.mux = {
-          selectorByte: result.muxInfo.selectorByte,
-          selectorStartBit: result.muxInfo.isTwoByte ? 0 : result.muxInfo.selectorByte * 8,
-          selectorBitLength: result.muxInfo.isTwoByte ? 16 : 8,
-          cases: result.muxInfo.selectorValues,
-          isTwoByte: result.muxInfo.isTwoByte,
+          selectorByte: isTwoByte ? -1 : 0,
+          selectorStartBit: 0,
+          selectorBitLength: isTwoByte ? 16 : 8,
+          cases: result.mux.cases.map((c) => c.value),
+          isTwoByte,
           source: 'changes-analysis',
         };
       }
 
       // Store per-case mux analysis data (multi-byte patterns per case)
-      if (result.muxCaseAnalyses && result.muxCaseAnalyses.length > 0 && updatedFrame.mux) {
+      if (result.mux && result.mux.cases.length > 0 && updatedFrame.mux) {
         const caseKnowledge = updatedFrame.mux.caseKnowledge ?? new Map<number, MuxCaseKnowledge>();
 
-        for (const caseAnalysis of result.muxCaseAnalyses) {
-          const existing = caseKnowledge.get(caseAnalysis.muxValue);
+        for (const muxCase of result.mux.cases) {
+          const existing = caseKnowledge.get(muxCase.value);
           const existingPatterns = existing?.multiBytePatterns ?? [];
-          const existingStartBytes = new Set(existingPatterns.map(p => p.startByte));
-          const newPatterns = (caseAnalysis.multiBytePatterns ?? []).filter(
-            p => !existingStartBytes.has(p.startByte)
-          );
+          const existingStarts = new Set(existingPatterns.map(p => p.start));
+          const newPatterns = muxCase.patterns.filter(p => !existingStarts.has(p.start));
 
-          caseKnowledge.set(caseAnalysis.muxValue, {
-            caseValue: caseAnalysis.muxValue,
+          caseKnowledge.set(muxCase.value, {
+            caseValue: muxCase.value,
             signals: existing?.signals ?? [],
             multiBytePatterns: [...existingPatterns, ...newPatterns],
           });
@@ -565,11 +516,10 @@ export function updateKnowledgeFromPayloadAnalysis(
       }
 
       // A mux frame's patterns are its cases'; its top-level ones span every case.
-      if (!result.muxInfo && result.multiBytePatterns && result.multiBytePatterns.length > 0) {
-        // Merge with existing patterns, avoiding duplicates by startByte
+      if (!result.mux && result.patterns.length > 0) {
         const existingPatterns = frame.multiBytePatterns ?? [];
-        const existingStartBytes = new Set(existingPatterns.map(p => p.startByte));
-        const newPatterns = result.multiBytePatterns.filter(p => !existingStartBytes.has(p.startByte));
+        const existingStarts = new Set(existingPatterns.map(p => p.start));
+        const newPatterns = result.patterns.filter(p => !existingStarts.has(p.start));
         updatedFrame.multiBytePatterns = [...existingPatterns, ...newPatterns];
       }
 
@@ -580,9 +530,9 @@ export function updateKnowledgeFromPayloadAnalysis(
   // Aggregate inferred endianness from all frames to update meta.defaultEndianness
   let littleCount = 0;
   let bigCount = 0;
-  for (const result of analysisResults) {
-    if (result.inferredEndianness === 'little') littleCount++;
-    else if (result.inferredEndianness === 'big') bigCount++;
+  for (const result of frames) {
+    if (result.endianness === 'little') littleCount++;
+    else if (result.endianness === 'big') bigCount++;
     // 'mixed' doesn't contribute to either
   }
 
