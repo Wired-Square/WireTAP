@@ -30,20 +30,20 @@ suggestedBranch: string,
  */
 branches: Array<string>, 
 /**
- * Git blob SHA of the bytes that would be committed.
- */
-localBlobSha: string, 
-/**
- * The same path's blob SHA on `base_branch`, so the dialog can say "nothing to
- * push" without asking for the file text. `None` — the path is not there yet, so
+ * The path's blob SHA on `base_branch`. `None` — the path is not there yet, so
  * this push creates it.
+ */
+baseBlobSha: string | null, 
+/**
+ * The bytes that would be committed are already on `base_branch`, so the dialog
+ * can say "nothing to push" without asking for the file text.
  *
  * Deliberately against `base_branch` rather than `branch`: the plan is not
  * re-fetched when the branch field moves, so a verdict about some other branch
  * would go stale the moment it was useful. The push dialog's `publish_diff`
  * answers for the branch actually chosen.
  */
-baseBlobSha: string | null, 
+identicalToBase: boolean, 
 /**
  * True when the account cannot push to the upstream, so the commit lands on a
  * fork. `can_push_upstream` used to sit beside this as its literal negation; the

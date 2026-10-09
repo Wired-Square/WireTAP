@@ -16,8 +16,8 @@ function plan(over: Partial<PublishPlan> = {}): PublishPlan {
     baseBranch: "main",
     suggestedBranch: "catalog/sbrxxx",
     branches: ["main", "v2-dev"],
-    localBlobSha: "aaa",
     baseBlobSha: "bbb",
+    identicalToBase: false,
     forkNeeded: false,
     targetIsPublic: false,
     contentBytes: 31391,
@@ -114,7 +114,7 @@ describe("publishBlockers", () => {
 
   describe("nothing to push", () => {
     it("is answered from the plan for a default direct push", () => {
-      const [blocker] = blockers({ plan: plan({ localBlobSha: "same", baseBlobSha: "same" }) });
+      const [blocker] = blockers({ plan: plan({ identicalToBase: true }) });
       expect(blocker.id).toBe("identical");
       expect(blocker.tone).toBe("warning");
       expect(blocker.message).toContain("main");
@@ -123,7 +123,7 @@ describe("publishBlockers", () => {
     // Nothing in this dialog resolves it — the answer is to edit the catalogue — so
     // offering a jump would send the user somewhere that cannot help.
     it("offers no tab to jump to, because no tab can fix it", () => {
-      const [blocker] = blockers({ plan: plan({ localBlobSha: "same", baseBlobSha: "same" }) });
+      const [blocker] = blockers({ plan: plan({ identicalToBase: true }) });
       expect(blocker.tab).toBeUndefined();
     });
 
@@ -132,7 +132,7 @@ describe("publishBlockers", () => {
     it("is not inferred from the base when another branch is the target", () => {
       expect(
         blockers({
-          plan: plan({ localBlobSha: "same", baseBlobSha: "same" }),
+          plan: plan({ identicalToBase: true }),
           effectiveBranch: "v2-dev",
         }),
       ).toEqual([]);
@@ -141,7 +141,7 @@ describe("publishBlockers", () => {
     it("defers to the loaded comparison, which knows the real target", () => {
       expect(
         blockers({
-          plan: plan({ localBlobSha: "same", baseBlobSha: "same" }),
+          plan: plan({ identicalToBase: true }),
           diff: diff({ identical: false }),
         }),
       ).toEqual([]);
