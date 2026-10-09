@@ -19,6 +19,7 @@ use crate::analysis::{
 use crate::capture_store::{FrameSelection, ProtocolFrames};
 use crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT;
 use crate::payload_source::Capture;
+use crate::report::{held, ReportFormat};
 
 /// One protocol's mirror groups.
 #[derive(Debug, Clone, Serialize)]
@@ -59,7 +60,10 @@ pub async fn payload_changes_cmd(
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
 ) -> Result<PayloadChanges, String> {
-    payload_changes(&Capture(&capture_id), selection, newest, usize::MAX).await
+    let key = held::window_key(&capture_id, &selection, newest, None);
+    let changes = payload_changes(&Capture(&capture_id), selection, newest, usize::MAX).await?;
+    held::hold_changes(key, changes.clone());
+    Ok(changes)
 }
 
 /// The Changes view's answer, shared with MCP `get_discovery_analysis`.
@@ -126,8 +130,34 @@ pub async fn frame_order_cmd(
     newest: Option<usize>,
     start: Option<OrderStart>,
 ) -> Result<Vec<ProtocolOrder>, String> {
+    let key = held::window_key(&capture_id, &selection, newest, start.as_ref());
     let selection = FrameSelection::from_groups(selection);
-    message_order(&Capture(&capture_id), &selection, newest, start.as_ref()).await
+    let orders = message_order(&Capture(&capture_id), &selection, newest, start.as_ref()).await?;
+    held::hold_orders(key, orders.clone());
+    Ok(orders)
+}
+
+/// The Payload Changes report on what `payload_changes_cmd` last returned for this window.
+#[tauri::command(rename_all = "snake_case")]
+pub fn payload_changes_report_cmd(
+    capture_id: String,
+    selection: Vec<ProtocolFrames>,
+    newest: Option<usize>,
+    format: ReportFormat,
+) -> Result<String, String> {
+    held::render_changes(&held::window_key(&capture_id, &selection, newest, None), format)
+}
+
+/// The Frame Order report on what `frame_order_cmd` last returned for this window.
+#[tauri::command(rename_all = "snake_case")]
+pub fn frame_order_report_cmd(
+    capture_id: String,
+    selection: Vec<ProtocolFrames>,
+    newest: Option<usize>,
+    start: Option<OrderStart>,
+    format: ReportFormat,
+) -> Result<String, String> {
+    held::render_orders(&held::window_key(&capture_id, &selection, newest, start.as_ref()), format)
 }
 
 /// Id and source-address candidates over one serial link's framed payloads.

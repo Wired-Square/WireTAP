@@ -1,0 +1,65 @@
+<h1>Catalogue Report — RS-485 bus</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Version</th><td>1</td></tr>
+<tr><th>Frames</th><td>3 frames</td></tr>
+<tr><th>Multiplexed</th><td>1 frame</td></tr>
+<tr><th>Signals</th><td>4 (0 enum)</td></tr>
+<tr><th>Confidence</th><td>0 high, 0 medium, 0 low, 4 none</td></tr>
+<tr><th>Byte order</th><td>Serial little-endian</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>Serial frames</h2>
+<section class="level-3">
+<h3>0x10</h3>
+<table class="fields">
+<tr><th>Length</th><td>12 bytes</td></tr>
+<tr><th>Transmitter</th><td>Controller</td></tr>
+<tr><th>Interval</th><td>250 ms</td></tr>
+<tr><th>Notes</th><td>Status broadcast</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>24/16</td><td><code>Voltage</code></td><td>×0.01</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>40/8</td><td><code>Flags</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-override">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x20</h3>
+<table class="fields">
+<tr><th>Length</th><td>16 bytes</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux Page at bits 24/8</h4>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>32/16</td><td><code>Temperature</code></td><td>×0.1</td><td>C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 2-3</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>32/32</td><td><code>Counter</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>heartbeat</h3>
+<table class="fields">
+<tr><th>Length</th><td>4 bytes</td></tr>
+<tr><th>Notes</th><td>Keyed by a name, not an id</td></tr>
+</table>
+</section>
+</section>

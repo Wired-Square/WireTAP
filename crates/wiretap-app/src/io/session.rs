@@ -1002,6 +1002,9 @@ async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_
     session_states().remove(session_id);
     session.retired = true;
     if destroying {
+        if let Some(capture_id) = crate::capture_store::get_session_frame_capture_id(session_id) {
+            crate::report::held::forget_capture(&capture_id);
+        }
         // The frontend fetches the orphaned ids from the post-session cache when it
         // handles `destroyed`, so they are stored before it and outlive the session.
         let orphaned = crate::capture_store::orphan_captures_for_session(session_id);

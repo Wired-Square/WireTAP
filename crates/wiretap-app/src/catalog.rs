@@ -86,6 +86,12 @@ pub async fn dispatch_catalog_command(
             let errors = wiretap_catalog::validate::validate_checksum_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
+        // The catalogue report. Params: { content, format }.
+        "catalog.report" => {
+            let format = serde_json::from_value(params.get("format").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid report format: {e}"))?;
+            Ok(serde_json::Value::String(crate::report::catalog::render(&content()?, format)?))
+        }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {
             let toml = wiretap_catalog::dbc::convert_dbc_to_toml(&content()?)?;

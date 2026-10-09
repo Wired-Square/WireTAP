@@ -1,936 +1,1025 @@
-# CAN Catalog Report — SBRXXX
+# Catalogue Report — SBRXXX
 
-## Overview
+## Summary
 
-| Property | Value |
-|----------|-------|
-| Version | 11 |
-| Default Endianness | little |
-| Frames | 76 |
-| Mux Frames | 7 |
-| Enums | 13 |
-| Signals | 162 |
+- **Version:** 11
+- **Frames:** 78 frames (76 CAN, 2 Modbus)
+- **Multiplexed:** 7 frames
+- **Signals:** 170 (13 enum)
+- **Confidence:** 117 high, 12 medium, 17 low, 24 none
+- **Byte order:** CAN little-endian, Modbus big-endian
 
-### Signal Confidence
-
-- **High**: 117
-- **Medium**: 12
-- **Low**: 17
-- **None**: 16
-
-## Frames
+## CAN frames
 
 ### 0x000
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x001
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x002
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x003
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x004
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x005
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 8/8 | `Status_Battery_End_Stop` | - |  | no | LE | high | Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h). |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Enum | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 8/8 | `Status_Battery_End_Stop` | — |  | no | LE | high | 0=Normal, 1=Full, 2=Empty, 3=Suspended, 16=Maintenance, 17=Maintenance, Full | Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h). |
 
 ### 0x006
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x007
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Notes:** Only transmitted on INIT
+- **Inherited:** signals
 
 ### 0x008
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** mux
 
 ### 0x009
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** signals
 
 ### 0x00A
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** mux
 
 ### 0x00B
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** signals
 
 ### 0x00D
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** signals
 
 ### 0x00E
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
+- **Notes:** Only transmitted on INIT
+- **Inherited:** signals
 
 ### 0x013
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x014
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x015
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x016
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x017
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x018
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x019
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x01A
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Inherited:** signals
 
 ### 0x01B
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Inherited:** signals
 
 ### 0x01C
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Inherited:** signals
 
 ### 0x01D
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Inherited:** signals
 
 ### 0x01E
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Inherited:** signals
 
 ### 0x100
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `100` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `100` | — |  | no | LE | none |  |
 
 ### 0x101
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Status_Inverter_Timestamp` | - |  | no | LE | high | Once per hour when battery connected |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Status_Inverter_Timestamp` | — |  | no | LE | high | Once per hour when battery connected |
 
 ### 0x102
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `102` | - |  | no | LE | none | NOBATT |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `102` | — |  | no | LE | none | NOBATT |
 
 ### 0x103
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Mux @ bit 0/8 (mux_259_0_8)
+#### Mux mux_259_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_SN_1` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_SN_1` | — |  | no | LE | medium | NOBATT |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_SN_2` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_SN_2` | — |  | no | LE | medium | NOBATT |
 
 ### 0x104
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Mux @ bit 0/8 (mux_260_0_8)
+#### Mux mux_260_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_Manufacturer_1` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_Manufacturer_1` | — |  | no | LE | medium | NOBATT |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_Manufacturer_2` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_Manufacturer_2` | — |  | no | LE | medium | NOBATT |
 
 ### 0x105
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Mux @ bit 0/8 (mux_261_0_8)
+#### Mux mux_261_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_Model_1` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_Model_1` | — |  | no | LE | medium | NOBATT |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Inverter_Model_2` | - |  | none |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Inverter_Model_2` | — |  | no | LE | none | NOBATT |
 
 ### 0x106
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
+- **Notes:** Carries the inverter's maintenance-mode command in byte 6, seen bounding five maintenance sessions across 28.7 M samples. No frame on this bus carries the SoC that maintenance discharges towards — the inverter appears to hold that target itself and simply discharge until the reported SoC arrives.
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `106_Unknown_1` | - |  | no | LE | none |  |
-| 16/16 | `106_Unknown_2` | - |  | no | LE | low | Constant 1000 across every sampled maintenance session. |
-| 32/16 | `106_Maintenance_Param` | - |  | no | LE | low | Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude. |
-| 48/8 | `Cmd_Maintenance_Mode` | - |  | no | LE | high | Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz. |
-| 56/8 | `106_Padding` | - |  | no | LE | medium |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Enum | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 0/16 | `106_Unknown_1` | — |  | no | LE | none |  |  |
+| 16/16 | `106_Unknown_2` | — |  | no | LE | low |  | Constant 1000 across every sampled maintenance session. |
+| 32/16 | `106_Maintenance_Param` | — |  | no | LE | low |  | Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude. |
+| 48/8 | `Cmd_Maintenance_Mode` | — |  | no | LE | high | 0=Off, 1=On | Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz. |
+| 56/8 | `106_Padding` | — |  | no | LE | medium |  |  |
 
 ### 0x108
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `108` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `108` | — |  | no | LE | none |  |
 
 ### 0x109
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
+- **Notes:** Inverter telemetry broadcast. Byte 0 is a constant 0xAA marker, bytes 1-2 a 16-bit LE power value, bytes 3-7 always zero.
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `109_Marker` | - |  | no | LE | high | Constant 0xAA in every sample. Frame marker / protocol tag, not data. |
-| 8/16 | `Status_PV_Power` | - | W | no | LE | high | The inverter's total DC (PV) input — matches the "Total DC power" it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive. |
-| 24/40 | `109_Padding` | - |  | no | LE | high | Always zero across every sampled window. |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `109_Marker` | — |  | no | LE | high | Constant 0xAA in every sample. Frame marker / protocol tag, not data. |
+| 8/16 | `Status_PV_Power` | — | W | no | LE | high | The inverter's total DC (PV) input — matches the "Total DC power" it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive. |
+| 24/40 | `109_Padding` | — |  | no | LE | high | Always zero across every sampled window. |
 
 ### 0x191
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
+- **Notes:** NOBATT Discovery Message
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `191` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `191` | — |  | no | LE | none |  |
 
 ### 0x1E0
 
-*Length: 8 | Transmitter: Inverter*
+- **Length:** 8 bytes
+- **Transmitter:** Inverter
+- **Notes:** Modbus-over-CAN tunnel. The inverter initiates and the BMS replies on this same CAN id, so both nodes transmit it — transmitter records the initiator only. Payloads concatenate into one Modbus RTU byte stream with no transport header: a 9- or 17-byte response arrives as 8+1 or 8+8+1. The `tunnel` table below hands it to the reassembler, which recovers each message by the RTU length rules and validates CRC-16/Modbus. Distinct from the 0x1F0 firmware-service tunnel, which is catalogued in sbr_modbus.toml.
 
 ### 0x400
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Notes:** No longer emitted beyond BMS firmware patch 0x26 (see Info_BMS_Firmware_Patch at 0x707).
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `400_Padding` | - |  | no | LE | none |  |
-| 8/16 | `Status_Battery_Actual_SoC` | x0.01 + 0 | % | no | LE | high |  |
-| 24/40 | `400_Unknown` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `400_Padding` | — |  | no | LE | none |  |
+| 8/16 | `Status_Battery_Actual_SoC` | ×0.01 | % | no | LE | high |  |
+| 24/40 | `400_Unknown` | — |  | no | LE | none |  |
 
 ### 0x401
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `401_Padding` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `401_Padding` | — |  | no | BE | high |  |
 
 ### 0x402
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Notes:** Appears on BMS firmware patch .30 and replaces 0x400, which is not emitted beyond patch 0x26 (see Info_BMS_Firmware_Patch at 0x707).
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `402_Unknown` | - |  | no | LE | high | Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown. |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `402_Unknown` | — |  | no | LE | high | Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown. |
 
 ### 0x500
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Notes:** Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of an observed 3-to-7 module change.
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `500_Unknown_0` | - |  | no | LE | none |  |
-| 8/16 | `500_Unknown_1` | - |  | no | LE | none |  |
-| 24/32 | `500_Unknown_2` | - |  | no | LE | none |  |
-| 56/8 | `Status_Battery_SoC_Int` | - | % | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `500_Unknown_0` | — |  | no | LE | none |  |
+| 8/16 | `500_Unknown_1` | — |  | no | LE | none |  |
+| 24/32 | `500_Unknown_2` | — |  | no | LE | none |  |
+| 56/8 | `Status_Battery_SoC_Int` | — | % | no | LE | high |  |
 
 ### 0x501
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x502
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x503
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x504
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 16/16 | `Status_Battery_Current_Inverted` | x0.1 + 0 | A | yes | LE | high | This is the opposite sign to the signal at 0x704 |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `Status_Battery_Current_Inverted` | ×0.1 | A | yes | LE | high | This is the opposite sign to the signal at 0x704 |
 
 ### 0x505
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x506
 
-*Length: 8*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Inherited:** signals
 
 ### 0x512
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `512_Padding` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `512_Padding` | — |  | no | LE | high |  |
 
 ### 0x700
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `700_Padding` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `700_Padding` | — |  | no | LE | high |  |
 
 ### 0x701
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Info_Battery_Max_Voltage` | x0.1 + 0 | V | no | LE | high |  |
-| 16/16 | `Info_Battery_Min_Voltage` | x0.1 + 0 | V | no | LE | high |  |
-| 32/16 | `Info_Battery_Max_Charge_Current` | x0.1 + 0 | A | no | LE | high |  |
-| 48/16 | `Info_Battery_Max_Dischg_Current` | x0.1 + 0 | A | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Info_Battery_Max_Voltage` | ×0.1 | V | no | LE | high |  |
+| 16/16 | `Info_Battery_Min_Voltage` | ×0.1 | V | no | LE | high |  |
+| 32/16 | `Info_Battery_Max_Charge_Current` | ×0.1 | A | no | LE | high |  |
+| 48/16 | `Info_Battery_Max_Dischg_Current` | ×0.1 | A | no | LE | high |  |
 
 ### 0x702
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Battery_Reported_SoC` | x0.01 + 0 | % | no | LE | high |  |
-| 16/16 | `Status_Battery_SoH` | x0.01 + 0 | % | no | LE | high |  |
-| 32/16 | `Status_Battery_Remaining_Energy` | - | Wh | no | LE | high |  |
-| 48/16 | `Status_Battery_Max_Energy` | - | Wh | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Battery_Reported_SoC` | ×0.01 | % | no | LE | high |  |
+| 16/16 | `Status_Battery_SoH` | ×0.01 | % | no | LE | high |  |
+| 32/16 | `Status_Battery_Remaining_Energy` | — | Wh | no | LE | high |  |
+| 48/16 | `Status_Battery_Max_Energy` | — | Wh | no | LE | high |  |
 
 ### 0x703
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Status_Battery_Energy_Charged` | - | Wh | no | LE | high |  |
-| 32/32 | `Status_Battery_Energy_Discharged` | - | Wh | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Status_Battery_Energy_Charged` | — | Wh | no | LE | high |  |
+| 32/32 | `Status_Battery_Energy_Discharged` | — | Wh | no | LE | high |  |
 
 ### 0x704
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Battery_Voltage` | x0.1 + 0 | V | no | LE | high |  |
-| 16/16 | `Status_Battery_Current` | x0.1 + 0 | A | yes | LE | high |  |
-| 32/16 | `Status_Battery_Voltage_Alt_704` | x0.1 + 0 | V | no | LE | medium | A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705. |
-| 48/16 | `Status_Battery_Temperature` | x0.1 + 0 | °C | yes | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Battery_Voltage` | ×0.1 | V | no | LE | high |  |
+| 16/16 | `Status_Battery_Current` | ×0.1 | A | yes | LE | high |  |
+| 32/16 | `Status_Battery_Voltage_Alt_704` | ×0.1 | V | no | LE | medium | A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705. |
+| 48/16 | `Status_Battery_Temperature` | ×0.1 | °C | yes | LE | high |  |
 
 ### 0x705
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `Info_Battery_Operation` | - |  | no | LE | high |  |
-| 8/8 | `705_End_Stop` | - |  | no | LE | low | The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror. |
-| 16/8 | `705_Always_1` | - |  | no | LE | low |  |
-| 24/16 | `Info_Battery_Type` | - |  | no | LE | high |  |
-| 40/16 | `Status_Battery_Voltage_Alt_705` | x0.1 + 0 | V | no | LE | medium | A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704. |
-| 56/8 | `705_Padding` | - |  | no | LE | medium |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Enum | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 0/8 | `Info_Battery_Operation` | — |  | no | LE | high | 0=Unplugged, 1=Standby, 2=Run |  |
+| 8/8 | `705_End_Stop` | — |  | no | LE | low |  | The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror. |
+| 16/8 | `705_Always_1` | — |  | no | LE | low |  |  |
+| 24/16 | `Info_Battery_Type` | — |  | no | LE | high | 8422=SBR064, 8423=SBR096, 8424=SBR128, 8425=SBR160, 8426=SBR192, 8427=SBR224, 8428=SBR256 |  |
+| 40/16 | `Status_Battery_Voltage_Alt_705` | ×0.1 | V | no | LE | medium |  | A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704. |
+| 56/8 | `705_Padding` | — |  | no | LE | medium |  |  |
 
 ### 0x706
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Overview_Cell_Max_Temp` | x0.1 + 0 | °C | yes | LE | high |  |
-| 16/16 | `Overview_Cell_Min_Temp` | x0.1 + 0 | °C | yes | LE | high |  |
-| 32/16 | `Overview_Cell_Max_Voltage` | x0.001 + 0 | V | no | LE | high |  |
-| 48/16 | `Overview_Cell_Min_Voltage` | x0.001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Overview_Cell_Max_Temp` | ×0.1 | °C | yes | LE | high |  |
+| 16/16 | `Overview_Cell_Min_Temp` | ×0.1 | °C | yes | LE | high |  |
+| 32/16 | `Overview_Cell_Max_Voltage` | ×0.001 | V | no | LE | high |  |
+| 48/16 | `Overview_Cell_Min_Voltage` | ×0.001 | V | no | LE | high |  |
 
 ### 0x707
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `Info_BMS_Firmware_Patch` | - |  | no | LE | high |  |
-| 8/16 | `707_All_Zero` | - |  | no | LE | none |  |
-| 24/8 | `Info_BMS_Firmware_Minor` | - |  | no | LE | high |  |
-| 32/16 | `Info_Battery_Nameplate_Capacity` | - | Wh | no | LE | high |  |
-| 48/16 | `Info_Battery_Module_Count` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `Info_BMS_Firmware_Patch` | — |  | no | LE | high |  |
+| 8/16 | `707_All_Zero` | — |  | no | LE | none |  |
+| 24/8 | `Info_BMS_Firmware_Minor` | — |  | no | LE | high |  |
+| 32/16 | `Info_Battery_Nameplate_Capacity` | — | Wh | no | LE | high |  |
+| 48/16 | `Info_Battery_Module_Count` | — |  | no | LE | high |  |
 
 ### 0x708
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Mux @ bit 0/8 (mux_1800_0_8)
+#### Mux mux_1800_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Battery_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Battery_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/48 | `Info_Battery_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/48 | `Info_Battery_SN_2` | — |  | no | LE | high |  |
 
 ### 0x709
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `709_Padding` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `709_Padding` | — |  | no | LE | none |  |
 
 ### 0x70A
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Mux @ bit 0/8 (mux_1802_0_8)
+#### Mux mux_1802_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Battery_Manufacturer` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Battery_Manufacturer` | — |  | no | LE | high |  |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `Info_Battery_Model_Short` | - |  | medium |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `Info_Battery_Model_Short` | — |  | no | LE | medium |  |
 
 ### 0x70B
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `Info_Battery_Model` | - |  | no | LE | medium |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `Info_Battery_Model` | — |  | no | LE | medium |  |
 
 ### 0x70D
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `70d_Unknown_Permission_3_10701__` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `70d_Unknown_Permission_3_10701__` | — |  | no | LE | none |  |
 
 ### 0x70E
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/64 | `70E_Unknown_Permission_3_10705__` | - |  | no | LE | none |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/64 | `70E_Unknown_Permission_3_10705__` | — |  | no | LE | none |  |
 
 ### 0x70F
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 10,000 ms
 
-#### Mux @ bit 0/8 (mux_1807_0_8)
+#### Mux mux_1807_0_8 at bits 0/8
 
-**Case 0x0:**
+##### Case 0
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `70F_Mux0_Const` | - |  | low |
-| 32/16 | `Info_Battery_Max_Power` | - | W | high |
-| 48/16 | `Info_Battery_Max_Power_2` | - | W | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `70F_Mux0_Const` | — |  | no | LE | low |  |
+| 32/16 | `Info_Battery_Max_Power` | — | W | no | LE | high | Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — it held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed. |
+| 48/16 | `Info_Battery_Max_Power_2` | — | W | no | LE | high | Second copy of the static 1920 W x module_count rating. Invariant across every sampled window — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701. |
 
-**Case 0x1:**
+##### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/56 | `70F_Mux1_Padding` | - |  | low |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 8/56 | `70F_Mux1_Padding` | — |  | no | LE | low |  |
 
-**Case 0x2:**
+##### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `70F_Unknown_Mux_2_1` | - |  | low |
-| 32/16 | `70F_Mux2_Padding` | - |  | low |
-| 48/16 | `70F_Unknown_Mux_2_3` | - |  | none |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `70F_Unknown_Mux_2_1` | — |  | no | LE | low | Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_3_1: ~9950 in warm windows, ~12800 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved. |
+| 32/16 | `70F_Mux2_Padding` | — |  | no | LE | low |  |
+| 48/16 | `70F_Unknown_Mux_2_3` | — |  | no | LE | none | dynamic, unmapped |
 
-**Case 0x3:**
+##### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `70F_Unknown_Mux_3_1` | - |  | low |
-| 32/16 | `70F_Mux3_Padding` | - |  | low |
-| 48/16 | `70F_Unknown_Mux_3_3` | x0.01 + 0 | % | low |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `70F_Unknown_Mux_3_1` | — |  | no | LE | low | Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_2_1: ~9926 in warm windows, ~12940 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved. |
+| 32/16 | `70F_Mux3_Padding` | — |  | no | LE | low |  |
+| 48/16 | `70F_Unknown_Mux_3_3` | ×0.01 | % | no | LE | low | Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three separate windows — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: it held constant at 9990 while SoC cycled 25.6 % to 100 %. |
 
-**Case 0x4:**
+##### Case 4
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 8/8 | `70F_Mux4_Padding_0` | - |  | low |
-| 16/16 | `70F_Mux4_Charge_Value` | - |  | low |
-| 32/24 | `70F_Mux4_Padding_1` | - |  | low |
-| 56/8 | `Status_Charge_State` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Enum | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 8/8 | `70F_Mux4_Padding_0` | — |  | no | LE | low |  |  |
+| 16/16 | `70F_Mux4_Charge_Value` | — |  | no | LE | low |  | Bytes 2-3 are one 16-bit field, not an 8-bit value plus padding: byte 3 changed from 7 to 10 between sampled windows. Drifts slowly (~1996 warm, ~2593 cold) and tracks with 70F_Unknown_Mux_2_1 and 70F_Unknown_Mux_3_1. |
+| 32/24 | `70F_Mux4_Padding_1` | — |  | no | LE | low |  |  |
+| 56/8 | `Status_Charge_State` | — |  | no | LE | high | 0=Normal, 2=Stop Charge |  |
 
-**Case 0x5:**
+##### Case 5
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `Status_Module_1_SoC` | x0.01 + 0 | % | high |
-| 32/16 | `Status_Module_2_SoC` | x0.01 + 0 | % | high |
-| 48/16 | `Status_Module_3_SoC` | x0.01 + 0 | % | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `Status_Module_1_SoC` | ×0.01 | % | no | LE | high |  |
+| 32/16 | `Status_Module_2_SoC` | ×0.01 | % | no | LE | high |  |
+| 48/16 | `Status_Module_3_SoC` | ×0.01 | % | no | LE | high |  |
 
-**Case 0x6:**
+##### Case 6
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `Status_Module_4_SoC` | x0.01 + 0 | % | high |
-| 32/16 | `Status_Module_5_SoC` | x0.01 + 0 | % | high |
-| 48/16 | `Status_Module_6_SoC` | x0.01 + 0 | % | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `Status_Module_4_SoC` | ×0.01 | % | no | LE | high |  |
+| 32/16 | `Status_Module_5_SoC` | ×0.01 | % | no | LE | high |  |
+| 48/16 | `Status_Module_6_SoC` | ×0.01 | % | no | LE | high |  |
 
-**Case 0x7:**
+##### Case 7
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/16 | `Status_Module_7_SoC` | x0.01 + 0 | % | high |
-| 32/16 | `Status_Module_8_SoC` | x0.01 + 0 | % | medium |
-| 48/16 | `70F_Mux7_Padding` | - |  | low |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/16 | `Status_Module_7_SoC` | ×0.01 | % | no | LE | high |  |
+| 32/16 | `Status_Module_8_SoC` | ×0.01 | % | no | LE | medium |  |
+| 48/16 | `70F_Mux7_Padding` | — |  | no | LE | low |  |
 
 ### 0x713
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `Status_Pos_Cell_Min_Temp` | - | Cell # | no | LE | high |  |
-| 8/8 | `Status_Pos_Module_Min_Temp` | - | Module # | no | LE | high |  |
-| 16/16 | `Status_Cell_Min_Temp` | x0.1 + 0 | °C | yes | LE | high |  |
-| 32/8 | `Status_Pos_Cell_Max_Temp` | - | Cell # | no | LE | high |  |
-| 40/8 | `Status_Pos_Module_Max_Temp` | - | Module # | no | LE | high |  |
-| 48/16 | `Status_Cell_Max_Temp` | x0.1 + 0 | °C | yes | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `Status_Pos_Cell_Min_Temp` | — | Cell # | no | LE | high |  |
+| 8/8 | `Status_Pos_Module_Min_Temp` | — | Module # | no | LE | high |  |
+| 16/16 | `Status_Cell_Min_Temp` | ×0.1 | °C | yes | LE | high |  |
+| 32/8 | `Status_Pos_Cell_Max_Temp` | — | Cell # | no | LE | high |  |
+| 40/8 | `Status_Pos_Module_Max_Temp` | — | Module # | no | LE | high |  |
+| 48/16 | `Status_Cell_Max_Temp` | ×0.1 | °C | yes | LE | high |  |
 
 ### 0x714
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `Status_Pos_Cell_Max_Voltage` | - | Cell # | no | LE | high |  |
-| 8/8 | `Status_Pos_Module_Max_Voltage` | - | Module # | no | LE | high |  |
-| 16/16 | `Status_Cell_Max_Voltage_HP` | x0.0001 + 0 | V | no | LE | high |  |
-| 32/8 | `Status_Pos_Cell_Min_Voltage` | - | Cell # | no | LE | high |  |
-| 40/8 | `Status_Pos_Module_Min_Voltage` | - | Module # | no | LE | high |  |
-| 48/16 | `Status_Cell_Min_Voltage_HP` | x0.0001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/8 | `Status_Pos_Cell_Max_Voltage` | — | Cell # | no | LE | high |  |
+| 8/8 | `Status_Pos_Module_Max_Voltage` | — | Module # | no | LE | high |  |
+| 16/16 | `Status_Cell_Max_Voltage_HP` | ×0.0001 | V | no | LE | high |  |
+| 32/8 | `Status_Pos_Cell_Min_Voltage` | — | Cell # | no | LE | high |  |
+| 40/8 | `Status_Pos_Module_Min_Voltage` | — | Module # | no | LE | high |  |
+| 48/16 | `Status_Cell_Min_Voltage_HP` | ×0.0001 | V | no | LE | high |  |
 
 ### 0x715
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Module_1_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 16/16 | `Status_Module_1_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 32/16 | `Status_Module_2_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 48/16 | `Status_Module_2_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Module_1_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 16/16 | `Status_Module_1_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 32/16 | `Status_Module_2_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 48/16 | `Status_Module_2_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
 
 ### 0x716
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Module_3_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 16/16 | `Status_Module_3_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 32/16 | `Status_Module_4_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 48/16 | `Status_Module_4_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Module_3_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 16/16 | `Status_Module_3_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 32/16 | `Status_Module_4_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 48/16 | `Status_Module_4_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
 
 ### 0x717
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Module_5_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 16/16 | `Status_Module_5_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 32/16 | `Status_Module_6_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 48/16 | `Status_Module_6_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Module_5_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 16/16 | `Status_Module_5_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 32/16 | `Status_Module_6_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 48/16 | `Status_Module_6_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
 
 ### 0x718
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_Module_7_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 16/16 | `Status_Module_7_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 32/16 | `Status_Module_8_Min_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
-| 48/16 | `Status_Module_8_Max_Voltage` | x0.0001 + 0 | V | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_Module_7_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 16/16 | `Status_Module_7_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 32/16 | `Status_Module_8_Min_Voltage` | ×0.0001 | V | no | LE | high |  |
+| 48/16 | `Status_Module_8_Max_Voltage` | ×0.0001 | V | no | LE | high |  |
 
 ### 0x719
 
-*Length: 8 | Transmitter: BMS*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/16 | `Status_3_10789__` | - |  | no | LE | low |  |
-| 16/16 | `Status_Module_Fault_3_10790__` | - |  | no | LE | low |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Status_3_10789__` | — |  | no | LE | low |  |
+| 16/16 | `Status_Module_Fault_3_10790__` | — |  | no | LE | low |  |
 
 ### 0x71A
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/8 | `Info_Module_1_Cell_Type` | - |  | no | LE | high |  |
-| 8/8 | `Info_Module_2_Cell_Type` | - |  | no | LE | high |  |
-| 16/8 | `Info_Module_3_Cell_Type` | - |  | no | LE | high |  |
-| 24/8 | `Info_Module_4_Cell_Type` | - |  | no | LE | high |  |
-| 32/8 | `Info_Module_5_Cell_Type` | - |  | no | LE | high |  |
-| 40/8 | `Info_Module_6_Cell_Type` | - |  | no | LE | high |  |
-| 48/8 | `Info_Module_7_Cell_Type` | - |  | no | LE | high |  |
-| 56/8 | `Info_Module_8_Cell_Type` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Enum | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 0/8 | `Info_Module_1_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 8/8 | `Info_Module_2_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 16/8 | `Info_Module_3_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 24/8 | `Info_Module_4_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 32/8 | `Info_Module_5_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 40/8 | `Info_Module_6_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 48/8 | `Info_Module_7_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
+| 56/8 | `Info_Module_8_Cell_Type` | — |  | no | LE | high | 66=IEC, 68=Non-IEC |  |
 
 ### 0x71B
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Info_Module_1_Production_Date` | - |  | no | LE | high |  |
-| 32/32 | `Info_Module_2_Production_Date` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Info_Module_1_Production_Date` | — |  | no | LE | high |  |
+| 32/32 | `Info_Module_2_Production_Date` | — |  | no | LE | high |  |
 
 ### 0x71C
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Info_Module_3_Production_Date` | - |  | no | LE | high |  |
-| 32/32 | `Info_Module_4_Production_Date` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Info_Module_3_Production_Date` | — |  | no | LE | high |  |
+| 32/32 | `Info_Module_4_Production_Date` | — |  | no | LE | high |  |
 
 ### 0x71D
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Info_Module_5_Production_Date` | - |  | no | LE | high |  |
-| 32/32 | `Info_Module_6_Production_Date` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Info_Module_5_Production_Date` | — |  | no | LE | high |  |
+| 32/32 | `Info_Module_6_Production_Date` | — |  | no | LE | high |  |
 
 ### 0x71E
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
 
-#### Signals
-
-| Bit Range | Signal | Scale | Unit | Signed | Endian | Confidence | Notes |
-|-----------|--------|-------|------|--------|--------|------------|-------|
-| 0/32 | `Info_Module_7_Production_Date` | - |  | no | LE | high |  |
-| 32/32 | `Info_Module_8_Production_Date` | - |  | no | LE | high |  |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/32 | `Info_Module_7_Production_Date` | — |  | no | LE | high |  |
+| 32/32 | `Info_Module_8_Production_Date` | — |  | no | LE | high |  |
 
 ### 0x71F
 
-*Length: 8 | Transmitter: BMS | Interval: 60000ms*
+- **Length:** 8 bytes
+- **Transmitter:** BMS
+- **Interval:** 60,000 ms
+- **Notes:** Characters 8–9 = year (YY), 10 = month (M, or A/B/C for 10–12), 11–12 = day (DD).
 
-#### Mux @ bit 0/8 (mux_1823_0_8)
+#### Mux mux_1823_0_8 at bits 0/8
 
-**Case 0x1:**
+##### Case 1
 
-##### Mux @ bit 8/8 (mux_1823_1_8_8)
+###### Mux mux_1823_1_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_1_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_1_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_1_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_1_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_1_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_1_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+##### Case 2
 
-##### Mux @ bit 8/8 (mux_1823_2_8_8)
+###### Mux mux_1823_2_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_2_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_2_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_2_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_2_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_2_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_2_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+##### Case 3
 
-##### Mux @ bit 8/8 (mux_1823_3_8_8)
+###### Mux mux_1823_3_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_3_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_3_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_3_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_3_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_3_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_3_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x4:**
+##### Case 4
 
-##### Mux @ bit 8/8 (mux_1823_4_8_8)
+###### Mux mux_1823_4_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_4_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_4_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_4_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_4_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_4_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_4_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x5:**
+##### Case 5
 
-##### Mux @ bit 8/8 (mux_1823_5_8_8)
+###### Mux mux_1823_5_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_5_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_5_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_5_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_5_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_5_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_5_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x6:**
+##### Case 6
 
-##### Mux @ bit 8/8 (mux_1823_6_8_8)
+###### Mux mux_1823_6_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_6_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_6_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_6_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_6_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_6_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_6_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x7:**
+##### Case 7
 
-##### Mux @ bit 8/8 (mux_1823_7_8_8)
+###### Mux mux_1823_7_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_7_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_7_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_7_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_7_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_7_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_7_SN_3` | — |  | no | LE | high |  |
 
-**Case 0x8:**
+##### Case 8
 
-##### Mux @ bit 8/8 (mux_1823_8_8_8)
+###### Mux mux_1823_8_8_8 at bits 8/8
 
-**Case 0x1:**
+###### Case 1
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_8_SN_1` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_8_SN_1` | — |  | no | LE | high |  |
 
-**Case 0x2:**
+###### Case 2
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_8_SN_2` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_8_SN_2` | — |  | no | LE | high |  |
 
-**Case 0x3:**
+###### Case 3
 
-| Bit Range | Signal | Scale | Unit | Confidence |
-|-----------|--------|-------|------|------------|
-| 16/48 | `Info_Module_8_SN_3` | - |  | high |
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 16/48 | `Info_Module_8_SN_3` | — |  | no | LE | high |  |
+
+## Modbus frames
+
+### tunnel_4de2_holding (register 19938)
+
+- **Length:** 12 bytes
+- **Interval:** 5,000 ms (default)
+
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Tunnel_4DE2_Holding_0` | — |  | no | BE | none |  |
+| 16/16 | `Tunnel_4DE2_Holding_1` | — |  | no | BE | none |  |
+| 32/16 | `Tunnel_4DE2_Holding_2` | — |  | no | BE | none |  |
+| 48/16 | `Tunnel_4DE2_Holding_3` | — |  | no | BE | none |  |
+| 64/16 | `Tunnel_4DE2_Holding_4` | — |  | no | BE | none |  |
+| 80/16 | `Tunnel_4DE2_Holding_5` | — |  | no | BE | none |  |
+
+### tunnel_4de2_input (register 19938)
+
+- **Length:** 4 bytes
+- **Interval:** 5,000 ms (default)
+
+| Bits | Signal | Scale | Unit | Signed | Order | Confidence | Notes |
+|---|---|---|---|---|---|---|---|
+| 0/16 | `Tunnel_4DE2_Input_0` | — |  | no | BE | none |  |
+| 16/16 | `Tunnel_4DE2_Input_1` | — |  | no | BE | none |  |
 
 ---
+
 *Generated by WireTAP*

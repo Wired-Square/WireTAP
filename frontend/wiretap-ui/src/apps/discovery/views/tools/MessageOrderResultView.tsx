@@ -23,8 +23,9 @@ import { formatMs, formatOptionalMs } from "../../../../utils/reportExport";
 import ExportReportDialog from "../../../../dialogs/ExportReportDialog";
 import { pickFileToSave } from "../../../../api/dialogs";
 import { saveCatalog } from "../../../../api/catalog";
-import { generateFrameOrderReport } from "../../../../utils/frameOrderReport";
-import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportExport";
+import { frameOrderReport } from "../../../../api/reports";
+import { getFilterForFormat, renderReport, type ExportFormat } from "../../../../utils/reportExport";
+import { withAppError } from "../../../../utils/appError";
 import { Button, IconButton } from "../../../../components/Button";
 import { Badge } from "../../../../components/Badge";
 import { Card, cardClass } from "../../../../components/Card";
@@ -37,6 +38,7 @@ type Props = {
 export default function MessageOrderResultView({ embedded = false, onClose }: Props) {
   const { t } = useTranslation("discovery");
   const results = useDiscoveryStore((s) => s.toolbox.messageOrderResults);
+  const orderWindow = useDiscoveryStore((s) => s.toolbox.messageOrderWindow);
   const updateOptions = useDiscoveryStore((s) => s.updateMessageOrderOptions);
   const runAnalysis = useDiscoveryStore((s) => s.runAnalysis);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -48,9 +50,11 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
   };
 
   const handleExport = async (format: ExportFormat, filename: string) => {
-    if (!results) return;
-    try {
-      const content = generateFrameOrderReport(results, format);
+    if (!results || !orderWindow) return;
+    await withAppError("Export Error", "The report was not exported", async () => {
+      const content = format === "json"
+        ? JSON.stringify(results, null, 2)
+        : await renderReport(format, "Frame Order Report", (f) => frameOrderReport(orderWindow, orderWindow.start, f));
       const path = await pickFileToSave({
         defaultPath: filename,
         filters: getFilterForFormat(format),
@@ -58,9 +62,7 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
       if (path) {
         await saveCatalog(path, content);
       }
-    } catch (err) {
-      console.error("Failed to export report:", err);
-    }
+    });
     setShowExportDialog(false);
   };
 

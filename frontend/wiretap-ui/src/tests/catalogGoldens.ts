@@ -54,6 +54,7 @@ const byteNoteCodes = fixtureJson<Record<string, ByteNotes>>("analysis/byteNoteC
 /** `byteNotes.json`'s profiles as Payload Changes reports them, each under its own id. */
 export const changesResult: ChangesResult = {
   tool: "changes",
+  window: { captureId: "capture", selection: [] },
   frameCount: 12345,
   frames: byteNotes.cases.map(({ name, input }, i) => ({
     ...input.profile,

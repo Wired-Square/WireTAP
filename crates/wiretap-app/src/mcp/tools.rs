@@ -19,7 +19,7 @@ use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::{json, Value};
 use wslib_ai_mcp::dom::{self, DomBridge};
-use wslib_ai_mcp::result::{internal_error as err, ok_json};
+use wslib_ai_mcp::result::{internal_error as err, ok_json, ok_text};
 use wslib_ai_mcp::rmcp;
 use wslib_ai_mcp::router::{compose, mark_read_only};
 use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
@@ -670,6 +670,17 @@ impl WireTapTools {
         )
     }
 
+    #[tool(description = "Describe a decoder catalog in Markdown: its counts, byte orders and every protocol's frames with their signals and mux cases — the catalogue report the Catalog Editor exports. Name as for read_catalog.")]
+    async fn describe_catalog(
+        &self,
+        Parameters(p): Parameters<ReadCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let cat = crate::catalog::find_catalog(&self.app, &p.name).await.map_err(err)?;
+        let toml = crate::catalog::open_catalog(cat.path).await.map_err(err)?;
+        let markdown = crate::report::catalog::render(&toml, crate::report::ReportFormat::Markdown).map_err(err)?;
+        Ok(ok_text(markdown))
+    }
+
     #[tool(description = "Validate catalog TOML without writing it. Returns { valid, errors: [{field, message}] } — a dry run for create_catalog/update_catalog.")]
     async fn validate_catalog(
         &self,
@@ -720,6 +731,27 @@ impl WireTapTools {
             "frames": changes.frames,
             "mirrors": changes.mirrors,
         }))
+    }
+
+    #[tool(description = "Describe a session's frame capture in Markdown: the Payload Changes report (byte roles, patterns, mux cases, mirrors, bursts, notes) then the Frame Order report (cycles, mux and burst timing, repetition groups per protocol and bus) — the reports Discovery exports. frame_ids and newest as for get_discovery_analysis; without frame_ids the first 64 frames are profiled.")]
+    async fn describe_capture_analysis(
+        &self,
+        Parameters(p): Parameters<SessionAnalysisParams>,
+    ) -> Result<CallToolResult, McpError> {
+        use crate::report::ReportFormat::Markdown;
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let groups = frame_key_groups(p.frame_ids).map_err(err)?;
+        let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
+        let selection = FrameSelection::from_groups(groups.clone());
+        let newest = Some(analysis_window(p.newest));
+        let source = Capture(&capture_id);
+        let changes = crate::byte_roles::payload_changes(&source, groups, newest, max_frames).await.map_err(err)?;
+        let orders = crate::analysis::message_order(&source, &selection, newest, None).await.map_err(err)?;
+        Ok(ok_text(format!(
+            "{}\n{}",
+            crate::report::changes::report(&changes).render(Markdown),
+            crate::report::order::report(&orders).render(Markdown)
+        )))
     }
 
     #[tool(description = "Message order of a session's frame capture, per protocol and per bus: interval groups, start-id candidates, cycle patterns (the order frames follow a start id), mux and burst timing, and the ids seen on more than one bus. The same answer as Discovery's Frame Order. Headless. Optional frame_ids (\"can:256\") restrict it, newest sets how many of the capture's newest frames are read (default 100000, Discovery's default live window; pass a larger value to read more of a long capture), and start_frame_id (with start_is_extended, and start_protocol to name one protocol) walks cycles from that id.")]

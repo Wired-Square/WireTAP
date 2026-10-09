@@ -4,8 +4,9 @@
 import { useTranslation } from "react-i18next";
 import type { ChangesResult } from "../stores/discoveryStore";
 import ExportReportDialog from "./ExportReportDialog";
-import { generatePayloadChangesReport } from "../utils/payloadChangesReport";
-import type { ExportFormat } from "../utils/reportExport";
+import { payloadChangesReport } from "../api/reports";
+import { renderReport, type ExportFormat } from "../utils/reportExport";
+import { withAppError } from "../utils/appError";
 
 export type ExportAnalysisDialogProps = {
   open: boolean;
@@ -25,10 +26,13 @@ export default function ExportAnalysisDialog({
   const { t, i18n } = useTranslation("dialogs");
   if (!results) return null;
 
-  const handleExport = (format: ExportFormat, filename: string) => {
-    const content = generatePayloadChangesReport(results, format);
-    onExport(content, filename, format);
-  };
+  const handleExport = (format: ExportFormat, filename: string) =>
+    withAppError("Export Error", "The report was not exported", async () => {
+      const content = format === "json"
+        ? JSON.stringify(results, null, 2)
+        : await renderReport(format, "Payload Changes Report", (f) => payloadChangesReport(results.window, f));
+      onExport(content, filename, format);
+    });
 
   return (
     <ExportReportDialog

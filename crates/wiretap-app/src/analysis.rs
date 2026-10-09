@@ -263,7 +263,7 @@ pub struct ProtocolOrder {
 
 /// The frame a cycle is walked from, in place of the likeliest start ids; under
 /// every protocol when none is named.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OrderStart {

@@ -48,6 +48,9 @@ export type CaptureSelection = { captureId: string; selection: ProtocolFrames[] 
  *  `newest` frames when live. */
 export type AnalysisWindow = CaptureSelection & { newest?: number };
 
+/** Frame Order's window, with the frame its cycles were walked from. */
+export type OrderWindow = AnalysisWindow & { start: OrderStart | null };
+
 /** The `ToolboxState` slot each tool writes its output into. */
 export type ToolResultKey =
   | 'messageOrderResults'
@@ -127,6 +130,8 @@ export type ModbusTargetOptions = {
 
 export type ChangesResult = {
   tool: 'changes';
+  /** What it read, which its report reads again. */
+  window: AnalysisWindow;
   /** The frames read for mirrors and bursts. */
   frameCount: number;
   frames: ChangesFrame[];
@@ -226,6 +231,8 @@ export type ToolboxState = {
   checksumDiscovery: ChecksumDiscoveryOptions;
   modbusTarget: ModbusTargetOptions;
   messageOrderResults: ProtocolOrder[] | null;
+  /** What `messageOrderResults` read, which its report reads again. */
+  messageOrderWindow: OrderWindow | null;
   changesResults: ChangesResult | null;
   serialFramingResults: SerialFramingResult | null;
   serialPayloadResults: SerialPayloadResult | null;
@@ -356,6 +363,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     },
     modbusTarget: { profileId: null, connection: MODBUS_BLANK_CONNECTION },
     messageOrderResults: null,
+    messageOrderWindow: null,
     changesResults: null,
     serialFramingResults: null,
     serialPayloadResults: null,
@@ -602,7 +610,12 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
 
     set((state) => ({
       knowledge: updateKnowledgeFromMessageOrder(seededKnowledge(state.knowledge, frameInfoMap), messageOrderResults),
-      toolbox: { ...state.toolbox, isRunning: false, messageOrderResults },
+      toolbox: {
+        ...state.toolbox,
+        isRunning: false,
+        messageOrderResults,
+        messageOrderWindow: { ...source, start: toolbox.messageOrder.start },
+      },
     }));
     useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['message-order'].tabId);
     return messageOrderResults;
@@ -620,6 +633,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     }
     const changesResults: ChangesResult = {
       tool: 'changes',
+      window: source,
       frameCount: changes.frameCount,
       frames: changes.frames,
       mirrors: changes.mirrors,

@@ -168,6 +168,13 @@ more of a long capture. Optional `frame_ids`, and
 `start_frame_id` (with `start_is_extended`, and `start_protocol` to name one
 protocol) to walk cycles from one id instead of the likeliest.
 
+### `describe_capture_analysis` and `describe_catalog`
+The export reports as Markdown text. `describe_capture_analysis` takes the
+`get_discovery_analysis` parameters and returns the Payload Changes report followed
+by the Frame Order report over the same window; `describe_catalog` takes a catalogue
+name as `read_catalog` does and returns the catalogue report, every protocol's frames
+included.
+
 ### `frame_checksum_scan`
 Finds checksums across every frame id in the source, or the `frame_ids` you name.
 
