@@ -196,7 +196,7 @@ mod tests {
         }
     }
 
-    /// The `rustBytes` column of the table `CHECKSUM_ALGORITHMS` is checked against.
+    /// The table the generated `CHECKSUM_OUTPUT_BYTES` is checked against.
     #[test]
     fn algorithm_widths_match_the_rule_table() {
         let table: serde_json::Value = serde_json::from_str(include_str!(
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(ids, wiretap_checksum::all_algorithm_ids());
         for (id, row) in ids.iter().zip(rows) {
             let width = ChecksumAlgorithm::from_str(id).ok().map(|a| a.output_bytes() as u64);
-            assert_eq!(width, row["rustBytes"].as_u64(), "{id}");
+            assert_eq!(width, row["bytes"].as_u64(), "{id}");
         }
     }
 

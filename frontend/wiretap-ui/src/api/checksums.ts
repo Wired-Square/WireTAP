@@ -5,27 +5,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ProtocolFrames } from "../utils/frameKey";
+import type { CHECKSUM_OUTPUT_BYTES } from "../generated/checksumAlgorithms";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * Supported checksum algorithms.
- * Must match the Rust ChecksumAlgorithm enum.
- */
-export type ChecksumAlgorithm =
-  | "xor"
-  | "sum8"
-  | "crc8"
-  | "crc8_sae_j1850"
-  | "crc8_autosar"
-  | "crc8_maxim"
-  | "crc8_cdma2000"
-  | "crc8_dvb_s2"
-  | "crc8_nissan"
-  | "crc16_modbus"
-  | "crc16_ccitt";
+export type ChecksumAlgorithm = keyof typeof CHECKSUM_OUTPUT_BYTES;
 
 /**
  * Result of checksum validation.

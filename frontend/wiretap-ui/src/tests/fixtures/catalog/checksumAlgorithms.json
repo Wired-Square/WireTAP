@@ -1,83 +1,57 @@
 {
-  "note": "`tsListed`/`tsBytes` are checksums.ts CHECKSUM_ALGORITHMS and getAlgorithmOutputBytes; `rustBytes` is wiretap_checksum ChecksumAlgorithm::output_bytes, null where the id does not parse; ids are all_algorithm_ids()",
+  "note": "ids are wiretap_checksum all_algorithm_ids(); `bytes` is ChecksumAlgorithm::output_bytes, null for a parameterised id whose width is its declaration's byte_length",
   "algorithms": [
     {
       "id": "xor",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "sum8",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_sae_j1850",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_autosar",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_maxim",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_cdma2000",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_dvb_s2",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc8_nissan",
-      "tsListed": true,
-      "tsBytes": 1,
-      "rustBytes": 1
+      "bytes": 1
     },
     {
       "id": "crc16_modbus",
-      "tsListed": true,
-      "tsBytes": 2,
-      "rustBytes": 2
+      "bytes": 2
     },
     {
       "id": "crc16_ccitt",
-      "tsListed": true,
-      "tsBytes": 2,
-      "rustBytes": 2
+      "bytes": 2
     },
     {
       "id": "crc_custom",
-      "tsListed": false,
-      "tsBytes": 1,
-      "rustBytes": null
+      "bytes": null
     },
     {
       "id": "sum8_negated",
-      "tsListed": false,
-      "tsBytes": 1,
-      "rustBytes": null
+      "bytes": null
     }
   ]
 }

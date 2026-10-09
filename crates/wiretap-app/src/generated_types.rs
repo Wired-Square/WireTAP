@@ -40,10 +40,16 @@ impl TypeVisitor for Render {
 fn render() -> BTreeMap<PathBuf, String> {
     let mut r = Render {
         cfg: Config::new().with_large_int("number"),
-        files: BTreeMap::from([(
-            PathBuf::from("wireConstants.ts"),
-            (TypeId::of::<crate::ws::protocol::MsgType>(), wire_constants()),
-        )]),
+        files: BTreeMap::from([
+            (
+                PathBuf::from("wireConstants.ts"),
+                (TypeId::of::<crate::ws::protocol::MsgType>(), wire_constants()),
+            ),
+            (
+                PathBuf::from("checksumAlgorithms.ts"),
+                (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
+            ),
+        ]),
     };
     r.visit::<crate::io::GvretDeviceInfo>();
     r.visit::<crate::io::ActiveSessionInfo>();
@@ -180,6 +186,17 @@ fn wire_constants() -> String {
         ),
     ]
     .join("\n")
+}
+
+/// The fixed-width checksum algorithms, in the sweep's preference order. The
+/// parameterised ids (`crc_custom`, `sum8_negated`) are absent: their width is
+/// the declaration's `byte_length`.
+fn checksum_algorithms() -> String {
+    let rows: String = wiretap_checksum::ALL_ALGORITHMS
+        .iter()
+        .map(|a| format!("  {}: {},\n", a.as_str(), a.output_bytes()))
+        .collect();
+    format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {
