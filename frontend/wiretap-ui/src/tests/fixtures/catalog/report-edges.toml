@@ -1,0 +1,81 @@
+[meta]
+name = "Report edges"
+version = 2
+default_endianness = "big"
+role = "gateway"
+default_interval = 100
+
+[meta.can]
+default_byte_order = "little"
+
+[frame.can."256"]
+name = "Decimal key"
+length = 8
+bus = 0
+interval_ms = 50
+transmitter = ["BMS", "Charger"]
+
+[[frame.can."256".signals]]
+name = "Big"
+start_bit = 0
+bit_length = 16
+byte_order = "big"
+factor = 1
+offset = 0
+
+[[frame.can."256".signals]]
+name = "<Tagged & 'quoted'>"
+start_bit = 16
+bit_length = 8
+endianness = "little"
+confidence = "none"
+notes = ["first", "second"]
+
+[frame.can."256".signals.enum]
+0 = "Off"
+1 = "On"
+
+[frame.can."0x18FF0010"]
+bus = 1
+tx_interval_ms = 1000
+
+[frame.can."0x18FF0010".mux]
+start_bit = 0
+bit_length = 8
+notes = ["selector", "page"]
+
+[[frame.can."0x18FF0010".mux."0-3".signals]]
+name = "Low"
+start_bit = 8
+bit_length = 8
+confidence = "low"
+
+[[frame.can."0x18FF0010".mux."10,12".signals]]
+name = "High"
+start_bit = 8
+bit_length = 16
+factor = 0.5
+offset = -10
+unit = "A"
+confidence = "medium"
+
+[frame.can."0x18FF0010".mux."10,12".mux]
+name = "Inner"
+start_bit = 24
+bit_length = 4
+
+[[frame.can."0x18FF0010".mux."10,12".mux."2".signals]]
+name = "Deep"
+start_bit = 28
+bit_length = 4
+
+[frame.can."0x7FF"]
+tx = { interval_ms = 20 }
+
+[frame.modbus."5000"]
+length = 1
+
+[[frame.modbus."5000".signals]]
+name = "Not in the report"
+start_bit = 0
+bit_length = 16

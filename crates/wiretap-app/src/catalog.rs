@@ -1079,6 +1079,37 @@ mod tests {
         assert_eq!(served, golden);
     }
 
+    /// The adapters' goldens read these served models, one per protocol.
+    #[test]
+    fn catalog_parse_serves_the_adapter_fixtures() {
+        for (toml, served_json) in [
+            ("sbrxxx.toml", "catalog/sbrxxx.catalog.json"),
+            ("catalog/modbus.toml", "catalog/modbus.catalog.json"),
+            ("catalog/serial.toml", "catalog/serial.catalog.json"),
+        ] {
+            let served = command("catalog.parse", serde_json::json!({ "content": fixture(toml) }));
+            if std::env::var_os("WRITE_ADAPTER_FIXTURES").is_some() {
+                let pretty = serde_json::to_string_pretty(&served).unwrap() + "\n";
+                std::fs::write(format!("{FIXTURES}/{served_json}"), pretty).unwrap();
+            }
+            let golden: serde_json::Value = serde_json::from_str(&fixture(served_json)).expect("golden json");
+            assert_eq!(served, golden, "{toml}");
+        }
+    }
+
+    /// The `rust` column of the table `muxCaseMatch.ts` is checked against.
+    #[test]
+    fn mux_case_keys_match_the_rule_table() {
+        let table: serde_json::Value = serde_json::from_str(&fixture("catalog/muxCaseKeys.json")).expect("table");
+        for row in table["keys"].as_array().expect("keys") {
+            let key = row["key"].as_str().expect("key");
+            let toml = format!("[frame.can.0x100.mux.{}]\nnotes = \"case\"\n", serde_json::to_string(key).unwrap());
+            let served = command("catalog.parse", serde_json::json!({ "content": toml }));
+            let is_case = served["frames"][0]["mux"]["cases"].get(key).is_some();
+            assert_eq!(is_case, row["rust"].as_bool().expect("rust"), "{key:?}");
+        }
+    }
+
     #[test]
     fn a_signal_format_the_crate_cannot_name_serialises_as_other() {
         assert_eq!(serde_json::to_value(wiretap_catalog::SignalFormat::Other).unwrap(), "other");

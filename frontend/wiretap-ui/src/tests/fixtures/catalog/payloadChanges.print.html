@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAN Payload Analysis Report</title>
+  <style>
+
+    :root {
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --bg-light: #f8fafc;
+      --accent: #7c3aed;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding: 20mm;
+      max-width: 210mm;
+      margin: 0 auto;
+    }
+
+    @media print {
+      body { padding: 0; max-width: none; }
+      .page-break { page-break-before: always; }
+      .no-break { page-break-inside: avoid; }
+      @page { margin: 15mm; size: A4; }
+    }
+
+    h1 {
+      font-size: 24pt;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8pt;
+      border-bottom: 2pt solid var(--accent);
+      padding-bottom: 8pt;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 16pt 0 8pt;
+      border-bottom: 1pt solid var(--border);
+      padding-bottom: 4pt;
+    }
+
+    h3 {
+      font-size: 11pt;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin: 10pt 0 4pt;
+    }
+
+    .summary-box {
+      background: var(--bg-light);
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      padding: 12pt;
+      margin: 12pt 0;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12pt;
+      text-align: center;
+    }
+
+    .stat-item .value {
+      font-size: 18pt;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-item .label {
+      font-size: 8pt;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 8pt;
+      padding: 2pt 6pt;
+      border-radius: 2pt;
+      font-weight: 500;
+    }
+
+    .badge-purple { background: #f3e8ff; color: #7c3aed; }
+    .badge-cyan { background: #cffafe; color: #0e7490; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-pink { background: #fce7f3; color: #be185d; }
+    .badge-slate { background: #f1f5f9; color: #475569; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin: 6pt 0;
+    }
+
+    th, td {
+      padding: 4pt 6pt;
+      text-align: left;
+      border: 0.5pt solid var(--border);
+    }
+
+    th {
+      background: var(--bg-light);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 8pt;
+      background: var(--bg-light);
+      padding: 1pt 3pt;
+      border-radius: 2pt;
+    }
+
+    .section-card {
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      padding: 10pt;
+      margin: 8pt 0;
+      background: white;
+    }
+
+    .frame-id {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 10pt;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .footer {
+      margin-top: 20pt;
+      padding-top: 10pt;
+      border-top: 1pt solid var(--border);
+      text-align: center;
+      font-size: 8pt;
+      color: var(--text-muted);
+    }
+
+    .print-instructions {
+      background: #eff6ff;
+      border: 1pt solid #bfdbfe;
+      border-radius: 4pt;
+      padding: 10pt;
+      margin: 12pt 0;
+      font-size: 9pt;
+      color: #1e40af;
+    }
+
+    @media print {
+      .print-instructions { display: none; }
+    }
+
+
+    .badge-mirror { background: #fce7f3; color: #be185d; }
+    .badge-identical { background: #f1f5f9; color: #475569; }
+    .badge-varying { background: #fef3c7; color: #92400e; }
+    .badge-mux { background: #ffedd5; color: #c2410c; }
+    .badge-burst { background: #cffafe; color: #0e7490; }
+    .badge-row {
+      display: flex;
+      gap: 6pt;
+      flex-wrap: wrap;
+      margin: 8pt 0;
+    }
+    .frame-card {
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      padding: 10pt;
+      margin: 8pt 0;
+      background: white;
+    }
+    .frame-header {
+      display: flex;
+      align-items: center;
+      gap: 8pt;
+      flex-wrap: wrap;
+      margin-bottom: 8pt;
+    }
+    .samples {
+      font-size: 9pt;
+      color: var(--text-muted);
+    }
+    .byte-viz {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 9pt;
+      padding: 6pt;
+      background: var(--bg-light);
+      border-radius: 3pt;
+      margin: 4pt 0;
+    }
+    .legend {
+      font-size: 7pt;
+      color: var(--text-muted);
+      margin-top: 2pt;
+    }
+    .role-static { color: #64748b; }
+    .role-counter { color: #16a34a; }
+    .role-sensor { color: #7c3aed; }
+    .role-value { color: #f59e0b; }
+    .notes-list {
+      margin: 4pt 0;
+      padding-left: 16pt;
+      font-size: 9pt;
+    }
+    .notes-list li {
+      margin: 2pt 0;
+      color: var(--text-secondary);
+    }
+    .mirror-card {
+      background: #fdf2f8;
+      border: 1pt solid #fbcfe8;
+      border-radius: 4pt;
+      padding: 8pt;
+      margin: 6pt 0;
+    }
+    .mirror-ids {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-weight: 700;
+      color: #be185d;
+    }
+
+  </style>
+</head>
+<body>
+  
+    <h1>CAN Payload Analysis Report</h1>
+    <div class="print-instructions">
+    <strong>To save as PDF:</strong> Use your browser's Print function (Ctrl+P / Cmd+P) and select "Save as PDF" as the destination.
+  </div>
+    <div class="summary-grid">
+      <div class="summary-card stat-item"><div class="value">12,345</div><div class="label">Total Frames</div></div>
+      <div class="summary-card stat-item"><div class="value">11</div><div class="label">Unique IDs</div></div>
+      <div class="summary-card stat-item"><div class="value">2</div><div class="label">Mirror Groups</div></div>
+      <div class="summary-card stat-item"><div class="value">3</div><div class="label">Multiplexed</div></div>
+    </div>
+
+    <div class="badge-row" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0;">
+      <span class="badge badge-mirror">Mirror Groups</span>
+      <span class="badge badge-identical">Identical</span>
+      <span class="badge badge-varying">Varying Length</span>
+      <span class="badge badge-mux">Multiplexed</span>
+      <span class="badge badge-burst">Burst</span>
+    </div>
+
+    <h2>Mirror Frame Groups</h2>
+    <p>These frame IDs transmit identical payloads that change together.</p>
+
+    <div class="mirror-card no-break">
+      <div class="mirror-ids">0x100 ↔ 0x18FF0010</div>
+      <div>Match rate: 98% (45 paired samples) · Sample: <code>00 1F AB FF</code></div>
+    </div>
+
+    <div class="mirror-card no-break">
+      <div class="mirror-ids">1/0x03 ↔ 2/0x03</div>
+      <div>Match rate: 100% (3 paired samples) · Sample: <code>01</code></div>
+    </div>
+
+    <h2>Frame Analysis</h2>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x100</span>
+        <span class="samples">0 samples</span>
+        
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>No frames to analyse</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x101</span>
+        <span class="samples">20 samples</span>
+        <span class="badge badge-varying">6-8 bytes</span><span class="badge badge-burst">Burst</span>
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-static">█</span><span class="role-counter">▲</span><span class="role-counter">▲</span><span class="role-sensor">≈</span><span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Detected Patterns</h3>
+      <table>
+        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
+        <tr><td><code>byte[4:5]</code></td><td>counter16</td><td>little endian</td></tr>
+        <tr><td><code>byte[6:7]</code></td><td>text</td><td>"OK"</td></tr>
+      </table>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Little-endian (inferred from 1 multi-byte pattern(s))</li>
+        <li>Varying length: 6–8 bytes</li>
+        <li>Burst frame: analysing stable payload portion only</li>
+        <li>Static bytes: byte[0]=0x1F</li>
+        <li>Counter at byte[1]: incrementing, step=1 (rollover detected)</li>
+        <li>Looping counter at byte[2]: incrementing, step=1, range 0–9 (mod 10)</li>
+        <li>Sensor at byte[3]: ↓ range 10–90 (76% trend)</li>
+        <li>16-bit counter at byte[4:5], little endian</li>
+        <li>Text at byte[6:7] "OK"</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x00000102</span>
+        <span class="samples">20 samples</span>
+        
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-counter">▲</span><span class="role-sensor">≈</span><span class="role-sensor">≈</span><span class="role-counter">▲</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Counter at byte[0]: decrementing, step=2</li>
+        <li>Looping counter at byte[3]: incrementing, step=3, range 1–3 (mod 0)</li>
+        <li>Sensor at byte[1]: ↕ range 3–200</li>
+        <li>Sensor at byte[2]: ↑ range 0–15 (50% trend)</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x103</span>
+        <span class="samples">20 samples</span>
+        
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-static">█</span><span class="role-counter">▲</span><span class="role-sensor">≈</span><span class="role-value">?</span><span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Detected Patterns</h3>
+      <table>
+        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
+        <tr><td><code>byte[0:1]</code></td><td>counter16</td><td>big endian, rollover</td></tr>
+        <tr><td><code>byte[2:3]</code></td><td>sensor16</td><td></td></tr>
+        <tr><td><code>byte[4:7]</code></td><td>text</td><td></td></tr>
+      </table>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Static bytes: byte[0]=0x00</li>
+        <li>16-bit counter at byte[0:1], big endian (rollover detected)</li>
+        <li>16-bit sensor at byte[2:3]</li>
+        <li>Text at byte[4:7]</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x104</span>
+        <span class="samples">20 samples</span>
+        
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>2 byte(s) with varying values detected</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x105</span>
+        <span class="samples">20 samples</span>
+        
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span><span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Detected Patterns</h3>
+      <table>
+        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
+        <tr><td><code>byte[0:1]</code></td><td>sensor16</td><td>big endian, rollover</td></tr>
+        <tr><td><code>byte[2:5]</code></td><td>sensor32</td><td>little endian, rollover</td></tr>
+      </table>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Mixed endianness (inferred from 2 multi-byte pattern(s))</li>
+        <li>16-bit sensor at byte[0:1], big endian, range 100–700 (rollover correlation detected)</li>
+        <li>32-bit sensor at byte[2:5], little endian, range 5–70000 (slow-changing upper bytes) (rollover correlation detected)</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x106</span>
+        <span class="samples">3 samples</span>
+        <span class="badge badge-identical">Identical</span>
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-static">█</span><span class="role-static">█</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Identical payload across all 3 samples: 01 AB</li>
+        <li>Static bytes: byte[0]=0x01, byte[1]=0xAB</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x107</span>
+        <span class="samples">20 samples</span>
+        
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Big-endian (inferred from 0 multi-byte pattern(s))</li>
+        <li>1 byte(s) with varying values detected</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x108</span>
+        <span class="samples">20 samples</span>
+        <span class="badge badge-mux">Mux</span>
+      </div>
+
+      <div class="byte-viz">
+        [<span class="role-counter">▲</span><span class="role-value">?</span>]
+        <div class="legend">
+          <span class="role-static">█ static</span> &nbsp;
+          <span class="role-counter">▲ counter</span> &nbsp;
+          <span class="role-sensor">≈ sensor</span> &nbsp;
+          <span class="role-value">? value</span>
+        </div>
+      </div>
+
+      <h3>Detected Patterns</h3>
+      <table>
+        <tr><th>Range</th><th>Pattern</th><th>Details</th></tr>
+        <tr><td><code>case 0x1 byte[1:2]</code></td><td>sensor16</td><td>big endian</td></tr>
+        <tr><td><code>case 0x1 byte[3:4]</code></td><td>counter16</td><td>big endian, rollover</td></tr>
+        <tr><td><code>case 0x1 byte[5:7]</code></td><td>text</td><td>"abc"</td></tr>
+        <tr><td><code>case 0x2 byte[1:4]</code></td><td>sensor32</td><td>little endian</td></tr>
+      </table>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Mixed endianness (inferred from 3 multi-byte pattern(s))</li>
+        <li>Multiplexed frame: byte[0], cases: 0, 1, 2</li>
+        <li>Case 0: 2 counter, 1 static</li>
+        <li>Case 1: 1 counter, 0 static</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x109</span>
+        <span class="samples">20 samples</span>
+        <span class="badge badge-mux">Mux</span>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Multiplexed frame: byte[0], 7 cases (0-6)</li>
+      </ul>
+    </div>
+
+    <div class="frame-card no-break">
+      <div class="frame-header">
+        <span class="frame-id">0x10A</span>
+        <span class="samples">20 samples</span>
+        <span class="badge badge-mux">Mux</span><span class="badge badge-burst">Burst</span>
+      </div>
+
+      <h3>Notes</h3>
+      <ul class="notes-list">
+        <li>Burst frame with mux: analysing stable payload portion only</li>
+        <li>Multiplexed frame: byte[0:1], 2 cases</li>
+        <li>Case 1:1: 1 counter, 0 static</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      Generated by WireTAP
+    </div>
+  
+</body>
+</html>

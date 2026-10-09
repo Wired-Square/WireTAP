@@ -1,0 +1,110 @@
+{
+  "cases": [
+    {
+      "name": "a CAN section with no byte order",
+      "input": {
+        "meta": {
+          "name": "d",
+          "version": 1
+        },
+        "frames": [],
+        "protocol": "can",
+        "can": {
+          "defaultExtended": true
+        }
+      },
+      "expected": {
+        "tree": {
+          "canConfig": {
+            "default_endianness": "big",
+            "default_extended": true
+          }
+        },
+        "resolved": {
+          "can": {
+            "default_extended": true
+          },
+          "serial": null,
+          "modbus": null
+        }
+      }
+    },
+    {
+      "name": "a serial checksum with no calculation end and no encoding",
+      "input": {
+        "meta": {
+          "name": "d",
+          "version": 1
+        },
+        "frames": [],
+        "protocol": "can",
+        "serial": {
+          "checksum": {
+            "algorithm": "xor",
+            "startByte": -1,
+            "byteLength": 1,
+            "calcStartByte": 0,
+            "bigEndian": false
+          }
+        }
+      },
+      "expected": {
+        "tree": {
+          "serialConfig": {
+            "encoding": "raw",
+            "checksum": {
+              "algorithm": "xor",
+              "start_byte": -1,
+              "byte_length": 1,
+              "calc_start_byte": 0,
+              "calc_end_byte": 0,
+              "big_endian": false
+            }
+          }
+        },
+        "resolved": {
+          "can": null,
+          "serial": {
+            "checksum": {
+              "algorithm": "xor",
+              "start_byte": -1,
+              "byte_length": 1,
+              "calc_start_byte": 0,
+              "big_endian": false
+            }
+          },
+          "modbus": null
+        }
+      }
+    },
+    {
+      "name": "a Modbus section with no register base",
+      "input": {
+        "meta": {
+          "name": "d",
+          "version": 1
+        },
+        "frames": [],
+        "protocol": "can",
+        "modbus": {
+          "defaultInterval": 500
+        }
+      },
+      "expected": {
+        "tree": {
+          "modbusConfig": {
+            "register_base": 0,
+            "default_interval": 500
+          }
+        },
+        "resolved": {
+          "can": null,
+          "serial": null,
+          "modbus": {
+            "default_interval": 500
+          }
+        }
+      }
+    }
+  ]
+}

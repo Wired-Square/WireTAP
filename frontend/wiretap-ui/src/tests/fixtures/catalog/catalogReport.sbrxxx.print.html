@@ -1,0 +1,5283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catalog Report — SBRXXX</title>
+  <style>
+
+    :root {
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --bg-light: #f8fafc;
+      --accent: #7c3aed;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding: 20mm;
+      max-width: 210mm;
+      margin: 0 auto;
+    }
+
+    @media print {
+      body { padding: 0; max-width: none; }
+      .page-break { page-break-before: always; }
+      .no-break { page-break-inside: avoid; }
+      @page { margin: 15mm; size: A4; }
+    }
+
+    h1 {
+      font-size: 24pt;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8pt;
+      border-bottom: 2pt solid var(--accent);
+      padding-bottom: 8pt;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 16pt 0 8pt;
+      border-bottom: 1pt solid var(--border);
+      padding-bottom: 4pt;
+    }
+
+    h3 {
+      font-size: 11pt;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin: 10pt 0 4pt;
+    }
+
+    .summary-box {
+      background: var(--bg-light);
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      padding: 12pt;
+      margin: 12pt 0;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12pt;
+      text-align: center;
+    }
+
+    .stat-item .value {
+      font-size: 18pt;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-item .label {
+      font-size: 8pt;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 8pt;
+      padding: 2pt 6pt;
+      border-radius: 2pt;
+      font-weight: 500;
+    }
+
+    .badge-purple { background: #f3e8ff; color: #7c3aed; }
+    .badge-cyan { background: #cffafe; color: #0e7490; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-pink { background: #fce7f3; color: #be185d; }
+    .badge-slate { background: #f1f5f9; color: #475569; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin: 6pt 0;
+    }
+
+    th, td {
+      padding: 4pt 6pt;
+      text-align: left;
+      border: 0.5pt solid var(--border);
+    }
+
+    th {
+      background: var(--bg-light);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 8pt;
+      background: var(--bg-light);
+      padding: 1pt 3pt;
+      border-radius: 2pt;
+    }
+
+    .section-card {
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      padding: 10pt;
+      margin: 8pt 0;
+      background: white;
+    }
+
+    .frame-id {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 10pt;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .footer {
+      margin-top: 20pt;
+      padding-top: 10pt;
+      border-top: 1pt solid var(--border);
+      text-align: center;
+      font-size: 8pt;
+      color: var(--text-muted);
+    }
+
+    .print-instructions {
+      background: #eff6ff;
+      border: 1pt solid #bfdbfe;
+      border-radius: 4pt;
+      padding: 10pt;
+      margin: 12pt 0;
+      font-size: 9pt;
+      color: #1e40af;
+    }
+
+    @media print {
+      .print-instructions { display: none; }
+    }
+
+
+    /* Confidence badges */
+    .conf-high { background: #dcfce7; color: #166534; }
+    .conf-medium { background: #dbeafe; color: #1e40af; }
+    .conf-low { background: #fef3c7; color: #92400e; }
+    .conf-none { background: #f1f5f9; color: #475569; }
+
+    /* Confidence row */
+    .confidence-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8pt;
+      margin-top: 6pt;
+      padding-top: 6pt;
+      border-top: 0.5pt solid var(--border);
+      font-size: 7pt;
+    }
+    .confidence-row .item {
+      display: flex;
+      align-items: center;
+      gap: 4pt;
+    }
+    .confidence-row .count {
+      font-weight: 600;
+    }
+
+    /* Endianness badges */
+    .end-default { background: #e2e8f0; color: #475569; }
+    .end-override { background: #fee2e2; color: #b91c1c; }
+
+    /* Frame cards */
+    .frame-card {
+      border: 1pt solid var(--border);
+      border-radius: 4pt;
+      margin: 10pt 0;
+      padding: 8pt;
+      background: white;
+      page-break-inside: avoid;
+    }
+    .frame-card h2 {
+      margin: 0 0 4pt;
+      font-size: 12pt;
+    }
+    .frame-card h2 code {
+      color: var(--accent);
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    }
+    .frame-meta {
+      display: flex;
+      gap: 6pt;
+      align-items: center;
+      margin: 2pt 0 8pt;
+      flex-wrap: wrap;
+    }
+    .frame-meta .pill {
+      background: var(--bg-light);
+      border: 0.5pt solid var(--border);
+      padding: 1pt 4pt;
+      border-radius: 3pt;
+      color: var(--text-secondary);
+      font-size: 8pt;
+    }
+
+    /* Signal tables */
+    .signals-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 4pt 0 8pt;
+      font-size: 8pt;
+    }
+    .signals-table th,
+    .signals-table td {
+      padding: 3pt 4pt;
+      border: 0.5pt solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+    .signals-table th {
+      background: var(--bg-light);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .signals-table .nwrap { white-space: nowrap; }
+    .signals-table .dim { color: var(--text-muted); }
+    .signals-table code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 7pt;
+    }
+
+    /* Mux blocks */
+    .mux-block {
+      border-left: 2pt solid #16a34a;
+      background: #f0fdf4;
+      padding: 4pt 6pt 0;
+      margin: 6pt 0 4pt;
+      border-radius: 3pt;
+    }
+    .mux-block.l2 {
+      border-left-color: #0891b2;
+      background: #ecfeff;
+    }
+    .mux-block.l3 {
+      border-left-color: #ea580c;
+      background: #fff7ed;
+    }
+    .mux-block.l4 {
+      border-left-color: #9333ea;
+      background: #faf5ff;
+    }
+    .mux-head {
+      font-weight: 600;
+      margin: 0 0 4pt;
+      font-size: 9pt;
+      color: var(--text-primary);
+    }
+
+    /* Legend */
+    .legend {
+      margin: 6pt 0 12pt;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6pt;
+      font-size: 7pt;
+    }
+    .legend .badge {
+      padding: 1pt 6pt;
+      border-radius: 999pt;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Catalog Report — SBRXXX</h1>
+
+  <div class="print-instructions">
+    <strong>To save as PDF:</strong> Use your browser's Print function (Ctrl+P / Cmd+P) and select "Save as PDF" as the destination.
+  </div>
+
+  <div class="summary-box">
+    <div class="summary-grid">
+      <div class="stat-item">
+        <div class="value">76</div>
+        <div class="label">Frames</div>
+      </div>
+      <div class="stat-item">
+        <div class="value">7</div>
+        <div class="label">Mux Frames</div>
+      </div>
+      <div class="stat-item">
+        <div class="value">13</div>
+        <div class="label">Enums</div>
+      </div>
+      <div class="stat-item">
+        <div class="value">162</div>
+        <div class="label">Signals</div>
+      </div>
+    </div>
+
+    <div class="confidence-row">
+      <div class="item">
+        <span class="badge conf-high">high</span>
+        <span class="count">117</span>
+      </div>
+      <div class="item">
+        <span class="badge conf-medium">medium</span>
+        <span class="count">12</span>
+      </div>
+      <div class="item">
+        <span class="badge conf-low">low</span>
+        <span class="count">17</span>
+      </div>
+      <div class="item">
+        <span class="badge conf-none">none</span>
+        <span class="count">16</span>
+      </div>
+      <div class="item" style="margin-left: auto;">
+        <span class="badge end-default">endian: default (LITTLE)</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="frame-card">
+    <h2><code>0x000</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x001</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x002</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x003</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x004</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x005</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            <th>enum</th>
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>Status_Battery_End_Stop</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">0=Normal, 1=Full, 2=Empty, 3=Suspended, 16=Maintenance, 17=Maintenance, Full</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h).</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x006</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x007</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x008</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x009</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x00A</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x00B</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x00D</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x00E</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x013</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x014</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x015</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x016</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x017</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x018</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x019</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x01A</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x01B</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x01C</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x01D</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x01E</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x100</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>100</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x101</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Status_Inverter_Timestamp</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Once per hour when battery connected</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x102</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>102</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x103</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      <span class="badge conf-medium">medium 2</span>
+      
+      
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_259_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x104</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      <span class="badge conf-medium">medium 2</span>
+      
+      
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_260_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_Manufacturer_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_Manufacturer_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x105</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      <span class="badge conf-medium">medium 1</span>
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_261_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_Model_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Inverter_Model_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;">NOBATT</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x106</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      <span class="badge conf-medium">medium 1</span>
+      <span class="badge conf-low">low 2</span>
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            <th>enum</th>
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>106_Unknown_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>106_Unknown_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Constant 1000 across every sampled maintenance session.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>106_Maintenance_Param</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/8</td>
+            <td><code>Cmd_Maintenance_Mode</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">0=Off, 1=On</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">56/8</td>
+            <td><code>106_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x108</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>108</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x109</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      <span class="badge conf-high">high 3</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>109_Marker</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Constant 0xAA in every sample. Frame marker / protocol tag, not data.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/16</td>
+            <td><code>Status_PV_Power</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">W</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">The inverter&#039;s total DC (PV) input — matches the &quot;Total DC power&quot; it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/40</td>
+            <td><code>109_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Always zero across every sampled window.</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x191</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>191</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x1E0</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: Inverter</span>
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x400</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      <span class="badge conf-none">none 2</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>400_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/16</td>
+            <td><code>Status_Battery_Actual_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/40</td>
+            <td><code>400_Unknown</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x401</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>401_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x402</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>402_Unknown</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown.</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x500</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      <span class="badge conf-none">none 3</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>500_Unknown_0</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/16</td>
+            <td><code>500_Unknown_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/32</td>
+            <td><code>500_Unknown_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">56/8</td>
+            <td><code>Status_Battery_SoC_Int</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x501</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x502</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x503</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x504</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Battery_Current_Inverted</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">A</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">This is the opposite sign to the signal at 0x704</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x505</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x506</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      
+      
+      
+      
+      
+      
+      
+    </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x512</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>512_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x700</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>700_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x701</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Info_Battery_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Info_Battery_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Info_Battery_Max_Charge_Current</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">A</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Info_Battery_Max_Dischg_Current</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">A</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x702</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Battery_Reported_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Battery_SoH</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Battery_Remaining_Energy</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Wh</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Battery_Max_Energy</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Wh</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x703</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Status_Battery_Energy_Charged</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Wh</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/32</td>
+            <td><code>Status_Battery_Energy_Discharged</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Wh</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x704</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 3</span>
+      <span class="badge conf-medium">medium 1</span>
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Battery_Voltage</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Battery_Current</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">A</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Battery_Voltage_Alt_704</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Battery_Temperature</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">°C</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x705</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 2</span>
+      <span class="badge conf-medium">medium 2</span>
+      <span class="badge conf-low">low 2</span>
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            <th>enum</th>
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>Info_Battery_Operation</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">0=Unplugged, 1=Standby, 2=Run</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>705_End_Stop</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/8</td>
+            <td><code>705_Always_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/16</td>
+            <td><code>Info_Battery_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">8422=SBR064, 8423=SBR096, 8424=SBR128, 8425=SBR160, 8426=SBR192, 8427=SBR224, 8428=SBR256</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">40/16</td>
+            <td><code>Status_Battery_Voltage_Alt_705</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;">A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">56/8</td>
+            <td><code>705_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x706</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Overview_Cell_Max_Temp</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">°C</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Overview_Cell_Min_Temp</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">°C</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Overview_Cell_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Overview_Cell_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x707</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>Info_BMS_Firmware_Patch</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/16</td>
+            <td><code>707_All_Zero</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/8</td>
+            <td><code>Info_BMS_Firmware_Minor</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Info_Battery_Nameplate_Capacity</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Wh</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Info_Battery_Module_Count</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x708</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_1800_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Battery_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/48</td>
+            <td><code>Info_Battery_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x709</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>709_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x70A</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 1</span>
+      <span class="badge conf-medium">medium 1</span>
+      
+      
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_1802_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Battery_Manufacturer</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>Info_Battery_Model_Short</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x70B</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      
+      <span class="badge conf-medium">medium 1</span>
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>Info_Battery_Model</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x70D</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>70d_Unknown_Permission_3_10701__</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x70E</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      
+      
+      
+      <span class="badge conf-none">none 1</span>
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/64</td>
+            <td><code>70E_Unknown_Permission_3_10705__</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x70F</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 10</span>
+      <span class="badge conf-medium">medium 1</span>
+      <span class="badge conf-low">low 11</span>
+      <span class="badge conf-none">none 1</span>
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_1807_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x0</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>70F_Mux0_Const</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Info_Battery_Max_Power</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">W</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — it held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Info_Battery_Max_Power_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">W</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;">Second copy of the static 1920 W x module_count rating. Invariant across every sampled window — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701.</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/56</td>
+            <td><code>70F_Mux1_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>70F_Unknown_Mux_2_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_3_1: ~9950 in warm windows, ~12800 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>70F_Mux2_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>70F_Unknown_Mux_2_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-none">none</span></td>
+            <td class="dim" style="font-size: 7pt;">dynamic, unmapped</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>70F_Unknown_Mux_3_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_2_1: ~9926 in warm windows, ~12940 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>70F_Mux3_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>70F_Unknown_Mux_3_3</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three separate windows — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: it held constant at 9990 while SoC cycled 25.6 % to 100 %.</td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x4</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            <th>enum</th>
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>70F_Mux4_Padding_0</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>70F_Mux4_Charge_Value</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;">Bytes 2-3 are one 16-bit field, not an 8-bit value plus padding: byte 3 changed from 7 to 10 between sampled windows. Drifts slowly (~1996 warm, ~2593 cold) and tracks with 70F_Unknown_Mux_2_1 and 70F_Unknown_Mux_3_1.</td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/24</td>
+            <td><code>70F_Mux4_Padding_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;"></td>
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">56/8</td>
+            <td><code>Status_Charge_State</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">0=Normal, 2=Stop Charge</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x5</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_1_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_2_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_3_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x6</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_4_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_5_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_6_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x7</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_7_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_8_SoC</code></td>
+            <td class="nwrap dim">x0.01 + 0</td>
+            <td class="nwrap">%</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-medium">medium</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>70F_Mux7_Padding</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x713</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 6</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>Status_Pos_Cell_Min_Temp</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Cell #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>Status_Pos_Module_Min_Temp</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Module #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Cell_Min_Temp</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">°C</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/8</td>
+            <td><code>Status_Pos_Cell_Max_Temp</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Cell #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">40/8</td>
+            <td><code>Status_Pos_Module_Max_Temp</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Module #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Cell_Max_Temp</code></td>
+            <td class="nwrap dim">x0.1 + 0</td>
+            <td class="nwrap">°C</td>
+            <td class="nwrap">yes</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x714</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 6</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>Status_Pos_Cell_Max_Voltage</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Cell #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>Status_Pos_Module_Max_Voltage</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Module #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Cell_Max_Voltage_HP</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/8</td>
+            <td><code>Status_Pos_Cell_Min_Voltage</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Cell #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">40/8</td>
+            <td><code>Status_Pos_Module_Min_Voltage</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap">Module #</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Cell_Min_Voltage_HP</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x715</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Module_1_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_1_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_2_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_2_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x716</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Module_3_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_3_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_4_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_4_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x717</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Module_5_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_5_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_6_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_6_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x718</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      <span class="badge conf-high">high 4</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_Module_7_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_7_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/16</td>
+            <td><code>Status_Module_8_Min_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/16</td>
+            <td><code>Status_Module_8_Max_Voltage</code></td>
+            <td class="nwrap dim">x0.0001 + 0</td>
+            <td class="nwrap">V</td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x719</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      
+      
+      
+      
+      <span class="badge conf-low">low 2</span>
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/16</td>
+            <td><code>Status_3_10789__</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/16</td>
+            <td><code>Status_Module_Fault_3_10790__</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-low">low</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71A</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 8</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            <th>enum</th>
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/8</td>
+            <td><code>Info_Module_1_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">8/8</td>
+            <td><code>Info_Module_2_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">16/8</td>
+            <td><code>Info_Module_3_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">24/8</td>
+            <td><code>Info_Module_4_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/8</td>
+            <td><code>Info_Module_5_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">40/8</td>
+            <td><code>Info_Module_6_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">48/8</td>
+            <td><code>Info_Module_7_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">56/8</td>
+            <td><code>Info_Module_8_Cell_Type</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            <td style="font-size: 7pt;">66=IEC, 68=Non-IEC</td>
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71B</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Info_Module_1_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/32</td>
+            <td><code>Info_Module_2_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71C</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Info_Module_3_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/32</td>
+            <td><code>Info_Module_4_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71D</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Info_Module_5_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/32</td>
+            <td><code>Info_Module_6_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71E</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 2</span>
+      
+      
+      
+    </div>
+    <div class="mux-head">Plain signals</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">0/32</td>
+            <td><code>Info_Module_7_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+          <tr>
+            <td class="nwrap">32/32</td>
+            <td><code>Info_Module_8_Production_Date</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+  </section>
+
+  <section class="frame-card">
+    <h2><code>0x71F</code></h2>
+    <div class="frame-meta">
+      <span class="pill">len: 8</span>
+      <span class="pill">tx: BMS</span>
+      <span class="pill">60000ms</span>
+      
+      <span class="badge conf-high">high 24</span>
+      
+      
+      
+    </div>
+
+      <div class="mux-block">
+        <div class="mux-head">Mux @ bit 0/8 (mux_1823_0_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_1_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_1_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_1_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_1_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_2_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_2_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_2_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_2_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_3_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_3_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_3_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_3_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x4</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_4_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_4_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_4_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_4_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x5</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_5_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_5_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_5_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_5_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x6</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_6_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_6_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_6_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_6_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x7</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_7_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_7_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_7_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_7_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x8</div>
+
+      <div class="mux-block l2">
+        <div class="mux-head">Mux @ bit 8/8 (mux_1823_8_8_8)</div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x1</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_8_SN_1</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x2</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_8_SN_2</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+        <div style="margin-left: 6pt; margin-bottom: 6pt;">
+          <div style="font-weight: 500; color: var(--text-secondary); font-size: 8pt; margin-bottom: 2pt;">Case 0x3</div>
+
+      <table class="signals-table">
+        <thead>
+          <tr>
+            <th class="nwrap">bit range</th>
+            <th>signal</th>
+            <th class="nwrap">scale</th>
+            <th class="nwrap">unit</th>
+            <th class="nwrap">signed</th>
+            <th class="nwrap">endian</th>
+            
+            <th class="nwrap">confidence</th>
+            <th>notes</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr>
+            <td class="nwrap">16/48</td>
+            <td><code>Info_Module_8_SN_3</code></td>
+            <td class="nwrap dim">x1 + 0</td>
+            <td class="nwrap"></td>
+            <td class="nwrap">no</td>
+            <td class="nwrap"><span class="badge end-default">LE</span></td>
+            
+            <td class="nwrap"><span class="badge conf-high">high</span></td>
+            <td class="dim" style="font-size: 7pt;"></td>
+          </tr>
+
+        </tbody>
+      </table>
+
+        </div>
+
+      </div>
+
+        </div>
+
+      </div>
+  </section>
+
+  <div class="footer">
+    Generated by WireTAP
+  </div>
+</body>
+</html>

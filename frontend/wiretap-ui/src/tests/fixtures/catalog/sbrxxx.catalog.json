@@ -1,0 +1,4084 @@
+{
+  "can": {
+    "defaultByteOrder": "little",
+    "defaultExtended": false
+  },
+  "frames": [
+    {
+      "frameId": 0,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x000",
+      "length": 8,
+      "mirrorOf": "0x700",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "high",
+          "inherited": true,
+          "name": "700_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x001",
+      "length": 8,
+      "mirrorOf": "0x701",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Min_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Charge_Current",
+          "signed": false,
+          "startBit": 32,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Dischg_Current",
+          "signed": false,
+          "startBit": 48,
+          "unit": "A"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 2,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x002",
+      "length": 8,
+      "mirrorOf": "0x702",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "inherited": true,
+          "name": "Status_Battery_Reported_SoC",
+          "signed": false,
+          "startBit": 0,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "inherited": true,
+          "name": "Status_Battery_SoH",
+          "signed": false,
+          "startBit": 16,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Remaining_Energy",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Max_Energy",
+          "signed": false,
+          "startBit": 48,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 3,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x003",
+      "length": 8,
+      "mirrorOf": "0x703",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Energy_Charged",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Energy_Discharged",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 4,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x004",
+      "length": 8,
+      "mirrorOf": "0x704",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Current",
+          "signed": true,
+          "startBit": 16,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage_Alt_704",
+          "notes": [
+            "A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705."
+          ],
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Temperature",
+          "signed": true,
+          "startBit": 48,
+          "unit": "°C"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 5,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x005",
+      "length": 8,
+      "mirrorOf": "0x705",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "0": "Unplugged",
+            "1": "Standby",
+            "2": "Run"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Battery_Operation",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "0": "Normal",
+            "1": "Full",
+            "16": "Maintenance",
+            "17": "Maintenance, Full",
+            "2": "Empty",
+            "3": "Suspended"
+          },
+          "format": "enum",
+          "name": "Status_Battery_End_Stop",
+          "notes": [
+            "Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h)."
+          ],
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "low",
+          "inherited": true,
+          "name": "705_Always_1",
+          "signed": false,
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "enum": {
+            "8422": "SBR064",
+            "8423": "SBR096",
+            "8424": "SBR128",
+            "8425": "SBR160",
+            "8426": "SBR192",
+            "8427": "SBR224",
+            "8428": "SBR256"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Battery_Type",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage_Alt_705",
+          "notes": [
+            "A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704."
+          ],
+          "signed": false,
+          "startBit": 40,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "medium",
+          "inherited": true,
+          "name": "705_Padding",
+          "signed": false,
+          "startBit": 56
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 6,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x006",
+      "length": 8,
+      "mirrorOf": "0x706",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Overview_Cell_Max_Temp",
+          "signed": true,
+          "startBit": 0,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Overview_Cell_Min_Temp",
+          "signed": true,
+          "startBit": 16,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "inherited": true,
+          "name": "Overview_Cell_Max_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "inherited": true,
+          "name": "Overview_Cell_Min_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 7,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x007",
+      "length": 8,
+      "mirrorOf": "0x707",
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "format": "hex",
+          "inherited": true,
+          "name": "Info_BMS_Firmware_Patch",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "inherited": true,
+          "name": "707_All_Zero",
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "format": "hex",
+          "inherited": true,
+          "name": "Info_BMS_Firmware_Minor",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Battery_Nameplate_Capacity",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Battery_Module_Count",
+          "signed": false,
+          "startBit": 48
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 8,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x008",
+      "length": 8,
+      "mirrorOf": "0x708",
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "high",
+                "format": "utf8",
+                "inherited": true,
+                "name": "Info_Battery_SN_1",
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 48,
+                "confidence": "high",
+                "inherited": true,
+                "name": "Info_Battery_SN_2",
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_1800_0_8",
+        "startBit": 0
+      },
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 9,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x009",
+      "length": 8,
+      "mirrorOf": "0x709",
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "inherited": true,
+          "name": "709_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 10,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x00a",
+      "length": 8,
+      "mirrorOf": "0x70a",
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "high",
+                "format": "utf8",
+                "inherited": true,
+                "name": "Info_Battery_Manufacturer",
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "inherited": true,
+                "name": "Info_Battery_Model_Short",
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_1802_0_8",
+        "startBit": 0
+      },
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 11,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x00b",
+      "length": 8,
+      "mirrorOf": "0x70b",
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "medium",
+          "format": "utf8",
+          "inherited": true,
+          "name": "Info_Battery_Model",
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 13,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x00d",
+      "length": 8,
+      "mirrorOf": "0x70d",
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "inherited": true,
+          "name": "70d_Unknown_Permission_3_10701__",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 14,
+      "inheritedFields": [
+        "transmitter",
+        "interval",
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x00e",
+      "length": 8,
+      "mirrorOf": "0x70e",
+      "notes": [
+        "Only transmitted on INIT"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "inherited": true,
+          "name": "70E_Unknown_Permission_3_10705__",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 19,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x013",
+      "length": 8,
+      "mirrorOf": "0x713",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Cell_Min_Temp",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Module_Min_Temp",
+          "signed": false,
+          "startBit": 8,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Cell_Min_Temp",
+          "signed": true,
+          "startBit": 16,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Cell_Max_Temp",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Module_Max_Temp",
+          "signed": false,
+          "startBit": 40,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Cell_Max_Temp",
+          "signed": true,
+          "startBit": 48,
+          "unit": "°C"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 20,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x014",
+      "length": 8,
+      "mirrorOf": "0x714",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Cell_Max_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Module_Max_Voltage",
+          "signed": false,
+          "startBit": 8,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Cell_Max_Voltage_HP",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Cell_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Pos_Module_Min_Voltage",
+          "signed": false,
+          "startBit": 40,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Cell_Min_Voltage_HP",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 21,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x015",
+      "length": 8,
+      "mirrorOf": "0x715",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_1_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_1_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_2_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_2_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 22,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x016",
+      "length": 8,
+      "mirrorOf": "0x716",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_3_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_3_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_4_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_4_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 23,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x017",
+      "length": 8,
+      "mirrorOf": "0x717",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_5_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_5_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_6_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_6_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 24,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x018",
+      "length": 8,
+      "mirrorOf": "0x718",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_7_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_7_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_8_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "inherited": true,
+          "name": "Status_Module_8_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 25,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x019",
+      "length": 8,
+      "mirrorOf": "0x719",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "inherited": true,
+          "name": "Status_3_10789__",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "inherited": true,
+          "name": "Status_Module_Fault_3_10790__",
+          "signed": false,
+          "startBit": 16
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 26,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x01A",
+      "length": 8,
+      "mirrorOf": "0x71A",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_1_Cell_Type",
+          "startBit": 0
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_2_Cell_Type",
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_3_Cell_Type",
+          "startBit": 16
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_4_Cell_Type",
+          "startBit": 24
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_5_Cell_Type",
+          "startBit": 32
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_6_Cell_Type",
+          "startBit": 40
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_7_Cell_Type",
+          "startBit": 48
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Module_8_Cell_Type",
+          "startBit": 56
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 27,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x01b",
+      "length": 8,
+      "mirrorOf": "0x71B",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_1_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_2_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 28,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x01c",
+      "length": 8,
+      "mirrorOf": "0x71c",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_3_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_4_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 29,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x01d",
+      "length": 8,
+      "mirrorOf": "0x71d",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_5_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_6_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 30,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x01e",
+      "length": 8,
+      "mirrorOf": "0x71e",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_7_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Info_Module_8_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 256,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x100",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "100",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 257,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x101",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "format": "unix_time",
+          "name": "Status_Inverter_Timestamp",
+          "notes": [
+            "Once per hour when battery connected"
+          ],
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 258,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x102",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "102",
+          "notes": [
+            "NOBATT"
+          ],
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 259,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x103",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Inverter_SN_1",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Inverter_SN_2",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_259_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 260,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x104",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Inverter_Manufacturer_1",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Inverter_Manufacturer_2",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_260_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 261,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x105",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Inverter_Model_1",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "format": "utf8",
+                "name": "Info_Inverter_Model_2",
+                "notes": [
+                  "NOBATT"
+                ],
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_261_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 262,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x106",
+      "length": 8,
+      "notes": [
+        "Carries the inverter's maintenance-mode command in byte 6, seen bounding five maintenance sessions across 28.7 M samples. No frame on this bus carries the SoC that maintenance discharges towards — the inverter appears to hold that target itself and simply discharge until the reported SoC arrives."
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "none",
+          "name": "106_Unknown_1",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "name": "106_Unknown_2",
+          "notes": [
+            "Constant 1000 across every sampled maintenance session."
+          ],
+          "signed": false,
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "name": "106_Maintenance_Param",
+          "notes": [
+            "Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude."
+          ],
+          "signed": false,
+          "startBit": 32
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "0": "Off",
+            "1": "On"
+          },
+          "format": "enum",
+          "name": "Cmd_Maintenance_Mode",
+          "notes": [
+            "Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz."
+          ],
+          "signed": false,
+          "startBit": 48
+        },
+        {
+          "bitLength": 8,
+          "confidence": "medium",
+          "name": "106_Padding",
+          "signed": false,
+          "startBit": 56
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 264,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x108",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "108",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 265,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x109",
+      "length": 8,
+      "notes": [
+        "Inverter telemetry broadcast. Byte 0 is a constant 0xAA marker, bytes 1-2 a 16-bit LE power value, bytes 3-7 always zero."
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "format": "hex",
+          "name": "109_Marker",
+          "notes": [
+            "Constant 0xAA in every sample. Frame marker / protocol tag, not data."
+          ],
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "name": "Status_PV_Power",
+          "notes": [
+            "The inverter's total DC (PV) input — matches the \"Total DC power\" it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive."
+          ],
+          "signed": false,
+          "startBit": 8,
+          "unit": "W"
+        },
+        {
+          "bitLength": 40,
+          "confidence": "high",
+          "format": "hex",
+          "name": "109_Padding",
+          "notes": [
+            "Always zero across every sampled window."
+          ],
+          "signed": false,
+          "startBit": 24
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 401,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x191",
+      "length": 8,
+      "notes": [
+        "NOBATT Discovery Message"
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "191",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "Inverter"
+    },
+    {
+      "frameId": 480,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x1E0",
+      "length": 8,
+      "notes": [
+        "Modbus-over-CAN tunnel. The inverter initiates and the BMS replies on this same CAN id, so both nodes transmit it — transmitter records the initiator only. Payloads concatenate into one Modbus RTU byte stream with no transport header: a 9- or 17-byte response arrives as 8+1 or 8+8+1. The `tunnel` table below hands it to the reassembler, which recovers each message by the RTU length rules and validates CRC-16/Modbus. Distinct from the 0x1F0 firmware-service tunnel, which is catalogued in sbr_modbus.toml."
+      ],
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "Inverter",
+      "tunnel": {
+        "deviceAddress": 1,
+        "protocol": "modbus_rtu"
+      }
+    },
+    {
+      "frameId": 1024,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x400",
+      "length": 8,
+      "notes": [
+        "No longer emitted beyond BMS firmware patch 0x26 (see Info_BMS_Firmware_Patch at 0x707)."
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "format": "hex",
+          "name": "400_Padding",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "name": "Status_Battery_Actual_SoC",
+          "signed": false,
+          "startBit": 8,
+          "unit": "%"
+        },
+        {
+          "bitLength": 40,
+          "format": "hex",
+          "name": "400_Unknown",
+          "signed": false,
+          "startBit": 24
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1025,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x401",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "high",
+          "endianness": "big",
+          "name": "401_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1026,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x402",
+      "length": 8,
+      "notes": [
+        "Appears on BMS firmware patch .30 and replaces 0x400, which is not emitted beyond patch 0x26 (see Info_BMS_Firmware_Patch at 0x707)."
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "high",
+          "format": "hex",
+          "name": "402_Unknown",
+          "notes": [
+            "Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown."
+          ],
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1280,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x500",
+      "length": 8,
+      "notes": [
+        "Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of an observed 3-to-7 module change."
+      ],
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "name": "500_Unknown_0",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "name": "500_Unknown_1",
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 32,
+          "format": "hex",
+          "name": "500_Unknown_2",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Status_Battery_SoC_Int",
+          "signed": false,
+          "startBit": 56,
+          "unit": "%"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1281,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x501",
+      "length": 8,
+      "mirrorOf": "0x701",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Min_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Charge_Current",
+          "signed": false,
+          "startBit": 32,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Info_Battery_Max_Dischg_Current",
+          "signed": false,
+          "startBit": 48,
+          "unit": "A"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1282,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x502",
+      "length": 8,
+      "mirrorOf": "0x702",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "inherited": true,
+          "name": "Status_Battery_Reported_SoC",
+          "signed": false,
+          "startBit": 0,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "inherited": true,
+          "name": "Status_Battery_SoH",
+          "signed": false,
+          "startBit": 16,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Remaining_Energy",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Max_Energy",
+          "signed": false,
+          "startBit": 48,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1283,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x503",
+      "length": 8,
+      "mirrorOf": "0x703",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Energy_Charged",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "inherited": true,
+          "name": "Status_Battery_Energy_Discharged",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1284,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x504",
+      "length": 8,
+      "mirrorOf": "0x704",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Battery_Current_Inverted",
+          "notes": [
+            "This is the opposite sign to the signal at 0x704"
+          ],
+          "signed": true,
+          "startBit": 16,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage_Alt_704",
+          "notes": [
+            "A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705."
+          ],
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Temperature",
+          "signed": true,
+          "startBit": 48,
+          "unit": "°C"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1285,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x505",
+      "length": 8,
+      "mirrorOf": "0x705",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "0": "Unplugged",
+            "1": "Standby",
+            "2": "Run"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Battery_Operation",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 8,
+          "confidence": "low",
+          "inherited": true,
+          "name": "705_End_Stop",
+          "notes": [
+            "The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror."
+          ],
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "low",
+          "inherited": true,
+          "name": "705_Always_1",
+          "signed": false,
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "enum": {
+            "8422": "SBR064",
+            "8423": "SBR096",
+            "8424": "SBR128",
+            "8425": "SBR160",
+            "8426": "SBR192",
+            "8427": "SBR224",
+            "8428": "SBR256"
+          },
+          "format": "enum",
+          "inherited": true,
+          "name": "Info_Battery_Type",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Status_Battery_Voltage_Alt_705",
+          "notes": [
+            "A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704."
+          ],
+          "signed": false,
+          "startBit": 40,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "medium",
+          "inherited": true,
+          "name": "705_Padding",
+          "signed": false,
+          "startBit": 56
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1286,
+      "inheritedFields": [
+        "transmitter",
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x506",
+      "length": 8,
+      "mirrorOf": "0x706",
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Overview_Cell_Max_Temp",
+          "signed": true,
+          "startBit": 0,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "inherited": true,
+          "name": "Overview_Cell_Min_Temp",
+          "signed": true,
+          "startBit": 16,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "inherited": true,
+          "name": "Overview_Cell_Max_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "inherited": true,
+          "name": "Overview_Cell_Min_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1298,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x512",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "high",
+          "name": "512_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1792,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x700",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "high",
+          "name": "700_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1793,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x701",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Info_Battery_Max_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Info_Battery_Min_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Info_Battery_Max_Charge_Current",
+          "signed": false,
+          "startBit": 32,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Info_Battery_Max_Dischg_Current",
+          "signed": false,
+          "startBit": 48,
+          "unit": "A"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1794,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x702",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "name": "Status_Battery_Reported_SoC",
+          "signed": false,
+          "startBit": 0,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.01,
+          "name": "Status_Battery_SoH",
+          "signed": false,
+          "startBit": 16,
+          "unit": "%"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "name": "Status_Battery_Remaining_Energy",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "name": "Status_Battery_Max_Energy",
+          "signed": false,
+          "startBit": 48,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1795,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x703",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Status_Battery_Energy_Charged",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Status_Battery_Energy_Discharged",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1796,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x704",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Battery_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Battery_Current",
+          "signed": true,
+          "startBit": 16,
+          "unit": "A"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "name": "Status_Battery_Voltage_Alt_704",
+          "notes": [
+            "A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705."
+          ],
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Battery_Temperature",
+          "signed": true,
+          "startBit": 48,
+          "unit": "°C"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1797,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x705",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "0": "Unplugged",
+            "1": "Standby",
+            "2": "Run"
+          },
+          "format": "enum",
+          "name": "Info_Battery_Operation",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 8,
+          "confidence": "low",
+          "name": "705_End_Stop",
+          "notes": [
+            "The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror."
+          ],
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "low",
+          "name": "705_Always_1",
+          "signed": false,
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "enum": {
+            "8422": "SBR064",
+            "8423": "SBR096",
+            "8424": "SBR128",
+            "8425": "SBR160",
+            "8426": "SBR192",
+            "8427": "SBR224",
+            "8428": "SBR256"
+          },
+          "format": "enum",
+          "name": "Info_Battery_Type",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 16,
+          "confidence": "medium",
+          "factor": 0.1,
+          "name": "Status_Battery_Voltage_Alt_705",
+          "notes": [
+            "A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704."
+          ],
+          "signed": false,
+          "startBit": 40,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "medium",
+          "name": "705_Padding",
+          "signed": false,
+          "startBit": 56
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1798,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x706",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Overview_Cell_Max_Temp",
+          "signed": true,
+          "startBit": 0,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Overview_Cell_Min_Temp",
+          "signed": true,
+          "startBit": 16,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "name": "Overview_Cell_Max_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.001,
+          "name": "Overview_Cell_Min_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1799,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x707",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "format": "hex",
+          "name": "Info_BMS_Firmware_Patch",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "name": "707_All_Zero",
+          "signed": false,
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "format": "hex",
+          "name": "Info_BMS_Firmware_Minor",
+          "signed": false,
+          "startBit": 24
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "name": "Info_Battery_Nameplate_Capacity",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Wh"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "name": "Info_Battery_Module_Count",
+          "signed": false,
+          "startBit": 48
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1800,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x708",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "high",
+                "format": "utf8",
+                "name": "Info_Battery_SN_1",
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 48,
+                "confidence": "high",
+                "name": "Info_Battery_SN_2",
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_1800_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1801,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x709",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "name": "709_Padding",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1802,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x70A",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "high",
+                "format": "utf8",
+                "name": "Info_Battery_Manufacturer",
+                "startBit": 8
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "medium",
+                "format": "utf8",
+                "name": "Info_Battery_Model_Short",
+                "startBit": 8
+              }
+            ]
+          }
+        },
+        "name": "mux_1802_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1803,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x70B",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "confidence": "medium",
+          "format": "utf8",
+          "name": "Info_Battery_Model",
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1805,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x70D",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "70d_Unknown_Permission_3_10701__",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1806,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x70E",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 64,
+          "format": "hex",
+          "name": "70E_Unknown_Permission_3_10705__",
+          "signed": false,
+          "startBit": 0
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1807,
+      "inheritedFields": [
+        "extended"
+      ],
+      "interval": 10000,
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x70F",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "0": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Mux0_Const",
+                "signed": false,
+                "startBit": 16
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "name": "Info_Battery_Max_Power",
+                "notes": [
+                  "Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — it held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed."
+                ],
+                "signed": false,
+                "startBit": 32,
+                "unit": "W"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "name": "Info_Battery_Max_Power_2",
+                "notes": [
+                  "Second copy of the static 1920 W x module_count rating. Invariant across every sampled window — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701."
+                ],
+                "signed": false,
+                "startBit": 48,
+                "unit": "W"
+              }
+            ]
+          },
+          "1": {
+            "signals": [
+              {
+                "bitLength": 56,
+                "confidence": "low",
+                "format": "hex",
+                "name": "70F_Mux1_Padding",
+                "signed": false,
+                "startBit": 8
+              }
+            ]
+          },
+          "2": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Unknown_Mux_2_1",
+                "notes": [
+                  "Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_3_1: ~9950 in warm windows, ~12800 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved."
+                ],
+                "signed": false,
+                "startBit": 16
+              },
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Mux2_Padding",
+                "signed": false,
+                "startBit": 32
+              },
+              {
+                "bitLength": 16,
+                "confidence": "none",
+                "name": "70F_Unknown_Mux_2_3",
+                "notes": [
+                  "dynamic, unmapped"
+                ],
+                "signed": false,
+                "startBit": 48
+              }
+            ]
+          },
+          "3": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Unknown_Mux_3_1",
+                "notes": [
+                  "Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_2_1: ~9926 in warm windows, ~12940 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved."
+                ],
+                "signed": false,
+                "startBit": 16
+              },
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Mux3_Padding",
+                "signed": false,
+                "startBit": 32
+              },
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "factor": 0.01,
+                "name": "70F_Unknown_Mux_3_3",
+                "notes": [
+                  "Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three separate windows — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: it held constant at 9990 while SoC cycled 25.6 % to 100 %."
+                ],
+                "signed": false,
+                "startBit": 48,
+                "unit": "%"
+              }
+            ]
+          },
+          "4": {
+            "signals": [
+              {
+                "bitLength": 8,
+                "confidence": "low",
+                "name": "70F_Mux4_Padding_0",
+                "signed": false,
+                "startBit": 8
+              },
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "name": "70F_Mux4_Charge_Value",
+                "notes": [
+                  "Bytes 2-3 are one 16-bit field, not an 8-bit value plus padding: byte 3 changed from 7 to 10 between sampled windows. Drifts slowly (~1996 warm, ~2593 cold) and tracks with 70F_Unknown_Mux_2_1 and 70F_Unknown_Mux_3_1."
+                ],
+                "signed": false,
+                "startBit": 16
+              },
+              {
+                "bitLength": 24,
+                "confidence": "low",
+                "name": "70F_Mux4_Padding_1",
+                "signed": false,
+                "startBit": 32
+              },
+              {
+                "bitLength": 8,
+                "confidence": "high",
+                "enum": {
+                  "0": "Normal",
+                  "2": "Stop Charge"
+                },
+                "format": "enum",
+                "name": "Status_Charge_State",
+                "signed": false,
+                "startBit": 56
+              }
+            ]
+          },
+          "5": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_1_SoC",
+                "signed": false,
+                "startBit": 16,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_2_SoC",
+                "signed": false,
+                "startBit": 32,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_3_SoC",
+                "signed": false,
+                "startBit": 48,
+                "unit": "%"
+              }
+            ]
+          },
+          "6": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_4_SoC",
+                "signed": false,
+                "startBit": 16,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_5_SoC",
+                "signed": false,
+                "startBit": 32,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_6_SoC",
+                "signed": false,
+                "startBit": 48,
+                "unit": "%"
+              }
+            ]
+          },
+          "7": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "confidence": "high",
+                "factor": 0.01,
+                "name": "Status_Module_7_SoC",
+                "signed": false,
+                "startBit": 16,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "medium",
+                "factor": 0.01,
+                "name": "Status_Module_8_SoC",
+                "signed": false,
+                "startBit": 32,
+                "unit": "%"
+              },
+              {
+                "bitLength": 16,
+                "confidence": "low",
+                "format": "hex",
+                "name": "70F_Mux7_Padding",
+                "signed": false,
+                "startBit": 48
+              }
+            ]
+          }
+        },
+        "name": "mux_1807_0_8",
+        "startBit": 0
+      },
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1811,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x713",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Cell_Min_Temp",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Module_Min_Temp",
+          "signed": false,
+          "startBit": 8,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Cell_Min_Temp",
+          "signed": true,
+          "startBit": 16,
+          "unit": "°C"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Cell_Max_Temp",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Module_Max_Temp",
+          "signed": false,
+          "startBit": 40,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.1,
+          "name": "Status_Cell_Max_Temp",
+          "signed": true,
+          "startBit": 48,
+          "unit": "°C"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1812,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x714",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Cell_Max_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Module_Max_Voltage",
+          "signed": false,
+          "startBit": 8,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Cell_Max_Voltage_HP",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Cell_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "Cell #"
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "name": "Status_Pos_Module_Min_Voltage",
+          "signed": false,
+          "startBit": 40,
+          "unit": "Module #"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Cell_Min_Voltage_HP",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1813,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x715",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_1_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_1_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_2_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_2_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1814,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x716",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_3_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_3_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_4_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_4_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1815,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x717",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_5_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_5_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_6_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_6_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1816,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x718",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_7_Min_Voltage",
+          "signed": false,
+          "startBit": 0,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_7_Max_Voltage",
+          "signed": false,
+          "startBit": 16,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_8_Min_Voltage",
+          "signed": false,
+          "startBit": 32,
+          "unit": "V"
+        },
+        {
+          "bitLength": 16,
+          "confidence": "high",
+          "factor": 0.0001,
+          "name": "Status_Module_8_Max_Voltage",
+          "signed": false,
+          "startBit": 48,
+          "unit": "V"
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1817,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x719",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "name": "Status_3_10789__",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "confidence": "low",
+          "name": "Status_Module_Fault_3_10790__",
+          "signed": false,
+          "startBit": 16
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1818,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71A",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_1_Cell_Type",
+          "startBit": 0
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_2_Cell_Type",
+          "startBit": 8
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_3_Cell_Type",
+          "startBit": 16
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_4_Cell_Type",
+          "startBit": 24
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_5_Cell_Type",
+          "startBit": 32
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_6_Cell_Type",
+          "startBit": 40
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_7_Cell_Type",
+          "startBit": 48
+        },
+        {
+          "bitLength": 8,
+          "confidence": "high",
+          "enum": {
+            "66": "IEC",
+            "68": "Non-IEC"
+          },
+          "format": "enum",
+          "name": "Info_Module_8_Cell_Type",
+          "startBit": 56
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1819,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71B",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_1_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_2_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1820,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71C",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_3_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_4_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1821,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71D",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_5_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_6_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1822,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71E",
+      "length": 8,
+      "protocol": "can",
+      "signals": [
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_7_Production_Date",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 32,
+          "confidence": "high",
+          "name": "Info_Module_8_Production_Date",
+          "signed": false,
+          "startBit": 32
+        }
+      ],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 1823,
+      "inheritedFields": [
+        "extended"
+      ],
+      "isExtended": false,
+      "isFd": false,
+      "key": "0x71F",
+      "length": 8,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "1": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_1_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_1_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_1_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_1_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "2": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_2_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_2_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_2_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_2_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "3": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_3_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_3_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_3_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_3_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "4": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_4_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_4_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_4_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_4_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "5": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_5_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_5_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_5_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_5_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "6": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_6_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_6_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_6_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_6_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "7": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_7_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_7_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_7_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_7_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          },
+          "8": {
+            "mux": {
+              "bitLength": 8,
+              "cases": {
+                "1": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_8_SN_1",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "2": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_8_SN_2",
+                      "startBit": 16
+                    }
+                  ]
+                },
+                "3": {
+                  "signals": [
+                    {
+                      "bitLength": 48,
+                      "confidence": "high",
+                      "format": "utf8",
+                      "name": "Info_Module_8_SN_3",
+                      "startBit": 16
+                    }
+                  ]
+                }
+              },
+              "name": "mux_1823_8_8_8",
+              "startBit": 8
+            },
+            "signals": []
+          }
+        },
+        "name": "mux_1823_0_8",
+        "startBit": 0
+      },
+      "notes": [
+        "Characters 8–9 = year (YY), 10 = month (M, or A/B/C for 10–12), 11–12 = day (DD)."
+      ],
+      "protocol": "can",
+      "signals": [],
+      "transmitter": "BMS"
+    },
+    {
+      "frameId": 19938,
+      "inheritedFields": [
+        "deviceAddress"
+      ],
+      "interval": 5000,
+      "key": "tunnel_4de2_holding",
+      "length": 12,
+      "modbusDeviceAddress": 1,
+      "modbusRegisterCount": 6,
+      "modbusRegisterType": "holding",
+      "name": "tunnel_4de2_holding",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19938,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_0",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19939,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_1",
+          "signed": false,
+          "startBit": 16
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19940,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_2",
+          "signed": false,
+          "startBit": 32
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19941,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_3",
+          "signed": false,
+          "startBit": 48
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19942,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_4",
+          "signed": false,
+          "startBit": 64
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19943,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Holding_5",
+          "signed": false,
+          "startBit": 80
+        }
+      ]
+    },
+    {
+      "frameId": 19938,
+      "inheritedFields": [
+        "deviceAddress"
+      ],
+      "interval": 5000,
+      "key": "tunnel_4de2_input",
+      "length": 4,
+      "modbusDeviceAddress": 1,
+      "modbusRegisterCount": 2,
+      "modbusRegisterType": "input",
+      "name": "tunnel_4de2_input",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19938,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Input_0",
+          "signed": false,
+          "startBit": 0
+        },
+        {
+          "bitLength": 16,
+          "format": "hex",
+          "modbusRegister": 19939,
+          "modbusRegisterCount": 1,
+          "name": "Tunnel_4DE2_Input_1",
+          "signed": false,
+          "startBit": 16
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "name": "SBRXXX",
+    "version": 11
+  },
+  "nodes": [
+    {
+      "name": "BMS"
+    },
+    {
+      "name": "Inverter"
+    }
+  ],
+  "protocol": "can"
+}

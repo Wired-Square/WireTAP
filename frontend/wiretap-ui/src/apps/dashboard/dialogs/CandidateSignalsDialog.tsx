@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Sparkles, ChevronRight } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 import Dialog, { DialogBody } from "../../../components/Dialog";
@@ -30,6 +31,51 @@ const SIGNAL_COLOURS = [
   "#a855f7", "#06b6d4", "#f97316", "#ec4899",
   "#84cc16", "#14b8a6", "#6366f1", "#e879f9",
 ];
+
+/** The `byte_<offset>_<bits>b_<le|be>` signals the dialog offers for one frame. */
+export function candidateSignals(
+  t: TFunction,
+  { startByte, endByte, bitLengths, endianness, analysis }: {
+    startByte: string;
+    endByte: string;
+    bitLengths: Set<number>;
+    endianness: Set<"le" | "be">;
+    analysis?: ChangesFrame;
+  },
+): CandidateSignal[] {
+  const start = parseInt(startByte, 10) || 0;
+  const end = parseInt(endByte, 10) || 7;
+  const result: CandidateSignal[] = [];
+
+  // Roles to include when using analysis hints
+  const interestingRoles = new Set<ByteColumn["role"]>(["sensor", "value", "unknown"]);
+
+  for (let offset = start; offset <= end; offset++) {
+    // If using analysis hints, skip bytes classified as static or counter
+    if (analysis) {
+      const byteStat = analysis.columns.find((b) => b.position === offset);
+      if (byteStat && !interestingRoles.has(byteStat.role)) continue;
+    }
+
+    for (const bits of Array.from(bitLengths).sort((a, b) => a - b)) {
+      // For multi-byte signals, check that offset + byte span doesn't exceed end
+      const byteSpan = bits / 8;
+      if (offset + byteSpan - 1 > end) continue;
+
+      for (const e of Array.from(endianness)) {
+        // 8-bit signals are endianness-agnostic — only generate once (as LE)
+        if (bits === 8 && e === "be") continue;
+
+        const signalName = `byte_${offset}_${bits}b_${e}`;
+        const label = bits > 8
+          ? t("candidates.byteLabelEndian", { offset, bits, endian: e === "le" ? "LE" : "BE" })
+          : t("candidates.byteLabel", { offset, bits });
+        result.push({ label, signalName, offset, bits, endianness: e });
+      }
+    }
+  }
+  return result;
+}
 
 export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
   const { t } = useTranslation("dashboard");
@@ -78,42 +124,10 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     });
   }, []);
 
-  // Generate candidate signals
-  const candidates: CandidateSignal[] = useMemo(() => {
-    if (!selectedFrameId) return [];
-    const start = parseInt(startByte, 10) || 0;
-    const end = parseInt(endByte, 10) || 7;
-    const result: CandidateSignal[] = [];
-
-    // Roles to include when using analysis hints
-    const interestingRoles = new Set<ByteColumn["role"]>(["sensor", "value", "unknown"]);
-
-    for (let offset = start; offset <= end; offset++) {
-      // If using analysis hints, skip bytes classified as static or counter
-      if (useAnalysisHints && analysisResult) {
-        const byteStat = analysisResult.columns.find((b) => b.position === offset);
-        if (byteStat && !interestingRoles.has(byteStat.role)) continue;
-      }
-
-      for (const bits of Array.from(bitLengths).sort((a, b) => a - b)) {
-        // For multi-byte signals, check that offset + byte span doesn't exceed end
-        const byteSpan = bits / 8;
-        if (offset + byteSpan - 1 > end) continue;
-
-        for (const e of Array.from(endianness)) {
-          // 8-bit signals are endianness-agnostic — only generate once (as LE)
-          if (bits === 8 && e === "be") continue;
-
-          const signalName = `byte_${offset}_${bits}b_${e}`;
-          const label = bits > 8
-            ? t("candidates.byteLabelEndian", { offset, bits, endian: e === "le" ? "LE" : "BE" })
-            : t("candidates.byteLabel", { offset, bits });
-          result.push({ label, signalName, offset, bits, endianness: e });
-        }
-      }
-    }
-    return result;
-  }, [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult, t]);
+  const candidates: CandidateSignal[] = useMemo(
+    () => (selectedFrameId ? candidateSignals(t, { startByte, endByte, bitLengths, endianness, analysis: useAnalysisHints ? analysisResult : undefined }) : []),
+    [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult, t],
+  );
 
   const handleGenerate = useCallback(() => {
     if (candidates.length === 0 || !selectedFrameId) return;

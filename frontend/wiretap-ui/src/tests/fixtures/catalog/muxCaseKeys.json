@@ -1,0 +1,135 @@
+{
+  "note": "`ts` is muxCaseMatch.ts isMuxCaseKey; `rust` is wiretap-catalog parse.rs is_mux_case_key, read through catalog.parse",
+  "keys": [
+    {
+      "key": "0",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "1",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "15",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "007",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "0-3",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "3-1",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "1,2,5",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "1, 2",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": " 1 ",
+      "ts": true,
+      "rust": true
+    },
+    {
+      "key": "0x10",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "-1",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "1-",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "-3",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "1,,2",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "2-3-4",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "1.5",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "٣",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "abc",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "notes",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "signals",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "mux",
+      "ts": true,
+      "rust": false
+    },
+    {
+      "key": "name",
+      "ts": false,
+      "rust": false
+    },
+    {
+      "key": "start_bit",
+      "ts": false,
+      "rust": false
+    },
+    {
+      "key": "bit_length",
+      "ts": false,
+      "rust": false
+    },
+    {
+      "key": "default",
+      "ts": false,
+      "rust": false
+    }
+  ]
+}

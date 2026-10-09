@@ -1,0 +1,405 @@
+{
+  "cases": [
+    {
+      "name": "modbus",
+      "input": "catalog/modbus.catalog.json",
+      "expected": {
+        "tree": [
+          {
+            "key": "meta",
+            "type": "meta",
+            "path": [
+              "meta"
+            ],
+            "metadata": {
+              "isMeta": true,
+              "properties": {
+                "name": "Inverter registers",
+                "version": 3
+              }
+            }
+          },
+          {
+            "key": "frame",
+            "type": "section",
+            "path": [
+              "frame"
+            ],
+            "children": [
+              {
+                "key": "modbus",
+                "type": "section",
+                "path": [
+                  "frame",
+                  "modbus"
+                ],
+                "children": [
+                  {
+                    "key": "0x32F9",
+                    "type": "modbus-frame",
+                    "path": [
+                      "frame",
+                      "modbus",
+                      "0x32F9"
+                    ],
+                    "children": [
+                      {
+                        "key": "Mode",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "modbus",
+                          "0x32F9",
+                          "signals",
+                          "0"
+                        ],
+                        "metadata": {
+                          "signalIndex": 0,
+                          "signalStartBit": 0,
+                          "signalBitLength": 16,
+                          "properties": {
+                            "name": "Mode",
+                            "start_bit": 0,
+                            "bit_length": 16,
+                            "signed": false,
+                            "format": "enum",
+                            "enum": {
+                              "0": "Stop",
+                              "1": "Run"
+                            },
+                            "modbus_register": 13049,
+                            "modbus_register_count": 1
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "modbus",
+                      "isId": true,
+                      "idValue": "0x32F9",
+                      "length": 2,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "interval": 1000,
+                      "intervalInherited": true,
+                      "signals": [
+                        {
+                          "name": "Mode",
+                          "start_bit": 0,
+                          "bit_length": 16,
+                          "signed": false,
+                          "format": "enum",
+                          "enum": {
+                            "0": "Stop",
+                            "1": "Run"
+                          },
+                          "modbus_register": 13049,
+                          "modbus_register_count": 1
+                        }
+                      ],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "registerNumber": 13049,
+                      "node": "Meter",
+                      "nodeAddress": 7,
+                      "deviceAddress": 7,
+                      "deviceAddressInherited": true,
+                      "registerType": "holding",
+                      "registerBase": 1,
+                      "registerBaseInherited": true
+                    }
+                  },
+                  {
+                    "key": "100",
+                    "type": "modbus-frame",
+                    "path": [
+                      "frame",
+                      "modbus",
+                      "100"
+                    ],
+                    "children": [
+                      {
+                        "key": "Relays",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "modbus",
+                          "100",
+                          "signals",
+                          "0"
+                        ],
+                        "metadata": {
+                          "signalIndex": 0,
+                          "signalStartBit": 0,
+                          "signalBitLength": 4,
+                          "properties": {
+                            "name": "Relays",
+                            "start_bit": 0,
+                            "bit_length": 4,
+                            "signed": false,
+                            "format": "hex",
+                            "modbus_register": 100,
+                            "modbus_register_count": 4
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "modbus",
+                      "isId": true,
+                      "idValue": "100",
+                      "length": 1,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "interval": 1000,
+                      "intervalInherited": true,
+                      "signals": [
+                        {
+                          "name": "Relays",
+                          "start_bit": 0,
+                          "bit_length": 4,
+                          "signed": false,
+                          "format": "hex",
+                          "modbus_register": 100,
+                          "modbus_register_count": 4
+                        }
+                      ],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "registerNumber": 100,
+                      "deviceAddress": 1,
+                      "deviceAddressInherited": true,
+                      "registerType": "coil",
+                      "registerBase": 1,
+                      "registerBaseInherited": true
+                    }
+                  },
+                  {
+                    "key": "5000",
+                    "type": "modbus-frame",
+                    "path": [
+                      "frame",
+                      "modbus",
+                      "5000"
+                    ],
+                    "children": [
+                      {
+                        "key": "Daily_Yield",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "modbus",
+                          "5000",
+                          "signals",
+                          "0"
+                        ],
+                        "metadata": {
+                          "signalIndex": 0,
+                          "signalStartBit": 0,
+                          "signalBitLength": 32,
+                          "properties": {
+                            "name": "Daily_Yield",
+                            "start_bit": 0,
+                            "bit_length": 32,
+                            "signed": false,
+                            "word_order": "little",
+                            "factor": 0.1,
+                            "unit": "kWh",
+                            "modbus_register": 5000,
+                            "modbus_register_count": 2
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "modbus",
+                      "isId": true,
+                      "idValue": "5000",
+                      "length": 4,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "interval": 1000,
+                      "intervalInherited": true,
+                      "notes": [
+                        "Running state",
+                        "Read every second"
+                      ],
+                      "signals": [
+                        {
+                          "name": "Daily_Yield",
+                          "start_bit": 0,
+                          "bit_length": 32,
+                          "signed": false,
+                          "word_order": "little",
+                          "factor": 0.1,
+                          "unit": "kWh",
+                          "modbus_register": 5000,
+                          "modbus_register_count": 2
+                        }
+                      ],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "registerNumber": 5000,
+                      "node": "Inverter",
+                      "nodeAddress": 3,
+                      "deviceAddress": 3,
+                      "deviceAddressInherited": true,
+                      "registerType": "input",
+                      "registerBase": 1,
+                      "registerBaseInherited": true
+                    }
+                  },
+                  {
+                    "key": "battery_power",
+                    "type": "modbus-frame",
+                    "path": [
+                      "frame",
+                      "modbus",
+                      "battery_power"
+                    ],
+                    "children": [
+                      {
+                        "key": "Battery_Power",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "modbus",
+                          "battery_power",
+                          "signals",
+                          "0"
+                        ],
+                        "metadata": {
+                          "signalIndex": 0,
+                          "signalStartBit": 0,
+                          "signalBitLength": 16,
+                          "properties": {
+                            "name": "Battery_Power",
+                            "start_bit": 0,
+                            "bit_length": 16,
+                            "signed": true,
+                            "unit": "W",
+                            "modbus_register": 13021,
+                            "modbus_register_count": 1
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "modbus",
+                      "isId": true,
+                      "idValue": "battery_power",
+                      "length": 2,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "interval": 500,
+                      "intervalInherited": false,
+                      "signals": [
+                        {
+                          "name": "Battery_Power",
+                          "start_bit": 0,
+                          "bit_length": 16,
+                          "signed": true,
+                          "unit": "W",
+                          "modbus_register": 13021,
+                          "modbus_register_count": 1
+                        }
+                      ],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "registerNumber": 13021,
+                      "deviceAddress": 1,
+                      "deviceAddressInherited": true,
+                      "registerType": "input",
+                      "registerBase": 1,
+                      "registerBaseInherited": true
+                    }
+                  }
+                ],
+                "metadata": {
+                  "properties": {}
+                }
+              }
+            ],
+            "metadata": {
+              "properties": {}
+            }
+          },
+          {
+            "key": "node",
+            "type": "section",
+            "path": [
+              "node"
+            ],
+            "children": [
+              {
+                "key": "Inverter",
+                "type": "node",
+                "path": [
+                  "node",
+                  "Inverter"
+                ],
+                "metadata": {
+                  "isNode": true,
+                  "deviceAddress": 3,
+                  "properties": {
+                    "device_address": 3,
+                    "notes": [
+                      "Hybrid inverter"
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "Meter",
+                "type": "node",
+                "path": [
+                  "node",
+                  "Meter"
+                ],
+                "metadata": {
+                  "isNode": true,
+                  "deviceAddress": 7,
+                  "properties": {
+                    "device_address": 7
+                  }
+                }
+              }
+            ],
+            "metadata": {
+              "properties": {}
+            }
+          }
+        ],
+        "meta": {
+          "name": "Inverter registers",
+          "version": 3,
+          "default_frame": "modbus"
+        },
+        "peers": [
+          "Inverter",
+          "Meter"
+        ],
+        "slaves": [
+          {
+            "name": "Inverter",
+            "address": 3
+          },
+          {
+            "name": "Meter",
+            "address": 7
+          }
+        ],
+        "modbusConfig": {
+          "device_address": 1,
+          "register_base": 1,
+          "default_interval": 1000,
+          "default_byte_order": "big",
+          "default_word_order": "little"
+        },
+        "hasCanFrames": false,
+        "hasModbusFrames": true,
+        "hasSerialFrames": false
+      }
+    }
+  ]
+}

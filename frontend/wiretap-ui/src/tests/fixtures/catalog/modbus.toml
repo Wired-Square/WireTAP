@@ -1,0 +1,71 @@
+[meta]
+name = "Inverter registers"
+version = 3
+default_frame = "modbus"
+
+[meta.modbus]
+device_address = 1
+register_base = 1
+default_interval = 1000
+default_byte_order = "big"
+default_word_order = "little"
+
+[node.Inverter]
+device_address = 3
+notes = "Hybrid inverter"
+
+[node.Meter]
+device_address = 7
+
+[frame.modbus."5000"]
+register_type = "input"
+length = 2
+node_address = 3
+notes = ["Running state", "Read every second"]
+
+[[frame.modbus."5000".signals]]
+name = "Daily_Yield"
+start_bit = 0
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+word_order = "little"
+confidence = "high"
+
+[frame.modbus.battery_power]
+register_number = 13021
+register_type = "input"
+length = 1
+transmitter = "Inverter"
+interval_ms = 500
+
+[[frame.modbus.battery_power.signals]]
+name = "Battery_Power"
+start_bit = 0
+bit_length = 16
+signed = true
+unit = "W"
+
+[frame.modbus."0x32F9"]
+length = 1
+node_address = 7
+
+[[frame.modbus."0x32F9".signals]]
+name = "Mode"
+start_bit = 0
+bit_length = 16
+format = "enum"
+
+[frame.modbus."0x32F9".signals.enum]
+0 = "Stop"
+1 = "Run"
+
+[frame.modbus."100"]
+register_type = "coil"
+length = 4
+
+[[frame.modbus."100".signals]]
+name = "Relays"
+start_bit = 0
+bit_length = 4
+format = "hex"

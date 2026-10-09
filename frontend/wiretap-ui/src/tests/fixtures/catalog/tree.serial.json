@@ -1,0 +1,388 @@
+{
+  "cases": [
+    {
+      "name": "serial",
+      "input": "catalog/serial.catalog.json",
+      "expected": {
+        "tree": [
+          {
+            "key": "meta",
+            "type": "meta",
+            "path": [
+              "meta"
+            ],
+            "metadata": {
+              "isMeta": true,
+              "properties": {
+                "name": "RS-485 bus",
+                "version": 1
+              }
+            }
+          },
+          {
+            "key": "frame",
+            "type": "section",
+            "path": [
+              "frame"
+            ],
+            "children": [
+              {
+                "key": "serial",
+                "type": "section",
+                "path": [
+                  "frame",
+                  "serial"
+                ],
+                "children": [
+                  {
+                    "key": "0x10",
+                    "type": "serial-frame",
+                    "path": [
+                      "frame",
+                      "serial",
+                      "0x10"
+                    ],
+                    "children": [
+                      {
+                        "key": "Frame CRC",
+                        "type": "checksum",
+                        "path": [
+                          "frame",
+                          "serial",
+                          "0x10",
+                          "checksum",
+                          "0"
+                        ],
+                        "metadata": {
+                          "checksumIndex": 0,
+                          "checksumAlgorithm": "crc16_ccitt",
+                          "checksumStartByte": 10,
+                          "checksumByteLength": 2,
+                          "checksumEndianness": "big",
+                          "checksumCalcStartByte": 0,
+                          "checksumCalcEndByte": 10,
+                          "properties": {
+                            "name": "Frame CRC",
+                            "algorithm": "crc16_ccitt",
+                            "start_byte": 10,
+                            "byte_length": 2,
+                            "endianness": "big",
+                            "calc_start_byte": 0,
+                            "calc_end_byte": 10
+                          }
+                        }
+                      },
+                      {
+                        "key": "Voltage",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "serial",
+                          "0x10",
+                          "signals",
+                          "0"
+                        ],
+                        "metadata": {
+                          "signalIndex": 0,
+                          "signalStartBit": 24,
+                          "signalBitLength": 16,
+                          "properties": {
+                            "name": "Voltage",
+                            "start_bit": 24,
+                            "bit_length": 16,
+                            "factor": 0.01,
+                            "unit": "V"
+                          }
+                        }
+                      },
+                      {
+                        "key": "Flags",
+                        "type": "signal",
+                        "path": [
+                          "frame",
+                          "serial",
+                          "0x10",
+                          "signals",
+                          "1"
+                        ],
+                        "metadata": {
+                          "signalIndex": 1,
+                          "signalStartBit": 40,
+                          "signalBitLength": 8,
+                          "properties": {
+                            "name": "Flags",
+                            "start_bit": 40,
+                            "bit_length": 8,
+                            "byte_order": "big",
+                            "format": "hex"
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "serial",
+                      "isId": true,
+                      "idValue": "0x10",
+                      "length": 12,
+                      "lengthInherited": false,
+                      "transmitter": "Controller",
+                      "transmitterInherited": false,
+                      "interval": 250,
+                      "intervalInherited": false,
+                      "notes": [
+                        "Status broadcast"
+                      ],
+                      "signals": [
+                        {
+                          "name": "Voltage",
+                          "start_bit": 24,
+                          "bit_length": 16,
+                          "factor": 0.01,
+                          "unit": "V"
+                        },
+                        {
+                          "name": "Flags",
+                          "start_bit": 40,
+                          "bit_length": 8,
+                          "byte_order": "big",
+                          "format": "hex"
+                        }
+                      ],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "encoding": "slip",
+                      "frameId": "0x10"
+                    }
+                  },
+                  {
+                    "key": "0x20",
+                    "type": "serial-frame",
+                    "path": [
+                      "frame",
+                      "serial",
+                      "0x20"
+                    ],
+                    "children": [
+                      {
+                        "key": "Page",
+                        "type": "mux",
+                        "path": [
+                          "frame",
+                          "serial",
+                          "0x20",
+                          "mux"
+                        ],
+                        "children": [
+                          {
+                            "key": "Case 1",
+                            "type": "mux-case",
+                            "path": [
+                              "frame",
+                              "serial",
+                              "0x20",
+                              "mux",
+                              "1"
+                            ],
+                            "children": [
+                              {
+                                "key": "Temperature",
+                                "type": "signal",
+                                "path": [
+                                  "frame",
+                                  "serial",
+                                  "0x20",
+                                  "mux",
+                                  "1",
+                                  "signals",
+                                  "0"
+                                ],
+                                "metadata": {
+                                  "signalIndex": 0,
+                                  "signalStartBit": 32,
+                                  "signalBitLength": 16,
+                                  "properties": {
+                                    "name": "Temperature",
+                                    "start_bit": 32,
+                                    "bit_length": 16,
+                                    "signed": true,
+                                    "factor": 0.1,
+                                    "unit": "C"
+                                  }
+                                }
+                              }
+                            ],
+                            "metadata": {
+                              "caseValue": "1",
+                              "properties": {
+                                "signals": [
+                                  {
+                                    "name": "Temperature",
+                                    "start_bit": 32,
+                                    "bit_length": 16,
+                                    "signed": true,
+                                    "factor": 0.1,
+                                    "unit": "C"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "key": "Case 2-3",
+                            "type": "mux-case",
+                            "path": [
+                              "frame",
+                              "serial",
+                              "0x20",
+                              "mux",
+                              "2-3"
+                            ],
+                            "children": [
+                              {
+                                "key": "Counter",
+                                "type": "signal",
+                                "path": [
+                                  "frame",
+                                  "serial",
+                                  "0x20",
+                                  "mux",
+                                  "2-3",
+                                  "signals",
+                                  "0"
+                                ],
+                                "metadata": {
+                                  "signalIndex": 0,
+                                  "signalStartBit": 32,
+                                  "signalBitLength": 32,
+                                  "properties": {
+                                    "name": "Counter",
+                                    "start_bit": 32,
+                                    "bit_length": 32
+                                  }
+                                }
+                              }
+                            ],
+                            "metadata": {
+                              "caseValue": "2-3",
+                              "properties": {
+                                "signals": [
+                                  {
+                                    "name": "Counter",
+                                    "start_bit": 32,
+                                    "bit_length": 32
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ],
+                        "metadata": {
+                          "muxName": "Page",
+                          "muxStartBit": 24,
+                          "muxBitLength": 8,
+                          "properties": {
+                            "name": "Page",
+                            "start_bit": 24,
+                            "bit_length": 8
+                          }
+                        }
+                      }
+                    ],
+                    "metadata": {
+                      "frameType": "serial",
+                      "isId": true,
+                      "idValue": "0x20",
+                      "length": 16,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "intervalInherited": false,
+                      "signals": [],
+                      "hasMux": true,
+                      "muxSignalCount": 2,
+                      "encoding": "slip",
+                      "frameId": "0x20",
+                      "delimiter": [
+                        192
+                      ]
+                    }
+                  }
+                ],
+                "metadata": {
+                  "properties": {}
+                }
+              }
+            ],
+            "metadata": {
+              "properties": {}
+            }
+          },
+          {
+            "key": "node",
+            "type": "section",
+            "path": [
+              "node"
+            ],
+            "children": [
+              {
+                "key": "Controller",
+                "type": "node",
+                "path": [
+                  "node",
+                  "Controller"
+                ],
+                "metadata": {
+                  "isNode": true,
+                  "properties": {
+                    "notes": [
+                      "Bus master"
+                    ]
+                  }
+                }
+              }
+            ],
+            "metadata": {
+              "properties": {}
+            }
+          }
+        ],
+        "meta": {
+          "name": "RS-485 bus",
+          "version": 1,
+          "default_frame": "serial"
+        },
+        "peers": [
+          "Controller"
+        ],
+        "slaves": [],
+        "serialConfig": {
+          "encoding": "slip",
+          "byte_order": "little",
+          "header_length": 3,
+          "min_frame_length": 5,
+          "fields": {
+            "id": {
+              "mask": 65280,
+              "format": "hex"
+            },
+            "source_address": {
+              "mask": 255,
+              "endianness": "big",
+              "format": "decimal"
+            }
+          },
+          "checksum": {
+            "algorithm": "crc16_modbus",
+            "start_byte": -2,
+            "byte_length": 2,
+            "calc_start_byte": 0,
+            "calc_end_byte": -2,
+            "big_endian": false
+          }
+        },
+        "hasCanFrames": false,
+        "hasModbusFrames": false,
+        "hasSerialFrames": true
+      }
+    }
+  ]
+}

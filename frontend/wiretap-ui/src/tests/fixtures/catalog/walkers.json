@@ -1,0 +1,598 @@
+{
+  "cases": [
+    {
+      "name": "walk sbrxxx frame.can.0x70F",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x70F.mux.4",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux",
+          "4"
+        ]
+      },
+      "expected": {
+        "muxRanges": [
+          {
+            "name": "mux_1807_0_8",
+            "start_bit": 0,
+            "bit_length": 8,
+            "type": "mux"
+          }
+        ],
+        "signalRanges": [
+          {
+            "name": "70F_Mux4_Padding_0",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "signal"
+          },
+          {
+            "name": "70F_Mux4_Charge_Value",
+            "start_bit": 16,
+            "bit_length": 16,
+            "type": "signal"
+          },
+          {
+            "name": "70F_Mux4_Padding_1",
+            "start_bit": 32,
+            "bit_length": 24,
+            "type": "signal"
+          },
+          {
+            "name": "Status_Charge_State",
+            "start_bit": 56,
+            "bit_length": 8,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x70F.mux.4.signals.1",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux",
+          "4",
+          "signals",
+          "1"
+        ]
+      },
+      "expected": {
+        "muxRanges": [
+          {
+            "name": "mux_1807_0_8",
+            "start_bit": 0,
+            "bit_length": 8,
+            "type": "mux"
+          }
+        ],
+        "signalRanges": [
+          {
+            "name": "70F_Mux4_Padding_0",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "signal"
+          },
+          {
+            "name": "70F_Mux4_Padding_1",
+            "start_bit": 32,
+            "bit_length": 24,
+            "type": "signal"
+          },
+          {
+            "name": "Status_Charge_State",
+            "start_bit": 56,
+            "bit_length": 8,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x71F.mux.8.mux.3",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux",
+          "3"
+        ]
+      },
+      "expected": {
+        "muxRanges": [
+          {
+            "name": "mux_1823_0_8",
+            "start_bit": 0,
+            "bit_length": 8,
+            "type": "mux"
+          },
+          {
+            "name": "mux_1823_8_8_8",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "mux"
+          }
+        ],
+        "signalRanges": [
+          {
+            "name": "Info_Module_8_SN_3",
+            "start_bit": 16,
+            "bit_length": 48,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x71F.mux.8.mux.3.signals.0",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux",
+          "3",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": {
+        "muxRanges": [
+          {
+            "name": "mux_1823_0_8",
+            "start_bit": 0,
+            "bit_length": 8,
+            "type": "mux"
+          },
+          {
+            "name": "mux_1823_8_8_8",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "mux"
+          }
+        ],
+        "signalRanges": [],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x005",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x005"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Status_Battery_End_Stop",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x005.signals.0",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x005",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Status_Battery_End_Stop",
+            "start_bit": 8,
+            "bit_length": 8,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx frame.can.0x999",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x999"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk sbrxxx node.BMS",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "node",
+          "BMS"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk modbus frame.modbus.5000.signals.0",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "5000",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Daily_Yield",
+            "start_bit": 0,
+            "bit_length": 32,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 4
+      }
+    },
+    {
+      "name": "walk modbus frame.modbus.battery_power",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "battery_power"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Battery_Power",
+            "start_bit": 0,
+            "bit_length": 16,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 2
+      }
+    },
+    {
+      "name": "walk modbus frame.modbus.100.signals.0",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "100",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Relays",
+            "start_bit": 0,
+            "bit_length": 4,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 8
+      }
+    },
+    {
+      "name": "walk serial frame.serial.0x10.signals.1",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x10",
+          "signals",
+          "1"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [
+          {
+            "name": "Voltage",
+            "start_bit": 24,
+            "bit_length": 16,
+            "type": "signal"
+          },
+          {
+            "name": "Flags",
+            "start_bit": 40,
+            "bit_length": 8,
+            "type": "signal"
+          }
+        ],
+        "frameByteLength": 12
+      }
+    },
+    {
+      "name": "walk serial frame.serial.0x20.mux.2-3.signals.0",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x20",
+          "mux",
+          "2-3",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": {
+        "muxRanges": [
+          {
+            "name": "Page",
+            "start_bit": 24,
+            "bit_length": 8,
+            "type": "mux"
+          }
+        ],
+        "signalRanges": [],
+        "frameByteLength": 16
+      }
+    },
+    {
+      "name": "walk serial frame.serial.heartbeat",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "heartbeat"
+        ]
+      },
+      "expected": {
+        "muxRanges": [],
+        "signalRanges": [],
+        "frameByteLength": 4
+      }
+    },
+    {
+      "name": "frame keys per protocol",
+      "input": [
+        "sbrxxx",
+        "modbus",
+        "serial"
+      ],
+      "expected": [
+        {
+          "can": 76,
+          "modbus": [
+            "tunnel_4de2_input",
+            "tunnel_4de2_holding"
+          ],
+          "serial": []
+        },
+        {
+          "can": 0,
+          "modbus": [
+            "100",
+            "5000",
+            "battery_power",
+            "0x32F9"
+          ],
+          "serial": []
+        },
+        {
+          "can": 0,
+          "modbus": [],
+          "serial": [
+            "0x10",
+            "0x20",
+            "heartbeat"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mux case key order",
+      "input": [
+        "10",
+        "2",
+        "0-3",
+        "1,2",
+        "abc",
+        "-1",
+        "B",
+        "a",
+        "0x10",
+        "2-5"
+      ],
+      "expected": [
+        "-1",
+        "0-3",
+        "0x10",
+        "1,2",
+        "2",
+        "2-5",
+        "10",
+        "a",
+        "abc",
+        "B"
+      ]
+    },
+    {
+      "name": "id parsing and the editor's id formatting",
+      "input": [
+        "0x7FF",
+        "0x800",
+        "0x1FFFFFFF",
+        "2047",
+        " 256 ",
+        "0X10",
+        "-1",
+        "status",
+        "",
+        "1e3"
+      ],
+      "expected": [
+        {
+          "number": 2047,
+          "hex": {
+            "primary": "7FF",
+            "secondary": "2047"
+          },
+          "decimal": {
+            "primary": "2047",
+            "secondary": "7FF"
+          }
+        },
+        {
+          "number": 2048,
+          "hex": {
+            "primary": "00000800",
+            "secondary": "2048"
+          },
+          "decimal": {
+            "primary": "2048",
+            "secondary": "00000800"
+          }
+        },
+        {
+          "number": 536870911,
+          "hex": {
+            "primary": "1FFFFFFF",
+            "secondary": "536870911"
+          },
+          "decimal": {
+            "primary": "536870911",
+            "secondary": "1FFFFFFF"
+          }
+        },
+        {
+          "number": 2047,
+          "hex": {
+            "primary": "7FF",
+            "secondary": "2047"
+          },
+          "decimal": {
+            "primary": "2047",
+            "secondary": "7FF"
+          }
+        },
+        {
+          "number": 256,
+          "hex": {
+            "primary": "100",
+            "secondary": "256"
+          },
+          "decimal": {
+            "primary": "256",
+            "secondary": "100"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "0X10"
+          },
+          "decimal": {
+            "primary": "0X10"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "-1"
+          },
+          "decimal": {
+            "primary": "-1"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "status"
+          },
+          "decimal": {
+            "primary": "status"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": ""
+          },
+          "decimal": {
+            "primary": ""
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "1e3"
+          },
+          "decimal": {
+            "primary": "1e3"
+          }
+        }
+      ]
+    }
+  ]
+}

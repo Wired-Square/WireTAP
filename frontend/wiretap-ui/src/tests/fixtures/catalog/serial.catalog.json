@@ -1,0 +1,143 @@
+{
+  "frames": [
+    {
+      "checksums": [
+        {
+          "algorithm": "crc16_ccitt",
+          "byteLength": 2,
+          "calcEndByte": 10,
+          "calcStartByte": 0,
+          "endianness": "big",
+          "name": "Frame CRC",
+          "startByte": 10
+        }
+      ],
+      "frameId": 16,
+      "interval": 250,
+      "key": "0x10",
+      "length": 12,
+      "notes": [
+        "Status broadcast"
+      ],
+      "protocol": "serial",
+      "signals": [
+        {
+          "bitLength": 16,
+          "factor": 0.01,
+          "name": "Voltage",
+          "startBit": 24,
+          "unit": "V"
+        },
+        {
+          "bitLength": 8,
+          "endianness": "big",
+          "format": "hex",
+          "name": "Flags",
+          "startBit": 40
+        }
+      ],
+      "transmitter": "Controller"
+    },
+    {
+      "delimiter": [
+        192
+      ],
+      "frameId": 32,
+      "key": "0x20",
+      "length": 16,
+      "mux": {
+        "bitLength": 8,
+        "cases": {
+          "1": {
+            "signals": [
+              {
+                "bitLength": 16,
+                "factor": 0.1,
+                "name": "Temperature",
+                "signed": true,
+                "startBit": 32,
+                "unit": "C"
+              }
+            ]
+          },
+          "2-3": {
+            "signals": [
+              {
+                "bitLength": 32,
+                "name": "Counter",
+                "startBit": 32
+              }
+            ]
+          }
+        },
+        "name": "Page",
+        "startBit": 24
+      },
+      "protocol": "serial",
+      "signals": []
+    }
+  ],
+  "meta": {
+    "defaultFrame": "serial",
+    "name": "RS-485 bus",
+    "version": 1
+  },
+  "nodes": [
+    {
+      "name": "Controller",
+      "notes": [
+        "Bus master"
+      ]
+    }
+  ],
+  "protocol": "serial",
+  "serial": {
+    "byteOrder": "little",
+    "checksum": {
+      "algorithm": "crc16_modbus",
+      "bigEndian": false,
+      "byteLength": 2,
+      "calcEndByte": -2,
+      "calcStartByte": 0,
+      "startByte": -2
+    },
+    "encoding": "slip",
+    "fields": {
+      "id": {
+        "format": "hex",
+        "mask": 65280
+      },
+      "source_address": {
+        "endianness": "big",
+        "format": "decimal",
+        "mask": 255
+      }
+    },
+    "frameIdByteOrder": "big",
+    "frameIdBytes": 1,
+    "frameIdStartByte": 1,
+    "headerFields": [
+      {
+        "byteOrder": "big",
+        "bytes": 1,
+        "format": "hex",
+        "mask": 65280,
+        "name": "id",
+        "startByte": 1
+      },
+      {
+        "byteOrder": "big",
+        "bytes": 1,
+        "format": "decimal",
+        "mask": 255,
+        "name": "source_address",
+        "startByte": 0
+      }
+    ],
+    "headerLength": 3,
+    "minFrameLength": 5,
+    "sourceAddressByteOrder": "big",
+    "sourceAddressBytes": 1,
+    "sourceAddressStartByte": 0
+  }
+}

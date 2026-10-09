@@ -1,0 +1,123 @@
+{
+  "cases": [
+    {
+      "name": "serial",
+      "input": "catalog/serial.catalog.json",
+      "expected": {
+        "metadata": {
+          "name": "RS-485 bus",
+          "version": 1,
+          "default_frame": "serial"
+        },
+        "canConfig": null,
+        "serialConfig": {
+          "encoding": "slip",
+          "byte_order": "little",
+          "default_byte_order": "little",
+          "header_length": 3,
+          "min_frame_length": 5,
+          "checksum": {
+            "algorithm": "crc16_modbus",
+            "start_byte": -2,
+            "byte_length": 2,
+            "calc_start_byte": 0,
+            "calc_end_byte": -2,
+            "big_endian": false
+          },
+          "frame_id_start_byte": 1,
+          "frame_id_bytes": 1,
+          "frame_id_byte_order": "big",
+          "source_address_start_byte": 0,
+          "source_address_bytes": 1,
+          "source_address_byte_order": "big",
+          "header_fields": [
+            {
+              "name": "id",
+              "mask": 65280,
+              "byte_order": "big",
+              "format": "hex",
+              "start_byte": 1,
+              "bytes": 1
+            },
+            {
+              "name": "source_address",
+              "mask": 255,
+              "byte_order": "big",
+              "format": "decimal",
+              "start_byte": 0,
+              "bytes": 1
+            }
+          ]
+        },
+        "modbusConfig": null,
+        "frames": [
+          [
+            16,
+            {
+              "frameId": 16,
+              "protocol": "serial",
+              "length": 12,
+              "transmitter": "Controller",
+              "interval": 250,
+              "signals": [
+                {
+                  "name": "Voltage",
+                  "start_bit": 24,
+                  "bit_length": 16,
+                  "factor": 0.01,
+                  "unit": "V"
+                },
+                {
+                  "name": "Flags",
+                  "start_bit": 40,
+                  "bit_length": 8,
+                  "endianness": "big",
+                  "format": "hex"
+                }
+              ]
+            }
+          ],
+          [
+            32,
+            {
+              "frameId": 32,
+              "protocol": "serial",
+              "length": 16,
+              "signals": [],
+              "mux": {
+                "name": "Page",
+                "start_bit": 24,
+                "bit_length": 8,
+                "cases": {
+                  "1": {
+                    "signals": [
+                      {
+                        "name": "Temperature",
+                        "start_bit": 32,
+                        "bit_length": 16,
+                        "signed": true,
+                        "factor": 0.1,
+                        "unit": "C"
+                      }
+                    ]
+                  },
+                  "2-3": {
+                    "signals": [
+                      {
+                        "name": "Counter",
+                        "start_bit": 32,
+                        "bit_length": 32
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        ],
+        "protocol": "serial",
+        "pollGroups": []
+      }
+    }
+  ]
+}

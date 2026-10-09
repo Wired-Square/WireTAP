@@ -1,0 +1,149 @@
+{
+  "frames": [
+    {
+      "frameId": 13049,
+      "inheritedFields": [
+        "deviceAddress",
+        "registerBase",
+        "interval"
+      ],
+      "interval": 1000,
+      "key": "0x32F9",
+      "length": 2,
+      "modbusDeviceAddress": 7,
+      "modbusNode": "Meter",
+      "modbusRegisterCount": 1,
+      "modbusRegisterType": "holding",
+      "name": "0x32F9",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 16,
+          "enum": {
+            "0": "Stop",
+            "1": "Run"
+          },
+          "format": "enum",
+          "modbusRegister": 13049,
+          "modbusRegisterCount": 1,
+          "name": "Mode",
+          "signed": false,
+          "startBit": 0
+        }
+      ]
+    },
+    {
+      "frameId": 100,
+      "inheritedFields": [
+        "deviceAddress",
+        "registerBase",
+        "interval"
+      ],
+      "interval": 1000,
+      "key": "100",
+      "length": 1,
+      "modbusDeviceAddress": 1,
+      "modbusRegisterCount": 4,
+      "modbusRegisterType": "coil",
+      "name": "100",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 4,
+          "format": "hex",
+          "modbusRegister": 100,
+          "modbusRegisterCount": 4,
+          "name": "Relays",
+          "signed": false,
+          "startBit": 0
+        }
+      ]
+    },
+    {
+      "frameId": 5000,
+      "inheritedFields": [
+        "deviceAddress",
+        "registerBase",
+        "interval"
+      ],
+      "interval": 1000,
+      "key": "5000",
+      "length": 4,
+      "modbusDeviceAddress": 3,
+      "modbusNode": "Inverter",
+      "modbusRegisterCount": 2,
+      "modbusRegisterType": "input",
+      "name": "5000",
+      "notes": [
+        "Running state",
+        "Read every second"
+      ],
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 32,
+          "factor": 0.1,
+          "modbusRegister": 5000,
+          "modbusRegisterCount": 2,
+          "name": "Daily_Yield",
+          "signed": false,
+          "startBit": 0,
+          "unit": "kWh",
+          "wordOrder": "little"
+        }
+      ]
+    },
+    {
+      "frameId": 13021,
+      "inheritedFields": [
+        "deviceAddress",
+        "registerBase"
+      ],
+      "interval": 500,
+      "key": "battery_power",
+      "length": 2,
+      "modbusDeviceAddress": 1,
+      "modbusRegisterCount": 1,
+      "modbusRegisterType": "input",
+      "name": "battery_power",
+      "protocol": "modbus",
+      "signals": [
+        {
+          "bitLength": 16,
+          "modbusRegister": 13021,
+          "modbusRegisterCount": 1,
+          "name": "Battery_Power",
+          "signed": true,
+          "startBit": 0,
+          "unit": "W"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "defaultFrame": "modbus",
+    "name": "Inverter registers",
+    "version": 3
+  },
+  "modbus": {
+    "defaultByteOrder": "big",
+    "defaultInterval": 1000,
+    "defaultWordOrder": "little",
+    "deviceAddress": 1,
+    "registerBase": 1
+  },
+  "nodes": [
+    {
+      "deviceAddress": 3,
+      "name": "Inverter",
+      "notes": [
+        "Hybrid inverter"
+      ]
+    },
+    {
+      "deviceAddress": 7,
+      "name": "Meter"
+    }
+  ],
+  "protocol": "modbus"
+}

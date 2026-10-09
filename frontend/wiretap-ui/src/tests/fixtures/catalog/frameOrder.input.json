@@ -1,0 +1,347 @@
+{
+  "orders": [
+    {
+      "protocol": "can",
+      "order": {
+        "totalFrames": 12387,
+        "uniqueKeys": 20,
+        "timeSpanMs": 61234.5,
+        "buses": [
+          {
+            "bus": 0,
+            "frameCount": 12345,
+            "patterns": [
+              {
+                "start": {
+                  "frameId": 256,
+                  "isExtended": false
+                },
+                "sequence": [
+                  {
+                    "frameId": 256,
+                    "isExtended": false
+                  },
+                  {
+                    "frameId": 257,
+                    "isExtended": false
+                  },
+                  {
+                    "frameId": 419364880,
+                    "isExtended": true
+                  }
+                ],
+                "occurrences": 40,
+                "confidence": 0.875,
+                "cycleMs": 100.0
+              },
+              {
+                "start": {
+                  "frameId": 512,
+                  "isExtended": false
+                },
+                "sequence": [
+                  {
+                    "frameId": 512,
+                    "isExtended": false
+                  },
+                  {
+                    "frameId": 513,
+                    "isExtended": false
+                  }
+                ],
+                "occurrences": 3,
+                "confidence": 0.5,
+                "cycleMs": null
+              }
+            ],
+            "intervalGroups": [
+              {
+                "intervalMs": 100,
+                "toleranceMs": 30,
+                "keys": [
+                  {
+                    "frameId": 256,
+                    "isExtended": false
+                  },
+                  {
+                    "frameId": 257,
+                    "isExtended": false
+                  }
+                ]
+              },
+              {
+                "intervalMs": 1500,
+                "toleranceMs": 450.5,
+                "keys": [
+                  {
+                    "frameId": 419364880,
+                    "isExtended": true
+                  }
+                ]
+              }
+            ],
+            "startCandidates": [
+              {
+                "frameId": 256,
+                "isExtended": false,
+                "maxGapBeforeMs": 100.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 10
+              },
+              {
+                "frameId": 257,
+                "isExtended": false,
+                "maxGapBeforeMs": 99.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 11
+              },
+              {
+                "frameId": 258,
+                "isExtended": false,
+                "maxGapBeforeMs": 98.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 12
+              },
+              {
+                "frameId": 259,
+                "isExtended": false,
+                "maxGapBeforeMs": 97.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 13
+              },
+              {
+                "frameId": 260,
+                "isExtended": false,
+                "maxGapBeforeMs": 96.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 14
+              },
+              {
+                "frameId": 261,
+                "isExtended": false,
+                "maxGapBeforeMs": 95.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 15
+              },
+              {
+                "frameId": 262,
+                "isExtended": false,
+                "maxGapBeforeMs": 94.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 16
+              },
+              {
+                "frameId": 263,
+                "isExtended": false,
+                "maxGapBeforeMs": 93.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 17
+              },
+              {
+                "frameId": 264,
+                "isExtended": false,
+                "maxGapBeforeMs": 92.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 18
+              },
+              {
+                "frameId": 265,
+                "isExtended": false,
+                "maxGapBeforeMs": 91.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 19
+              },
+              {
+                "frameId": 266,
+                "isExtended": false,
+                "maxGapBeforeMs": 90.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 20
+              },
+              {
+                "frameId": 267,
+                "isExtended": false,
+                "maxGapBeforeMs": 89.0,
+                "avgGapBeforeMs": 50.25,
+                "minGapBeforeMs": 1.5,
+                "occurrences": 21
+              }
+            ],
+            "mux": [
+              {
+                "muxPeriodMs": 500.0,
+                "interMessageMs": 10.0,
+                "frameId": 264,
+                "isExtended": false,
+                "selector": "oneByte",
+                "occurrences": {
+                  "0": 5,
+                  "1": 5,
+                  "2": 4
+                }
+              },
+              {
+                "muxPeriodMs": null,
+                "interMessageMs": 2.5,
+                "frameId": 769,
+                "isExtended": false,
+                "selector": "twoByte",
+                "occurrences": {
+                  "1": 1,
+                  "2": 1,
+                  "256": 1,
+                  "257": 1,
+                  "258": 1,
+                  "512": 1,
+                  "513": 1,
+                  "514": 1,
+                  "515": 1,
+                  "1024": 1
+                }
+              }
+            ],
+            "bursts": [
+              {
+                "framesPerBurst": 2.5,
+                "burstPeriodMs": 1000.0,
+                "interMessageMs": 1.0,
+                "lengths": [
+                  8,
+                  4
+                ],
+                "flags": [
+                  "variable-length",
+                  "burst-pattern",
+                  "request-response"
+                ],
+                "frameId": 1024,
+                "isExtended": false
+              },
+              {
+                "framesPerBurst": 1,
+                "burstPeriodMs": 250.0,
+                "interMessageMs": 250.0,
+                "lengths": [
+                  8
+                ],
+                "flags": [],
+                "frameId": 1025,
+                "isExtended": false
+              }
+            ]
+          },
+          {
+            "bus": 1,
+            "frameCount": 42,
+            "patterns": [],
+            "intervalGroups": [
+              {
+                "intervalMs": 10,
+                "toleranceMs": 3,
+                "keys": [
+                  {
+                    "frameId": 256,
+                    "isExtended": false
+                  }
+                ]
+              }
+            ],
+            "startCandidates": [],
+            "mux": [],
+            "bursts": []
+          }
+        ],
+        "multiBus": [
+          {
+            "framesPerBus": {
+              "0": 12000,
+              "1": 42
+            },
+            "frameId": 256,
+            "isExtended": false
+          }
+        ]
+      }
+    },
+    {
+      "protocol": "serial",
+      "order": {
+        "totalFrames": 7,
+        "uniqueKeys": 1,
+        "timeSpanMs": 900.0,
+        "buses": [
+          {
+            "bus": 0,
+            "frameCount": 7,
+            "patterns": [],
+            "intervalGroups": [],
+            "startCandidates": [
+              {
+                "frameId": 16,
+                "isExtended": false,
+                "maxGapBeforeMs": 2000.0,
+                "avgGapBeforeMs": 999.95,
+                "minGapBeforeMs": 0.04,
+                "occurrences": 7
+              }
+            ],
+            "mux": [],
+            "bursts": []
+          }
+        ],
+        "multiBus": []
+      }
+    },
+    {
+      "protocol": "modbus_rtu",
+      "order": {
+        "totalFrames": 3,
+        "uniqueKeys": 2,
+        "timeSpanMs": 40.0,
+        "buses": [
+          {
+            "bus": 0,
+            "frameCount": 3,
+            "patterns": [
+              {
+                "start": {
+                  "frameId": 259,
+                  "isExtended": false
+                },
+                "sequence": [
+                  {
+                    "frameId": 259,
+                    "isExtended": false
+                  },
+                  {
+                    "frameId": 515,
+                    "isExtended": false
+                  }
+                ],
+                "occurrences": 2,
+                "confidence": 1,
+                "cycleMs": 20.0
+              }
+            ],
+            "intervalGroups": [],
+            "startCandidates": [],
+            "mux": [],
+            "bursts": []
+          }
+        ],
+        "multiBus": []
+      }
+    }
+  ]
+}

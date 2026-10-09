@@ -1,0 +1,726 @@
+{
+  "cases": [
+    {
+      "name": "CANFrameView 0x70F",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "CANFrameView 0x71F",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "CANFrameView 0x005",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x005"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "Info_Battery_Operation",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "signal"
+            },
+            {
+              "name": "Status_Battery_End_Stop",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "signal"
+            },
+            {
+              "name": "705_Always_1",
+              "start_bit": 16,
+              "bit_length": 8,
+              "type": "signal"
+            },
+            {
+              "name": "Info_Battery_Type",
+              "start_bit": 24,
+              "bit_length": 16,
+              "type": "signal"
+            },
+            {
+              "name": "Status_Battery_Voltage_Alt_705",
+              "start_bit": 40,
+              "bit_length": 16,
+              "type": "signal"
+            },
+            {
+              "name": "705_Padding",
+              "start_bit": 56,
+              "bit_length": 8,
+              "type": "signal"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "SerialFrameView 0x10",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x10"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 12,
+          "ranges": [
+            {
+              "name": "Voltage",
+              "start_bit": 24,
+              "bit_length": 16,
+              "type": "signal"
+            },
+            {
+              "name": "Flags",
+              "start_bit": 40,
+              "bit_length": 8,
+              "type": "signal"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "SerialFrameView 0x20",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x20"
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "MuxView frame.can.0x70F.mux",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "MuxView frame.can.0x71F.mux.8.mux",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "MuxView frame.serial.0x20.mux",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x20",
+          "mux"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 16,
+          "ranges": [
+            {
+              "name": "Page",
+              "start_bit": 24,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 0
+        }
+      ]
+    },
+    {
+      "name": "MuxCaseView frame.can.0x70F.mux.4",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux",
+          "4"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "70F_Mux4_Padding_0",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "signal"
+            },
+            {
+              "name": "70F_Mux4_Charge_Value",
+              "start_bit": 16,
+              "bit_length": 16,
+              "type": "signal"
+            },
+            {
+              "name": "70F_Mux4_Padding_1",
+              "start_bit": 32,
+              "bit_length": 24,
+              "type": "signal"
+            },
+            {
+              "name": "Status_Charge_State",
+              "start_bit": 56,
+              "bit_length": 8,
+              "type": "signal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MuxCaseView frame.can.0x71F.mux.8.mux.3",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux",
+          "3"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "mux_1823_8_8_8",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "Info_Module_8_SN_3",
+              "start_bit": 16,
+              "bit_length": 48,
+              "type": "signal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MuxCaseView frame.serial.0x20.mux.2-3",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x20",
+          "mux",
+          "2-3"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 16,
+          "ranges": [
+            {
+              "name": "Page",
+              "start_bit": 24,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "Counter",
+              "start_bit": 32,
+              "bit_length": 32,
+              "type": "signal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SignalView sbrxxx frame.can.0x70F.mux.4.signals.1",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux",
+          "4",
+          "signals",
+          "1"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 16,
+          "currentBitLength": 16
+        }
+      ]
+    },
+    {
+      "name": "SignalView sbrxxx frame.can.0x71F.mux.8.mux.3.signals.0",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux",
+          "3",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "mux_1823_8_8_8",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 16,
+          "currentBitLength": 48
+        }
+      ]
+    },
+    {
+      "name": "SignalView modbus frame.modbus.5000.signals.0",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "5000",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 4,
+          "ranges": [],
+          "currentStartBit": 0,
+          "currentBitLength": 32
+        }
+      ]
+    },
+    {
+      "name": "SignalView modbus frame.modbus.100.signals.0",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "100",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [],
+          "currentStartBit": 0,
+          "currentBitLength": 4
+        }
+      ]
+    },
+    {
+      "name": "SignalView serial frame.serial.0x10.signals.1",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x10",
+          "signals",
+          "1"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 12,
+          "ranges": [],
+          "currentStartBit": 40,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "SignalEditDialog sbrxxx frame.can.0x70F editing null",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "SignalEditDialog sbrxxx frame.can.0x70F.mux.4 editing null",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x70F",
+          "mux",
+          "4"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "70F_Mux4_Padding_0",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "signal"
+            },
+            {
+              "name": "70F_Mux4_Charge_Value",
+              "start_bit": 16,
+              "bit_length": 16,
+              "type": "signal"
+            },
+            {
+              "name": "70F_Mux4_Padding_1",
+              "start_bit": 32,
+              "bit_length": 24,
+              "type": "signal"
+            },
+            {
+              "name": "Status_Charge_State",
+              "start_bit": 56,
+              "bit_length": 8,
+              "type": "signal"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "SignalEditDialog sbrxxx frame.can.0x71F.mux.8.mux.3.signals.0 editing 0",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "frame",
+          "can",
+          "0x71F",
+          "mux",
+          "8",
+          "mux",
+          "3",
+          "signals",
+          "0"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "mux_1823_8_8_8",
+              "start_bit": 8,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "SignalEditDialog modbus frame.modbus.5000 editing 0",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "frame",
+          "modbus",
+          "5000"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 4,
+          "ranges": [],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "SignalEditDialog serial frame.serial.0x20.mux.2-3 editing null",
+      "input": {
+        "catalogue": "catalog/serial.toml",
+        "path": [
+          "frame",
+          "serial",
+          "0x20",
+          "mux",
+          "2-3"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 16,
+          "ranges": [
+            {
+              "name": "Page",
+              "start_bit": 24,
+              "bit_length": 8,
+              "type": "mux"
+            },
+            {
+              "name": "Counter",
+              "start_bit": 32,
+              "bit_length": 32,
+              "type": "signal"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "MuxEditDialog sbrxxx frame.can.0x70F",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "meta"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1807_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "MuxEditDialog sbrxxx frame.can.0x71F.mux.8",
+      "input": {
+        "catalogue": "sbrxxx.toml",
+        "path": [
+          "meta"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 8,
+          "ranges": [
+            {
+              "name": "mux_1823_0_8",
+              "start_bit": 0,
+              "bit_length": 8,
+              "type": "mux"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    },
+    {
+      "name": "MuxEditDialog modbus frame.modbus.5000",
+      "input": {
+        "catalogue": "catalog/modbus.toml",
+        "path": [
+          "meta"
+        ]
+      },
+      "expected": [
+        {
+          "numBytes": 4,
+          "ranges": [
+            {
+              "name": "Daily_Yield",
+              "start_bit": 0,
+              "bit_length": 32,
+              "type": "signal"
+            }
+          ],
+          "currentStartBit": 0,
+          "currentBitLength": 8
+        }
+      ]
+    }
+  ]
+}

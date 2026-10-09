@@ -1,0 +1,83 @@
+{
+  "note": "`tsListed`/`tsBytes` are checksums.ts CHECKSUM_ALGORITHMS and getAlgorithmOutputBytes; `rustBytes` is wiretap_checksum ChecksumAlgorithm::output_bytes, null where the id does not parse; ids are all_algorithm_ids()",
+  "algorithms": [
+    {
+      "id": "xor",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "sum8",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_sae_j1850",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_autosar",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_maxim",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_cdma2000",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_dvb_s2",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc8_nissan",
+      "tsListed": true,
+      "tsBytes": 1,
+      "rustBytes": 1
+    },
+    {
+      "id": "crc16_modbus",
+      "tsListed": true,
+      "tsBytes": 2,
+      "rustBytes": 2
+    },
+    {
+      "id": "crc16_ccitt",
+      "tsListed": true,
+      "tsBytes": 2,
+      "rustBytes": 2
+    },
+    {
+      "id": "crc_custom",
+      "tsListed": false,
+      "tsBytes": 1,
+      "rustBytes": null
+    },
+    {
+      "id": "sum8_negated",
+      "tsListed": false,
+      "tsBytes": 1,
+      "rustBytes": null
+    }
+  ]
+}

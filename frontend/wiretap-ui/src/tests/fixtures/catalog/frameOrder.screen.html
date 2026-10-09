@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frame Order Analysis Report</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent-purple: #a855f7;
+      --accent-pink: #ec4899;
+      --accent-cyan: #22d3ee;
+      --accent-orange: #f97316;
+      --accent-green: #22c55e;
+      --accent-yellow: #eab308;
+      --border: #475569;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      padding: 2rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    h2 { font-size: 1.5rem; margin: 2rem 0 1rem; color: var(--accent-purple); }
+    h3 { font-size: 1.2rem; margin: 1.5rem 0 0.5rem; color: var(--text-primary); }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .summary-card {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+    }
+    .summary-card .label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .badge-cyan { background: rgba(34, 211, 238, 0.2); color: #22d3ee; }
+    .badge-orange { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .badge-pink { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .badge-yellow { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+    .badge-slate { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.5rem 0;
+      font-size: 0.875rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-secondary); font-weight: 500; }
+    .section-card {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      border: 1px solid var(--border);
+    }
+    .frame-id { font-family: monospace; font-weight: bold; color: var(--accent-purple); }
+    .footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Frame Order Analysis Report</h1>
+    
+    <div class="summary-grid">
+      <div class="summary-card stat-item"><div class="value">12,397</div><div class="label">Total Frames</div></div>
+      <div class="summary-card stat-item"><div class="value">23</div><div class="label">Unique IDs</div></div>
+      <div class="summary-card stat-item"><div class="value">61.2s</div><div class="label">Time Span</div></div>
+      <div class="summary-card stat-item"><div class="value">4</div><div class="label">Buses</div></div>
+    </div>
+<h2>CAN · Bus 0 (12,345 frames)</h2>
+    <div class="section-card">
+      <div><strong>Pattern #1</strong> — starts with <span class="frame-id">0x100</span> · 88% consistent</div>
+      <div><span class="badge badge-purple">0x100</span> <span class="badge badge-slate">0x101</span> <span class="badge badge-slate">0x18FF0010</span></div>
+      <div>3 frames • 40× seen • cycle: 100.0ms</div>
+    </div>
+    <div class="section-card">
+      <div><strong>Pattern #2</strong> — starts with <span class="frame-id">0x200</span> · 50% consistent</div>
+      <div><span class="badge badge-purple">0x200</span> <span class="badge badge-slate">0x201</span></div>
+      <div>2 frames • 3× seen • cycle: —</div>
+    </div><h3>Multiplexed Frames</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Selector</th><th>Cases</th><th>Mux Period</th><th>Inter-msg</th></tr>
+      <tr><td><span class="frame-id">0x108</span></td><td>byte[0]</td><td><span class="badge badge-orange">0</span> <span class="badge badge-orange">1</span> <span class="badge badge-orange">2</span></td><td>500.0ms</td><td>10.0ms</td></tr>
+      <tr><td><span class="frame-id">0x301</span></td><td>byte[0:1]</td><td><span class="badge badge-orange">0.1</span> <span class="badge badge-orange">0.2</span> <span class="badge badge-orange">1.0</span> <span class="badge badge-orange">1.1</span> <span class="badge badge-orange">1.2</span> <span class="badge badge-orange">2.0</span> <span class="badge badge-orange">2.1</span> <span class="badge badge-orange">2.2</span>...</td><td>—</td><td>2.5ms</td></tr></table><h3>Burst/Transaction Frames</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Lengths</th><th>Burst Size</th><th>Cycle</th><th>Flags</th></tr>
+      <tr><td><span class="frame-id">0x400</span></td><td><span class="badge badge-cyan">8</span> <span class="badge badge-cyan">4</span></td><td>~2.5</td><td>1.0s</td><td><span class="badge badge-slate">variable-length</span> <span class="badge badge-slate">burst-pattern</span> <span class="badge badge-slate">request-response</span></td></tr>
+      <tr><td><span class="frame-id">0x401</span></td><td><span class="badge badge-cyan">8</span></td><td>—</td><td>250.0ms</td><td>—</td></tr></table><h3>Repetition Period Groups</h3>
+    <div class="section-card">
+      <div><strong>~100.0ms</strong> (2 frames)</div>
+      <div><span class="badge badge-slate">0x100</span> <span class="badge badge-slate">0x101</span></div>
+    </div>
+    <div class="section-card">
+      <div><strong>~1.5s</strong> (1 frames)</div>
+      <div><span class="badge badge-slate">0x18FF0010</span></div>
+    </div><h3>Start ID Candidates</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Max Gap</th><th>Avg Gap</th><th>Min Gap</th><th>Count</th></tr>
+      <tr><td><span class="frame-id">0x100</span></td><td>100.0ms</td><td>50.3ms</td><td>1.5ms</td><td>10</td></tr>
+      <tr><td><span class="frame-id">0x101</span></td><td>99.0ms</td><td>50.3ms</td><td>1.5ms</td><td>11</td></tr>
+      <tr><td><span class="frame-id">0x102</span></td><td>98.0ms</td><td>50.3ms</td><td>1.5ms</td><td>12</td></tr>
+      <tr><td><span class="frame-id">0x103</span></td><td>97.0ms</td><td>50.3ms</td><td>1.5ms</td><td>13</td></tr>
+      <tr><td><span class="frame-id">0x104</span></td><td>96.0ms</td><td>50.3ms</td><td>1.5ms</td><td>14</td></tr>
+      <tr><td><span class="frame-id">0x105</span></td><td>95.0ms</td><td>50.3ms</td><td>1.5ms</td><td>15</td></tr>
+      <tr><td><span class="frame-id">0x106</span></td><td>94.0ms</td><td>50.3ms</td><td>1.5ms</td><td>16</td></tr>
+      <tr><td><span class="frame-id">0x107</span></td><td>93.0ms</td><td>50.3ms</td><td>1.5ms</td><td>17</td></tr>
+      <tr><td><span class="frame-id">0x108</span></td><td>92.0ms</td><td>50.3ms</td><td>1.5ms</td><td>18</td></tr>
+      <tr><td><span class="frame-id">0x109</span></td><td>91.0ms</td><td>50.3ms</td><td>1.5ms</td><td>19</td></tr></table>
+<h2>CAN · Bus 1 (42 frames)</h2><h3>Repetition Period Groups</h3>
+    <div class="section-card">
+      <div><strong>~10.0ms</strong> (1 frames)</div>
+      <div><span class="badge badge-slate">0x100</span></div>
+    </div>
+<h2>Serial · Bus 0 (7 frames)</h2><h3>Start ID Candidates</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Max Gap</th><th>Avg Gap</th><th>Min Gap</th><th>Count</th></tr>
+      <tr><td><span class="frame-id">0x010</span></td><td>2.0s</td><td>1000.0ms</td><td>0.0ms</td><td>7</td></tr></table>
+<h2>Modbus RTU · Bus 0 (3 frames)</h2>
+    <div class="section-card">
+      <div><strong>Pattern #1</strong> — starts with <span class="frame-id">1/0x03</span> · 100% consistent</div>
+      <div><span class="badge badge-purple">1/0x03</span> <span class="badge badge-slate">2/0x03</span></div>
+      <div>2 frames • 2× seen • cycle: 20.0ms</div>
+    </div><h2>Multi-Bus Frames</h2>
+    <table>
+      <tr><th>Frame ID</th><th>Count per Bus</th></tr>
+      <tr><td><span class="frame-id">0x100</span></td><td><span class="badge badge-pink">Bus 0: 12000</span> <span class="badge badge-pink">Bus 1: 42</span></td></tr></table>
+    <div class="footer">Generated by WireTAP</div>
+  </div>
+</body>
+</html>
