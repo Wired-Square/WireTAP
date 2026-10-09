@@ -13,9 +13,11 @@ use wiretap_analysis::{
 };
 
 use crate::analysis::{
-    byte_profiles, message_order, timed_by_protocol, FrameByteProfile, FrameSource, OrderStart,
-    PayloadSource, ProtocolOrder, ScanFilter,
+    byte_profiles, orders_of, timed_by_protocol, FrameByteProfile, FrameSource,
+    OrderStart, PayloadSource, ProtocolOrder, ScanFilter,
 };
+use crate::drafting;
+use wiretap_analysis::draft::Draft;
 use crate::capture_store::{FrameSelection, ProtocolFrames};
 use crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT;
 use crate::payload_source::Capture;
@@ -51,19 +53,29 @@ pub struct PayloadChanges {
     pub mirrors: Vec<ProtocolMirrors>,
 }
 
+/// An analysis' answer, and the catalogue draft it was folded into.
+#[derive(Debug, Serialize)]
+pub struct Drafted<T> {
+    pub result: T,
+    pub draft: Draft,
+}
+
 /// Payload Changes over a capture's selection: each frame profiled over its most
 /// recent `DEFAULT_SAMPLE_LIMIT` payloads, mirrors and bursts over its newest
-/// `newest` frames, or all of them.
+/// `newest` frames, or all of them; folded into `draft`.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn payload_changes_cmd(
     capture_id: String,
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
-) -> Result<PayloadChanges, String> {
+    draft: Option<Draft>,
+) -> Result<Drafted<PayloadChanges>, String> {
     let key = held::window_key(&capture_id, &selection, newest, None);
-    let changes = payload_changes(&Capture(&capture_id), selection, newest, usize::MAX).await?;
-    held::hold_changes(key, changes.clone());
-    Ok(changes)
+    let result = payload_changes(&Capture(&capture_id), selection, newest, usize::MAX).await?;
+    held::hold_changes(key, result.clone());
+    let mut draft = draft.unwrap_or_default();
+    drafting::apply_changes(&mut draft, &result);
+    Ok(Drafted { result, draft })
 }
 
 /// The Changes view's answer, shared with MCP `get_discovery_analysis`.
@@ -122,19 +134,29 @@ pub async fn payload_changes<S: PayloadSource + FrameSource>(
 }
 
 /// Message order per protocol over a capture's selection, its newest `newest`
-/// frames or all of them.
+/// frames or all of them; folded into `draft`, every frame read seeded.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn frame_order_cmd(
     capture_id: String,
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
     start: Option<OrderStart>,
-) -> Result<Vec<ProtocolOrder>, String> {
+    draft: Option<Draft>,
+) -> Result<Drafted<Vec<ProtocolOrder>>, String> {
     let key = held::window_key(&capture_id, &selection, newest, start.as_ref());
     let selection = FrameSelection::from_groups(selection);
-    let orders = message_order(&Capture(&capture_id), &selection, newest, start.as_ref()).await?;
-    held::hold_orders(key, orders.clone());
-    Ok(orders)
+    let frames = Capture(&capture_id).frames(&selection, newest).await?;
+    let mut draft = draft.unwrap_or_default();
+    drafting::seed(
+        &mut draft,
+        frames.iter().map(|f| (f.protocol.as_str(), FrameKey::new(f.frame_id, f.is_extended), f.bytes.len())),
+    );
+    let result = orders_of(timed_by_protocol(frames), start.as_ref());
+    held::hold_orders(key, result.clone());
+    draft.apply_orders(
+        result.iter().filter_map(|o| Some((drafting::catalog_protocol(&o.protocol)?, &o.order))),
+    );
+    Ok(Drafted { result, draft })
 }
 
 /// The Payload Changes report on what `payload_changes_cmd` last returned for this window.
@@ -170,6 +192,7 @@ pub fn serial_structure_cmd(payloads: Vec<Vec<u8>>) -> SerialStructure {
 mod tests {
     use super::*;
     use crate::analysis::memory::MemorySource;
+    use crate::analysis::message_order;
     use wiretap_analysis::{profile_bytes, ByteNote};
 
     #[tokio::test]

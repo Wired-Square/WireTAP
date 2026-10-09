@@ -11,6 +11,7 @@ import type { MultiBytePattern } from "../generated/MultiBytePattern";
 import type { MuxSelector } from "../generated/MuxSelector";
 import type { ProtocolMirrors } from "../generated/ProtocolMirrors";
 import type { ProtocolFrames } from "../utils/frameKey";
+import type { Draft, Drafted } from "./drafting";
 
 export type { Endianness, MultiBytePattern };
 
@@ -82,13 +83,14 @@ export interface PayloadChanges {
 }
 
 /** Each selected frame profiled over its most recent 5000 payloads; mirrors and
- *  bursts over the newest `newest` frames, or the whole capture. */
+ *  bursts over the newest `newest` frames, or the whole capture; folded into `draft`. */
 export async function payloadChanges(
   captureId: string,
   selection: ProtocolFrames[],
   newest?: number,
-): Promise<PayloadChanges> {
-  return invoke<PayloadChanges>("payload_changes_cmd", { capture_id: captureId, selection, newest });
+  draft?: Draft | null,
+): Promise<Drafted<PayloadChanges>> {
+  return invoke<Drafted<PayloadChanges>>("payload_changes_cmd", { capture_id: captureId, selection, newest, draft });
 }
 
 export type CandidateReason =

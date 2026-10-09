@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { framesCatalogOps, knowledgeCatalogOps, modbusCatalogOps } from "../utils/frameExport";
+import { framesCatalogOps, modbusCatalogOps, serialReservedSpans } from "../utils/frameExport";
 import type { EditOp } from "../types/catalogEdit";
 import * as f from "./fixtures/discovery-export/inputs";
 
@@ -14,16 +14,6 @@ function fixture(name: string): EditOp[] {
 }
 
 describe("Discovery catalogue export", () => {
-  it("builds a knowledge export's ops", () => {
-    expect(knowledgeCatalogOps(f.knowledgeCanFrames, f.canMeta, f.hexId)).toEqual(fixture("knowledge-can"));
-  });
-
-  it("builds a serial knowledge export's ops", () => {
-    expect(knowledgeCatalogOps(f.serialFrames, f.serialMeta, f.hexId, f.serialConfig)).toEqual(
-      fixture("knowledge-serial"),
-    );
-  });
-
   it("builds a plain frames export's ops", () => {
     expect(framesCatalogOps(f.plainFrames, f.canMeta, f.hexId)).toEqual(fixture("plain-can"));
   });
@@ -32,12 +22,12 @@ describe("Discovery catalogue export", () => {
     expect(modbusCatalogOps(f.modbusRegisters, f.modbusMeta, f.modbusConfig)).toEqual(fixture("modbus"));
   });
 
-  it("names every mux selector, which validation requires", () => {
-    const muxes = knowledgeCatalogOps(f.knowledgeCanFrames, f.canMeta, f.hexId).flatMap((op) =>
-      op.op === "SetMux" ? [op.mux.name] : [],
-    );
-
-    expect(muxes).toEqual(["selector_0", "selector_0", "selector_1", "selector_1"]);
+  it("reserves a serial frame's id, source address and checksum bytes", () => {
+    expect(serialReservedSpans(f.serialConfig)).toEqual([
+      { start: 1, len: 2 },
+      { start: 0, len: 1 },
+      { start: -1, len: 1 },
+    ]);
   });
 
   it("refuses a protocol a catalogue has no frames for", () => {

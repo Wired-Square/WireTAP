@@ -8,6 +8,7 @@ import { emptyStateText } from "../../../../../styles/typography";
 import { textMuted } from "../../../../../styles";
 import { formatValue } from "../../../utils/dashboardFormat";
 import { tooltipPlugin, wheelZoomPlugin, panPlugin, measurementPlugin } from "../line-chart/chartPlugins";
+import { BYTE_NAMES } from "../../../../../generated/byteNames";
 
 interface Props {
   panel: DashboardPanel;
@@ -120,7 +121,7 @@ export default function FlowViewPanel({ panel, canvasRef }: Props) {
     const count = panel.byteCount ?? 8;
     return Array.from({ length: count }, (_, i) => ({
       frameId: panel.targetFrameId!,
-      signalName: `byte[${i}]`,
+      signalName: BYTE_NAMES[i],
       colour: BYTE_COLOURS[i % BYTE_COLOURS.length],
     }));
   }, [panel.targetFrameId, panel.byteCount]);

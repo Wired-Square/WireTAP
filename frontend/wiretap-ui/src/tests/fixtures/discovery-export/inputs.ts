@@ -1,11 +1,4 @@
-import type {
-  ExportFrame,
-  ExportFrameWithKnowledge,
-  ExportMeta,
-  ModbusExportConfig,
-  SerialFrameConfig,
-} from "../../../utils/frameExport";
-import type { FrameKnowledge, MuxKnowledge } from "../../../utils/decoderKnowledge";
+import type { ExportFrame, ExportMeta, ModbusExportConfig, SerialFrameConfig } from "../../../utils/frameExport";
 
 export const hexId = (id: number) => `0x${id.toString(16).toUpperCase()}`;
 
@@ -15,63 +8,6 @@ export const canMeta: ExportMeta = {
   default_byte_order: "big",
   default_interval: 100,
 };
-
-function knowledge(frameId: number, length: number, extra: Partial<FrameKnowledge>): FrameKnowledge {
-  return { frameId, length, signals: [], notes: [], ...extra };
-}
-
-const oneLevelMux: MuxKnowledge = {
-  selectorByte: 0,
-  selectorStartBit: 0,
-  selectorBitLength: 8,
-  cases: [1, 2],
-  caseKnowledge: new Map([
-    [
-      1,
-      {
-        caseValue: 1,
-        signals: [{ name: "speed kph", startBit: 16, bitLength: 16, source: "user", confidence: "medium" }],
-        multiBytePatterns: [{ start: 4, len: 2, kind: "counter16", endianness: null, rollover: false, correlatedRollover: true, slowUpperBytes: false, range: null, sampleText: null }],
-      },
-    ],
-  ]),
-  isTwoByte: false,
-  source: "mux-detection",
-};
-
-const twoLevelMux: MuxKnowledge = {
-  selectorByte: -1,
-  selectorStartBit: 0,
-  selectorBitLength: 16,
-  cases: [0x0102, 0x0103, 0x0201],
-  isTwoByte: true,
-  source: "mux-detection",
-};
-
-export const knowledgeCanFrames: ExportFrameWithKnowledge[] = [
-  {
-    id: 0x100,
-    len: 8,
-    knowledge: knowledge(0x100, 8, {
-      notes: ["seen at 10 Hz", "rolls over at 0xFFFF"],
-      intervalMs: 50,
-      signals: [
-        { name: "rpm", startBit: 16, bitLength: 16, source: "user", confidence: "high", endianness: "little" },
-      ],
-      multiBytePatterns: [{ start: 4, len: 2, kind: "sensor16", endianness: "little", rollover: false, correlatedRollover: false, slowUpperBytes: false, range: null, sampleText: null }],
-    }),
-  },
-  { id: 0x200, len: 8, knowledge: knowledge(0x200, 8, { mux: oneLevelMux, intervalMs: 100 }) },
-  { id: 0x300, len: 8, knowledge: knowledge(0x300, 8, { mux: twoLevelMux }) },
-  { id: 0x18ff0001, len: 4, isExtended: true },
-];
-
-export const serialMeta: ExportMeta = { ...canMeta, name: "serial export", default_byte_order: "little" };
-
-export const serialFrames: ExportFrameWithKnowledge[] = [
-  { id: 0x10, len: 8, protocol: "serial", knowledge: knowledge(0x10, 8, { intervalMs: 250, notes: ["status"] }) },
-  { id: 0x11, len: 6, protocol: "serial" },
-];
 
 export const serialConfig: SerialFrameConfig = {
   encoding: "slip",

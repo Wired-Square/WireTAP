@@ -1,11 +1,10 @@
 // ui/src/stores/discoveryToolboxStore.ts
 //
 // Toolbox state and analysis functionality for Discovery app.
-// Manages analysis tools (message order, changes, serial analysis) and decoder knowledge.
+// Manages analysis tools (message order, changes, serial analysis) and the catalogue draft they grow.
 
 import { create } from 'zustand';
 import type { FrameMessage } from '../types/frame';
-import i18n from 'i18next';
 import type { ChangesFrame } from '../api/byteRoles';
 import type { OrderStart } from '../generated/OrderStart';
 import type { ProtocolMirrors } from '../generated/ProtocolMirrors';
@@ -19,17 +18,10 @@ import type {
   ChecksumDiscoveryOptions,
   ChecksumDiscoveryResult,
 } from '../api/checksums';
-import {
-  type DecoderKnowledge,
-  createEmptyKnowledge,
-  initializeFrameKnowledge,
-  updateKnowledgeFromMessageOrder,
-  updateKnowledgeFromPayloadAnalysis,
-} from '../utils/decoderKnowledge';
+import type { Draft } from '../api/drafting';
 import type { FcProbeEntry, Protocol } from '../api/io';
 import { MODBUS_BLANK_CONNECTION, type ModbusConnection } from '../utils/modbusProfiles';
-import type { FrameInfo } from './discoveryStore';
-import { parseFrameKey, type ProtocolFrames } from '../utils/frameKey';
+import type { ProtocolFrames } from '../utils/frameKey';
 import { useDiscoveryUIStore } from './discoveryUIStore';
 import { ANALYSIS_YIELD_MS } from '../constants';
 
@@ -247,8 +239,8 @@ interface DiscoveryToolboxState {
   // Toolbox state
   toolbox: ToolboxState;
 
-  // Decoder knowledge
-  knowledge: DecoderKnowledge;
+  /** What the analyses have learnt, in Rust's shape; null until one has run. */
+  draft: Draft | null;
   showInfoView: boolean;
 
   // Actions - Toolbox
@@ -277,22 +269,15 @@ interface DiscoveryToolboxState {
   clearAnalysisResults: () => void;
   clearToolResult: (toolTabId: string) => void;
 
-  // Actions - Knowledge
-  openInfoView: (frameInfoMap: Map<string, FrameInfo>) => void;
+  // Actions - Draft
+  openInfoView: () => void;
   closeInfoView: () => void;
-  resetKnowledge: () => void;
-  updateKnowledge: (knowledge: DecoderKnowledge) => void;
+  resetDraft: () => void;
 
   // Analysis runners
-  runMessageOrderAnalysis: (
-    source: AnalysisWindow,
-    frameInfoMap: Map<string, FrameInfo>
-  ) => Promise<ProtocolOrder[] | null>;
+  runMessageOrderAnalysis: (source: AnalysisWindow) => Promise<ProtocolOrder[] | null>;
 
-  runChangesAnalysis: (
-    source: AnalysisWindow,
-    frameInfoMap: Map<string, FrameInfo>
-  ) => Promise<ChangesResult | null>;
+  runChangesAnalysis: (source: AnalysisWindow) => Promise<ChangesResult | null>;
 
   runSerialFramingAnalysis: (
     bytesCaptureId: string,
@@ -325,17 +310,6 @@ function updateActiveScan(
   return {
     toolbox: { ...state.toolbox, [resultKeyFor(scan.scanType)]: fn(scan) },
   };
-}
-
-/** `knowledge`, with a frame for each discovered one when it has none yet. */
-function seededKnowledge(knowledge: DecoderKnowledge, frameInfoMap: Map<string, FrameInfo>): DecoderKnowledge {
-  if (knowledge.frames.size > 0) return knowledge;
-  const frames = new Map(knowledge.frames);
-  for (const [fk, info] of frameInfoMap) {
-    const { frameId } = parseFrameKey(fk);
-    frames.set(frameId, initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus));
-  }
-  return { ...knowledge, frames };
 }
 
 /** A tool's backend call failed: log it and stop showing the tool as running. */
@@ -373,7 +347,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     modbusFcProbeResults: null,
     isRunning: false,
   },
-  knowledge: createEmptyKnowledge(),
+  draft: null,
   showInfoView: false,
 
   // Toolbox actions
@@ -559,57 +533,28 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     set((state) => ({ toolbox: { ...state.toolbox, [resultKey]: null } }));
   },
 
-  // Knowledge actions
-  openInfoView: (frameInfoMap) => {
-    const { knowledge } = get();
-    if (knowledge.frames.size === 0 && frameInfoMap.size > 0) {
-      // Detect predominant protocol from frames
-      let serialCount = 0;
-      let canCount = 0;
-      for (const info of frameInfoMap.values()) {
-        if (info.protocol === 'serial') {
-          serialCount++;
-        } else {
-          canCount++;
-        }
-      }
-      const detectedProtocol: 'can' | 'serial' = serialCount > canCount ? 'serial' : 'can';
-
-      const newKnowledge = createEmptyKnowledge(detectedProtocol);
-      for (const [fk, info] of frameInfoMap) {
-        const { frameId } = parseFrameKey(fk);
-        newKnowledge.frames.set(
-          frameId,
-          initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)
-        );
-      }
-      set({ knowledge: newKnowledge, showInfoView: true });
-    } else {
-      set({ showInfoView: true });
-    }
-  },
+  openInfoView: () => set({ showInfoView: true }),
 
   closeInfoView: () => set({ showInfoView: false }),
 
-  resetKnowledge: () => set({ knowledge: createEmptyKnowledge() }),
-
-  updateKnowledge: (knowledge) => set({ knowledge }),
+  resetDraft: () => set({ draft: null }),
 
   // Analysis runners
-  runMessageOrderAnalysis: async (source, frameInfoMap) => {
-    const { toolbox } = get();
+  runMessageOrderAnalysis: async (source) => {
+    const { toolbox, draft } = get();
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     const { frameOrder } = await import('../api/frameOrder');
-    let messageOrderResults;
+    let drafted;
     try {
-      messageOrderResults = await frameOrder(source.captureId, source.selection, source.newest, toolbox.messageOrder.start);
+      drafted = await frameOrder(source.captureId, source.selection, source.newest, toolbox.messageOrder.start, draft);
     } catch (e) {
       return failed(set, 'Frame Order', e);
     }
+    const messageOrderResults = drafted.result;
 
     set((state) => ({
-      knowledge: updateKnowledgeFromMessageOrder(seededKnowledge(state.knowledge, frameInfoMap), messageOrderResults),
+      draft: drafted.draft,
       toolbox: {
         ...state.toolbox,
         isRunning: false,
@@ -621,16 +566,17 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     return messageOrderResults;
   },
 
-  runChangesAnalysis: async (source, frameInfoMap) => {
+  runChangesAnalysis: async (source) => {
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     const { payloadChanges } = await import('../api/byteRoles');
-    let changes;
+    let drafted;
     try {
-      changes = await payloadChanges(source.captureId, source.selection, source.newest);
+      drafted = await payloadChanges(source.captureId, source.selection, source.newest, get().draft);
     } catch (e) {
       return failed(set, 'Payload Changes', e);
     }
+    const changes = drafted.result;
     const changesResults: ChangesResult = {
       tool: 'changes',
       window: source,
@@ -640,7 +586,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     };
 
     set((state) => ({
-      knowledge: updateKnowledgeFromPayloadAnalysis(seededKnowledge(state.knowledge, frameInfoMap), changes.frames, i18n.t.bind(i18n)),
+      draft: drafted.draft,
       toolbox: { ...state.toolbox, isRunning: false, changesResults },
     }));
     useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['changes'].tabId);

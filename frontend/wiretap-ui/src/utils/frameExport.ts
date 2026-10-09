@@ -1,12 +1,6 @@
 // ui/src/utils/frameExport.ts
 
-import {
-  type FrameKnowledge,
-  type SignalKnowledge,
-  type MuxKnowledge,
-  createDefaultSignalsForFrame,
-} from './decoderKnowledge';
-import type { MultiBytePattern } from '../generated/MultiBytePattern';
+import type { ByteSpan } from '../generated/ByteSpan';
 import type { EditOp, HeaderField, SerialConfigFields } from '../types/catalogEdit';
 import type { Endianness, Protocol } from '../types/catalogModel';
 
@@ -92,11 +86,7 @@ export type ExportFrame = {
   protocol?: string;
 };
 
-export type ExportFrameWithKnowledge = ExportFrame & {
-  knowledge?: FrameKnowledge;
-};
-
-function catalogProtocol(frames: ExportFrame[]): Protocol {
+export function catalogProtocol(frames: { protocol?: string }[]): Protocol {
   const protocol = frames.find((f) => f.protocol)?.protocol ?? 'can';
   if (protocol === 'can' || protocol === 'serial' || protocol === 'modbus') return protocol;
   throw new Error(`${protocol} frames cannot be saved as a catalogue`);
@@ -137,7 +127,8 @@ function serialConfigFields(config: SerialFrameConfig, meta: ExportMeta): Serial
   };
 }
 
-function headOps(protocol: Protocol, meta: ExportMeta, serialConfig: SerialFrameConfig = {}): EditOp[] {
+/** The meta and protocol config a Discovery catalogue opens with. */
+export function headOps(protocol: Protocol, meta: ExportMeta, serialConfig: SerialFrameConfig = {}): EditOp[] {
   const ops = [setMeta(meta, protocol)];
   if (protocol === 'can') {
     ops.push({
@@ -168,99 +159,13 @@ export function framesCatalogOps(
   ];
 }
 
-/** Known signals first, then pattern signals, then hex for every byte still unclaimed. */
-function signalsWithFill(
-  frameLength: number,
-  signals: SignalKnowledge[] = [],
-  patterns: MultiBytePattern[] | undefined,
-  defaultByteOrder: Endianness,
-  mux?: MuxKnowledge,
-  serialConfig?: SerialFrameConfig,
-): SignalKnowledge[] {
+/** The bytes a serial frame's id, source address and checksum take. */
+export function serialReservedSpans(config: SerialFrameConfig = {}): ByteSpan[] {
+  const span = (start?: number, len?: number) => (start === undefined || len === undefined ? [] : [{ start, len }]);
   return [
-    ...signals,
-    ...createDefaultSignalsForFrame(frameLength, mux, signals, patterns, defaultByteOrder, serialConfig),
-  ];
-}
-
-function sanitizeSignalName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
-}
-
-function signalOps(owner: string[], signals: SignalKnowledge[]): EditOp[] {
-  if (signals.length === 0) return [{ op: 'SetTable', path: owner, value: {} }];
-  return signals.map((s) => ({
-    op: 'UpsertSignal',
-    owner_path: owner,
-    signal: {
-      name: sanitizeSignalName(s.name),
-      start_bit: s.startBit,
-      bit_length: s.bitLength,
-      format: s.format,
-      byte_order: s.endianness,
-      confidence: s.source === 'default' ? undefined : s.confidence,
-    },
-  }));
-}
-
-function setMux(owner: string[], name: string, startBit: number, bitLength: number): EditOp {
-  return { op: 'SetMux', owner_path: owner, mux: { name, start_bit: startBit, bit_length: bitLength } };
-}
-
-/** A two-byte mux nests: byte 0 selects the outer case, byte 1 the inner one. */
-function muxOps(owner: string[], mux: MuxKnowledge, frameLength: number, defaultByteOrder: Endianness): EditOp[] {
-  const caseOps = (casePath: string[], caseValue: number) => {
-    const known = mux.caseKnowledge?.get(caseValue);
-    return signalOps(casePath, signalsWithFill(frameLength, known?.signals, known?.multiBytePatterns, defaultByteOrder, mux));
-  };
-
-  if (!mux.isTwoByte) {
-    return [
-      setMux(owner, `selector_${mux.selectorByte}`, mux.selectorStartBit, mux.selectorBitLength),
-      ...mux.cases.flatMap((c) => caseOps([...owner, 'mux', String(c)], c)),
-    ];
-  }
-
-  const innerByOuter = new Map<number, number[]>();
-  for (const caseValue of mux.cases) {
-    const outer = (caseValue >> 8) & 0xff;
-    innerByOuter.set(outer, [...(innerByOuter.get(outer) ?? []), caseValue & 0xff]);
-  }
-  const ops = [setMux(owner, 'selector_0', 0, 8)];
-  for (const outer of [...innerByOuter.keys()].sort((a, b) => a - b)) {
-    const outerPath = [...owner, 'mux', String(outer)];
-    ops.push(setMux(outerPath, 'selector_1', 8, 8));
-    for (const inner of innerByOuter.get(outer)!.sort((a, b) => a - b)) {
-      ops.push(...caseOps([...outerPath, 'mux', String(inner)], (outer << 8) | inner));
-    }
-  }
-  return ops;
-}
-
-/**
- * A catalogue from what Discovery learnt about each frame: notes, interval, signals
- * or a mux, with hex signals over every byte nothing else claims.
- */
-export function knowledgeCatalogOps(
-  frames: ExportFrameWithKnowledge[],
-  meta: ExportMeta,
-  formatId: (id: number, isExtended?: boolean) => string,
-  serialConfig?: SerialFrameConfig,
-): EditOp[] {
-  const protocol = catalogProtocol(frames);
-  return [
-    ...headOps(protocol, meta, serialConfig),
-    ...frames.flatMap((f) => {
-      const key = formatId(f.id, f.isExtended);
-      const owner = ['frame', protocol, key];
-      const k = f.knowledge;
-      const interval = k?.intervalMs !== meta.default_interval ? k?.intervalMs : undefined;
-      const frame: EditOp = { op: 'SetFrame', protocol, key, frame: { length: f.len, notes: k?.notes, interval_ms: interval } };
-      const body = k?.mux
-        ? muxOps(owner, k.mux, f.len, meta.default_byte_order)
-        : signalOps(owner, signalsWithFill(f.len, k?.signals, k?.multiBytePatterns, meta.default_byte_order, undefined, serialConfig));
-      return [frame, ...body];
-    }),
+    ...span(config.frame_id_start_byte, config.frame_id_bytes),
+    ...span(config.source_address_start_byte, config.source_address_bytes),
+    ...span(config.checksum?.start_byte, config.checksum?.byte_length),
   ];
 }
 

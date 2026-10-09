@@ -196,7 +196,7 @@ fn edit_ops(params: &serde_json::Value) -> Result<Vec<wiretap_catalog::edit::Edi
     serde_json::from_value(ops).map_err(|e| format!("invalid edit op: {e}"))
 }
 
-fn refuse_unless_valid(text: &str) -> Result<(), String> {
+pub(crate) fn refuse_unless_valid(text: &str) -> Result<(), String> {
     let findings = wiretap_catalog::validate::validate(text);
     if findings.is_empty() {
         return Ok(());
@@ -1313,7 +1313,7 @@ mod tests {
 
     #[test]
     fn each_discovery_export_builds_the_catalogue_its_typescript_writer_did() {
-        for name in ["knowledge-can", "knowledge-serial", "plain-can", "modbus"] {
+        for name in ["plain-can", "modbus"] {
             let mut ours = built_export(name);
             let golden = discovery_export(&format!("{name}.golden.toml"));
             let mut theirs = parsed(golden.into());
@@ -1321,21 +1321,6 @@ mod tests {
             without_new_keys(&mut theirs);
             assert_eq!(ours, theirs, "{name}");
         }
-    }
-
-    #[test]
-    fn a_discovery_export_names_its_mux_selectors_and_keeps_signal_confidence() {
-        let catalogue = built_export("knowledge-can");
-        let frames = catalogue["frames"].as_array().unwrap();
-        let frame = |id: u64| frames.iter().find(|f| f["frameId"] == id).unwrap();
-
-        assert_eq!(frame(0x200)["mux"]["name"], "selector_0");
-        assert_eq!(frame(0x300)["mux"]["name"], "selector_0");
-        let inner = &frame(0x300)["mux"]["cases"]["1"]["mux"];
-        assert_eq!(inner["name"], "selector_1");
-        let signals = frame(0x100)["signals"].as_array().unwrap();
-        let rpm = signals.iter().find(|s| s["name"] == "rpm").unwrap();
-        assert_eq!(rpm["confidence"], "high");
     }
 
     fn set_meta_version(original: &str) -> serde_json::Value {

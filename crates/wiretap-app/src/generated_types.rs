@@ -46,6 +46,10 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<crate::ws::protocol::MsgType>(), wire_constants()),
             ),
             (
+                PathBuf::from("byteNames.ts"),
+                (TypeId::of::<wiretap_decode::PayloadField>(), byte_names()),
+            ),
+            (
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
@@ -151,6 +155,9 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::analysis::OrderStart>();
     r.visit::<crate::byte_roles::ProtocolMirrors>();
     r.visit::<crate::analysis_ts::ByteNotes>();
+    r.visit::<crate::analysis_ts::CandidateSignal>();
+    r.visit::<crate::drafting::DraftPreview>();
+    r.visit::<crate::drafting::DraftWrite>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -198,6 +205,15 @@ fn checksum_algorithms() -> String {
         .map(|a| format!("  {}: {},\n", a.as_str(), a.output_bytes()))
         .collect();
     format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
+}
+
+/// Each byte of the longest payload as `wiretap_decode::byte_name` spells a
+/// one-byte field, for the panels that chart every byte.
+fn byte_names() -> String {
+    let names: String = (0..64)
+        .map(|i| format!("  \"{}\",\n", wiretap_decode::byte_name(i, 8, wiretap_decode::Endianness::Little)))
+        .collect();
+    format!("{HEADER}\nexport const BYTE_NAMES = [\n{names}] as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {
@@ -565,6 +581,52 @@ fn analysis_results_serialise_as_declared() {
             assert_declared::<ts::ByteNote>(&note);
         }
     }
+}
+
+#[tokio::test]
+async fn drafts_serialise_as_declared() {
+    use crate::analysis::memory::MemorySource;
+    use crate::analysis_ts as ts;
+
+    let mut source = MemorySource::default();
+    for i in 0..30u8 {
+        let t = i as u64 * 100_000;
+        source.push_at("can", 0, 0x100, false, t, vec![i % 3, i, 0x5A, ((i as u16 * 300) >> 8) as u8]);
+        source.push_at("can", 1, 0x100, false, t + 5_000, vec![i % 3, i, 0x5A, 0]);
+        source.push_at("can", 0, 0x200, false, t + 1_000, vec![0x80, 0x11]);
+        source.push_at("can", 0, 0x200, false, t + 3_000, vec![0x80, 0x22, 0x33]);
+    }
+    let changes = crate::byte_roles::payload_changes(&source, vec![], None, usize::MAX).await.unwrap();
+    let mut draft = wiretap_analysis::draft::Draft::default();
+    crate::drafting::apply_changes(&mut draft, &changes);
+    let orders = crate::analysis::message_order(&source, &crate::capture_store::FrameSelection::default(), None, None)
+        .await
+        .unwrap();
+    draft.apply_orders(orders.iter().map(|o| (wiretap_catalog::model::Protocol::Can, &o.order)));
+    draft.serial_reserved.push(wiretap_analysis::draft::ByteSpan { start: -1, len: 1 });
+    let preview = crate::drafting::draft_preview_cmd(Some(draft), Vec::new());
+
+    let json = serde_json::to_value(&preview).unwrap();
+    assert_declared::<ts::Draft>(&json["draft"]);
+    each(&json["draft"], "serialReserved").for_each(assert_declared::<ts::ByteSpan>);
+    let frames: Vec<_> = each(&json["draft"], "frames").collect();
+    frames.iter().for_each(|f| assert_declared::<ts::FrameDraft>(f));
+    assert!(frames.iter().any(|f| f["mux"].is_object()), "no mux to check");
+    assert!(frames.iter().any(|f| f["burst"].is_object()), "no burst to check");
+    for f in &frames {
+        if let Some(mux) = f["mux"].as_object() {
+            assert_declared::<ts::MuxDraft>(&serde_json::Value::Object(mux.clone()));
+            mux["cases"].as_object().unwrap().values().for_each(assert_declared::<ts::MuxCaseDraft>);
+        }
+        if f["burst"].is_object() {
+            assert_declared::<ts::BurstDraft>(&f["burst"]);
+        }
+    }
+    for signal in json["signals"].as_array().unwrap().iter().flat_map(|s| s.as_array().unwrap()) {
+        assert_declared::<ts::DraftSignal>(signal);
+    }
+    let candidates = crate::drafting::candidate_signals_cmd(0, 1, vec![8, 16], vec![wiretap_decode::Endianness::Big], None);
+    assert_declared::<ts::CandidateSignal>(&serde_json::to_value(&candidates[0]).unwrap());
 }
 
 /// The lib's byte notes for each `byteNotes.json` profile, the codes the

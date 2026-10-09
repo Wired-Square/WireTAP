@@ -1,14 +1,16 @@
 // ui/src/apps/dashboard/dialogs/CandidateSignalsDialog.tsx
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { Sparkles, ChevronRight } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
-import type { ByteColumn, ChangesFrame } from "../../../api/byteRoles";
+import type { ChangesFrame } from "../../../api/byteRoles";
+import { candidateSignals } from "../../../api/drafting";
+import type { ByteOrder } from "../../../generated/ByteOrder";
+import type { CandidateSignal } from "../../../generated/CandidateSignal";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button } from "../../../components/Button";
 import { PrimaryButton, SecondaryButton, Select, Input, Checkbox } from "../../../components/forms";
@@ -18,63 +20,16 @@ interface Props {
   onClose: () => void;
 }
 
-interface CandidateSignal {
-  label: string;
-  signalName: string; // pattern: byte_<offset>_<bits>b_<endian>
-  offset: number;
-  bits: number;
-  endianness: "le" | "be";
-}
-
 const SIGNAL_COLOURS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b",
   "#a855f7", "#06b6d4", "#f97316", "#ec4899",
   "#84cc16", "#14b8a6", "#6366f1", "#e879f9",
 ];
 
-/** The `byte_<offset>_<bits>b_<le|be>` signals the dialog offers for one frame. */
-export function candidateSignals(
-  t: TFunction,
-  { startByte, endByte, bitLengths, endianness, analysis }: {
-    startByte: string;
-    endByte: string;
-    bitLengths: Set<number>;
-    endianness: Set<"le" | "be">;
-    analysis?: ChangesFrame;
-  },
-): CandidateSignal[] {
-  const start = parseInt(startByte, 10) || 0;
-  const end = parseInt(endByte, 10) || 7;
-  const result: CandidateSignal[] = [];
-
-  // Roles to include when using analysis hints
-  const interestingRoles = new Set<ByteColumn["role"]>(["sensor", "value", "unknown"]);
-
-  for (let offset = start; offset <= end; offset++) {
-    // If using analysis hints, skip bytes classified as static or counter
-    if (analysis) {
-      const byteStat = analysis.columns.find((b) => b.position === offset);
-      if (byteStat && !interestingRoles.has(byteStat.role)) continue;
-    }
-
-    for (const bits of Array.from(bitLengths).sort((a, b) => a - b)) {
-      // For multi-byte signals, check that offset + byte span doesn't exceed end
-      const byteSpan = bits / 8;
-      if (offset + byteSpan - 1 > end) continue;
-
-      for (const e of Array.from(endianness)) {
-        // 8-bit signals are endianness-agnostic — only generate once (as LE)
-        if (bits === 8 && e === "be") continue;
-
-        const signalName = `byte_${offset}_${bits}b_${e}`;
-        const label = bits > 8
-          ? t("candidates.byteLabelEndian", { offset, bits, endian: e === "le" ? "LE" : "BE" })
-          : t("candidates.byteLabel", { offset, bits });
-        result.push({ label, signalName, offset, bits, endianness: e });
-      }
-    }
-  }
-  return result;
+/** A typed byte index, or null for anything that is not one. */
+function byteIndex(text: string): number | null {
+  const n = Number(text);
+  return text.trim() !== "" && Number.isInteger(n) && n >= 0 ? n : null;
 }
 
 export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
@@ -88,7 +43,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
   const [selectedFrameId, setSelectedFrameId] = useState("");
   const [bitLengths, setBitLengths] = useState<Set<number>>(new Set([8, 16]));
-  const [endianness, setEndianness] = useState<Set<"le" | "be">>(new Set(["le"]));
+  const [endianness, setEndianness] = useState<Set<ByteOrder>>(new Set(["little"]));
   const [startByte, setStartByte] = useState("0");
   const [endByte, setEndByte] = useState("7");
   const [useAnalysisHints, setUseAnalysisHints] = useState(false);
@@ -115,7 +70,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     });
   }, []);
 
-  const toggleEndianness = useCallback((e: "le" | "be") => {
+  const toggleEndianness = useCallback((e: ByteOrder) => {
     setEndianness((prev) => {
       const next = new Set(prev);
       if (next.has(e)) next.delete(e);
@@ -124,9 +79,30 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     });
   }, []);
 
-  const candidates: CandidateSignal[] = useMemo(
-    () => (selectedFrameId ? candidateSignals(t, { startByte, endByte, bitLengths, endianness, analysis: useAnalysisHints ? analysisResult : undefined }) : []),
-    [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult, t],
+  const [candidates, setCandidates] = useState<CandidateSignal[]>([]);
+  useEffect(() => {
+    const [start, end] = [byteIndex(startByte), byteIndex(endByte)];
+    if (!selectedFrameId || start === null || end === null) {
+      setCandidates([]);
+      return;
+    }
+    const hints = useAnalysisHints ? analysisResult?.columns.map(({ position, role }) => ({ position, role })) : undefined;
+    let current = true;
+    candidateSignals(start, end, [...bitLengths], [...endianness], hints).then(
+      (found) => current && setCandidates(found),
+      () => current && setCandidates([]),
+    );
+    return () => {
+      current = false;
+    };
+  }, [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult]);
+
+  const label = useCallback(
+    (c: CandidateSignal) =>
+      c.bits > 8
+        ? t("candidates.byteLabelEndian", { offset: c.offset, bits: c.bits, endian: c.endianness === "little" ? "LE" : "BE" })
+        : t("candidates.byteLabel", { offset: c.offset, bits: c.bits }),
+    [t],
   );
 
   const handleGenerate = useCallback(() => {
@@ -143,18 +119,18 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
       // Set a descriptive title
       const title = chunk.length === 1
-        ? t("candidates.panelTitle", { label: chunk[0].label })
-        : t("candidates.panelTitleRange", { from: chunk[0].label, to: chunk[chunk.length - 1].label });
+        ? t("candidates.panelTitle", { label: label(chunk[0]) })
+        : t("candidates.panelTitleRange", { from: label(chunk[0]), to: label(chunk[chunk.length - 1]) });
       updatePanel(panelId, { title });
 
       // Add each candidate signal
       for (const candidate of chunk) {
-        addSignalToPanel(panelId, frameId, candidate.signalName);
+        addSignalToPanel(panelId, frameId, candidate.name);
       }
     }
 
     onClose();
-  }, [candidates, selectedFrameId, addPanel, updatePanel, addSignalToPanel, onClose]);
+  }, [candidates, selectedFrameId, addPanel, updatePanel, addSignalToPanel, onClose, label, t]);
 
   const handleClose = useCallback(() => {
     setStep(1);
@@ -222,18 +198,18 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               </label>
               <div className="flex gap-2">
                 <Button
-                  onClick={() => toggleEndianness("le")}
+                  onClick={() => toggleEndianness("little")}
                   variant="outline"
                   size="sm"
-                  pressed={endianness.has("le")}
+                  pressed={endianness.has("little")}
                 >
                   {t("candidates.fields.littleEndian")}
                 </Button>
                 <Button
-                  onClick={() => toggleEndianness("be")}
+                  onClick={() => toggleEndianness("big")}
                   variant="outline"
                   size="sm"
-                  pressed={endianness.has("be")}
+                  pressed={endianness.has("big")}
                 >
                   {t("candidates.fields.bigEndian")}
                 </Button>
@@ -303,20 +279,20 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 {t("candidates.preview.summary", { count: candidates.length })}
               </p>
               <div className="max-h-48 overflow-y-auto space-y-0.5 text-xs">
-                {candidates.map((c) => (
+                {candidates.map((c, i) => (
                   <div
-                    key={c.signalName}
+                    key={c.name}
                     className="flex items-center gap-2 px-2 py-1 rounded bg-primary"
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: SIGNAL_COLOURS[candidates.indexOf(c) % SIGNAL_COLOURS.length] }}
+                      style={{ background: SIGNAL_COLOURS[i % SIGNAL_COLOURS.length] }}
                     />
                     <span className="text-primary font-mono">
-                      {c.signalName}
+                      {c.name}
                     </span>
                     <span className="text-muted ml-auto">
-                      {c.label}
+                      {label(c)}
                     </span>
                   </div>
                 ))}

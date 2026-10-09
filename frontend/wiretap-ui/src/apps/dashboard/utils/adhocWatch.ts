@@ -2,6 +2,7 @@
 
 import type { AdhocSignalRef } from "../../../api/adhoc";
 import type { DashboardPanel, HypothesisParams } from "../../../stores/dashboardStore";
+import { BYTE_NAMES } from "../../../generated/byteNames";
 
 /** What the panels chart, for Rust to decode: every signal, flow and bitfield bytes, and heatmap frames. */
 export function adhocWatch(
@@ -14,7 +15,7 @@ export function adhocWatch(
     const frameId = panel.targetFrameId;
     if (frameId != null && panel.type === "heatmap") heatmaps.push(frameId);
     if (frameId != null && (panel.type === "flow" || panel.type === "bitfield")) {
-      for (let i = 0; i < (panel.byteCount ?? 8); i++) signals.push({ frameId, name: `byte[${i}]` });
+      for (let i = 0; i < (panel.byteCount ?? 8); i++) signals.push({ frameId, name: BYTE_NAMES[i] });
     }
     for (const s of panel.signals) {
       signals.push({ frameId: s.frameId, name: s.signalName, params: registry.get(s.signalName) });

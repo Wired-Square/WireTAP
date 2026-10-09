@@ -19,6 +19,7 @@ mod catalog_share;
 mod apiclient;
 mod gateway_admin;
 mod dashboard;
+mod drafting;
 mod checksum_discovery;
 mod checksums;
 mod credentials;
@@ -1388,6 +1389,9 @@ pub fn run() {
             byte_roles::frame_order_cmd,
             byte_roles::payload_changes_report_cmd,
             byte_roles::frame_order_report_cmd,
+            drafting::draft_preview_cmd,
+            drafting::draft_catalog_cmd,
+            drafting::candidate_signals_cmd,
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,
             frame_export::export_frame_dump,

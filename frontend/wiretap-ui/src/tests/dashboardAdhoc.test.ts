@@ -32,8 +32,8 @@ describe("adhocWatch", () => {
     expect(signals.slice(0, 4)).toEqual([
       { frameId: 0x100, name: "hyp_100_b12_12bes", params: hyp },
       { frameId: 0x100, name: "byte_0_16b_le", params: undefined },
-      { frameId: 0x200, name: "byte[0]" },
-      { frameId: 0x200, name: "byte[1]" },
+      { frameId: 0x200, name: "byte_0_8b_le" },
+      { frameId: 0x200, name: "byte_1_8b_le" },
     ]);
     expect(signals.filter((s) => s.frameId === 0x300)).toHaveLength(8);
   });
