@@ -64,4 +64,14 @@ describe("saving the catalogue configuration", () => {
       { op: "DeleteAtPath", path: ["meta", "modbus"] },
     ]);
   });
+
+  it("shows a refused save without marking a valid catalogue invalid", async () => {
+    useCatalogEditorStore.getState().setValidation([], true);
+    vi.mocked(editCatalogOps).mockRejectedValueOnce(new Error("mask 'zz' is not hexadecimal"));
+    await savedOps({ can: {} });
+    const { validation, ui } = useCatalogEditorStore.getState();
+    expect(validation.errors).toEqual([{ field: "config", message: "mask 'zz' is not hexadecimal" }]);
+    expect(validation.isValid).toBe(true);
+    expect(ui.dialogs.validationErrors).toBe(true);
+  });
 });

@@ -224,7 +224,7 @@ export interface CatalogEditorState {
   setDiff: (diff: CatalogDiff | null) => void;
 
   // Actions - Validation
-  setValidation: (errors: ValidationError[], isValid?: boolean) => void;
+  setValidation: (errors: ValidationError[], isValid?: boolean | null) => void;
   clearValidation: () => void;
 
   // Actions - Tree
