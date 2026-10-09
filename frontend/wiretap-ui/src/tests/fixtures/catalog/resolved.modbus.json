@@ -89,6 +89,7 @@
                   "word_order": "little",
                   "factor": 0.1,
                   "unit": "kWh",
+                  "confidence": "high",
                   "modbus_register": 5000,
                   "modbus_register_count": 2
                 }
@@ -106,6 +107,7 @@
               "protocol": "modbus",
               "name": "battery_power",
               "length": 2,
+              "transmitter": "Inverter",
               "interval": 500,
               "signals": [
                 {

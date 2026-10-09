@@ -1,4 +1,11 @@
 {
+  "effectiveDefaults": {
+    "canByteOrder": "little",
+    "modbusByteOrder": "big",
+    "modbusRegisterBase": 1,
+    "modbusWordOrder": "little",
+    "serialByteOrder": "little"
+  },
   "frames": [
     {
       "frameId": 13049,
@@ -82,6 +89,7 @@
       "signals": [
         {
           "bitLength": 32,
+          "confidence": "high",
           "factor": 0.1,
           "modbusRegister": 5000,
           "modbusRegisterCount": 2,
@@ -117,7 +125,8 @@
           "startBit": 0,
           "unit": "W"
         }
-      ]
+      ],
+      "transmitter": "Inverter"
     }
   ],
   "meta": {

@@ -1,4 +1,11 @@
 {
+  "effectiveDefaults": {
+    "canByteOrder": "little",
+    "modbusByteOrder": "big",
+    "modbusRegisterBase": 0,
+    "modbusWordOrder": "big",
+    "serialByteOrder": "little"
+  },
   "frames": [
     {
       "checksums": [

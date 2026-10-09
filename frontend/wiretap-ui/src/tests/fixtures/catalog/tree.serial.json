@@ -305,6 +305,32 @@
                         192
                       ]
                     }
+                  },
+                  {
+                    "key": "heartbeat",
+                    "type": "serial-frame",
+                    "path": [
+                      "frame",
+                      "serial",
+                      "heartbeat"
+                    ],
+                    "metadata": {
+                      "frameType": "serial",
+                      "isId": true,
+                      "idValue": "heartbeat",
+                      "length": 4,
+                      "lengthInherited": false,
+                      "transmitterInherited": false,
+                      "intervalInherited": false,
+                      "notes": [
+                        "Keyed by a name, not an id"
+                      ],
+                      "signals": [],
+                      "hasMux": false,
+                      "muxSignalCount": 0,
+                      "encoding": "slip",
+                      "frameId": "heartbeat"
+                    }
                   }
                 ],
                 "metadata": {

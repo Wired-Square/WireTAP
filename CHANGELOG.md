@@ -28,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Dashboard gauge shows "—" and an empty arc for a signal that has never had a value.** It used to read 0.000 and draw the arc to zero, the same as a real zero. A real zero still reads 0.000.
 - **Level-bar, rotary and icon-state tooltips show "—" for a signal that has never had a value.** They used to read NaN.
 - **A new catalogue's suggested filename is always a plain name in the decoder directory.** A name ending in `.toml` is no longer offered as `name.toml.toml`, and a name with a path separator or a leading dot is offered as `decoder.toml` rather than a path outside the directory or a hidden file. You can still type any name in the save dialog.
+- **Catalogues read the legacy `tx_interval_ms` key and show serial frames keyed by a name.** A frame that sets its interval only with `tx_interval_ms` now has that interval, and a mirror of it inherits it. A serial frame keyed by a name, such as `[frame.serial.heartbeat]`, now appears in the Catalog Editor instead of being skipped.
 
 ## [0.14.0] - 2026-10-06
 

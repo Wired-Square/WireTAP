@@ -205,6 +205,7 @@
                             "word_order": "little",
                             "factor": 0.1,
                             "unit": "kWh",
+                            "confidence": "high",
                             "modbus_register": 5000,
                             "modbus_register_count": 2
                           }
@@ -233,6 +234,7 @@
                           "word_order": "little",
                           "factor": 0.1,
                           "unit": "kWh",
+                          "confidence": "high",
                           "modbus_register": 5000,
                           "modbus_register_count": 2
                         }
@@ -290,6 +292,7 @@
                       "idValue": "battery_power",
                       "length": 2,
                       "lengthInherited": false,
+                      "transmitter": "Inverter",
                       "transmitterInherited": false,
                       "interval": 500,
                       "intervalInherited": false,

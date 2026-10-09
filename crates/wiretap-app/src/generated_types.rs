@@ -184,6 +184,7 @@ fn wire_constants() -> String {
             "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
         ),
+        format!("export const NAME_KEYED_FRAME_ID = {};\n", wiretap_catalog::NAME_KEYED_FRAME_ID),
     ]
     .join("\n")
 }

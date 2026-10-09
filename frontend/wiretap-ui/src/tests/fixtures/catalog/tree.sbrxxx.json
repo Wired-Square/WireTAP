@@ -3371,7 +3371,8 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": true,
-                      "intervalInherited": false,
+                      "interval": 60000,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Info_Module_1_Cell_Type",
@@ -3537,7 +3538,8 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": true,
-                      "intervalInherited": false,
+                      "interval": 60000,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Info_Module_1_Production_Date",
@@ -3629,7 +3631,8 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": true,
-                      "intervalInherited": false,
+                      "interval": 60000,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Info_Module_3_Production_Date",
@@ -3721,7 +3724,8 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": true,
-                      "intervalInherited": false,
+                      "interval": 60000,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Info_Module_5_Production_Date",
@@ -3813,7 +3817,8 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": true,
-                      "intervalInherited": false,
+                      "interval": 60000,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Info_Module_7_Production_Date",
@@ -10908,6 +10913,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "signals": [
                         {
@@ -11073,6 +11079,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "signals": [
                         {
@@ -11164,6 +11171,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "signals": [
                         {
@@ -11255,6 +11263,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "signals": [
                         {
@@ -11346,6 +11355,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "signals": [
                         {
@@ -13101,6 +13111,7 @@
                       "lengthInherited": false,
                       "transmitter": "BMS",
                       "transmitterInherited": false,
+                      "interval": 60000,
                       "intervalInherited": false,
                       "notes": [
                         "Characters 8–9 = year (YY), 10 = month (M, or A/B/C for 10–12), 11–12 = day (DD)."
@@ -13158,6 +13169,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19938,
                             "modbus_register_count": 1
                           }
@@ -13183,6 +13195,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19939,
                             "modbus_register_count": 1
                           }
@@ -13208,6 +13221,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19940,
                             "modbus_register_count": 1
                           }
@@ -13233,6 +13247,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19941,
                             "modbus_register_count": 1
                           }
@@ -13258,6 +13273,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19942,
                             "modbus_register_count": 1
                           }
@@ -13283,6 +13299,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19943,
                             "modbus_register_count": 1
                           }
@@ -13297,7 +13314,7 @@
                       "lengthInherited": false,
                       "transmitterInherited": false,
                       "interval": 5000,
-                      "intervalInherited": false,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Tunnel_4DE2_Holding_0",
@@ -13305,6 +13322,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19938,
                           "modbus_register_count": 1
                         },
@@ -13314,6 +13332,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19939,
                           "modbus_register_count": 1
                         },
@@ -13323,6 +13342,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19940,
                           "modbus_register_count": 1
                         },
@@ -13332,6 +13352,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19941,
                           "modbus_register_count": 1
                         },
@@ -13341,6 +13362,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19942,
                           "modbus_register_count": 1
                         },
@@ -13350,6 +13372,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19943,
                           "modbus_register_count": 1
                         }
@@ -13392,6 +13415,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19938,
                             "modbus_register_count": 1
                           }
@@ -13417,6 +13441,7 @@
                             "bit_length": 16,
                             "signed": false,
                             "format": "hex",
+                            "confidence": "none",
                             "modbus_register": 19939,
                             "modbus_register_count": 1
                           }
@@ -13431,7 +13456,7 @@
                       "lengthInherited": false,
                       "transmitterInherited": false,
                       "interval": 5000,
-                      "intervalInherited": false,
+                      "intervalInherited": true,
                       "signals": [
                         {
                           "name": "Tunnel_4DE2_Input_0",
@@ -13439,6 +13464,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19938,
                           "modbus_register_count": 1
                         },
@@ -13448,6 +13474,7 @@
                           "bit_length": 16,
                           "signed": false,
                           "format": "hex",
+                          "confidence": "none",
                           "modbus_register": 19939,
                           "modbus_register_count": 1
                         }

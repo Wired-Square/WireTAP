@@ -3,12 +3,20 @@
     "defaultByteOrder": "little",
     "defaultExtended": false
   },
+  "effectiveDefaults": {
+    "canByteOrder": "little",
+    "modbusByteOrder": "big",
+    "modbusRegisterBase": 0,
+    "modbusWordOrder": "big",
+    "serialByteOrder": "little"
+  },
   "frames": [
     {
       "frameId": 0,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -32,7 +40,8 @@
       "frameId": 1,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -88,7 +97,8 @@
       "frameId": 2,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -142,7 +152,8 @@
       "frameId": 3,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -176,7 +187,8 @@
       "frameId": 4,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -235,7 +247,8 @@
       "frameId": 5,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -331,7 +344,8 @@
       "frameId": 6,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -387,7 +401,8 @@
       "frameId": 7,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -449,7 +464,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "mux"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -500,7 +516,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "signals"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -528,7 +545,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "mux"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -579,7 +597,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "signals"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -608,7 +627,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "signals"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -637,7 +657,8 @@
       "inheritedFields": [
         "transmitter",
         "interval",
-        "extended"
+        "extended",
+        "signals"
       ],
       "interval": 10000,
       "isExtended": false,
@@ -665,7 +686,8 @@
       "frameId": 19,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -737,7 +759,8 @@
       "frameId": 20,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -809,7 +832,8 @@
       "frameId": 21,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -865,7 +889,8 @@
       "frameId": 22,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -921,7 +946,8 @@
       "frameId": 23,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -977,7 +1003,8 @@
       "frameId": 24,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -1033,7 +1060,8 @@
       "frameId": 25,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -1065,8 +1093,11 @@
       "frameId": 26,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "interval",
+        "extended",
+        "signals"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x01A",
@@ -1177,8 +1208,11 @@
       "frameId": 27,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "interval",
+        "extended",
+        "signals"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x01b",
@@ -1209,8 +1243,11 @@
       "frameId": 28,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "interval",
+        "extended",
+        "signals"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x01c",
@@ -1241,8 +1278,11 @@
       "frameId": 29,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "interval",
+        "extended",
+        "signals"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x01d",
@@ -1273,8 +1313,11 @@
       "frameId": 30,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "interval",
+        "extended",
+        "signals"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x01e",
@@ -1842,7 +1885,8 @@
       "frameId": 1281,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -1898,7 +1942,8 @@
       "frameId": 1282,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -1952,7 +1997,8 @@
       "frameId": 1283,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -1986,7 +2032,8 @@
       "frameId": 1284,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -2047,7 +2094,8 @@
       "frameId": 1285,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -2135,7 +2183,8 @@
       "frameId": 1286,
       "inheritedFields": [
         "transmitter",
-        "extended"
+        "extended",
+        "signals"
       ],
       "isExtended": false,
       "isFd": false,
@@ -3387,6 +3436,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71A",
@@ -3489,6 +3539,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71B",
@@ -3517,6 +3568,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71C",
@@ -3545,6 +3597,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71D",
@@ -3573,6 +3626,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71E",
@@ -3601,6 +3655,7 @@
       "inheritedFields": [
         "extended"
       ],
+      "interval": 60000,
       "isExtended": false,
       "isFd": false,
       "key": "0x71F",
@@ -3966,7 +4021,8 @@
     {
       "frameId": 19938,
       "inheritedFields": [
-        "deviceAddress"
+        "deviceAddress",
+        "interval"
       ],
       "interval": 5000,
       "key": "tunnel_4de2_holding",
@@ -3979,6 +4035,7 @@
       "signals": [
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19938,
           "modbusRegisterCount": 1,
@@ -3988,6 +4045,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19939,
           "modbusRegisterCount": 1,
@@ -3997,6 +4055,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19940,
           "modbusRegisterCount": 1,
@@ -4006,6 +4065,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19941,
           "modbusRegisterCount": 1,
@@ -4015,6 +4075,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19942,
           "modbusRegisterCount": 1,
@@ -4024,6 +4085,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19943,
           "modbusRegisterCount": 1,
@@ -4036,7 +4098,8 @@
     {
       "frameId": 19938,
       "inheritedFields": [
-        "deviceAddress"
+        "deviceAddress",
+        "interval"
       ],
       "interval": 5000,
       "key": "tunnel_4de2_input",
@@ -4049,6 +4112,7 @@
       "signals": [
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19938,
           "modbusRegisterCount": 1,
@@ -4058,6 +4122,7 @@
         },
         {
           "bitLength": 16,
+          "confidence": "none",
           "format": "hex",
           "modbusRegister": 19939,
           "modbusRegisterCount": 1,

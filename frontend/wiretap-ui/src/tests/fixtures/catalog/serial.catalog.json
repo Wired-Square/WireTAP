@@ -1,4 +1,11 @@
 {
+  "effectiveDefaults": {
+    "canByteOrder": "little",
+    "modbusByteOrder": "big",
+    "modbusRegisterBase": 0,
+    "modbusWordOrder": "big",
+    "serialByteOrder": "little"
+  },
   "frames": [
     {
       "checksums": [
@@ -73,6 +80,17 @@
         "name": "Page",
         "startBit": 24
       },
+      "protocol": "serial",
+      "signals": []
+    },
+    {
+      "frameId": 4294967295,
+      "key": "heartbeat",
+      "length": 4,
+      "name": "heartbeat",
+      "notes": [
+        "Keyed by a name, not an id"
+      ],
       "protocol": "serial",
       "signals": []
     }

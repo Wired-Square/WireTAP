@@ -7,6 +7,7 @@
 
 import { openCatalogAtPath } from '../apps/catalog/io';
 import { parseCatalog, attachCatalog, catalogPolls, type ModbusPollGroup } from '../api/catalog';
+import { NAME_KEYED_FRAME_ID } from '../generated/wireConstants';
 import type { Confidence, SignalFormat, Endianness } from '../types/catalog';
 import type { MuxDef, MuxCaseDef, SignalDef } from '../types/decoder';
 import type {
@@ -328,7 +329,7 @@ function adaptSerialConfig(c?: SerialConfig): SerialProtocolConfig | null {
 export function catalogToResolved(catalog: Catalog, rawToml: string): ParsedCatalog {
   const frames = new Map<number, ResolvedFrame>();
   for (const f of catalog.frames) {
-    frames.set(f.frameId, adaptFrame(f));
+    if (f.frameId !== NAME_KEYED_FRAME_ID) frames.set(f.frameId, adaptFrame(f));
   }
 
   return {

@@ -1093,20 +1093,24 @@ mod tests {
         tauri::async_runtime::block_on(dispatch_catalog_command(op, params, 0)).expect(op)
     }
 
+    fn assert_serves(toml: &str, served_json: &str) {
+        let served = command("catalog.parse", serde_json::json!({ "content": fixture(toml) }));
+        if std::env::var_os("WRITE_ADAPTER_FIXTURES").is_some() {
+            let pretty = serde_json::to_string_pretty(&served).unwrap() + "\n";
+            std::fs::write(format!("{FIXTURES}/{served_json}"), pretty).unwrap();
+        }
+        let golden: serde_json::Value = serde_json::from_str(&fixture(served_json)).expect("golden json");
+        assert_eq!(served, golden, "{toml}");
+    }
+
     #[test]
     fn catalog_parse_serves_the_dashboard_display_hints_fixture() {
-        let toml = display_hints_fixture("toml");
-        let served = command("catalog.parse", serde_json::json!({ "content": toml }));
-        let golden: serde_json::Value =
-            serde_json::from_str(&display_hints_fixture("catalog.json")).expect("golden json");
-        assert_eq!(served, golden);
+        assert_serves("display-hints.toml", "display-hints.catalog.json");
     }
 
     #[test]
     fn catalog_parse_serves_the_catalogue_model_fixture() {
-        let served = command("catalog.parse", serde_json::json!({ "content": fixture("catalog-model.toml") }));
-        let golden: serde_json::Value = serde_json::from_str(&fixture("catalog-model.catalog.json")).expect("golden json");
-        assert_eq!(served, golden);
+        assert_serves("catalog-model.toml", "catalog-model.catalog.json");
     }
 
     /// The adapters' goldens read these served models, one per protocol.
@@ -1117,13 +1121,7 @@ mod tests {
             ("catalog/modbus.toml", "catalog/modbus.catalog.json"),
             ("catalog/serial.toml", "catalog/serial.catalog.json"),
         ] {
-            let served = command("catalog.parse", serde_json::json!({ "content": fixture(toml) }));
-            if std::env::var_os("WRITE_ADAPTER_FIXTURES").is_some() {
-                let pretty = serde_json::to_string_pretty(&served).unwrap() + "\n";
-                std::fs::write(format!("{FIXTURES}/{served_json}"), pretty).unwrap();
-            }
-            let golden: serde_json::Value = serde_json::from_str(&fixture(served_json)).expect("golden json");
-            assert_eq!(served, golden, "{toml}");
+            assert_serves(toml, served_json);
         }
     }
 
