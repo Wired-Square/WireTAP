@@ -7,7 +7,7 @@ import "../i18n";
 import DecoderFramesView from "../apps/decoder/views/DecoderFramesView";
 import { LRUMap } from "../utils/LRUMap";
 import type { DecodedFrame } from "../stores/decoderStore";
-import type { FrameDetail } from "../types/decoder";
+import type { Frame } from "../types/catalogModel";
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
@@ -16,14 +16,16 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const frame: FrameDetail = {
-  id: 0x005,
-  len: 8,
+const frame: Frame = {
+  key: "0x005",
+  frameId: 0x005,
+  protocol: "can",
+  length: 8,
   mirrorOf: "0x705",
   signals: [
-    { name: "Differs", start_bit: 0, bit_length: 8, _inherited: true },
-    { name: "Agrees", start_bit: 8, bit_length: 8, _inherited: true },
-    { name: "Uncompared", start_bit: 24, bit_length: 8, _inherited: true },
+    { name: "Differs", startBit: 0, bitLength: 8, inherited: true },
+    { name: "Agrees", startBit: 8, bitLength: 8, inherited: true },
+    { name: "Uncompared", startBit: 24, bitLength: 8, inherited: true },
   ],
 };
 
@@ -52,7 +54,7 @@ describe("DecoderFramesView reads Rust's verdicts", () => {
     document.body.appendChild(host);
     root = createRoot(host);
     const decoded = new LRUMap<number, DecodedFrame>(10);
-    decoded.set(frame.id, decodedFrame);
+    decoded.set(frame.frameId, decodedFrame);
     act(() => {
       root.render(
         <DecoderFramesView

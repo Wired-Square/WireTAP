@@ -41,7 +41,7 @@ import {
   type FramingMode,
   type ModbusRangeSpec,
 } from '../api/io';
-import { loadCatalog } from "../utils/catalogParser";
+import { parseCatalogAtPath } from "../api/catalog";
 import type { TimeBounds } from "../components/TimeBoundsInput";
 
 // Import extracted components
@@ -578,12 +578,12 @@ export default function IoSourcePickerDialog({
       return;
     }
     let cancelled = false;
-    loadCatalog(selectedCatalogPath)
-      .then((parsed) => {
+    parseCatalogAtPath(selectedCatalogPath)
+      .then((catalog) => {
         if (cancelled) return;
         // Passed through whole: a catalogue framing no framer implements (COBS,
         // length-prefixed) is refused by the backend rather than dropped here.
-        setCatalogSerialEncoding((parsed.serialConfig?.encoding as FramingMode | undefined) ?? null);
+        setCatalogSerialEncoding((catalog.serial?.encoding as FramingMode | undefined) ?? null);
       })
       .catch(() => { if (!cancelled) setCatalogSerialEncoding(null); });
     return () => { cancelled = true; };

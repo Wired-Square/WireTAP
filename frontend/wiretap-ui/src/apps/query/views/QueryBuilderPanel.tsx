@@ -15,7 +15,8 @@ import {
   type QueryType,
   type SelectedSignal,
 } from "../stores/queryStore";
-import type { ResolvedSignal } from "../../../utils/catalogParser";
+import type { Frame, Signal } from "../../../types/catalogModel";
+import { frameByKey, framesById } from "../../../utils/catalogFrames";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { FrameIdFormat } from "../../../hooks/useSettings";
 import { formatFrameId, formatFrameIdInput, parseFrameId } from "../../../utils/frameIds";
@@ -67,7 +68,7 @@ export default function QueryBuilderPanel({
   const queryType = useQueryStore((s) => s.queryType);
   const queryParams = useQueryStore((s) => s.queryParams);
   const contextWindow = useQueryStore((s) => s.contextWindow);
-  const parsedCatalog = useQueryStore((s) => s.parsedCatalog);
+  const catalog = useQueryStore((s) => s.catalog);
   const selectedSignal = useQueryStore((s) => s.selectedSignal);
 
   // Settings
@@ -86,52 +87,24 @@ export default function QueryBuilderPanel({
     [displayIdFormat]
   );
 
-  // Catalog-derived data: sorted frames list
-  const catalogFrames = useMemo(() => {
-    if (!parsedCatalog?.frames) return [];
-    return Array.from(parsedCatalog.frames.entries())
-      .map(([id, frame]) => ({ id, frame }))
-      .sort((a, b) => a.id - b.id);
-  }, [parsedCatalog]);
+  const catalogFrameMap = useMemo(() => (catalog ? framesById(catalog) : new Map<number, Frame>()), [catalog]);
+  const catalogFrames = useMemo(
+    () => Array.from(catalogFrameMap, ([id, frame]) => ({ id, frame })).sort((a, b) => a.id - b.id),
+    [catalogFrameMap]
+  );
 
-  // Get signals for currently selected frame
-  const currentFrameSignals = useMemo((): ResolvedSignal[] => {
-    if (!parsedCatalog?.frames) return [];
-    const frame = parsedCatalog.frames.get(queryParams.frameId);
-    return frame?.signals ?? [];
-  }, [parsedCatalog, queryParams.frameId]);
+  const currentFrameSignals = useMemo(
+    (): Signal[] => catalogFrameMap.get(queryParams.frameId)?.signals ?? [],
+    [catalogFrameMap, queryParams.frameId]
+  );
 
-  // Whether we have a catalog with frames to pick from
   const hasCatalogFrames = catalogFrames.length > 0;
 
-  // Catalog-derived data: frames with mirrorOf defined (for mirror validation)
-  const mirrorFrames = useMemo(() => {
-    if (!parsedCatalog?.frames) return [];
-    return Array.from(parsedCatalog.frames.entries())
-      .filter(([_, frame]) => frame.mirrorOf)
-      .map(([id, frame]) => ({ id, frame }))
-      .sort((a, b) => a.id - b.id);
-  }, [parsedCatalog]);
+  const mirrorFrames = useMemo(() => catalogFrames.filter(({ frame }) => frame.mirrorOf), [catalogFrames]);
 
-  // Resolve mirrorOf reference to source frame ID
-  const getMirrorSourceId = useCallback(
-    (mirrorOf: string): number | null => {
-      if (!parsedCatalog?.frames) return null;
-      // mirrorOf is a string like "0x123" or "Engine_Status" - try to find it
-      for (const [id, frame] of parsedCatalog.frames.entries()) {
-        // Check if mirrorOf matches the frame ID in hex
-        if (mirrorOf.toLowerCase() === `0x${id.toString(16).toLowerCase()}`) {
-          return id;
-        }
-        // Check if mirrorOf matches transmitter name
-        if (frame.transmitter && mirrorOf.toLowerCase() === frame.transmitter.toLowerCase()) {
-          return id;
-        }
-      }
-      // Try parsing as numeric
-      return parseFrameId(mirrorOf, "auto");
-    },
-    [parsedCatalog]
+  const mirrorSource = useCallback(
+    (frame: Frame): Frame | undefined => (frame.mirrorOf ? frameByKey(catalog, frame.protocol, frame.mirrorOf) : undefined),
+    [catalog]
   );
 
   // Frame ID text inputs (allow free typing; re-format on store/format change).
@@ -233,15 +206,13 @@ export default function QueryBuilderPanel({
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const frameId = parseInt(e.target.value, 10);
       if (!isNaN(frameId)) {
-        // Get the frame's isExtended value from the catalog
-        const frame = parsedCatalog?.frames.get(frameId);
-        const isExtended = frame?.isExtended ?? false;
+        const isExtended = catalogFrameMap.get(frameId)?.isExtended ?? false;
         updateQueryParams({ frameId, isExtended });
         setSelectedSignal(null); // Clear signal when frame changes
         setFrameIdText(formatFrameIdInput(frameId, displayIdFormat));
       }
     },
-    [updateQueryParams, setSelectedSignal, parsedCatalog, displayIdFormat, setFrameIdText]
+    [updateQueryParams, setSelectedSignal, catalogFrameMap, displayIdFormat, setFrameIdText]
   );
 
   // Handle catalog signal selection
@@ -253,13 +224,13 @@ export default function QueryBuilderPanel({
         return;
       }
       const signal = currentFrameSignals.find((s) => s.name === signalName);
-      if (signal && signal.start_bit !== undefined && signal.bit_length !== undefined) {
+      if (signal && signal.startBit !== undefined && signal.bitLength !== undefined) {
         const newSignal: SelectedSignal = {
           frameId: queryParams.frameId,
           signalName: signal.name ?? signalName,
-          startBit: signal.start_bit,
-          bitLength: signal.bit_length,
-          byteIndex: Math.floor(signal.start_bit / 8),
+          startBit: signal.startBit,
+          bitLength: signal.bitLength,
+          byteIndex: Math.floor(signal.startBit / 8),
         };
         setSelectedSignal(newSignal);
       }
@@ -273,13 +244,8 @@ export default function QueryBuilderPanel({
       const mirrorFrameId = parseInt(e.target.value, 10);
       if (isNaN(mirrorFrameId)) return;
 
-      // Find the frame and resolve its mirrorOf to get the source
-      const mirrorEntry = mirrorFrames.find((mf) => mf.id === mirrorFrameId);
-      const mirrorOf = mirrorEntry?.frame.mirrorOf;
-      const sourceFrameId = mirrorOf ? getMirrorSourceId(mirrorOf) : null;
-
-      // Get the frame's isExtended value from the catalog
-      const frame = parsedCatalog?.frames.get(mirrorFrameId);
+      const frame = catalogFrameMap.get(mirrorFrameId);
+      const sourceFrameId = frame ? mirrorSource(frame)?.frameId ?? null : null;
       const isExtended = frame?.isExtended ?? false;
 
       updateQueryParams({
@@ -292,7 +258,7 @@ export default function QueryBuilderPanel({
         setSourceFrameIdText(formatFrameIdInput(sourceFrameId, displayIdFormat));
       }
     },
-    [mirrorFrames, getMirrorSourceId, updateQueryParams, parsedCatalog, displayIdFormat, setMirrorFrameIdText, setSourceFrameIdText]
+    [catalogFrameMap, mirrorSource, updateQueryParams, displayIdFormat, setMirrorFrameIdText, setSourceFrameIdText]
   );
 
   // Handle tolerance change
@@ -725,12 +691,12 @@ ORDER BY id, extended`;
           >
             <option value="">{t("builder.selectSignalOrByte")}</option>
             {currentFrameSignals
-              .filter((s) => s.name && s.start_bit !== undefined)
+              .filter((s) => s.name && s.startBit !== undefined)
               .map((signal) => (
                 <option key={signal.name} value={signal.name}>
                   {signal.name}
                   {signal.unit ? ` (${signal.unit})` : ""}
-                  {t("builder.signalOption", { byte: Math.floor((signal.start_bit ?? 0) / 8) })}
+                  {t("builder.signalOption", { byte: Math.floor((signal.startBit ?? 0) / 8) })}
                 </option>
               ))}
           </Select>
@@ -895,11 +861,9 @@ ORDER BY id, extended`;
                 >
                   <option value={0}>{t("builder.selectMirror")}</option>
                   {mirrorFrames.map(({ id, frame }) => {
-                    // Resolve source frame info for display
-                    const sourceId = frame.mirrorOf ? getMirrorSourceId(frame.mirrorOf) : null;
-                    const sourceFrame = sourceId !== null ? parsedCatalog?.frames.get(sourceId) : null;
-                    const sourceInfo = sourceId !== null
-                      ? ` → ${fmtId(sourceId, sourceFrame?.isExtended)}${sourceFrame?.transmitter ? ` — ${sourceFrame.transmitter}` : ""}`
+                    const source = mirrorSource(frame);
+                    const sourceInfo = source
+                      ? ` → ${fmtId(source.frameId, source.isExtended)}${source.transmitter ? ` — ${source.transmitter}` : ""}`
                       : "";
                     return (
                       <option key={id} value={id}>

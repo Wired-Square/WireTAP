@@ -865,18 +865,17 @@ function DecoderInner() {
   // WebKit to settle before destroying the window.
 
   const frameList = useMemo(
-    () => Array.from(frames.values()).sort((a, b) => a.id - b.id),
+    () => Array.from(frames.values()).sort((a, b) => a.frameId - b.frameId),
     [frames]
   );
 
-  // For FramePickerDialog: convert FrameDetail[] to FrameInfo[] with composite string keys
+  // For FramePickerDialog: FrameInfo[] with composite string keys
   const pickerFrameList = useMemo(
     () => frameList.map((f) => ({
-      id: frameKey(protocol, f.id),
-      len: f.len,
+      id: frameKey(protocol, f.frameId),
+      len: f.length,
       isExtended: f.isExtended,
       bus: f.bus,
-      lenMismatch: f.lenMismatch,
       protocol,
     })),
     [frameList, protocol]

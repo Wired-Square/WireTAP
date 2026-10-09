@@ -25,7 +25,7 @@ import {
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from "../../../api/io";
 import type { CaptureMetadata } from "../../../api/capture";
-import type { FrameDetail } from "../../../types/decoder";
+import type { Frame } from "../../../types/catalogModel";
 import type { LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
 import type { SelectionSet } from "../../../utils/selectionSets";
 
@@ -64,7 +64,7 @@ export interface UseDecoderHandlersParams {
   applySelectionSet: (selectionSet: SelectionSet) => void;
 
   // Store state (decoder) — keyed by composite frame keys (e.g. "can:256")
-  frames: Map<string, FrameDetail>;
+  frames: Map<string, Frame>;
   selectedFrames: Set<string>;
   activeSelectionSetId: string | null;
   selectionSetDirty: boolean;

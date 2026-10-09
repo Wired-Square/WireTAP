@@ -85,18 +85,18 @@ export function getFilteredFrames(): FilteredFrame[] { return _filteredFrames; }
 export function getTunnelTransactions(): TunnelTransaction[] { return _tunnelTransactions; }
 
 import { saveCatalog } from '../api';
-import { framesCatalogOps, type SerialFrameConfig } from '../utils/frameExport';
+import { framesCatalogOps, serialFrameConfigOf, type SerialFrameConfig } from '../utils/frameExport';
 import { withAppError } from '../utils/appError';
 import { formatFrameId } from '../utils/frameIds';
-import type { FrameDetail, SignalDef } from '../types/decoder';
+import type { Catalog, Frame } from '../types/catalogModel';
 import type { DecodedMirrorVerdict, DecodedSignalsEntry, DecodedTunnelMessage } from '../services/wsProtocol';
 import type { ChecksumValidationResult } from '../api/checksums';
 import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
 import type { HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
-import { loadCatalog as loadCatalogFromPath, attachAndResolve, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
 import { subscriberIdFor } from '../utils/subscriberId';
-import { buildCatalog, type ModbusPollGroup } from '../api/catalog';
+import { attachCatalog, buildCatalog, catalogPolls, openCatalog, parseCatalog, type ModbusPollGroup } from '../api/catalog';
+import { framesById } from '../utils/catalogFrames';
 import { frameKey } from '../utils/frameKey';
 
 
@@ -233,7 +233,7 @@ interface DecoderState {
   /** The attached catalogue declares at least one tunnel frame — drives the
    *  Decoder's Modbus tab, which must exist before any message arrives. */
   hasTunnel: boolean;
-  frames: Map<string, FrameDetail>;
+  frames: Map<string, Frame>;
   selectedFrames: Set<string>;
   seenIds: Set<string>;
   /** Protocol type from catalog meta (default_frame) */
@@ -250,8 +250,6 @@ interface DecoderState {
   pollGroups: ModbusPollGroup[];
   /** JSON-serialised poll groups for watchSource; null when no modbus polls. */
   modbusPollsJson: string | null;
-  /** Modbus protocol meta from the catalog (null for non-modbus). */
-  modbusConfig: ModbusProtocolConfig | null;
 
   // Decoding state (actual data lives in module-level mutables — see getters above)
   /** Version counter for decoded data — bumped on every decode batch.
@@ -303,8 +301,8 @@ interface DecoderState {
   loadCatalog: (path: string) => Promise<void>;
   /** Attach to a session for Rust decode AND load the model from that one parse. */
   loadCatalogForSession: (sessionId: string, path: string) => Promise<void>;
-  /** Build the in-memory model from an already-resolved catalogue. */
-  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => void;
+  /** Build the in-memory model from a served catalogue and its Modbus poll groups. */
+  applyCatalog: (catalog: Catalog, pollGroups: ModbusPollGroup[], path: string) => void;
   /** Track the active catalogue path without parsing (mirrors session changes). */
   setCatalogPath: (path: string | null) => void;
 
@@ -372,7 +370,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   mirrorValidation: new Map(),
   pollGroups: [],
   modbusPollsJson: null,
-  modbusConfig: null,
   decodedVersion: 0,
   ioProfile: null,
   showRawBytes: false,
@@ -403,14 +400,17 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   // Catalog actions
   loadCatalog: async (path: string) => {
-    get().applyParsedCatalog(await loadCatalogFromPath(path), path);
+    const content = await openCatalog(path);
+    get().applyCatalog(await parseCatalog(content), await catalogPolls(content), path);
   },
 
   loadCatalogForSession: async (sessionId: string, path: string) => {
     try {
       // catalog.attach binds Rust decode AND returns the resolved catalogue, so
       // the model comes from the same parse.
-      get().applyParsedCatalog(await attachAndResolve(sessionId, path, subscriberIdFor("decoder")), path);
+      const content = await openCatalog(path);
+      const { catalog } = await attachCatalog(sessionId, content, path, subscriberIdFor("decoder"));
+      get().applyCatalog(catalog, await catalogPolls(content), path);
     } catch (e) {
       // If attach fails, still load the model so the UI works without decode.
       tlog.info(`[decoderStore] catalog attach failed, loading model only: ${e}`);
@@ -420,64 +420,17 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   setCatalogPath: (path: string | null) => set({ catalogPath: path }),
 
-  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => {
+  applyCatalog: (catalog: Catalog, pollGroups: ModbusPollGroup[], path: string) => {
     try {
-      // Convert ParsedCatalog to decoder's FrameDetail format
-      // Use composite keys (e.g. "can:256", "modbus:5013")
       const proto = catalog.protocol;
-      const frameMap = new Map<string, FrameDetail>();
-      const seenIds = new Set<string>();
+      const frameMap = new Map<string, Frame>();
+      for (const [id, frame] of framesById(catalog)) frameMap.set(frameKey(proto, id), frame);
+      const seenIds = new Set(frameMap.keys());
       // Whether the Modbus tab exists is a property of the catalogue, not of
       // what has arrived: a tunnel on a quiet bus still gets its (empty) tab,
       // and clearing decoded values does not make the tab vanish underfoot.
-      let hasTunnel = false;
-
-      for (const [id, frame] of catalog.frames) {
-        const fk = frameKey(proto, id);
-        frameMap.set(fk, {
-          id,
-          len: frame.length,
-          isExtended: frame.isExtended,
-          bus: frame.bus,
-          lenMismatch: false,
-          signals: frame.signals as SignalDef[],
-          mux: frame.mux,
-          interval: frame.interval,
-          modbusRegisterType: frame.modbusRegisterType,
-          mirrorOf: frame.mirrorOf,
-          copyFrom: frame.copyFrom,
-        });
-        seenIds.add(fk);
-        if (frame.tunnel) hasTunnel = true;
-      }
-
-      // Convert SerialProtocolConfig to SerialFrameConfig
-      let serialConfig: SerialFrameConfig | null = null;
-      if (catalog.serialConfig) {
-        const sc = catalog.serialConfig;
-        serialConfig = {
-          default_byte_order: sc.default_byte_order,
-          encoding: sc.encoding,
-          frame_id_start_byte: sc.frame_id_start_byte,
-          frame_id_bytes: sc.frame_id_bytes,
-          frame_id_byte_order: sc.frame_id_byte_order,
-          frame_id_mask: sc.frame_id_mask,
-          source_address_start_byte: sc.source_address_start_byte,
-          source_address_bytes: sc.source_address_bytes,
-          source_address_byte_order: sc.source_address_byte_order,
-          min_frame_length: sc.min_frame_length,
-          header_length: sc.header_length,
-          header_fields: sc.header_fields,
-          checksum: sc.checksum ? {
-            algorithm: sc.checksum.algorithm,
-            start_byte: sc.checksum.start_byte,
-            byte_length: sc.checksum.byte_length,
-            calc_start_byte: sc.checksum.calc_start_byte,
-            calc_end_byte: sc.checksum.calc_end_byte ?? -1,
-            big_endian: sc.checksum.big_endian ?? false,
-          } : undefined,
-        };
-      }
+      const hasTunnel = catalog.frames.some((f) => f.tunnel);
+      const serialConfig = catalog.serial ? serialFrameConfigOf(catalog.serial) : null;
 
       // Preserve existing frame selection when reloading catalog
       const { selectedFrames: currentSelected, catalogPath: currentPath } = get();
@@ -504,27 +457,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         newSelected = new Set(Array.from(frameMap.keys()));
       }
 
-      // Apply Modbus default_word_order to signals that don't have an explicit word_order
-      if (catalog.modbusConfig?.default_word_order) {
-        const defaultWo = catalog.modbusConfig.default_word_order;
-        for (const [, frame] of frameMap) {
-          for (const signal of frame.signals) {
-            if (!signal.word_order) signal.word_order = defaultWo;
-          }
-          if (frame.mux) {
-            for (const caseDef of Object.values(frame.mux.cases)) {
-              for (const signal of caseDef.signals) {
-                if (!signal.word_order) signal.word_order = defaultWo;
-              }
-            }
-          }
-        }
-      }
-
-      // Modbus poll groups are built in Rust (`catalog.polls`, surfaced on the
-      // ParsedCatalog) — the single source of truth, shared with the headless
-      // open flow. Empty for non-Modbus catalogues.
-      const pollGroups = catalog.pollGroups;
       const modbusPollsJson = pollGroups.length > 0 ? JSON.stringify(pollGroups) : null;
 
       if (!hasTunnel) _tunnelTransactions = [];
@@ -542,7 +474,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         mirrorValidation: new Map(),
         pollGroups,
         modbusPollsJson,
-        modbusConfig: catalog.modbusConfig,
       });
     } catch (e) {
       tlog.info(`[decoderStore] Failed to load catalog: ${e}`);
@@ -912,7 +843,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
     const selectedFramesList = Array.from(frames.entries())
       .filter(([fk]) => selectedFrames.has(fk))
-      .map(([, f]) => f)
+      .map(([, f]) => ({ id: f.frameId, len: f.length, isExtended: f.isExtended }))
       .sort((a, b) => a.id - b.id);
 
     const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {

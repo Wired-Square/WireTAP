@@ -67,6 +67,10 @@ export async function parseCatalog(content: string): Promise<Catalog> {
   return await wsTransport.command<Catalog>("catalog.parse", { content });
 }
 
+export async function parseCatalogAtPath(path: string): Promise<Catalog> {
+  return parseCatalog(await openCatalog(path));
+}
+
 /** What a bit-layout preview of the item at `path` below the frame shows; null when there is none. */
 export async function frameLayout(content: string, protocol: Protocol, key: string, path: string[]): Promise<FrameLayout | null> {
   return await wsTransport.command<FrameLayout | null>("catalog.frameLayout", { content, protocol, key, path });

@@ -47,7 +47,7 @@ describe("Discovery's Send to Transmit loads the frame as received", () => {
 });
 
 describe("the Decoder's Send to Transmit loads the frame as received", () => {
-  const detail = { id: 0x123, len: 8, signals: [] };
+  const detail = { frameId: 0x123, length: 8 };
   const decoded = (over: Partial<DecodedFrame>): DecodedFrame => ({
     signals: [],
     rawBytes: Array(8).fill(0x11),
@@ -77,7 +77,7 @@ describe("the Decoder's Send to Transmit loads the frame as received", () => {
   });
 
   it("a decoded frame is sent with its received id, not the catalogue's masked one", () => {
-    const masked = { id: 0x18ef0000, len: 8, signals: [], isExtended: true };
+    const masked = { frameId: 0x18ef0000, length: 8, isExtended: true };
     editor().updateCanEditor(canEditorFromDecoded(masked, decoded({ frameId: 0x18ef0042, isExtended: true })));
     expect(editor().buildCanFrame()).toMatchObject({ frame_id: 0x18ef0042 });
   });

@@ -1,12 +1,13 @@
 import type { CanEditorState } from "../../stores/transmitStore";
 import type { DecodedFrame, UnmatchedFrame } from "../../stores/decoderStore";
-import type { FrameDetail } from "../../types/decoder";
+import type { Frame } from "../../types/catalogModel";
+import { formatFrameIdInput } from "../../utils/frameIds";
 
 /** The Transmit editor loaded with a decoded frame, as received. */
-export function canEditorFromDecoded(frame: FrameDetail, decoded: DecodedFrame | undefined): Partial<CanEditorState> {
+export function canEditorFromDecoded(frame: Pick<Frame, "frameId" | "length" | "isExtended" | "bus">, decoded: DecodedFrame | undefined): Partial<CanEditorState> {
   return {
-    frameId: (decoded?.frameId ?? frame.id).toString(16).toUpperCase(),
-    dlc: decoded?.dlc ?? frame.len,
+    frameId: formatFrameIdInput(decoded?.frameId ?? frame.frameId),
+    dlc: decoded?.dlc ?? frame.length,
     data: [...(decoded?.rawBytes ?? [])],
     isExtended: decoded?.isExtended ?? frame.isExtended ?? false,
     isFd: decoded?.isFd ?? false,
@@ -18,7 +19,7 @@ export function canEditorFromDecoded(frame: FrameDetail, decoded: DecodedFrame |
 /** The Transmit editor loaded with an unmatched frame, as received. */
 export function canEditorFromUnmatched(frame: UnmatchedFrame): Partial<CanEditorState> {
   return {
-    frameId: frame.frameId.toString(16).toUpperCase(),
+    frameId: formatFrameIdInput(frame.frameId),
     dlc: frame.dlc ?? frame.bytes.length,
     data: [...frame.bytes],
     isExtended: frame.isExtended ?? false,

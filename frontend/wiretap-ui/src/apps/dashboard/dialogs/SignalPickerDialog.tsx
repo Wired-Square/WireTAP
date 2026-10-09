@@ -8,7 +8,7 @@ import { textSecondary, hoverLight } from "../../../styles";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
-import { getAllFrameSignals } from "../../../utils/frameSignals";
+import { allFrameSignals } from "../../../utils/catalogFrames";
 import { SecondaryButton, PrimaryButton, Input } from "../../../components/forms";
 import { Listbox, Option } from "../../../components/Listbox";
 
@@ -82,7 +82,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     const all = Array.from(frames.entries()).sort(([a], [b]) => a - b);
     if (!needle) return all;
     return all.filter(([, frame]) =>
-      getAllFrameSignals(frame).some(
+      allFrameSignals(frame).some(
         (s) => s.name && s.name.toLowerCase().includes(needle),
       ),
     );
@@ -230,7 +230,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
             <div className="py-1">
               {sortedFrames.map(([frameId, frame]) => {
                 const isExpanded = expandedFrames.has(frameId) || !!needle;
-                const allNumeric = getAllFrameSignals(frame).filter(
+                const allNumeric = allFrameSignals(frame).filter(
                   (s) => s.name && s.format !== "ascii" && s.format !== "utf8" && s.format !== "hex",
                 );
                 const numericSignals = needle

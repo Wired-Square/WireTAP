@@ -2,7 +2,7 @@
 
 import type { ByteSpan } from '../generated/ByteSpan';
 import type { EditOp, HeaderField, SerialConfigFields } from '../types/catalogEdit';
-import type { Endianness, Protocol } from '../types/catalogModel';
+import type { Endianness, Protocol, SerialConfig } from '../types/catalogModel';
 
 export type ExportMeta = {
   name: string;
@@ -77,6 +77,39 @@ export type SerialFrameConfig = {
   /** All header field definitions from [meta.serial.fields] */
   header_fields?: SerialHeaderFieldDef[];
 };
+
+/** The served serial config in the framing shape sessions and Discovery share. */
+export function serialFrameConfigOf(c: SerialConfig): SerialFrameConfig {
+  return {
+    default_byte_order: c.byteOrder,
+    encoding: c.encoding,
+    frame_id_start_byte: c.frameIdStartByte,
+    frame_id_bytes: c.frameIdBytes,
+    frame_id_byte_order: c.frameIdByteOrder,
+    frame_id_mask: c.frameIdMask,
+    source_address_start_byte: c.sourceAddressStartByte,
+    source_address_bytes: c.sourceAddressBytes,
+    source_address_byte_order: c.sourceAddressByteOrder,
+    min_frame_length: c.minFrameLength,
+    header_length: c.headerLength,
+    header_fields: c.headerFields?.map((h) => ({
+      name: h.name,
+      mask: h.mask,
+      byte_order: h.byteOrder,
+      format: h.format === 'decimal' ? 'decimal' : 'hex',
+      start_byte: h.startByte,
+      bytes: h.bytes,
+    })),
+    checksum: c.checksum && {
+      algorithm: c.checksum.algorithm,
+      start_byte: c.checksum.startByte,
+      byte_length: c.checksum.byteLength,
+      calc_start_byte: c.checksum.calcStartByte,
+      calc_end_byte: c.checksum.calcEndByte ?? -1,
+      big_endian: c.checksum.bigEndian,
+    },
+  };
+}
 
 export type ExportFrame = {
   id: number;

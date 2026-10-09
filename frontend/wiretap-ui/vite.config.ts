@@ -58,9 +58,6 @@ export default defineConfig(async () => ({
           if (id.includes('node_modules/zustand/')) {
             return 'vendor-zustand';
           }
-          if (id.includes('node_modules/smol-toml/')) {
-            return 'vendor-toml';
-          }
           if (id.includes('node_modules/@sentry/')) {
             return 'vendor-sentry';
           }

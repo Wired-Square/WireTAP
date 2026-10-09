@@ -43,7 +43,7 @@ import {
 } from "../../../api/capturequery";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
-import type { ParsedCatalog } from "../../../utils/catalogParser";
+import type { Catalog } from "../../../types/catalogModel";
 
 export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult, InventoryRow };
 
@@ -313,7 +313,7 @@ interface QueryState {
 
   // Catalog state
   catalogPath: string | null;
-  parsedCatalog: ParsedCatalog | null;
+  catalog: Catalog | null;
   selectedSignal: SelectedSignal | null;
 
   // Database activity state (Stats tab)
@@ -346,7 +346,7 @@ interface QueryState {
 
   // Catalog actions
   setCatalogPath: (path: string | null) => void;
-  setParsedCatalog: (catalog: ParsedCatalog | null) => void;
+  setCatalog: (catalog: Catalog | null) => void;
   setSelectedSignal: (signal: SelectedSignal | null) => void;
 
   // Activity actions (Stats tab)
@@ -394,7 +394,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
   // Catalog state
   catalogPath: null,
-  parsedCatalog: null,
+  catalog: null,
   selectedSignal: null,
 
   // Activity state (Stats tab)
@@ -450,7 +450,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       queue: [],
       selectedQueryId: null,
       catalogPath: null,
-      parsedCatalog: null,
+      catalog: null,
       selectedSignal: null,
     }),
 
@@ -916,8 +916,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     set({ catalogPath: path });
   },
 
-  setParsedCatalog: (catalog: ParsedCatalog | null) => {
-    set({ parsedCatalog: catalog, selectedSignal: null });
+  setCatalog: (catalog: Catalog | null) => {
+    set({ catalog, selectedSignal: null });
   },
 
   setSelectedSignal: (signal: SelectedSignal | null) => {
