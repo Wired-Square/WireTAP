@@ -11,7 +11,7 @@
 // so selection, find, frame grouping, the edit views and the comment-preserving
 // `catalog.edit` ops (which target the TOML document by path) keep working.
 
-import { isMuxCaseKey, sortMuxCaseKeys } from "../../../utils/muxCaseMatch";
+import { sortMuxCaseKeys } from "../../../utils/muxCaseMatch";
 import type {
   Catalog,
   Frame,
@@ -121,7 +121,7 @@ function signalNode(s: Signal, idx: number, framePath: string[], prefix: string[
 /** Build a mux node and its case/nested-mux subtree at `muxPath` under the frame. */
 function muxNode(m: Mux, framePath: string[], muxPath: string[]): TomlNode {
   const caseNodes: TomlNode[] = [];
-  const orderedKeys = sortMuxCaseKeys(Object.keys(m.cases).filter(isMuxCaseKey));
+  const orderedKeys = sortMuxCaseKeys(Object.keys(m.cases));
   for (const k of orderedKeys) {
     const c: MuxCase = m.cases[k];
     const caseChildren: TomlNode[] = c.signals.map((s, idx) =>
