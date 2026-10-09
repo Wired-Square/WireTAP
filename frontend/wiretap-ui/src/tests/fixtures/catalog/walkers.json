@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "name": "mux case key order",
+      "input": [
+        "10",
+        "2",
+        "0-3",
+        "1,2",
+        "abc",
+        "-1",
+        "B",
+        "a",
+        "0x10",
+        "2-5"
+      ],
+      "expected": [
+        "-1",
+        "0-3",
+        "0x10",
+        "1,2",
+        "2",
+        "2-5",
+        "10",
+        "a",
+        "abc",
+        "B"
+      ]
+    },
+    {
+      "name": "id parsing and the editor's id formatting",
+      "input": [
+        "0x7FF",
+        "0x800",
+        "0x1FFFFFFF",
+        "2047",
+        " 256 ",
+        "0X10",
+        "-1",
+        "status",
+        "",
+        "1e3"
+      ],
+      "expected": [
+        {
+          "number": 2047,
+          "hex": {
+            "primary": "7FF",
+            "secondary": "2047"
+          },
+          "decimal": {
+            "primary": "2047",
+            "secondary": "7FF"
+          }
+        },
+        {
+          "number": 2048,
+          "hex": {
+            "primary": "00000800",
+            "secondary": "2048"
+          },
+          "decimal": {
+            "primary": "2048",
+            "secondary": "00000800"
+          }
+        },
+        {
+          "number": 536870911,
+          "hex": {
+            "primary": "1FFFFFFF",
+            "secondary": "536870911"
+          },
+          "decimal": {
+            "primary": "536870911",
+            "secondary": "1FFFFFFF"
+          }
+        },
+        {
+          "number": 2047,
+          "hex": {
+            "primary": "7FF",
+            "secondary": "2047"
+          },
+          "decimal": {
+            "primary": "2047",
+            "secondary": "7FF"
+          }
+        },
+        {
+          "number": 256,
+          "hex": {
+            "primary": "100",
+            "secondary": "256"
+          },
+          "decimal": {
+            "primary": "256",
+            "secondary": "100"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "0X10"
+          },
+          "decimal": {
+            "primary": "0X10"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "-1"
+          },
+          "decimal": {
+            "primary": "-1"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "status"
+          },
+          "decimal": {
+            "primary": "status"
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": ""
+          },
+          "decimal": {
+            "primary": ""
+          }
+        },
+        {
+          "number": null,
+          "hex": {
+            "primary": "1e3"
+          },
+          "decimal": {
+            "primary": "1e3"
+          }
+        }
+      ]
+    }
+  ]
+}

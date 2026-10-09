@@ -196,6 +196,22 @@ mod tests {
         }
     }
 
+    /// The table the generated `CHECKSUM_OUTPUT_BYTES` is checked against.
+    #[test]
+    fn algorithm_widths_match_the_rule_table() {
+        let table: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../frontend/wiretap-ui/src/tests/fixtures/catalog/checksumAlgorithms.json"
+        ))
+        .expect("table");
+        let rows = table["algorithms"].as_array().expect("algorithms");
+        let ids: Vec<&str> = rows.iter().map(|row| row["id"].as_str().expect("id")).collect();
+        assert_eq!(ids, wiretap_checksum::all_algorithm_ids());
+        for (id, row) in ids.iter().zip(rows) {
+            let width = ChecksumAlgorithm::from_str(id).ok().map(|a| a.output_bytes() as u64);
+            assert_eq!(width, row["bytes"].as_u64(), "{id}");
+        }
+    }
+
     #[test]
     fn an_unknown_algorithm_name_is_an_error_not_a_default() {
         assert!(calculate_checksum_cmd("nope".into(), vec![1, 2], 0, -1).is_err());

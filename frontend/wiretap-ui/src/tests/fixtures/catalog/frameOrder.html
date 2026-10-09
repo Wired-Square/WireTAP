@@ -1,0 +1,137 @@
+<h1>Frame Order Report</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Frames analysed</th><td>364</td></tr>
+<tr><th>Distinct frames</th><td>6</td></tr>
+<tr><th>Time span</th><td>4.0 s</td></tr>
+<tr><th>Cycle patterns</th><td>3</td></tr>
+<tr><th>Multi-bus frames</th><td>1</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>CAN · bus 0 (204 frames)</h2>
+<section class="level-3">
+<h3>Cycle patterns</h3>
+<table>
+<thead><tr><th>#</th><th>Start</th><th>Sequence</th><th>Occurrences</th><th>Confidence</th><th>Cycle</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>0x300</code></td><td><code>0x300 → 0x100 → 0x200 → 0x18FF0001</code></td><td>4</td><td>100%</td><td>1.0 s</td></tr>
+<tr><td>2</td><td><code>0x100</code></td><td><code>0x100 → 0x200 → 0x18FF0001</code></td><td>40</td><td>100%</td><td>100.0 ms</td></tr>
+<tr><td>3</td><td><code>0x18FF0001</code></td><td><code>0x18FF0001 → 0x100 → 0x200</code></td><td>39</td><td>90%</td><td>100.0 ms</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Multiplexed frames</h3>
+<table>
+<thead><tr><th>Frame</th><th>Selector</th><th>Cases</th><th>Mux period</th><th>Inter-message</th></tr></thead>
+<tbody>
+<tr><td><code>0x18FF0001</code></td><td><code>byte[0]</code></td><td>1, 2, 3</td><td>100.0 ms</td><td>10.0 ms</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Repetition groups</h3>
+<table>
+<thead><tr><th>Interval</th><th>Frames</th><th>Ids</th></tr></thead>
+<tbody>
+<tr><td>~100.0 ms</td><td>3</td><td><code>0x100, 0x200, 0x18FF0001</code></td></tr>
+<tr><td>~1.0 s</td><td>1</td><td><code>0x300</code></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Start candidates</h3>
+<table>
+<thead><tr><th>Frame</th><th>Max gap</th><th>Avg gap</th><th>Min gap</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td><code>0x100</code></td><td>70.0 ms</td><td>66.9 ms</td><td>40.0 ms</td><td>40</td></tr>
+<tr><td><code>0x300</code></td><td>30.0 ms</td><td>30.0 ms</td><td>30.0 ms</td><td>4</td></tr>
+<tr><td><code>0x18FF0001</code></td><td>10.0 ms</td><td>9.7 ms</td><td>9.0 ms</td><td>120</td></tr>
+<tr><td><code>0x200</code></td><td>1.0 ms</td><td>1.0 ms</td><td>1.0 ms</td><td>40</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+<section class="level-2">
+<h2>CAN · bus 1 (80 frames)</h2>
+<section class="level-3">
+<h3>Bursts</h3>
+<table>
+<thead><tr><th>Frame</th><th>Lengths</th><th>Frames per burst</th><th>Cycle</th><th>Flags</th></tr></thead>
+<tbody>
+<tr><td><code>0x300</code></td><td>2, 3</td><td>~2.0</td><td>100.0 ms</td><td>variable length, burst pattern, request/response</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Repetition groups</h3>
+<table>
+<thead><tr><th>Interval</th><th>Frames</th><th>Ids</th></tr></thead>
+<tbody>
+<tr><td>~100.0 ms</td><td>1</td><td><code>0x300</code></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Start candidates</h3>
+<table>
+<thead><tr><th>Frame</th><th>Max gap</th><th>Avg gap</th><th>Min gap</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td><code>0x300</code></td><td>98.0 ms</td><td>49.4 ms</td><td>2.0 ms</td><td>80</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+<section class="level-2">
+<h2>Modbus · bus 0 (40 frames)</h2>
+<section class="level-3">
+<h3>Repetition groups</h3>
+<table>
+<thead><tr><th>Interval</th><th>Frames</th><th>Ids</th></tr></thead>
+<tbody>
+<tr><td>~100.0 ms</td><td>1</td><td><code>40001</code></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Start candidates</h3>
+<table>
+<thead><tr><th>Frame</th><th>Max gap</th><th>Avg gap</th><th>Min gap</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td><code>40001</code></td><td>100.0 ms</td><td>100.0 ms</td><td>100.0 ms</td><td>40</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+<section class="level-2">
+<h2>Serial · bus 0 (40 frames)</h2>
+<section class="level-3">
+<h3>Repetition groups</h3>
+<table>
+<thead><tr><th>Interval</th><th>Frames</th><th>Ids</th></tr></thead>
+<tbody>
+<tr><td>~100.0 ms</td><td>1</td><td><code>0x10</code></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Start candidates</h3>
+<table>
+<thead><tr><th>Frame</th><th>Max gap</th><th>Avg gap</th><th>Min gap</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td><code>0x10</code></td><td>100.0 ms</td><td>100.0 ms</td><td>100.0 ms</td><td>40</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+<section class="level-2">
+<h2>Multi-bus frames</h2>
+<table>
+<thead><tr><th>Frame</th><th>Frames per bus</th></tr></thead>
+<tbody>
+<tr><td><code>0x300</code></td><td>bus 0: 4, bus 1: 80</td></tr>
+</tbody>
+</table>
+</section>

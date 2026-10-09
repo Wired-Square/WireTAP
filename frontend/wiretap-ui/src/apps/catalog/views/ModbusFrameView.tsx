@@ -19,15 +19,17 @@ export default function ModbusFrameView({
   onDeleteFrame,
 }: ModbusFrameViewProps) {
   const { t } = useTranslation("catalog");
-  const registerNumber = selectedNode.metadata?.registerNumber;
-  const deviceAddress = selectedNode.metadata?.deviceAddress;
-  const deviceAddressInherited = selectedNode.metadata?.deviceAddressInherited;
-  const registerType = selectedNode.metadata?.registerType ?? "holding";
-  const length = selectedNode.metadata?.length;
-  const slave = selectedNode.metadata?.node;
-  const interval = selectedNode.metadata?.interval;
-  const intervalInherited = selectedNode.metadata?.intervalInherited;
-  const notes = selectedNode.metadata?.notes;
+  const frame = selectedNode.metadata!.frame!;
+  const inherited = new Set(frame.inheritedFields ?? []);
+  const registerNumber = frame.frameId;
+  const deviceAddress = frame.modbusDeviceAddress;
+  const deviceAddressInherited = inherited.has("deviceAddress");
+  const registerType = frame.modbusRegisterType ?? "holding";
+  const length = frame.modbusRegisterCount;
+  const slave = frame.modbusNode;
+  const interval = frame.interval;
+  const intervalInherited = inherited.has("interval");
+  const notes = frame.notes ?? [];
 
   return (
     <div className="space-y-6">
@@ -132,13 +134,13 @@ export default function ModbusFrameView({
       </div>
 
       {/* Notes */}
-      {notes && (
+      {notes.length > 0 && (
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
             {t("modbusFrame.notes")}
           </div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
-            {Array.isArray(notes) ? notes.join("\n") : notes}
+            {notes.join("\n")}
           </div>
         </div>
       )}

@@ -212,8 +212,7 @@
     },
     "meta": {
       "title": "Meta (for [meta] section)",
-      "notDetermined": "not determined",
-      "basedOnGroup": "Based on largest repetition period group ({{count}} frames)"
+      "notDetermined": "not determined"
     },
     "frames": {
       "title": "Frames",

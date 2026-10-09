@@ -19,7 +19,7 @@ use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::{json, Value};
 use wslib_ai_mcp::dom::{self, DomBridge};
-use wslib_ai_mcp::result::{internal_error as err, ok_json};
+use wslib_ai_mcp::result::{internal_error as err, ok_json, ok_text};
 use wslib_ai_mcp::rmcp;
 use wslib_ai_mcp::router::{compose, mark_read_only};
 use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
@@ -111,6 +111,26 @@ fn resolve_catalog_path(
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();
     Ok((path, exists))
+}
+
+/// The text a catalogue write saves: `content` as given, or `ops` applied to `base`.
+fn catalog_text(
+    base: impl FnOnce() -> Result<String, String>,
+    content: Option<String>,
+    ops: Option<Vec<serde_json::Value>>,
+) -> Result<String, String> {
+    match (content, ops) {
+        (Some(content), None) => Ok(content),
+        (None, Some(ops)) => {
+            let ops: Vec<wiretap_catalog::edit::EditOp> = ops
+                .into_iter()
+                .map(serde_json::from_value)
+                .collect::<Result<_, _>>()
+                .map_err(|e| format!("invalid edit op: {e}"))?;
+            wiretap_catalog::edit::apply_edits(&base()?, &ops)
+        }
+        _ => Err("give either content or ops".to_string()),
+    }
 }
 
 /// Validate catalog TOML; on findings, return an error embedding them (no write).
@@ -650,6 +670,17 @@ impl WireTapTools {
         )
     }
 
+    #[tool(description = "Describe a decoder catalog in Markdown: its counts, byte orders and every protocol's frames with their signals and mux cases — the catalogue report the Catalog Editor exports. Name as for read_catalog.")]
+    async fn describe_catalog(
+        &self,
+        Parameters(p): Parameters<ReadCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let cat = crate::catalog::find_catalog(&self.app, &p.name).await.map_err(err)?;
+        let toml = crate::catalog::open_catalog(cat.path).await.map_err(err)?;
+        let markdown = crate::report::catalog::render(&toml, crate::report::ReportFormat::Markdown).map_err(err)?;
+        Ok(ok_text(markdown))
+    }
+
     #[tool(description = "Validate catalog TOML without writing it. Returns { valid, errors: [{field, message}] } — a dry run for create_catalog/update_catalog.")]
     async fn validate_catalog(
         &self,
@@ -700,6 +731,27 @@ impl WireTapTools {
             "frames": changes.frames,
             "mirrors": changes.mirrors,
         }))
+    }
+
+    #[tool(description = "Describe a session's frame capture in Markdown: the Payload Changes report (byte roles, patterns, mux cases, mirrors, bursts, notes) then the Frame Order report (cycles, mux and burst timing, repetition groups per protocol and bus) — the reports Discovery exports. frame_ids and newest as for get_discovery_analysis; without frame_ids the first 64 frames are profiled.")]
+    async fn describe_capture_analysis(
+        &self,
+        Parameters(p): Parameters<SessionAnalysisParams>,
+    ) -> Result<CallToolResult, McpError> {
+        use crate::report::ReportFormat::Markdown;
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let groups = frame_key_groups(p.frame_ids).map_err(err)?;
+        let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
+        let selection = FrameSelection::from_groups(groups.clone());
+        let newest = Some(analysis_window(p.newest));
+        let source = Capture(&capture_id);
+        let changes = crate::byte_roles::payload_changes(&source, groups, newest, max_frames).await.map_err(err)?;
+        let orders = crate::analysis::message_order(&source, &selection, newest, None).await.map_err(err)?;
+        Ok(ok_text(format!(
+            "{}\n{}",
+            crate::report::changes::report(&changes).render(Markdown),
+            crate::report::order::report(&orders).render(Markdown)
+        )))
     }
 
     #[tool(description = "Message order of a session's frame capture, per protocol and per bus: interval groups, start-id candidates, cycle patterns (the order frames follow a start id), mux and burst timing, and the ids seen on more than one bus. The same answer as Discovery's Frame Order. Headless. Optional frame_ids (\"can:256\") restrict it, newest sets how many of the capture's newest frames are read (default 100000, Discovery's default live window; pass a larger value to read more of a long capture), and start_frame_id (with start_is_extended, and start_protocol to name one protocol) walks cycles from that id.")]
@@ -1451,7 +1503,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_write_router)]
 impl WireTapTools {
     #[tool(
-        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Requires the catalog-write MCP permission.",
+        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which build it from nothing and apply the catalogue's authoring rules. Requires the catalog-write MCP permission.",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
     )]
     async fn create_catalog(
@@ -1465,8 +1517,9 @@ impl WireTapTools {
                 p.filename
             )));
         }
-        validate_or_reject(&p.content)?;
-        crate::catalog::save_catalog(self.app.clone(), path.to_string_lossy().into_owned(), p.content)
+        let content = catalog_text(|| Ok(String::new()), p.content, p.ops).map_err(err)?;
+        validate_or_reject(&content)?;
+        crate::catalog::save_catalog(self.app.clone(), path.to_string_lossy().into_owned(), content)
             .await
             .map_err(err)?;
         ok_json(json!({ "created": true, "path": path.to_string_lossy() }))
@@ -1519,7 +1572,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_modify_router)]
 impl WireTapTools {
     #[tool(
-        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Requires the catalog-modify MCP permission.",
+        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which edit the file in place, keeping its comments, and apply the catalogue's authoring rules. Requires the catalog-modify MCP permission.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
     async fn update_catalog(
@@ -1529,8 +1582,10 @@ impl WireTapTools {
         let cat = crate::catalog::find_catalog(&self.app, &p.filename)
             .await
             .map_err(err)?;
-        validate_or_reject(&p.content)?;
-        crate::catalog::save_catalog(self.app.clone(), cat.path.clone(), p.content).await.map_err(err)?;
+        let on_disk = || std::fs::read_to_string(&cat.path).map_err(|e| format!("Failed to read catalog: {e}"));
+        let content = catalog_text(on_disk, p.content, p.ops).map_err(err)?;
+        validate_or_reject(&content)?;
+        crate::catalog::save_catalog(self.app.clone(), cat.path.clone(), content).await.map_err(err)?;
         ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
     }
 }
@@ -1628,7 +1683,7 @@ fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOSt
 
 #[cfg(test)]
 mod tests {
-    use super::{analysis_window, modbus_write_json, parse_frame_key, scan_status};
+    use super::{analysis_window, catalog_text, modbus_write_json, parse_frame_key, scan_status};
     use crate::io::IOState;
     use std::time::Duration;
     use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
@@ -1637,6 +1692,21 @@ mod tests {
     fn an_analysis_reads_discoverys_default_window_unless_told_otherwise() {
         assert_eq!(analysis_window(None), 100_000);
         assert_eq!(analysis_window(Some(5_000_000)), 5_000_000);
+    }
+
+    #[test]
+    fn a_catalogue_write_takes_content_or_ops_applied_to_its_base() {
+        let base = || Ok("[meta]\nname = \"d\"\nversion = 1\n".to_string());
+        assert_eq!(catalog_text(base, Some("x".into()), None).unwrap(), "x");
+        let ops = vec![serde_json::json!({ "op": "AddFrame", "protocol": "modbus", "key": "5000", "frame": { "length": 2 } })];
+        let text = catalog_text(base, None, Some(ops)).unwrap();
+        assert!(text.starts_with("[meta]"), "{text}");
+        let catalog = wiretap_catalog::Catalog::parse(&text).unwrap();
+        let frame = catalog.frame_by_key(wiretap_catalog::Protocol::Modbus, "5000").unwrap();
+        assert_eq!((frame.modbus_register_count, frame.signals.len()), (Some(2), 1));
+        assert!(catalog_text(base, None, None).is_err());
+        assert!(catalog_text(base, Some("x".into()), Some(vec![])).is_err());
+        assert!(catalog_text(base, None, Some(vec![serde_json::json!({ "op": "Nope" })])).is_err());
     }
 
     #[test]

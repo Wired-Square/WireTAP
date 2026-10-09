@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use wiretap_analysis::hypothesis::{rank_fields, Candidate, CandidateReason, Sweep};
-use wiretap_decode::{Endianness, PayloadField, ScaledField};
+use wiretap_decode::{parse_byte_name, Endianness, PayloadField, ScaledField};
 
 use crate::io::FrameMessage;
 
@@ -20,23 +20,6 @@ use crate::io::FrameMessage;
 const MAX_CANDIDATES: usize = 500;
 
 // ── Names ────────────────────────────────────────────────────────────────────
-
-/// The field a `byte[i]` or `byte_<offset>_<bits>b_<le|be>` name reads.
-fn parse_byte_name(name: &str) -> Option<PayloadField> {
-    if let Some(index) = name.strip_prefix("byte[").and_then(|s| s.strip_suffix(']')) {
-        return Some(PayloadField::bytes(index.parse().ok()?, 1, Endianness::Little));
-    }
-    let mut parts = name.strip_prefix("byte_")?.split('_');
-    let offset = parts.next()?.parse().ok()?;
-    let bits: u32 = parts.next()?.strip_suffix('b')?.parse().ok()?;
-    let endianness = match parts.next()? {
-        "le" => Endianness::Little,
-        "be" => Endianness::Big,
-        _ => return None,
-    };
-    (parts.next().is_none() && bits.is_multiple_of(8) && (8..=64).contains(&bits))
-        .then(|| PayloadField::bytes(offset, bits / 8, endianness))
-}
 
 /// `hyp_<idHex>_b<start>_<len><le|be>[s]`. Its scaling is saved beside it.
 fn hypothesis_name(frame_id: u32, field: &PayloadField) -> String {
@@ -485,13 +468,9 @@ mod tests {
     }
 
     #[test]
-    fn byte_names_parse_and_others_do_not() {
+    fn saved_byte_names_still_parse() {
         assert_eq!(parse_byte_name("byte[3]"), Some(PayloadField::bytes(3, 1, Endianness::Little)));
         assert_eq!(parse_byte_name("byte_2_16b_be"), Some(PayloadField::bytes(2, 2, Endianness::Big)));
-        assert_eq!(parse_byte_name("byte_0_32b_le"), Some(PayloadField::bytes(0, 4, Endianness::Little)));
-        for name in ["byte_2_12b_le", "byte_2_16b_xe", "byte_2_16b_le_x", "byte[x]", "hyp_100_b0_8le", "Speed"] {
-            assert_eq!(parse_byte_name(name), None, "{name}");
-        }
     }
 
     /// The names the TypeScript `buildSignalName` wrote, which saved dashboards hold.

@@ -5,6 +5,7 @@
 import { readTimeSeries, getSignalLabel, type DashboardPanel, type SignalTimeSeries, type SignalRef } from "../../../stores/dashboardStore";
 import { buildCsv } from "../../../utils/csvBuilder";
 import { formatTimestampIso } from "./dashboardFormat";
+import { BYTE_NAMES } from "../../../generated/byteNames";
 
 /**
  * Build CSV content from a panel's signal data.
@@ -80,7 +81,7 @@ export function buildFlowPanelCsv(
   const count = panel.byteCount ?? 8;
   const signals: SignalRef[] = Array.from({ length: count }, (_, i) => ({
     frameId: panel.targetFrameId!,
-    signalName: `byte[${i}]`,
+    signalName: BYTE_NAMES[i],
     colour: "#000",
   }));
 

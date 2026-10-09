@@ -7,6 +7,9 @@
 
 import type { Confidence, DisplayHint, Endianness, Protocol, RegisterType } from "./catalogModel";
 
+/** Trimmed and blank ones dropped by the crate; one is written as a string. */
+export type Notes = string | string[];
+
 export interface SignalFields {
   name: string;
   start_bit: number;
@@ -19,9 +22,9 @@ export interface SignalFields {
   min?: number;
   max?: number;
   format?: string;
-  confidence?: Confidence;
+  confidence?: Confidence | "";
   enum?: Record<string, string>;
-  notes?: string[];
+  notes?: Notes;
   display?: DisplayHint;
 }
 
@@ -29,7 +32,7 @@ export interface FrameFields {
   length?: number;
   transmitter?: string;
   interval_ms?: number;
-  notes?: string[];
+  notes?: Notes;
   extended?: boolean;
   fd?: boolean;
   bus?: number;
@@ -41,11 +44,12 @@ export interface FrameFields {
   register_type?: RegisterType;
 }
 
+/** Blank is named by the crate. */
 export interface MuxFields {
-  name: string;
+  name?: string;
   start_bit: number;
   bit_length: number;
-  notes?: string[];
+  notes?: Notes;
 }
 
 export interface MetaFields {
@@ -54,8 +58,11 @@ export interface MetaFields {
   default_frame?: Protocol;
 }
 
+/** A number, or hex text with or without `0x`; text that is not hex is refused. */
+export type Mask = number | string;
+
 export interface HeaderField {
-  mask: number;
+  mask: Mask;
   shift?: number;
   format?: string;
   endianness?: Endianness;
@@ -75,7 +82,7 @@ export interface CanConfigFields {
   default_interval?: number;
   default_extended?: boolean;
   default_fd?: boolean;
-  frame_id_mask?: number;
+  frame_id_mask?: Mask;
   fields?: Record<string, HeaderField>;
 }
 
@@ -100,6 +107,7 @@ export interface ModbusConfigFields {
 export type EditOp =
   | { op: "UpsertSignal"; owner_path: string[]; index?: number; signal: SignalFields }
   | { op: "SetFrame"; protocol: Protocol; key: string; rename_from?: string; frame: FrameFields }
+  | { op: "AddFrame"; protocol: Protocol; key: string; frame: FrameFields }
   | { op: "SetMux"; owner_path: string[]; mux: MuxFields }
   | { op: "SetMeta"; meta: MetaFields }
   | { op: "SetCanConfig"; config: CanConfigFields }

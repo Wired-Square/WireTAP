@@ -19,6 +19,7 @@ mod catalog_share;
 mod apiclient;
 mod gateway_admin;
 mod dashboard;
+mod drafting;
 mod checksum_discovery;
 mod checksums;
 mod credentials;
@@ -43,6 +44,7 @@ mod store_manager;
 mod transmit;
 mod transmit_history;
 mod replay;
+mod report;
 mod io_test;
 mod mcp;
 pub mod ws;
@@ -1196,6 +1198,7 @@ pub fn run() {
             catalog::save_binary_file,
             catalog::list_catalogs,
             catalog::import_catalog,
+            catalog::new_catalog_filename,
             catalog::duplicate_catalog,
             catalog::rename_catalog,
             catalog::delete_catalog,
@@ -1384,6 +1387,11 @@ pub fn run() {
             checksum_discovery::discover_checksums_in_capture_cmd,
             byte_roles::payload_changes_cmd,
             byte_roles::frame_order_cmd,
+            byte_roles::payload_changes_report_cmd,
+            byte_roles::frame_order_report_cmd,
+            drafting::draft_preview_cmd,
+            drafting::draft_catalog_cmd,
+            drafting::candidate_signals_cmd,
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,
             frame_export::export_frame_dump,

@@ -4,7 +4,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import { openCatalogWithMigration, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
-import { editCatalogOps, validateCatalogWs, validateMetaWs } from "../../../../api/catalog";
+import { editCatalogOps, newCatalogFilename, validateCatalogWs, validateMetaWs } from "../../../../api/catalog";
 import { metaOp, canConfigOp, modbusConfigOp, serialConfigOp, addNodeToml } from "../../editorOps";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
@@ -29,6 +29,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
 
   const metaFields = useCatalogEditorStore((s) => s.forms.meta);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
+  const seedConfigForms = useCatalogEditorStore((s) => s.seedConfigForms);
 
   // Protocol config fields from store
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
@@ -56,6 +57,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   };
 
   const handleNewCatalog = () => {
+    seedConfigForms(null);
     setMetaFields({
       name: "",
       version: 1,
@@ -78,7 +80,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
       const configOp =
         selectedProtocol === "can"
           ? canConfigOp({
-              default_endianness: canDefaultEndianness,
+              default_byte_order: canDefaultEndianness,
               default_interval: canDefaultInterval,
               default_extended: canDefaultExtended,
               default_fd: canDefaultFd,
@@ -98,16 +100,9 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
         content = await addNodeToml(content, `Slave ${modbusDeviceAddress}`, undefined, modbusDeviceAddress);
       }
 
-      const nameBase = metaFields.name.trim() || "decoder";
-      const numericName = /^\d+$/.test(nameBase) ? parseInt(nameBase, 10) : null;
-      const formattedName =
-        numericName !== null
-          ? saveFrameIdFormat === "hex"
-            ? `0x${numericName.toString(16)}`
-            : `${numericName}`
-          : nameBase.toLowerCase().replace(/\s+/g, "-");
-      const defaultPath =
-        decoderDir && formattedName ? `${decoderDir}/${formattedName}.toml` : undefined;
+      const defaultPath = decoderDir
+        ? `${decoderDir}/${await newCatalogFilename(metaFields.name, saveFrameIdFormat === "hex")}`
+        : undefined;
       const savePath = await pickCatalogSavePath(defaultPath);
       if (savePath) {
         await saveCatalogAtPath(savePath, content);

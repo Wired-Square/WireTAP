@@ -7,150 +7,45 @@ import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Select, Textarea, Checkbox, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h3, labelSmall } from "../../../styles";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import BitPreview, { BitRange } from "../../../components/BitPreview";
-import type { TomlNode } from "../types";
-import { tomlParse } from "../toml";
-import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
+import BitPreview from "../../../components/BitPreview";
+import type { SignalFields } from "../../../types/catalogEdit";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { defaultByteOrder } from "../model";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
 import EnumEditorDialog from "./EnumEditorDialog";
 import { Button } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 
-export type SignalFields = {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  factor?: number;
-  offset?: number;
-  unit?: string;
-  signed?: boolean;
-  endianness?: "little" | "big";
-  min?: number;
-  max?: number;
-  format?: string;
-  confidence?: string;
-  enum?: Record<string, string>;
-  notes?: string;
-};
-
 export type SignalEditDialogProps = {
   open: boolean;
-  selectedNode: TomlNode;
-  catalogContent: string;
+  /** The frame or mux case that owns the signal. */
+  ownerPath: string[];
   fields: SignalFields;
   setFields: (f: SignalFields) => void;
   editingIndex: number | null;
-  inheritedByteOrder?: "little" | "big";
   onCancel: () => void;
   onSave: () => void;
 };
 
 export default function SignalEditDialog({
   open,
-  selectedNode,
-  catalogContent,
+  ownerPath,
   fields,
   setFields,
   editingIndex,
-  inheritedByteOrder,
   onCancel,
   onSave,
 }: SignalEditDialogProps) {
   const { t } = useTranslation("catalog");
   const [showEnumEditor, setShowEnumEditor] = useState(false);
+  const inheritedByteOrder = useCatalogEditorStore((s) => defaultByteOrder(s.tree.catalog, ownerPath[1]));
+  const layout = useFrameLayout(
+    open ? (editingIndex === null ? ownerPath : [...ownerPath, "signals", String(editingIndex)]) : null,
+  );
 
-  // Early return if not open or no selected node - prevents errors when dialog is closed
-  if (!open || !selectedNode) {
+  if (!open) {
     return null;
   }
-
-  // Parse the catalog content to get frame info
-  let parsed: any;
-  try {
-    parsed = tomlParse(catalogContent);
-  } catch {
-    parsed = null;
-  }
-
-  // Get frame length using protocol-aware utility (handles CAN, Modbus, Serial)
-  const frameLength = parsed
-    ? getFrameByteLengthFromPath(selectedNode.path, parsed)
-    : (selectedNode.metadata?.length || 8);
-
-  const existingSignals = selectedNode.metadata?.signals?.filter((_: any, i: number) => i !== editingIndex) || [];
-
-  const ranges: BitRange[] = [];
-
-  existingSignals.forEach((s: any) => {
-    ranges.push({
-      name: s.name || "Signal",
-      start_bit: s.start_bit || 0,
-      bit_length: s.bit_length || 8,
-      type: "signal",
-    });
-  });
-
-  try {
-    if (!parsed) throw new Error("No parsed content");
-    const protocol = selectedNode.path[1];
-    const frameKey = selectedNode.path[2];
-    const frame = parsed?.frame?.[protocol]?.[frameKey];
-
-    // Extract all mux ranges from the path hierarchy (handles nested muxes)
-    const muxRanges = extractMuxRangesFromPath(selectedNode.path, parsed);
-    ranges.push(...muxRanges);
-
-    // When adding/editing inside a mux case, also show frame-level signals so bit usage stays visible.
-    const isInsideMuxCase = selectedNode.path.includes("mux");
-    const addSignalRange = (signal: any) => {
-      const start = signal.start_bit || 0;
-      const length = signal.bit_length || 8;
-      // avoid duplicate entries when metadata already supplied the same signal
-      const alreadyPresent = ranges.some(
-        (r) => r.type === "signal" && r.start_bit === start && r.bit_length === length && r.name === (signal.name || "Signal")
-      );
-      if (!alreadyPresent) {
-        ranges.push({
-          name: signal.name || "Signal",
-          start_bit: start,
-          bit_length: length,
-          type: "signal",
-        });
-      }
-    };
-
-    if (isInsideMuxCase) {
-      // Add frame-level signals
-      if (frame?.signals) {
-        frame.signals.forEach(addSignalRange);
-      }
-
-      // Traverse path to add signals from all mux cases in hierarchy
-      let currentObj = frame;
-      for (let i = 3; i < selectedNode.path.length; i++) {
-        const segment = selectedNode.path[i];
-        if (segment === "mux") {
-          currentObj = currentObj?.mux;
-          i++;
-          if (i < selectedNode.path.length && currentObj) {
-            const caseKey = selectedNode.path[i];
-            const caseObj = currentObj[caseKey] || currentObj.cases?.[caseKey];
-            if (caseObj) {
-              const caseSignals = caseObj.signals || [];
-              // Check if this is the level we're editing
-              const nextSegment = selectedNode.path[i + 1];
-              const isEditingLevel = nextSegment === "signals" || nextSegment === "signal";
-              caseSignals
-                .filter((_: any, idx: number) => !(isEditingLevel && idx === editingIndex))
-                .forEach(addSignalRange);
-              currentObj = caseObj;
-            }
-          }
-        } else if (segment === "signals" || segment === "signal") {
-          break;
-        }
-      }
-    }
-  } catch {}
 
   const isFormatDisabled = (fields.format || "number") !== "number";
 
@@ -292,7 +187,7 @@ export default function SignalEditDialog({
                 <Select
                   size="lg"
                   value={fields.confidence || "none"}
-                  onChange={(e) => setFields({ ...fields, confidence: e.target.value })}
+                  onChange={(e) => setFields({ ...fields, confidence: e.target.value as SignalFields["confidence"] })}
                 >
                   <option value="none">{t("signalEdit.confidenceNone")}</option>
                   <option value="low">{t("signalEdit.confidenceLow")}</option>
@@ -304,7 +199,7 @@ export default function SignalEditDialog({
                 label={
                   <span className="inline-flex items-center gap-2">
                     {t("signalEdit.byteOrder")}
-                    {!fields.endianness && inheritedByteOrder && (
+                    {!fields.byte_order && inheritedByteOrder && (
                       <Badge tone="primary" size="lg">{t("signalEdit.inheritedBadge")}</Badge>
                     )}
                   </span>
@@ -313,9 +208,9 @@ export default function SignalEditDialog({
               >
                 <Select
                   size="lg"
-                  className={!fields.endianness ? "text-muted" : ""}
-                  value={fields.endianness || ""}
-                  onChange={(e) => setFields({ ...fields, endianness: e.target.value === "" ? undefined : e.target.value as "little" | "big" })}
+                  className={!fields.byte_order ? "text-muted" : ""}
+                  value={fields.byte_order || ""}
+                  onChange={(e) => setFields({ ...fields, byte_order: e.target.value === "" ? undefined : e.target.value as "little" | "big" })}
                 >
                   <option value="">
                     {inheritedByteOrder
@@ -333,7 +228,7 @@ export default function SignalEditDialog({
             <FormField label={t("signalEdit.notes")} variant="default">
               <Textarea
                 size="lg"
-                value={fields.notes ?? ""}
+                value={typeof fields.notes === "string" ? fields.notes : fields.notes?.join("\n") ?? ""}
                 onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
                 placeholder={t("signalEdit.notesPlaceholder")}
                 rows={2}
@@ -344,8 +239,8 @@ export default function SignalEditDialog({
           <div>
             <h3 className={`${h3} mb-3`}>{t("signalEdit.bitPreview")}</h3>
             <BitPreview
-              numBytes={frameLength}
-              ranges={ranges}
+              numBytes={layout?.byteLength ?? 8}
+              ranges={previewRanges(layout, true)}
               currentStartBit={fields.start_bit}
               currentBitLength={fields.bit_length}
               interactive

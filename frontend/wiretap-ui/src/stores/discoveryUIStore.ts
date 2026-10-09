@@ -4,12 +4,13 @@
 // Handles error dialogs, save dialogs, playback, time range, etc.
 
 import { create } from 'zustand';
+import i18n from 'i18next';
 import { saveCatalog } from '../api';
 import { buildCatalog } from '../api/catalog';
-import type { EditOp } from '../types/catalogEdit';
+import { draftCatalog, type Draft, type DraftFrame } from '../api/drafting';
 import { withAppError } from '../utils/appError';
-import { knowledgeCatalogOps, modbusCatalogOps, type ExportFrameWithKnowledge, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
-import { formatFrameId } from '../utils/frameIds';
+import { frameNoteLines } from '../utils/analysis/byteNoteText';
+import { catalogProtocol, headOps, modbusCatalogOps, serialReservedSpans, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
 import { parseFrameKey } from '../utils/frameKey';
 import { normalizeMeta } from '../utils/catalogMeta';
 import { configFromCandidate, serialChecksumFromConfig } from '../apps/discovery/views/serial/checksumConfig';
@@ -29,6 +30,14 @@ export type FrameMetadata = {
   default_interval: number;
   filename: string;
 };
+
+/** A frame's notes from the draft, worded. */
+function draftNotes(draft: Draft | null, frame: DraftFrame): string[] {
+  const known = draft?.frames.find(
+    (d) => d.protocol === frame.protocol && d.frameId === frame.frameId && d.isExtended === frame.isExtended,
+  );
+  return known ? frameNoteLines(i18n.t.bind(i18n), known.notes, known.mux?.selector) : [];
+}
 
 interface DiscoveryUIState {
   // General UI state
@@ -185,7 +194,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   },
 
   saveFrames: async (decoderDir, saveFrameIdFormat, selectedFrames, frameInfoMap) => {
-    const { knowledge, toolbox } = useDiscoveryToolboxStore.getState();
+    const { draft, toolbox } = useDiscoveryToolboxStore.getState();
 
     const { saveMetadata, serialConfig } = get();
 
@@ -198,33 +207,27 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const filename = safeFilename.endsWith('.toml') ? safeFilename : `${safeFilename}.toml`;
     const baseDir = decoderDir.replace(/[\\/]+$/, '');
     const path = `${baseDir}/${filename}`;
-    const saveBuilt = async (ops: () => EditOp[]) => {
+    const saveBuilt = async (build: () => Promise<string>) => {
       const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
-        await saveCatalog(path, await buildCatalog(ops()));
+        await saveCatalog(path, await build());
       });
       if (saved) set({ showSaveDialog: false });
     };
 
-    const selectedFramesList: ExportFrameWithKnowledge[] = Array.from(frameInfoMap.entries())
+    const selectedFramesList: DraftFrame[] = Array.from(frameInfoMap.entries())
       .filter(([fk]) => selectedFrames.has(fk))
-      .map(([fk, info]) => {
-        const { frameId } = parseFrameKey(fk);
-        return {
-          id: frameId,
-          len: info.len,
-          isExtended: info.isExtended,
-          protocol: info.protocol,
-          knowledge: knowledge.frames.get(frameId),
-        };
-      })
-      .sort((a, b) => a.id - b.id);
+      .map(([fk, info]) => ({
+        protocol: info.protocol ?? 'can',
+        frameId: parseFrameKey(fk).frameId,
+        isExtended: !!info.isExtended,
+        length: info.len,
+      }))
+      .sort((a, b) => a.frameId - b.frameId);
 
     const detectedProtocol = selectedFramesList.find(f => f.protocol)?.protocol ?? 'can';
-    const defaultInterval = knowledge.meta.defaultInterval ?? saveMetadata.default_interval;
+    const defaultInterval = draft?.defaultIntervalMs ?? saveMetadata.default_interval;
     // Use detected byte order from analysis if available, otherwise use user selection
-    const defaultByteOrder = knowledge.analysisRun
-      ? knowledge.meta.defaultEndianness
-      : saveMetadata.default_byte_order;
+    const defaultByteOrder = draft?.defaultEndianness ?? saveMetadata.default_byte_order;
 
     const normalizedMeta = normalizeMeta({
       name: saveMetadata.name,
@@ -238,10 +241,10 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const { modbusExportConfig } = get();
     if (detectedProtocol === 'modbus' && modbusExportConfig) {
       const registers = selectedFramesList.map(f => ({
-        frameId: f.id,
-        dlc: f.len,
+        frameId: f.frameId,
+        dlc: f.length,
       }));
-      await saveBuilt(() => modbusCatalogOps(registers, normalizedMeta, { ...modbusExportConfig, default_interval: defaultInterval }));
+      await saveBuilt(() => buildCatalog(modbusCatalogOps(registers, normalizedMeta, { ...modbusExportConfig, default_interval: defaultInterval })));
       return;
     }
 
@@ -263,12 +266,18 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
       }
     }
 
-    await saveBuilt(() => knowledgeCatalogOps(
-      selectedFramesList,
-      normalizedMeta,
-      (id: number, isExtended?: boolean) => formatFrameId(id, saveFrameIdFormat, isExtended),
-      detectedProtocol === 'serial' ? enrichedSerialConfig ?? undefined : undefined
-    ));
+    const serial = detectedProtocol === 'serial' ? enrichedSerialConfig ?? undefined : undefined;
+    await saveBuilt(() => {
+      const head = headOps(catalogProtocol(selectedFramesList), normalizedMeta, serial);
+      return draftCatalog(draft, head, {
+        frames: selectedFramesList,
+        notes: selectedFramesList.map((f) => draftNotes(draft, f)),
+        defaultEndianness: normalizedMeta.default_byte_order,
+        defaultIntervalMs: normalizedMeta.default_interval,
+        serialReserved: serialReservedSpans(serial),
+        decimalIds: saveFrameIdFormat === 'decimal',
+      });
+    });
   },
 
   // Selection sets

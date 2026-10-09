@@ -50,7 +50,7 @@ describe("upsertSignalToml", () => {
     await upsertSignalToml(
       BASE,
       ["frame", "can", "0x123", "mux", "case1", "signals", "2"],
-      { name: "B", start_bit: 8, bit_length: 8, endianness: "little", notes: "two\nlines" },
+      { name: "B", start_bit: 8, bit_length: 8, byte_order: "little", notes: "two\nlines" },
       null,
     );
     expect(editCatalogOps).toHaveBeenCalledWith(BASE, [
@@ -58,7 +58,7 @@ describe("upsertSignalToml", () => {
         op: "UpsertSignal",
         owner_path: ["frame", "can", "0x123", "mux", "case1"],
         index: 2,
-        signal: { name: "B", start_bit: 8, bit_length: 8, byte_order: "little", notes: ["two\nlines"] },
+        signal: { name: "B", start_bit: 8, bit_length: 8, byte_order: "little", notes: "two\nlines" },
       },
     ]);
   });

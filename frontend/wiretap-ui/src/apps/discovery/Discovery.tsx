@@ -140,7 +140,7 @@ function DiscoveryInner() {
   const toolboxIsRunning = useDiscoveryToolboxStore((s) => s.toolbox.isRunning);
   const toolboxActiveView = useDiscoveryToolboxStore((s) => s.toolbox.activeView);
   const showInfoView = useDiscoveryToolboxStore((s) => s.showInfoView);
-  const knowledge = useDiscoveryToolboxStore((s) => s.knowledge);
+  const draft = useDiscoveryToolboxStore((s) => s.draft);
   const closeInfoView = useDiscoveryToolboxStore((s) => s.closeInfoView);
   const clearAnalysisResults = useDiscoveryToolboxStore((s) => s.clearAnalysisResults);
 
@@ -206,10 +206,7 @@ function DiscoveryInner() {
     return useDiscoveryUIStore.getState().saveFrames(decoderDir, saveFrameIdFormat, sf, fim);
   }, []);
 
-  const openInfoView = useCallback(() => {
-    const fim = useDiscoveryFrameStore.getState().frameInfoMap;
-    useDiscoveryToolboxStore.getState().openInfoView(fim);
-  }, []);
+  const openInfoView = useDiscoveryToolboxStore((s) => s.openInfoView);
 
   const { effective: displayFrameIdFormat } = useFrameIdFormat();
   const displayTimeFormat = settings?.display_time_format ?? "human";
@@ -1150,8 +1147,8 @@ function DiscoveryInner() {
         open={showSaveDialog}
         meta={saveMetadata}
         decoderDir={decoderDir}
-        knowledgeInterval={knowledge.meta.defaultInterval}
-        knowledgeEndianness={knowledge.analysisRun ? knowledge.meta.defaultEndianness : null}
+        knowledgeInterval={draft?.defaultIntervalMs ?? null}
+        knowledgeEndianness={draft?.defaultEndianness ?? null}
         onChange={updateSaveMetadata}
         onCancel={closeSaveDialog}
         onSave={handlers.handleSaveFrames}

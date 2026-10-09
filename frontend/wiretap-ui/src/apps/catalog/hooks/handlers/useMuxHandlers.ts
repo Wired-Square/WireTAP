@@ -9,7 +9,10 @@ import {
   editMuxCaseToml,
   deleteMuxCaseToml,
 } from "../../editorOps";
-import type { MuxFields } from "../useCatalogForms";
+import type { MuxFields } from "../../../../types/catalogEdit";
+import type { Mux } from "../../../../types/catalogModel";
+import { showRefusal } from "./refusal";
+import { NEW_MUX_FIELDS } from "../useCatalogForms";
 
 export interface UseMuxHandlersParams {
   muxFields: MuxFields;
@@ -51,91 +54,35 @@ export function useMuxHandlers({
   const setSelectedPath = useCatalogEditorStore((s) => s.setSelectedPath);
   const selectedPath = useCatalogEditorStore((s) => s.tree.selectedPath);
 
-  // Mux name generation
-  const generateMuxName = (
-    muxPath: string[],
-    startBit: number,
-    bitLength: number,
-    isNested: boolean
-  ): string => {
-    const idKey = muxPath[2] || muxPath[muxPath.length - 1];
-    const decimalId = idKey.startsWith("0x") ? parseInt(idKey, 16) : parseInt(idKey);
-
-    if (isNested) {
-      const caseVal = muxPath[muxPath.length - 1];
-      return `mux_${decimalId}_${caseVal}_${startBit}_${bitLength}`;
-    } else {
-      return `mux_${decimalId}_${startBit}_${bitLength}`;
-    }
-  };
-
-  // Mux operations
-  const handleAddMux = (idKey: string, muxPath?: string[]) => {
-    setCurrentMuxPath(muxPath || ["frame", "can", idKey]);
-    setIsAddingNestedMux(false);
+  /** `ownerPath` is the frame or the mux case the new selector belongs to. */
+  const handleAddMux = (ownerPath: string[]) => {
+    setCurrentMuxPath(ownerPath);
+    setIsAddingNestedMux(ownerPath.length > 3);
     setIsEditingExistingMux(false);
-    const decimalId = idKey.startsWith("0x") ? parseInt(idKey, 16) : parseInt(idKey);
-    const defaultName = `mux_${decimalId}_0_8`;
-    setMuxFields({
-      name: defaultName,
-      start_bit: 0,
-      bit_length: 8,
-    });
+    setMuxFields(NEW_MUX_FIELDS);
     setEditingMux(true);
   };
 
-  const handleAddNestedMux = (muxCasePath: string[]) => {
-    setCurrentMuxPath(muxCasePath);
-    setIsAddingNestedMux(true);
-    setIsEditingExistingMux(false);
-
-    const defaultName = generateMuxName(muxCasePath, 0, 8, true);
-
-    setMuxFields({
-      name: defaultName,
-      start_bit: 0,
-      bit_length: 8,
-    });
-    setEditingMux(true);
-  };
-
-  const handleEditMux = (muxPath: string[], muxData: any) => {
+  const handleEditMux = (muxPath: string[], mux: Mux) => {
     setCurrentMuxPath(muxPath);
     setIsAddingNestedMux(false);
     setIsEditingExistingMux(true);
-    const notesValue = muxData.notes
-      ? Array.isArray(muxData.notes)
-        ? muxData.notes.join("\n")
-        : muxData.notes
-      : undefined;
     setMuxFields({
-      name: muxData.name || "",
-      start_bit: muxData.start_bit || 0,
-      bit_length: muxData.bit_length || 8,
-      notes: notesValue,
+      name: mux.name ?? "",
+      start_bit: mux.startBit,
+      bit_length: mux.bitLength,
+      notes: mux.notes?.join("\n"),
     });
     setEditingMux(true);
   };
 
   const handleSaveMux = async () => {
-    if (!muxFields.name || muxFields.start_bit === undefined || muxFields.bit_length === undefined) {
-      return;
-    }
-
+    const ownerPath = isEditingExistingMux ? currentMuxPath.slice(0, -1) : currentMuxPath;
     try {
-      let ownerPath = currentMuxPath;
-      if (
-        isEditingExistingMux &&
-        currentMuxPath.length > 0 &&
-        currentMuxPath[currentMuxPath.length - 1] === "mux"
-      ) {
-        ownerPath = currentMuxPath.slice(0, -1);
-      }
-      const newContent = await upsertMuxToml(catalogContent, ownerPath, muxFields);
-      setToml(newContent);
+      setToml(await upsertMuxToml(catalogContent, ownerPath, muxFields));
       setEditingMux(false);
     } catch (error) {
-      console.error("Failed to save mux:", error);
+      showRefusal("mux", error);
     }
   };
 
@@ -244,12 +191,7 @@ export function useMuxHandlers({
   };
 
   return {
-    // Mux name generation
-    generateMuxName,
-
-    // Mux operations
     handleAddMux,
-    handleAddNestedMux,
     handleEditMux,
     handleSaveMux,
     handleDeleteMux,

@@ -142,9 +142,9 @@ export interface Frame {
   notes?: string[];
   /** Per-frame checksums (CAN/serial; absent on Modbus). */
   checksums?: FrameChecksum[];
-  /** Fields whose value was inherited rather than set explicitly — drives the
-   *  editor's "(inherited)" labels. Entries: `length`, `transmitter`,
-   *  `interval`, `extended`, `fd`, `deviceAddress`, `registerBase`. */
+  /** Fields whose value was inherited rather than set explicitly. Entries:
+   *  `length`, `transmitter`, `interval`, `extended`, `fd`, `signals` (some
+   *  are), `mux` (all of it, from `mirror_of`), `deviceAddress`, `registerBase`. */
   inheritedFields?: string[];
 }
 
@@ -240,6 +240,15 @@ export interface NodeDef {
   notes?: string[];
 }
 
+/** The defaults decode applies where the catalogue sets none. */
+export interface EffectiveDefaults {
+  canByteOrder: Endianness;
+  serialByteOrder: Endianness;
+  modbusByteOrder: Endianness;
+  modbusWordOrder: Endianness;
+  modbusRegisterBase: number;
+}
+
 export interface Catalog {
   meta: Meta;
   protocol: Protocol;
@@ -249,4 +258,20 @@ export interface Catalog {
   frames: Frame[];
   /** Network nodes/peers from the `[node]` table, in key order. */
   nodes?: NodeDef[];
+  effectiveDefaults: EffectiveDefaults;
+}
+
+/** What a bit-layout preview of one item shows (`catalog.frameLayout`). */
+export interface FrameLayout {
+  byteLength: number;
+  ranges: LayoutRange[];
+}
+
+export interface LayoutRange {
+  name?: string;
+  startBit: number;
+  bitLength: number;
+  kind: "signal" | "selector" | "checksum";
+  /** The item the path addresses. */
+  edited?: boolean;
 }

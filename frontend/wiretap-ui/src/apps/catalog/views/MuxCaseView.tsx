@@ -7,15 +7,14 @@ import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { caption, labelSmallMuted, bgSurface, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
-import { tomlParse } from "../toml";
-import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
 import { useState } from "react";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
+import { signalRange } from "./signalRanges";
 import type { TomlNode } from "../types";
 import { Button, IconButton } from "../../../components/Button";
 
 export type MuxCaseViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
 
   onAddSignal: (idKey: string, signalPath: string[]) => void;
   onAddNestedMux: (muxCasePath: string[]) => void;
@@ -34,7 +33,6 @@ export type MuxCaseViewProps = {
 
 export default function MuxCaseView({
   selectedNode,
-  catalogContent,
   onAddSignal,
   onAddNestedMux,
   onEditCase,
@@ -44,6 +42,8 @@ export default function MuxCaseView({
 }: MuxCaseViewProps) {
   const { t } = useTranslation("catalog");
   const caseValue = selectedNode.metadata?.caseValue;
+  const muxCase = selectedNode.metadata!.muxCase!;
+  const editable = !selectedNode.metadata?.inherited;
   const idKey = selectedNode.path[2];
 
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -54,72 +54,9 @@ export default function MuxCaseView({
   );
   const [colorForRange, setColorForRange] = useState<(range: BitRange) => string | undefined>(() => () => undefined);
 
-  const { ranges, caseSignals, numBytes } = React.useMemo(() => {
-    const next: BitRange[] = [];
-    const signals: any[] = [];
-    let bytes = selectedNode.metadata?.length || 8;
-
-    try {
-      const parsed = tomlParse(catalogContent) as any;
-      const protocol = selectedNode.path[1];
-      const frameKey = selectedNode.path[2];
-      const frame = parsed?.frame?.[protocol]?.[frameKey];
-
-      // Get frame byte length (handles CAN, Modbus, Serial)
-      bytes = getFrameByteLengthFromPath(selectedNode.path, parsed);
-
-      // Extract all mux ranges from the path hierarchy (handles nested muxes)
-      const muxRanges = extractMuxRangesFromPath(selectedNode.path, parsed);
-      next.push(...muxRanges);
-
-      // Add frame-level signals
-      if (frame?.signals) {
-        frame.signals.forEach((signal: any) => {
-          next.push({
-            name: signal.name || "Signal",
-            start_bit: signal.start_bit || 0,
-            bit_length: signal.bit_length || 8,
-            type: "signal",
-          });
-        });
-      }
-
-      // Traverse path to get signals from this mux case and parent cases
-      let currentObj = frame;
-      for (let i = 3; i < selectedNode.path.length; i++) {
-        const segment = selectedNode.path[i];
-        if (segment === "mux") {
-          currentObj = currentObj?.mux;
-          i++;
-          if (i < selectedNode.path.length && currentObj) {
-            const caseKey = selectedNode.path[i];
-            const caseObj = currentObj[caseKey] || currentObj.cases?.[caseKey];
-            if (caseObj) {
-              const caseSignalsArr = caseObj.signals || [];
-              // Check if this is the current mux case level (last case in path)
-              const isCurrentLevel = i === selectedNode.path.length - 1;
-              caseSignalsArr.forEach((signal: any) => {
-                if (isCurrentLevel) {
-                  signals.push(signal);
-                }
-                next.push({
-                  name: signal.name || "Signal",
-                  start_bit: signal.start_bit || 0,
-                  bit_length: signal.bit_length || 8,
-                  type: "signal",
-                });
-              });
-              currentObj = caseObj;
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore parse errors; fall back to defaults
-    }
-
-    return { ranges: next, caseSignals: signals, numBytes: bytes };
-  }, [catalogContent, caseValue, idKey, selectedNode.path, selectedNode.metadata?.length]);
+  const layout = useFrameLayout(selectedNode.path);
+  const ranges = previewRanges(layout);
+  const caseSignals = muxCase.signals;
 
   return (
     <div className="space-y-4">
@@ -128,12 +65,9 @@ export default function MuxCaseView({
           {t("muxCaseView.titlePrefix", { value: caseValue })}
         </h3>
 
-        <div className={flexRowGap2}>
+        {editable && <div className={flexRowGap2}>
           <Button
-            onClick={() => {
-              const idKey = selectedNode.path[2];
-              onAddSignal(idKey, selectedNode.path);
-            }}
+            onClick={() => onAddSignal(idKey, selectedNode.path)}
             variant="solid"
             tone="success"
             size="sm"
@@ -155,12 +89,7 @@ export default function MuxCaseView({
           {onEditCase && (
             <IconButton
               onClick={() => {
-                const muxPath = selectedNode.path.slice(0, -1);
-                const caseNotes = selectedNode.metadata?.properties?.notes;
-                const notesStr = caseNotes
-                  ? (Array.isArray(caseNotes) ? caseNotes.join('\n') : caseNotes)
-                  : undefined;
-                onEditCase(muxPath, caseValue || '', notesStr);
+                onEditCase(selectedNode.path.slice(0, -1), caseValue || '', muxCase.notes?.join("\n"));
               }}
               title={t("muxCaseView.editCase")}
             >
@@ -180,32 +109,32 @@ export default function MuxCaseView({
           >
             <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
-        </div>
+        </div>}
       </div>
 
-      {selectedNode.metadata?.properties?.notes && (
+      {muxCase.notes && (
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("muxCaseView.notes")}</div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
-            {Array.isArray(selectedNode.metadata.properties.notes)
-              ? selectedNode.metadata.properties.notes.join("\n")
-              : selectedNode.metadata.properties.notes}
+            {muxCase.notes.join("\n")}
           </div>
         </div>
       )}
 
       <div className="space-y-4">
-        <div className="p-4 bg-surface rounded-lg">
-          <div className="text-xs font-medium text-muted mb-2">
-            {t("muxCaseView.bitLayoutTitle")}
+        {layout && (
+          <div className="p-4 bg-surface rounded-lg">
+            <div className="text-xs font-medium text-muted mb-2">
+              {t("muxCaseView.bitLayoutTitle")}
+            </div>
+            <BitPreview
+              numBytes={layout.byteLength}
+              ranges={ranges}
+              showLegend={false}
+              onColorMapping={(lookup) => setColorForRange(() => lookup)}
+            />
           </div>
-          <BitPreview
-            numBytes={numBytes}
-            ranges={ranges}
-            showLegend={false}
-            onColorMapping={(lookup) => setColorForRange(() => lookup)}
-          />
-        </div>
+        )}
 
         <div>
           <div className={`${sectionHeaderText} mb-2`}>
@@ -215,7 +144,7 @@ export default function MuxCaseView({
             <div className={emptyStateText}>{t("muxCaseView.noSignals")}</div>
           ) : (
             <div className="space-y-2">
-              {caseSignals.map((signal: any, idx: number) => (
+              {caseSignals.map((signal, idx) => (
                 <div
                   key={`${signal.name || "signal"}-${idx}`}
                   className={`p-3 ${bgSurface} rounded-lg flex items-center justify-between`}
@@ -223,12 +152,7 @@ export default function MuxCaseView({
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-2 h-8 rounded-sm ${
-                        colorForRange({
-                          name: signal.name || t("muxCaseView.signalDefault", { idx: idx + 1 }),
-                          start_bit: signal.start_bit || 0,
-                          bit_length: signal.bit_length || 8,
-                          type: "signal",
-                        }) || "bg-surface"
+                        colorForRange(signalRange(signal)) || "bg-surface"
                       }`}
                     />
                     <div>
@@ -238,20 +162,20 @@ export default function MuxCaseView({
                       </div>
                       <div className={`${caption} mt-1`}>
                         {t("muxCaseView.bitsRange", {
-                          start: signal.start_bit ?? 0,
-                          end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
-                          length: signal.bit_length ?? 0,
+                          start: signal.startBit ?? 0,
+                          end: (signal.startBit ?? 0) + (signal.bitLength ?? 0) - 1,
+                          length: signal.bitLength ?? 0,
                         })}
                       </div>
                       {signal.notes && (
                         <div className="text-xs text-muted mt-2 italic whitespace-pre-wrap">
-                          {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
+                          {signal.notes.join("\n")}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {onRequestDeleteSignal && (
+                  {onRequestDeleteSignal && editable && (
                     <IconButton
                       onClick={() =>
                         onRequestDeleteSignal(
@@ -291,14 +215,7 @@ export default function MuxCaseView({
                     {child.key}
                   </div>
 
-                  {child.type === "signal" && child.metadata?.properties && (
-                    <div className={`${caption} mt-1`}>
-                      {t("muxCaseView.bitsRangeShort", {
-                        start: child.metadata.properties.start_bit ?? 0,
-                        end: (child.metadata.properties.start_bit ?? 0) + (child.metadata.properties.bit_length ?? 0) - 1,
-                      })}
-                    </div>
-                  )}
+
                 </div>
               ))}
             </div>

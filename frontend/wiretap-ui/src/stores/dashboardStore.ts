@@ -2,13 +2,13 @@
 
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
-import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
 import type { Confidence } from '../types/catalog';
-import type { CanProtocolConfig, ParsedCatalog } from '../utils/catalogParser';
-import { loadCatalog as loadCatalogFromPath, attachAndResolve } from '../utils/catalogParser';
+import type { Catalog, Frame } from '../types/catalogModel';
+import { attachCatalog, openCatalog, parseCatalogAtPath } from '../api/catalog';
+import { allFrameSignals, framesById } from '../utils/catalogFrames';
 import { subscriberIdFor } from '../utils/subscriberId';
 
-import type { SerialFrameConfig } from '../utils/frameExport';
+import { serialFrameConfigOf, type SerialFrameConfig } from '../utils/frameExport';
 import {
   getAllDashboardLayouts,
   saveDashboardLayout,
@@ -181,38 +181,8 @@ function generatePanelId(): string {
   return `panel_${Date.now()}_${panelCounter++}`;
 }
 
-/** Recursively search a frame (incl. mux cases) for a signal's definition. */
-function findSignalDef(frame: FrameDetail, name: string): SignalDef | undefined {
-  const direct = frame.signals.find((s) => s.name === name);
-  if (direct) return direct;
-  return frame.mux ? findMuxSignalDef(frame.mux, name) : undefined;
-}
-
-function findMuxSignalDef(mux: MuxDef, name: string): SignalDef | undefined {
-  for (const caseKey of Object.keys(mux.cases)) {
-    const c = mux.cases[caseKey];
-    const sig = c.signals.find((s) => s.name === name);
-    if (sig) return sig;
-    if (c.mux) {
-      const nested = findMuxSignalDef(c.mux, name);
-      if (nested) return nested;
-    }
-  }
-  return undefined;
-}
-
-/** Recursively search mux cases for a signal's confidence */
-function findMuxSignalConfidence(mux: MuxDef, signalName: string): Confidence | undefined {
-  for (const caseKey of Object.keys(mux.cases)) {
-    const muxCase = mux.cases[caseKey];
-    const sig = muxCase.signals.find((s) => s.name === signalName);
-    if (sig?.confidence) return sig.confidence;
-    if (muxCase.mux) {
-      const nested = findMuxSignalConfidence(muxCase.mux, signalName);
-      if (nested) return nested;
-    }
-  }
-  return undefined;
+function signalConfidence(frame: Frame | undefined, name: string): Confidence | undefined {
+  return frame && allFrameSignals(frame).find((s) => s.name === name && s.confidence)?.confidence;
 }
 
 /** Auto-save store key */
@@ -243,14 +213,9 @@ function scheduleAutoSave() {
 interface DashboardState {
   // ── Catalog ──
   catalogPath: string | null;
-  frames: Map<number, FrameDetail>;
+  frames: Map<number, Frame>;
   protocol: 'can' | 'serial' | 'modbus';
-  canConfig: CanProtocolConfig | null;
   serialConfig: SerialFrameConfig | null;
-  /** Default byte order from catalog */
-  defaultByteOrder: 'big' | 'little';
-  /** Frame ID mask for catalog lookup */
-  frameIdMask: number | undefined;
 
   // ── IO Session ──
   ioProfile: string | null;
@@ -284,7 +249,7 @@ interface DashboardState {
   /** Attach to a session for Rust decode AND load the model from that one parse. */
   loadCatalogForSession: (sessionId: string, path: string) => Promise<void>;
   /** Build the in-memory model from an already-resolved catalogue. */
-  applyParsedCatalog: (catalog: ParsedCatalog) => void;
+  applyCatalog: (catalog: Catalog) => void;
   /** Track the active catalogue path without parsing. */
   setCatalogPath: (path: string | null) => void;
   initFromSettings: (decoderDir?: string) => Promise<void>;
@@ -340,10 +305,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   catalogPath: null,
   frames: new Map(),
   protocol: 'can',
-  canConfig: null,
   serialConfig: null,
-  defaultByteOrder: 'little',
-  frameIdMask: undefined,
 
   ioProfile: null,
   playbackSpeed: 1,
@@ -362,12 +324,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // ── Actions ──
 
   loadCatalog: async (path: string) => {
-    get().applyParsedCatalog(await loadCatalogFromPath(path));
+    get().applyCatalog(await parseCatalogAtPath(path));
   },
 
   loadCatalogForSession: async (sessionId: string, path: string) => {
     try {
-      get().applyParsedCatalog(await attachAndResolve(sessionId, path, subscriberIdFor("dashboard")));
+      const { catalog } = await attachCatalog(sessionId, await openCatalog(path), path, subscriberIdFor("dashboard"));
+      get().applyCatalog(catalog);
     } catch (e) {
       tlog.info(`[dashboardStore] catalog attach failed, loading model only: ${e}`);
       await get().loadCatalog(path);
@@ -379,65 +342,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // Apply a parsed catalogue to the dashboard's decode model. The catalogue PATH is
   // owned by the session (Rust-authoritative, mirrored one-way via useSessionCatalog) —
   // this must NOT write `catalogPath`, or it races the mirror into a reload loop.
-  applyParsedCatalog: (catalog: ParsedCatalog) => {
-    try {
-      // Convert ParsedCatalog frames to FrameDetail format
-      const frameMap = new Map<number, FrameDetail>();
-      for (const [id, frame] of catalog.frames) {
-        frameMap.set(id, {
-          id,
-          len: frame.length,
-          isExtended: frame.isExtended,
-          bus: frame.bus,
-          lenMismatch: false,
-          signals: frame.signals as SignalDef[],
-          mux: frame.mux,
-          interval: frame.interval,
-        });
-      }
-
-      // Determine default byte order
-      const defaultByteOrder: 'big' | 'little' =
-        catalog.canConfig?.default_byte_order ??
-        catalog.serialConfig?.default_byte_order ??
-        'little';
-
-      // Determine frame ID mask
-      const frameIdMask = catalog.protocol === 'can'
-        ? catalog.canConfig?.frame_id_mask
-        : catalog.serialConfig?.frame_id_mask;
-
-      // Convert SerialProtocolConfig to SerialFrameConfig
-      let serialConfig: SerialFrameConfig | null = null;
-      if (catalog.serialConfig) {
-        const sc = catalog.serialConfig;
-        serialConfig = {
-          default_byte_order: sc.default_byte_order,
-          encoding: sc.encoding,
-          frame_id_start_byte: sc.frame_id_start_byte,
-          frame_id_bytes: sc.frame_id_bytes,
-          frame_id_byte_order: sc.frame_id_byte_order,
-          frame_id_mask: sc.frame_id_mask,
-          source_address_start_byte: sc.source_address_start_byte,
-          source_address_bytes: sc.source_address_bytes,
-          source_address_byte_order: sc.source_address_byte_order,
-          min_frame_length: sc.min_frame_length,
-          header_length: sc.header_length,
-        };
-      }
-
-      set({
-        frames: frameMap,
-        protocol: catalog.protocol,
-        canConfig: catalog.canConfig,
-        serialConfig,
-        defaultByteOrder,
-        frameIdMask,
-      });
-    } catch (e) {
-      tlog.info(`[dashboardStore] Failed to load catalog: ${e}`);
-      throw e;
-    }
+  applyCatalog: (catalog: Catalog) => {
+    set({
+      frames: framesById(catalog),
+      protocol: catalog.protocol,
+      serialConfig: catalog.serial ? serialFrameConfigOf(catalog.serial) : null,
+    });
   },
 
   initFromSettings: async (_decoderDir) => {
@@ -500,14 +410,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     for (const { frameId, signalName, unit } of entries) {
       const frame = frames.get(frameId);
-      const def = frame ? findSignalDef(frame, signalName) : undefined;
+      const def = frame && allFrameSignals(frame).find((s) => s.name === signalName);
       const meta = { unit: unit ?? def?.unit, min: def?.min, max: def?.max, enum: def?.enum, format: def?.format };
       const widget = widgetForSignal(meta, def?.display);
 
       const size = WIDGET_META[widget.type]?.defaultSize ?? { w: 3, h: 3 };
       if (x + size.w > 12) { x = 0; rowY += rowH; rowH = 0; }
 
-      const confidence = def?.confidence ?? (frame?.mux ? findMuxSignalConfidence(frame.mux, signalName) : undefined);
+      const confidence = signalConfidence(frame, signalName);
       const id = generatePanelId();
       newPanels.push({
         id,
@@ -601,17 +511,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const colourIndex = panel.signals.length % SIGNAL_COLOURS.length;
     const colour = SIGNAL_COLOURS[colourIndex];
 
-    // Look up confidence from catalog
-    let confidence: Confidence | undefined;
-    const frame = frames.get(frameId);
-    if (frame) {
-      const signalDef = frame.signals.find((s) => s.name === signalName);
-      if (signalDef?.confidence) {
-        confidence = signalDef.confidence;
-      } else if (frame.mux) {
-        confidence = findMuxSignalConfidence(frame.mux, signalName);
-      }
-    }
+    const confidence = signalConfidence(frames.get(frameId), signalName);
 
     const newSignal: SignalRef = { frameId, signalName, unit, colour, confidence };
 
@@ -728,17 +628,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   replaceSignalSource: (panelId, oldFrameId, oldSignalName, newFrameId, newSignalName, newUnit) => {
     const { panels, frames } = get();
 
-    // Look up confidence for the new signal
-    let confidence: Confidence | undefined;
-    const frame = frames.get(newFrameId);
-    if (frame) {
-      const signalDef = frame.signals.find((s) => s.name === newSignalName);
-      if (signalDef?.confidence) {
-        confidence = signalDef.confidence;
-      } else if (frame.mux) {
-        confidence = findMuxSignalConfidence(frame.mux, newSignalName);
-      }
-    }
+    const confidence = signalConfidence(frames.get(newFrameId), newSignalName);
 
     set({
       panels: panels.map((p) => {

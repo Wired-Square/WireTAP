@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/views/FrameEditView.tsx
 // Generic frame editor that handles CAN, Modbus, and Serial protocols
 
-import { useMemo, useCallback } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
@@ -12,29 +12,27 @@ import type {
   CANConfig,
   ModbusConfig,
   SerialConfig,
-  BaseFrameFields,
+  FrameBaseFields,
+  SerialEncoding,
   SlaveOption,
 } from "../types";
-import { protocolRegistry } from "../protocols";
+import { defaultFrameConfig } from "./frameEditUtils";
 import { CANConfigSection, ModbusConfigSection, SerialConfigSection } from "./protocol-editors";
 import { SecondaryButton, PrimaryButton, Input, Select, Checkbox, Textarea } from "../../../components/forms";
 
-// Icon mapping for protocols
-const protocolIcons: Record<ProtocolType, React.ComponentType<{ className?: string }>> = {
-  can: Network,
-  modbus: Server,
-  serial: Cable,
-};
+const PROTOCOLS: { type: ProtocolType; displayName: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { type: "can", displayName: "CAN", Icon: Network },
+  { type: "modbus", displayName: "Modbus", Icon: Server },
+  { type: "serial", displayName: "Serial (RS-485)", Icon: Cable },
+];
 
 export interface FrameEditFields {
   protocol: ProtocolType;
   config: ProtocolConfig;
-  base: BaseFrameFields;
+  base: FrameBaseFields;
   // For Modbus, we need a separate key since it's not derived from config
   modbusFrameKey?: string;
-  // Inheritance flags
-  isLengthInherited?: boolean;
-  isTransmitterInherited?: boolean;
+  /** Leave the interval to the catalogue default. */
   isIntervalInherited?: boolean;
 }
 
@@ -55,9 +53,7 @@ export type FrameEditViewProps = {
   /** Default values from catalog meta */
   defaults?: {
     interval?: number;
-    modbusDeviceAddress?: number;
-    modbusRegisterBase?: 0 | 1;
-    serialEncoding?: "slip" | "cobs" | "raw" | "length_prefixed";
+    serialEncoding?: SerialEncoding;
   };
 
   primaryActionLabel?: string;
@@ -85,22 +81,12 @@ export default function FrameEditView({
   const resolvedTitle = title ?? t("frameEditView.addTitle");
   const resolvedSubtitle = subtitle ?? t("frameEditView.addSubtitle");
   const resolvedAction = primaryActionLabel ?? t("frameEditView.addButton");
-  // Get registered protocols
-  const protocols = useMemo(() => protocolRegistry.all(), []);
-
-  // Handle protocol change
   const handleProtocolChange = useCallback(
     (newProtocol: ProtocolType) => {
-      const handler = protocolRegistry.get(newProtocol);
-      if (!handler) return;
-
-      const config = handler.getDefaultConfig();
-      // NOTE: For serial, encoding is NOT in config - it's catalog-level in [frame.serial.config]
-
       setFields({
         ...fields,
         protocol: newProtocol,
-        config,
+        config: defaultFrameConfig(newProtocol),
         modbusFrameKey: newProtocol === "modbus" ? "" : undefined,
       });
     },
@@ -138,7 +124,7 @@ export default function FrameEditView({
 
   // Base fields updates
   const handleBaseChange = useCallback(
-    (updates: Partial<BaseFrameFields>) => {
+    (updates: Partial<FrameBaseFields>) => {
       setFields({
         ...fields,
         base: { ...fields.base, ...updates },
@@ -147,11 +133,8 @@ export default function FrameEditView({
     [fields, setFields]
   );
 
-  // Inheritance flag updates
-  const handleInheritanceChange = useCallback(
-    (flag: keyof Pick<FrameEditFields, "isLengthInherited" | "isTransmitterInherited" | "isIntervalInherited">, value: boolean) => {
-      setFields({ ...fields, [flag]: value });
-    },
+  const handleIntervalInheritedChange = useCallback(
+    (isIntervalInherited: boolean) => setFields({ ...fields, isIntervalInherited }),
     [fields, setFields]
   );
 
@@ -173,7 +156,6 @@ export default function FrameEditView({
             frameKey={fields.modbusFrameKey ?? ""}
             onFrameKeyChange={handleModbusKeyChange}
             availableSlaves={availableSlaves}
-            defaultRegisterBase={defaults?.modbusRegisterBase}
           />
         );
       case "serial":
@@ -189,8 +171,7 @@ export default function FrameEditView({
     }
   };
 
-  // Get current handler for display info
-  const currentHandler = protocolRegistry.get(fields.protocol);
+  const currentProtocol = PROTOCOLS.find((p) => p.type === fields.protocol);
 
   return (
     <div className="max-w-4xl">
@@ -207,14 +188,13 @@ export default function FrameEditView({
               {t("frameEditView.protocolLabel")}
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {protocols.map((handler) => {
-                const Icon = protocolIcons[handler.type];
-                const isSelected = fields.protocol === handler.type;
+              {PROTOCOLS.map(({ type, displayName, Icon }) => {
+                const isSelected = fields.protocol === type;
                 return (
                   <button
-                    key={handler.type}
+                    key={type}
                     type="button"
-                    onClick={() => handleProtocolChange(handler.type)}
+                    onClick={() => handleProtocolChange(type)}
                     className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                       isSelected
                         ? "border-accent-primary bg-info"
@@ -231,7 +211,7 @@ export default function FrameEditView({
                         isSelected ? "text-info" : "text-secondary"
                       }`}
                     >
-                      {handler.displayName}
+                      {displayName}
                     </span>
                   </button>
                 );
@@ -243,13 +223,10 @@ export default function FrameEditView({
         {/* Protocol-Specific Configuration */}
         <div className="p-4 bg-surface rounded-lg">
           <h3 className="text-sm font-semibold text-secondary mb-4 flex items-center gap-2">
-            {currentHandler && (
+            {currentProtocol && (
               <>
-                {(() => {
-                  const Icon = protocolIcons[currentHandler.type];
-                  return <Icon className={iconMd} />;
-                })()}
-                {currentHandler.displayName} {t("frameEditView.configurationSuffix")}
+                <currentProtocol.Icon className={iconMd} />
+                {currentProtocol.displayName} {t("frameEditView.configurationSuffix")}
               </>
             )}
           </h3>
@@ -310,7 +287,7 @@ export default function FrameEditView({
                   <label className={`flex items-center gap-2 ${caption}`}>
                     <Checkbox
                       checked={fields.isIntervalInherited ?? false}
-                      onChange={(e) => handleInheritanceChange("isIntervalInherited", e.target.checked)}
+                      onChange={(e) => handleIntervalInheritedChange(e.target.checked)}
                       size="sm"
                     />
                     {t("frameEditView.useDefault", { value: defaults.interval })}

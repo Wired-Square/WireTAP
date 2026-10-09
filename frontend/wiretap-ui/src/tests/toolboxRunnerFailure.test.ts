@@ -23,14 +23,14 @@ describe("a failed analysis command", () => {
 
   it("leaves Payload Changes not running", async () => {
     refuse("payload_changes_cmd");
-    const result = await useDiscoveryToolboxStore.getState().runChangesAnalysis(source, new Map());
+    const result = await useDiscoveryToolboxStore.getState().runChangesAnalysis(source);
     expect(result).toBeNull();
     expect(useDiscoveryToolboxStore.getState().toolbox.isRunning).toBe(false);
   });
 
   it("leaves Frame Order not running", async () => {
     refuse("frame_order_cmd");
-    const result = await useDiscoveryToolboxStore.getState().runMessageOrderAnalysis(source, new Map());
+    const result = await useDiscoveryToolboxStore.getState().runMessageOrderAnalysis(source);
     expect(result).toBeNull();
     expect(useDiscoveryToolboxStore.getState().toolbox.isRunning).toBe(false);
   });

@@ -4,31 +4,19 @@ import { useTranslation } from "react-i18next";
 import { FileText, Pencil, Network, Cable, Check } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, bgSurface, captionMuted, sectionHeaderText } from "../../../styles";
-import type { MetaFields, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig } from "../types";
+import type { Catalog } from "../../../types/catalogModel";
+import { hasFrames } from "../model";
 import { IconButton } from "../../../components/Button";
 import { Card } from "../../../components/Card";
 export type MetaViewProps = {
-  metaFields: MetaFields;
-  canConfig?: CanProtocolConfig;
-  serialConfig?: SerialProtocolConfig;
-  modbusConfig?: ModbusProtocolConfig;
-  hasCanFrames?: boolean;
-  hasSerialFrames?: boolean;
-  hasModbusFrames?: boolean;
+  catalog: Catalog | null;
   onEditMeta: () => void;
 };
 
-export default function MetaView({
-  metaFields,
-  canConfig,
-  serialConfig,
-  modbusConfig,
-  hasCanFrames,
-  hasSerialFrames,
-  hasModbusFrames,
-  onEditMeta,
-}: MetaViewProps) {
+export default function MetaView({ catalog, onEditMeta }: MetaViewProps) {
   const { t } = useTranslation("catalog");
+  if (!catalog) return null;
+  const { meta, can: canConfig, serial: serialConfig, modbus: modbusConfig, effectiveDefaults } = catalog;
   return (
     <div className="space-y-6">
       {/* Header with actions */}
@@ -61,7 +49,7 @@ export default function MetaView({
             {t("metaView.name")} <span className="text-danger">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
-            {metaFields.name || <span className="text-danger">{t("metaView.notSet")}</span>}
+            {meta.name || <span className="text-danger">{t("metaView.notSet")}</span>}
           </div>
         </div>
 
@@ -70,7 +58,7 @@ export default function MetaView({
             {t("metaView.version")} <span className="text-danger">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
-            {metaFields.version}
+            {meta.version}
           </div>
         </div>
       </div>
@@ -87,16 +75,16 @@ export default function MetaView({
           iconBg="bg-success"
           name={t("metaView.canName")}
           isConfigured={!!canConfig}
-          hasFrames={hasCanFrames}
+          hasFrames={hasFrames(catalog, "can")}
         >
           {canConfig && (
             <div className="text-xs text-muted">
-              <span>{t("metaView.byteOrder", { order: canConfig.default_endianness })}</span>
-              {canConfig.default_interval !== undefined && (
-                <span> • {t("metaView.intervalMs", { ms: canConfig.default_interval })}</span>
+              <span>{t("metaView.byteOrder", { order: effectiveDefaults.canByteOrder })}</span>
+              {canConfig.defaultInterval !== undefined && (
+                <span> • {t("metaView.intervalMs", { ms: canConfig.defaultInterval })}</span>
               )}
-              {canConfig.frame_id_mask !== undefined && (
-                <span> • {t("metaView.maskHex", { hex: canConfig.frame_id_mask.toString(16).toUpperCase() })}</span>
+              {canConfig.frameIdMask !== undefined && (
+                <span> • {t("metaView.maskHex", { hex: canConfig.frameIdMask.toString(16).toUpperCase() })}</span>
               )}
               {canConfig.fields && Object.keys(canConfig.fields).length > 0 && (
                 <span> • {t("metaView.headerFields", { count: Object.keys(canConfig.fields).length })}</span>
@@ -111,16 +99,14 @@ export default function MetaView({
           iconBg="bg-info"
           name={t("metaView.serialName")}
           isConfigured={!!serialConfig}
-          hasFrames={hasSerialFrames}
+          hasFrames={hasFrames(catalog, "serial")}
         >
           {serialConfig && (
             <div className="text-xs text-muted">
               <span>{t("metaView.encoding", { encoding: serialConfig.encoding?.toUpperCase() })}</span>
-              {serialConfig.byte_order && (
-                <span> • {serialConfig.byte_order === 'big' ? t("metaView.endianBE") : t("metaView.endianLE")}</span>
-              )}
-              {serialConfig.header_length !== undefined && (
-                <span> • {t("metaView.headerLength", { length: serialConfig.header_length })}</span>
+              <span> • {effectiveDefaults.serialByteOrder === 'big' ? t("metaView.endianBE") : t("metaView.endianLE")}</span>
+              {serialConfig.headerLength !== undefined && (
+                <span> • {t("metaView.headerLength", { length: serialConfig.headerLength })}</span>
               )}
               {serialConfig.fields && Object.keys(serialConfig.fields).length > 0 && (
                 <span> • {t("metaView.fields", { count: Object.keys(serialConfig.fields).length })}</span>
@@ -138,23 +124,19 @@ export default function MetaView({
           iconBg="bg-warning"
           name={t("metaView.modbusName")}
           isConfigured={!!modbusConfig}
-          hasFrames={hasModbusFrames}
+          hasFrames={hasFrames(catalog, "modbus")}
         >
           {modbusConfig && (
             <div className="text-xs text-muted">
-              {modbusConfig.device_address !== undefined && (
-                <span>{t("metaView.address", { addr: modbusConfig.device_address })} • </span>
+              {modbusConfig.deviceAddress !== undefined && (
+                <span>{t("metaView.address", { addr: modbusConfig.deviceAddress })} • </span>
               )}
-              <span>{t("metaView.registerBase", { base: modbusConfig.register_base })}</span>
-              {modbusConfig.default_interval !== undefined && (
-                <span> • {t("metaView.intervalMs", { ms: modbusConfig.default_interval })}</span>
+              <span>{t("metaView.registerBase", { base: effectiveDefaults.modbusRegisterBase })}</span>
+              {modbusConfig.defaultInterval !== undefined && (
+                <span> • {t("metaView.intervalMs", { ms: modbusConfig.defaultInterval })}</span>
               )}
-              {modbusConfig.default_byte_order && (
-                <span> • {t("metaView.byteShort", { order: modbusConfig.default_byte_order === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
-              )}
-              {modbusConfig.default_word_order && (
-                <span> • {t("metaView.wordShort", { order: modbusConfig.default_word_order === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
-              )}
+              <span> • {t("metaView.byteShort", { order: effectiveDefaults.modbusByteOrder === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
+              <span> • {t("metaView.wordShort", { order: effectiveDefaults.modbusWordOrder === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
             </div>
           )}
         </ProtocolConfigCard>

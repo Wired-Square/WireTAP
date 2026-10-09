@@ -5,6 +5,7 @@ import { useDashboardStore, type DashboardPanel } from "../../../../../stores/da
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import { formatFrameId } from "../../../../../utils/frameIds";
+import { BYTE_NAMES } from "../../../../../generated/byteNames";
 
 interface Props {
   panel: DashboardPanel;
@@ -38,7 +39,7 @@ export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
 
   const bytes: number[] = [];
   for (let i = 0; i < byteCount; i++) {
-    bytes.push(buffers.get(`${frameId}:byte[${i}]`)?.latestValue ?? 0);
+    bytes.push(buffers.get(`${frameId}:${BYTE_NAMES[i]}`)?.latestValue ?? 0);
   }
 
   const svgW = LABEL_W + 8 * (CELL + GAP);

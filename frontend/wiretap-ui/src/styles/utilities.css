@@ -77,7 +77,6 @@
   .inline { display: inline }
   .inline-block { display: inline-block }
   .inline-flex { display: inline-flex }
-  .inline-table { display: inline-table }
   .\!h-3 { height: 0.75rem !important }
   .h-0 { height: 0 }
   .h-0\.5 { height: 0.125rem }

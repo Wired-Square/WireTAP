@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "name": "modbus",
+      "input": "catalog/modbus.catalog.json",
+      "expected": [
+        {
+          "key": "meta",
+          "type": "meta",
+          "path": "meta"
+        },
+        {
+          "key": "frame",
+          "type": "section",
+          "path": "frame",
+          "children": [
+            {
+              "key": "modbus",
+              "type": "section",
+              "path": "frame.modbus",
+              "children": [
+                {
+                  "key": "0x32F9",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.0x32F9",
+                  "children": [
+                    {
+                      "key": "Mode",
+                      "type": "signal",
+                      "path": "frame.modbus.0x32F9.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "100",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.100",
+                  "children": [
+                    {
+                      "key": "Relays",
+                      "type": "signal",
+                      "path": "frame.modbus.100.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "5000",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.5000",
+                  "children": [
+                    {
+                      "key": "Daily_Yield",
+                      "type": "signal",
+                      "path": "frame.modbus.5000.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "battery_power",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.battery_power",
+                  "children": [
+                    {
+                      "key": "Battery_Power",
+                      "type": "signal",
+                      "path": "frame.modbus.battery_power.signals.0"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "node",
+          "type": "section",
+          "path": "node",
+          "children": [
+            {
+              "key": "Inverter",
+              "type": "node",
+              "path": "node.Inverter"
+            },
+            {
+              "key": "Meter",
+              "type": "node",
+              "path": "node.Meter"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

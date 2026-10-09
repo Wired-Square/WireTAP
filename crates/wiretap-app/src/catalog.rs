@@ -49,6 +49,16 @@ pub async fn dispatch_catalog_command(
             let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
             serde_json::to_value(cat).map_err(|e| e.to_string())
         }
+        // Params: { content, protocol, key, path }; null when there is no such frame or item.
+        "catalog.frameLayout" => {
+            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let protocol = serde_json::from_value(params.get("protocol").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid protocol: {e}"))?;
+            let path: Vec<String> = serde_json::from_value(params.get("path").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid path: {e}"))?;
+            let layout = wiretap_catalog::frame_layout(&cat, protocol, &req("key")?, &path);
+            serde_json::to_value(layout).map_err(|e| e.to_string())
+        }
         // TOML → field-path + message validation findings.
         "catalog.validate" => {
             let errors = wiretap_catalog::validate::validate(&content()?);
@@ -75,6 +85,12 @@ pub async fn dispatch_catalog_command(
             let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
             let errors = wiretap_catalog::validate::validate_checksum_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
+        // The catalogue report. Params: { content, format }.
+        "catalog.report" => {
+            let format = serde_json::from_value(params.get("format").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid report format: {e}"))?;
+            Ok(serde_json::Value::String(crate::report::catalog::render(&content()?, format)?))
         }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {
@@ -180,7 +196,7 @@ fn edit_ops(params: &serde_json::Value) -> Result<Vec<wiretap_catalog::edit::Edi
     serde_json::from_value(ops).map_err(|e| format!("invalid edit op: {e}"))
 }
 
-fn refuse_unless_valid(text: &str) -> Result<(), String> {
+pub(crate) fn refuse_unless_valid(text: &str) -> Result<(), String> {
     let findings = wiretap_catalog::validate::validate(text);
     if findings.is_empty() {
         return Ok(());
@@ -662,6 +678,24 @@ pub fn sanitise_catalog_filename(filename: &str) -> Result<String, String> {
     }
 }
 
+/// The filename a new catalogue named `name` is first offered under: a numeric
+/// name in the save format's id style, anything else slugged.
+#[tauri::command]
+pub fn new_catalog_filename(name: String, hex_ids: bool) -> String {
+    let name = name.trim();
+    let numeric = name.bytes().all(|b| b.is_ascii_digit());
+    let stem = match name.parse::<u64>() {
+        Ok(id) if numeric && hex_ids => format!("{id:#x}"),
+        Ok(id) if numeric => id.to_string(),
+        _ => name
+            .to_lowercase()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join("-"),
+    };
+    sanitise_catalog_filename(&stem).unwrap_or_else(|_| "decoder.toml".to_string())
+}
+
 /// Write a file via a temp name plus rename, so no reader can observe a partial
 /// file.
 ///
@@ -869,6 +903,18 @@ mod tests {
     }
 
     #[test]
+    fn a_new_catalogue_is_offered_a_bare_toml_filename() {
+        let offer = |name: &str, hex| new_catalog_filename(name.to_string(), hex);
+        assert_eq!(offer("  My  Pack ", false), "my-pack.toml");
+        assert_eq!(offer("256", true), "0x100.toml");
+        assert_eq!(offer("0256", false), "256.toml");
+        assert_eq!(offer("pack.TOML", false), "pack.toml");
+        assert_eq!(offer("", false), "decoder.toml");
+        assert_eq!(offer("a/b", false), "decoder.toml");
+        assert_eq!(offer(".hidden", false), "decoder.toml");
+    }
+
+    #[test]
     fn renaming_a_catalogue_leaves_its_signal_names_alone() {
         let catalogue = "[[frame.can.0x100.signals]]\nname = \"Voltage\"\nstart_bit = 0\nbit_length = 16\n\n[meta]\nname = \"Pack\"\nversion = 1\n";
 
@@ -1063,20 +1109,49 @@ mod tests {
         tauri::async_runtime::block_on(dispatch_catalog_command(op, params, 0)).expect(op)
     }
 
+    fn assert_serves(toml: &str, served_json: &str) {
+        let served = command("catalog.parse", serde_json::json!({ "content": fixture(toml) }));
+        if std::env::var_os("WRITE_ADAPTER_FIXTURES").is_some() {
+            let pretty = serde_json::to_string_pretty(&served).unwrap() + "\n";
+            std::fs::write(format!("{FIXTURES}/{served_json}"), pretty).unwrap();
+        }
+        let golden: serde_json::Value = serde_json::from_str(&fixture(served_json)).expect("golden json");
+        assert_eq!(served, golden, "{toml}");
+    }
+
     #[test]
     fn catalog_parse_serves_the_dashboard_display_hints_fixture() {
-        let toml = display_hints_fixture("toml");
-        let served = command("catalog.parse", serde_json::json!({ "content": toml }));
-        let golden: serde_json::Value =
-            serde_json::from_str(&display_hints_fixture("catalog.json")).expect("golden json");
-        assert_eq!(served, golden);
+        assert_serves("display-hints.toml", "display-hints.catalog.json");
     }
 
     #[test]
     fn catalog_parse_serves_the_catalogue_model_fixture() {
-        let served = command("catalog.parse", serde_json::json!({ "content": fixture("catalog-model.toml") }));
-        let golden: serde_json::Value = serde_json::from_str(&fixture("catalog-model.catalog.json")).expect("golden json");
-        assert_eq!(served, golden);
+        assert_serves("catalog-model.toml", "catalog-model.catalog.json");
+    }
+
+    /// The adapters' goldens read these served models, one per protocol.
+    #[test]
+    fn catalog_parse_serves_the_adapter_fixtures() {
+        for (toml, served_json) in [
+            ("sbrxxx.toml", "catalog/sbrxxx.catalog.json"),
+            ("catalog/modbus.toml", "catalog/modbus.catalog.json"),
+            ("catalog/serial.toml", "catalog/serial.catalog.json"),
+        ] {
+            assert_serves(toml, served_json);
+        }
+    }
+
+    /// The `rust` column of the table `muxCaseMatch.ts` is checked against.
+    #[test]
+    fn mux_case_keys_match_the_rule_table() {
+        let table: serde_json::Value = serde_json::from_str(&fixture("catalog/muxCaseKeys.json")).expect("table");
+        for row in table["keys"].as_array().expect("keys") {
+            let key = row["key"].as_str().expect("key");
+            let toml = format!("[frame.can.0x100.mux.{}]\nnotes = \"case\"\n", serde_json::to_string(key).unwrap());
+            let served = command("catalog.parse", serde_json::json!({ "content": toml }));
+            let is_case = served["frames"][0]["mux"]["cases"].get(key).is_some();
+            assert_eq!(is_case, row["rust"].as_bool().expect("rust"), "{key:?}");
+        }
     }
 
     #[test]
@@ -1137,6 +1212,51 @@ mod tests {
         assert_eq!(parsed["frames"][0]["signals"][0]["name"], "rpm");
     }
 
+    fn layout(protocol: &str, key: &str, path: &[&str]) -> serde_json::Value {
+        command(
+            "catalog.frameLayout",
+            serde_json::json!({ "content": fixture("sbrxxx.toml"), "protocol": protocol, "key": key, "path": path }),
+        )
+    }
+
+    #[test]
+    fn a_frame_layout_flags_the_item_its_path_addresses() {
+        let selector = layout("can", "0x70F", &["mux"]);
+        let edited: Vec<_> = selector["ranges"].as_array().unwrap().iter().filter(|r| r["edited"] == true).collect();
+        assert_eq!(edited.len(), 1);
+        assert_eq!(edited[0]["kind"], "selector");
+        assert_eq!(selector["byteLength"], 8);
+        assert!(layout("can", "0x70F", &["signals", "99"]).is_null());
+        assert!(layout("modbus", "0x70F", &[]).is_null());
+    }
+
+    /// `authoring.json`'s unchanged-save cases, applied to the catalogues they were
+    /// read from: each must parse back to the model it started as. A stated value
+    /// equal to what the frame inherits is dropped, so only the inheritance flags differ.
+    #[test]
+    fn the_editors_frame_saves_change_nothing_they_were_not_asked_to() {
+        let golden: serde_json::Value = serde_json::from_str(&fixture("catalog/authoring.json")).expect("golden");
+        let saves = |prefix: &str| -> Vec<serde_json::Value> {
+            let case = golden["cases"].as_array().unwrap().iter().find(|c| c["name"].as_str().unwrap().starts_with(prefix)).expect(prefix);
+            case["expected"].as_array().unwrap().iter().flat_map(|save| save["ops"].as_array().unwrap().clone()).collect()
+        };
+        for (toml, prefix) in [
+            ("sbrxxx.toml", "Saving every sbrxxx frame"),
+            ("catalog/modbus.toml", "Saving every Modbus frame"),
+            ("catalog/serial.toml", "Saving every serial frame"),
+        ] {
+            let original = fixture(toml);
+            let saved = command("catalog.edits", serde_json::json!({ "content": original, "ops": saves(prefix) }));
+            let without_flags = |mut model: serde_json::Value| {
+                model["frames"].as_array_mut().unwrap().iter_mut().for_each(|f| {
+                    f.as_object_mut().unwrap().remove("inheritedFields");
+                });
+                model
+            };
+            assert_eq!(without_flags(parsed(saved)), without_flags(parsed(original.into())), "{toml}");
+        }
+    }
+
     #[test]
     fn catalog_build_refuses_a_catalogue_that_does_not_validate() {
         let refused = try_command(
@@ -1193,7 +1313,7 @@ mod tests {
 
     #[test]
     fn each_discovery_export_builds_the_catalogue_its_typescript_writer_did() {
-        for name in ["knowledge-can", "knowledge-serial", "plain-can", "modbus"] {
+        for name in ["plain-can", "modbus"] {
             let mut ours = built_export(name);
             let golden = discovery_export(&format!("{name}.golden.toml"));
             let mut theirs = parsed(golden.into());
@@ -1201,21 +1321,6 @@ mod tests {
             without_new_keys(&mut theirs);
             assert_eq!(ours, theirs, "{name}");
         }
-    }
-
-    #[test]
-    fn a_discovery_export_names_its_mux_selectors_and_keeps_signal_confidence() {
-        let catalogue = built_export("knowledge-can");
-        let frames = catalogue["frames"].as_array().unwrap();
-        let frame = |id: u64| frames.iter().find(|f| f["frameId"] == id).unwrap();
-
-        assert_eq!(frame(0x200)["mux"]["name"], "selector_0");
-        assert_eq!(frame(0x300)["mux"]["name"], "selector_0");
-        let inner = &frame(0x300)["mux"]["cases"]["1"]["mux"];
-        assert_eq!(inner["name"], "selector_1");
-        let signals = frame(0x100)["signals"].as_array().unwrap();
-        let rpm = signals.iter().find(|s| s["name"] == "rpm").unwrap();
-        assert_eq!(rpm["confidence"], "high");
     }
 
     fn set_meta_version(original: &str) -> serde_json::Value {

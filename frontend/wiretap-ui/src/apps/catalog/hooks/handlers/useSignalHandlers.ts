@@ -10,7 +10,10 @@ import {
   type ChecksumData,
 } from "../../editorOps";
 import { validateSignalWs, validateChecksumWs } from "../../../../api/catalog";
-import type { SignalFields } from "../useCatalogForms";
+import type { SignalFields } from "../../../../types/catalogEdit";
+import type { FrameChecksum, Signal } from "../../../../types/catalogModel";
+import { NEW_SIGNAL_FIELDS } from "../useCatalogForms";
+import { showRefusal } from "./refusal";
 
 export interface UseSignalHandlersParams {
   signalFields: SignalFields;
@@ -24,31 +27,24 @@ export interface UseSignalHandlersParams {
   setCurrentSignalPath: (v: string[]) => void;
 }
 
-export function signalFieldsFor(signal: any): SignalFields {
-  const notesValue = signal.notes
-    ? Array.isArray(signal.notes)
-      ? signal.notes.join("\n")
-      : signal.notes
-    : undefined;
-  // Coerce start_bit and bit_length to integers to handle string values from TOML
-  const startBit = typeof signal.start_bit === "string" ? parseInt(signal.start_bit, 10) : (signal.start_bit ?? 0);
-  const bitLength = typeof signal.bit_length === "string" ? parseInt(signal.bit_length, 10) : (signal.bit_length ?? 8);
+/** The edit form for a signal as the model holds it. */
+export function signalFieldsFor(signal: Signal): SignalFields {
   return {
-    name: signal.name || "",
-    start_bit: Number.isNaN(startBit) ? 0 : startBit,
-    bit_length: Number.isNaN(bitLength) ? 8 : bitLength,
+    name: signal.name ?? "",
+    start_bit: signal.startBit ?? 0,
+    bit_length: signal.bitLength ?? 0,
     factor: signal.factor,
     offset: signal.offset,
     unit: signal.unit,
     signed: signal.signed,
-    endianness: signal.endianness || signal.byte_order, // TOML stores as byte_order
+    byte_order: signal.endianness,
     min: signal.min,
     max: signal.max,
     format: signal.format,
     confidence: signal.confidence,
     enum: signal.enum,
     display: signal.display,
-    notes: notesValue,
+    notes: signal.notes?.join("\n"),
   };
 }
 
@@ -102,25 +98,11 @@ export function useSignalHandlers({
     setCurrentIdForSignal(idKey);
     setCurrentSignalPath(signalPath || ["frame", "can", idKey]);
     setEditingSignalIndex(null);
-    setSignalFields({
-      name: "",
-      start_bit: 0,
-      bit_length: 8,
-      factor: 1,
-      offset: 0,
-      unit: "",
-      signed: false,
-      endianness: undefined,
-      min: undefined,
-      max: undefined,
-      format: undefined,
-      confidence: undefined,
-      enum: undefined,
-    });
+    setSignalFields(NEW_SIGNAL_FIELDS);
     setEditingSignal(true);
   };
 
-  const handleEditSignal = (idKey: string, signalIndex: number, signal: any, signalsParentPath?: string[]) => {
+  const handleEditSignal = (idKey: string, signalIndex: number, signal: Signal, signalsParentPath?: string[]) => {
     setCurrentIdForSignal(idKey);
     const parentPath = signalsParentPath || ["frame", "can", idKey];
     setCurrentSignalPath(parentPath);
@@ -132,7 +114,7 @@ export function useSignalHandlers({
   const handleSaveSignal = async () => {
     if (!currentIdForSignal) return;
 
-    const errors = await validateSignalWs(signalFields);
+    const errors = await validateSignalWs({ ...signalFields, endianness: signalFields.byte_order });
     if (errors.length > 0) {
       setValidation(errors);
       return;
@@ -144,8 +126,7 @@ export function useSignalHandlers({
       setEditingSignal(false);
       clearValidation();
     } catch (error) {
-      console.error("Failed to save signal:", error);
-      setValidation([{ field: "signal", message: "Failed to save signal" }]);
+      showRefusal("signal", error);
     }
   };
 
@@ -161,12 +142,21 @@ export function useSignalHandlers({
   };
 
   // Checksum operations
-  const handleEditChecksum = (idKey: string, checksumIndex: number, checksum: any, checksumsParentPath?: string[]) => {
+  const handleEditChecksum = (idKey: string, checksumIndex: number, checksum: FrameChecksum, checksumsParentPath?: string[]) => {
     setDialogPayload({
       checksumToEdit: {
         idKey,
         index: checksumIndex,
-        checksum,
+        checksum: {
+          name: checksum.name ?? "",
+          algorithm: checksum.algorithm,
+          start_byte: checksum.startByte,
+          byte_length: checksum.byteLength,
+          endianness: checksum.endianness,
+          calc_start_byte: checksum.calcStartByte,
+          calc_end_byte: checksum.calcEndByte,
+          notes: checksum.notes?.join("\n"),
+        },
         checksumsParentPath: checksumsParentPath || ["frame", "can", idKey],
       },
     });

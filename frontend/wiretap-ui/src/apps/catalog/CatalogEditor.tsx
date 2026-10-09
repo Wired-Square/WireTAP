@@ -18,7 +18,8 @@ import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
 import { catalogToTree } from "./tree/catalogToTree";
-import type { TomlNode, ParsedCatalogTree } from "./types";
+import type { SerialEncoding, TomlNode } from "./types";
+import type { Catalog } from "../../types/catalogModel";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
 import { createRenderTreeNode } from "./tree/renderTreeNode";
@@ -27,9 +28,8 @@ import EditorViewRouter from "./views/EditorViewRouter";
 import TextModeView from "./views/TextModeView";
 import DiffView from "./views/DiffView";
 import EmptySelectionView from "./views/EmptySelectionView";
-import CANFrameEditView from "./views/CANFrameEditView";
 import FrameEditView from "./views/FrameEditView";
-import { isFrameFieldsValid } from "./views/frameEditUtils";
+import { frameDefaultInterval, isFrameFieldsValid } from "./views/frameEditUtils";
 import { CATALOG_SEARCH_INPUT_ID } from "./components/FindBar";
 import TextFindBar from "./components/TextFindBar";
 import CatalogDialogs from "./components/CatalogDialogs";
@@ -57,7 +57,6 @@ function CatalogEditorInner() {
   const editMode = useCatalogEditorStore((s) => s.mode);
   const setMode = useCatalogEditorStore((s) => s.setMode);
   const validationState = useCatalogEditorStore((s) => s.validation.isValid);
-  const setValidation = useCatalogEditorStore((s) => s.setValidation);
   const parsedTree = useCatalogEditorStore((s) => s.tree.nodes);
   const expandedNodes = useCatalogEditorStore((s) => s.tree.expandedIds);
   const selectedPath = useCatalogEditorStore((s) => s.tree.selectedPath);
@@ -66,24 +65,7 @@ function CatalogEditorInner() {
   const toggleExpanded = useCatalogEditorStore((s) => s.toggleExpanded);
   const expandAll = useCatalogEditorStore((s) => s.expandAll);
   const collapseAll = useCatalogEditorStore((s) => s.resetExpanded);
-  const idFields = useCatalogEditorStore((s) => s.forms.canFrame);
-  const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
-  const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
-  const canDefaultEndianness = useCatalogEditorStore((s) => s.forms.canDefaultEndianness);
-  const setCanDefaultEndianness = useCatalogEditorStore((s) => s.setCanDefaultEndianness);
-  const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
-  const setCanDefaultInterval = useCatalogEditorStore((s) => s.setCanDefaultInterval);
-  const setCanDefaultExtended = useCatalogEditorStore((s) => s.setCanDefaultExtended);
-  const setCanDefaultFd = useCatalogEditorStore((s) => s.setCanDefaultFd);
-  const setCanFrameIdMask = useCatalogEditorStore((s) => s.setCanFrameIdMask);
-  const setCanHeaderFields = useCatalogEditorStore((s) => s.setCanHeaderFields);
-  const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
-  const setSerialEncoding = useCatalogEditorStore((s) => s.setSerialEncoding);
-  const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
-  const setSerialByteOrder = useCatalogEditorStore((s) => s.setSerialByteOrder);
-  const setSerialHeaderFields = useCatalogEditorStore((s) => s.setSerialHeaderFields);
-  const setSerialHeaderLength = useCatalogEditorStore((s) => s.setSerialHeaderLength);
-  const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
+  const catalog = useCatalogEditorStore((s) => s.tree.catalog);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
   const setAvailablePeers = useCatalogEditorStore((s) => s.setAvailablePeers);
   const availableSlaves = useCatalogEditorStore((s) => s.ui.availableSlaves);
@@ -177,11 +159,6 @@ function CatalogEditorInner() {
     setIsAddingNestedMux: forms.setIsAddingNestedMux,
     setIsEditingExistingMux: forms.setIsEditingExistingMux,
 
-    // CAN frame editing (legacy)
-    editingFrameId: forms.editingFrameId,
-    setEditingId: forms.setEditingId,
-    setEditingFrameId: forms.setEditingFrameId,
-
     // Generic frame editing
     frameFields: forms.frameFields,
     editingFrameOriginalKey: forms.editingFrameOriginalKey,
@@ -190,37 +167,10 @@ function CatalogEditorInner() {
     setEditingFrameOriginalKey: forms.setEditingFrameOriginalKey,
   });
 
-  // Get catalog defaults for the generic frame editor
-  const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
-  const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
-  const setModbusDeviceAddress = useCatalogEditorStore((s) => s.setModbusDeviceAddress);
-  const setModbusRegisterBase = useCatalogEditorStore((s) => s.setModbusRegisterBase);
-  const setModbusDefaultInterval = useCatalogEditorStore((s) => s.setModbusDefaultInterval);
-  const setModbusDefaultByteOrder = useCatalogEditorStore((s) => s.setModbusDefaultByteOrder);
-  const setModbusDefaultWordOrder = useCatalogEditorStore((s) => s.setModbusDefaultWordOrder);
   const catalogDefaults = useMemo(() => ({
-    interval: canDefaultInterval,           // From [frame.can.config], stored in forms.canDefaultInterval
-    endianness: canDefaultEndianness,       // From [frame.can.config], stored in forms.canDefaultEndianness
-    modbusDeviceAddress,  // From [frame.modbus.config], stored in forms.modbusDeviceAddress
-    modbusRegisterBase,   // From [frame.modbus.config], stored in forms.modbusRegisterBase
-    serialEncoding,       // From [frame.serial.config], stored in forms.serialEncoding
-  }), [canDefaultInterval, canDefaultEndianness, modbusDeviceAddress, modbusRegisterBase, serialEncoding]);
-
-  // Protocol configs + frame detection, derived from the Rust-parsed catalogue
-  // (set by the async parse effect below).
-  const EMPTY_INFO = { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false } as const;
-  const [parsedCatalogInfo, setParsedCatalogInfo] = useState<{
-    canConfig?: ParsedCatalogTree["canConfig"];
-    serialConfig?: ParsedCatalogTree["serialConfig"];
-    modbusConfig?: ParsedCatalogTree["modbusConfig"];
-    hasCanFrames: boolean;
-    hasModbusFrames: boolean;
-    hasSerialFrames: boolean;
-  }>(EMPTY_INFO);
-
-  const currentCanConfig = parsedCatalogInfo.canConfig;
-  const currentSerialConfig = parsedCatalogInfo.serialConfig;
-  const currentModbusConfig = parsedCatalogInfo.modbusConfig;
+    interval: frameDefaultInterval(catalog, forms.frameFields.protocol),
+    serialEncoding: catalog?.serial?.encoding as SerialEncoding | undefined,
+  }), [catalog, forms.frameFields.protocol]);
 
   // Computed values — the store owns the dirty logic (prefer the Rust diff, fall
   // back to a string compare); recompute when its inputs change.
@@ -254,14 +204,9 @@ function CatalogEditorInner() {
     [displayFrameIdFormat]
   );
 
-  // Wrapper to add frames with inferred protocol from catalog configs
+  // Priority: single configured protocol > settings default > "can"
   const handleAddFrameWithDefaults = useCallback(() => {
-    // Infer protocol from which config exists in the catalog
-    // Priority: single configured protocol > settings default > "can"
-    const configuredProtocols: Array<"can" | "serial" | "modbus"> = [];
-    if (currentCanConfig) configuredProtocols.push("can");
-    if (currentSerialConfig) configuredProtocols.push("serial");
-    if (currentModbusConfig) configuredProtocols.push("modbus");
+    const configuredProtocols = (["can", "serial", "modbus"] as const).filter((p) => catalog?.[p]);
 
     // If exactly one protocol is configured, use it
     if (configuredProtocols.length === 1) {
@@ -272,7 +217,7 @@ function CatalogEditorInner() {
     // Otherwise fall back to settings default or "can"
     const protocol = settings?.default_frame_type || "can";
     handlers.handleAddFrame(protocol);
-  }, [currentCanConfig, currentSerialConfig, currentModbusConfig, settings?.default_frame_type, handlers]);
+  }, [catalog, settings?.default_frame_type, handlers]);
 
   // Load default catalog on mount when settings are available
   useEffect(() => {
@@ -348,11 +293,10 @@ function CatalogEditorInner() {
     if (editMode !== "ui") return;
 
     const clear = () => {
-      setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
+      setTreeData({ nodes: [], catalog: null });
       setSelectedPath(null);
       setAvailablePeers([]);
       setAvailableSlaves([]);
-      setParsedCatalogInfo(EMPTY_INFO);
     };
 
     if (!catalogContent) {
@@ -361,87 +305,21 @@ function CatalogEditorInner() {
     }
 
     let cancelled = false;
-    const applyParsed = ({ tree, meta, peers, slaves, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames }: ParsedCatalogTree) => {
-      setTreeData({ nodes: tree, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames });
-      setParsedCatalogInfo({ canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames });
-      if (meta) setMetaFields(meta);
-      setAvailablePeers(peers);
-      setAvailableSlaves(slaves);
-      // Store CAN config from [meta.can] if present
-      if (canConfig) {
-        setCanDefaultEndianness(canConfig.default_endianness);
-        setCanDefaultInterval(canConfig.default_interval);
-        setCanDefaultExtended(canConfig.default_extended);
-        setCanDefaultFd(canConfig.default_fd);
-        // Convert frame_id_mask to hex string for display (or empty if not set)
-        setCanFrameIdMask(canConfig.frame_id_mask !== undefined ? `0x${canConfig.frame_id_mask.toString(16).toUpperCase()}` : '');
-        // Convert header fields from Record<name, field> to array form for editing
-        if (canConfig.fields) {
-          setCanHeaderFields(
-            Object.entries(canConfig.fields).map(([name, field]) => ({
-              name,
-              mask: `0x${field.mask.toString(16).toUpperCase()}`,
-              shift: field.shift,
-              format: field.format ?? 'hex',
-            }))
-          );
-        } else {
-          setCanHeaderFields([]);
-        }
-      } else {
-        // Reset fields when no CAN config
-        setCanFrameIdMask('');
-        setCanHeaderFields([]);
-        setCanDefaultExtended(undefined);
-        setCanDefaultFd(undefined);
-      }
-      // Store serial config from [meta.serial] if present
-      if (serialConfig?.encoding) {
-        setSerialEncoding(serialConfig.encoding);
-        setSerialByteOrder(serialConfig.byte_order ?? 'big');
-        // Convert header fields from Record<name, field> to array form for editing
-        if (serialConfig.fields) {
-          setSerialHeaderFields(
-            Object.entries(serialConfig.fields).map(([name, field]) => ({
-              name,
-              mask: field.mask,
-              endianness: field.endianness ?? 'big',
-              format: field.format ?? 'hex',
-            }))
-          );
-        } else {
-          setSerialHeaderFields([]);
-        }
-        // Initialize header_length and checksum from parsed config
-        setSerialHeaderLength(serialConfig.header_length);
-        setSerialChecksum(serialConfig.checksum ?? null);
-      } else {
-        setSerialHeaderFields([]);
-        setSerialHeaderLength(undefined);
-        setSerialChecksum(null);
-      }
-      // Store modbus config from [meta.modbus] if present
-      if (modbusConfig) {
-        setModbusDeviceAddress(modbusConfig.device_address ?? 1);
-        setModbusRegisterBase(modbusConfig.register_base);
-        setModbusDefaultInterval(modbusConfig.default_interval);
-        setModbusDefaultByteOrder(modbusConfig.default_byte_order ?? "big");
-        setModbusDefaultWordOrder(modbusConfig.default_word_order ?? "big");
-      }
-
-      // Keep selection stable by path; clear it if the node no longer exists.
-      if (selectedPath) {
-        const next = findNodeByPath(tree, selectedPath);
-        if (!next) {
-          setSelectedPath(null);
-        }
+    const applyParsed = (parsed: Catalog) => {
+      const nodes = catalogToTree(parsed);
+      setTreeData({ nodes, catalog: parsed });
+      const declared = parsed.nodes ?? [];
+      setAvailablePeers(declared.map((n) => n.name));
+      setAvailableSlaves(declared.flatMap((n) => (n.deviceAddress == null ? [] : [{ name: n.name, address: n.deviceAddress }])));
+      if (selectedPath && !findNodeByPath(nodes, selectedPath)) {
+        setSelectedPath(null);
       }
     };
 
     const handle = setTimeout(() => {
       parseCatalog(catalogContent)
         .then((cat) => {
-          if (!cancelled) applyParsed(catalogToTree(cat));
+          if (!cancelled) applyParsed(cat);
         })
         .catch((e) => {
           if (cancelled) return;
@@ -550,14 +428,8 @@ function CatalogEditorInner() {
             frameGroups={frameGroups}
             selectedProtocol={selectedProtocol}
             setSelectedProtocol={setSelectedProtocol}
-            hasCanFrames={parsedCatalogInfo.hasCanFrames}
-            hasModbusFrames={parsedCatalogInfo.hasModbusFrames}
-            hasSerialFrames={parsedCatalogInfo.hasSerialFrames}
-            canConfig={currentCanConfig}
-            modbusConfig={currentModbusConfig}
-            serialConfig={currentSerialConfig}
+            catalog={catalog}
             onAddNode={handlers.handleAddNode}
-            onAddCanFrame={handlers.handleAddCanFrame}
             onAddFrame={handleAddFrameWithDefaults}
             onExpandAll={expandAll}
             onCollapseAll={collapseAll}
@@ -662,25 +534,6 @@ function CatalogEditorInner() {
                   primaryActionLabel={forms.editingFrameOriginalKey ? t("editor.saveChanges") : t("editor.addFrameButton")}
                   disableSave={!isFrameFieldsValid(forms.frameFields)}
                 />
-              ) : forms.editingId && !selectedNode ? (
-                <CANFrameEditView
-                  title={forms.editingFrameId ? t("editor.editCanFrameTitle") : t("editor.addCanFrameTitle")}
-                  subtitle={
-                    forms.editingFrameId
-                      ? t("editor.editCanFrameDescription")
-                      : t("editor.addCanFrameDescription")
-                  }
-                  idFields={idFields}
-                  setIdFields={setIdFields}
-                  availablePeers={availablePeers}
-                  onCancel={() => {
-                    forms.setEditingId(false);
-                    forms.setEditingFrameId(null);
-                  }}
-                  onSave={handlers.handleSaveId}
-                  primaryActionLabel={forms.editingFrameId ? t("editor.saveChanges") : t("editor.addFrameButton")}
-                  disableSave={!idFields.id}
-                />
               ) : !selectedNode ? (
                 <EmptySelectionView />
               ) : (
@@ -688,8 +541,8 @@ function CatalogEditorInner() {
                   <SelectionHeader
                     selectedNode={selectedNode}
                     formatFrameId={formatFrameIdForDisplay}
-                    onEdit={selectedNode.type === "can-frame" && !forms.editingId ? () => handlers.handleEditId(selectedNode) : undefined}
-                    onDelete={selectedNode.type === "can-frame" && !forms.editingId ? () => handlers.handleDeleteId(selectedNode.metadata?.idValue || selectedNode.key) : undefined}
+                    onEdit={selectedNode.type === "can-frame" ? () => handlers.handleEditFrame(selectedNode) : undefined}
+                    onDelete={selectedNode.type === "can-frame" ? () => handlers.handleDeleteId(selectedNode.key) : undefined}
                   />
 
                   <EditorViewRouter
@@ -701,9 +554,7 @@ function CatalogEditorInner() {
                     }}
                     canFrameProps={{
                       selectedNode,
-                      catalogContent,
                       displayFrameIdFormat,
-                      editingId: forms.editingId,
                       editingSignal: forms.editingSignal,
                       onAddSignal: handlers.handleAddSignal,
                       onEditSignal: handlers.handleEditSignal,
@@ -714,23 +565,12 @@ function CatalogEditorInner() {
                       onAddCase: handlers.handleAddCase,
                       onSelectNode: (node: any) => setSelectedPath(node.path),
                     }}
-                    canConfigProps={{
-                      canConfig: currentCanConfig,
-                      onEditConfig: () => openDialog("config"),
-                    }}
                     metaProps={{
-                      metaFields: useCatalogEditorStore.getState().forms.meta,
-                      canConfig: currentCanConfig,
-                      serialConfig: currentSerialConfig,
-                      modbusConfig: currentModbusConfig,
-                      hasCanFrames: parsedCatalogInfo.hasCanFrames,
-                      hasSerialFrames: parsedCatalogInfo.hasSerialFrames,
-                      hasModbusFrames: parsedCatalogInfo.hasModbusFrames,
+                      catalog,
                       onEditMeta: () => openDialog("config"),
                     }}
                     muxProps={{
                       selectedNode,
-                      catalogContent,
                       onAddCase: handlers.handleAddCase,
                       onEditMux: handlers.handleEditMux,
                       onDeleteMux: handlers.handleDeleteMux,
@@ -738,9 +578,8 @@ function CatalogEditorInner() {
                     }}
                     muxCaseProps={{
                       selectedNode,
-                      catalogContent,
                       onAddSignal: handlers.handleAddSignal,
-                      onAddNestedMux: handlers.handleAddNestedMux,
+                      onAddNestedMux: handlers.handleAddMux,
                       onEditCase: handlers.handleEditCase,
                       onDeleteCase: handlers.handleDeleteCase,
                       onRequestDeleteSignal: (idKey, signalIndex, parentPath, signalName) =>
@@ -749,53 +588,19 @@ function CatalogEditorInner() {
                     }}
                     signalProps={{
                       selectedNode,
-                      catalogContent,
-                      inheritedByteOrder: (() => {
-                        const protocol = selectedNode?.path?.[1];
-                        if (protocol === "can") return canDefaultEndianness;
-                        if (protocol === "serial") return serialByteOrder;
-                        return undefined;
-                      })(),
                       onEditSignal: handlers.handleEditSignal,
                       onRequestDeleteSignal: handlers.requestDeleteSignal,
-                      onSetValidation: (errors) => setValidation(errors),
                     }}
                     checksumProps={{
-                      catalogContent,
                       onEditChecksum: handlers.handleEditChecksum,
                       onRequestDeleteChecksum: handlers.requestDeleteChecksum,
-                      onSetValidation: (errors) => setValidation(errors),
                     }}
                     nodeProps={{
                       selectedNode,
-                      catalogContent,
                       displayFrameIdFormat,
                       onSelectPath: (path) => setSelectedPath(path),
-                      onSelectNode: (node) => setSelectedPath(node.path),
-                      onAddCanFrameForNode: (nodeName) => {
-                        setIdFields({
-                          id: "",
-                          length: 8,
-                          transmitter: nodeName,
-                          interval: undefined,
-                          isIntervalInherited: false,
-                          isLengthInherited: false,
-                          isTransmitterInherited: false,
-                        });
-                        forms.setEditingId(true);
-                        setSelectedPath(null);
-                      },
-                      onAddRegisterForSlave: (slaveAddress) => {
-                        forms.setFrameFields({
-                          protocol: "modbus",
-                          config: { protocol: "modbus", register_type: "holding", node_address: slaveAddress },
-                          base: { length: 1 },
-                          modbusFrameKey: "",
-                        });
-                        forms.setEditingFrameOriginalKey(null);
-                        forms.setEditingFrame(true);
-                        setSelectedPath(null);
-                      },
+                      onAddCanFrameForNode: (transmitter) => handlers.handleAddFrame("can", { transmitter }),
+                      onAddRegisterForSlave: (nodeAddress) => handlers.handleAddFrame("modbus", { nodeAddress }),
                       onEditNode: handlers.handleEditNode,
                       onDeleteNode: handlers.handleRequestDeleteNode,
                       onRequestDeleteFrame: handlers.handleDeleteId,
@@ -803,22 +608,11 @@ function CatalogEditorInner() {
                       onRequestDeleteSignal: (idKey, index, parentPath, signalName) =>
                         handlers.requestDeleteSignal(idKey, index, parentPath, signalName),
                     }}
-                    arrayProps={{
-                      selectedNode,
-                    }}
-                    valueProps={{
-                      selectedNode,
-                    }}
                     modbusFrameProps={{
                       onEditFrame: handlers.handleEditFrame,
                       onDeleteFrame: (key) => handlers.handleDeleteFrame("modbus", key),
                     }}
-                    modbusConfigProps={{
-                      modbusConfig: currentModbusConfig,
-                      onEditConfig: () => openDialog("config"),
-                    }}
                     serialFrameProps={{
-                      catalogContent,
                       editingSignal: forms.editingSignal,
                       onEditFrame: handlers.handleEditFrame,
                       onDeleteFrame: (key) => handlers.handleDeleteFrame("serial", key),
@@ -826,10 +620,7 @@ function CatalogEditorInner() {
                       onAddSignal: (idKey) => handlers.handleAddSignal(idKey, ["frame", "serial", idKey]),
                       onEditSignal: handlers.handleEditSignal,
                       onRequestDeleteSignal: handlers.requestDeleteSignal,
-                      onAddMux: (idKey) => handlers.handleAddMux(idKey, ["frame", "serial", idKey]),
-                    }}
-                    serialConfigProps={{
-                      onEditConfig: () => openDialog("config"),
+                      onAddMux: handlers.handleAddMux,
                     }}
                     fallback={<></>}
                   />
@@ -845,6 +636,7 @@ function CatalogEditorInner() {
       <CatalogDialogs
         editingSignal={forms.editingSignal}
         currentIdForSignal={forms.currentIdForSignal}
+        currentSignalPath={forms.currentSignalPath}
         selectedNode={selectedNode}
         catalogContent={catalogContent}
         signalFields={forms.signalFields}

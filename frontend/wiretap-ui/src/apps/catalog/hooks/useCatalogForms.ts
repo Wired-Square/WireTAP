@@ -5,34 +5,9 @@ import { useState } from "react";
 import type { FrameEditFields } from "../views/FrameEditView";
 import { createDefaultFrameFields } from "../views/frameEditUtils";
 import type { ProtocolType } from "../types";
-import type { DisplayHint } from "../../../types/catalogModel";
+import type { MuxFields, SignalFields } from "../../../types/catalogEdit";
 
-export interface SignalFields {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  factor?: number;
-  offset?: number;
-  unit?: string;
-  signed?: boolean;
-  endianness?: "little" | "big";
-  min?: number;
-  max?: number;
-  format?: string;
-  confidence?: string;
-  enum?: Record<string, string>;
-  display?: DisplayHint;
-  notes?: string;
-}
-
-export interface MuxFields {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  notes?: string;
-}
-
-const DEFAULT_SIGNAL_FIELDS: SignalFields = {
+export const NEW_SIGNAL_FIELDS: SignalFields = {
   name: "",
   start_bit: 0,
   bit_length: 8,
@@ -40,28 +15,14 @@ const DEFAULT_SIGNAL_FIELDS: SignalFields = {
   offset: 0,
   unit: "",
   signed: false,
-  endianness: undefined,
-  min: undefined,
-  max: undefined,
-  format: undefined,
-  confidence: undefined,
-  enum: undefined,
 };
 
-const DEFAULT_MUX_FIELDS: MuxFields = {
-  name: "",
-  start_bit: 0,
-  bit_length: 8,
-};
+export const NEW_MUX_FIELDS: MuxFields = { name: "", start_bit: 0, bit_length: 8 };
 
 export function useCatalogForms() {
-  // Editing mode flags
-  const [editingId, setEditingId] = useState(false);
-  const [editingFrameId, setEditingFrameId] = useState<string | null>(null);
-
   // Signal editing state
   const [editingSignal, setEditingSignal] = useState(false);
-  const [signalFields, setSignalFields] = useState<SignalFields>(DEFAULT_SIGNAL_FIELDS);
+  const [signalFields, setSignalFields] = useState<SignalFields>(NEW_SIGNAL_FIELDS);
   const [editingSignalIndex, setEditingSignalIndex] = useState<number | null>(null);
   const [currentIdForSignal, setCurrentIdForSignal] = useState<string | null>(null);
   const [currentSignalPath, setCurrentSignalPath] = useState<string[]>([]);
@@ -69,7 +30,7 @@ export function useCatalogForms() {
   // Mux editing state
   const [editingMux, setEditingMux] = useState(false);
   const [isEditingExistingMux, setIsEditingExistingMux] = useState(false);
-  const [muxFields, setMuxFields] = useState<MuxFields>(DEFAULT_MUX_FIELDS);
+  const [muxFields, setMuxFields] = useState<MuxFields>(NEW_MUX_FIELDS);
   const [currentMuxPath, setCurrentMuxPath] = useState<string[]>([]);
   const [isAddingNestedMux, setIsAddingNestedMux] = useState(false);
 
@@ -88,7 +49,7 @@ export function useCatalogForms() {
   };
 
   const resetSignalFields = () => {
-    setSignalFields(DEFAULT_SIGNAL_FIELDS);
+    setSignalFields(NEW_SIGNAL_FIELDS);
     setEditingSignalIndex(null);
     setCurrentIdForSignal(null);
     setCurrentSignalPath([]);
@@ -96,7 +57,7 @@ export function useCatalogForms() {
   };
 
   const resetMuxFields = () => {
-    setMuxFields(DEFAULT_MUX_FIELDS);
+    setMuxFields(NEW_MUX_FIELDS);
     setCurrentMuxPath([]);
     setIsAddingNestedMux(false);
     setIsEditingExistingMux(false);
@@ -104,12 +65,6 @@ export function useCatalogForms() {
   };
 
   return {
-    // Frame ID editing
-    editingId,
-    setEditingId,
-    editingFrameId,
-    setEditingFrameId,
-
     // Signal editing
     editingSignal,
     setEditingSignal,

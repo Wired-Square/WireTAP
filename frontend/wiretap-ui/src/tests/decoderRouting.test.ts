@@ -8,7 +8,7 @@ import {
   getTunnelTransactions,
 } from "../stores/decoderStore";
 import type { DecodedFrameMsg, DecodedSignalsEntry, DecodedTunnelMessage, UnroutedFrameMsg } from "../services/wsProtocol";
-import type { ParsedCatalog } from "../utils/catalogParser";
+import type { Catalog } from "../types/catalogModel";
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
@@ -158,10 +158,7 @@ describe("decoderStore.applyDecodedBatch", () => {
 
   it("leaves no Modbus rows behind a swap to a catalogue with no tunnel", () => {
     apply([decoded({ tunnel: [tunnelMessage] })]);
-    useDecoderStore.getState().applyParsedCatalog(
-      { frames: new Map(), protocol: "can", modbusConfig: null, serialConfig: null, pollGroups: [] } as unknown as ParsedCatalog,
-      "plain.toml",
-    );
+    useDecoderStore.getState().applyCatalog({ meta: { name: "plain", version: 1 }, frames: [], protocol: "can" } as unknown as Catalog, [], "plain.toml");
     expect(getTunnelTransactions()).toEqual([]);
   });
 });

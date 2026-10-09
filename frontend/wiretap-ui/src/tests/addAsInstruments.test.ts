@@ -9,7 +9,6 @@ vi.mock("../api/store", () => ({
 }));
 
 import { useDashboardStore } from "../stores/dashboardStore";
-import { catalogToResolved } from "../utils/catalogParser";
 import type { Catalog } from "../types/catalogModel";
 
 // `display-hints.catalog.json` is what `catalog.parse` serves for `display-hints.toml`;
@@ -19,7 +18,7 @@ const fixture = (name: string) => readFileSync(resolve(__dirname, "fixtures", na
 function addAsInstruments(entries: Array<{ frameId: number; signalName: string }>) {
   const catalog = JSON.parse(fixture("display-hints.catalog.json")) as Catalog;
   useDashboardStore.setState({ panels: [], layout: [] });
-  useDashboardStore.getState().applyParsedCatalog(catalogToResolved(catalog, fixture("display-hints.toml")));
+  useDashboardStore.getState().applyCatalog(catalog);
   useDashboardStore.getState().addSignalsAsInstruments(entries);
   return useDashboardStore.getState().panels.map((p) => ({
     signal: `${p.signals[0].frameId}:${p.signals[0].signalName}`,

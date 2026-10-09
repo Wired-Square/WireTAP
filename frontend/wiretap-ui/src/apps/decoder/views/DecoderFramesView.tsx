@@ -5,12 +5,11 @@ import { Calculator, Flag, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter,
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
-import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
 import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textMuted, textDataPrimary, textSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
-import { formatFrameId, formatProtocolFrameId } from "../../../utils/frameIds";
+import { formatFrameId, formatProtocolFrameId, parseFrameId } from "../../../utils/frameIds";
 import { protocolLabel, MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
 import MessageBytes from "../../../components/MessageBytes";
 import { CanFlagBadges, RemoteRequest } from "../../../components/CanFlagMarks";
@@ -28,9 +27,9 @@ import { canEditorFromDecoded, canEditorFromUnmatched } from "../canEditorFromDe
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
-import type { FrameDetail, SignalDef } from "../../../types/decoder";
+import type { Frame, Signal } from "../../../types/catalogModel";
 import type { LRUMap } from "../../../utils/LRUMap";
-import { getAllFrameSignals } from "../../../utils/frameSignals";
+import { allFrameSignals } from "../../../utils/catalogFrames";
 import { bytesToHex, byteToHex, byteToAscii, bytesToAscii } from "../../../utils/byteUtils";
 import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
@@ -41,7 +40,7 @@ import { Input, Select } from "../../../components/forms";
 import { Badge, type BadgeTone } from "../../../components/Badge";
 
 type Props = {
-  frames: FrameDetail[];
+  frames: Frame[];
   selectedIds: Set<string>;
   decoded: LRUMap<number, DecodedFrame>;
   /** Decoded frames keyed by "frameId:sourceAddress" for per-source view mode */
@@ -266,18 +265,14 @@ function brightenColour(colour: string, amount: number): string {
  * Navigate to a frame's definition in the Catalog Editor.
  * Searches tree nodes recursively for a matching frame by numeric ID.
  */
-function navigateToCatalogFrame(frameId: number) {
+function navigateToCatalogFrame({ protocol, key }: Frame) {
   const store = useCatalogEditorStore.getState();
   const { nodes, expandedIds } = store.tree;
 
   function findFrameNode(nodeList: TomlNode[]): TomlNode | null {
     for (const node of nodeList) {
-      if (
-        (node.type === 'can-frame' || node.type === 'serial-frame') &&
-        node.metadata?.idValue
-      ) {
-        const numericId = parseCanId(node.metadata.idValue);
-        if (numericId === frameId) return node;
+      if (node.type.endsWith('-frame') && node.metadata?.frame?.protocol === protocol && node.metadata.frame.key === key) {
+        return node;
       }
       if (node.children) {
         const found = findFrameNode(node.children);
@@ -383,7 +378,7 @@ function FrameCard({
   onFrameContextMenu,
   onSignalContextMenu,
 }: {
-  frame: FrameDetail;
+  frame: Frame;
   decodedFrame: DecodedFrame | undefined;
   displayFrameIdFormat: "hex" | "decimal";
   showRawBytes: boolean;
@@ -405,9 +400,9 @@ function FrameCard({
   /** Mirror validation result for this frame (if it's a mirror frame) */
   mirrorValidation?: MirrorValidationEntry;
   /** Context menu handler for frame header right-click */
-  onFrameContextMenu?: (frame: FrameDetail, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => void;
+  onFrameContextMenu?: (frame: Frame, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => void;
   /** Context menu handler for signal row right-click */
-  onSignalContextMenu?: (frame: FrameDetail, signal: DecodedSignal, position: { x: number; y: number }) => void;
+  onSignalContextMenu?: (frame: Frame, signal: DecodedSignal, position: { x: number; y: number }) => void;
 }) {
   const { t } = useTranslation("decoder");
   // Track which byte indices are currently "bright" (recently changed)
@@ -520,7 +515,7 @@ function FrameCard({
   };
 
   // Check if any of a signal's bytes are currently bright
-  const signalHasBrightBytes = (signal: SignalDef): boolean => {
+  const signalHasBrightBytes = (signal: Signal): boolean => {
     if (brightByteIndices.size === 0) return false;
     const signalBytes = signalByteIndices(signal);
     for (const byteIdx of signalBytes) {
@@ -532,7 +527,7 @@ function FrameCard({
   };
 
   // Get text colour with optional flash brightening (only if signal's bytes are bright)
-  const getTextColour = (baseColour: string | undefined, signal: SignalDef | undefined) => {
+  const getTextColour = (baseColour: string | undefined, signal: Signal | undefined) => {
     if (signal && signalHasBrightBytes(signal)) {
       // When flashing, brighten the colour significantly
       if (baseColour) {
@@ -544,7 +539,7 @@ function FrameCard({
     return baseColour;
   };
 
-  const allSignals = getAllFrameSignals(frame);
+  const allSignals = allFrameSignals(frame);
 
   // Build a mapping from byte index to the confidence colour of the signal that covers it
   // If multiple signals cover a byte, use the first one found (priority based on definition order)
@@ -627,8 +622,8 @@ function FrameCard({
           onFrameContextMenu(frame, decodedFrame, { x: e.clientX, y: e.clientY });
         } : undefined}
       >
-        <span className="font-mono">{renderFrameId(frame.id, frame.isExtended)}</span>
-        <span className={caption}>len {frame.len}</span>
+        <span className="font-mono">{renderFrameId(frame.frameId, frame.isExtended)}</span>
+        <span className={caption}>len {frame.length}</span>
         {/* Modbus register adornments (modbusRegisterType only set for Modbus catalogues) */}
         {frame.modbusRegisterType && (
           <>
@@ -646,7 +641,7 @@ function FrameCard({
         {frame.mirrorOf && (
           <Badge tone="cyan" mono title={`Inherits signals from frame ${frame.mirrorOf}`}>
             <Layers className={iconXs} />
-            Mirror of {formatFrameId(parseCanId(frame.mirrorOf) ?? 0, displayFrameIdFormat)}
+            Mirror of {formatFrameId(parseFrameId(frame.mirrorOf) ?? 0, displayFrameIdFormat)}
           </Badge>
         )}
         {/* Mirror validation badge */}
@@ -784,12 +779,12 @@ function FrameCard({
                   >
                     {decoded.name}
                   </span>
-                  {signalDef?.modbus_register !== undefined && (
+                  {signalDef?.modbusRegister !== undefined && (
                     <span className={`${caption} font-mono`} title="Modbus register">
-                      {modbusRegisterLabel(signalDef.modbus_register, signalDef.modbus_register_count, displayFrameIdFormat)}
+                      {modbusRegisterLabel(signalDef.modbusRegister, signalDef.modbusRegisterCount, displayFrameIdFormat)}
                     </span>
                   )}
-                  {signalDef?._inherited && (
+                  {signalDef?.inherited && (
                     <span
                       className={`${caption} italic flex items-center gap-1 ${
                         signalMismatch === true ? 'text-danger' :
@@ -951,8 +946,8 @@ export default function DecoderFramesView({
   void _onToggleRawBytes; // Silence unused variable warning
   void _frameIdFilter; // Frame ID filtering is done at processing level in Decoder.tsx
   const proto = protocol ?? 'can';
-  const selectedFrames = frames.filter((f) => selectedIds.has(frameKey(proto, f.id)));
-  const deselectedFrames = frames.filter((f) => !selectedIds.has(frameKey(proto, f.id)));
+  const selectedFrames = frames.filter((f) => selectedIds.has(frameKey(proto, f.frameId)));
+  const deselectedFrames = frames.filter((f) => !selectedIds.has(frameKey(proto, f.frameId)));
 
   // Use stream start time for delta-start calculation (passed from store)
   const startTimeSeconds = streamStartTimeSeconds ?? undefined;
@@ -1087,13 +1082,13 @@ export default function DecoderFramesView({
   // ── Context menu state ──
 
   const [frameContextMenu, setFrameContextMenu] = useState<{
-    frame: FrameDetail;
+    frame: Frame;
     decodedFrame: DecodedFrame | undefined;
     position: { x: number; y: number };
   } | null>(null);
 
   const handleFrameContextMenu = useCallback(
-    (frame: FrameDetail, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => {
+    (frame: Frame, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => {
       setSignalContextMenu(null);
       setUnmatchedContextMenu(null);
       setFrameContextMenu({ frame, decodedFrame, position });
@@ -1106,13 +1101,13 @@ export default function DecoderFramesView({
   }, []);
 
   const [signalContextMenu, setSignalContextMenu] = useState<{
-    frame: FrameDetail;
+    frame: Frame;
     signal: DecodedSignal;
     position: { x: number; y: number };
   } | null>(null);
 
   const handleSignalContextMenu = useCallback(
-    (frame: FrameDetail, signal: DecodedSignal, position: { x: number; y: number }) => {
+    (frame: Frame, signal: DecodedSignal, position: { x: number; y: number }) => {
       setFrameContextMenu(null);
       setUnmatchedContextMenu(null);
       setSignalContextMenu({ frame, signal, position });
@@ -1148,7 +1143,7 @@ export default function DecoderFramesView({
   const frameContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!frameContextMenu) return [];
     const { frame, decodedFrame } = frameContextMenu;
-    const formattedId = formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended);
+    const formattedId = formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended);
     const rawBytes = decodedFrame?.rawBytes ?? [];
     const hexData = rawBytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
@@ -1167,7 +1162,7 @@ export default function DecoderFramesView({
       {
         label: 'Filter',
         icon: <Filter />,
-        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.id)); },
+        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.frameId)); },
       },
       {
         label: 'Solo',
@@ -1175,7 +1170,7 @@ export default function DecoderFramesView({
         onClick: () => {
           const store = useDecoderStore.getState();
           store.deselectAllFrames();
-          store.toggleFrameSelection(frameKey(proto, frame.id));
+          store.toggleFrameSelection(frameKey(proto, frame.frameId));
         },
       },
       { separator: true, label: '', onClick: () => {} },
@@ -1207,7 +1202,7 @@ export default function DecoderFramesView({
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('flow');
-          gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
           openPanel("dashboard");
         },
@@ -1217,7 +1212,7 @@ export default function DecoderFramesView({
         icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const allSignals = getAllFrameSignals(frame);
+          const allSignals = allFrameSignals(frame);
           const numericSignals = allSignals.filter(s => {
             const fmt = s.format;
             return !fmt || !['enum', 'ascii', 'utf8', 'hex'].includes(fmt);
@@ -1231,10 +1226,10 @@ export default function DecoderFramesView({
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('line-chart');
-          gStore.updatePanel(panelId, { title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          gStore.updatePanel(panelId, { title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
           for (const signal of numericSignals) {
             if (signal.name) {
-              gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
+              gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit);
             }
           }
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
@@ -1244,7 +1239,7 @@ export default function DecoderFramesView({
       {
         label: 'Edit in Catalog',
         icon: <Pencil />,
-        onClick: () => { navigateToCatalogFrame(frame.id); },
+        onClick: () => { navigateToCatalogFrame(frame); },
       },
       ...(onAddEvent
         ? [
@@ -1272,7 +1267,7 @@ export default function DecoderFramesView({
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('flow');
-          gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
           openPanel("dashboard");
         },
@@ -1289,7 +1284,7 @@ export default function DecoderFramesView({
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('line-chart');
-          gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
+          gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit);
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
           openPanel("dashboard");
         },
@@ -1539,12 +1534,12 @@ export default function DecoderFramesView({
               // Single view: most recent message per frame ID
               // When hideUnseen is true, only show frames that have been decoded
               selectedFrames
-                .filter((f) => !hideUnseen || decodedFor(f.id) !== undefined)
+                .filter((f) => !hideUnseen || decodedFor(f.frameId) !== undefined)
                 .map((f) => (
                   <FrameCard
-                    key={f.id}
+                    key={f.frameId}
                     frame={f}
-                    decodedFrame={decodedFor(f.id)}
+                    decodedFrame={decodedFor(f.frameId)}
                     displayFrameIdFormat={displayFrameIdFormat}
                     showRawBytes={showRawBytes}
                     showAsciiGutter={showAsciiGutter}
@@ -1552,7 +1547,7 @@ export default function DecoderFramesView({
                     displayTimeFormat={displayTimeFormat}
                     onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                     startTimeSeconds={startTimeSeconds}
-                    mirrorValidation={mirrorValidation?.get(f.id)}
+                    mirrorValidation={mirrorValidation?.get(f.frameId)}
                     onFrameContextMenu={handleFrameContextMenu}
                     onSignalContextMenu={handleSignalContextMenu}
                   />
@@ -1568,7 +1563,7 @@ export default function DecoderFramesView({
                     const [frameIdStr, sourceAddrStr] = key.split(':');
                     const frameId = parseInt(frameIdStr, 10);
                     const sourceAddr = parseInt(sourceAddrStr, 10);
-                    if (frameId === f.id && !isNaN(sourceAddr)) {
+                    if (frameId === f.frameId && !isNaN(sourceAddr)) {
                       // Apply header field filter to per-source entries
                       let passesFilter = true;
                       if (headerFieldFilters && headerFieldFilters.size > 0) {
@@ -1592,7 +1587,7 @@ export default function DecoderFramesView({
 
                   // If no per-source data yet, fall back to single decoded entry (if it passes filter)
                   if (sourceEntries.length === 0) {
-                    const singleDecoded = decodedFor(f.id);
+                    const singleDecoded = decodedFor(f.frameId);
                     if (singleDecoded) {
                       sourceEntries.push({
                         sourceAddress: singleDecoded.sourceAddress ?? 0,
@@ -1605,10 +1600,10 @@ export default function DecoderFramesView({
                 })
                 .filter(({ sourceEntries }) => !hideUnseen || sourceEntries.length > 0)
                 .map(({ frame: f, sourceEntries }) => (
-                  <div key={f.id} className="space-y-2">
+                  <div key={f.frameId} className="space-y-2">
                     {sourceEntries.map(({ sourceAddress, decodedFrame }) => (
                       <FrameCard
-                        key={`${f.id}:${sourceAddress}`}
+                        key={`${f.frameId}:${sourceAddress}`}
                         frame={f}
                         decodedFrame={decodedFrame}
                         displayFrameIdFormat={displayFrameIdFormat}
@@ -1619,7 +1614,7 @@ export default function DecoderFramesView({
                         displayTimeFormat={displayTimeFormat}
                         onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                         startTimeSeconds={startTimeSeconds}
-                        mirrorValidation={mirrorValidation?.get(f.id)}
+                        mirrorValidation={mirrorValidation?.get(f.frameId)}
                         onFrameContextMenu={handleFrameContextMenu}
                         onSignalContextMenu={handleSignalContextMenu}
                       />
@@ -1662,9 +1657,9 @@ export default function DecoderFramesView({
             )}
             {deselectedFrames.map((f) => (
               <FrameCard
-                key={f.id}
+                key={f.frameId}
                 frame={f}
-                decodedFrame={decoded.peek(f.id)}
+                decodedFrame={decoded.peek(f.frameId)}
                 displayFrameIdFormat={displayFrameIdFormat}
                 showRawBytes={showRawBytes}
                 showAsciiGutter={showAsciiGutter}
@@ -1672,7 +1667,7 @@ export default function DecoderFramesView({
                 displayTimeFormat={displayTimeFormat}
                 onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                 startTimeSeconds={startTimeSeconds}
-                mirrorValidation={mirrorValidation?.get(f.id)}
+                mirrorValidation={mirrorValidation?.get(f.frameId)}
                 onFrameContextMenu={handleFrameContextMenu}
                 onSignalContextMenu={handleSignalContextMenu}
               />

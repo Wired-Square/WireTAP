@@ -64,6 +64,7 @@ describe("Payload Changes text pattern", () => {
   beforeEach(async () => {
     useDiscoveryToolboxStore.getState().setChangesResults({
       tool: "changes",
+      window: { captureId: "capture", selection: [] },
       frameCount: 100,
       frames: [frame],
       mirrors: [],

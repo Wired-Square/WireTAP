@@ -8,10 +8,9 @@ import { cardClass } from "../../../components/Card";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { pickFileToSave, CATALOG_FILTERS, DBC_FILTERS, HTML_FILTERS, MARKDOWN_FILTERS, TEXT_FILTERS, type DialogFilter } from "../../../api/dialogs";
 import { exportDbcWs, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
-import { tomlParse } from "../toml";
-import { generateCatalogReport, type CatalogReportFormat } from "../../../utils/catalogReport";
+import { catalogReport } from "../../../api/reports";
+import { renderReport } from "../../../utils/reportExport";
 import { useSettings } from "../../../hooks/useSettings";
-import type { CatalogDoc } from "../../../types/catalog";
 import { Button } from "../../../components/Button";
 import { SecondaryButton, Select, Radio } from "../../../components/forms";
 
@@ -142,10 +141,9 @@ export default function ExportCatalogDialog({
           : catalogContent;
         await saveCatalog(path, output);
       } else {
-        // Generate report - parse TOML and generate report content
-        const catalogDoc = tomlParse(catalogContent) as CatalogDoc;
-        const reportFormat = format as CatalogReportFormat;
-        const content = generateCatalogReport(catalogDoc, reportFormat);
+        const content = await renderReport(format as Exclude<CatalogExportFormat, "toml" | "dbc">, `Catalogue Report — ${baseName}`, (f) =>
+          catalogReport(catalogContent, f),
+        );
         await saveCatalog(path, content);
       }
 

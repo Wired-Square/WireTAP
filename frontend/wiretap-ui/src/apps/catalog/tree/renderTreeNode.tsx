@@ -3,14 +3,13 @@
 import React from "react";
 import {
   ChevronDown, ChevronRight, Link2, Layers,
-  Network, Server, Cable, Zap, Lock, ClipboardList, Settings, User, Shuffle, MapPin,
+  Network, Server, Cable, Zap, Lock, ClipboardList, User, Shuffle, MapPin,
   type LucideIcon,
 } from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { hoverLight } from "../../../styles";
 import { textMuted, textSecondary } from "../../../styles/colourTokens";
 import { formatFrameId as formatId } from "../../../utils/frameIds";
-import { parseCanIdToNumber } from "../utils";
 import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
@@ -36,9 +35,6 @@ const NODE_ICON: Record<string, { Icon: LucideIcon; cls: string }> = {
   "can-frame":     { Icon: Network,  cls: "text-green" },
   "modbus-frame":  { Icon: Server,   cls: "text-amber" },
   "serial-frame":  { Icon: Cable,    cls: "text-purple" },
-  "can-config":    { Icon: Settings, cls: textMuted },
-  "modbus-config": { Icon: Settings, cls: textMuted },
-  "serial-config": { Icon: Settings, cls: textMuted },
   signal:          { Icon: Zap,           cls: "text-amber" },
   checksum:        { Icon: Lock,          cls: textMuted },
   meta:            { Icon: ClipboardList, cls: textMuted },
@@ -64,8 +60,12 @@ export function createRenderTreeNode({
     const isExpanded = expandedNodes.has(nodePath);
     const hasChildren = !!node.children && node.children.length > 0 && node.type !== "meta";
     const isSelected = (selectedNode?.path.join(".") ?? "") === nodePath;
-    const isCopy = node.metadata?.isCopy;
-    const isMirror = node.metadata?.isMirror;
+    const { frame, signal, mux, muxCase, checksum, nodeDef } = node.metadata ?? {};
+    const notes = (frame ?? signal ?? mux ?? muxCase ?? checksum ?? nodeDef)?.notes;
+    const note = (max: number) => {
+      const first = notes?.[0];
+      return first && first.length > max ? first.slice(0, max) + "..." : first;
+    };
 
     return (
       <div key={nodePath}>
@@ -96,13 +96,13 @@ export function createRenderTreeNode({
           )}
 
           <span className="text-sm truncate flex items-center gap-1.5">
-            {isCopy && (
-              <span title={`Copied from ${node.metadata?.copyFrom}`}>
+            {frame?.copyFrom && (
+              <span title={`Copied from ${frame.copyFrom}`}>
                 <Link2 className={`${iconSm} text-blue flex-shrink-0`} />
               </span>
             )}
-            {isMirror && (
-              <span title={`Mirror of ${node.metadata?.mirrorOf}`}>
+            {frame?.mirrorOf && (
+              <span title={`Mirror of ${frame.mirrorOf}`}>
                 <Layers className={`${iconSm} text-purple flex-shrink-0`} />
               </span>
             )}
@@ -112,16 +112,9 @@ export function createRenderTreeNode({
               const { Icon, cls } = icon;
               return <Icon className={`${iconSm} ${cls} flex-shrink-0`} />;
             })()}
-            {node.type === "can-frame" ? (() => {
-              const num = parseCanIdToNumber(node.key);
-              const id = num !== null
-                ? formatId(num, displayFrameIdFormat, node.metadata?.extended)
-                : node.key;
-              const notes = node.metadata?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 40
-                ? firstNote.slice(0, 40) + "..."
-                : firstNote;
+            {node.type === "can-frame" && frame ? (() => {
+              const id = formatId(frame.frameId, displayFrameIdFormat, frame.isExtended);
+              const truncatedNote = note(40);
               return (
                 <span className="flex flex-col">
                   <span>{id}</span>
@@ -132,12 +125,9 @@ export function createRenderTreeNode({
                   )}
                 </span>
               );
-            })() : node.type === "modbus-frame" ? (() => {
-              const regNum = node.metadata?.registerNumber;
-              const regType = node.metadata?.registerType;
-              const address = typeof regNum === "number"
-                ? formatId(regNum, displayFrameIdFormat)
-                : undefined;
+            })() : node.type === "modbus-frame" && frame ? (() => {
+              const regType = frame.modbusRegisterType;
+              const address = formatId(frame.frameId, displayFrameIdFormat);
               // The colour conveys the register type, so the row drops the `[holding]` text.
               const tone = regType ? MODBUS_REGISTER_TONES[regType as ModbusRegisterType] : undefined;
               return (
@@ -150,23 +140,15 @@ export function createRenderTreeNode({
                   <span>{node.key}</span>
                 </span>
               );
-            })() : node.type === "mux" ? (() => {
-              const notes = node.metadata?.properties?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 30
-                ? firstNote.slice(0, 30) + "..."
-                : firstNote;
-              const hasStartBit = node.metadata?.muxStartBit !== undefined;
-              const hasBitLength = node.metadata?.muxBitLength !== undefined;
+            })() : node.type === "mux" && mux ? (() => {
+              const truncatedNote = note(30);
               return (
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
-                    {hasStartBit && hasBitLength && (
-                      <span className={`${textSecondary} text-xs`}>
-                        ({node.metadata?.muxStartBit}:{node.metadata?.muxBitLength})
-                      </span>
-                    )}
+                    <span className={`${textSecondary} text-xs`}>
+                      ({mux.startBit}:{mux.bitLength})
+                    </span>
                   </span>
                   {truncatedNote && (
                     <span className={`${textSecondary} text-xs italic`}>
@@ -176,11 +158,7 @@ export function createRenderTreeNode({
                 </span>
               );
             })() : node.type === "mux-case" ? (() => {
-              const notes = node.metadata?.properties?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 30
-                ? firstNote.slice(0, 30) + "..."
-                : firstNote;
+              const truncatedNote = note(30);
               return (
                 <span className="flex flex-col">
                   <span>{node.key}</span>
@@ -191,18 +169,14 @@ export function createRenderTreeNode({
                   )}
                 </span>
               );
-            })() : node.type === "signal" ? (() => {
-              const notes = node.metadata?.properties?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 30
-                ? firstNote.slice(0, 30) + "..."
-                : firstNote;
-              const hasStartBit = node.metadata?.signalStartBit !== undefined;
-              const hasBitLength = node.metadata?.signalBitLength !== undefined;
+            })() : node.type === "signal" && signal ? (() => {
+              const truncatedNote = note(30);
+              const hasStartBit = signal.startBit !== undefined;
+              const hasBitLength = signal.bitLength !== undefined;
               // Modbus signals carry a synthesised per-signal register address
               // (frame base + bit offset) — surface it as a badge so the
               // multi-register layout is visible in the tree.
-              const sigReg = node.metadata?.properties?.modbus_register;
+              const sigReg = signal.modbusRegister;
               return (
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
@@ -214,7 +188,7 @@ export function createRenderTreeNode({
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
                       <span className={`${textSecondary} text-xs`}>
-                        ({node.metadata?.signalStartBit}:{node.metadata?.signalBitLength})
+                        ({signal.startBit}:{signal.bitLength})
                       </span>
                     )}
                   </span>
@@ -225,29 +199,18 @@ export function createRenderTreeNode({
                   )}
                 </span>
               );
-            })() : node.type === "checksum" ? (() => {
-              const notes = node.metadata?.properties?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 30
-                ? firstNote.slice(0, 30) + "..."
-                : firstNote;
-              const algorithm = node.metadata?.checksumAlgorithm;
-              const startByte = node.metadata?.checksumStartByte;
-              const byteLength = node.metadata?.checksumByteLength;
+            })() : node.type === "checksum" && checksum ? (() => {
+              const truncatedNote = note(30);
               return (
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
-                    {algorithm && (
-                      <span className="text-purple text-xs font-medium">
-                        [{algorithm}]
-                      </span>
-                    )}
-                    {startByte !== undefined && byteLength !== undefined && (
-                      <span className={`${textSecondary} text-xs`}>
-                        (byte {startByte}:{byteLength})
-                      </span>
-                    )}
+                    <span className="text-purple text-xs font-medium">
+                      [{checksum.algorithm}]
+                    </span>
+                    <span className={`${textSecondary} text-xs`}>
+                      (byte {checksum.startByte}:{checksum.byteLength})
+                    </span>
                   </span>
                   {truncatedNote && (
                     <span className={`${textSecondary} text-xs italic`}>
@@ -257,11 +220,7 @@ export function createRenderTreeNode({
                 </span>
               );
             })() : node.type === "node" ? (() => {
-              const notes = node.metadata?.properties?.notes;
-              const firstNote = Array.isArray(notes) ? notes[0] : notes;
-              const truncatedNote = firstNote && firstNote.length > 30
-                ? firstNote.slice(0, 30) + "..."
-                : firstNote;
+              const truncatedNote = note(30);
               return (
                 <span className="flex flex-col">
                   <span>{node.key}</span>
@@ -274,13 +233,6 @@ export function createRenderTreeNode({
               );
             })() : (
               node.key
-            )}
-            {node.type === "array" && ` [${node.metadata?.arrayItems?.length || 0}]`}
-            {node.type === "value" && node.value !== undefined && (
-              <span className={`${textSecondary} ml-1`}>
-                = {String(node.value).substring(0, 20)}
-                {String(node.value).length > 20 ? "..." : ""}
-              </span>
             )}
           </span>
         </div>

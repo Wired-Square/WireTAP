@@ -5,25 +5,23 @@ import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { caption, labelSmallMuted, monoBody, bgSurface, sectionHeaderText, hoverLight } from "../../../styles";
-import BitPreview, { BitRange } from "../../../components/BitPreview";
+import BitPreview from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
-import { tomlParse } from "../toml";
-import { getFrameByteLengthFromPath } from "../utils";
+import type { Mux } from "../../../types/catalogModel";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
 import { Button, IconButton } from "../../../components/Button";
 import { Card } from "../../../components/Card";
 export type MuxViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
   onAddCase: (muxPath: string[]) => void;
-  onEditMux: (muxPath: string[], muxData: any) => void;
+  onEditMux: (muxPath: string[], mux: Mux) => void;
   onDeleteMux: (muxPath: string[]) => void;
   onSelectNode: (node: TomlNode) => void;
 };
 
 export default function MuxView({
   selectedNode,
-  catalogContent,
   onAddCase,
   onEditMux,
   onDeleteMux,
@@ -32,48 +30,16 @@ export default function MuxView({
   const { t } = useTranslation("catalog");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
-  const { ranges, numBytes } = React.useMemo(() => {
-    const r: BitRange[] = [];
-    let bytes = 8;
-    try {
-      const parsed = tomlParse(catalogContent) as any;
-      const protocol = selectedNode.path[1];
-      const frameKey = selectedNode.path[2];
-      const frame = parsed?.frame?.[protocol]?.[frameKey];
-      bytes = getFrameByteLengthFromPath(selectedNode.path, parsed);
-
-      // Frame-level signals
-      if (frame?.signals) {
-        frame.signals.forEach((signal: any) => {
-          r.push({
-            name: signal.name || "Signal",
-            start_bit: signal.start_bit || 0,
-            bit_length: signal.bit_length || 8,
-            type: "signal",
-          });
-        });
-      }
-
-      // Mux selector range
-      if (frame?.mux) {
-        r.push({
-          name: frame.mux.name || "Mux",
-          start_bit: frame.mux.start_bit || 0,
-          bit_length: frame.mux.bit_length || 8,
-          type: "mux",
-        });
-      }
-    } catch {
-      // fall back to defaults
-    }
-    return { ranges: r, numBytes: bytes };
-  }, [catalogContent, selectedNode.path]);
+  const mux = selectedNode.metadata!.mux!;
+  const editable = !selectedNode.metadata?.inherited;
+  const layout = useFrameLayout(selectedNode.path);
+  const ranges = previewRanges(layout);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-primary">{t("muxView.title")}</h3>
-        <div className={flexRowGap2}>
+        {editable && <div className={flexRowGap2}>
           <Button
             onClick={() => onAddCase(selectedNode.path)}
             variant="solid"
@@ -84,7 +50,7 @@ export default function MuxView({
           </Button>
 
           <IconButton
-            onClick={() => onEditMux(selectedNode.path, selectedNode.metadata?.properties || {})}
+            onClick={() => onEditMux(selectedNode.path, mux)}
             title={t("muxView.editMux")}
           >
             <Pencil className={`${iconMd} text-secondary`} />
@@ -98,23 +64,23 @@ export default function MuxView({
           >
             <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
-        </div>
+        </div>}
       </div>
 
       <div className={`p-3 ${bgSurface} rounded-lg`}>
         <div className={labelSmallMuted}>{t("muxView.name")}</div>
         <div className={monoBody}>
-          {selectedNode.metadata?.muxName || t("muxView.nameNa")}
+          {mux.name || t("muxView.nameNa")}
         </div>
       </div>
 
-      {ranges.length > 0 && (
+      {layout && ranges.length > 0 && (
         <div className="p-4 bg-surface rounded-lg">
           <div className="text-xs font-medium text-secondary mb-3">
             {t("muxView.byteLayout")}
           </div>
           <BitPreview
-            numBytes={numBytes}
+            numBytes={layout.byteLength}
             ranges={ranges}
             currentStartBit={0}
             currentBitLength={0}
@@ -124,22 +90,20 @@ export default function MuxView({
         </div>
       )}
 
-      {selectedNode.metadata?.properties?.notes && (
+      {mux.notes && (
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("muxView.notes")}</div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
-            {Array.isArray(selectedNode.metadata.properties.notes)
-              ? selectedNode.metadata.properties.notes.join("\n")
-              : selectedNode.metadata.properties.notes}
+            {mux.notes.join("\n")}
           </div>
         </div>
       )}
 
-      {selectedNode.metadata?.muxDefaultCase && (
+      {mux.default && (
         <Card tone="info">
           <div className="text-xs font-medium text-info mb-1">{t("muxView.defaultCase")}</div>
           <div className="font-mono text-sm text-info">
-            {selectedNode.metadata.muxDefaultCase}
+            {mux.default}
           </div>
         </Card>
       )}
@@ -151,7 +115,7 @@ export default function MuxView({
           </div>
           <div className="space-y-2">
             {selectedNode.children.map((caseNode, idx) => {
-              const caseSignals = caseNode.metadata?.properties?.signals || [];
+              const caseSignals = caseNode.metadata?.muxCase?.signals ?? [];
               return (
                 <div
                   key={idx}
@@ -167,11 +131,11 @@ export default function MuxView({
                   </div>
                   {caseSignals.length > 0 && (
                     <div className={`${caption} mt-1 ml-6 space-y-0.5`}>
-                      {caseSignals.map((sig: any, sIdx: number) => (
+                      {caseSignals.map((sig, sIdx) => (
                         <div key={sIdx} className="truncate">
                           ⚡ {sig.name || t("muxView.signalDefault", { idx: sIdx + 1 })}
                           <span className="ml-1 text-muted">
-                            ({sig.start_bit ?? 0}:{sig.bit_length ?? 0})
+                            ({sig.startBit ?? 0}:{sig.bitLength ?? 0})
                           </span>
                         </div>
                       ))}
@@ -188,7 +152,7 @@ export default function MuxView({
         open={confirmOpen}
         title={t("muxView.deleteMuxTitle")}
         message={t("muxView.deleteMuxMessage")}
-        highlightText={selectedNode.metadata?.muxName || undefined}
+        highlightText={mux.name || undefined}
         confirmText={t("muxView.deleteLabel")}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {

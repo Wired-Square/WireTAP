@@ -1,0 +1,8 @@
+[id."0x10"]
+name = "Legacy keyed frame"
+length = 4
+
+[[id."0x10".signals]]
+name = "Legacy"
+start_bit = 0
+bit_length = 8

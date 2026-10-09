@@ -1,0 +1,106 @@
+{
+  "cases": [
+    {
+      "name": "serial",
+      "input": "catalog/serial.catalog.json",
+      "expected": [
+        {
+          "key": "meta",
+          "type": "meta",
+          "path": "meta"
+        },
+        {
+          "key": "frame",
+          "type": "section",
+          "path": "frame",
+          "children": [
+            {
+              "key": "serial",
+              "type": "section",
+              "path": "frame.serial",
+              "children": [
+                {
+                  "key": "0x10",
+                  "type": "serial-frame",
+                  "path": "frame.serial.0x10",
+                  "children": [
+                    {
+                      "key": "Frame CRC",
+                      "type": "checksum",
+                      "path": "frame.serial.0x10.checksum.0"
+                    },
+                    {
+                      "key": "Voltage",
+                      "type": "signal",
+                      "path": "frame.serial.0x10.signals.0"
+                    },
+                    {
+                      "key": "Flags",
+                      "type": "signal",
+                      "path": "frame.serial.0x10.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x20",
+                  "type": "serial-frame",
+                  "path": "frame.serial.0x20",
+                  "children": [
+                    {
+                      "key": "Page",
+                      "type": "mux",
+                      "path": "frame.serial.0x20.mux",
+                      "children": [
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.serial.0x20.mux.1",
+                          "children": [
+                            {
+                              "key": "Temperature",
+                              "type": "signal",
+                              "path": "frame.serial.0x20.mux.1.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 2-3",
+                          "type": "mux-case",
+                          "path": "frame.serial.0x20.mux.2-3",
+                          "children": [
+                            {
+                              "key": "Counter",
+                              "type": "signal",
+                              "path": "frame.serial.0x20.mux.2-3.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "heartbeat",
+                  "type": "serial-frame",
+                  "path": "frame.serial.heartbeat"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "node",
+          "type": "section",
+          "path": "node",
+          "children": [
+            {
+              "key": "Controller",
+              "type": "node",
+              "path": "node.Controller"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

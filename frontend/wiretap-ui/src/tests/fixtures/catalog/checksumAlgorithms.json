@@ -1,0 +1,57 @@
+{
+  "note": "ids are wiretap_checksum all_algorithm_ids(); `bytes` is ChecksumAlgorithm::output_bytes, null for a parameterised id whose width is its declaration's byte_length",
+  "algorithms": [
+    {
+      "id": "xor",
+      "bytes": 1
+    },
+    {
+      "id": "sum8",
+      "bytes": 1
+    },
+    {
+      "id": "crc8",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_sae_j1850",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_autosar",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_maxim",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_cdma2000",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_dvb_s2",
+      "bytes": 1
+    },
+    {
+      "id": "crc8_nissan",
+      "bytes": 1
+    },
+    {
+      "id": "crc16_modbus",
+      "bytes": 2
+    },
+    {
+      "id": "crc16_ccitt",
+      "bytes": 2
+    },
+    {
+      "id": "crc_custom",
+      "bytes": null
+    },
+    {
+      "id": "sum8_negated",
+      "bytes": null
+    }
+  ]
+}

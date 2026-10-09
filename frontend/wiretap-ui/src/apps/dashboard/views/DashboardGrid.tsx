@@ -17,6 +17,7 @@ import {
   exportSvgElementAsPng,
   exportChartAsSvg,
 } from "../utils/dashboardExportImage";
+import { BYTE_NAMES } from "../../../generated/byteNames";
 
 interface Props {
   onOpenPanelConfig: (panelId: string) => void;
@@ -136,7 +137,7 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
       const signals = panel.type === 'flow'
         ? Array.from({ length: panel.byteCount ?? 8 }, (_, i) => ({
             frameId: panel.targetFrameId!,
-            signalName: `byte[${i}]`,
+            signalName: BYTE_NAMES[i],
             colour: BYTE_COLOURS[i % 8],
           }))
         : panel.signals;

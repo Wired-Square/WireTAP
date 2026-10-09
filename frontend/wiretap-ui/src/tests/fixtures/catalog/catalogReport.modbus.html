@@ -1,0 +1,69 @@
+<h1>Catalogue Report — Inverter registers</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Version</th><td>3</td></tr>
+<tr><th>Frames</th><td>4 frames</td></tr>
+<tr><th>Multiplexed</th><td>0 frames</td></tr>
+<tr><th>Signals</th><td>4 (1 enum)</td></tr>
+<tr><th>Confidence</th><td>1 high, 0 medium, 0 low, 3 none</td></tr>
+<tr><th>Byte order</th><td>Modbus big-endian</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>Modbus frames</h2>
+<section class="level-3">
+<h3>Register 100</h3>
+<table class="fields">
+<tr><th>Length</th><td>1 byte</td></tr>
+<tr><th>Interval</th><td>1,000 ms (default)</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/4</td><td><code>Relays</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>Register 5000</h3>
+<table class="fields">
+<tr><th>Length</th><td>4 bytes</td></tr>
+<tr><th>Interval</th><td>1,000 ms (default)</td></tr>
+<tr><th>Notes</th><td>Running state; Read every second</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Daily_Yield</code></td><td>×0.1</td><td>kWh</td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>battery_power (register 13021)</h3>
+<table class="fields">
+<tr><th>Length</th><td>2 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+<tr><th>Interval</th><td>500 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Battery_Power</code></td><td>—</td><td>W</td><td>yes</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x32F9 (register 13049)</h3>
+<table class="fields">
+<tr><th>Length</th><td>2 bytes</td></tr>
+<tr><th>Interval</th><td>1,000 ms (default)</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Mode</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td>0=Stop, 1=Run</td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>

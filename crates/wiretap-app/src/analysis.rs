@@ -263,7 +263,7 @@ pub struct ProtocolOrder {
 
 /// The frame a cycle is walked from, in place of the likeliest start ids; under
 /// every protocol when none is named.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OrderStart {
@@ -300,7 +300,12 @@ pub async fn message_order(
     start: Option<&OrderStart>,
 ) -> Result<Vec<ProtocolOrder>, String> {
     let frames = source.frames(selection, newest).await?;
-    Ok(timed_by_protocol(frames)
+    Ok(orders_of(timed_by_protocol(frames), start))
+}
+
+/// Message order per protocol over frames already read.
+pub fn orders_of(timed: BTreeMap<String, Vec<TimedFrame>>, start: Option<&OrderStart>) -> Vec<ProtocolOrder> {
+    timed
         .into_iter()
         .map(|(protocol, frames)| {
             let start = start
@@ -308,7 +313,7 @@ pub async fn message_order(
                 .map(|s| FrameKey::new(s.frame_id, s.is_extended));
             ProtocolOrder { order: analyse_order(&frames, start), protocol }
         })
-        .collect())
+        .collect()
 }
 
 /// Frame ids fetched before a batch is analysed. Bounds resident payloads while

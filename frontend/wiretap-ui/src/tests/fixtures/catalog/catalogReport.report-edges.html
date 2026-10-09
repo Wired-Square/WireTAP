@@ -1,0 +1,97 @@
+<h1>Catalogue Report — Report edges</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Version</th><td>2</td></tr>
+<tr><th>Frames</th><td>4 frames (3 CAN, 1 Modbus)</td></tr>
+<tr><th>Multiplexed</th><td>1 frame</td></tr>
+<tr><th>Signals</th><td>6 (1 enum)</td></tr>
+<tr><th>Confidence</th><td>0 high, 1 medium, 1 low, 4 none</td></tr>
+<tr><th>Byte order</th><td>CAN little-endian, Modbus big-endian</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>CAN frames</h2>
+<section class="level-3">
+<h3>0x100 — Decimal key</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Interval</th><td>50 ms</td></tr>
+<tr><th>Bus</th><td>0</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Big</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-override">BE</span></td><td><span class="badge conf-none">none</span></td><td></td><td></td></tr>
+<tr><td>16/8</td><td><code>&lt;Tagged &amp; 'quoted'&gt;</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-override">LE</span></td><td><span class="badge conf-none">none</span></td><td>0=Off, 1=On</td><td>first; second</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x7FF</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Interval</th><td>20 ms</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x18FF0010</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Interval</th><td>1,000 ms</td></tr>
+<tr><th>Bus</th><td>1</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux at bits 0/8</h4>
+<table class="fields">
+<tr><th>Notes</th><td>selector; page</td></tr>
+</table>
+<section class="level-5">
+<h5>Case 0-3</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/8</td><td><code>Low</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 10,12</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/16</td><td><code>High</code></td><td>×0.5 − 10</td><td>A</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td></tr>
+</tbody>
+</table>
+<section class="level-6">
+<h6>Mux Inner at bits 24/4</h6>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>28/4</td><td><code>Deep</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+</section>
+</section>
+</section>
+<section class="level-2">
+<h2>Modbus frames</h2>
+<section class="level-3">
+<h3>Register 5000</h3>
+<table class="fields">
+<tr><th>Length</th><td>2 bytes</td></tr>
+<tr><th>Interval</th><td>5,000 ms (default)</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Not in the report</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>

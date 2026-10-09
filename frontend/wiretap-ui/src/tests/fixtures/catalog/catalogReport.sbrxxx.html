@@ -1,0 +1,1410 @@
+<h1>Catalogue Report — SBRXXX</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Version</th><td>11</td></tr>
+<tr><th>Frames</th><td>78 frames (76 CAN, 2 Modbus)</td></tr>
+<tr><th>Multiplexed</th><td>7 frames</td></tr>
+<tr><th>Signals</th><td>170 (13 enum)</td></tr>
+<tr><th>Confidence</th><td>117 high, 12 medium, 17 low, 24 none</td></tr>
+<tr><th>Byte order</th><td>CAN little-endian, Modbus big-endian</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>CAN frames</h2>
+<section class="level-3">
+<h3>0x000</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x001</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x002</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x003</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x004</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x005</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/8</td><td><code>Status_Battery_End_Stop</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>0=Normal, 1=Full, 2=Empty, 3=Suspended, 16=Maintenance, 17=Maintenance, Full</td><td>Carried only on the 0x0NN copy — byte 1 is 0 on the 0x505/0x705 copies, hence the local declaration. Bits 0-1 are a state code and bit 4 an independent maintenance flag; they combine, giving 16 and 17. Share of 28.7 M samples: 0 = 72.0 %, 1 = 26.6 %, 2 = 1.16 %, 3 = 0.18 %, 16 = 0.066 %, 17 = 0.001 %. Value 1 coincides with SoC = 100 % and Info_Battery_Max_Charge_Current at 0x701 reading exactly 0 for the whole window. Value 2 tracks the SoC floor but does not stop discharge — Info_Battery_Max_Discharge_Current held 261-298 dA through a 14 h value-2 window. Value 3 is not a both-ends-reached condition: the pack is online but passing no current while still advertising 30 A in both directions and reporting Run, making it the only indication that those limits are not live. Seen during BMS restart (35-47 s, with 705_End_Stop reading 2 over the same window) and during commanded maintenance (no 0x705 counterpart, lasting up to ~9 h).</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x006</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x007</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x008</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>mux</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x009</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x00A</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>mux</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x00B</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x00D</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x00E</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+<tr><th>Notes</th><td>Only transmitted on INIT</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x013</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x014</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x015</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x016</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x017</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x018</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x019</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x01A</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x01B</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x01C</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x01D</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x01E</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x100</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>100</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x101</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Status_Inverter_Timestamp</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Once per hour when battery connected</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x102</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>102</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x103</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_259_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x104</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_260_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_Manufacturer_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_Manufacturer_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x105</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_261_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_Model_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Inverter_Model_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td>NOBATT</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x106</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+<tr><th>Notes</th><td>Carries the inverter's maintenance-mode command in byte 6, seen bounding five maintenance sessions across 28.7 M samples. No frame on this bus carries the SoC that maintenance discharges towards — the inverter appears to hold that target itself and simply discharge until the reported SoC arrives.</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>106_Unknown_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td><td></td></tr>
+<tr><td>16/16</td><td><code>106_Unknown_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td>Constant 1000 across every sampled maintenance session.</td></tr>
+<tr><td>32/16</td><td><code>106_Maintenance_Param</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td>Moves with Cmd_Maintenance_Mode — 270 at entry, revised to 210 mid-session, 0 while the command is clear — but 270 also occurs outside maintenance (byte 4 = 14 in 7.1 % of all samples), so it is not a dedicated maintenance field. Not the target SoC: a session that ran with 210 settled at 23.56-23.93 %, which 210 does not encode under any obvious scaling. Units unresolved; a current or power limit would fit the magnitude.</td></tr>
+<tr><td>48/8</td><td><code>Cmd_Maintenance_Mode</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>0=Off, 1=On</td><td>Inverter to battery, and what puts the pack into maintenance. Across five observed sessions the battery raised bit 4 of Status_Battery_End_Stop at 0x005 within ~2.3 s of every rising edge and cleared it within ~0.8 s of every falling edge. Frame 0x012 is transmitted only while this is set, at ~0.95 Hz.</td></tr>
+<tr><td>56/8</td><td><code>106_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x108</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>108</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x109</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+<tr><th>Notes</th><td>Inverter telemetry broadcast. Byte 0 is a constant 0xAA marker, bytes 1-2 a 16-bit LE power value, bytes 3-7 always zero.</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>109_Marker</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Constant 0xAA in every sample. Frame marker / protocol tag, not data.</td></tr>
+<tr><td>8/16</td><td><code>Status_PV_Power</code></td><td>—</td><td>W</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>The inverter's total DC (PV) input — matches the &quot;Total DC power&quot; it reports over Modbus (3882 W vs 3935 W decoded seconds later). Not battery power: same battery current gives different values here. Zero all night; peak 7423 W across the archive.</td></tr>
+<tr><td>24/40</td><td><code>109_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Always zero across every sampled window.</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x191</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+<tr><th>Notes</th><td>NOBATT Discovery Message</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>191</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x1E0</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>Inverter</td></tr>
+<tr><th>Notes</th><td>Modbus-over-CAN tunnel. The inverter initiates and the BMS replies on this same CAN id, so both nodes transmit it — transmitter records the initiator only. Payloads concatenate into one Modbus RTU byte stream with no transport header: a 9- or 17-byte response arrives as 8+1 or 8+8+1. The `tunnel` table below hands it to the reassembler, which recovers each message by the RTU length rules and validates CRC-16/Modbus. Distinct from the 0x1F0 firmware-service tunnel, which is catalogued in sbr_modbus.toml.</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x400</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Notes</th><td>No longer emitted beyond BMS firmware patch 0x26 (see Info_BMS_Firmware_Patch at 0x707).</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>400_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>8/16</td><td><code>Status_Battery_Actual_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>24/40</td><td><code>400_Unknown</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x401</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>401_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-override">BE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x402</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Notes</th><td>Appears on BMS firmware patch .30 and replaces 0x400, which is not emitted beyond patch 0x26 (see Info_BMS_Firmware_Patch at 0x707).</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>402_Unknown</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown.</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x500</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Notes</th><td>Not a mirror of 0x700 despite the 0x5NN block — 0x700 is all-zero padding. Bytes 0-6 are constant `01 01 03 FF 00 01 00`; only byte 7 (SoC) moves. Byte 2 = 3 is NOT the module count: bytes 0-6 are unchanged either side of an observed 3-to-7 module change.</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>500_Unknown_0</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>8/16</td><td><code>500_Unknown_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>24/32</td><td><code>500_Unknown_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>56/8</td><td><code>Status_Battery_SoC_Int</code></td><td>—</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x501</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x502</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x503</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x504</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>Status_Battery_Current_Inverted</code></td><td>×0.1</td><td>A</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>This is the opposite sign to the signal at 0x704</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x505</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x506</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Inherited</th><td>signals</td></tr>
+</table>
+</section>
+<section class="level-3">
+<h3>0x512</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>512_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x700</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>700_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x701</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Info_Battery_Max_Voltage</code></td><td>×0.1</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Info_Battery_Min_Voltage</code></td><td>×0.1</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Info_Battery_Max_Charge_Current</code></td><td>×0.1</td><td>A</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Info_Battery_Max_Dischg_Current</code></td><td>×0.1</td><td>A</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x702</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Battery_Reported_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Battery_SoH</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Battery_Remaining_Energy</code></td><td>—</td><td>Wh</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Battery_Max_Energy</code></td><td>—</td><td>Wh</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x703</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Status_Battery_Energy_Charged</code></td><td>—</td><td>Wh</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/32</td><td><code>Status_Battery_Energy_Discharged</code></td><td>—</td><td>Wh</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x704</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Battery_Voltage</code></td><td>×0.1</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Battery_Current</code></td><td>×0.1</td><td>A</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Battery_Voltage_Alt_704</code></td><td>×0.1</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td>A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705.</td></tr>
+<tr><td>48/16</td><td><code>Status_Battery_Temperature</code></td><td>×0.1</td><td>°C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x705</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>Info_Battery_Operation</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>0=Unplugged, 1=Standby, 2=Run</td><td></td></tr>
+<tr><td>8/8</td><td><code>705_End_Stop</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td>The same byte as Status_Battery_End_Stop on the 0x005 copy, but nearly inert here: 0 across all 28.3 M sampled frames except 2 for 36-47 s during each of four BMS restarts, 156 samples in total. Never 1, so the charge end stop is not reported on this copy. Discriminates why 0x005 reads 3 — both abnormal together is a BMS restart, 0x005 alone is maintenance. Previously named 705_Always_0, which was accurate for this frame but wrong for the 0x005 mirror.</td></tr>
+<tr><td>16/8</td><td><code>705_Always_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td></td></tr>
+<tr><td>24/16</td><td><code>Info_Battery_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>8422=SBR064, 8423=SBR096, 8424=SBR128, 8425=SBR160, 8426=SBR192, 8427=SBR224, 8428=SBR256</td><td></td></tr>
+<tr><td>40/16</td><td><code>Status_Battery_Voltage_Alt_705</code></td><td>×0.1</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td><td>A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704.</td></tr>
+<tr><td>56/8</td><td><code>705_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x706</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Overview_Cell_Max_Temp</code></td><td>×0.1</td><td>°C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Overview_Cell_Min_Temp</code></td><td>×0.1</td><td>°C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Overview_Cell_Max_Voltage</code></td><td>×0.001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Overview_Cell_Min_Voltage</code></td><td>×0.001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x707</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>Info_BMS_Firmware_Patch</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>8/16</td><td><code>707_All_Zero</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>24/8</td><td><code>Info_BMS_Firmware_Minor</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Info_Battery_Nameplate_Capacity</code></td><td>—</td><td>Wh</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Info_Battery_Module_Count</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x708</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_1800_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Battery_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/48</td><td><code>Info_Battery_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x709</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>709_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x70A</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_1802_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Battery_Manufacturer</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>Info_Battery_Model_Short</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x70B</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>Info_Battery_Model</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x70D</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>70d_Unknown_Permission_3_10701__</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x70E</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/64</td><td><code>70E_Unknown_Permission_3_10705__</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x70F</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>10,000 ms</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_1807_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 0</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>70F_Mux0_Const</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Info_Battery_Max_Power</code></td><td>—</td><td>W</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — it held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed.</td></tr>
+<tr><td>48/16</td><td><code>Info_Battery_Max_Power_2</code></td><td>—</td><td>W</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>Second copy of the static 1920 W x module_count rating. Invariant across every sampled window — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701.</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 1</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/56</td><td><code>70F_Mux1_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 2</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>70F_Unknown_Mux_2_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td>Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_3_1: ~9950 in warm windows, ~12800 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved.</td></tr>
+<tr><td>32/16</td><td><code>70F_Mux2_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>70F_Unknown_Mux_2_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-none">none</span></td><td>dynamic, unmapped</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 3</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>70F_Unknown_Mux_3_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td>Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_2_1: ~9926 in warm windows, ~12940 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved.</td></tr>
+<tr><td>32/16</td><td><code>70F_Mux3_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>70F_Unknown_Mux_3_3</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td>Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three separate windows — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: it held constant at 9990 while SoC cycled 25.6 % to 100 %.</td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 4</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>8/8</td><td><code>70F_Mux4_Padding_0</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td></td></tr>
+<tr><td>16/16</td><td><code>70F_Mux4_Charge_Value</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td>Bytes 2-3 are one 16-bit field, not an 8-bit value plus padding: byte 3 changed from 7 to 10 between sampled windows. Drifts slowly (~1996 warm, ~2593 cold) and tracks with 70F_Unknown_Mux_2_1 and 70F_Unknown_Mux_3_1.</td></tr>
+<tr><td>32/24</td><td><code>70F_Mux4_Padding_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td><td></td></tr>
+<tr><td>56/8</td><td><code>Status_Charge_State</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>0=Normal, 2=Stop Charge</td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 5</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>Status_Module_1_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_2_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_3_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 6</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>Status_Module_4_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_5_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_6_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-5">
+<h5>Case 7</h5>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/16</td><td><code>Status_Module_7_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_8_SoC</code></td><td>×0.01</td><td>%</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-medium">medium</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>70F_Mux7_Padding</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-3">
+<h3>0x713</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>Status_Pos_Cell_Min_Temp</code></td><td>—</td><td>Cell #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>8/8</td><td><code>Status_Pos_Module_Min_Temp</code></td><td>—</td><td>Module #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Cell_Min_Temp</code></td><td>×0.1</td><td>°C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/8</td><td><code>Status_Pos_Cell_Max_Temp</code></td><td>—</td><td>Cell #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>40/8</td><td><code>Status_Pos_Module_Max_Temp</code></td><td>—</td><td>Module #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Cell_Max_Temp</code></td><td>×0.1</td><td>°C</td><td>yes</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x714</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>Status_Pos_Cell_Max_Voltage</code></td><td>—</td><td>Cell #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>8/8</td><td><code>Status_Pos_Module_Max_Voltage</code></td><td>—</td><td>Module #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Cell_Max_Voltage_HP</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/8</td><td><code>Status_Pos_Cell_Min_Voltage</code></td><td>—</td><td>Cell #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>40/8</td><td><code>Status_Pos_Module_Min_Voltage</code></td><td>—</td><td>Module #</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Cell_Min_Voltage_HP</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x715</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Module_1_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Module_1_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_2_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_2_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x716</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Module_3_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Module_3_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_4_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_4_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x717</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Module_5_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Module_5_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_6_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_6_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x718</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_Module_7_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Module_7_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Status_Module_8_Min_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Status_Module_8_Max_Voltage</code></td><td>×0.0001</td><td>V</td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x719</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Status_3_10789__</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Status_Module_Fault_3_10790__</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-low">low</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71A</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Enum</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/8</td><td><code>Info_Module_1_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>8/8</td><td><code>Info_Module_2_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>16/8</td><td><code>Info_Module_3_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>24/8</td><td><code>Info_Module_4_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>32/8</td><td><code>Info_Module_5_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>40/8</td><td><code>Info_Module_6_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>48/8</td><td><code>Info_Module_7_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+<tr><td>56/8</td><td><code>Info_Module_8_Cell_Type</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td>66=IEC, 68=Non-IEC</td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71B</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Info_Module_1_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/32</td><td><code>Info_Module_2_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71C</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Info_Module_3_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/32</td><td><code>Info_Module_4_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71D</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Info_Module_5_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/32</td><td><code>Info_Module_6_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71E</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/32</td><td><code>Info_Module_7_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+<tr><td>32/32</td><td><code>Info_Module_8_Production_Date</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>0x71F</h3>
+<table class="fields">
+<tr><th>Length</th><td>8 bytes</td></tr>
+<tr><th>Transmitter</th><td>BMS</td></tr>
+<tr><th>Interval</th><td>60,000 ms</td></tr>
+<tr><th>Notes</th><td>Characters 8–9 = year (YY), 10 = month (M, or A/B/C for 10–12), 11–12 = day (DD).</td></tr>
+</table>
+<section class="level-4">
+<h4>Mux mux_1823_0_8 at bits 0/8</h4>
+<section class="level-5">
+<h5>Case 1</h5>
+<section class="level-6">
+<h6>Mux mux_1823_1_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_1_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_1_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_1_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 2</h5>
+<section class="level-6">
+<h6>Mux mux_1823_2_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_2_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_2_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_2_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 3</h5>
+<section class="level-6">
+<h6>Mux mux_1823_3_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_3_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_3_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_3_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 4</h5>
+<section class="level-6">
+<h6>Mux mux_1823_4_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_4_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_4_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_4_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 5</h5>
+<section class="level-6">
+<h6>Mux mux_1823_5_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_5_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_5_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_5_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 6</h5>
+<section class="level-6">
+<h6>Mux mux_1823_6_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_6_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_6_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_6_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 7</h5>
+<section class="level-6">
+<h6>Mux mux_1823_7_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_7_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_7_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_7_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section class="level-5">
+<h5>Case 8</h5>
+<section class="level-6">
+<h6>Mux mux_1823_8_8_8 at bits 8/8</h6>
+<section class="level-6">
+<h6>Case 1</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_8_SN_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 2</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_8_SN_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-6">
+<h6>Case 3</h6>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>16/48</td><td><code>Info_Module_8_SN_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">LE</span></td><td><span class="badge conf-high">high</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+</section>
+</section>
+</section>
+<section class="level-2">
+<h2>Modbus frames</h2>
+<section class="level-3">
+<h3>tunnel_4de2_holding (register 19938)</h3>
+<table class="fields">
+<tr><th>Length</th><td>12 bytes</td></tr>
+<tr><th>Interval</th><td>5,000 ms (default)</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Tunnel_4DE2_Holding_0</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Tunnel_4DE2_Holding_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>32/16</td><td><code>Tunnel_4DE2_Holding_2</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>48/16</td><td><code>Tunnel_4DE2_Holding_3</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>64/16</td><td><code>Tunnel_4DE2_Holding_4</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>80/16</td><td><code>Tunnel_4DE2_Holding_5</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-3">
+<h3>tunnel_4de2_input (register 19938)</h3>
+<table class="fields">
+<tr><th>Length</th><td>4 bytes</td></tr>
+<tr><th>Interval</th><td>5,000 ms (default)</td></tr>
+</table>
+<table>
+<thead><tr><th>Bits</th><th>Signal</th><th>Scale</th><th>Unit</th><th>Signed</th><th>Order</th><th>Confidence</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>0/16</td><td><code>Tunnel_4DE2_Input_0</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+<tr><td>16/16</td><td><code>Tunnel_4DE2_Input_1</code></td><td>—</td><td></td><td>no</td><td><span class="badge end-default">BE</span></td><td><span class="badge conf-none">none</span></td><td></td></tr>
+</tbody>
+</table>
+</section>
+</section>

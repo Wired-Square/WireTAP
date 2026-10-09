@@ -220,3 +220,110 @@ pub enum PatternKind {
     Sensor32,
     Text,
 }
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct Draft {
+    pub default_endianness: ByteOrder,
+    pub default_interval_ms: Option<f64>,
+    pub serial_reserved: Vec<ByteSpan>,
+    pub frames: Vec<FrameDraft>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum ByteOrder {
+    Big,
+    Little,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum CatalogProtocol {
+    Can,
+    Serial,
+    Modbus,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum Confidence {
+    None,
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Serialize, TS)]
+pub struct ByteSpan {
+    pub start: i32,
+    pub len: u32,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameDraft {
+    pub protocol: CatalogProtocol,
+    #[serde(flatten)]
+    pub key: FrameKey,
+    pub length: usize,
+    pub bus: Option<u8>,
+    pub signals: Vec<DraftSignal>,
+    pub patterns: Vec<MultiBytePattern>,
+    pub mux: Option<MuxDraft>,
+    pub interval_ms: Option<f64>,
+    pub burst: Option<BurstDraft>,
+    pub buses: BTreeMap<u8, usize>,
+    pub notes: Vec<ByteNote>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftSignal {
+    pub name: String,
+    pub start_bit: u32,
+    pub bit_length: u32,
+    pub source: SignalSource,
+    pub confidence: Confidence,
+    pub byte_order: Option<ByteOrder>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum SignalSource {
+    Known,
+    Pattern,
+    Fill,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MuxDraft {
+    pub selector: MuxSelector,
+    pub cases: BTreeMap<u16, MuxCaseDraft>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MuxCaseDraft {
+    pub signals: Vec<DraftSignal>,
+    pub patterns: Vec<MultiBytePattern>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct BurstDraft {
+    pub frames_per_burst: f64,
+    pub burst_period_ms: f64,
+    pub inter_message_ms: f64,
+    pub flags: Vec<BurstFlag>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CandidateSignal {
+    pub name: String,
+    pub offset: u32,
+    pub bits: u32,
+    pub endianness: ByteOrder,
+}

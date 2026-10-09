@@ -26,7 +26,7 @@ import type { PlaybackPosition } from "../../api/io";
 import { useCatalogList } from "../../hooks/useCatalogList";
 
 import { addCaptureEvent, type EventDraft } from "../../api/captureEvents";
-import { loadCatalog } from "../../utils/catalogParser";
+import { parseCatalogAtPath } from "../../api/catalog";
 import type { TimeBounds } from "../../components/TimeBoundsInput";
 import AppLayout from "../../components/AppLayout";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../components/AppTabView";
@@ -59,7 +59,7 @@ function QueryInner() {
   const catalogPath = useQueryStore((s) => s.catalogPath);
   const setCatalogPath = useQueryStore((s) => s.setCatalogPath);
 
-  const setParsedCatalog = useQueryStore((s) => s.setParsedCatalog);
+  const setCatalog = useQueryStore((s) => s.setCatalog);
 
   // Catalog state — backend-owned list, pushed live.
   const catalogs = useCatalogList();
@@ -97,21 +97,17 @@ function QueryInner() {
   // Load and parse catalog when path changes
   useEffect(() => {
     if (!catalogPath) {
-      setParsedCatalog(null);
+      setCatalog(null);
       return;
     }
 
-    const loadParsedCatalog = async () => {
-      try {
-        const parsed = await loadCatalog(catalogPath);
-        setParsedCatalog(parsed);
-      } catch (e) {
+    parseCatalogAtPath(catalogPath)
+      .then(setCatalog)
+      .catch((e) => {
         console.error("Failed to load catalog:", e);
-        setParsedCatalog(null);
-      }
-    };
-    loadParsedCatalog();
-  }, [catalogPath, setParsedCatalog]);
+        setCatalog(null);
+      });
+  }, [catalogPath, setCatalog]);
 
 
   // The Query app works against a database, which means a WireTAP backend.

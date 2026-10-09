@@ -121,17 +121,17 @@ pub struct PublishPlan {
     /// Empty when the refs could not be read: a picker with no suggestions still lets
     /// the user type a new branch name, which is the primary use.
     pub branches: Vec<String>,
-    /// Git blob SHA of the bytes that would be committed.
-    pub local_blob_sha: String,
-    /// The same path's blob SHA on `base_branch`, so the dialog can say "nothing to
-    /// push" without asking for the file text. `None` — the path is not there yet, so
+    /// The path's blob SHA on `base_branch`. `None` — the path is not there yet, so
     /// this push creates it.
+    pub base_blob_sha: Option<String>,
+    /// The bytes that would be committed are already on `base_branch`, so the dialog
+    /// can say "nothing to push" without asking for the file text.
     ///
     /// Deliberately against `base_branch` rather than `branch`: the plan is not
     /// re-fetched when the branch field moves, so a verdict about some other branch
     /// would go stale the moment it was useful. The push dialog's `publish_diff`
     /// answers for the branch actually chosen.
-    pub base_blob_sha: Option<String>,
+    pub identical_to_base: bool,
     /// True when the account cannot push to the upstream, so the commit lands on a
     /// fork. `can_push_upstream` used to sit beside this as its literal negation; the
     /// only thing that ever read it was the commit-to-base checkbox this replaced.
@@ -417,7 +417,6 @@ pub async fn preflight_publish(
 async fn enrich_for_dialog(mut resolved: Resolved) -> Resolved {
     let plan = &mut resolved.plan;
     plan.branches = git::branches(&resolved.clone_dir).await.unwrap_or_default();
-    plan.local_blob_sha = super::registry::git_blob_sha(resolved.content.as_bytes());
     // The tree entry id, not the file: this only feeds an equality test, so inflating
     // up to 2 MB to hash it would be work thrown away. Absent for a path that is not
     // upstream yet, which the dialog reads as "this push adds the file".
@@ -425,6 +424,8 @@ async fn enrich_for_dialog(mut resolved: Resolved) -> Resolved {
         .await
         .ok()
         .flatten();
+    plan.identical_to_base = plan.base_blob_sha.as_deref()
+        == Some(super::registry::git_blob_sha(resolved.content.as_bytes()).as_str());
     resolved
 }
 
@@ -854,8 +855,8 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
         // Filled by `enrich_for_dialog`, which only the preflight runs. `resolve` is
         // shared with the publish path, and that path reads none of the three.
         branches: Vec::new(),
-        local_blob_sha: String::new(),
         base_blob_sha: None,
+        identical_to_base: false,
         fork_needed: !upstream.can_push,
         target_is_public: !upstream.private,
         content_bytes: content.len(),

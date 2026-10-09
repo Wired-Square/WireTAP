@@ -1,163 +1,100 @@
 // ui/src/apps/catalog/views/SignalView.tsx
 
-import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmall, labelSmallMuted, monoBody, bgSurface } from "../../../styles";
-import BitPreview, { BitRange } from "../../../components/BitPreview";
-import { tomlParse } from "../toml";
-import { extractMuxRangesFromPath, getFrameByteLengthFromPath } from "../utils";
-import type { TomlNode, ValidationError } from "../types";
+import BitPreview from "../../../components/BitPreview";
+import type { TomlNode } from "../types";
+import type { Signal } from "../../../types/catalogModel";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { defaultByteOrder } from "../model";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 
 export type SignalViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
-  inheritedByteOrder?: "little" | "big";
 
   // Actions
-  onEditSignal: (idKey: string, signalIndex: number, signal: any, signalsParentPath?: string[]) => void;
+  onEditSignal: (idKey: string, signalIndex: number, signal: Signal, signalsParentPath?: string[]) => void;
   onRequestDeleteSignal: (idKey: string, signalIndex: number, signalsParentPath?: string[], signalName?: string) => void;
-
-  // Validation
-  onSetValidation: (errors: ValidationError[]) => void;
 };
+
+/** The signal's catalogue keys, in the order the editor lists them. */
+function signalProperties(signal: Signal): [string, unknown][] {
+  const entries: [string, unknown][] = [
+    ["name", signal.name],
+    ["start_bit", signal.startBit],
+    ["bit_length", signal.bitLength],
+    ["signed", signal.signed],
+    ["word_order", signal.wordOrder],
+    ["factor", signal.factor],
+    ["offset", signal.offset],
+    ["unit", signal.unit],
+    ["min", signal.min],
+    ["max", signal.max],
+    ["format", signal.format],
+    ["enum", signal.enum],
+    ["confidence", signal.confidence],
+    ["display", signal.display],
+    ["notes", signal.notes],
+    ["modbus_register", signal.modbusRegister],
+    ["modbus_register_count", signal.modbusRegisterCount],
+  ];
+  return entries.filter(([, value]) => value !== undefined);
+}
 
 export default function SignalView({
   selectedNode,
-  catalogContent,
-  inheritedByteOrder,
   onEditSignal,
   onRequestDeleteSignal,
-  onSetValidation,
 }: SignalViewProps) {
   const { t } = useTranslation("catalog");
-  // Use tree metadata directly instead of re-parsing TOML and searching by properties.
-  const locateSignal = React.useCallback(() => {
-    const signalsIdx = selectedNode.path.findIndex(
-      (seg) => seg === "signals" || seg === "signal"
-    );
-    if (signalsIdx < 0) return null;
-
-    const signalsParentPath = selectedNode.path.slice(0, signalsIdx);
-    const idKey = signalsParentPath[signalsParentPath.length - 1];
-    const idx = selectedNode.metadata?.signalIndex;
-    const signal = selectedNode.metadata?.properties;
-
-    if (idx === undefined || idx === null || !signal) return null;
-
-    return { idKey, idx, signal, signalsParentPath };
-  }, [selectedNode.metadata?.signalIndex, selectedNode.metadata?.properties, selectedNode.path]);
+  const signal = selectedNode.metadata!.signal!;
+  const signalIndex = selectedNode.metadata!.signalIndex!;
+  const signalsParentPath = selectedNode.path.slice(0, -2);
+  const idKey = selectedNode.path[2];
+  const inheritedByteOrder = useCatalogEditorStore((s) => defaultByteOrder(s.tree.catalog, selectedNode.path[1]));
+  const layout = useFrameLayout(selectedNode.path);
 
   return (
     <div className="space-y-4">
-      {/* Action Buttons */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-primary">{t("signalDetails.title")}</h3>
-        <div className={flexRowGap2}>
+        {!selectedNode.metadata?.inherited && <div className={flexRowGap2}>
           <IconButton
-            onClick={() => {
-              try {
-                const found = locateSignal();
-                if (!found) return;
-                onEditSignal(found.idKey, found.idx, found.signal, found.signalsParentPath);
-              } catch (error) {
-                console.error("Failed to locate/edit signal:", error);
-                onSetValidation([{ field: "signal", message: t("signalDetails.errorEdit") }]);
-              }
-            }}
+            onClick={() => onEditSignal(idKey, signalIndex, signal, signalsParentPath)}
             title={t("signalDetails.edit")}
           >
             <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
 
-          {/* Pattern A delete */}
           <IconButton
-            onClick={() => {
-              try {
-                const found = locateSignal();
-                if (!found) return;
-                onRequestDeleteSignal(found.idKey, found.idx, found.signalsParentPath, found.signal?.name);
-              } catch (error) {
-                console.error("Failed to locate/delete signal:", error);
-                onSetValidation([{ field: "signal", message: t("signalDetails.errorDelete") }]);
-              }
-            }}
+            onClick={() => onRequestDeleteSignal(idKey, signalIndex, signalsParentPath, signal.name)}
             tone="danger"
             title={t("signalDetails.delete")}
           >
             <Trash2 className={`${iconMd} text-danger`} />
           </IconButton>
-        </div>
+        </div>}
       </div>
 
-      {/* Bit Preview - shows signal and all parent mux selectors */}
-      {selectedNode.metadata?.properties &&
-        (() => {
-          const signal = selectedNode.metadata!.properties as any;
-          const startBit = signal.start_bit ?? 0;
-          const bitLength = signal.bit_length ?? 0;
-
-          // Build ranges including all parent mux selectors
-          const ranges: BitRange[] = [];
-
-          try {
-            const parsed = tomlParse(catalogContent);
-            // Extract all mux ranges from the path hierarchy
-            const muxRanges = extractMuxRangesFromPath(selectedNode.path, parsed);
-            ranges.push(...muxRanges);
-
-            // Get frame length for numBytes (handles CAN, Modbus, Serial)
-            const frameLength = getFrameByteLengthFromPath(selectedNode.path, parsed);
-
-            return (
-              <div className="p-4 bg-surface rounded-lg">
-                <h4 className="text-sm font-semibold text-primary mb-3">{t("signalDetails.bitPreview")}</h4>
-                <BitPreview
-                  numBytes={frameLength}
-                  ranges={ranges}
-                  currentStartBit={startBit}
-                  currentBitLength={bitLength}
-                  showLegend={ranges.length > 0}
-                />
-              </div>
-            );
-          } catch {
-            // Fallback: show just the signal bytes if parsing fails
-            const endBit = startBit + bitLength;
-            const startByte = Math.floor(startBit / 8);
-            const endByte = Math.floor((endBit - 1) / 8);
-            const numBytes = endByte - startByte + 1;
-
-            return (
-              <div className="p-4 bg-surface rounded-lg">
-                <h4 className="text-sm font-semibold text-primary mb-3">{t("signalDetails.bitPreview")}</h4>
-                <BitPreview
-                  numBytes={numBytes}
-                  ranges={[]}
-                  currentStartBit={startBit - startByte * 8}
-                  currentBitLength={bitLength}
-                  showLegend={false}
-                />
-              </div>
-            );
-          }
-        })()}
-
-      {selectedNode.metadata?.muxCase && (
-        <div className="p-3 bg-purple border-2 border-purple rounded-lg">
-          <div className="text-xs font-medium text-purple mb-1">{t("signalDetails.muxCase")}</div>
-          <div className="font-mono text-sm text-purple">{selectedNode.metadata.muxCase}</div>
+      {layout && (
+        <div className="p-4 bg-surface rounded-lg">
+          <h4 className="text-sm font-semibold text-primary mb-3">{t("signalDetails.bitPreview")}</h4>
+          <BitPreview
+            numBytes={layout.byteLength}
+            ranges={previewRanges(layout, true)}
+            currentStartBit={signal.startBit ?? 0}
+            currentBitLength={signal.bitLength ?? 0}
+            showLegend={layout.ranges.length > 1}
+          />
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        {selectedNode.metadata?.properties &&
-          Object.entries(selectedNode.metadata.properties)
-            .filter(([key]) => key !== "endianness" && key !== "byte_order")
-            .map(([key, value]) => (
+        {signalProperties(signal).map(([key, value]) => (
             <div key={key} className={`p-3 ${bgSurface} rounded-lg min-w-0`}>
               <div className={labelSmallMuted}>{key}</div>
               <div className={`${monoBody} break-all`}>
@@ -176,8 +113,7 @@ export default function SignalView({
 
         {/* Byte Order - show inherited value if not explicitly set */}
         {(() => {
-          const props = selectedNode.metadata?.properties as any;
-          const explicitByteOrder = props?.endianness || props?.byte_order;
+          const explicitByteOrder = signal.endianness;
           const effectiveByteOrder = explicitByteOrder || inheritedByteOrder;
           const isInherited = !explicitByteOrder && !!inheritedByteOrder;
 

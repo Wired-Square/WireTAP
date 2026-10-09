@@ -1,6 +1,7 @@
 // ui/src/dialogs/ToolboxDialog.tsx
 
 import { ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck, Radar, Network, ScanSearch } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { iconMd, iconLg } from "../styles/spacing";
@@ -153,8 +154,9 @@ export default function ToolboxDialog({
   // Picking a tool collapses the list to that one, so the options panel below it
   // gets the dialog's height instead of eight buttons nobody is reading. Clicking
   // it again is what brings the list back — the same click that already deselected
-  // it, so there is no new control and nothing to discover.
-  const visibleTools = selectedTool ? [selectedTool] : availableTools;
+  // it. A pick kept from an earlier opening shows every tool.
+  const [collapsed, setCollapsed] = useState(false);
+  const visibleTools = selectedTool && collapsed ? [selectedTool] : availableTools;
 
   const getEffectiveCount = (): number => {
     if (!selectedTool) return 0;
@@ -184,11 +186,9 @@ export default function ToolboxDialog({
   const handleToolClick = (toolId: ToolboxView) => {
     const tool = tools.find(t => t.id === toolId);
     if (!tool || !isToolAvailable(tool)) return;
-    if (activeView === toolId) {
-      setActiveView("frames");
-    } else {
-      setActiveView(toolId);
-    }
+    const picked = activeView !== toolId;
+    setActiveView(picked ? toolId : "frames");
+    setCollapsed(picked);
   };
 
   const handleRunAnalysis = async () => {

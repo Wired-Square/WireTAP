@@ -43,7 +43,7 @@ export default function CANConfigSection({
         <Checkbox
           id="extended"
           checked={config.extended ?? false}
-          onChange={(e) => onChange({ ...config, extended: e.target.checked || undefined })}
+          onChange={(e) => onChange({ ...config, extended: e.target.checked })}
         />
         <label htmlFor="extended" className="text-sm text-secondary">
           {t("protocolEditors.canExtendedLabel")}

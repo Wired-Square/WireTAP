@@ -1,0 +1,85 @@
+[meta]
+name = "RS-485 bus"
+version = 1
+default_frame = "serial"
+
+[meta.serial]
+encoding = "slip"
+byte_order = "little"
+header_length = 3
+min_frame_length = 5
+
+[meta.serial.fields.id]
+mask = 0xFF00
+format = "hex"
+
+[meta.serial.fields.source_address]
+mask = 0xFF
+endianness = "big"
+format = "decimal"
+
+[meta.serial.checksum]
+algorithm = "crc16_modbus"
+start_byte = -2
+byte_length = 2
+calc_start_byte = 0
+calc_end_byte = -2
+big_endian = false
+
+[node.Controller]
+notes = "Bus master"
+
+[frame.serial.0x10]
+length = 12
+transmitter = "Controller"
+interval_ms = 250
+notes = "Status broadcast"
+
+[[frame.serial.0x10.signals]]
+name = "Voltage"
+start_bit = 24
+bit_length = 16
+factor = 0.01
+unit = "V"
+
+[[frame.serial.0x10.signals]]
+name = "Flags"
+start_bit = 40
+bit_length = 8
+format = "hex"
+byte_order = "big"
+
+[[frame.serial.0x10.checksum]]
+name = "Frame CRC"
+algorithm = "crc16_ccitt"
+start_byte = 10
+byte_length = 2
+byte_order = "big"
+calc_start_byte = 0
+calc_end_byte = 10
+
+[frame.serial.0x20]
+length = 16
+delimiter = [0xC0]
+
+[frame.serial.0x20.mux]
+name = "Page"
+start_bit = 24
+bit_length = 8
+
+[[frame.serial.0x20.mux."1".signals]]
+name = "Temperature"
+start_bit = 32
+bit_length = 16
+signed = true
+factor = 0.1
+unit = "C"
+
+[[frame.serial.0x20.mux."2-3".signals]]
+name = "Counter"
+start_bit = 32
+bit_length = 32
+
+[frame.serial.heartbeat]
+length = 4
+notes = "Keyed by a name, not an id"

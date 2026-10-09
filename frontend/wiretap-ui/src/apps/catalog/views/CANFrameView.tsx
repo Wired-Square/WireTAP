@@ -8,27 +8,26 @@ import { caption, labelSmall, labelSmallMuted, monoBody, bgSurface, hoverLight }
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
-import { tomlParse } from "../toml";
+import type { Mux, Signal } from "../../../types/catalogModel";
 import { formatFrameId } from "../utils";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
+import { muxSignalCount, selectorRange, signalRange } from "./signalRanges";
 import { Button, IconButton } from "../../../components/Button";
 import { Card } from "../../../components/Card";
 export type CANFrameViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
   displayFrameIdFormat?: "hex" | "decimal";
 
-  // Flags
-  editingId: boolean;
   editingSignal: boolean;
 
   // Signal actions
   onAddSignal: (idKey: string) => void;
-  onEditSignal: (idKey: string, signalIndex: number, signal: any, parentPath?: string[]) => void;
+  onEditSignal: (idKey: string, signalIndex: number, signal: Signal, parentPath?: string[]) => void;
   onRequestDeleteSignal: (idKey: string, signalIndex: number, signalsParentPath?: string[], signalName?: string) => void;
 
   // Mux actions
-  onAddMux: (idKey: string) => void;
-  onEditMux?: (muxPath: string[], muxData: any) => void;
+  onAddMux: (ownerPath: string[]) => void;
+  onEditMux?: (muxPath: string[], mux: Mux) => void;
   onDeleteMux?: (muxPath: string[]) => void;
   onAddCase?: (muxPath: string[]) => void;
   onSelectNode?: (node: TomlNode) => void;
@@ -36,8 +35,6 @@ export type CANFrameViewProps = {
 
 export default function CANFrameView({
   selectedNode,
-  catalogContent,
-  editingId,
   editingSignal,
   onAddSignal,
   onEditSignal,
@@ -50,80 +47,38 @@ export default function CANFrameView({
   displayFrameIdFormat = "hex",
 }: CANFrameViewProps) {
   const { t } = useTranslation("catalog");
-  const idKey = selectedNode.metadata?.idValue || selectedNode.key;
+  const frame = selectedNode.metadata!.frame!;
+  const idKey = frame.key;
+  const inherited = new Set(frame.inheritedFields ?? []);
+  const mux = frame.mux;
+  const muxInherited = inherited.has("mux");
   const [colorForRange, setColorForRange] = useState<(range: BitRange) => string | undefined>(() => () => undefined);
   const [confirmDeleteMux, setConfirmDeleteMux] = useState(false);
   const formattedId = formatFrameId(idKey, displayFrameIdFormat);
-  const signalColor = useCallback(
-    (signal: any) =>
-      colorForRange({
-        name: signal.name || t("frameView.signals"),
-        start_bit: signal.start_bit || 0,
-        bit_length: signal.bit_length || 8,
-        type: "signal",
-      }),
-    [colorForRange, t]
+  const layout = useFrameLayout(selectedNode.path);
+  const ranges = previewRanges(layout);
+  const signalColor = useCallback((signal: Signal) => colorForRange(signalRange(signal)), [colorForRange]);
+
+  const muxLegendColor = useMemo(
+    () => (mux ? colorForRange(selectorRange(mux)) : undefined),
+    [mux, colorForRange]
   );
 
-  // Parse mux data from TOML for display
-  const muxData = useMemo(() => {
-    try {
-      const parsed = tomlParse(catalogContent) as any;
-      return parsed?.frame?.can?.[idKey]?.mux || null;
-    } catch {
-      return null;
-    }
-  }, [catalogContent, idKey]);
-
-  const muxLegendColor = useMemo(() => {
-    if (!muxData) return undefined;
-    return colorForRange({
-      name: muxData.name || "Mux",
-      start_bit: muxData.start_bit || 0,
-      bit_length: muxData.bit_length || 8,
-      type: "mux",
-    });
-  }, [muxData, colorForRange]);
-
-  // Mux tree node from children (for case iteration)
   const muxNode = useMemo(
     () => selectedNode.children?.find((c) => c.type === "mux") || null,
     [selectedNode.children]
   );
 
-  // Compute all bit ranges (base signals + mux selector) for BitPreview
-  const { ranges, sortedSignals, numBytes } = useMemo(() => {
-    const r: BitRange[] = [];
-    const signals = selectedNode.metadata?.signals
-      ? [...selectedNode.metadata.signals].sort((a: any, b: any) => (a.start_bit ?? 0) - (b.start_bit ?? 0))
-      : [];
-
-    signals.forEach((signal: any) => {
-      r.push({
-        name: signal.name || "Signal",
-        start_bit: signal.start_bit || 0,
-        bit_length: signal.bit_length || 8,
-        type: "signal",
-      });
-    });
-
-    if (muxData) {
-      r.push({
-        name: muxData.name || "Mux",
-        start_bit: muxData.start_bit || 0,
-        bit_length: muxData.bit_length || 8,
-        type: "mux",
-      });
-    }
-
-    return { ranges: r, sortedSignals: signals, numBytes: selectedNode.metadata?.length || 8 };
-  }, [selectedNode.metadata?.signals, selectedNode.metadata?.length, muxData]);
+  const sortedSignals = useMemo(
+    () => frame.signals.map((signal, index) => ({ signal, index })).sort((a, b) => (a.signal.startBit ?? 0) - (b.signal.startBit ?? 0)),
+    [frame.signals]
+  );
+  const muxSignals = mux ? muxSignalCount(mux) : 0;
+  const notes = frame.notes ?? [];
 
   return (
     <div className="space-y-6">
-      {/* Summary cards (non-edit only) */}
-      {!editingId && (
-        <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>{t("canFrameView.id")}</div>
             <div className={`${monoBody} flex items-center gap-2`}>
@@ -137,35 +92,35 @@ export default function CANFrameView({
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.lengthDlc")} <span className="text-danger">{t("canFrameView.required")}</span>
-              {selectedNode.metadata?.lengthInherited && (
+              {inherited.has("length") && (
                 <span className="ml-1 text-info" title={t("canFrameView.inheritedTooltip")}>
                   {t("canFrameView.inheritedSuffix")}
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.length || <span className="text-warning">{t("canFrameView.notSet")}</span>}
+              {frame.length || <span className="text-warning">{t("canFrameView.notSet")}</span>}
             </div>
           </div>
 
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.transmitter")}
-              {selectedNode.metadata?.transmitterInherited && (
+              {inherited.has("transmitter") && (
                 <span className="ml-1 text-info" title={t("canFrameView.inheritedTooltip")}>
                   {t("canFrameView.inheritedSuffix")}
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.transmitter || <span className="text-muted">{t("canFrameView.none")}</span>}
+              {frame.transmitter || <span className="text-muted">{t("canFrameView.none")}</span>}
             </div>
           </div>
 
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.interval")}
-              {selectedNode.metadata?.intervalInherited && (
+              {inherited.has("interval") && (
                 <span
                   className="ml-1 text-info"
                   title={t("canFrameView.intervalInheritedTooltip")}
@@ -175,8 +130,8 @@ export default function CANFrameView({
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.interval !== undefined ? (
-                t("canFrameView.intervalMs", { ms: selectedNode.metadata.interval })
+              {frame.interval !== undefined ? (
+                t("canFrameView.intervalMs", { ms: frame.interval })
               ) : (
                 <span className="text-muted">{t("canFrameView.none")}</span>
               )}
@@ -186,7 +141,7 @@ export default function CANFrameView({
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.extendedId")}
-              {selectedNode.metadata?.extendedInherited && (
+              {inherited.has("extended") && (
                 <span
                   className="ml-1 text-info"
                   title={t("canFrameView.extendedInheritedTooltip")}
@@ -196,14 +151,14 @@ export default function CANFrameView({
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.extended ? t("canFrameView.yes29bit") : t("canFrameView.no11bit")}
+              {frame.isExtended ? t("canFrameView.yes29bit") : t("canFrameView.no11bit")}
             </div>
           </div>
 
           <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.canFd")}
-              {selectedNode.metadata?.fdInherited && (
+              {inherited.has("fd") && (
                 <span
                   className="ml-1 text-info"
                   title={t("canFrameView.fdInheritedTooltip")}
@@ -213,48 +168,45 @@ export default function CANFrameView({
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.fd ? t("canFrameView.yes") : t("canFrameView.noClassic")}
+              {frame.isFd ? t("canFrameView.yes") : t("canFrameView.noClassic")}
             </div>
           </div>
         </div>
-      )}
 
       {/* Notes card */}
-      {!editingId && selectedNode.metadata?.notes && (
+      {notes.length > 0 && (
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
             {t("canFrameView.notes")}
           </div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
-            {Array.isArray(selectedNode.metadata.notes)
-              ? selectedNode.metadata.notes.join("\n")
-              : selectedNode.metadata.notes}
+            {notes.join("\n")}
           </div>
         </div>
       )}
 
       {/* Signals + Bit preview + Mux */}
-      {!editingId && !editingSignal && (
+      {!editingSignal && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-primary shrink-0">
-              {t("canFrameView.signalsHeader", { count: (selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0) })}
-              {selectedNode.metadata?.hasMux && (
+              {t("canFrameView.signalsHeader", { count: frame.signals.length + muxSignals })}
+              {mux && (
                 <span className="ml-2 text-xs font-normal text-purple inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
-                  {t("canFrameView.muxSignalsHint", { count: selectedNode.metadata.muxSignalCount })}
+                  {t("canFrameView.muxSignalsHint", { count: muxSignals })}
                 </span>
               )}
             </h3>
 
             <div className="flex items-center gap-2 shrink-0">
               <span className={caption}>
-                {selectedNode.metadata?.length ? t("canFrameView.totalBytes", { count: selectedNode.metadata.length }) : ""}
+                {frame.length ? t("canFrameView.totalBytes", { count: frame.length }) : ""}
               </span>
 
-              {!selectedNode.metadata?.hasMux && (
+              {!mux && (
                 <Button
-                  onClick={() => onAddMux(idKey)}
+                  onClick={() => onAddMux(selectedNode.path)}
                   variant="solid"
                   tone="purple"
                   size="sm"
@@ -263,7 +215,7 @@ export default function CANFrameView({
                 </Button>
               )}
 
-              {selectedNode.metadata?.hasMux && onAddCase && muxNode && (
+              {mux && !muxInherited && onAddCase && muxNode && (
                 <Button
                   onClick={() => onAddCase(muxNode.path)}
                   variant="solid"
@@ -286,13 +238,13 @@ export default function CANFrameView({
           </div>
 
           {/* BitPreview — renders when there are any ranges (base signals or mux selector) */}
-          {ranges.length > 0 && (
+          {layout && ranges.length > 0 && (
             <div className="mb-4 p-4 bg-surface rounded-lg">
               <div className="text-xs font-medium text-secondary mb-3">
                 {t("canFrameView.byteLayout")}
               </div>
               <BitPreview
-                numBytes={numBytes}
+                numBytes={layout.byteLength}
                 ranges={ranges}
                 currentStartBit={0}
                 currentBitLength={0}
@@ -306,9 +258,9 @@ export default function CANFrameView({
           {/* Base signals list */}
           {sortedSignals.length > 0 && (
             <div className="space-y-2">
-              {sortedSignals.map((signal: any, idx: number) => (
+              {sortedSignals.map(({ signal, index }) => (
                 <div
-                  key={idx}
+                  key={index}
                   className={`p-3 ${bgSurface} rounded-lg ${hoverLight} transition-colors`}
                 >
                   <div className="flex items-start justify-between min-w-0">
@@ -322,7 +274,7 @@ export default function CANFrameView({
                         <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                           <span className="shrink-0">⚡</span>
                           <span className="truncate">{signal.name}</span>
-                          {signal._inherited && (
+                          {signal.inherited && (
                             <span
                               className="text-xs text-purple flex items-center gap-1"
                               title={t("canFrameView.inheritedFromMirror")}
@@ -336,9 +288,9 @@ export default function CANFrameView({
                         <div className={`${caption} mt-1 space-y-0.5`}>
                           <div>
                             {t("canFrameView.bitsRange", {
-                              start: signal.start_bit ?? 0,
-                              end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
-                              length: signal.bit_length ?? 0,
+                              start: signal.startBit ?? 0,
+                              end: (signal.startBit ?? 0) + (signal.bitLength ?? 0) - 1,
+                              length: signal.bitLength ?? 0,
                             })}
                           </div>
                           {signal.unit && <div>{t("canFrameView.unit", { unit: signal.unit })}</div>}
@@ -347,28 +299,28 @@ export default function CANFrameView({
                         </div>
                         {signal.notes && (
                           <div className="text-xs text-secondary mt-2 italic whitespace-pre-wrap">
-                            {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
+                            {signal.notes.join("\n")}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
+                    {!signal.inherited && <div className="flex items-center gap-2 ml-4 shrink-0">
                       <IconButton
-                        onClick={() => onEditSignal(idKey, idx, signal, ["frame", "can", idKey])}
+                        onClick={() => onEditSignal(idKey, index, signal, selectedNode.path)}
                         title={t("canFrameView.editSignal")}
                       >
                         <Pencil className={`${iconMd} text-secondary`} />
                       </IconButton>
 
                       <IconButton
-                        onClick={() => onRequestDeleteSignal(idKey, idx, signal.name)}
+                        onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name)}
                         tone="danger"
                         title={t("canFrameView.deleteSignal")}
                       >
                         <Trash2 className={`${iconMd} text-danger`} />
                       </IconButton>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               ))}
@@ -376,7 +328,7 @@ export default function CANFrameView({
           )}
 
           {/* Mux section — selector bubble + inline cases */}
-          {selectedNode.metadata?.hasMux && muxData && (
+          {mux && (
             <div className="mt-4 space-y-3">
               {/* Mux selector bubble */}
               <Card tone="purple">
@@ -388,36 +340,42 @@ export default function CANFrameView({
                     <div className="min-w-0">
                       <div className="font-medium text-primary flex items-center gap-2 min-w-0">
                         <span className="shrink-0">🔀</span>
-                        <span className="truncate">{muxData.name || t("canFrameView.muxName")}</span>
+                        <span className="truncate">{mux.name || t("canFrameView.muxName")}</span>
+                        {muxInherited && (
+                          <span className="text-xs text-purple flex items-center gap-1" title={t("canFrameView.inheritedFromMirror")}>
+                            <Layers className="w-3 h-3" />
+                            <span>{t("canFrameView.inheritedShort")}</span>
+                          </span>
+                        )}
                       </div>
                       <div className={`${caption} mt-1`}>
                         {t("canFrameView.bitsRange", {
-                          start: muxData.start_bit ?? 0,
-                          end: (muxData.start_bit ?? 0) + (muxData.bit_length ?? 0) - 1,
-                          length: muxData.bit_length ?? 0,
+                          start: mux.startBit,
+                          end: mux.startBit + mux.bitLength - 1,
+                          length: mux.bitLength,
                         })}
-                        {muxData.default !== undefined && (
-                          <span className="ml-2 text-blue">{t("canFrameView.muxDefault", { value: muxData.default })}</span>
+                        {mux.default !== undefined && (
+                          <span className="ml-2 text-blue">{t("canFrameView.muxDefault", { value: mux.default })}</span>
                         )}
                       </div>
-                      {muxData.notes && (
+                      {mux.notes && (
                         <div className="text-xs text-secondary mt-2 italic whitespace-pre-wrap">
-                          {Array.isArray(muxData.notes) ? muxData.notes.join('\n') : muxData.notes}
+                          {mux.notes.join("\n")}
                         </div>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 ml-4 shrink-0">
-                    {onEditMux && (
+                    {onEditMux && !muxInherited && (
                       <IconButton
-                        onClick={() => onEditMux(["frame", "can", idKey, "mux"], muxData)}
+                        onClick={() => onEditMux([...selectedNode.path, "mux"], mux)}
                         title={t("canFrameView.editMux")}
                       >
                         <Pencil className={`${iconMd} text-secondary`} />
                       </IconButton>
                     )}
-                    {onDeleteMux && (
+                    {onDeleteMux && !muxInherited && (
                       <IconButton
                         onClick={() => setConfirmDeleteMux(true)}
                         tone="danger"
@@ -434,7 +392,7 @@ export default function CANFrameView({
               {muxNode?.children && muxNode.children.length > 0 && (
                 <div className="space-y-2 ml-4">
                   {muxNode.children.map((caseNode, idx) => {
-                    const caseSignals = caseNode.metadata?.properties?.signals || [];
+                    const caseSignals = caseNode.metadata?.muxCase?.signals ?? [];
                     return (
                       <div
                         key={idx}
@@ -452,11 +410,11 @@ export default function CANFrameView({
                             </div>
                             {caseSignals.length > 0 && (
                               <div className={`${caption} mt-1 ml-6 space-y-0.5`}>
-                                {caseSignals.map((sig: any, sIdx: number) => (
+                                {caseSignals.map((sig, sIdx) => (
                                   <div key={sIdx} className="truncate">
                                     ⚡ {sig.name || t("canFrameView.signalDefault", { idx: sIdx + 1 })}
                                     <span className="ml-1 text-muted">
-                                      ({sig.start_bit ?? 0}:{sig.bit_length ?? 0})
+                                      ({sig.startBit ?? 0}:{sig.bitLength ?? 0})
                                     </span>
                                   </div>
                                 ))}
@@ -481,12 +439,12 @@ export default function CANFrameView({
           open={confirmDeleteMux}
           title={t("canFrameView.deleteMuxTitle")}
           message={t("canFrameView.deleteMuxMessage")}
-          highlightText={muxData?.name || undefined}
+          highlightText={mux?.name || undefined}
           confirmText={t("canFrameView.deleteLabel")}
           onCancel={() => setConfirmDeleteMux(false)}
           onConfirm={() => {
             setConfirmDeleteMux(false);
-            onDeleteMux(["frame", "can", idKey, "mux"]);
+            onDeleteMux([...selectedNode.path, "mux"]);
           }}
         />
       )}

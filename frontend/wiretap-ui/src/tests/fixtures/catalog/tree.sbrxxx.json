@@ -1,0 +1,2586 @@
+{
+  "cases": [
+    {
+      "name": "sbrxxx",
+      "input": "catalog/sbrxxx.catalog.json",
+      "expected": [
+        {
+          "key": "meta",
+          "type": "meta",
+          "path": "meta"
+        },
+        {
+          "key": "frame",
+          "type": "section",
+          "path": "frame",
+          "children": [
+            {
+              "key": "can",
+              "type": "section",
+              "path": "frame.can",
+              "children": [
+                {
+                  "key": "0x000",
+                  "type": "can-frame",
+                  "path": "frame.can.0x000",
+                  "children": [
+                    {
+                      "key": "700_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x000.signals.0",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x001",
+                  "type": "can-frame",
+                  "path": "frame.can.0x001",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x001.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x001.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Max_Charge_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x001.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Max_Dischg_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x001.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x002",
+                  "type": "can-frame",
+                  "path": "frame.can.0x002",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Reported_SoC",
+                      "type": "signal",
+                      "path": "frame.can.0x002.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_SoH",
+                      "type": "signal",
+                      "path": "frame.can.0x002.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Remaining_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x002.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Max_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x002.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x003",
+                  "type": "can-frame",
+                  "path": "frame.can.0x003",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Energy_Charged",
+                      "type": "signal",
+                      "path": "frame.can.0x003.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Energy_Discharged",
+                      "type": "signal",
+                      "path": "frame.can.0x003.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x004",
+                  "type": "can-frame",
+                  "path": "frame.can.0x004",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x004.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x004.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_704",
+                      "type": "signal",
+                      "path": "frame.can.0x004.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Temperature",
+                      "type": "signal",
+                      "path": "frame.can.0x004.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x005",
+                  "type": "can-frame",
+                  "path": "frame.can.0x005",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Operation",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_End_Stop",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.1"
+                    },
+                    {
+                      "key": "705_Always_1",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_705",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.4",
+                      "inherited": true
+                    },
+                    {
+                      "key": "705_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x005.signals.5",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x006",
+                  "type": "can-frame",
+                  "path": "frame.can.0x006",
+                  "children": [
+                    {
+                      "key": "Overview_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x006.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x006.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x006.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x006.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x007",
+                  "type": "can-frame",
+                  "path": "frame.can.0x007",
+                  "children": [
+                    {
+                      "key": "Info_BMS_Firmware_Patch",
+                      "type": "signal",
+                      "path": "frame.can.0x007.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "707_All_Zero",
+                      "type": "signal",
+                      "path": "frame.can.0x007.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_BMS_Firmware_Minor",
+                      "type": "signal",
+                      "path": "frame.can.0x007.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Nameplate_Capacity",
+                      "type": "signal",
+                      "path": "frame.can.0x007.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Module_Count",
+                      "type": "signal",
+                      "path": "frame.can.0x007.signals.4",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x008",
+                  "type": "can-frame",
+                  "path": "frame.can.0x008",
+                  "children": [
+                    {
+                      "key": "mux_1800_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x008.mux",
+                      "inherited": true,
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x008.mux.0",
+                          "inherited": true,
+                          "children": [
+                            {
+                              "key": "Info_Battery_SN_1",
+                              "type": "signal",
+                              "path": "frame.can.0x008.mux.0.signals.0",
+                              "inherited": true
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x008.mux.1",
+                          "inherited": true,
+                          "children": [
+                            {
+                              "key": "Info_Battery_SN_2",
+                              "type": "signal",
+                              "path": "frame.can.0x008.mux.1.signals.0",
+                              "inherited": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x009",
+                  "type": "can-frame",
+                  "path": "frame.can.0x009",
+                  "children": [
+                    {
+                      "key": "709_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x009.signals.0",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x00a",
+                  "type": "can-frame",
+                  "path": "frame.can.0x00a",
+                  "children": [
+                    {
+                      "key": "mux_1802_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x00a.mux",
+                      "inherited": true,
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x00a.mux.0",
+                          "inherited": true,
+                          "children": [
+                            {
+                              "key": "Info_Battery_Manufacturer",
+                              "type": "signal",
+                              "path": "frame.can.0x00a.mux.0.signals.0",
+                              "inherited": true
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x00a.mux.1",
+                          "inherited": true,
+                          "children": [
+                            {
+                              "key": "Info_Battery_Model_Short",
+                              "type": "signal",
+                              "path": "frame.can.0x00a.mux.1.signals.0",
+                              "inherited": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x00b",
+                  "type": "can-frame",
+                  "path": "frame.can.0x00b",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Model",
+                      "type": "signal",
+                      "path": "frame.can.0x00b.signals.0",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x00d",
+                  "type": "can-frame",
+                  "path": "frame.can.0x00d",
+                  "children": [
+                    {
+                      "key": "70d_Unknown_Permission_3_10701__",
+                      "type": "signal",
+                      "path": "frame.can.0x00d.signals.0",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x00e",
+                  "type": "can-frame",
+                  "path": "frame.can.0x00e",
+                  "children": [
+                    {
+                      "key": "70E_Unknown_Permission_3_10705__",
+                      "type": "signal",
+                      "path": "frame.can.0x00e.signals.0",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x013",
+                  "type": "can-frame",
+                  "path": "frame.can.0x013",
+                  "children": [
+                    {
+                      "key": "Status_Pos_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Module_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Module_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.4",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x013.signals.5",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x014",
+                  "type": "can-frame",
+                  "path": "frame.can.0x014",
+                  "children": [
+                    {
+                      "key": "Status_Pos_Cell_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Module_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Cell_Max_Voltage_HP",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Cell_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Pos_Module_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.4",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Cell_Min_Voltage_HP",
+                      "type": "signal",
+                      "path": "frame.can.0x014.signals.5",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x015",
+                  "type": "can-frame",
+                  "path": "frame.can.0x015",
+                  "children": [
+                    {
+                      "key": "Status_Module_1_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x015.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_1_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x015.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_2_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x015.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_2_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x015.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x016",
+                  "type": "can-frame",
+                  "path": "frame.can.0x016",
+                  "children": [
+                    {
+                      "key": "Status_Module_3_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x016.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_3_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x016.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_4_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x016.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_4_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x016.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x017",
+                  "type": "can-frame",
+                  "path": "frame.can.0x017",
+                  "children": [
+                    {
+                      "key": "Status_Module_5_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x017.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_5_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x017.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_6_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x017.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_6_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x017.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x018",
+                  "type": "can-frame",
+                  "path": "frame.can.0x018",
+                  "children": [
+                    {
+                      "key": "Status_Module_7_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x018.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_7_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x018.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_8_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x018.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_8_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x018.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x019",
+                  "type": "can-frame",
+                  "path": "frame.can.0x019",
+                  "children": [
+                    {
+                      "key": "Status_3_10789__",
+                      "type": "signal",
+                      "path": "frame.can.0x019.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Module_Fault_3_10790__",
+                      "type": "signal",
+                      "path": "frame.can.0x019.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x01A",
+                  "type": "can-frame",
+                  "path": "frame.can.0x01A",
+                  "children": [
+                    {
+                      "key": "Info_Module_1_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_2_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_3_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_4_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_5_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.4",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_6_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.5",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_7_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.6",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_8_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x01A.signals.7",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x01b",
+                  "type": "can-frame",
+                  "path": "frame.can.0x01b",
+                  "children": [
+                    {
+                      "key": "Info_Module_1_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01b.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_2_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01b.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x01c",
+                  "type": "can-frame",
+                  "path": "frame.can.0x01c",
+                  "children": [
+                    {
+                      "key": "Info_Module_3_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01c.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_4_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01c.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x01d",
+                  "type": "can-frame",
+                  "path": "frame.can.0x01d",
+                  "children": [
+                    {
+                      "key": "Info_Module_5_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01d.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_6_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01d.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x01e",
+                  "type": "can-frame",
+                  "path": "frame.can.0x01e",
+                  "children": [
+                    {
+                      "key": "Info_Module_7_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01e.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Module_8_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x01e.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x100",
+                  "type": "can-frame",
+                  "path": "frame.can.0x100",
+                  "children": [
+                    {
+                      "key": "100",
+                      "type": "signal",
+                      "path": "frame.can.0x100.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x101",
+                  "type": "can-frame",
+                  "path": "frame.can.0x101",
+                  "children": [
+                    {
+                      "key": "Status_Inverter_Timestamp",
+                      "type": "signal",
+                      "path": "frame.can.0x101.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x102",
+                  "type": "can-frame",
+                  "path": "frame.can.0x102",
+                  "children": [
+                    {
+                      "key": "102",
+                      "type": "signal",
+                      "path": "frame.can.0x102.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x103",
+                  "type": "can-frame",
+                  "path": "frame.can.0x103",
+                  "children": [
+                    {
+                      "key": "mux_259_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x103.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x103.mux.0",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_SN_1",
+                              "type": "signal",
+                              "path": "frame.can.0x103.mux.0.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x103.mux.1",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_SN_2",
+                              "type": "signal",
+                              "path": "frame.can.0x103.mux.1.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x104",
+                  "type": "can-frame",
+                  "path": "frame.can.0x104",
+                  "children": [
+                    {
+                      "key": "mux_260_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x104.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x104.mux.0",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_Manufacturer_1",
+                              "type": "signal",
+                              "path": "frame.can.0x104.mux.0.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x104.mux.1",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_Manufacturer_2",
+                              "type": "signal",
+                              "path": "frame.can.0x104.mux.1.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x105",
+                  "type": "can-frame",
+                  "path": "frame.can.0x105",
+                  "children": [
+                    {
+                      "key": "mux_261_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x105.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x105.mux.0",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_Model_1",
+                              "type": "signal",
+                              "path": "frame.can.0x105.mux.0.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x105.mux.1",
+                          "children": [
+                            {
+                              "key": "Info_Inverter_Model_2",
+                              "type": "signal",
+                              "path": "frame.can.0x105.mux.1.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x106",
+                  "type": "can-frame",
+                  "path": "frame.can.0x106",
+                  "children": [
+                    {
+                      "key": "106_Unknown_1",
+                      "type": "signal",
+                      "path": "frame.can.0x106.signals.0"
+                    },
+                    {
+                      "key": "106_Unknown_2",
+                      "type": "signal",
+                      "path": "frame.can.0x106.signals.1"
+                    },
+                    {
+                      "key": "106_Maintenance_Param",
+                      "type": "signal",
+                      "path": "frame.can.0x106.signals.2"
+                    },
+                    {
+                      "key": "Cmd_Maintenance_Mode",
+                      "type": "signal",
+                      "path": "frame.can.0x106.signals.3"
+                    },
+                    {
+                      "key": "106_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x106.signals.4"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x108",
+                  "type": "can-frame",
+                  "path": "frame.can.0x108",
+                  "children": [
+                    {
+                      "key": "108",
+                      "type": "signal",
+                      "path": "frame.can.0x108.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x109",
+                  "type": "can-frame",
+                  "path": "frame.can.0x109",
+                  "children": [
+                    {
+                      "key": "109_Marker",
+                      "type": "signal",
+                      "path": "frame.can.0x109.signals.0"
+                    },
+                    {
+                      "key": "Status_PV_Power",
+                      "type": "signal",
+                      "path": "frame.can.0x109.signals.1"
+                    },
+                    {
+                      "key": "109_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x109.signals.2"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x191",
+                  "type": "can-frame",
+                  "path": "frame.can.0x191",
+                  "children": [
+                    {
+                      "key": "191",
+                      "type": "signal",
+                      "path": "frame.can.0x191.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x1E0",
+                  "type": "can-frame",
+                  "path": "frame.can.0x1E0"
+                },
+                {
+                  "key": "0x400",
+                  "type": "can-frame",
+                  "path": "frame.can.0x400",
+                  "children": [
+                    {
+                      "key": "400_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x400.signals.0"
+                    },
+                    {
+                      "key": "Status_Battery_Actual_SoC",
+                      "type": "signal",
+                      "path": "frame.can.0x400.signals.1"
+                    },
+                    {
+                      "key": "400_Unknown",
+                      "type": "signal",
+                      "path": "frame.can.0x400.signals.2"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x401",
+                  "type": "can-frame",
+                  "path": "frame.can.0x401",
+                  "children": [
+                    {
+                      "key": "401_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x401.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x402",
+                  "type": "can-frame",
+                  "path": "frame.can.0x402",
+                  "children": [
+                    {
+                      "key": "402_Unknown",
+                      "type": "signal",
+                      "path": "frame.can.0x402.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x500",
+                  "type": "can-frame",
+                  "path": "frame.can.0x500",
+                  "children": [
+                    {
+                      "key": "500_Unknown_0",
+                      "type": "signal",
+                      "path": "frame.can.0x500.signals.0"
+                    },
+                    {
+                      "key": "500_Unknown_1",
+                      "type": "signal",
+                      "path": "frame.can.0x500.signals.1"
+                    },
+                    {
+                      "key": "500_Unknown_2",
+                      "type": "signal",
+                      "path": "frame.can.0x500.signals.2"
+                    },
+                    {
+                      "key": "Status_Battery_SoC_Int",
+                      "type": "signal",
+                      "path": "frame.can.0x500.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x501",
+                  "type": "can-frame",
+                  "path": "frame.can.0x501",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x501.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x501.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Max_Charge_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x501.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Max_Dischg_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x501.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x502",
+                  "type": "can-frame",
+                  "path": "frame.can.0x502",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Reported_SoC",
+                      "type": "signal",
+                      "path": "frame.can.0x502.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_SoH",
+                      "type": "signal",
+                      "path": "frame.can.0x502.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Remaining_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x502.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Max_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x502.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x503",
+                  "type": "can-frame",
+                  "path": "frame.can.0x503",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Energy_Charged",
+                      "type": "signal",
+                      "path": "frame.can.0x503.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Energy_Discharged",
+                      "type": "signal",
+                      "path": "frame.can.0x503.signals.1",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x504",
+                  "type": "can-frame",
+                  "path": "frame.can.0x504",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x504.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Current_Inverted",
+                      "type": "signal",
+                      "path": "frame.can.0x504.signals.1"
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_704",
+                      "type": "signal",
+                      "path": "frame.can.0x504.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Temperature",
+                      "type": "signal",
+                      "path": "frame.can.0x504.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x505",
+                  "type": "can-frame",
+                  "path": "frame.can.0x505",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Operation",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "705_End_Stop",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "705_Always_1",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Info_Battery_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.3",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_705",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.4",
+                      "inherited": true
+                    },
+                    {
+                      "key": "705_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x505.signals.5",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x506",
+                  "type": "can-frame",
+                  "path": "frame.can.0x506",
+                  "children": [
+                    {
+                      "key": "Overview_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x506.signals.0",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x506.signals.1",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x506.signals.2",
+                      "inherited": true
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x506.signals.3",
+                      "inherited": true
+                    }
+                  ]
+                },
+                {
+                  "key": "0x512",
+                  "type": "can-frame",
+                  "path": "frame.can.0x512",
+                  "children": [
+                    {
+                      "key": "512_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x512.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x700",
+                  "type": "can-frame",
+                  "path": "frame.can.0x700",
+                  "children": [
+                    {
+                      "key": "700_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x700.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x701",
+                  "type": "can-frame",
+                  "path": "frame.can.0x701",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x701.signals.0"
+                    },
+                    {
+                      "key": "Info_Battery_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x701.signals.1"
+                    },
+                    {
+                      "key": "Info_Battery_Max_Charge_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x701.signals.2"
+                    },
+                    {
+                      "key": "Info_Battery_Max_Dischg_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x701.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x702",
+                  "type": "can-frame",
+                  "path": "frame.can.0x702",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Reported_SoC",
+                      "type": "signal",
+                      "path": "frame.can.0x702.signals.0"
+                    },
+                    {
+                      "key": "Status_Battery_SoH",
+                      "type": "signal",
+                      "path": "frame.can.0x702.signals.1"
+                    },
+                    {
+                      "key": "Status_Battery_Remaining_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x702.signals.2"
+                    },
+                    {
+                      "key": "Status_Battery_Max_Energy",
+                      "type": "signal",
+                      "path": "frame.can.0x702.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x703",
+                  "type": "can-frame",
+                  "path": "frame.can.0x703",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Energy_Charged",
+                      "type": "signal",
+                      "path": "frame.can.0x703.signals.0"
+                    },
+                    {
+                      "key": "Status_Battery_Energy_Discharged",
+                      "type": "signal",
+                      "path": "frame.can.0x703.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x704",
+                  "type": "can-frame",
+                  "path": "frame.can.0x704",
+                  "children": [
+                    {
+                      "key": "Status_Battery_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x704.signals.0"
+                    },
+                    {
+                      "key": "Status_Battery_Current",
+                      "type": "signal",
+                      "path": "frame.can.0x704.signals.1"
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_704",
+                      "type": "signal",
+                      "path": "frame.can.0x704.signals.2"
+                    },
+                    {
+                      "key": "Status_Battery_Temperature",
+                      "type": "signal",
+                      "path": "frame.can.0x704.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x705",
+                  "type": "can-frame",
+                  "path": "frame.can.0x705",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Operation",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.0"
+                    },
+                    {
+                      "key": "705_End_Stop",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.1"
+                    },
+                    {
+                      "key": "705_Always_1",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.2"
+                    },
+                    {
+                      "key": "Info_Battery_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.3"
+                    },
+                    {
+                      "key": "Status_Battery_Voltage_Alt_705",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.4"
+                    },
+                    {
+                      "key": "705_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x705.signals.5"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x706",
+                  "type": "can-frame",
+                  "path": "frame.can.0x706",
+                  "children": [
+                    {
+                      "key": "Overview_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x706.signals.0"
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x706.signals.1"
+                    },
+                    {
+                      "key": "Overview_Cell_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x706.signals.2"
+                    },
+                    {
+                      "key": "Overview_Cell_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x706.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x707",
+                  "type": "can-frame",
+                  "path": "frame.can.0x707",
+                  "children": [
+                    {
+                      "key": "Info_BMS_Firmware_Patch",
+                      "type": "signal",
+                      "path": "frame.can.0x707.signals.0"
+                    },
+                    {
+                      "key": "707_All_Zero",
+                      "type": "signal",
+                      "path": "frame.can.0x707.signals.1"
+                    },
+                    {
+                      "key": "Info_BMS_Firmware_Minor",
+                      "type": "signal",
+                      "path": "frame.can.0x707.signals.2"
+                    },
+                    {
+                      "key": "Info_Battery_Nameplate_Capacity",
+                      "type": "signal",
+                      "path": "frame.can.0x707.signals.3"
+                    },
+                    {
+                      "key": "Info_Battery_Module_Count",
+                      "type": "signal",
+                      "path": "frame.can.0x707.signals.4"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x708",
+                  "type": "can-frame",
+                  "path": "frame.can.0x708",
+                  "children": [
+                    {
+                      "key": "mux_1800_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x708.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x708.mux.0",
+                          "children": [
+                            {
+                              "key": "Info_Battery_SN_1",
+                              "type": "signal",
+                              "path": "frame.can.0x708.mux.0.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x708.mux.1",
+                          "children": [
+                            {
+                              "key": "Info_Battery_SN_2",
+                              "type": "signal",
+                              "path": "frame.can.0x708.mux.1.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x709",
+                  "type": "can-frame",
+                  "path": "frame.can.0x709",
+                  "children": [
+                    {
+                      "key": "709_Padding",
+                      "type": "signal",
+                      "path": "frame.can.0x709.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x70A",
+                  "type": "can-frame",
+                  "path": "frame.can.0x70A",
+                  "children": [
+                    {
+                      "key": "mux_1802_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x70A.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70A.mux.0",
+                          "children": [
+                            {
+                              "key": "Info_Battery_Manufacturer",
+                              "type": "signal",
+                              "path": "frame.can.0x70A.mux.0.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70A.mux.1",
+                          "children": [
+                            {
+                              "key": "Info_Battery_Model_Short",
+                              "type": "signal",
+                              "path": "frame.can.0x70A.mux.1.signals.0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x70B",
+                  "type": "can-frame",
+                  "path": "frame.can.0x70B",
+                  "children": [
+                    {
+                      "key": "Info_Battery_Model",
+                      "type": "signal",
+                      "path": "frame.can.0x70B.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x70D",
+                  "type": "can-frame",
+                  "path": "frame.can.0x70D",
+                  "children": [
+                    {
+                      "key": "70d_Unknown_Permission_3_10701__",
+                      "type": "signal",
+                      "path": "frame.can.0x70D.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x70E",
+                  "type": "can-frame",
+                  "path": "frame.can.0x70E",
+                  "children": [
+                    {
+                      "key": "70E_Unknown_Permission_3_10705__",
+                      "type": "signal",
+                      "path": "frame.can.0x70E.signals.0"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x70F",
+                  "type": "can-frame",
+                  "path": "frame.can.0x70F",
+                  "children": [
+                    {
+                      "key": "mux_1807_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x70F.mux",
+                      "children": [
+                        {
+                          "key": "Case 0",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.0",
+                          "children": [
+                            {
+                              "key": "70F_Mux0_Const",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.0.signals.0"
+                            },
+                            {
+                              "key": "Info_Battery_Max_Power",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.0.signals.1"
+                            },
+                            {
+                              "key": "Info_Battery_Max_Power_2",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.0.signals.2"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.1",
+                          "children": [
+                            {
+                              "key": "70F_Mux1_Padding",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.1.signals.0"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 2",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.2",
+                          "children": [
+                            {
+                              "key": "70F_Unknown_Mux_2_1",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.2.signals.0"
+                            },
+                            {
+                              "key": "70F_Mux2_Padding",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.2.signals.1"
+                            },
+                            {
+                              "key": "70F_Unknown_Mux_2_3",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.2.signals.2"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 3",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.3",
+                          "children": [
+                            {
+                              "key": "70F_Unknown_Mux_3_1",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.3.signals.0"
+                            },
+                            {
+                              "key": "70F_Mux3_Padding",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.3.signals.1"
+                            },
+                            {
+                              "key": "70F_Unknown_Mux_3_3",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.3.signals.2"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 4",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.4",
+                          "children": [
+                            {
+                              "key": "70F_Mux4_Padding_0",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.4.signals.0"
+                            },
+                            {
+                              "key": "70F_Mux4_Charge_Value",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.4.signals.1"
+                            },
+                            {
+                              "key": "70F_Mux4_Padding_1",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.4.signals.2"
+                            },
+                            {
+                              "key": "Status_Charge_State",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.4.signals.3"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 5",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.5",
+                          "children": [
+                            {
+                              "key": "Status_Module_1_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.5.signals.0"
+                            },
+                            {
+                              "key": "Status_Module_2_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.5.signals.1"
+                            },
+                            {
+                              "key": "Status_Module_3_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.5.signals.2"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 6",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.6",
+                          "children": [
+                            {
+                              "key": "Status_Module_4_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.6.signals.0"
+                            },
+                            {
+                              "key": "Status_Module_5_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.6.signals.1"
+                            },
+                            {
+                              "key": "Status_Module_6_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.6.signals.2"
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 7",
+                          "type": "mux-case",
+                          "path": "frame.can.0x70F.mux.7",
+                          "children": [
+                            {
+                              "key": "Status_Module_7_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.7.signals.0"
+                            },
+                            {
+                              "key": "Status_Module_8_SoC",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.7.signals.1"
+                            },
+                            {
+                              "key": "70F_Mux7_Padding",
+                              "type": "signal",
+                              "path": "frame.can.0x70F.mux.7.signals.2"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "0x713",
+                  "type": "can-frame",
+                  "path": "frame.can.0x713",
+                  "children": [
+                    {
+                      "key": "Status_Pos_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.0"
+                    },
+                    {
+                      "key": "Status_Pos_Module_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.1"
+                    },
+                    {
+                      "key": "Status_Cell_Min_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.2"
+                    },
+                    {
+                      "key": "Status_Pos_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.3"
+                    },
+                    {
+                      "key": "Status_Pos_Module_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.4"
+                    },
+                    {
+                      "key": "Status_Cell_Max_Temp",
+                      "type": "signal",
+                      "path": "frame.can.0x713.signals.5"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x714",
+                  "type": "can-frame",
+                  "path": "frame.can.0x714",
+                  "children": [
+                    {
+                      "key": "Status_Pos_Cell_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.0"
+                    },
+                    {
+                      "key": "Status_Pos_Module_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.1"
+                    },
+                    {
+                      "key": "Status_Cell_Max_Voltage_HP",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.2"
+                    },
+                    {
+                      "key": "Status_Pos_Cell_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.3"
+                    },
+                    {
+                      "key": "Status_Pos_Module_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.4"
+                    },
+                    {
+                      "key": "Status_Cell_Min_Voltage_HP",
+                      "type": "signal",
+                      "path": "frame.can.0x714.signals.5"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x715",
+                  "type": "can-frame",
+                  "path": "frame.can.0x715",
+                  "children": [
+                    {
+                      "key": "Status_Module_1_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x715.signals.0"
+                    },
+                    {
+                      "key": "Status_Module_1_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x715.signals.1"
+                    },
+                    {
+                      "key": "Status_Module_2_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x715.signals.2"
+                    },
+                    {
+                      "key": "Status_Module_2_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x715.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x716",
+                  "type": "can-frame",
+                  "path": "frame.can.0x716",
+                  "children": [
+                    {
+                      "key": "Status_Module_3_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x716.signals.0"
+                    },
+                    {
+                      "key": "Status_Module_3_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x716.signals.1"
+                    },
+                    {
+                      "key": "Status_Module_4_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x716.signals.2"
+                    },
+                    {
+                      "key": "Status_Module_4_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x716.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x717",
+                  "type": "can-frame",
+                  "path": "frame.can.0x717",
+                  "children": [
+                    {
+                      "key": "Status_Module_5_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x717.signals.0"
+                    },
+                    {
+                      "key": "Status_Module_5_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x717.signals.1"
+                    },
+                    {
+                      "key": "Status_Module_6_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x717.signals.2"
+                    },
+                    {
+                      "key": "Status_Module_6_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x717.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x718",
+                  "type": "can-frame",
+                  "path": "frame.can.0x718",
+                  "children": [
+                    {
+                      "key": "Status_Module_7_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x718.signals.0"
+                    },
+                    {
+                      "key": "Status_Module_7_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x718.signals.1"
+                    },
+                    {
+                      "key": "Status_Module_8_Min_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x718.signals.2"
+                    },
+                    {
+                      "key": "Status_Module_8_Max_Voltage",
+                      "type": "signal",
+                      "path": "frame.can.0x718.signals.3"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x719",
+                  "type": "can-frame",
+                  "path": "frame.can.0x719",
+                  "children": [
+                    {
+                      "key": "Status_3_10789__",
+                      "type": "signal",
+                      "path": "frame.can.0x719.signals.0"
+                    },
+                    {
+                      "key": "Status_Module_Fault_3_10790__",
+                      "type": "signal",
+                      "path": "frame.can.0x719.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71A",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71A",
+                  "children": [
+                    {
+                      "key": "Info_Module_1_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.0"
+                    },
+                    {
+                      "key": "Info_Module_2_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.1"
+                    },
+                    {
+                      "key": "Info_Module_3_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.2"
+                    },
+                    {
+                      "key": "Info_Module_4_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.3"
+                    },
+                    {
+                      "key": "Info_Module_5_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.4"
+                    },
+                    {
+                      "key": "Info_Module_6_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.5"
+                    },
+                    {
+                      "key": "Info_Module_7_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.6"
+                    },
+                    {
+                      "key": "Info_Module_8_Cell_Type",
+                      "type": "signal",
+                      "path": "frame.can.0x71A.signals.7"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71B",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71B",
+                  "children": [
+                    {
+                      "key": "Info_Module_1_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71B.signals.0"
+                    },
+                    {
+                      "key": "Info_Module_2_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71B.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71C",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71C",
+                  "children": [
+                    {
+                      "key": "Info_Module_3_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71C.signals.0"
+                    },
+                    {
+                      "key": "Info_Module_4_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71C.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71D",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71D",
+                  "children": [
+                    {
+                      "key": "Info_Module_5_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71D.signals.0"
+                    },
+                    {
+                      "key": "Info_Module_6_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71D.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71E",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71E",
+                  "children": [
+                    {
+                      "key": "Info_Module_7_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71E.signals.0"
+                    },
+                    {
+                      "key": "Info_Module_8_Production_Date",
+                      "type": "signal",
+                      "path": "frame.can.0x71E.signals.1"
+                    }
+                  ]
+                },
+                {
+                  "key": "0x71F",
+                  "type": "can-frame",
+                  "path": "frame.can.0x71F",
+                  "children": [
+                    {
+                      "key": "mux_1823_0_8",
+                      "type": "mux",
+                      "path": "frame.can.0x71F.mux",
+                      "children": [
+                        {
+                          "key": "Case 1",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.1",
+                          "children": [
+                            {
+                              "key": "mux_1823_1_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.1.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.1.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_1_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.1.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.1.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_1_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.1.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.1.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_1_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.1.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 2",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.2",
+                          "children": [
+                            {
+                              "key": "mux_1823_2_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.2.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.2.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_2_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.2.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.2.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_2_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.2.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.2.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_2_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.2.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 3",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.3",
+                          "children": [
+                            {
+                              "key": "mux_1823_3_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.3.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.3.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_3_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.3.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.3.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_3_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.3.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.3.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_3_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.3.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 4",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.4",
+                          "children": [
+                            {
+                              "key": "mux_1823_4_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.4.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.4.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_4_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.4.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.4.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_4_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.4.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.4.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_4_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.4.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 5",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.5",
+                          "children": [
+                            {
+                              "key": "mux_1823_5_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.5.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.5.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_5_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.5.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.5.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_5_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.5.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.5.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_5_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.5.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 6",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.6",
+                          "children": [
+                            {
+                              "key": "mux_1823_6_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.6.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.6.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_6_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.6.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.6.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_6_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.6.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.6.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_6_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.6.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 7",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.7",
+                          "children": [
+                            {
+                              "key": "mux_1823_7_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.7.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.7.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_7_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.7.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.7.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_7_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.7.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.7.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_7_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.7.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "key": "Case 8",
+                          "type": "mux-case",
+                          "path": "frame.can.0x71F.mux.8",
+                          "children": [
+                            {
+                              "key": "mux_1823_8_8_8",
+                              "type": "mux",
+                              "path": "frame.can.0x71F.mux.8.mux",
+                              "children": [
+                                {
+                                  "key": "Case 1",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.8.mux.1",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_8_SN_1",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.8.mux.1.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 2",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.8.mux.2",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_8_SN_2",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.8.mux.2.signals.0"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "key": "Case 3",
+                                  "type": "mux-case",
+                                  "path": "frame.can.0x71F.mux.8.mux.3",
+                                  "children": [
+                                    {
+                                      "key": "Info_Module_8_SN_3",
+                                      "type": "signal",
+                                      "path": "frame.can.0x71F.mux.8.mux.3.signals.0"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "modbus",
+              "type": "section",
+              "path": "frame.modbus",
+              "children": [
+                {
+                  "key": "tunnel_4de2_holding",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.tunnel_4de2_holding",
+                  "children": [
+                    {
+                      "key": "Tunnel_4DE2_Holding_0",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.0"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Holding_1",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.1"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Holding_2",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.2"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Holding_3",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.3"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Holding_4",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.4"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Holding_5",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_holding.signals.5"
+                    }
+                  ]
+                },
+                {
+                  "key": "tunnel_4de2_input",
+                  "type": "modbus-frame",
+                  "path": "frame.modbus.tunnel_4de2_input",
+                  "children": [
+                    {
+                      "key": "Tunnel_4DE2_Input_0",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_input.signals.0"
+                    },
+                    {
+                      "key": "Tunnel_4DE2_Input_1",
+                      "type": "signal",
+                      "path": "frame.modbus.tunnel_4de2_input.signals.1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "node",
+          "type": "section",
+          "path": "node",
+          "children": [
+            {
+              "key": "BMS",
+              "type": "node",
+              "path": "node.BMS"
+            },
+            {
+              "key": "Inverter",
+              "type": "node",
+              "path": "node.Inverter"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

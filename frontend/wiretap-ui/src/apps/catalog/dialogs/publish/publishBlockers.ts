@@ -103,6 +103,5 @@ function identicalTo(
 ): string | null {
   // The loaded comparison wins: it was made against the ref actually chosen.
   if (diff) return diff.identical ? diff.comparedRef : null;
-  const isDefaultPush = effectiveBranch === plan.baseBranch;
-  return isDefaultPush && plan.localBlobSha === plan.baseBlobSha ? plan.baseBranch : null;
+  return effectiveBranch === plan.baseBranch && plan.identicalToBase ? plan.baseBranch : null;
 }

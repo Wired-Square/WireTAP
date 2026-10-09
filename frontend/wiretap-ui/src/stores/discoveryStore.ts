@@ -7,7 +7,7 @@
 // - discoveryFrameStore.ts - frame data, selection, buffer mode
 // - discoveryUIStore.ts - UI state, dialogs, playback, time range
 // - discoverySerialStore.ts - serial bytes, framing
-// - discoveryToolboxStore.ts - analysis tools, knowledge
+// - discoveryToolboxStore.ts - analysis tools, the catalogue draft
 
 import { useDiscoveryFrameStore, type FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './discoveryUIStore';
@@ -101,7 +101,7 @@ type CombinedDiscoveryState = {
 
   // Toolbox store
   toolbox: import('./discoveryToolboxStore').ToolboxState;
-  knowledge: import('../utils/decoderKnowledge').DecoderKnowledge;
+  draft: import('../api/drafting').Draft | null;
   showInfoView: boolean;
 
   // Combined actions
@@ -163,7 +163,7 @@ type CombinedDiscoveryState = {
   updateChecksumDiscoveryOptions: (options: Partial<import('../api/checksums').ChecksumDiscoveryOptions>) => void;
   openInfoView: () => void;
   closeInfoView: () => void;
-  resetKnowledge: () => void;
+  resetDraft: () => void;
   clearAnalysisResults: () => void;
   clearToolResult: (toolTabId: string) => void;
   /** `bytesCaptureId` is the session's byte capture — only the Serial Framing tool reads it. */
@@ -240,7 +240,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
 
     // Toolbox store state
     toolbox: toolboxStore.toolbox,
-    knowledge: toolboxStore.knowledge,
+    draft: toolboxStore.draft,
     showInfoView: toolboxStore.showInfoView,
 
     // Frame store actions (with coordination)
@@ -391,16 +391,16 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     updateMessageOrderOptions: toolboxStore.updateMessageOrderOptions,
     updateChangesOptions: toolboxStore.updateChangesOptions,
     updateChecksumDiscoveryOptions: toolboxStore.updateChecksumDiscoveryOptions,
-    openInfoView: () => toolboxStore.openInfoView(frameStore.frameInfoMap),
+    openInfoView: toolboxStore.openInfoView,
     closeInfoView: toolboxStore.closeInfoView,
-    resetKnowledge: toolboxStore.resetKnowledge,
+    resetDraft: toolboxStore.resetDraft,
     clearAnalysisResults: toolboxStore.clearAnalysisResults,
     clearToolResult: toolboxStore.clearToolResult,
 
     // Combined runAnalysis that coordinates between stores
     runAnalysis: async (bytesCaptureId) => {
       const { toolbox } = toolboxStore;
-      const { selectedFrames, captureMode, frameInfoMap } = frameStore;
+      const { selectedFrames, captureMode } = frameStore;
       const { isSerialMode } = serialStore;
       const { useSessionStore } = await import('./sessionStore');
       const sessionCaptureId =
@@ -461,10 +461,10 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           await toolboxStore.runChecksumDiscoveryAnalysis({ captureId, selection });
           break;
         case 'message-order':
-          await toolboxStore.runMessageOrderAnalysis({ captureId, selection, newest }, frameInfoMap);
+          await toolboxStore.runMessageOrderAnalysis({ captureId, selection, newest });
           break;
         case 'changes':
-          await toolboxStore.runChangesAnalysis({ captureId, selection, newest }, frameInfoMap);
+          await toolboxStore.runChangesAnalysis({ captureId, selection, newest });
           break;
       }
     },

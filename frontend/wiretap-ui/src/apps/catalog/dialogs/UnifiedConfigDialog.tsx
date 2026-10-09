@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { hasFrames } from "../model";
 import {
   MetadataSection,
   CanConfigSection,
@@ -28,9 +29,13 @@ export default function UnifiedConfigDialog({
   const metaFields = useCatalogEditorStore((s) => s.forms.meta);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
 
+  const catalog = useCatalogEditorStore((s) => s.tree.catalog);
+  const seedConfigForms = useCatalogEditorStore((s) => s.seedConfigForms);
+  const effective = catalog?.effectiveDefaults;
+
   // CAN config
-  const canConfig = useCatalogEditorStore((s) => s.tree.canConfig);
-  const hasCanFrames = useCatalogEditorStore((s) => s.tree.hasCanFrames);
+  const canConfig = catalog?.can;
+  const hasCanFrames = hasFrames(catalog, "can");
   const canDefaultEndianness = useCatalogEditorStore((s) => s.forms.canDefaultEndianness);
   const setCanDefaultEndianness = useCatalogEditorStore((s) => s.setCanDefaultEndianness);
   const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
@@ -45,8 +50,8 @@ export default function UnifiedConfigDialog({
   const setCanHeaderFields = useCatalogEditorStore((s) => s.setCanHeaderFields);
 
   // Serial config
-  const serialConfig = useCatalogEditorStore((s) => s.tree.serialConfig);
-  const hasSerialFrames = useCatalogEditorStore((s) => s.tree.hasSerialFrames);
+  const serialConfig = catalog?.serial;
+  const hasSerialFrames = hasFrames(catalog, "serial");
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
   const setSerialEncoding = useCatalogEditorStore((s) => s.setSerialEncoding);
   const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
@@ -59,8 +64,8 @@ export default function UnifiedConfigDialog({
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
 
   // Modbus config
-  const modbusConfig = useCatalogEditorStore((s) => s.tree.modbusConfig);
-  const hasModbusFrames = useCatalogEditorStore((s) => s.tree.hasModbusFrames);
+  const modbusConfig = catalog?.modbus;
+  const hasModbusFrames = hasFrames(catalog, "modbus");
   const setModbusDeviceAddress = useCatalogEditorStore((s) => s.setModbusDeviceAddress);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
   const setModbusRegisterBase = useCatalogEditorStore((s) => s.setModbusRegisterBase);
@@ -81,9 +86,11 @@ export default function UnifiedConfigDialog({
   const [serialExpanded, setSerialExpanded] = useState(false);
   const [modbusExpanded, setModbusExpanded] = useState(false);
 
-  // Sync enabled state with actual config when dialog opens
+  // Seed the draft and the enabled state from the catalogue when the dialog opens
   useEffect(() => {
     if (open) {
+      seedConfigForms(catalog);
+      if (catalog) setMetaFields({ name: catalog.meta.name, version: catalog.meta.version, default_frame: catalog.meta.defaultFrame });
       setCanEnabled(!!canConfig);
       setSerialEnabled(!!serialConfig);
       setModbusEnabled(!!modbusConfig);
@@ -93,14 +100,14 @@ export default function UnifiedConfigDialog({
       setSerialExpanded(!!serialConfig || (hasSerialFrames && !serialConfig));
       setModbusExpanded(!!modbusConfig || (hasModbusFrames && !modbusConfig));
     }
-  }, [open, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Handle adding a protocol config
   const handleAddCanConfig = () => {
     setCanEnabled(true);
     setCanExpanded(true);
-    // Set defaults
-    setCanDefaultEndianness("little");
+    setCanDefaultEndianness(undefined);
     setCanDefaultInterval(undefined);
     setCanDefaultExtended(undefined);
     setCanDefaultFd(undefined);
@@ -111,9 +118,8 @@ export default function UnifiedConfigDialog({
   const handleAddSerialConfig = () => {
     setSerialEnabled(true);
     setSerialExpanded(true);
-    // Set defaults
     setSerialEncoding("slip");
-    setSerialByteOrder("big");
+    setSerialByteOrder(undefined);
     setSerialHeaderFields([]);
     setSerialHeaderLength(undefined);
     setSerialChecksum(null);
@@ -122,12 +128,11 @@ export default function UnifiedConfigDialog({
   const handleAddModbusConfig = () => {
     setModbusEnabled(true);
     setModbusExpanded(true);
-    // Set defaults
     setModbusDeviceAddress(1);
     setModbusRegisterBase(1);
     setModbusDefaultInterval(undefined);
-    setModbusDefaultByteOrder("big");
-    setModbusDefaultWordOrder("big");
+    setModbusDefaultByteOrder(undefined);
+    setModbusDefaultWordOrder(undefined);
   };
 
   // Handle removing a protocol config (just update local state - actual removal on Save)
@@ -196,7 +201,7 @@ export default function UnifiedConfigDialog({
             onToggleExpanded={() => setCanExpanded(!canExpanded)}
             onAdd={handleAddCanConfig}
             onRemove={handleRemoveCanConfig}
-            defaultEndianness={canDefaultEndianness}
+            defaultEndianness={canDefaultEndianness ?? effective?.canByteOrder ?? "little"}
             setDefaultEndianness={setCanDefaultEndianness}
             defaultInterval={canDefaultInterval}
             setDefaultInterval={setCanDefaultInterval}
@@ -219,7 +224,7 @@ export default function UnifiedConfigDialog({
             onRemove={handleRemoveSerialConfig}
             encoding={serialEncoding}
             setEncoding={setSerialEncoding}
-            byteOrder={serialByteOrder}
+            byteOrder={serialByteOrder ?? effective?.serialByteOrder ?? "little"}
             setByteOrder={setSerialByteOrder}
             headerFields={serialHeaderFields}
             setHeaderFields={setSerialHeaderFields}
@@ -240,9 +245,9 @@ export default function UnifiedConfigDialog({
             setRegisterBase={setModbusRegisterBase}
             defaultInterval={modbusDefaultInterval}
             setDefaultInterval={setModbusDefaultInterval}
-            defaultByteOrder={modbusDefaultByteOrder}
+            defaultByteOrder={modbusDefaultByteOrder ?? effective?.modbusByteOrder ?? "big"}
             setDefaultByteOrder={setModbusDefaultByteOrder}
-            defaultWordOrder={modbusDefaultWordOrder}
+            defaultWordOrder={modbusDefaultWordOrder ?? effective?.modbusWordOrder ?? "big"}
             setDefaultWordOrder={setModbusDefaultWordOrder}
           />
         </div>

@@ -1,0 +1,149 @@
+<h1>Payload Changes Report</h1>
+<section class="level-2">
+<h2>Summary</h2>
+<table class="fields">
+<tr><th>Frames read</th><td>364</td></tr>
+<tr><th>Frames profiled</th><td>6</td></tr>
+<tr><th>Protocols</th><td>CAN, Modbus, Serial</td></tr>
+<tr><th>Mirror groups</th><td>1</td></tr>
+<tr><th>Varying length</th><td>1</td></tr>
+<tr><th>Multiplexed</th><td>1</td></tr>
+<tr><th>Burst</th><td>1</td></tr>
+</table>
+</section>
+<section class="level-2">
+<h2>Mirror groups</h2>
+<table>
+<thead><tr><th>Frames</th><th>Match</th><th>Paired samples</th><th>Sample</th></tr></thead>
+<tbody>
+<tr><td><code>0x100 ↔ 0x200</code></td><td>100%</td><td>40</td><td><code>00 5A E8 03</code></td></tr>
+</tbody>
+</table>
+</section>
+<section class="level-2">
+<h2>Frames</h2>
+<section class="level-3">
+<h3>CAN 0x100</h3>
+<table class="fields">
+<tr><th>Samples</th><td>40</td></tr>
+<tr><th>Length</th><td>4 bytes</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>counter</td><td>step 1</td></tr>
+<tr><td>1</td><td>static</td><td>0x5A</td></tr>
+<tr><td>2</td><td>counter</td><td>step 7, rollover</td></tr>
+<tr><td>3</td><td>value</td><td>2 distinct values</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Bytes</th><th>Pattern</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td><code>byte[2:3]</code></td><td>16-bit counter</td><td>little endian</td></tr>
+</tbody>
+</table>
+<ul><li>Little-endian (inferred from 1 multi-byte pattern(s))</li><li>Static bytes: byte[1]=0x5A</li><li>Counter at byte[0]: incrementing, step=1</li><li>16-bit counter at byte[2:3], little endian</li></ul>
+</section>
+<section class="level-3">
+<h3>CAN 0x200</h3>
+<table class="fields">
+<tr><th>Samples</th><td>40</td></tr>
+<tr><th>Length</th><td>4 bytes</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>counter</td><td>step 1</td></tr>
+<tr><td>1</td><td>static</td><td>0x5A</td></tr>
+<tr><td>2</td><td>counter</td><td>step 7, rollover</td></tr>
+<tr><td>3</td><td>value</td><td>2 distinct values</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Bytes</th><th>Pattern</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td><code>byte[2:3]</code></td><td>16-bit counter</td><td>little endian</td></tr>
+</tbody>
+</table>
+<ul><li>Little-endian (inferred from 1 multi-byte pattern(s))</li><li>Static bytes: byte[1]=0x5A</li><li>Counter at byte[0]: incrementing, step=1</li><li>16-bit counter at byte[2:3], little endian</li></ul>
+</section>
+<section class="level-3">
+<h3>CAN 0x300</h3>
+<table class="fields">
+<tr><th>Samples</th><td>84</td></tr>
+<tr><th>Length</th><td>2–3 bytes</td></tr>
+<tr><th>Flags</th><td>burst</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>sensor</td><td>trend increasing</td></tr>
+<tr><td>1</td><td>value</td><td>2 distinct values</td></tr>
+<tr><td>2</td><td>static</td><td>0x33</td></tr>
+</tbody>
+</table>
+<ul><li>Varying length: 2–3 bytes</li><li>Burst frame: analysing stable payload portion only</li><li>Static bytes: byte[2]=0x33</li><li>Sensor at byte[0]: ↑ range 128–131 (73% trend)</li></ul>
+</section>
+<section class="level-3">
+<h3>CAN 0x18FF0001</h3>
+<table class="fields">
+<tr><th>Samples</th><td>120</td></tr>
+<tr><th>Length</th><td>4 bytes</td></tr>
+<tr><th>Flags</th><td>multiplexed</td></tr>
+<tr><th>Selector</th><td>byte[0]</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>sensor</td><td>trend increasing</td></tr>
+<tr><td>2</td><td>sensor</td><td>trend increasing</td></tr>
+<tr><td>3</td><td>static</td><td>0x00</td></tr>
+</tbody>
+</table>
+<ul><li>Multiplexed frame: byte[0], cases: 1, 2, 3</li><li>Case 1: 1 counter, 2 static</li><li>Case 2: 1 counter, 2 static</li><li>Case 3: 1 counter, 2 static</li></ul>
+<section class="level-4">
+<h4>Case 1 (40 samples)</h4>
+<ul><li>Static: byte[1]=0x10, byte[3]=0x00</li><li>Counter byte[2]: inc, step=1</li></ul>
+</section>
+<section class="level-4">
+<h4>Case 2 (40 samples)</h4>
+<ul><li>Static: byte[1]=0x20, byte[3]=0x00</li><li>Counter byte[2]: inc, step=1</li></ul>
+</section>
+<section class="level-4">
+<h4>Case 3 (40 samples)</h4>
+<ul><li>Static: byte[1]=0x30, byte[3]=0x00</li><li>Counter byte[2]: inc, step=1</li></ul>
+</section>
+</section>
+<section class="level-3">
+<h3>Modbus 40001</h3>
+<table class="fields">
+<tr><th>Samples</th><td>40</td></tr>
+<tr><th>Length</th><td>2 bytes</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>static</td><td>0x00</td></tr>
+<tr><td>1</td><td>counter</td><td>step 1</td></tr>
+</tbody>
+</table>
+<ul><li>Static bytes: byte[0]=0x00</li><li>Counter at byte[1]: incrementing, step=1</li></ul>
+</section>
+<section class="level-3">
+<h3>Serial 0x10</h3>
+<table class="fields">
+<tr><th>Samples</th><td>40</td></tr>
+<tr><th>Length</th><td>3 bytes</td></tr>
+</table>
+<table>
+<thead><tr><th>Byte</th><th>Role</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>static</td><td>0xAA</td></tr>
+<tr><td>1</td><td>counter</td><td>step 1</td></tr>
+<tr><td>2</td><td>static</td><td>0x00</td></tr>
+</tbody>
+</table>
+<ul><li>Static bytes: byte[0]=0xAA, byte[2]=0x00</li><li>Counter at byte[1]: incrementing, step=1</li></ul>
+</section>
+</section>
