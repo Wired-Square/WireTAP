@@ -21,20 +21,9 @@ function findMatchingNodes(nodes: TomlNode[], query: string): string[][] {
   const matches: string[][] = [];
 
   function traverse(node: TomlNode) {
-    // Check if the node's key matches
     const keyMatches = node.key.toLowerCase().includes(lowerQuery);
-
-    // Check metadata fields that might contain searchable names
-    const idMatches = node.metadata?.idValue?.toLowerCase().includes(lowerQuery);
-    const transmitterMatches = node.metadata?.transmitter?.toLowerCase().includes(lowerQuery);
-    const muxNameMatches = node.metadata?.muxName?.toLowerCase().includes(lowerQuery);
-
-    // For signal nodes, check the value which contains signal properties
-    const signalNameMatches = node.type === 'signal' &&
-      typeof node.value === 'object' &&
-      node.value?.name?.toLowerCase().includes(lowerQuery);
-
-    if (keyMatches || idMatches || transmitterMatches || muxNameMatches || signalNameMatches) {
+    const transmitterMatches = node.metadata?.frame?.transmitter?.toLowerCase().includes(lowerQuery);
+    if (keyMatches || transmitterMatches) {
       matches.push(node.path);
     }
 

@@ -3,7 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { wsTransport } from "../services/wsTransport";
-import type { Catalog } from "../types/catalogModel";
+import type { Catalog, FrameLayout, Protocol } from "../types/catalogModel";
 import type { EditOp } from "../types/catalogEdit";
 // Type-only: erased at build time, so the catalogue picker gets this field without
 // the sharing store's runtime subtree landing in every panel that mounts it.
@@ -65,6 +65,11 @@ export interface ValidationResult {
  */
 export async function parseCatalog(content: string): Promise<Catalog> {
   return await wsTransport.command<Catalog>("catalog.parse", { content });
+}
+
+/** What a bit-layout preview of the item at `path` below the frame shows; null when there is none. */
+export async function frameLayout(content: string, protocol: Protocol, key: string, path: string[]): Promise<FrameLayout | null> {
+  return await wsTransport.command<FrameLayout | null>("catalog.frameLayout", { content, protocol, key, path });
 }
 
 /** Validate catalogue TOML, returning field-path + message findings. */

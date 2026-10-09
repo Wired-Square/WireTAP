@@ -1,82 +1,40 @@
 // ui/src/apps/catalog/views/ChecksumView.tsx
 
-import React from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, bgSurface } from "../../../styles";
-import { tomlParse } from "../toml";
-import { getFrameByteLengthFromPath } from "../utils";
 import { getAlgorithmInfo, resolveByteIndexSync } from "../checksums";
-import type { TomlNode, ValidationError, ChecksumAlgorithm } from "../types";
+import type { TomlNode, ChecksumAlgorithm } from "../types";
+import type { FrameChecksum } from "../../../types/catalogModel";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { frameAt } from "../model";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { Card } from "../../../components/Card";
 export type ChecksumViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
 
   // Actions
-  onEditChecksum: (idKey: string, checksumIndex: number, checksum: any, checksumsParentPath?: string[]) => void;
+  onEditChecksum: (idKey: string, checksumIndex: number, checksum: FrameChecksum, checksumsParentPath?: string[]) => void;
   onRequestDeleteChecksum: (idKey: string, checksumIndex: number, checksumsParentPath?: string[], checksumName?: string) => void;
-
-  // Validation
-  onSetValidation: (errors: ValidationError[]) => void;
 };
-
-function normalizeTomlKey(seg: string): string {
-  return seg.startsWith('"') && seg.endsWith('"') ? seg.slice(1, -1) : seg;
-}
 
 export default function ChecksumView({
   selectedNode,
-  catalogContent,
   onEditChecksum,
   onRequestDeleteChecksum,
-  onSetValidation,
 }: ChecksumViewProps) {
   const { t } = useTranslation("catalog");
-  const locateChecksum = React.useCallback(() => {
-    const checksumIdx = selectedNode.path.findIndex((seg) => seg === "checksum");
-    if (checksumIdx < 0) return null;
+  const checksum = selectedNode.metadata!.checksum!;
+  const checksumIndex = selectedNode.metadata!.checksumIndex!;
+  const checksumsParentPath = selectedNode.path.slice(0, -2);
+  const idKey = selectedNode.path[2];
+  const frameLength = useCatalogEditorStore((s) => frameAt(s.tree.catalog, selectedNode.path)?.length ?? 8);
+  const algorithm = checksum.algorithm as ChecksumAlgorithm;
+  const algorithmInfo = getAlgorithmInfo(algorithm);
+  const notes = checksum.notes?.join("\n");
 
-    const checksumsParentPath = selectedNode.path.slice(0, checksumIdx);
-
-    const parsed = tomlParse(catalogContent) as any;
-
-    // Navigate to the parent object that owns the checksum array
-    let cur: any = parsed;
-    for (const seg of checksumsParentPath) {
-      const key = normalizeTomlKey(seg);
-      cur = cur?.[key];
-    }
-
-    const arr: any[] = Array.isArray(cur?.checksum) ? cur.checksum : [];
-    const targetName = selectedNode.key;
-
-    const idx = arr.findIndex((c) =>
-      c && c.name === targetName
-    );
-
-    if (idx < 0) return null;
-
-    const idKey = checksumsParentPath[checksumsParentPath.length - 1];
-    return { idKey, idx, checksum: arr[idx], checksumsParentPath };
-  }, [catalogContent, selectedNode.key, selectedNode.metadata?.properties, selectedNode.path]);
-
-  // Get checksum properties
-  const props = selectedNode.metadata?.properties || {};
-  const algorithm = props.algorithm as ChecksumAlgorithm | undefined;
-  const algorithmInfo = algorithm ? getAlgorithmInfo(algorithm) : undefined;
-
-  // Get frame length for byte visualization
-  let frameLength = 8;
-  try {
-    const parsed = tomlParse(catalogContent);
-    frameLength = getFrameByteLengthFromPath(selectedNode.path, parsed);
-  } catch {
-    // Use default
-  }
 
   return (
     <div className="space-y-4">
@@ -85,32 +43,14 @@ export default function ChecksumView({
         <h3 className="text-lg font-semibold text-primary">{t("checksumDetails.title")}</h3>
         <div className={flexRowGap2}>
           <IconButton
-            onClick={() => {
-              try {
-                const found = locateChecksum();
-                if (!found) return;
-                onEditChecksum(found.idKey, found.idx, found.checksum, found.checksumsParentPath);
-              } catch (error) {
-                console.error("Failed to locate/edit checksum:", error);
-                onSetValidation([{ field: "checksum", message: t("checksumDetails.errorEdit") }]);
-              }
-            }}
+            onClick={() => onEditChecksum(idKey, checksumIndex, checksum, checksumsParentPath)}
             title={t("checksumDetails.edit")}
           >
             <Pencil className={`${iconMd} text-secondary`} />
           </IconButton>
 
           <IconButton
-            onClick={() => {
-              try {
-                const found = locateChecksum();
-                if (!found) return;
-                onRequestDeleteChecksum(found.idKey, found.idx, found.checksumsParentPath, found.checksum?.name);
-              } catch (error) {
-                console.error("Failed to locate/delete checksum:", error);
-                onSetValidation([{ field: "checksum", message: t("checksumDetails.errorDelete") }]);
-              }
-            }}
+            onClick={() => onRequestDeleteChecksum(idKey, checksumIndex, checksumsParentPath, checksum.name)}
             tone="danger"
             title={t("checksumDetails.delete")}
           >
@@ -138,23 +78,23 @@ export default function ChecksumView({
         <h4 className="text-sm font-semibold text-primary mb-3">{t("checksumDetails.byteLayout")}</h4>
         {(() => {
           // Resolve negative indices for display
-          const resolvedStartByte = props.start_byte !== undefined
-            ? resolveByteIndexSync(props.start_byte, frameLength)
+          const resolvedStartByte = checksum.startByte !== undefined
+            ? resolveByteIndexSync(checksum.startByte, frameLength)
             : undefined;
-          const resolvedCalcStart = props.calc_start_byte !== undefined
-            ? resolveByteIndexSync(props.calc_start_byte, frameLength)
+          const resolvedCalcStart = checksum.calcStartByte !== undefined
+            ? resolveByteIndexSync(checksum.calcStartByte, frameLength)
             : undefined;
-          const resolvedCalcEnd = props.calc_end_byte !== undefined
-            ? resolveByteIndexSync(props.calc_end_byte, frameLength)
+          const resolvedCalcEnd = checksum.calcEndByte !== undefined
+            ? resolveByteIndexSync(checksum.calcEndByte, frameLength)
             : undefined;
 
           return (
             <div className="flex flex-wrap gap-1 font-mono text-xs">
               {Array.from({ length: frameLength }).map((_, i) => {
                 const isChecksumByte = resolvedStartByte !== undefined &&
-                  props.byte_length !== undefined &&
+                  checksum.byteLength !== undefined &&
                   i >= resolvedStartByte &&
-                  i < resolvedStartByte + props.byte_length;
+                  i < resolvedStartByte + checksum.byteLength;
 
                 const isCalcByte = resolvedCalcStart !== undefined &&
                   resolvedCalcEnd !== undefined &&
@@ -198,53 +138,53 @@ export default function ChecksumView({
         {/* Core Properties */}
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.name")}</div>
-          <div className={monoBody}>"{props.name}"</div>
+          <div className={monoBody}>"{checksum.name}"</div>
         </div>
 
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.algorithm")}</div>
-          <div className={monoBody}>{props.algorithm}</div>
+          <div className={monoBody}>{checksum.algorithm}</div>
         </div>
 
         {/* Checksum Location */}
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.checksumPosition")}</div>
           <div className={monoBody}>
-            {props.start_byte !== undefined && props.start_byte < 0 ? (
+            {checksum.startByte !== undefined && checksum.startByte < 0 ? (
               <>
-                {t("checksumDetails.byteWithResolved", { idx: props.start_byte, resolved: resolveByteIndexSync(props.start_byte, frameLength) })}
+                {t("checksumDetails.byteWithResolved", { idx: checksum.startByte, resolved: resolveByteIndexSync(checksum.startByte, frameLength) })}
               </>
             ) : (
-              t("checksumDetails.byteSingle", { idx: props.start_byte })
+              t("checksumDetails.byteSingle", { idx: checksum.startByte })
             )}
-            {" "}({t("checksumDetails.byteCount", { count: props.byte_length })})
+            {" "}({t("checksumDetails.byteCount", { count: checksum.byteLength })})
           </div>
         </div>
 
         <div className={`p-3 ${bgSurface} rounded-lg`}>
           <div className={labelSmallMuted}>{t("checksumDetails.endianness")}</div>
-          <div className={monoBody}>{props.endianness || "big"}</div>
+          <div className={monoBody}>{checksum.endianness || "big"}</div>
         </div>
 
         {/* Calculation Range */}
         <div className={`p-3 ${bgSurface} rounded-lg col-span-2`}>
           <div className={labelSmallMuted}>{t("checksumDetails.calculationRange")}</div>
           {(() => {
-            const hasNegativeStart = props.calc_start_byte !== undefined && props.calc_start_byte < 0;
-            const hasNegativeEnd = props.calc_end_byte !== undefined && props.calc_end_byte < 0;
-            const resolvedStart = props.calc_start_byte !== undefined
-              ? resolveByteIndexSync(props.calc_start_byte, frameLength)
+            const hasNegativeStart = checksum.calcStartByte !== undefined && checksum.calcStartByte < 0;
+            const hasNegativeEnd = checksum.calcEndByte !== undefined && checksum.calcEndByte < 0;
+            const resolvedStart = checksum.calcStartByte !== undefined
+              ? resolveByteIndexSync(checksum.calcStartByte, frameLength)
               : 0;
-            const resolvedEnd = props.calc_end_byte !== undefined
-              ? resolveByteIndexSync(props.calc_end_byte, frameLength)
+            const resolvedEnd = checksum.calcEndByte !== undefined
+              ? resolveByteIndexSync(checksum.calcEndByte, frameLength)
               : frameLength;
 
             if (hasNegativeStart || hasNegativeEnd) {
               return (
                 <div className={monoBody}>
-                  bytes {props.calc_start_byte}
+                  bytes {checksum.calcStartByte}
                   {hasNegativeStart && <span className="text-muted"> (→ {resolvedStart})</span>}
-                  {" "}to {props.calc_end_byte}
+                  {" "}to {checksum.calcEndByte}
                   {hasNegativeEnd && <span className="text-muted"> (→ {resolvedEnd})</span>}
                   {" "}= bytes {resolvedStart} to {resolvedEnd - 1}
                 </div>
@@ -253,17 +193,17 @@ export default function ChecksumView({
 
             return (
               <div className={monoBody}>
-                bytes {props.calc_start_byte} to {resolvedEnd - 1} (exclusive end: {props.calc_end_byte})
+                bytes {checksum.calcStartByte} to {resolvedEnd - 1} (exclusive end: {checksum.calcEndByte})
               </div>
             );
           })()}
         </div>
 
         {/* Notes */}
-        {props.notes && (
+        {notes && (
           <div className={`p-3 ${bgSurface} rounded-lg col-span-2`}>
             <div className={labelSmallMuted}>{t("checksumDetails.notes")}</div>
-            <div className="text-sm text-primary">{props.notes}</div>
+            <div className="text-sm text-primary">{notes}</div>
           </div>
         )}
       </div>

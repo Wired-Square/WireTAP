@@ -272,12 +272,8 @@ function navigateToCatalogFrame(frameId: number) {
 
   function findFrameNode(nodeList: TomlNode[]): TomlNode | null {
     for (const node of nodeList) {
-      if (
-        (node.type === 'can-frame' || node.type === 'serial-frame') &&
-        node.metadata?.idValue
-      ) {
-        const numericId = parseCanId(node.metadata.idValue);
-        if (numericId === frameId) return node;
+      if ((node.type === 'can-frame' || node.type === 'serial-frame') && node.metadata?.frame?.frameId === frameId) {
+        return node;
       }
       if (node.children) {
         const found = findFrameNode(node.children);

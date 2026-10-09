@@ -314,14 +314,23 @@ gate:
 - **`validate_catalog { content }`** — always available (read-only): parses + validates
   the TOML and returns `{ valid, errors: [{field, message}] }`. A dry run for the two
   writers.
-- **`create_catalog { filename, content }`** — gated by **catalog write**. Creates a
+- **`create_catalog { filename, content | ops }`** — gated by **catalog write**. Creates a
   *new* file under the decoder directory; **refuses if it already exists**.
-- **`update_catalog { filename, content }`** — gated by **catalog modify**. Overwrites
+- **`update_catalog { filename, content | ops }`** — gated by **catalog modify**. Overwrites
   an *existing* catalog (by filename or display name); **refuses if it doesn't exist**.
 
+Each takes either `content` (the full TOML) or `ops`: the `wiretap-catalog` edit ops,
+tagged by `op` (`SetMeta`, `Set{Can,Serial,Modbus}Config`, `AddFrame`, `SetFrame`,
+`UpsertSignal`, `SetMux`, `DeleteAtPath`, …), the same ones the Catalog Editor sends.
+`create_catalog` applies them to an empty file; `update_catalog` to the file on disk,
+keeping its comments. The ops apply the catalogue's authoring rules: a frame's Modbus
+length is in registers, nothing the frame inherits is written, a new Modbus frame is
+seeded with a signal, a mux with a blank name is named for its frame and bits, and a
+blank key or a mask that is not hex is refused.
+
 Both writers **validate before writing** and reject (without touching disk) if there
-are any findings — so a malformed catalog can never be persisted. They take the full
-TOML (the agent builds it; the tool validates + saves via `catalog::save_catalog`),
+are any findings — so a malformed catalog can never be persisted, whether it came as
+`content` or from `ops`; either way it is saved via `catalog::save_catalog`,
 preserving comments, mux shorthands and mirror/copy inheritance. Filenames are
 sanitised (no path separators or `..`; a `.toml` suffix is added if missing) and always
 resolve under `settings.decoder_dir`.

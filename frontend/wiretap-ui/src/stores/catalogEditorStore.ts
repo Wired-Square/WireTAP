@@ -5,7 +5,8 @@ import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
-import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
+import type { EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
+import type { Catalog, Endianness } from '../types/catalogModel';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
 import { openCatalog } from '../api/catalog';
 import type { CatalogDiff } from '../api/catalog';
@@ -71,14 +72,8 @@ export interface CatalogEditorState {
     nodes: TomlNode[];
     selectedPath: string[] | null;
     expandedIds: Set<string>;
-    // Protocol configs parsed from TOML
-    canConfig?: CanProtocolConfig;
-    serialConfig?: SerialProtocolConfig;
-    modbusConfig?: ModbusProtocolConfig;
-    // Track whether frames exist for each protocol
-    hasCanFrames: boolean;
-    hasSerialFrames: boolean;
-    hasModbusFrames: boolean;
+    /** The buffer as `catalog.parse` served it; `null` while empty or unparseable. */
+    catalog: Catalog | null;
   };
 
   // UI state
@@ -136,34 +131,32 @@ export interface CatalogEditorState {
     };
   };
 
-  // Form state
+  // Form state. The protocol fields are the configuration dialogs' draft, seeded
+  // when one opens; a byte order left undefined is not written.
   forms: {
     meta: MetaFields;
-    canFrame: CanidFields;
-    signal: any;
-    mux: any;
     nodeName: string;
     nodeNotes: string;
     /** Modbus-specific: the device (slave) address a node owns. */
     nodeDeviceAddress?: number;
     muxCaseValue: string;
     muxCaseNotes: string;
-    canDefaultEndianness: "little" | "big";  // For CAN config - stored in [meta.can]
+    canDefaultEndianness: Endianness | undefined;
     canDefaultInterval: number | undefined;   // For CAN config - stored in [meta.can]
     canDefaultExtended: boolean | undefined;  // For CAN config - default to 29-bit extended IDs
     canDefaultFd: boolean | undefined;        // For CAN config - default to CAN FD frames
     canFrameIdMask: string;           // For CAN config - hex string like "0x1FFFFF00"
     canHeaderFields: CanHeaderFieldEntry[];  // For CAN config - header fields extracted from CAN ID
     serialEncoding: SerialEncoding;  // For new catalog dialog - stored in [frame.serial.config]
-    serialByteOrder: "little" | "big";  // For Serial config - default byte order for signals
+    serialByteOrder: Endianness | undefined;
     serialHeaderFields: SerialHeaderFieldEntry[];  // For Serial config - header field masks over header bytes
     serialHeaderLength: number | undefined;  // For Serial config - global header length in bytes
     serialChecksum: SerialChecksumConfig | null;  // For Serial config - protocol-level checksum defaults
     modbusDeviceAddress: number;     // For new catalog dialog - stored in [meta.modbus]
     modbusRegisterBase: 0 | 1;       // For new catalog dialog - stored in [meta.modbus]
     modbusDefaultInterval: number | undefined;  // Default poll interval in ms - stored in [meta.modbus]
-    modbusDefaultByteOrder: "big" | "little";   // Default byte order - stored in [meta.modbus]
-    modbusDefaultWordOrder: "big" | "little";   // Default word order - stored in [meta.modbus]
+    modbusDefaultByteOrder: Endianness | undefined;
+    modbusDefaultWordOrder: Endianness | undefined;
   };
 
   // Validation state
@@ -236,15 +229,7 @@ export interface CatalogEditorState {
 
   // Actions - Tree
   setTree: (nodes: TomlNode[]) => void;
-  setTreeData: (data: {
-    nodes: TomlNode[];
-    canConfig?: CanProtocolConfig;
-    serialConfig?: SerialProtocolConfig;
-    modbusConfig?: ModbusProtocolConfig;
-    hasCanFrames?: boolean;
-    hasSerialFrames?: boolean;
-    hasModbusFrames?: boolean;
-  }) => void;
+  setTreeData: (data: { nodes: TomlNode[]; catalog: Catalog | null }) => void;
   setSelectedPath: (path: string[] | null) => void;
   toggleExpanded: (id: string) => void;
   resetExpanded: () => void;
@@ -284,33 +269,77 @@ export interface CatalogEditorState {
 
   // Actions - Forms
   setMetaForm: (meta: MetaFields) => void;
-  setCanFrameForm: (canFrame: CanidFields) => void;
-  setSignalForm: (signal: any) => void;
-  setMuxForm: (mux: any) => void;
+  /** Seed the configuration draft from `catalog`, or the new-catalogue defaults. */
+  seedConfigForms: (catalog: Catalog | null) => void;
   setNodeName: (name: string) => void;
   setNodeNotes: (notes: string) => void;
   setNodeDeviceAddress: (addr: number | undefined) => void;
   setMuxCaseValue: (value: string) => void;
   setMuxCaseNotes: (notes: string) => void;
-  setCanDefaultEndianness: (endianness: "little" | "big") => void;
+  setCanDefaultEndianness: (endianness: Endianness | undefined) => void;
   setCanDefaultInterval: (interval: number | undefined) => void;
   setCanDefaultExtended: (extended: boolean | undefined) => void;
   setCanDefaultFd: (fd: boolean | undefined) => void;
   setCanFrameIdMask: (mask: string) => void;
   setCanHeaderFields: (fields: CanHeaderFieldEntry[]) => void;
   setSerialEncoding: (encoding: SerialEncoding) => void;
-  setSerialByteOrder: (byteOrder: "little" | "big") => void;
+  setSerialByteOrder: (byteOrder: Endianness | undefined) => void;
   setSerialHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   setSerialHeaderLength: (length: number | undefined) => void;
   setSerialChecksum: (checksum: SerialChecksumConfig | null) => void;
   setModbusDeviceAddress: (address: number) => void;
   setModbusRegisterBase: (base: 0 | 1) => void;
   setModbusDefaultInterval: (interval: number | undefined) => void;
-  setModbusDefaultByteOrder: (order: "big" | "little") => void;
-  setModbusDefaultWordOrder: (order: "big" | "little") => void;
+  setModbusDefaultByteOrder: (order: Endianness | undefined) => void;
+  setModbusDefaultWordOrder: (order: Endianness | undefined) => void;
 
   // Computed
   hasUnsavedChanges: () => boolean;
+}
+
+const hexMask = (mask: number) => `0x${mask.toString(16).toUpperCase()}`;
+
+function configForms(catalog: Catalog | null) {
+  const can = catalog?.can;
+  const serial = catalog?.serial;
+  const modbus = catalog?.modbus;
+  return {
+    canDefaultEndianness: can?.defaultByteOrder,
+    canDefaultInterval: can?.defaultInterval,
+    canDefaultExtended: can?.defaultExtended,
+    canDefaultFd: can?.defaultFd,
+    canFrameIdMask: can?.frameIdMask === undefined ? '' : hexMask(can.frameIdMask),
+    canHeaderFields: Object.entries(can?.fields ?? {}).map(([name, f]): CanHeaderFieldEntry => ({
+      name,
+      mask: hexMask(f.mask),
+      shift: f.shift,
+      format: (f.format ?? 'hex') as HeaderFieldFormat,
+    })),
+    serialEncoding: (serial?.encoding ?? 'slip') as SerialEncoding,
+    serialByteOrder: serial?.byteOrder,
+    serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
+      name,
+      mask: f.mask,
+      endianness: f.endianness ?? 'big',
+      format: (f.format ?? 'hex') as HeaderFieldFormat,
+    })),
+    serialHeaderLength: serial?.headerLength,
+    serialChecksum: serial?.checksum
+      ? {
+          algorithm: serial.checksum.algorithm as SerialChecksumConfig['algorithm'],
+          start_byte: serial.checksum.startByte,
+          byte_length: serial.checksum.byteLength,
+          calc_start_byte: serial.checksum.calcStartByte,
+          calc_end_byte: serial.checksum.calcEndByte,
+          big_endian: serial.checksum.bigEndian,
+        }
+      : null,
+    modbusDeviceAddress: modbus?.deviceAddress ?? 1,
+    modbusRegisterBase: (modbus?.registerBase ?? 0) as 0 | 1,
+    modbusDefaultInterval: modbus?.defaultInterval,
+    modbusDefaultByteOrder: modbus?.defaultByteOrder,
+    modbusDefaultWordOrder: modbus?.defaultWordOrder,
+  };
 }
 
 const initialDialogs = {
@@ -357,12 +386,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     nodes: [],
     selectedPath: null,
     expandedIds: new Set<string>(),
-    canConfig: undefined,
-    serialConfig: undefined,
-    modbusConfig: undefined,
-    hasCanFrames: false,
-    hasSerialFrames: false,
-    hasModbusFrames: false,
+    catalog: null,
   },
 
   ui: {
@@ -392,47 +416,12 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       name: '',
       version: 1,
     },
-    canFrame: {
-      id: '',
-      length: 8,
-      transmitter: undefined,
-      interval: undefined,
-      isIntervalInherited: false,
-      isLengthInherited: false,
-      isTransmitterInherited: false,
-      notes: undefined,
-    },
-    signal: {
-      name: '',
-      start_bit: 0,
-      bit_length: 8,
-    },
-    mux: {
-      name: '',
-      start_bit: 0,
-      bit_length: 8,
-    },
     nodeName: '',
     nodeNotes: '',
     nodeDeviceAddress: undefined,
     muxCaseValue: '',
     muxCaseNotes: '',
-    canDefaultEndianness: 'little',   // Default for new catalogs - stored in [meta.can]
-    canDefaultInterval: undefined,     // Default for new catalogs - stored in [meta.can]
-    canDefaultExtended: undefined,     // Default for new catalogs - undefined = auto-detect from ID
-    canDefaultFd: undefined,           // Default for new catalogs - undefined = classic CAN
-    canFrameIdMask: '',       // Empty = no mask
-    canHeaderFields: [],      // Empty = no header fields
-    serialEncoding: 'slip',  // Default for new catalogs
-    serialByteOrder: 'big',  // Default for new catalogs - stored in [meta.serial]
-    serialHeaderFields: [],  // Empty = no header fields (ID field replaces frame_id_mask)
-    serialHeaderLength: undefined,  // No global header length
-    serialChecksum: null,    // No protocol-level checksum config
-    modbusDeviceAddress: 1,  // Default for new catalogs
-    modbusRegisterBase: 0,   // Default for new catalogs (0-based)
-    modbusDefaultInterval: undefined,  // No default interval
-    modbusDefaultByteOrder: 'big',     // Default for new catalogs
-    modbusDefaultWordOrder: 'big',     // Default for new catalogs
+    ...configForms(null),
   },
 
   validation: { errors: [], isValid: null },
@@ -453,12 +442,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
         nodes: [],
         selectedPath: null,
         expandedIds: new Set<string>(),
-        canConfig: undefined,
-        serialConfig: undefined,
-        modbusConfig: undefined,
-        hasCanFrames: false,
-        hasSerialFrames: false,
-        hasModbusFrames: false,
+        catalog: null,
       },
       ui: {
         ...get().ui,
@@ -585,12 +569,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       tree: {
         ...state.tree,
         nodes: data.nodes,
-        canConfig: data.canConfig,
-        serialConfig: data.serialConfig,
-        modbusConfig: data.modbusConfig,
-        hasCanFrames: data.hasCanFrames ?? false,
-        hasSerialFrames: data.hasSerialFrames ?? false,
-        hasModbusFrames: data.hasModbusFrames ?? false,
+        catalog: data.catalog,
       },
     })),
 
@@ -778,14 +757,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   setMetaForm: (meta) =>
     set((state) => ({ forms: { ...state.forms, meta } })),
 
-  setCanFrameForm: (canFrame) =>
-    set((state) => ({ forms: { ...state.forms, canFrame } })),
-
-  setSignalForm: (signal) =>
-    set((state) => ({ forms: { ...state.forms, signal } })),
-
-  setMuxForm: (mux) =>
-    set((state) => ({ forms: { ...state.forms, mux } })),
+  seedConfigForms: (catalog) =>
+    set((state) => ({ forms: { ...state.forms, ...configForms(catalog) } })),
 
   setNodeName: (nodeName) =>
     set((state) => ({ forms: { ...state.forms, nodeName } })),

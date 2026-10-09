@@ -49,6 +49,16 @@ pub async fn dispatch_catalog_command(
             let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
             serde_json::to_value(cat).map_err(|e| e.to_string())
         }
+        // Params: { content, protocol, key, path }; null when there is no such frame or item.
+        "catalog.frameLayout" => {
+            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let protocol = serde_json::from_value(params.get("protocol").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid protocol: {e}"))?;
+            let path: Vec<String> = serde_json::from_value(params.get("path").cloned().unwrap_or_default())
+                .map_err(|e| format!("invalid path: {e}"))?;
+            let layout = wiretap_catalog::frame_layout(&cat, protocol, &req("key")?, &path);
+            serde_json::to_value(layout).map_err(|e| e.to_string())
+        }
         // TOML → field-path + message validation findings.
         "catalog.validate" => {
             let errors = wiretap_catalog::validate::validate(&content()?);
@@ -1194,6 +1204,51 @@ mod tests {
         );
         let parsed = command("catalog.parse", serde_json::json!({ "content": edited }));
         assert_eq!(parsed["frames"][0]["signals"][0]["name"], "rpm");
+    }
+
+    fn layout(protocol: &str, key: &str, path: &[&str]) -> serde_json::Value {
+        command(
+            "catalog.frameLayout",
+            serde_json::json!({ "content": fixture("sbrxxx.toml"), "protocol": protocol, "key": key, "path": path }),
+        )
+    }
+
+    #[test]
+    fn a_frame_layout_flags_the_item_its_path_addresses() {
+        let selector = layout("can", "0x70F", &["mux"]);
+        let edited: Vec<_> = selector["ranges"].as_array().unwrap().iter().filter(|r| r["edited"] == true).collect();
+        assert_eq!(edited.len(), 1);
+        assert_eq!(edited[0]["kind"], "selector");
+        assert_eq!(selector["byteLength"], 8);
+        assert!(layout("can", "0x70F", &["signals", "99"]).is_null());
+        assert!(layout("modbus", "0x70F", &[]).is_null());
+    }
+
+    /// `authoring.json`'s unchanged-save cases, applied to the catalogues they were
+    /// read from: each must parse back to the model it started as. A stated value
+    /// equal to what the frame inherits is dropped, so only the inheritance flags differ.
+    #[test]
+    fn the_editors_frame_saves_change_nothing_they_were_not_asked_to() {
+        let golden: serde_json::Value = serde_json::from_str(&fixture("catalog/authoring.json")).expect("golden");
+        let saves = |prefix: &str| -> Vec<serde_json::Value> {
+            let case = golden["cases"].as_array().unwrap().iter().find(|c| c["name"].as_str().unwrap().starts_with(prefix)).expect(prefix);
+            case["expected"].as_array().unwrap().iter().flat_map(|save| save["ops"].as_array().unwrap().clone()).collect()
+        };
+        for (toml, prefix) in [
+            ("sbrxxx.toml", "Saving every sbrxxx frame"),
+            ("catalog/modbus.toml", "Saving every Modbus frame"),
+            ("catalog/serial.toml", "Saving every serial frame"),
+        ] {
+            let original = fixture(toml);
+            let saved = command("catalog.edits", serde_json::json!({ "content": original, "ops": saves(prefix) }));
+            let without_flags = |mut model: serde_json::Value| {
+                model["frames"].as_array_mut().unwrap().iter_mut().for_each(|f| {
+                    f.as_object_mut().unwrap().remove("inheritedFields");
+                });
+                model
+            };
+            assert_eq!(without_flags(parsed(saved)), without_flags(parsed(original.into())), "{toml}");
+        }
     }
 
     #[test]

@@ -4,8 +4,8 @@ import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Select, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h3, helpText } from "../../../styles";
 import type { TomlNode, ChecksumAlgorithm } from "../types";
-import { tomlParse } from "../toml";
-import { getFrameByteLengthFromPath } from "../utils";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { frameAt } from "../model";
 import { CHECKSUM_ALGORITHMS, resolveByteIndexSync } from "../checksums";
 import { Card } from "../../../components/Card";
 export type ChecksumFields = {
@@ -22,7 +22,6 @@ export type ChecksumFields = {
 export type ChecksumEditDialogProps = {
   open: boolean;
   selectedNode: TomlNode;
-  catalogContent: string;
   fields: ChecksumFields;
   setFields: (f: ChecksumFields) => void;
   editingIndex: number | null;
@@ -33,30 +32,17 @@ export type ChecksumEditDialogProps = {
 export default function ChecksumEditDialog({
   open,
   selectedNode,
-  catalogContent,
   fields,
   setFields,
   editingIndex,
   onCancel,
   onSave,
 }: ChecksumEditDialogProps) {
-  // Early return if not open or no selected node - prevents errors when dialog is closed
+  const frameLength = useCatalogEditorStore((s) => (selectedNode && frameAt(s.tree.catalog, selectedNode.path)?.length) || 8);
+
   if (!open || !selectedNode) {
     return null;
   }
-
-  // Parse the catalog content to get frame info
-  let parsed: any;
-  try {
-    parsed = tomlParse(catalogContent);
-  } catch {
-    parsed = null;
-  }
-
-  // Get frame length using protocol-aware utility (handles CAN, Modbus, Serial)
-  const frameLength = parsed
-    ? getFrameByteLengthFromPath(selectedNode.path, parsed)
-    : (selectedNode.metadata?.length || 8);
 
   // Get algorithm info for UI hints
   const selectedAlgorithm = CHECKSUM_ALGORITHMS.find((a) => a.id === fields.algorithm);

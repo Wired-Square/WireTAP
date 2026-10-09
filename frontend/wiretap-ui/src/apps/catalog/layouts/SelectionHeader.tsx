@@ -3,6 +3,7 @@
 import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
 import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
 import type { TomlNode } from "../types";
+import { muxSignalCount } from "../views/signalRanges";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 
@@ -13,21 +14,17 @@ export type SelectionHeaderProps = {
   onDelete?: () => void;
 };
 
-/** Count the signals decoded from a Modbus register (frame-level + mux cases). */
 function modbusSignalCount(node: TomlNode): number {
-  return (node.metadata?.signals?.length ?? 0) + (node.metadata?.muxSignalCount ?? 0);
+  const frame = node.metadata?.frame;
+  return (frame?.signals.length ?? 0) + (frame?.mux ? muxSignalCount(frame.mux) : 0);
 }
 
 function labelForNode(node: TomlNode): string {
   switch (node.type) {
     case "section":
       return "Table";
-    case "table-array":
-      return "Signals";
     case "signal":
       return "Signal";
-    case "array":
-      return "Array";
     case "meta":
       return "Metadata";
     case "can-frame":
@@ -37,15 +34,11 @@ function labelForNode(node: TomlNode): string {
       return modbusSignalCount(node) > 1 ? "Register Group" : "Register";
     case "node":
       // A Modbus node owns a device address; CAN/serial nodes are peers.
-      return node.metadata?.deviceAddress != null ? "Slave" : "Peer";
-    case "value":
-      return "Value";
+      return node.metadata?.nodeDef?.deviceAddress != null ? "Slave" : "Peer";
     case "mux":
       return "Mux";
     case "mux-case":
       return "Mux Case";
-    case "inline-table":
-      return "Inline Table";
     default:
       return node.type;
   }
@@ -53,19 +46,21 @@ function labelForNode(node: TomlNode): string {
 
 export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, onDelete }: SelectionHeaderProps) {
   const isCanFrame = selectedNode.type === "can-frame";
+  const copyFrom = selectedNode.metadata?.frame?.copyFrom;
+  const mirrorOf = selectedNode.metadata?.frame?.mirrorOf;
   const idLabel = isCanFrame && formatFrameId ? formatFrameId(selectedNode.key) : null;
 
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-bold text-primary flex items-center gap-3">
-          {selectedNode.metadata?.isCopy && (
-            <span title={`Copied from ${selectedNode.metadata?.copyFrom}`}>
+          {copyFrom && (
+            <span title={`Copied from ${copyFrom}`}>
               <Link2 className={`${iconXl} text-accent-primary`} />
             </span>
           )}
-          {selectedNode.metadata?.isMirror && (
-            <span title={`Mirror of ${selectedNode.metadata?.mirrorOf}`}>
+          {mirrorOf && (
+            <span title={`Mirror of ${mirrorOf}`}>
               <Layers className={`${iconXl} text-purple`} />
             </span>
           )}
@@ -99,11 +94,11 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
       <div className={`${flexRowGap2} text-sm text-muted`}>
         <Badge size="lg">{labelForNode(selectedNode)}</Badge>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
-        {selectedNode.metadata?.isCopy && (
-          <Badge tone="primary" size="lg">Copy of {selectedNode.metadata?.copyFrom}</Badge>
+        {copyFrom && (
+          <Badge tone="primary" size="lg">Copy of {copyFrom}</Badge>
         )}
-        {selectedNode.metadata?.isMirror && (
-          <Badge tone="purple" variant="outline" size="lg">Mirror of {selectedNode.metadata?.mirrorOf}</Badge>
+        {mirrorOf && (
+          <Badge tone="purple" variant="outline" size="lg">Mirror of {mirrorOf}</Badge>
         )}
       </div>
     </div>

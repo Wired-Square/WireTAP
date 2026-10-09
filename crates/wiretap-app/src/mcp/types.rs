@@ -625,8 +625,12 @@ pub struct CreateCatalogParams {
     /// Target filename within the decoder directory (a `.toml` suffix is added
     /// if missing). Must be a bare name — no path separators.
     pub filename: String,
-    /// Full catalog TOML to write.
-    pub content: String,
+    /// Full catalog TOML to write. Give this or `ops`.
+    #[serde(default)]
+    pub content: Option<String>,
+    /// Edit ops that build the catalogue from nothing, applied in order. Give this or `content`.
+    #[serde(default)]
+    pub ops: Option<Vec<serde_json::Value>>,
 }
 
 /// Overwrite an existing catalog file (gated by the catalog-modify permission).
@@ -634,8 +638,13 @@ pub struct CreateCatalogParams {
 pub struct UpdateCatalogParams {
     /// Existing catalog filename (or display name) to overwrite.
     pub filename: String,
-    /// Full catalog TOML to write.
-    pub content: String,
+    /// Full catalog TOML to write. Give this or `ops`.
+    #[serde(default)]
+    pub content: Option<String>,
+    /// Edit ops applied in order to the catalogue as it is on disk, keeping its
+    /// comments. Give this or `content`.
+    #[serde(default)]
+    pub ops: Option<Vec<serde_json::Value>>,
 }
 
 /// Write a dashboard artifact (gated by the dashboard-write permission).

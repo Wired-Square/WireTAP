@@ -1,459 +1,58 @@
 {
   "cases": [
     {
-      "name": "CAN frame (legacy editor): notes array of one collapses, interval goes under tx",
+      "name": "A new frame is AddFrame; an edit is SetFrame, naming the old key only on a rename",
       "input": {
-        "id": "0x123",
-        "length": 8,
-        "transmitter": "BMS",
-        "interval": 100,
-        "notes": [
-          "one"
-        ]
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "can",
-            "key": "0x123",
-            "value": {
-              "length": 8,
-              "notes": "one",
-              "transmitter": "BMS",
-              "tx": {
-                "interval_ms": 100
-              }
-            },
-            "managed_keys": [
-              "length",
-              "notes",
-              "transmitter",
-              "tx"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "CAN frame (legacy editor): inherited length, transmitter and interval are omitted, a rename names the old key",
-      "input": {
-        "oldId": "0x100",
-        "id": "0x101",
-        "length": 8,
-        "transmitter": "BMS",
-        "interval": 100,
-        "isLengthInherited": true,
-        "isTransmitterInherited": true,
-        "isIntervalInherited": true,
-        "notes": []
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "can",
-            "key": "0x101",
-            "value": {},
-            "managed_keys": [
-              "length",
-              "notes",
-              "transmitter",
-              "tx"
-            ],
-            "rename_from": "0x100"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CAN frame (legacy editor): two notes stay an array, an empty string is dropped",
-      "input": [
-        {
-          "id": "0x1",
-          "length": 0,
-          "notes": [
-            "a",
-            "b"
-          ]
-        },
-        {
-          "id": "0x2",
-          "length": 8,
-          "notes": ""
+        "frame": {
+          "length": 2,
+          "register_type": "input"
         }
-      ],
+      },
       "expected": [
         {
           "ops": [
             {
-              "op": "UpsertFrame",
-              "protocol": "can",
-              "key": "0x1",
-              "value": {
-                "length": 0,
-                "notes": [
-                  "a",
-                  "b"
-                ]
-              },
-              "managed_keys": [
-                "length",
-                "notes",
-                "transmitter",
-                "tx"
-              ]
+              "op": "AddFrame",
+              "protocol": "modbus",
+              "key": "5000",
+              "frame": {
+                "length": 2,
+                "register_type": "input"
+              }
             }
           ]
         },
         {
           "ops": [
             {
-              "op": "UpsertFrame",
-              "protocol": "can",
-              "key": "0x2",
-              "value": {
-                "length": 8
-              },
-              "managed_keys": [
-                "length",
-                "notes",
-                "transmitter",
-                "tx"
-              ]
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "5000",
+              "frame": {
+                "length": 2,
+                "register_type": "input"
+              }
+            }
+          ]
+        },
+        {
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "5001",
+              "rename_from": "5000",
+              "frame": {
+                "length": 2,
+                "register_type": "input"
+              }
             }
           ]
         }
       ]
     },
     {
-      "name": "can frame through its handler: {\"protocol\":\"can\",\"id\":\"0x200\",\"extended\":false,\"fd\":true,\"bus\":1,\"copy\":\"0x100\",\"mirror_of\":\"0x300\"}",
-      "input": {
-        "protocol": "can",
-        "base": {
-          "length": 8,
-          "transmitter": "BMS",
-          "interval": 100,
-          "notes": [
-            "n"
-          ],
-          "signals": [
-            {
-              "name": "s"
-            }
-          ],
-          "mux": {
-            "name": "m"
-          },
-          "checksums": []
-        },
-        "config": {
-          "protocol": "can",
-          "id": "0x200",
-          "extended": false,
-          "fd": true,
-          "bus": 1,
-          "copy": "0x100",
-          "mirror_of": "0x300"
-        },
-        "omitInherited": {}
-      },
-      "expected": {
-        "serialised": {
-          "length": 8,
-          "transmitter": "BMS",
-          "interval_ms": 100,
-          "notes": [
-            "n"
-          ],
-          "extended": false,
-          "fd": true,
-          "bus": 1,
-          "copy": "0x100",
-          "mirror_of": "0x300",
-          "signals": [
-            {
-              "name": "s"
-            }
-          ],
-          "mux": {
-            "name": "m"
-          }
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "can",
-            "key": "0x200",
-            "value": {
-              "length": 8,
-              "transmitter": "BMS",
-              "interval_ms": 100,
-              "notes": [
-                "n"
-              ],
-              "extended": false,
-              "fd": true,
-              "bus": 1,
-              "copy": "0x100",
-              "mirror_of": "0x300"
-            },
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "can frame through its handler: {\"protocol\":\"can\",\"id\":\"0x200\",\"extended\":true,\"fd\":false} with inherited fields omitted",
-      "input": {
-        "protocol": "can",
-        "base": {
-          "length": 8,
-          "transmitter": "BMS",
-          "interval": 100
-        },
-        "config": {
-          "protocol": "can",
-          "id": "0x200",
-          "extended": true,
-          "fd": false
-        },
-        "omitInherited": {
-          "length": true,
-          "transmitter": true,
-          "interval": true,
-          "extended": true,
-          "fd": true
-        }
-      },
-      "expected": {
-        "serialised": {},
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "can",
-            "key": "0x200",
-            "value": {},
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "modbus frame through its handler: {\"protocol\":\"modbus\",\"register_number\":13021,\"node_address\":3,\"register_type\":\"holding\",\"register_base\":1}",
-      "input": {
-        "protocol": "modbus",
-        "base": {
-          "length": 1,
-          "interval": 500
-        },
-        "config": {
-          "protocol": "modbus",
-          "register_number": 13021,
-          "node_address": 3,
-          "register_type": "holding",
-          "register_base": 1
-        },
-        "omitInherited": {}
-      },
-      "expected": {
-        "serialised": {
-          "register_number": 13021,
-          "node_address": 3,
-          "register_base": 1,
-          "interval_ms": 500
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "13021",
-            "value": {
-              "register_number": 13021,
-              "node_address": 3,
-              "register_base": 1,
-              "interval_ms": 500
-            },
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "modbus frame through its handler: {\"protocol\":\"modbus\",\"register_type\":\"coil\",\"register_base\":0} with inherited fields omitted",
-      "input": {
-        "protocol": "modbus",
-        "base": {
-          "length": 4,
-          "transmitter": "Inverter",
-          "notes": "n"
-        },
-        "config": {
-          "protocol": "modbus",
-          "register_type": "coil",
-          "register_base": 0
-        },
-        "omitInherited": {
-          "registerBase": true,
-          "interval": true
-        }
-      },
-      "expected": {
-        "serialised": {
-          "register_type": "coil",
-          "length": 4,
-          "transmitter": "Inverter",
-          "notes": "n"
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "new_register",
-            "value": {
-              "register_type": "coil",
-              "length": 4,
-              "transmitter": "Inverter",
-              "notes": "n"
-            },
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "serial frame through its handler: {\"protocol\":\"serial\",\"frame_id\":\"0x10\",\"delimiter\":[]}",
-      "input": {
-        "protocol": "serial",
-        "base": {
-          "length": 0,
-          "interval": 250
-        },
-        "config": {
-          "protocol": "serial",
-          "frame_id": "0x10",
-          "delimiter": []
-        },
-        "omitInherited": {}
-      },
-      "expected": {
-        "serialised": {
-          "interval_ms": 250
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "serial",
-            "key": "0x10",
-            "value": {
-              "interval_ms": 250
-            },
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "serial frame through its handler: {\"protocol\":\"serial\",\"frame_id\":\"\",\"delimiter\":[192,0]} with inherited fields omitted",
-      "input": {
-        "protocol": "serial",
-        "base": {
-          "length": 12,
-          "transmitter": "Controller"
-        },
-        "config": {
-          "protocol": "serial",
-          "frame_id": "",
-          "delimiter": [
-            192,
-            0
-          ]
-        },
-        "omitInherited": {
-          "interval": true
-        }
-      },
-      "expected": {
-        "serialised": {
-          "length": 12,
-          "delimiter": [
-            192,
-            0
-          ],
-          "transmitter": "Controller"
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "serial",
-            "key": "unnamed_frame",
-            "value": {
-              "length": 12,
-              "delimiter": [
-                192,
-                0
-              ],
-              "transmitter": "Controller"
-            },
-            "managed_keys": [],
-            "rename_from": "old",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "Serial frame shorthand",
-      "input": {
-        "oldKey": "0x10",
-        "frameId": "0x11",
-        "length": 6,
-        "delimiter": [
-          126
-        ],
-        "transmitter": "Controller",
-        "interval": 50,
-        "notes": [
-          "a"
-        ],
-        "isIntervalInherited": false
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "serial",
-            "key": "0x11",
-            "value": {
-              "length": 6,
-              "delimiter": [
-                126
-              ],
-              "transmitter": "Controller",
-              "interval_ms": 50,
-              "notes": [
-                "a"
-              ]
-            },
-            "managed_keys": [],
-            "rename_from": "0x10",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "Signal with the editor's new-signal defaults: endianness renamed, empty confidence dropped, defaults passed through",
+      "name": "Signal with the editor's new-signal defaults, sent as the form holds it",
       "input": {
         "path": [
           "frame",
@@ -489,14 +88,16 @@
               "factor": 1,
               "offset": 0,
               "unit": "",
-              "signed": false
+              "signed": false,
+              "confidence": "",
+              "notes": ""
             }
           }
         ]
       }
     },
     {
-      "name": "Signal at a full signal path inside a mux case: index from the path, notes become a one-line array",
+      "name": "Signal at a full signal path inside a mux case: index from the path",
       "input": {
         "path": [
           "frame",
@@ -516,7 +117,7 @@
           "offset": -40,
           "unit": "C",
           "signed": true,
-          "endianness": "big",
+          "byte_order": "big",
           "min": -40,
           "max": 125,
           "format": "number",
@@ -547,17 +148,15 @@
               "offset": -40,
               "unit": "C",
               "signed": true,
+              "byte_order": "big",
               "min": -40,
               "max": 125,
               "format": "number",
+              "confidence": "high",
               "enum": {
                 "0": "Off"
               },
-              "byte_order": "big",
-              "confidence": "high",
-              "notes": [
-                "two\nlines"
-              ]
+              "notes": "two\nlines"
             }
           }
         ]
@@ -594,7 +193,7 @@
       }
     },
     {
-      "name": "Mux upsert and delete, notes to an array",
+      "name": "Mux upsert and delete",
       "input": {
         "owner": [
           "frame",
@@ -602,7 +201,7 @@
           "0x100"
         ],
         "mux": {
-          "name": "mux_256_0_8",
+          "name": "",
           "start_bit": 0,
           "bit_length": 8,
           "notes": "page"
@@ -619,12 +218,10 @@
                 "0x100"
               ],
               "mux": {
-                "name": "mux_256_0_8",
+                "name": "",
                 "start_bit": 0,
                 "bit_length": 8,
-                "notes": [
-                  "page"
-                ]
+                "notes": "page"
               }
             }
           ]
@@ -921,226 +518,7 @@
       ]
     },
     {
-      "name": "Config ops: CAN default endianness renamed, serial checksum to camelCase, Modbus passed through",
-      "input": {
-        "meta": {
-          "name": "N",
-          "version": 2,
-          "default_frame": "can"
-        },
-        "can": {
-          "default_endianness": "big",
-          "default_interval": 100,
-          "default_extended": true,
-          "frame_id_mask": 536870656,
-          "fields": {
-            "source": {
-              "mask": 255,
-              "format": "hex"
-            }
-          }
-        },
-        "serial": {
-          "encoding": "cobs",
-          "byte_order": "little",
-          "header_length": 2,
-          "min_frame_length": 0,
-          "fields": {
-            "id": {
-              "mask": 65280,
-              "endianness": "big",
-              "format": "hex"
-            }
-          },
-          "checksum": {
-            "algorithm": "xor",
-            "start_byte": -1,
-            "byte_length": 1,
-            "calc_start_byte": 0,
-            "calc_end_byte": -1,
-            "big_endian": false
-          }
-        },
-        "modbus": {
-          "device_address": 7,
-          "register_base": 1,
-          "default_interval": 1000,
-          "default_byte_order": "big",
-          "default_word_order": "little"
-        }
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "SetMeta",
-            "meta": {
-              "name": "N",
-              "version": 2,
-              "default_frame": "can"
-            }
-          },
-          {
-            "op": "SetCanConfig",
-            "config": {
-              "default_byte_order": "big",
-              "default_interval": 100,
-              "default_extended": true,
-              "frame_id_mask": 536870656,
-              "fields": {
-                "source": {
-                  "mask": 255,
-                  "format": "hex"
-                }
-              }
-            }
-          },
-          {
-            "op": "SetSerialConfig",
-            "config": {
-              "encoding": "cobs",
-              "byte_order": "little",
-              "header_length": 2,
-              "min_frame_length": 0,
-              "fields": {
-                "id": {
-                  "mask": 65280,
-                  "endianness": "big",
-                  "format": "hex"
-                }
-              },
-              "checksum": {
-                "algorithm": "xor",
-                "startByte": -1,
-                "byteLength": 1,
-                "calcStartByte": 0,
-                "calcEndByte": -1,
-                "bigEndian": false
-              }
-            }
-          },
-          {
-            "op": "SetModbusConfig",
-            "config": {
-              "device_address": 7,
-              "register_base": 1,
-              "default_interval": 1000,
-              "default_byte_order": "big",
-              "default_word_order": "little"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Frame keys a fresh frame falls back to, and the handlers' display ids",
-      "input": {
-        "can": [
-          {
-            "protocol": "can",
-            "id": "0x7FF"
-          },
-          {
-            "protocol": "can",
-            "id": "256"
-          },
-          {
-            "protocol": "can",
-            "id": "status"
-          },
-          {
-            "protocol": "can",
-            "id": ""
-          }
-        ],
-        "modbus": [
-          {
-            "protocol": "modbus",
-            "register_number": 5000,
-            "node_address": 3
-          },
-          {
-            "protocol": "modbus"
-          }
-        ],
-        "serial": [
-          {
-            "protocol": "serial",
-            "frame_id": "0x10"
-          },
-          {
-            "protocol": "serial"
-          }
-        ]
-      },
-      "expected": {
-        "can": {
-          "defaultConfig": {
-            "protocol": "can",
-            "id": ""
-          },
-          "frames": [
-            {
-              "key": "0x7FF",
-              "displayId": "0x7FF",
-              "displaySecondary": "2047"
-            },
-            {
-              "key": "256",
-              "displayId": "256",
-              "displaySecondary": "0x100"
-            },
-            {
-              "key": "status",
-              "displayId": "status",
-              "displaySecondary": null
-            },
-            {
-              "key": "",
-              "displayId": "",
-              "displaySecondary": null
-            }
-          ]
-        },
-        "modbus": {
-          "defaultConfig": {
-            "protocol": "modbus",
-            "register_type": "holding"
-          },
-          "frames": [
-            {
-              "key": "5000",
-              "displayId": "Reg 5000",
-              "displaySecondary": "Slave 3"
-            },
-            {
-              "key": "new_register",
-              "displayId": "Reg (from name)",
-              "displaySecondary": "No slave"
-            }
-          ]
-        },
-        "serial": {
-          "defaultConfig": {
-            "protocol": "serial",
-            "frame_id": ""
-          },
-          "frames": [
-            {
-              "key": "0x10",
-              "displayId": "0x10",
-              "displaySecondary": null
-            },
-            {
-              "key": "unnamed_frame",
-              "displayId": "(unnamed)",
-              "displaySecondary": null
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "New Modbus frame seeds one signal: holding, two registers",
+      "name": "New Modbus frame, the crate seeding its signal: holding, two registers",
       "input": {
         "modbusFrameKey": "5000",
         "config": {
@@ -1152,28 +530,20 @@
       "expected": {
         "ops": [
           {
-            "op": "UpsertFrame",
+            "op": "AddFrame",
             "protocol": "modbus",
             "key": "5000",
-            "value": {
-              "length": 2
-            },
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "5000",
-                "start_bit": 0,
-                "bit_length": 32,
-                "signed": false,
-                "endianness": "big"
-              }
-            ]
+            "frame": {
+              "length": 2,
+              "register_type": "holding"
+            }
           }
-        ]
+        ],
+        "validation": []
       }
     },
     {
-      "name": "New Modbus frame seeds one signal: input, length 0 seeds one register",
+      "name": "New Modbus frame, the crate seeding its signal: input, length 0",
       "input": {
         "modbusFrameKey": "13021",
         "config": {
@@ -1185,29 +555,20 @@
       "expected": {
         "ops": [
           {
-            "op": "UpsertFrame",
+            "op": "AddFrame",
             "protocol": "modbus",
             "key": "13021",
-            "value": {
-              "register_type": "input",
-              "length": 0
-            },
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "13021",
-                "start_bit": 0,
-                "bit_length": 16,
-                "signed": false,
-                "endianness": "big"
-              }
-            ]
+            "frame": {
+              "length": 0,
+              "register_type": "input"
+            }
           }
-        ]
+        ],
+        "validation": []
       }
     },
     {
-      "name": "New Modbus frame seeds one signal: coil, four coils, no byte order",
+      "name": "New Modbus frame, the crate seeding its signal: coil, four coils",
       "input": {
         "modbusFrameKey": "100",
         "config": {
@@ -1219,92 +580,20 @@
       "expected": {
         "ops": [
           {
-            "op": "UpsertFrame",
+            "op": "AddFrame",
             "protocol": "modbus",
             "key": "100",
-            "value": {
-              "register_type": "coil",
-              "length": 4
-            },
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "100",
-                "start_bit": 0,
-                "bit_length": 4,
-                "signed": false
-              }
-            ]
+            "frame": {
+              "length": 4,
+              "register_type": "coil"
+            }
           }
-        ]
+        ],
+        "validation": []
       }
     },
     {
-      "name": "New Modbus frame seeds one signal: discrete, one input",
-      "input": {
-        "modbusFrameKey": "200",
-        "config": {
-          "protocol": "modbus",
-          "register_type": "discrete"
-        },
-        "length": 1
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "200",
-            "value": {
-              "register_type": "discrete"
-            },
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "200",
-                "start_bit": 0,
-                "bit_length": 1,
-                "signed": false
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "New Modbus frame seeds one signal: no register type",
-      "input": {
-        "modbusFrameKey": "300",
-        "config": {
-          "protocol": "modbus"
-        },
-        "length": 3
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "300",
-            "value": {
-              "length": 3
-            },
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "300",
-                "start_bit": 0,
-                "bit_length": 48,
-                "signed": false,
-                "endianness": "big"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "New Modbus frame seeds one signal: a key of spaces names the signal value",
+      "name": "New Modbus frame, the crate seeding its signal: a key of spaces",
       "input": {
         "modbusFrameKey": "  ",
         "config": {
@@ -1314,49 +603,11 @@
         "length": 1
       },
       "expected": {
-        "ops": [
+        "ops": [],
+        "validation": [
           {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "new_register",
-            "value": {},
-            "managed_keys": [],
-            "initial_signals": [
-              {
-                "name": "value",
-                "start_bit": 0,
-                "bit_length": 16,
-                "signed": false,
-                "endianness": "big"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "Editing a Modbus frame seeds nothing",
-      "input": {
-        "originalKey": "5000",
-        "config": {
-          "protocol": "modbus",
-          "register_type": "input"
-        },
-        "length": 2
-      },
-      "expected": {
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "5000",
-            "value": {
-              "register_type": "input",
-              "length": 2
-            },
-            "managed_keys": [],
-            "rename_from": "5000",
-            "initial_signals": []
+            "field": "frame",
+            "message": "Frame identifier is required"
           }
         ]
       }
@@ -1380,263 +631,401 @@
       }
     },
     {
-      "name": "Editing a can tree node, then saving it unchanged: 0x200",
+      "name": "A refused save is shown in the validation dialog",
       "input": {
-        "key": "0x200",
-        "metadata": {
-          "frameType": "can",
-          "idValue": "0x200",
-          "length": 8,
-          "lengthInherited": false,
-          "transmitter": "BMS",
-          "transmitterInherited": true,
-          "interval": 100,
-          "intervalInherited": true,
-          "extended": false,
-          "extendedInherited": true,
-          "fd": false,
-          "fdInherited": true,
-          "bus": 1,
-          "copyFrom": "0x100",
-          "mirrorOf": "0x300",
-          "notes": [
-            "n"
-          ]
-        }
+        "refusal": "a Modbus frame covers at least one register"
       },
       "expected": {
-        "fields": {
-          "protocol": "can",
-          "config": {
-            "protocol": "can",
-            "id": "0x200",
-            "extended": false,
-            "bus": 1,
-            "copy": "0x100"
-          },
-          "base": {
-            "length": 8,
-            "transmitter": "BMS",
-            "interval": 100,
-            "notes": [
-              "n"
-            ]
-          },
-          "isLengthInherited": false,
-          "isTransmitterInherited": true,
-          "isIntervalInherited": true
-        },
-        "originalKey": "0x200",
-        "ops": [
+        "errors": [
           {
-            "op": "UpsertFrame",
+            "field": "frame",
+            "message": "a Modbus frame covers at least one register"
+          }
+        ],
+        "dialogOpen": true,
+        "editorClosed": false
+      }
+    },
+    {
+      "name": "Saving every sbrxxx frame of interest unchanged: a plain frame, a mux frame, a mirror with an inherited mux",
+      "input": {
+        "catalogue": "catalog/sbrxxx.catalog.json",
+        "keys": [
+          "0x100",
+          "0x70F",
+          "0x00a",
+          "0x501"
+        ]
+      },
+      "expected": [
+        {
+          "fields": {
             "protocol": "can",
-            "key": "0x200",
-            "value": {
+            "base": {
               "length": 8,
+              "transmitter": "BMS",
+              "interval": 10000,
               "notes": [
-                "n"
-              ],
-              "extended": false,
-              "bus": 1,
-              "copy": "0x100"
-            },
-            "managed_keys": [],
-            "rename_from": "0x200",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "Editing a modbus tree node, then saving it unchanged: battery_power",
-      "input": {
-        "key": "battery_power",
-        "metadata": {
-          "frameType": "modbus",
-          "length": 1,
-          "registerNumber": 13021,
-          "nodeAddress": 3,
-          "registerType": "input",
-          "interval": 1000,
-          "intervalInherited": true
-        }
-      },
-      "expected": {
-        "fields": {
-          "protocol": "modbus",
-          "config": {
-            "protocol": "modbus",
-            "register_number": 13021,
-            "node_address": 3,
-            "register_type": "input"
-          },
-          "base": {
-            "length": 1,
-            "interval": 1000
-          },
-          "modbusFrameKey": "battery_power",
-          "isIntervalInherited": true
-        },
-        "originalKey": "battery_power",
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "battery_power",
-            "value": {
-              "register_number": 13021,
-              "node_address": 3,
-              "register_type": "input"
-            },
-            "managed_keys": [],
-            "rename_from": "battery_power",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "Editing a modbus tree node, then saving it unchanged: 5000",
-      "input": {
-        "key": "5000",
-        "metadata": {
-          "frameType": "modbus",
-          "registerNumber": 5000
-        }
-      },
-      "expected": {
-        "fields": {
-          "protocol": "modbus",
-          "config": {
-            "protocol": "modbus",
-            "register_number": 5000,
-            "register_type": "holding"
-          },
-          "base": {
-            "length": 1
-          },
-          "modbusFrameKey": "5000"
-        },
-        "originalKey": "5000",
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "modbus",
-            "key": "5000",
-            "value": {
-              "register_number": 5000
-            },
-            "managed_keys": [],
-            "rename_from": "5000",
-            "initial_signals": []
-          }
-        ]
-      }
-    },
-    {
-      "name": "Editing a serial tree node, then saving it unchanged: 0x20",
-      "input": {
-        "key": "0x20",
-        "metadata": {
-          "frameType": "serial",
-          "frameId": "0x20",
-          "length": 16,
-          "delimiter": [
-            192
-          ]
-        }
-      },
-      "expected": {
-        "fields": {
-          "protocol": "serial",
-          "config": {
-            "protocol": "serial",
-            "frame_id": "0x20",
-            "delimiter": [
-              192
-            ]
-          },
-          "base": {
-            "length": 16
-          }
-        },
-        "originalKey": "0x20",
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "serial",
-            "key": "0x20",
-            "value": {
-              "length": 16,
-              "delimiter": [
-                192
+                "Only transmitted on INIT"
               ]
             },
-            "managed_keys": [],
-            "rename_from": "0x20",
-            "initial_signals": []
-          }
-        ]
-      }
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "can",
+              "id": "0x00a",
+              "extended": false,
+              "fd": false,
+              "mirror_of": "0x70a"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "can",
+              "key": "0x00a",
+              "frame": {
+                "length": 8,
+                "transmitter": "BMS",
+                "interval_ms": 10000,
+                "notes": [
+                  "Only transmitted on INIT"
+                ],
+                "extended": false,
+                "fd": false,
+                "mirror_of": "0x70a"
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "can",
+            "base": {
+              "length": 8,
+              "transmitter": "Inverter"
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "can",
+              "id": "0x100",
+              "extended": false,
+              "fd": false
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "can",
+              "key": "0x100",
+              "frame": {
+                "length": 8,
+                "transmitter": "Inverter",
+                "extended": false,
+                "fd": false
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "can",
+            "base": {
+              "length": 8,
+              "transmitter": "BMS"
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "can",
+              "id": "0x501",
+              "extended": false,
+              "fd": false,
+              "mirror_of": "0x701"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "can",
+              "key": "0x501",
+              "frame": {
+                "length": 8,
+                "transmitter": "BMS",
+                "extended": false,
+                "fd": false,
+                "mirror_of": "0x701"
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "can",
+            "base": {
+              "length": 8,
+              "transmitter": "BMS",
+              "interval": 10000
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "can",
+              "id": "0x70F",
+              "extended": false,
+              "fd": false
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "can",
+              "key": "0x70F",
+              "frame": {
+                "length": 8,
+                "transmitter": "BMS",
+                "interval_ms": 10000,
+                "extended": false,
+                "fd": false
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "name": "Editing then saving a Modbus frame as the tree shows it: the model's byte length becomes the register count",
+      "name": "Saving every Modbus frame unchanged: the length goes in registers",
       "input": {
-        "catalogue": "catalog/modbus.catalog.json",
-        "path": [
-          "frame",
-          "modbus",
-          "5000"
-        ]
+        "catalogue": "catalog/modbus.catalog.json"
       },
-      "expected": {
-        "treeLength": 4,
-        "fields": {
-          "protocol": "modbus",
-          "config": {
+      "expected": [
+        {
+          "fields": {
             "protocol": "modbus",
-            "register_number": 5000,
-            "node_address": 3,
-            "register_type": "input"
+            "base": {
+              "length": 1,
+              "interval": 1000
+            },
+            "isIntervalInherited": true,
+            "modbusFrameKey": "0x32F9",
+            "config": {
+              "protocol": "modbus",
+              "register_number": 13049,
+              "node_address": 7,
+              "register_type": "holding"
+            }
           },
-          "base": {
-            "length": 4,
-            "interval": 1000,
-            "notes": [
-              "Running state",
-              "Read every second"
-            ]
-          },
-          "modbusFrameKey": "5000",
-          "isLengthInherited": false,
-          "isTransmitterInherited": false,
-          "isIntervalInherited": true
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "0x32F9",
+              "frame": {
+                "length": 1,
+                "register_number": 13049,
+                "node_address": 7,
+                "register_type": "holding"
+              }
+            }
+          ]
         },
-        "ops": [
-          {
-            "op": "UpsertFrame",
+        {
+          "fields": {
             "protocol": "modbus",
-            "key": "5000",
-            "value": {
-              "register_number": 5000,
-              "node_address": 3,
-              "register_type": "input",
+            "base": {
               "length": 4,
+              "interval": 1000
+            },
+            "isIntervalInherited": true,
+            "modbusFrameKey": "100",
+            "config": {
+              "protocol": "modbus",
+              "register_number": 100,
+              "register_type": "coil"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "100",
+              "frame": {
+                "length": 4,
+                "register_number": 100,
+                "register_type": "coil"
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "modbus",
+            "base": {
+              "length": 2,
+              "interval": 1000,
               "notes": [
                 "Running state",
                 "Read every second"
               ]
             },
-            "managed_keys": [],
-            "rename_from": "5000",
-            "initial_signals": []
-          }
-        ]
-      }
+            "isIntervalInherited": true,
+            "modbusFrameKey": "5000",
+            "config": {
+              "protocol": "modbus",
+              "register_number": 5000,
+              "node_address": 3,
+              "register_type": "input"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "5000",
+              "frame": {
+                "length": 2,
+                "notes": [
+                  "Running state",
+                  "Read every second"
+                ],
+                "register_number": 5000,
+                "node_address": 3,
+                "register_type": "input"
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "modbus",
+            "base": {
+              "length": 1,
+              "transmitter": "Inverter",
+              "interval": 500
+            },
+            "isIntervalInherited": false,
+            "modbusFrameKey": "battery_power",
+            "config": {
+              "protocol": "modbus",
+              "register_number": 13021,
+              "register_type": "input"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "modbus",
+              "key": "battery_power",
+              "frame": {
+                "length": 1,
+                "transmitter": "Inverter",
+                "interval_ms": 500,
+                "register_number": 13021,
+                "register_type": "input"
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "name": "Adding a frame: each protocol's starting form",
+      "name": "Saving every serial frame unchanged, the name-keyed one too",
+      "input": {
+        "catalogue": "catalog/serial.catalog.json"
+      },
+      "expected": [
+        {
+          "fields": {
+            "protocol": "serial",
+            "base": {
+              "length": 12,
+              "transmitter": "Controller",
+              "interval": 250,
+              "notes": [
+                "Status broadcast"
+              ]
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "serial",
+              "frame_id": "0x10"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "serial",
+              "key": "0x10",
+              "frame": {
+                "length": 12,
+                "transmitter": "Controller",
+                "interval_ms": 250,
+                "notes": [
+                  "Status broadcast"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "serial",
+            "base": {
+              "length": 16
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "serial",
+              "frame_id": "0x20",
+              "delimiter": [
+                192
+              ]
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "serial",
+              "key": "0x20",
+              "frame": {
+                "length": 16,
+                "delimiter": [
+                  192
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "fields": {
+            "protocol": "serial",
+            "base": {
+              "length": 4,
+              "notes": [
+                "Keyed by a name, not an id"
+              ]
+            },
+            "isIntervalInherited": false,
+            "config": {
+              "protocol": "serial",
+              "frame_id": "heartbeat"
+            }
+          },
+          "ops": [
+            {
+              "op": "SetFrame",
+              "protocol": "serial",
+              "key": "heartbeat",
+              "frame": {
+                "length": 4,
+                "notes": [
+                  "Keyed by a name, not an id"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Adding a frame: each protocol's starting form, and from a node",
       "input": [
         "can",
         "modbus",
@@ -1673,60 +1062,34 @@
           "base": {
             "length": 0
           }
+        },
+        {
+          "protocol": "can",
+          "config": {
+            "protocol": "can",
+            "id": ""
+          },
+          "base": {
+            "length": 8,
+            "transmitter": "BMS"
+          }
+        },
+        {
+          "protocol": "modbus",
+          "config": {
+            "protocol": "modbus",
+            "register_type": "holding",
+            "node_address": 3
+          },
+          "base": {
+            "length": 1
+          },
+          "modbusFrameKey": ""
         }
       ]
     },
     {
-      "name": "Editing then saving a CAN frame in the legacy editor",
-      "input": {
-        "key": "0x200",
-        "metadata": {
-          "idValue": "0x200",
-          "length": 0,
-          "lengthInherited": true,
-          "transmitter": "BMS",
-          "transmitterInherited": false,
-          "interval": 100,
-          "intervalInherited": true,
-          "notes": [
-            "n"
-          ]
-        }
-      },
-      "expected": {
-        "form": {
-          "id": "0x200",
-          "length": 8,
-          "transmitter": "BMS",
-          "isIntervalInherited": true,
-          "isLengthInherited": true,
-          "isTransmitterInherited": false,
-          "notes": [
-            "n"
-          ]
-        },
-        "ops": [
-          {
-            "op": "UpsertFrame",
-            "protocol": "can",
-            "key": "0x200",
-            "value": {
-              "notes": "n",
-              "transmitter": "BMS"
-            },
-            "managed_keys": [
-              "length",
-              "notes",
-              "transmitter",
-              "tx"
-            ],
-            "rename_from": "0x200"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Saving the configuration: CAN mask and header fields parsed, disabled protocols deleted",
+      "name": "Saving the configuration: masks go to the crate as typed, disabled protocols deleted",
       "input": {
         "forms": {
           "meta": {
@@ -1744,12 +1107,6 @@
               "mask": "0xFF",
               "shift": 0,
               "format": "hex"
-            },
-            {
-              "name": "priority",
-              "mask": "zz",
-              "shift": 26,
-              "format": "decimal"
             },
             {
               "name": "",
@@ -1785,17 +1142,20 @@
               "default_byte_order": "big",
               "default_interval": 100,
               "default_extended": true,
-              "frame_id_mask": 536870656,
+              "frame_id_mask": " 0x1FFFFF00 ",
               "fields": {
-                "source": {
-                  "mask": 255,
+                " source ": {
+                  "mask": "0xFF",
                   "shift": 0,
                   "format": "hex"
                 },
-                "priority": {
-                  "mask": 0,
-                  "shift": 26,
-                  "format": "decimal"
+                "": {
+                  "mask": "0xF0",
+                  "format": "hex"
+                },
+                "blank": {
+                  "mask": " ",
+                  "format": "hex"
                 }
               }
             }
@@ -1818,7 +1178,7 @@
       }
     },
     {
-      "name": "Saving the configuration: serial header fields and the file's mask carried, Modbus device address from the file",
+      "name": "Saving the configuration: an unset byte order stays unset, the file's mask and device address carried",
       "input": {
         "forms": {
           "meta": {
@@ -1826,7 +1186,6 @@
             "version": 4
           },
           "serialEncoding": "raw",
-          "serialByteOrder": "little",
           "serialHeaderLength": 3,
           "serialHeaderFields": [
             {
@@ -1846,25 +1205,23 @@
             "algorithm": "sum8",
             "start_byte": -1,
             "byte_length": 1,
-            "calc_start_byte": 0,
-            "calc_end_byte": -1
+            "calc_start_byte": 0
           },
           "modbusRegisterBase": 1,
           "modbusDefaultInterval": 1000,
-          "modbusDefaultByteOrder": "big",
           "modbusDefaultWordOrder": "little",
           "canFrameIdMask": "",
           "canHeaderFields": []
         },
-        "tree": {
-          "serialConfig": {
+        "catalog": {
+          "serial": {
             "encoding": "raw",
-            "frame_id_mask": 65280,
-            "min_frame_length": 4
+            "frameIdMask": 65280,
+            "minFrameLength": 4
           },
-          "modbusConfig": {
-            "register_base": 0,
-            "device_address": 9
+          "modbus": {
+            "registerBase": 0,
+            "deviceAddress": 9
           }
         },
         "enabled": {
@@ -1893,23 +1250,26 @@
             "op": "SetSerialConfig",
             "config": {
               "encoding": "raw",
-              "byte_order": "little",
-              "frame_id_mask": 65280,
               "header_length": 3,
+              "frame_id_mask": 65280,
               "min_frame_length": 4,
               "fields": {
                 "id": {
                   "mask": 65280,
                   "endianness": "big",
                   "format": "hex"
+                },
+                " ": {
+                  "mask": 255,
+                  "endianness": "big",
+                  "format": "decimal"
                 }
               },
               "checksum": {
                 "algorithm": "sum8",
                 "startByte": -1,
                 "byteLength": 1,
-                "calcStartByte": 0,
-                "calcEndByte": -1
+                "calcStartByte": 0
               }
             }
           },
@@ -1919,12 +1279,102 @@
               "device_address": 9,
               "register_base": 1,
               "default_interval": 1000,
-              "default_byte_order": "big",
               "default_word_order": "little"
             }
           }
         ]
       }
+    },
+    {
+      "name": "Configuration draft seeded from the model: unset byte orders stay unset",
+      "input": [
+        {
+          "meta": {
+            "name": "d",
+            "version": 1
+          },
+          "frames": [],
+          "can": {
+            "defaultExtended": true,
+            "frameIdMask": 536870656,
+            "fields": {
+              "src": {
+                "mask": 255
+              }
+            }
+          }
+        },
+        {
+          "meta": {
+            "name": "d",
+            "version": 1
+          },
+          "frames": [],
+          "serial": {
+            "checksum": {
+              "algorithm": "xor",
+              "startByte": -1,
+              "byteLength": 1,
+              "calcStartByte": 0,
+              "bigEndian": false
+            }
+          }
+        },
+        {
+          "meta": {
+            "name": "d",
+            "version": 1
+          },
+          "frames": [],
+          "modbus": {
+            "defaultInterval": 500,
+            "deviceAddress": 7
+          }
+        }
+      ],
+      "expected": [
+        {
+          "canDefaultExtended": true,
+          "canFrameIdMask": "0x1FFFFF00",
+          "canHeaderFields": [
+            {
+              "name": "src",
+              "mask": "0xFF",
+              "format": "hex"
+            }
+          ],
+          "serialEncoding": "slip",
+          "serialHeaderFields": [],
+          "serialChecksum": null,
+          "modbusDeviceAddress": 1,
+          "modbusRegisterBase": 0
+        },
+        {
+          "canFrameIdMask": "",
+          "canHeaderFields": [],
+          "serialEncoding": "slip",
+          "serialHeaderFields": [],
+          "serialChecksum": {
+            "algorithm": "xor",
+            "start_byte": -1,
+            "byte_length": 1,
+            "calc_start_byte": 0,
+            "big_endian": false
+          },
+          "modbusDeviceAddress": 1,
+          "modbusRegisterBase": 0
+        },
+        {
+          "canFrameIdMask": "",
+          "canHeaderFields": [],
+          "serialEncoding": "slip",
+          "serialHeaderFields": [],
+          "serialChecksum": null,
+          "modbusDeviceAddress": 7,
+          "modbusRegisterBase": 0,
+          "modbusDefaultInterval": 500
+        }
+      ]
     },
     {
       "name": "Nodes: notes trimmed, blank notes dropped",
@@ -1984,215 +1434,87 @@
       ]
     },
     {
-      "name": "Mux names minted from the frame key, start bit and length",
+      "name": "Adding a mux: a blank name for the crate to mint, the owner the frame or case",
       "input": [
         [
-          [
-            "frame",
-            "can",
-            "0x71F"
-          ],
-          0,
-          8,
-          false
+          "frame",
+          "can",
+          "0x71F"
         ],
         [
-          [
-            "frame",
-            "can",
-            "1823"
-          ],
-          8,
-          4,
-          false
+          "frame",
+          "serial",
+          "status"
         ],
         [
-          [
-            "frame",
-            "serial",
-            "0x20"
-          ],
-          24,
-          8,
-          false
-        ],
-        [
-          [
-            "frame",
-            "serial",
-            "heartbeat"
-          ],
-          0,
-          8,
-          false
-        ],
-        [
-          [
-            "frame",
-            "can",
-            "0x71F",
-            "mux",
-            "3"
-          ],
-          8,
-          8,
-          true
-        ],
-        [
-          [
-            "frame",
-            "can",
-            "0x71F",
-            "mux",
-            "0-3"
-          ],
-          16,
-          8,
-          true
-        ],
-        [
-          [
-            "frame",
-            "can",
-            "0x71F",
-            "mux",
-            "3",
-            "mux",
-            "1"
-          ],
-          24,
-          8,
-          true
-        ],
-        [
-          [
-            "0x100"
-          ],
-          0,
-          8,
-          false
-        ]
-      ],
-      "expected": [
-        "mux_1823_0_8",
-        "mux_1823_8_4",
-        "mux_32_24_8",
-        "mux_NaN_0_8",
-        "mux_1823_3_8_8",
-        "mux_1823_0-3_16_8",
-        "mux_1823_1_24_8",
-        "mux_256_0_8"
-      ]
-    },
-    {
-      "name": "Adding a mux: the default name and owner path",
-      "input": [
-        [
-          "0x71F",
-          null
-        ],
-        [
-          "256",
-          null
-        ],
-        [
-          "status",
-          [
-            "frame",
-            "serial",
-            "status"
-          ]
-        ]
-      ],
-      "expected": [
-        {
-          "path": [
-            "frame",
-            "can",
-            "0x71F"
-          ],
-          "fields": {
-            "name": "mux_1823_0_8",
-            "start_bit": 0,
-            "bit_length": 8
-          }
-        },
-        {
-          "path": [
-            "frame",
-            "can",
-            "256"
-          ],
-          "fields": {
-            "name": "mux_256_0_8",
-            "start_bit": 0,
-            "bit_length": 8
-          }
-        },
-        {
-          "path": [
-            "frame",
-            "serial",
-            "status"
-          ],
-          "fields": {
-            "name": "mux_NaN_0_8",
-            "start_bit": 0,
-            "bit_length": 8
-          }
-        }
-      ]
-    },
-    {
-      "name": "Adding a nested mux under a case",
-      "input": [
-        "frame",
-        "can",
-        "0x71F",
-        "mux",
-        "4"
-      ],
-      "expected": {
-        "path": [
           "frame",
           "can",
           "0x71F",
           "mux",
           "4"
-        ],
-        "fields": {
-          "name": "mux_1823_4_0_8",
-          "start_bit": 0,
-          "bit_length": 8
-        }
-      }
-    },
-    {
-      "name": "Editing a mux: notes joined, missing fields defaulted",
-      "input": [
-        {
-          "name": "Page",
-          "start_bit": 8,
-          "bit_length": 4,
-          "notes": [
-            "a",
-            "b"
-          ]
-        },
-        {
-          "start_bit": 0,
-          "bit_length": 0
-        }
+        ]
       ],
       "expected": [
         {
-          "name": "Page",
-          "start_bit": 8,
-          "bit_length": 4,
-          "notes": "a\nb"
+          "path": [
+            "frame",
+            "can",
+            "0x71F"
+          ],
+          "nested": false,
+          "fields": {
+            "name": "",
+            "start_bit": 0,
+            "bit_length": 8
+          }
         },
         {
-          "name": "",
+          "path": [
+            "frame",
+            "serial",
+            "status"
+          ],
+          "nested": false,
+          "fields": {
+            "name": "",
+            "start_bit": 0,
+            "bit_length": 8
+          }
+        },
+        {
+          "path": [
+            "frame",
+            "can",
+            "0x71F",
+            "mux",
+            "4"
+          ],
+          "nested": true,
+          "fields": {
+            "name": "",
+            "start_bit": 0,
+            "bit_length": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "Editing a mux read from the model",
+      "input": {
+        "catalogue": "catalog/sbrxxx.catalog.json",
+        "keys": [
+          "0x70F",
+          "0x71F"
+        ]
+      },
+      "expected": [
+        {
+          "name": "mux_1807_0_8",
+          "start_bit": 0,
+          "bit_length": 8
+        },
+        {
+          "name": "mux_1823_0_8",
           "start_bit": 0,
           "bit_length": 8
         }
@@ -2208,7 +1530,12 @@
             "0x100",
             "mux"
           ],
-          "existing": true
+          "existing": true,
+          "fields": {
+            "name": "Page",
+            "start_bit": 0,
+            "bit_length": 8
+          }
         },
         {
           "path": [
@@ -2216,7 +1543,12 @@
             "can",
             "0x100"
           ],
-          "existing": false
+          "existing": false,
+          "fields": {
+            "name": "",
+            "start_bit": 0,
+            "bit_length": 8
+          }
         },
         {
           "path": [
@@ -2226,7 +1558,12 @@
             "mux",
             "4"
           ],
-          "existing": false
+          "existing": false,
+          "fields": {
+            "name": "",
+            "start_bit": 8,
+            "bit_length": 4
+          }
         }
       ],
       "expected": [
@@ -2240,7 +1577,7 @@
                 "0x100"
               ],
               "mux": {
-                "name": "m",
+                "name": "Page",
                 "start_bit": 0,
                 "bit_length": 8
               }
@@ -2257,7 +1594,7 @@
                 "0x100"
               ],
               "mux": {
-                "name": "m",
+                "name": "",
                 "start_bit": 0,
                 "bit_length": 8
               }
@@ -2276,9 +1613,9 @@
                 "4"
               ],
               "mux": {
-                "name": "m",
-                "start_bit": 0,
-                "bit_length": 8
+                "name": "",
+                "start_bit": 8,
+                "bit_length": 4
               }
             }
           ]
@@ -2348,47 +1685,20 @@
       ]
     },
     {
-      "name": "A signal read back into the form: byte_order to endianness, string bits coerced, notes joined",
-      "input": [
-        {
-          "name": "A",
-          "start_bit": "8",
-          "bit_length": "x",
-          "byte_order": "big",
-          "notes": [
-            "one",
-            "two"
-          ],
-          "factor": 0.5
-        },
-        {
-          "start_bit": 0,
-          "endianness": "little",
-          "byte_order": "big",
-          "notes": "single"
-        },
-        {}
-      ],
+      "name": "A signal read back into the form from the model",
+      "input": {
+        "catalogue": "catalog/modbus.catalog.json",
+        "key": "5000"
+      },
       "expected": [
         {
-          "name": "A",
-          "start_bit": 8,
-          "bit_length": 8,
-          "factor": 0.5,
-          "endianness": "big",
-          "notes": "one\ntwo"
-        },
-        {
-          "name": "",
+          "name": "Daily_Yield",
           "start_bit": 0,
-          "bit_length": 8,
-          "endianness": "little",
-          "notes": "single"
-        },
-        {
-          "name": "",
-          "start_bit": 0,
-          "bit_length": 8
+          "bit_length": 32,
+          "factor": 0.1,
+          "unit": "kWh",
+          "signed": false,
+          "confidence": "high"
         }
       ]
     },

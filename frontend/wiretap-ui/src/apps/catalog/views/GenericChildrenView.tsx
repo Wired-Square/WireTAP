@@ -17,7 +17,7 @@ export type GenericChildrenViewProps = {
 export default function GenericChildrenView({ selectedNode, onSelectNode, onRequestDelete }: GenericChildrenViewProps) {
   const { t } = useTranslation("catalog");
   const hasChildren = !!selectedNode.children && selectedNode.children.length > 0;
-  const title = selectedNode.type === "table-array" ? t("genericChildren.signals") : t("genericChildren.properties");
+  const title = t("genericChildren.properties");
 
   return (
     <div className="space-y-4">
@@ -52,20 +52,14 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
                     {child.key}
                   </div>
 
-                  {child.type === "value" && child.value !== undefined && (
-                    <div className="font-mono text-xs text-muted truncate">
-                      {String(child.value)}
-                    </div>
-                  )}
-
-                  {child.type === "signal" && child.metadata?.properties && (
+                  {child.type === "signal" && child.metadata?.signal && (
                     <div className={`${caption} mt-1 space-y-0.5`}>
-                      {child.metadata.properties.unit && <div>{t("genericChildren.unitLabel", { unit: child.metadata.properties.unit })}</div>}
-                      {child.metadata.properties.factor !== undefined && <div>{t("genericChildren.factorLabel", { factor: child.metadata.properties.factor })}</div>}
+                      {child.metadata.signal.unit && <div>{t("genericChildren.unitLabel", { unit: child.metadata.signal.unit })}</div>}
+                      {child.metadata.signal.factor !== undefined && <div>{t("genericChildren.factorLabel", { factor: child.metadata.signal.factor })}</div>}
                     </div>
                   )}
 
-                  {child.type !== "value" && child.type !== "signal" && child.children && (
+                  {child.type !== "signal" && child.children && (
                     <div className={caption}>
                       {t("genericChildren.itemsCount", { count: child.children.length })}
                     </div>
@@ -74,10 +68,7 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
 
                 <Badge size="lg">
                   {child.type === "section" && t("genericChildren.typeTable")}
-                  {child.type === "table-array" && t("genericChildren.typeArray")}
                   {child.type === "signal" && t("genericChildren.typeSignal")}
-                  {child.type === "array" && t("genericChildren.typeArraySize", { count: child.metadata?.arrayItems?.length || 0 })}
-                  {child.type === "value" && t("genericChildren.typeValue")}
                 </Badge>
               </div>
             </div>

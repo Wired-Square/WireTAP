@@ -1,27 +1,28 @@
 // ui/src/apps/catalog/editorOps.ts
 //
-// Catalogue edit operations. Each builds an `EditOp` payload and applies it in Rust
-// (the wiretap-catalog crate, via toml_edit) so comments and formatting survive —
-// only the targeted entry changes. The typed ops (signals, mux, meta, protocol
-// configs) carry their elision rules in the crate; for the generic ones, which
-// fields to write is decided here.
+// Catalogue edit operations. Each builds an `EditOp` and applies it in Rust (the
+// wiretap-catalog crate, via toml_edit) so comments and formatting survive. The
+// typed ops (frames, signals, mux, meta, protocol configs) own what is written;
+// the generic ones write what they are given.
 
-import type { MetaFields, ProtocolType, BaseFrameFields, ProtocolConfig, SerialConfig, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig, ChecksumAlgorithm } from "./types";
-import { tomlParse } from "./toml";
+import type { ProtocolType, ChecksumAlgorithm } from "./types";
 import { editCatalog, editCatalogOps } from "../../api/catalog";
-import type { Confidence, DisplayHint } from "../../types/catalogModel";
-import type { EditOp } from "../../types/catalogEdit";
-import { protocolRegistry } from "./protocols";
-
-// ── small pure helpers (path/data shaping stays in TS) ───────────────────────
+import type {
+  CanConfigFields,
+  EditOp,
+  FrameFields,
+  MetaFields,
+  ModbusConfigFields,
+  MuxFields,
+  SerialConfigFields,
+  SignalFields,
+} from "../../types/catalogEdit";
 
 function isNumericSegment(seg: string): boolean {
   return /^-?\d+$/.test(seg);
 }
 
-/** Drop only-undefined keys; keep `false`/`0`/`""`. Mirrors the old "only write
- *  non-default fields" object building (undefined is dropped by JSON anyway, but
- *  being explicit keeps payloads clean). */
+/** Drop only-undefined keys; keep `false`/`0`/`""`. */
 function compact<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -31,7 +32,6 @@ function compact<T extends Record<string, unknown>>(obj: T): Record<string, unkn
 }
 
 function normalizeSignalTarget(targetPath: string[], index: number | null): { ownerPath: string[]; index: number | null } {
-  // Allow callers to pass a full signal-node path like [..., "signals", "3"].
   if (
     index === null &&
     targetPath.length >= 2 &&
@@ -54,238 +54,42 @@ export function deleteOp(path: string[]): EditOp {
   return { op: "DeleteAtPath", path };
 }
 
-// ============================================================================
-// Protocol configs ([meta.can], [meta.serial], [meta.modbus])
-// ============================================================================
+export const canConfigOp = (config: CanConfigFields): EditOp => ({ op: "SetCanConfig", config });
 
-export function canConfigOp(config: CanProtocolConfig): EditOp {
-  return {
-    op: "SetCanConfig",
-    config: {
-      default_byte_order: config.default_endianness,
-      default_interval: config.default_interval,
-      default_extended: config.default_extended,
-      default_fd: config.default_fd,
-      frame_id_mask: config.frame_id_mask,
-      fields: config.fields,
-    },
-  };
-}
+export const serialConfigOp = (config: SerialConfigFields): EditOp => ({ op: "SetSerialConfig", config });
 
-export function serialConfigOp(config: SerialProtocolConfig): EditOp {
-  const { checksum } = config;
-  return {
-    op: "SetSerialConfig",
-    config: {
-      encoding: config.encoding,
-      byte_order: config.byte_order,
-      frame_id_mask: config.frame_id_mask,
-      header_length: config.header_length,
-      min_frame_length: config.min_frame_length,
-      fields: config.fields,
-      checksum: checksum && {
-        algorithm: checksum.algorithm,
-        startByte: checksum.start_byte,
-        byteLength: checksum.byte_length,
-        calcStartByte: checksum.calc_start_byte,
-        calcEndByte: checksum.calc_end_byte,
-        bigEndian: checksum.big_endian,
-      },
-    },
-  };
-}
-
-/** `device_address` is the legacy default slave; a save passes the file's own through. */
-export function modbusConfigOp(config: ModbusProtocolConfig): EditOp {
-  return {
-    op: "SetModbusConfig",
-    config: {
-      device_address: config.device_address,
-      register_base: config.register_base,
-      default_interval: config.default_interval,
-      default_byte_order: config.default_byte_order,
-      default_word_order: config.default_word_order,
-    },
-  };
-}
+export const modbusConfigOp = (config: ModbusConfigFields): EditOp => ({ op: "SetModbusConfig", config });
 
 // ============================================================================
-// CAN Frames (legacy direct editor)
+// Frames
 // ============================================================================
 
-export interface UpsertCanFrameParams {
-  oldId?: string | null;
-  id: string;
-  length: number;
-  transmitter?: string;
-  interval?: number;
-  isLengthInherited?: boolean;
-  isTransmitterInherited?: boolean;
-  isIntervalInherited?: boolean;
-  notes?: string | string[];
-}
-
-/** Collapse a single-element notes array to a plain string (tidier TOML). */
-function normalizeNotes(notes: string | string[] | undefined): string | string[] | undefined {
-  if (Array.isArray(notes)) {
-    if (notes.length === 0) return undefined;
-    if (notes.length === 1) return notes[0];
-  }
-  return notes || undefined;
-}
-
-export function upsertCanFrameToml(toml: string, p: UpsertCanFrameParams): Promise<string> {
-  const value: Record<string, unknown> = compact({
-    length: p.isLengthInherited ? undefined : p.length,
-    notes: normalizeNotes(p.notes),
-    transmitter: p.transmitter && !p.isTransmitterInherited ? p.transmitter : undefined,
-    tx: p.interval !== undefined && !p.isIntervalInherited ? { interval_ms: p.interval } : undefined,
-  });
-  return editCatalog(toml, {
-    op: "UpsertFrame",
-    protocol: "can",
-    key: p.id,
-    value,
-    managed_keys: ["length", "notes", "transmitter", "tx"],
-    rename_from: p.oldId ?? undefined,
-  });
-}
-
-export function deleteCanFrameToml(toml: string, id: string): Promise<string> {
-  return editCatalog(toml, { op: "DeleteAtPath", path: ["frame", "can", id] });
-}
-
-// ============================================================================
-// Generic Frames (CAN/Modbus/Serial via the protocol registry)
-// ============================================================================
-
-export interface UpsertFrameParams {
-  protocol: ProtocolType;
-  base: BaseFrameFields;
-  config: ProtocolConfig;
-  key?: string;
-  originalKey?: string;
-  omitInherited?: {
-    length?: boolean;
-    transmitter?: boolean;
-    interval?: boolean;
-    registerBase?: boolean;
-  };
-  initialSignals?: Array<{
-    name: string;
-    start_bit: number;
-    bit_length: number;
-    signed?: boolean;
-    endianness?: "little" | "big";
-  }>;
-}
-
-export function upsertFrameToml(toml: string, params: UpsertFrameParams): Promise<string> {
-  const { protocol, base, config, key, originalKey, omitInherited, initialSignals } = params;
-  const handler = protocolRegistry.get(protocol);
-  if (!handler) throw new Error(`Unknown protocol: ${protocol}`);
-
-  const frameKey = (key?.trim() || handler.getFrameKey(config));
-  // The handler decides which scalar fields to write; strip sub-tables so the
-  // Rust merge preserves any existing signals/mux/checksum on the frame.
-  const serialized = handler.serializeFrame(frameKey, base, config, omitInherited);
-  const value: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(serialized)) {
-    if (k === "signals" || k === "mux" || k === "checksum") continue;
-    if (v !== undefined) value[k] = v;
-  }
-
-  return editCatalog(toml, {
-    op: "UpsertFrame",
-    protocol,
-    key: frameKey,
-    value,
-    managed_keys: [], // merge-only (matches the previous Object.assign semantics)
-    rename_from: originalKey ?? undefined,
-    initial_signals: initialSignals ?? [],
-  });
+/** A new frame (`originalKey` null) or the whole of an existing one's own keys. */
+export function saveFrameToml(
+  toml: string,
+  protocol: ProtocolType,
+  key: string,
+  frame: FrameFields,
+  originalKey: string | null,
+): Promise<string> {
+  const op: EditOp =
+    originalKey === null
+      ? { op: "AddFrame", protocol, key, frame }
+      : { op: "SetFrame", protocol, key, rename_from: originalKey === key ? undefined : originalKey, frame };
+  return editCatalogOps(toml, [op]);
 }
 
 export function deleteFrameToml(toml: string, protocol: ProtocolType, key: string): Promise<string> {
   return editCatalog(toml, { op: "DeleteAtPath", path: ["frame", protocol, key] });
 }
 
-/** Existing frame keys for a protocol (duplicate detection; read-only). */
-export function getFrameKeys(toml: string, protocol: ProtocolType): string[] {
-  const parsed = tomlParse(toml) as any;
-  const section = parsed?.frame?.[protocol];
-  return section && typeof section === "object" ? Object.keys(section) : [];
-}
-
-export function deleteModbusFrameToml(toml: string, key: string): Promise<string> {
-  return deleteFrameToml(toml, "modbus", key);
-}
-
-export interface UpsertSerialFrameParams {
-  oldKey?: string | null;
-  frameId: string;
-  length?: number;
-  delimiter?: number[];
-  transmitter?: string;
-  interval?: number;
-  notes?: string | string[];
-  isIntervalInherited?: boolean;
-}
-
-export function upsertSerialFrameToml(toml: string, p: UpsertSerialFrameParams): Promise<string> {
-  const base: BaseFrameFields = { length: p.length ?? 0, transmitter: p.transmitter, interval: p.interval, notes: p.notes };
-  const config: SerialConfig = { protocol: "serial", frame_id: p.frameId, delimiter: p.delimiter };
-  return upsertFrameToml(toml, {
-    protocol: "serial",
-    base,
-    config,
-    originalKey: p.oldKey ?? undefined,
-    omitInherited: { interval: p.isIntervalInherited },
-  });
-}
-
-export function deleteSerialFrameToml(toml: string, key: string): Promise<string> {
-  return deleteFrameToml(toml, "serial", key);
-}
-
 // ============================================================================
 // Signals
 // ============================================================================
 
-export interface SignalData {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  factor?: number;
-  offset?: number;
-  unit?: string;
-  signed?: boolean;
-  endianness?: "little" | "big";
-  min?: number;
-  max?: number;
-  format?: string;
-  confidence?: string;
-  enum?: Record<string, string>;
-  display?: DisplayHint;
-  notes?: string;
-}
-
-export function upsertSignalToml(toml: string, targetPath: string[], signal: SignalData, index: number | null): Promise<string> {
+export function upsertSignalToml(toml: string, targetPath: string[], signal: SignalFields, index: number | null): Promise<string> {
   const { ownerPath, index: idx } = normalizeSignalTarget(targetPath, index);
-  const { endianness, confidence, notes, ...fields } = signal;
-  return editCatalogOps(toml, [
-    {
-      op: "UpsertSignal",
-      owner_path: ownerPath,
-      index: idx ?? undefined,
-      signal: {
-        ...fields,
-        byte_order: endianness,
-        confidence: (confidence || undefined) as Confidence | undefined,
-        notes: notes ? [notes] : undefined,
-      },
-    },
-  ]);
+  return editCatalogOps(toml, [{ op: "UpsertSignal", owner_path: ownerPath, index: idx ?? undefined, signal }]);
 }
 
 export function deleteSignalToml(toml: string, signalsParentPath: string[], index: number): Promise<string> {
@@ -302,17 +106,9 @@ export function deleteSignalToml(toml: string, signalsParentPath: string[], inde
 // Mux
 // ============================================================================
 
-export interface MuxData {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  notes?: string;
-}
-
-export function upsertMuxToml(toml: string, muxOwnerPath: string[], mux: MuxData): Promise<string> {
-  return editCatalogOps(toml, [
-    { op: "SetMux", owner_path: muxOwnerPath, mux: { ...mux, notes: mux.notes ? [mux.notes] : undefined } },
-  ]);
+/** A blank name is minted by the crate from the owner, start bit and length. */
+export function upsertMuxToml(toml: string, muxOwnerPath: string[], mux: MuxFields): Promise<string> {
+  return editCatalogOps(toml, [{ op: "SetMux", owner_path: muxOwnerPath, mux }]);
 }
 
 export function deleteMuxToml(toml: string, muxPath: string[]): Promise<string> {

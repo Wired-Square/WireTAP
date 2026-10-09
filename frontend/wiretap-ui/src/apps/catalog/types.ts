@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/types.ts
 
 import type { ChecksumAlgorithm as CA } from "../../utils/analysis/checksums";
+import type { Frame, FrameChecksum, Mux, MuxCase, NodeDef, Signal } from "../../types/catalogModel";
 
 // Re-export checksum type for consumers
 export type ChecksumAlgorithm = CA;
@@ -9,19 +10,12 @@ export type EditMode = "text" | "ui";
 
 export type TomlNodeType =
   | "section"
-  | "array"
-  | "value"
-  | "table-array"
   | "signal"
   | "checksum"
-  | "inline-table"
   | "meta"
   | "can-frame"
-  | "can-config"
   | "modbus-frame"
-  | "modbus-config"
   | "serial-frame"
-  | "serial-config"
   | "node"
   | "mux"
   | "mux-case";
@@ -33,54 +27,12 @@ export type TomlNodeType =
 /** Supported protocol types */
 export type ProtocolType = "can" | "modbus" | "serial";
 
-/** Signal definition - protocol-agnostic */
-export interface SignalDefinition {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  factor?: number;
-  offset?: number;
-  unit?: string;
-  signed?: boolean;
-  endianness?: "little" | "big";
-  min?: number;
-  max?: number;
-  format?: string;
-  confidence?: string;
-  enum?: Record<string, string>;
-  notes?: string;
-}
-
-/** Mux definition - protocol-agnostic */
-export interface MuxDefinition {
-  name?: string;
-  start_bit: number;
-  bit_length: number;
-  default?: string;
-  [caseKey: string]: any; // Case values contain signals and nested mux
-}
-
-/** Checksum definition - protocol-agnostic */
-export interface ChecksumDefinition {
-  name: string;
-  algorithm: ChecksumAlgorithm;
-  start_byte: number;           // Byte offset where checksum value is stored
-  byte_length: number;          // Length of checksum value (1 or 2 bytes)
-  endianness?: "little" | "big"; // Byte order for multi-byte checksums (default: big)
-  calc_start_byte: number;      // First byte included in calculation
-  calc_end_byte: number;        // Last byte (exclusive) included in calculation
-  notes?: string;
-}
-
-/** Common frame fields shared by ALL protocols */
-export interface BaseFrameFields {
+/** The frame editor's fields common to every protocol. Modbus length is in registers. */
+export interface FrameBaseFields {
   length: number;
   transmitter?: string;
   interval?: number;
   notes?: string | string[];
-  signals?: SignalDefinition[];
-  mux?: MuxDefinition;
-  checksums?: ChecksumDefinition[];
 }
 
 /** CAN protocol configuration */
@@ -104,53 +56,10 @@ export interface ModbusConfig {
    *  node by its `device_address`. */
   node_address?: number;
   register_type?: "holding" | "input" | "coil" | "discrete";
-  register_base?: 0 | 1;         // 0-based or 1-based addressing (some manufacturers differ)
 }
 
 /** Header field format for display */
 export type HeaderFieldFormat = "hex" | "decimal";
-
-/** CAN header field - extracts value from CAN ID using bitmask */
-export interface CanHeaderField {
-  mask: number;                    // Bitmask to apply to CAN ID
-  shift?: number;                  // Right-shift after masking (default: 0)
-  format?: HeaderFieldFormat;      // Display format (default: hex)
-}
-
-/** Serial header field - named mask over header bytes */
-export interface SerialHeaderField {
-  mask: number;                    // Bitmask over header bytes (e.g., 0xFF00 for first byte of 2-byte header)
-  endianness?: "big" | "little";   // Byte order (default: big)
-  format?: HeaderFieldFormat;      // Display format (default: hex)
-  // Legacy fields (for backward compatibility during parsing)
-  start_byte?: number;             // DEPRECATED: Use mask instead
-  bytes?: number;                  // DEPRECATED: Use mask instead
-}
-
-/** CAN protocol config - stored in [frame.can.config] */
-export interface CanProtocolConfig {
-  default_endianness: "little" | "big";  // Endianness for signal decoding
-  default_interval?: number;              // Default transmit interval in ms
-  /** Default to 29-bit extended IDs (default: false = 11-bit standard) */
-  default_extended?: boolean;
-  /** Default to CAN FD frames (default: false = classic CAN) */
-  default_fd?: boolean;
-  /** Mask applied to frame_id before matching catalog entries (e.g., 0x1FFFFF00 for J1939 to mask off source) */
-  frame_id_mask?: number;
-  /** Named header fields extracted from CAN ID */
-  fields?: Record<string, CanHeaderField>;
-}
-
-/** Modbus protocol config - stored in [meta.modbus] */
-export interface ModbusProtocolConfig {
-  /** Legacy default slave address. The address now lives on each slave node;
-   *  this is kept only to migrate older catalogs. */
-  device_address?: number;
-  register_base: 0 | 1;        // 0-based or 1-based register addressing
-  default_interval?: number;   // Default poll interval in milliseconds
-  default_byte_order?: "big" | "little";  // Default byte order for multi-register values
-  default_word_order?: "big" | "little";  // Default word order for multi-register values (word swap)
-}
 
 /** Serial encoding types */
 export type SerialEncoding = "slip" | "cobs" | "raw" | "length_prefixed";
@@ -165,27 +74,10 @@ export interface SerialChecksumConfig {
   byte_length: number;
   /** Start of calculation range (0-indexed) */
   calc_start_byte: number;
-  /** End of calculation range (exclusive, supports negative indexing) */
-  calc_end_byte: number;
+  /** End of calculation range (exclusive, supports negative indexing); absent is the frame's end */
+  calc_end_byte?: number;
   /** Whether checksum value is big-endian (default: false = little-endian) */
   big_endian?: boolean;
-}
-
-/** Serial protocol config - stored in [meta.serial] */
-export interface SerialProtocolConfig {
-  encoding: SerialEncoding;
-  /** Default byte order for signal decoding (inherited by all signals unless overridden) */
-  byte_order?: "little" | "big";
-  /** Global header length in bytes (required when header fields are defined) */
-  header_length?: number;
-  /** Frames shorter than this are dropped. */
-  min_frame_length?: number;
-  /** Named header fields - masks over header bytes (ID field is used for frame matching) */
-  fields?: Record<string, SerialHeaderField>;
-  /** Protocol-level checksum configuration (applies to all frames) */
-  checksum?: SerialChecksumConfig;
-  /** @deprecated Use 'id' header field instead. Kept for backward compatibility. */
-  frame_id_mask?: number;
 }
 
 /** Serial/RS-485 frame configuration - per-frame settings only */
@@ -199,92 +91,27 @@ export interface SerialConfig {
 /** Union of all protocol configs (discriminated by 'protocol' field) */
 export type ProtocolConfig = CANConfig | ModbusConfig | SerialConfig;
 
-/** Helper to get protocol type from config */
-export function getProtocolType(config: ProtocolConfig): ProtocolType {
-  return config.protocol;
-}
-
+/** A node of the editor's tree: a path into the document and the part of the
+ *  served model it shows. */
 export interface TomlNode {
   key: string;
   type: TomlNodeType;
-  value?: any;
   children?: TomlNode[];
   path: string[];
-  rawContent?: string;
   metadata?: {
-    frameType?: ProtocolType;
-    isCopy?: boolean;
-    copyFrom?: string;
-    isMirror?: boolean;
-    mirrorOf?: string;
-    isArray?: boolean;
-    arrayItems?: any[];
-    properties?: Record<string, any>;
-    isMeta?: boolean;
-    isId?: boolean;
-    isNode?: boolean;
-    idValue?: string;
-    // CAN-specific
-    extended?: boolean;
-    extendedInherited?: boolean;
-    fd?: boolean;
-    fdInherited?: boolean;
-    bus?: number;
-    // Modbus-specific
-    registerNumber?: number;
-    /** Resolved display name of the slave a register belongs to (matched by
-     *  address); used to group registers under their slave. */
-    node?: string;
-    /** The slave address a register references (`node_address`); seeds the edit
-     *  form's Slave picker. Undefined when the register names no slave. */
-    nodeAddress?: number;
-    deviceAddress?: number;
-    deviceAddressInherited?: boolean;
-    registerType?: "holding" | "input" | "coil" | "discrete";
-    registerBase?: 0 | 1;
-    registerBaseInherited?: boolean;
-    // Serial-specific
-    encoding?: "slip" | "cobs" | "raw" | "length_prefixed";
-    frameId?: string;
-    delimiter?: number[];
-    maxLength?: number;
-    // Common frame fields
-    length?: number;
-    lengthInherited?: boolean;
-    transmitter?: string;
-    transmitterInherited?: boolean;
-    interval?: number;
-    intervalInherited?: boolean;
-    notes?: string | string[];
-    signals?: any[];
-    /** Bit keys (start_bit:bit_length) of signals inherited from mirror primary */
-    inheritedSignalBitKeys?: Set<string>;
-    hasMux?: boolean;
-    muxSignalCount?: number;
-    // Mux-specific
-    muxCase?: string;
-    muxName?: string;
-    muxStartBit?: number;
-    muxBitLength?: number;
-    muxDefaultCase?: string;
-    caseValue?: string;
-    // Signal-specific
-    signalStartBit?: number;
-    signalBitLength?: number;
+    frame?: Frame;
+    signal?: Signal;
     signalIndex?: number;
-    // Checksum-specific
-    checksumAlgorithm?: ChecksumAlgorithm;
-    checksumStartByte?: number;
-    checksumByteLength?: number;
-    checksumEndianness?: "little" | "big";
-    checksumCalcStartByte?: number;
-    checksumCalcEndByte?: number;
+    mux?: Mux;
+    muxCase?: MuxCase;
+    caseValue?: string;
+    checksum?: FrameChecksum;
     checksumIndex?: number;
-    checksums?: ChecksumDefinition[];
+    nodeDef?: NodeDef;
+    /** Comes from the frame's `mirror_of` source, so it is edited there. */
+    inherited?: boolean;
   };
 }
-
-export type TreeNode = TomlNode;
 
 export interface MetaFields {
   name: string;
@@ -296,36 +123,11 @@ export interface MetaFields {
   // - Serial: encoding in [meta.serial]
 }
 
-export interface CanidFields {
-  id: string;
-  length: number;
-  transmitter?: string;
-  interval?: number;
-  isIntervalInherited?: boolean;
-  isLengthInherited?: boolean;
-  isTransmitterInherited?: boolean;
-  notes?: string | string[];
-}
-
 /** A selectable slave for the Modbus register editor: a node's display name and
  *  the `device_address` a register references it by. */
 export interface SlaveOption {
   name: string;
   address: number;
-}
-
-export interface ParsedCatalogTree {
-  tree: TomlNode[];
-  meta: MetaFields | null;
-  peers: string[];
-  /** Declared slave nodes (name + device address) for the Modbus Slave picker. */
-  slaves: SlaveOption[];
-  canConfig?: CanProtocolConfig;        // From [frame.can.config] section
-  modbusConfig?: ModbusProtocolConfig;  // From [frame.modbus.config] section
-  serialConfig?: SerialProtocolConfig;  // From [frame.serial.config] section
-  hasCanFrames?: boolean;               // True if [frame.can] section has frames (excluding config)
-  hasModbusFrames?: boolean;            // True if [frame.modbus] section has frames (excluding config)
-  hasSerialFrames?: boolean;            // True if [frame.serial] section has frames (excluding config)
 }
 
 export interface ValidationError {

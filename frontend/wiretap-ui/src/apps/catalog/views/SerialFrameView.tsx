@@ -7,12 +7,14 @@ import { iconMd, iconXs } from "../../../styles/spacing";
 import { caption, labelSmall, labelSmallMuted, monoBody, bgSurface, hoverLight, emptyStateText } from "../../../styles";
 import BitPreview, { BitRange } from "../../../components/BitPreview";
 import type { TomlNode } from "../types";
-import { tomlParse } from "../toml";
+import type { Signal } from "../../../types/catalogModel";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
+import { previewRanges, useFrameLayout } from "../hooks/useFrameLayout";
+import { muxSignalCount, selectorRange, signalRange } from "./signalRanges";
 import { Button, IconButton } from "../../../components/Button";
 
 export type SerialFrameViewProps = {
   selectedNode: TomlNode;
-  catalogContent: string;
 
   // Flags
   editingSignal?: boolean;
@@ -24,16 +26,15 @@ export type SerialFrameViewProps = {
 
   // Signal actions
   onAddSignal?: (idKey: string) => void;
-  onEditSignal?: (idKey: string, signalIndex: number, signal: any, parentPath?: string[]) => void;
+  onEditSignal?: (idKey: string, signalIndex: number, signal: Signal, parentPath?: string[]) => void;
   onRequestDeleteSignal?: (idKey: string, signalIndex: number, signalsParentPath?: string[], signalName?: string) => void;
 
   // Mux actions
-  onAddMux?: (idKey: string) => void;
+  onAddMux?: (ownerPath: string[]) => void;
 };
 
 export default function SerialFrameView({
   selectedNode,
-  catalogContent,
   editingSignal,
   onEditFrame,
   onDeleteFrame,
@@ -44,45 +45,26 @@ export default function SerialFrameView({
   onAddMux,
 }: SerialFrameViewProps) {
   const { t } = useTranslation("catalog");
-  const encoding = selectedNode.metadata?.encoding;
-  const frameId = selectedNode.metadata?.frameId ?? selectedNode.key;
-  const idKey = selectedNode.key;
-  const length = selectedNode.metadata?.length;
-  const delimiter = selectedNode.metadata?.delimiter;
-  const maxLength = selectedNode.metadata?.maxLength;
-  const transmitter = selectedNode.metadata?.transmitter;
-  const interval = selectedNode.metadata?.interval;
-  const intervalInherited = selectedNode.metadata?.intervalInherited;
-  const notes = selectedNode.metadata?.notes;
-
-  const [colorForRange, setColorForRange] = useState<(range: BitRange) => string | undefined>(() => () => undefined);
-
-  const signalColor = useCallback(
-    (signal: any) =>
-      colorForRange({
-        name: signal.name || "Signal",
-        start_bit: signal.start_bit || 0,
-        bit_length: signal.bit_length || 8,
-        type: "signal",
-      }),
-    [colorForRange]
+  const frame = selectedNode.metadata!.frame!;
+  const encoding = useCatalogEditorStore((s) => s.tree.catalog?.serial?.encoding);
+  const idKey = frame.key;
+  const { length, delimiter, transmitter, interval, mux } = frame;
+  const intervalInherited = frame.inheritedFields?.includes("interval");
+  const notes = frame.notes ?? [];
+  const muxSignals = mux ? muxSignalCount(mux) : 0;
+  const layout = useFrameLayout(selectedNode.path);
+  const ranges = previewRanges(layout);
+  const signals = useMemo(
+    () => frame.signals.map((signal, index) => ({ signal, index })).sort((a, b) => (a.signal.startBit ?? 0) - (b.signal.startBit ?? 0)),
+    [frame.signals]
   );
 
-  const muxLegendColor = useMemo(() => {
-    try {
-      const parsed = tomlParse(catalogContent) as any;
-      const existingMux = parsed?.frame?.serial?.[idKey]?.mux;
-      if (!existingMux) return undefined;
-      return colorForRange({
-        name: existingMux.name || "Mux",
-        start_bit: existingMux.start_bit || 0,
-        bit_length: existingMux.bit_length || 8,
-        type: "mux",
-      });
-    } catch {
-      return undefined;
-    }
-  }, [catalogContent, idKey, colorForRange]);
+  const [colorForRange, setColorForRange] = useState<(range: BitRange) => string | undefined>(() => () => undefined);
+  const signalColor = useCallback((signal: Signal) => colorForRange(signalRange(signal)), [colorForRange]);
+  const muxLegendColor = useMemo(
+    () => (mux ? colorForRange(selectorRange(mux)) : undefined),
+    [mux, colorForRange]
+  );
 
   return (
     <div className="space-y-6">
@@ -91,7 +73,7 @@ export default function SerialFrameView({
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted">{t("serialFrame.subtitle")}</p>
           <div className="text-lg font-bold text-primary">
-            {frameId}
+            {idKey}
           </div>
         </div>
         {(onEditFrame || onDeleteFrame) && (
@@ -124,7 +106,7 @@ export default function SerialFrameView({
             {t("serialFrame.frameId")}
           </div>
           <div className={monoBody}>
-            {frameId}
+            {idKey}
           </div>
         </div>
 
@@ -147,20 +129,9 @@ export default function SerialFrameView({
             {t("serialFrame.length")}
           </div>
           <div className={monoBody}>
-            {length ?? <span className="text-muted">{t("serialFrame.lengthNotSet")}</span>}
+            {length || <span className="text-muted">{t("serialFrame.lengthNotSet")}</span>}
           </div>
         </div>
-
-        {maxLength !== undefined && (
-          <div className={`p-4 ${bgSurface} rounded-lg`}>
-            <div className={labelSmallMuted}>
-              {t("serialFrame.maxLength")}
-            </div>
-            <div className={monoBody}>
-              {maxLength}
-            </div>
-          </div>
-        )}
 
         {transmitter && (
           <div className={`p-4 ${bgSurface} rounded-lg`}>
@@ -203,13 +174,13 @@ export default function SerialFrameView({
       )}
 
       {/* Notes */}
-      {notes && (
+      {notes.length > 0 && (
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
             {t("serialFrame.notes")}
           </div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
-            {Array.isArray(notes) ? notes.join("\n") : notes}
+            {notes.join("\n")}
           </div>
         </div>
       )}
@@ -219,11 +190,11 @@ export default function SerialFrameView({
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-primary">
-              {t("serialFrame.signalsHeader", { count: (selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0) })}
-              {selectedNode.metadata?.hasMux && (
+              {t("serialFrame.signalsHeader", { count: frame.signals.length + muxSignals })}
+              {mux && (
                 <span className="ml-2 text-xs font-normal text-purple inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
-                  {t("serialFrame.muxSignalsHint", { count: selectedNode.metadata.muxSignalCount })}
+                  {t("serialFrame.muxSignalsHint", { count: muxSignals })}
                 </span>
               )}
             </h3>
@@ -233,9 +204,9 @@ export default function SerialFrameView({
                 {length ? t("serialFrame.totalBytes", { count: length }) : ""}
               </span>
 
-              {onAddMux && !selectedNode.metadata?.hasMux && (
+              {onAddMux && !mux && (
                 <Button
-                  onClick={() => onAddMux(idKey)}
+                  onClick={() => onAddMux(selectedNode.path)}
                   variant="solid"
                   tone="purple"
                   size="sm"
@@ -257,61 +228,28 @@ export default function SerialFrameView({
             </div>
           </div>
 
-          {selectedNode.metadata?.signals && selectedNode.metadata.signals.length > 0 &&
-            (() => {
-              const signals = [...selectedNode.metadata.signals].sort(
-                (a, b) => (a.start_bit ?? 0) - (b.start_bit ?? 0)
-              );
+          {layout && ranges.length > 0 && (
+            <div className="mb-4 p-4 bg-surface rounded-lg">
+              <div className="text-xs font-medium text-muted mb-3">
+                {t("serialFrame.byteLayout")}
+              </div>
+              <BitPreview
+                numBytes={layout.byteLength || 8}
+                ranges={ranges}
+                currentStartBit={0}
+                currentBitLength={0}
+                interactive={false}
+                showLegend={false}
+                onColorMapping={(lookup) => setColorForRange(() => lookup)}
+              />
+            </div>
+          )}
 
-              const ranges: BitRange[] = [];
-              signals.forEach((signal: any) => {
-                ranges.push({
-                  name: signal.name || "Signal",
-                  start_bit: signal.start_bit || 0,
-                  bit_length: signal.bit_length || 8,
-                  type: "signal",
-                });
-              });
-
-              // mux selector range
-              try {
-                const parsed = tomlParse(catalogContent) as any;
-                const existingMux = parsed?.frame?.serial?.[idKey]?.mux;
-                if (existingMux) {
-                  ranges.push({
-                    name: existingMux.name || "Mux",
-                    start_bit: existingMux.start_bit || 0,
-                    bit_length: existingMux.bit_length || 8,
-                    type: "mux",
-                  });
-                }
-              } catch {
-                // ignore parse errors: view should still render signals list
-              }
-
-              const numBytes = length || 8;
-
-              return (
-                <>
-                  <div className="mb-4 p-4 bg-surface rounded-lg">
-                    <div className="text-xs font-medium text-muted mb-3">
-                      {t("serialFrame.byteLayout")}
-                    </div>
-                    <BitPreview
-                      numBytes={numBytes}
-                      ranges={ranges}
-                      currentStartBit={0}
-                      currentBitLength={0}
-                      interactive={false}
-                      showLegend={false}
-                      onColorMapping={(lookup) => setColorForRange(() => lookup)}
-                    />
-                  </div>
-
+          {signals.length > 0 && (
                   <div className="space-y-2">
-                    {signals.map((signal: any, idx: number) => (
+                    {signals.map(({ signal, index }) => (
                       <div
-                        key={idx}
+                        key={index}
                         className={`p-3 ${bgSurface} rounded-lg ${hoverLight} transition-colors`}
                       >
                         <div className="flex items-start justify-between">
@@ -330,9 +268,9 @@ export default function SerialFrameView({
                               <div className={`${caption} mt-1 space-y-0.5`}>
                                 <div>
                                   {t("serialFrame.bitsRange", {
-                                    start: signal.start_bit ?? 0,
-                                    end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
-                                    length: signal.bit_length ?? 0,
+                                    start: signal.startBit ?? 0,
+                                    end: (signal.startBit ?? 0) + (signal.bitLength ?? 0) - 1,
+                                    length: signal.bitLength ?? 0,
                                   })}
                                 </div>
                                 {signal.unit && <div>{t("serialFrame.unit", { unit: signal.unit })}</div>}
@@ -341,7 +279,7 @@ export default function SerialFrameView({
                               </div>
                               {signal.notes && (
                                 <div className="text-xs text-muted mt-2 italic whitespace-pre-wrap">
-                                  {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
+                                  {signal.notes.join("\n")}
                                 </div>
                               )}
                             </div>
@@ -351,7 +289,7 @@ export default function SerialFrameView({
                             <div className="flex items-center gap-2 ml-4">
                               {onEditSignal && (
                                 <IconButton
-                                  onClick={() => onEditSignal(idKey, idx, signal, ["frame", "serial", idKey])}
+                                  onClick={() => onEditSignal(idKey, index, signal, selectedNode.path)}
                                   title={t("serialFrame.editSignal")}
                                 >
                                   <Pencil className={`${iconMd} text-secondary`} />
@@ -360,7 +298,7 @@ export default function SerialFrameView({
 
                               {onRequestDeleteSignal && (
                                 <IconButton
-                                  onClick={() => onRequestDeleteSignal(idKey, idx, ["frame", "serial", idKey], signal.name)}
+                                  onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name)}
                                   tone="danger"
                                   title={t("serialFrame.deleteSignal")}
                                 >
@@ -373,11 +311,9 @@ export default function SerialFrameView({
                       </div>
                     ))}
                   </div>
-                </>
-              );
-            })()}
+          )}
 
-          {(!selectedNode.metadata?.signals || selectedNode.metadata.signals.length === 0) && (
+          {signals.length === 0 && (
             <div className={`${emptyStateText} p-4 ${bgSurface} rounded-lg`}>
               {t("serialFrame.noSignalsHint")}
             </div>

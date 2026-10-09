@@ -2,13 +2,9 @@
 // Frame, node, and config operations for catalog editor
 
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
-import { tomlParse } from "../../toml";
 import {
-  upsertCanFrameToml,
-  deleteCanFrameToml,
-  upsertFrameToml,
+  saveFrameToml,
   deleteFrameToml,
-  getFrameKeys,
   addNodeToml,
   editNodeToml,
   deleteNodeToml,
@@ -21,16 +17,13 @@ import {
 } from "../../editorOps";
 import { editCatalogOps, validateFrameWs } from "../../../../api/catalog";
 import type { EditOp } from "../../../../types/catalogEdit";
-import { protocolRegistry } from "../../protocols";
 import type { FrameEditFields } from "../../views/FrameEditView";
-import type { ProtocolType, CANConfig, SerialConfig } from "../../types";
+import { createDefaultFrameFields, frameEditFieldsFor, frameFieldsOf, frameKeyOf } from "../../views/frameEditUtils";
+import { frameAt } from "../../model";
+import type { ProtocolType } from "../../types";
+import { showRefusal } from "./refusal";
 
 export interface UseFrameHandlersParams {
-  // CAN frame editing (legacy)
-  editingFrameId: string | null;
-  setEditingId: (v: boolean) => void;
-  setEditingFrameId: (v: string | null) => void;
-  // Generic frame editing
   frameFields?: FrameEditFields;
   editingFrameOriginalKey?: string | null;
   setEditingFrame?: (v: boolean) => void;
@@ -39,42 +32,18 @@ export interface UseFrameHandlersParams {
 }
 
 export function useFrameHandlers({
-  editingFrameId,
-  setEditingId,
-  setEditingFrameId,
   frameFields,
   editingFrameOriginalKey,
   setEditingFrame,
   setFrameFields,
   setEditingFrameOriginalKey,
 }: UseFrameHandlersParams) {
-  // Store selectors
   const catalogContent = useCatalogEditorStore((s) => s.content.toml);
+  const catalog = useCatalogEditorStore((s) => s.tree.catalog);
   const setToml = useCatalogEditorStore((s) => s.setToml);
 
-  const idFields = useCatalogEditorStore((s) => s.forms.canFrame);
-  const nodeName = useCatalogEditorStore((s) => s.forms.nodeName);
-  const nodeNotes = useCatalogEditorStore((s) => s.forms.nodeNotes);
-  const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
-  const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
-  const parsedModbusConfig = useCatalogEditorStore((s) => s.tree.modbusConfig);
-  const parsedSerialConfig = useCatalogEditorStore((s) => s.tree.serialConfig);
-  const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
-  const modbusDefaultInterval = useCatalogEditorStore((s) => s.forms.modbusDefaultInterval);
-  const modbusDefaultByteOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultByteOrder);
-  const modbusDefaultWordOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultWordOrder);
-  const canDefaultEndianness = useCatalogEditorStore((s) => s.forms.canDefaultEndianness);
-  const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
-  const canDefaultExtended = useCatalogEditorStore((s) => s.forms.canDefaultExtended);
-  const canDefaultFd = useCatalogEditorStore((s) => s.forms.canDefaultFd);
-  const canFrameIdMask = useCatalogEditorStore((s) => s.forms.canFrameIdMask);
-  const canHeaderFields = useCatalogEditorStore((s) => s.forms.canHeaderFields);
-  const metaFields = useCatalogEditorStore((s) => s.forms.meta);
-  const serialHeaderFields = useCatalogEditorStore((s) => s.forms.serialHeaderFields);
-  const serialHeaderLength = useCatalogEditorStore((s) => s.forms.serialHeaderLength);
-  const serialChecksum = useCatalogEditorStore((s) => s.forms.serialChecksum);
-  const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
-  const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
+  const forms = useCatalogEditorStore((s) => s.forms);
+  const { nodeName, nodeNotes, nodeDeviceAddress } = forms;
   const setNodeName = useCatalogEditorStore((s) => s.setNodeName);
   const setNodeNotes = useCatalogEditorStore((s) => s.setNodeNotes);
   const setNodeDeviceAddress = useCatalogEditorStore((s) => s.setNodeDeviceAddress);
@@ -91,84 +60,8 @@ export function useFrameHandlers({
   const selectedPath = useCatalogEditorStore((s) => s.tree.selectedPath);
 
   // ============================================================================
-  // CAN Frame operations (legacy - for backwards compatibility)
+  // Frames
   // ============================================================================
-
-  const handleEditId = (node: any) => {
-    if (node.type === "can-frame" && node.metadata) {
-      const originalId = node.metadata.idValue || node.key;
-      setIdFields({
-        id: originalId,
-        length: node.metadata.lengthInherited ? 8 : node.metadata.length || 8,
-        transmitter: node.metadata.transmitterInherited ? undefined : node.metadata.transmitter,
-        interval: node.metadata.intervalInherited ? undefined : node.metadata.interval,
-        isIntervalInherited: node.metadata.intervalInherited || false,
-        isLengthInherited: node.metadata.lengthInherited || false,
-        isTransmitterInherited: node.metadata.transmitterInherited || false,
-        notes: node.metadata.notes,
-      });
-
-      setEditingFrameId(originalId);
-      setEditingId(true);
-      setSelectedPath(null);
-      clearValidation();
-    }
-  };
-
-  const handleSaveId = async () => {
-    if (!idFields.id) return;
-
-    const oldId = editingFrameId;
-
-    try {
-      const parsedForValidation = tomlParse(catalogContent) as any;
-      const existingIds = parsedForValidation?.frame?.can
-        ? Object.keys(parsedForValidation.frame.can)
-        : [];
-
-      const errors = await validateFrameWs({
-        protocol: "can",
-        key: idFields.id,
-        length: idFields.length,
-        transmitter: idFields.transmitter,
-        interval: idFields.interval,
-        maxLength: 64,
-        existingKeys: existingIds,
-        originalKey: oldId ?? undefined,
-        availablePeers,
-      });
-
-      if (errors.length > 0) {
-        setValidation(errors);
-        return;
-      }
-    } catch {
-      setValidation([{ field: "toml", message: "TOML is invalid; fix syntax errors before saving" }]);
-      return;
-    }
-
-    try {
-      const newContent = await upsertCanFrameToml(catalogContent, {
-        oldId,
-        id: idFields.id,
-        length: idFields.length,
-        transmitter: idFields.transmitter,
-        interval: idFields.interval,
-        isLengthInherited: idFields.isLengthInherited,
-        isTransmitterInherited: idFields.isTransmitterInherited,
-        isIntervalInherited: idFields.isIntervalInherited,
-        notes: idFields.notes,
-      });
-
-      setToml(newContent);
-      setEditingId(false);
-      setEditingFrameId(null);
-      clearValidation();
-    } catch (error) {
-      console.error("Failed to save ID:", error);
-      setValidation([{ field: "can-frame", message: "Failed to save CAN frame" }]);
-    }
-  };
 
   const handleDeleteId = (idKey: string) => {
     setDialogPayload({ idToDelete: idKey });
@@ -179,7 +72,7 @@ export function useFrameHandlers({
     if (!dialogPayload.idToDelete) return;
 
     try {
-      const newContent = await deleteCanFrameToml(catalogContent, dialogPayload.idToDelete);
+      const newContent = await deleteFrameToml(catalogContent, "can", dialogPayload.idToDelete);
       setToml(newContent);
       closeDialog("deleteCanFrame");
       setDialogPayload({ idToDelete: null });
@@ -190,155 +83,38 @@ export function useFrameHandlers({
     }
   };
 
-  const handleAddCanFrame = () => {
-    setIdFields({
-      id: "",
-      length: 8,
-      transmitter: undefined,
-      interval: undefined,
-      isIntervalInherited: false,
-      isLengthInherited: false,
-      isTransmitterInherited: false,
-    });
-
-    setEditingFrameId(null);
-    setEditingId(true);
-    setSelectedPath(null);
-    clearValidation();
-  };
-
-  // ============================================================================
-  // Generic Frame Operations (CAN, Modbus, Serial)
-  // ============================================================================
-
-  /**
-   * Get the frame key from FrameEditFields based on protocol type
-   */
-  const getFrameKeyFromFields = (fields: FrameEditFields): string => {
-    switch (fields.protocol) {
-      case "can":
-        return (fields.config as CANConfig).id || "";
-      case "modbus":
-        return fields.modbusFrameKey || "";
-      case "serial":
-        return (fields.config as SerialConfig).frame_id || "";
-      default:
-        return "";
-    }
-  };
-
-  /**
-   * Handle adding a new frame (opens the generic frame editor)
-   */
-  const handleAddFrame = (protocol: ProtocolType = "can") => {
+  const openFrameEditor = (fields: FrameEditFields, originalKey: string | null) => {
     if (!setEditingFrame || !setFrameFields || !setEditingFrameOriginalKey) return;
-
-    const handler = protocolRegistry.get(protocol);
-    if (!handler) return;
-
-    const defaultConfig = handler.getDefaultConfig();
-    setFrameFields({
-      protocol,
-      config: defaultConfig,
-      base: {
-        length: protocol === "can" ? 8 : protocol === "modbus" ? 1 : 0,
-      },
-      modbusFrameKey: protocol === "modbus" ? "" : undefined,
-    });
-    setEditingFrameOriginalKey(null);
-    setEditingFrame(true);
-    setSelectedPath(null);
-    clearValidation();
-  };
-
-  /**
-   * Handle editing an existing frame (opens the generic frame editor)
-   */
-  const handleEditFrame = (node: any) => {
-    if (!setEditingFrame || !setFrameFields || !setEditingFrameOriginalKey) return;
-
-    const protocol = node.metadata?.frameType as ProtocolType;
-    if (!protocol) return;
-
-    const handler = protocolRegistry.get(protocol);
-    if (!handler) return;
-
-    let config;
-    let modbusFrameKey: string | undefined;
-
-    switch (protocol) {
-      case "can": {
-        const idKey = node.metadata?.idValue || node.key;
-        config = {
-          protocol: "can" as const,
-          id: idKey,
-          extended: node.metadata?.extended,
-          bus: node.metadata?.bus,
-          copy: node.metadata?.copyFrom,
-        };
-        break;
-      }
-      case "modbus": {
-        modbusFrameKey = node.key;
-        config = {
-          protocol: "modbus" as const,
-          register_number: node.metadata?.registerNumber,
-          node_address: node.metadata?.nodeAddress,
-          register_type: node.metadata?.registerType ?? "holding",
-        };
-        break;
-      }
-      case "serial": {
-        config = {
-          protocol: "serial" as const,
-          frame_id: node.metadata?.frameId ?? node.key,
-          delimiter: node.metadata?.delimiter,
-        };
-        break;
-      }
-      default:
-        return;
-    }
-
-    const originalKey = getFrameKeyFromFields({ protocol, config, base: { length: 0 }, modbusFrameKey });
-
-    setFrameFields({
-      protocol,
-      config,
-      base: {
-        length: node.metadata?.length ?? (protocol === "can" ? 8 : 1),
-        transmitter: node.metadata?.transmitter,
-        interval: node.metadata?.interval,
-        notes: node.metadata?.notes,
-      },
-      modbusFrameKey,
-      isLengthInherited: node.metadata?.lengthInherited,
-      isTransmitterInherited: node.metadata?.transmitterInherited,
-      isIntervalInherited: node.metadata?.intervalInherited,
-    });
+    setFrameFields(fields);
     setEditingFrameOriginalKey(originalKey);
     setEditingFrame(true);
     setSelectedPath(null);
     clearValidation();
   };
 
-  /**
-   * Handle saving a generic frame (CAN, Modbus, or Serial)
-   */
+  const handleAddFrame = (protocol: ProtocolType = "can", seed?: { transmitter?: string; nodeAddress?: number }) => {
+    const fields = createDefaultFrameFields(protocol);
+    if (seed?.transmitter) fields.base.transmitter = seed.transmitter;
+    if (seed?.nodeAddress !== undefined && fields.config.protocol === "modbus") fields.config.node_address = seed.nodeAddress;
+    openFrameEditor(fields, null);
+  };
+
+  const handleEditFrame = (node: { path: string[] }) => {
+    const frame = frameAt(catalog, node.path);
+    if (frame) openFrameEditor(frameEditFieldsFor(frame, catalog), frame.key);
+  };
+
   const handleSaveFrame = async () => {
     if (!frameFields || !setEditingFrame) return;
 
-    const frameKey = getFrameKeyFromFields(frameFields);
+    const frameKey = frameKeyOf(frameFields);
     if (!frameKey) {
       setValidation([{ field: "frame", message: "Frame identifier is required" }]);
       return;
     }
 
-    // Validate identity + common + protocol-config fields in the crate (the
-    // single source of truth). `cfg` carries the protocol-specific keys; the
-    // crate reads only the ones relevant to `protocol`.
-    const existingKeys = getFrameKeys(catalogContent, frameFields.protocol);
-    const cfg = frameFields.config as Record<string, any>;
+    const existingKeys = (catalog?.frames ?? []).filter((f) => f.protocol === frameFields.protocol).map((f) => f.key);
+    const cfg = frameFields.config;
     const allErrors = await validateFrameWs({
       protocol: frameFields.protocol,
       key: frameKey,
@@ -346,12 +122,11 @@ export function useFrameHandlers({
       transmitter: frameFields.base.transmitter,
       interval: frameFields.base.interval,
       maxLength: frameFields.protocol === "can" ? 64 : 256,
-      extended: cfg.extended,
-      registerNumber: cfg.register_number,
-      nodeAddress: cfg.node_address,
-      registerType: cfg.register_type,
-      registerBase: cfg.register_base,
-      delimiter: cfg.delimiter,
+      extended: cfg.protocol === "can" ? cfg.extended : undefined,
+      registerNumber: cfg.protocol === "modbus" ? cfg.register_number : undefined,
+      nodeAddress: cfg.protocol === "modbus" ? cfg.node_address : undefined,
+      registerType: cfg.protocol === "modbus" ? cfg.register_type : undefined,
+      delimiter: cfg.protocol === "serial" ? cfg.delimiter : undefined,
       existingKeys,
       originalKey: editingFrameOriginalKey ?? undefined,
       availablePeers,
@@ -363,49 +138,15 @@ export function useFrameHandlers({
     }
 
     try {
-      // For new Modbus frames, create a default signal spanning the whole block:
-      // 16 bits per register, one per coil — and a coil block has no byte order.
-      let initialSignals: Array<{ name: string; start_bit: number; bit_length: number; signed?: boolean; endianness?: "big" | "little" }> | undefined;
-      if (frameFields.protocol === "modbus" && !editingFrameOriginalKey) {
-        const length = frameFields.base.length || 1;
-        const isRegisterBank = cfg.register_type !== "coil" && cfg.register_type !== "discrete";
-        const signalName = frameFields.modbusFrameKey?.trim() || "value";
-        initialSignals = [{
-          name: signalName,
-          start_bit: 0,
-          bit_length: isRegisterBank ? length * 16 : length,
-          signed: false,
-          ...(isRegisterBank ? { endianness: "big" as const } : {}),
-        }];
-      }
-
-      const newContent = await upsertFrameToml(catalogContent, {
-        protocol: frameFields.protocol,
-        base: frameFields.base,
-        config: frameFields.config,
-        key: frameKey,
-        originalKey: editingFrameOriginalKey ?? undefined,
-        omitInherited: {
-          length: frameFields.isLengthInherited,
-          transmitter: frameFields.isTransmitterInherited,
-          interval: frameFields.isIntervalInherited,
-        },
-        initialSignals,
-      });
-
-      setToml(newContent);
+      setToml(await saveFrameToml(catalogContent, frameFields.protocol, frameKey, frameFieldsOf(frameFields), editingFrameOriginalKey ?? null));
       setEditingFrame(false);
       if (setEditingFrameOriginalKey) setEditingFrameOriginalKey(null);
       clearValidation();
     } catch (error) {
-      console.error("Failed to save frame:", error);
-      setValidation([{ field: "frame", message: "Failed to save frame" }]);
+      showRefusal("frame", error);
     }
   };
 
-  /**
-   * Handle deleting a frame by protocol and key
-   */
   const handleDeleteFrame = async (protocol: ProtocolType, key: string) => {
     try {
       const newContent = await deleteFrameToml(catalogContent, protocol, key);
@@ -417,9 +158,6 @@ export function useFrameHandlers({
     }
   };
 
-  /**
-   * Cancel generic frame editing
-   */
   const handleCancelFrameEdit = () => {
     if (setEditingFrame) setEditingFrame(false);
     if (setEditingFrameOriginalKey) setEditingFrameOriginalKey(null);
@@ -551,99 +289,70 @@ export function useFrameHandlers({
   // Protocol config operations
   // ============================================================================
 
-  /**
-   * Save unified config - saves meta + only the enabled protocol configs
-   * Called from UnifiedConfigDialog with explicit enabled states
-   */
+  /** Meta plus each enabled protocol's config; a disabled one is deleted. */
   const handleSaveConfig = async (enabledConfigs: { can: boolean; serial: boolean; modbus: boolean }) => {
+    const ops: EditOp[] = [metaOp(forms.meta)];
+    ops.push(
+      enabledConfigs.can
+        ? canConfigOp({
+            default_byte_order: forms.canDefaultEndianness,
+            default_interval: forms.canDefaultInterval,
+            default_extended: forms.canDefaultExtended,
+            default_fd: forms.canDefaultFd,
+            frame_id_mask: forms.canFrameIdMask,
+            fields: Object.fromEntries(
+              forms.canHeaderFields.map((f) => [f.name, { mask: f.mask, shift: f.shift, format: f.format }]),
+            ),
+          })
+        : deleteOp(["meta", "can"]),
+    );
+    const checksum = forms.serialChecksum;
+    ops.push(
+      enabledConfigs.serial
+        ? serialConfigOp({
+            encoding: forms.serialEncoding,
+            byte_order: forms.serialByteOrder,
+            header_length: forms.serialHeaderLength,
+            frame_id_mask: catalog?.serial?.frameIdMask,
+            min_frame_length: catalog?.serial?.minFrameLength,
+            fields: Object.fromEntries(
+              forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, endianness: f.endianness, format: f.format }]),
+            ),
+            checksum: checksum ? {
+              algorithm: checksum.algorithm,
+              startByte: checksum.start_byte,
+              byteLength: checksum.byte_length,
+              calcStartByte: checksum.calc_start_byte,
+              calcEndByte: checksum.calc_end_byte,
+              bigEndian: checksum.big_endian,
+            } : undefined,
+          })
+        : deleteOp(["meta", "serial"]),
+    );
+    ops.push(
+      enabledConfigs.modbus
+        ? modbusConfigOp({
+            device_address: catalog?.modbus?.deviceAddress,
+            register_base: forms.modbusRegisterBase,
+            default_interval: forms.modbusDefaultInterval,
+            default_byte_order: forms.modbusDefaultByteOrder,
+            default_word_order: forms.modbusDefaultWordOrder,
+          })
+        : deleteOp(["meta", "modbus"]),
+    );
+
     try {
-      const ops: EditOp[] = [metaOp(metaFields)];
-
-      if (enabledConfigs.can) {
-        const frameIdMaskStr = canFrameIdMask.trim().replace(/^0x/i, '');
-        const frameIdMaskNum = frameIdMaskStr ? parseInt(frameIdMaskStr, 16) : undefined;
-
-        const fields: Record<string, { mask: number; shift?: number; format?: "hex" | "decimal" }> | undefined =
-          canHeaderFields.length > 0
-            ? Object.fromEntries(
-                canHeaderFields
-                  .filter((f) => f.name.trim() && f.mask.trim())
-                  .map((f) => {
-                    const maskStr = f.mask.trim().replace(/^0x/i, '');
-                    const maskNum = parseInt(maskStr, 16);
-                    return [
-                      f.name.trim(),
-                      { mask: Number.isFinite(maskNum) ? maskNum : 0, shift: f.shift, format: f.format },
-                    ];
-                  })
-              )
-            : undefined;
-
-        ops.push(canConfigOp({
-          default_endianness: canDefaultEndianness,
-          default_interval: canDefaultInterval,
-          default_extended: canDefaultExtended,
-          default_fd: canDefaultFd,
-          frame_id_mask: Number.isFinite(frameIdMaskNum) ? frameIdMaskNum : undefined,
-          fields,
-        }));
-      } else {
-        ops.push(deleteOp(["meta", "can"]));
-      }
-
-      if (enabledConfigs.serial) {
-        const fields: Record<string, { mask: number; endianness?: "big" | "little"; format?: "hex" | "decimal" }> | undefined =
-          serialHeaderFields.length > 0
-            ? Object.fromEntries(
-                serialHeaderFields
-                  .filter((f) => f.name.trim())
-                  .map((f) => [f.name.trim(), { mask: f.mask, endianness: f.endianness, format: f.format }])
-              )
-            : undefined;
-
-        ops.push(serialConfigOp({
-          encoding: serialEncoding,
-          byte_order: serialByteOrder,
-          header_length: serialHeaderLength,
-          frame_id_mask: parsedSerialConfig?.frame_id_mask,
-          min_frame_length: parsedSerialConfig?.min_frame_length,
-          fields,
-          checksum: serialChecksum ?? undefined,
-        }));
-      } else {
-        ops.push(deleteOp(["meta", "serial"]));
-      }
-
-      if (enabledConfigs.modbus) {
-        ops.push(modbusConfigOp({
-          device_address: parsedModbusConfig?.device_address,
-          register_base: modbusRegisterBase,
-          default_interval: modbusDefaultInterval,
-          default_byte_order: modbusDefaultByteOrder,
-          default_word_order: modbusDefaultWordOrder,
-        }));
-      } else {
-        ops.push(deleteOp(["meta", "modbus"]));
-      }
-
       setToml(await editCatalogOps(catalogContent, ops));
       closeDialog("config");
       clearValidation();
     } catch (error) {
-      console.error("[handleSaveConfig] Error:", error);
-      setValidation([{ field: "config", message: "Failed to save configuration" }]);
+      showRefusal("config", error);
     }
   };
 
   return {
-    // CAN Frame operations (legacy)
-    handleEditId,
-    handleSaveId,
     handleDeleteId,
     handleConfirmDeleteId,
-    handleAddCanFrame,
-
-    // Generic frame operations
     handleAddFrame,
     handleEditFrame,
     handleSaveFrame,

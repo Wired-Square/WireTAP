@@ -5,7 +5,6 @@
 // filter applied to the tree before display.
 
 import type { TomlNode, ProtocolType } from "../types";
-import { parseCanIdToNumber } from "../utils";
 
 export type CatalogViewMode = "tree" | "frames" | "nodes";
 
@@ -39,17 +38,12 @@ export function collectFrameNodes(parsedTree: TomlNode[]): TomlNode[] {
   );
 }
 
-/** Sortable numeric id for a frame: register number (Modbus) or parsed CAN id. */
-function frameNumericId(frame: TomlNode): number {
-  return frame.metadata?.registerNumber ?? parseCanIdToNumber(frame.key) ?? 0;
-}
+const frameNumericId = (node: TomlNode) => node.metadata?.frame?.frameId ?? 0;
 
 /** The node a frame belongs to: CAN transmitter or Modbus slave (else Unassigned). */
-function nodeKey(frame: TomlNode): string {
-  if (frame.metadata?.frameType === "modbus") {
-    return frame.metadata?.node ?? UNASSIGNED;
-  }
-  return frame.metadata?.transmitter ?? UNASSIGNED;
+function nodeKey(node: TomlNode): string {
+  const frame = node.metadata?.frame;
+  return (frame?.protocol === "modbus" ? frame.modbusNode : frame?.transmitter) ?? UNASSIGNED;
 }
 
 /**

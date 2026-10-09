@@ -2,7 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { ModbusConfig, SlaveOption } from "../../types";
-import { isRegisterKey, modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
+import { parseCanIdToNumber } from "../../utils";
 import { caption, textMedium } from "../../../../styles";
 import { Input, Select } from "../../../../components/forms";
 
@@ -14,7 +14,6 @@ export type ModbusConfigSectionProps = {
   onFrameKeyChange: (key: string) => void;
   /** Declared slave nodes (name + address) the register can be attributed to. */
   availableSlaves: SlaveOption[];
-  defaultRegisterBase?: 0 | 1;
 };
 
 export default function ModbusConfigSection({
@@ -23,13 +22,12 @@ export default function ModbusConfigSection({
   frameKey,
   onFrameKeyChange,
   availableSlaves,
-  defaultRegisterBase,
 }: ModbusConfigSectionProps) {
   const { t } = useTranslation("catalog");
   // The register comes from a numeric frame key OR an explicit register number.
   // A non-numeric name with no register number is incomplete — warn.
-  const keyIsRegister = isRegisterKey(frameKey);
-  const needsRegisterNumber = modbusNeedsRegisterNumber(frameKey, config);
+  const keyIsRegister = parseCanIdToNumber(frameKey) !== null;
+  const needsRegisterNumber = !keyIsRegister && config.register_number == null;
   return (
     <div className="space-y-4">
       {/* Frame Key (friendly name) - Required */}
@@ -69,7 +67,7 @@ export default function ModbusConfigSection({
         />
         {needsRegisterNumber ? (
           <p className="mt-1 text-xs text-amber">
-            ⚠ {MODBUS_REGISTER_REQUIRED_MESSAGE}
+            ⚠ Name isn't a register — enter a register number, or name the frame by its register (e.g. 2581 or 0x32F9).
           </p>
         ) : (
           <p className={`${caption} mt-1`}>
@@ -124,34 +122,6 @@ export default function ModbusConfigSection({
           <option value="coil">{t("protocolEditors.modbusRegisterTypeCoil")}</option>
           <option value="discrete">{t("protocolEditors.modbusRegisterTypeDiscrete")}</option>
         </Select>
-      </div>
-
-      {/* Register Base - Optional (uses catalog default if not specified) */}
-      <div>
-        <label className={`block ${textMedium} mb-2`}>
-          {t("protocolEditors.modbusRegisterBaseLabel")}
-        </label>
-        <Select
-          value={config.register_base ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...config,
-              register_base: e.target.value === "" ? undefined : (parseInt(e.target.value) as 0 | 1),
-            })
-          }
-          size="lg"
-        >
-          <option value="">
-            {defaultRegisterBase !== undefined
-              ? t("protocolEditors.modbusRegisterBaseDefault", { base: defaultRegisterBase })
-              : t("protocolEditors.modbusRegisterBaseNotSpecified")}
-          </option>
-          <option value="0">{t("protocolEditors.modbusRegisterBase0")}</option>
-          <option value="1">{t("protocolEditors.modbusRegisterBase1")}</option>
-        </Select>
-        <p className={`${caption} mt-1`}>
-          {t("protocolEditors.modbusRegisterBaseHint")}
-        </p>
       </div>
     </div>
   );

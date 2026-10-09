@@ -14,12 +14,6 @@
         }
       },
       "expected": {
-        "tree": {
-          "canConfig": {
-            "default_endianness": "big",
-            "default_extended": true
-          }
-        },
         "resolved": {
           "can": {
             "default_extended": true
@@ -49,19 +43,6 @@
         }
       },
       "expected": {
-        "tree": {
-          "serialConfig": {
-            "encoding": "raw",
-            "checksum": {
-              "algorithm": "xor",
-              "start_byte": -1,
-              "byte_length": 1,
-              "calc_start_byte": 0,
-              "calc_end_byte": 0,
-              "big_endian": false
-            }
-          }
-        },
         "resolved": {
           "can": null,
           "serial": {
@@ -91,12 +72,6 @@
         }
       },
       "expected": {
-        "tree": {
-          "modbusConfig": {
-            "register_base": 0,
-            "default_interval": 500
-          }
-        },
         "resolved": {
           "can": null,
           "serial": null,

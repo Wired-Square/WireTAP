@@ -29,6 +29,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
 
   const metaFields = useCatalogEditorStore((s) => s.forms.meta);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
+  const seedConfigForms = useCatalogEditorStore((s) => s.seedConfigForms);
 
   // Protocol config fields from store
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
@@ -56,6 +57,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   };
 
   const handleNewCatalog = () => {
+    seedConfigForms(null);
     setMetaFields({
       name: "",
       version: 1,
@@ -78,7 +80,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
       const configOp =
         selectedProtocol === "can"
           ? canConfigOp({
-              default_endianness: canDefaultEndianness,
+              default_byte_order: canDefaultEndianness,
               default_interval: canDefaultInterval,
               default_extended: canDefaultExtended,
               default_fd: canDefaultFd,

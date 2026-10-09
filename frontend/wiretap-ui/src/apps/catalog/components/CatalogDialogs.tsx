@@ -16,13 +16,15 @@ import ExportCatalogDialog from "../dialogs/ExportCatalogDialog";
 import ValidationErrorsDialog from "../dialogs/ValidationErrorsDialog";
 import UnifiedConfigDialog from "../dialogs/UnifiedConfigDialog";
 import type { TomlNode, ChecksumAlgorithm } from "../types";
-import type { SignalFields, MuxFields } from "../hooks/useCatalogForms";
+import { hasFrames } from "../model";
+import type { SignalFields, MuxFields } from "../../../types/catalogEdit";
 import type { CatalogHandlers } from "../hooks/useCatalogHandlers";
 
 type Props = {
   // Signal editing
   editingSignal: boolean;
   currentIdForSignal: string | null;
+  currentSignalPath: string[];
   selectedNode: TomlNode | null;
   catalogContent: string;
   signalFields: SignalFields;
@@ -51,6 +53,7 @@ type Props = {
 export default function CatalogDialogs({
   editingSignal,
   currentIdForSignal,
+  currentSignalPath,
   selectedNode,
   catalogContent,
   signalFields,
@@ -90,10 +93,8 @@ export default function CatalogDialogs({
   const setNodeNotes = useCatalogEditorStore((s) => s.setNodeNotes);
   const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
   const setNodeDeviceAddress = useCatalogEditorStore((s) => s.setNodeDeviceAddress);
-  const hasModbusFrames = useCatalogEditorStore((s) => s.tree.hasModbusFrames);
-  const hasModbusConfig = useCatalogEditorStore((s) => !!s.tree.modbusConfig);
   // A node owns a device (slave) address only in a Modbus catalogue.
-  const showNodeDeviceAddress = hasModbusFrames || hasModbusConfig;
+  const showNodeDeviceAddress = useCatalogEditorStore((s) => !!s.tree.catalog?.modbus || hasFrames(s.tree.catalog, "modbus"));
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
   const setSerialEncoding = useCatalogEditorStore((s) => s.setSerialEncoding);
   const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
@@ -104,16 +105,6 @@ export default function CatalogDialogs({
   const setCanDefaultEndianness = useCatalogEditorStore((s) => s.setCanDefaultEndianness);
   const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
   const setCanDefaultInterval = useCatalogEditorStore((s) => s.setCanDefaultInterval);
-  const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
-
-  // Determine inherited byte order based on protocol type from path
-  const inheritedByteOrder = (() => {
-    if (!selectedNode?.path) return undefined;
-    const protocol = selectedNode.path[1]; // path is ["frame", "can"|"serial"|"modbus", ...]
-    if (protocol === "can") return canDefaultEndianness;
-    if (protocol === "serial") return serialByteOrder;
-    return undefined;
-  })();
 
   return (
     <>
@@ -124,26 +115,22 @@ export default function CatalogDialogs({
       />
 
       <SignalEditDialog
-        open={editingSignal && !!currentIdForSignal && !!selectedNode}
-        selectedNode={selectedNode as TomlNode}
-        catalogContent={catalogContent}
+        open={editingSignal && !!currentIdForSignal}
+        ownerPath={currentSignalPath}
         fields={signalFields}
         setFields={setSignalFields}
         editingIndex={editingSignalIndex}
-        inheritedByteOrder={inheritedByteOrder}
         onCancel={() => setEditingSignal(false)}
         onSave={handlers.handleSaveSignal}
       />
 
       <MuxEditDialog
         open={editingMux}
-        catalogContent={catalogContent}
         currentMuxPath={currentMuxPath}
         isAddingNestedMux={isAddingNestedMux}
         isEditingExistingMux={isEditingExistingMux}
         fields={muxFields}
         setFields={setMuxFields}
-        generateMuxName={handlers.generateMuxName}
         onCancel={() => setEditingMux(false)}
         onSave={handlers.handleSaveMux}
       />
@@ -186,7 +173,7 @@ export default function CatalogDialogs({
         open={dialogs.newCatalog}
         metaFields={metaFields}
         setMetaFields={setMetaFields}
-        canDefaultEndianness={canDefaultEndianness}
+        canDefaultEndianness={canDefaultEndianness ?? "little"}
         setCanDefaultEndianness={setCanDefaultEndianness}
         canDefaultInterval={canDefaultInterval}
         setCanDefaultInterval={setCanDefaultInterval}
@@ -284,7 +271,6 @@ export default function CatalogDialogs({
         <ChecksumEditDialog
           open={dialogs.editChecksum}
           selectedNode={selectedNode as TomlNode}
-          catalogContent={catalogContent}
           fields={{
             name: dialogPayload.checksumToEdit.checksum?.name || "",
             algorithm: (dialogPayload.checksumToEdit.checksum?.algorithm || "sum8") as ChecksumAlgorithm,

@@ -5,7 +5,7 @@ import { useFileHandlers } from "./handlers/useFileHandlers";
 import { useSignalHandlers } from "./handlers/useSignalHandlers";
 import { useMuxHandlers } from "./handlers/useMuxHandlers";
 import { useFrameHandlers } from "./handlers/useFrameHandlers";
-import type { SignalFields, MuxFields } from "./useCatalogForms";
+import type { SignalFields, MuxFields } from "../../../types/catalogEdit";
 import type { FrameEditFields } from "../views/FrameEditView";
 import type { AppSettings } from "../../../hooks/useSettings";
 
@@ -36,11 +36,6 @@ export interface UseCatalogHandlersParams {
   setCurrentMuxPath: (v: string[]) => void;
   setIsAddingNestedMux: (v: boolean) => void;
   setIsEditingExistingMux: (v: boolean) => void;
-
-  // CAN frame editing (legacy)
-  editingFrameId: string | null;
-  setEditingId: (v: boolean) => void;
-  setEditingFrameId: (v: string | null) => void;
 
   // Generic frame editing
   frameFields?: FrameEditFields;
@@ -84,9 +79,6 @@ export function useCatalogHandlers(params: UseCatalogHandlersParams) {
 
   // Frame, node, and config operations
   const frameHandlers = useFrameHandlers({
-    editingFrameId: params.editingFrameId,
-    setEditingId: params.setEditingId,
-    setEditingFrameId: params.setEditingFrameId,
     frameFields: params.frameFields,
     editingFrameOriginalKey: params.editingFrameOriginalKey,
     setEditingFrame: params.setEditingFrame,

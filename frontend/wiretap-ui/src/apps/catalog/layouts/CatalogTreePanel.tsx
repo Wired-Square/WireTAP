@@ -7,7 +7,9 @@ import { iconMd, iconSm, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
 import ResizableSidebar from "../../../components/ResizableSidebar";
 import FindBar from "../components/FindBar";
-import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
+import type { TomlNode, ProtocolType } from "../types";
+import type { Catalog } from "../../../types/catalogModel";
+import { hasFrames } from "../model";
 import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
 import { Button, IconButton } from "../../../components/Button";
 import { Tab, Tabs } from "../../../components/Tabs";
@@ -36,19 +38,11 @@ export type CatalogTreePanelProps = {
   selectedProtocol: ProtocolType | null;
   setSelectedProtocol: (protocol: ProtocolType | null) => void;
 
-  // Protocol detection for badges
-  hasCanFrames?: boolean;
-  hasModbusFrames?: boolean;
-  hasSerialFrames?: boolean;
-  canConfig?: CanProtocolConfig;
-  modbusConfig?: ModbusProtocolConfig;
-  serialConfig?: SerialProtocolConfig;
+  /** Which protocols have a configuration or frames, for the badges. */
+  catalog: Catalog | null;
 
   onAddNode: () => void;
-  /** Legacy callback for CAN-only frame adding (kept for backward compat) */
-  onAddCanFrame?: () => void;
-  /** Generic callback for adding any protocol frame */
-  onAddFrame?: (protocol?: ProtocolType) => void;
+  onAddFrame: () => void;
 
   /** Expand every node with children. */
   onExpandAll: () => void;
@@ -68,21 +62,13 @@ export default function CatalogTreePanel({
   frameGroups,
   selectedProtocol,
   setSelectedProtocol,
-  hasCanFrames,
-  hasModbusFrames,
-  hasSerialFrames,
-  canConfig,
-  modbusConfig,
-  serialConfig,
+  catalog,
   onAddNode,
-  onAddCanFrame,
   onAddFrame,
   onExpandAll,
   onCollapseAll,
 }: CatalogTreePanelProps) {
   const { t } = useTranslation("catalog");
-  // Use generic handler if available, otherwise fall back to CAN-only
-  const handleAddFrame = onAddFrame ?? onAddCanFrame;
   // Per-node collapse in the Nodes view (ephemeral; keyed by group label).
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (label: string) =>
@@ -96,29 +82,13 @@ export default function CatalogTreePanel({
 
   // Protocol filter badges — shown when a protocol has config or frames.
   // Clicking one filters the tree to that protocol (toggles off when re-clicked).
-  const protocolBadges = [
-    {
-      protocol: "can" as ProtocolType,
-      show: !!canConfig || hasCanFrames,
-      Icon: Network,
-      label: "CAN",
-      configured: !!canConfig,
-    },
-    {
-      protocol: "modbus" as ProtocolType,
-      show: !!modbusConfig || hasModbusFrames,
-      Icon: Server,
-      label: "Modbus",
-      configured: !!modbusConfig,
-    },
-    {
-      protocol: "serial" as ProtocolType,
-      show: !!serialConfig || hasSerialFrames,
-      Icon: Cable,
-      label: "Serial",
-      configured: !!serialConfig,
-    },
-  ].filter((b) => b.show);
+  const protocolBadges = ([
+    { protocol: "can", Icon: Network, label: "CAN" },
+    { protocol: "modbus", Icon: Server, label: "Modbus" },
+    { protocol: "serial", Icon: Cable, label: "Serial" },
+  ] as const)
+    .map((b) => ({ ...b, configured: !!catalog?.[b.protocol] }))
+    .filter((b) => b.configured || hasFrames(catalog, b.protocol));
   const hasAnyBadge = protocolBadges.length > 0;
 
   // Collapsed content - just the action buttons as icons
@@ -133,7 +103,7 @@ export default function CatalogTreePanel({
         <UserPlus className={iconMd} />
       </IconButton>
       <IconButton
-        onClick={() => handleAddFrame?.()}
+        onClick={() => onAddFrame()}
         variant="solid"
         tone="primary"
         title={t("tree.addFrame")}
@@ -192,7 +162,7 @@ export default function CatalogTreePanel({
               <UserPlus className={iconMd} />
             </IconButton>
             <IconButton
-              onClick={() => handleAddFrame?.()}
+              onClick={() => onAddFrame()}
               variant="solid"
               tone="primary"
               title={t("tree.addFrame")}

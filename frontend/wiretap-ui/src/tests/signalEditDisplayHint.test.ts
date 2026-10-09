@@ -28,8 +28,8 @@ function findNode(nodes: TomlNode[], path: string[]): TomlNode | undefined {
 // `editing_a_signal_keeps_its_display_hint` in the app crate.
 describe("editing a signal", () => {
   it("keeps its display hint", async () => {
-    const node = findNode(catalogToTree(catalog).tree, ["frame", "can", "0x100", "mux", "1", "signals", "0"]);
-    const fields = { ...signalFieldsFor(node?.metadata?.properties), unit: "kPa" };
+    const node = findNode(catalogToTree(catalog), ["frame", "can", "0x100", "mux", "1", "signals", "0"]);
+    const fields = { ...signalFieldsFor(node!.metadata!.signal!), unit: "kPa" };
 
     await upsertSignalToml("", ["frame", "can", "0x100", "mux", "1"], fields, 0);
 
