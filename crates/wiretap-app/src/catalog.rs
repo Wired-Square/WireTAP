@@ -662,6 +662,24 @@ pub fn sanitise_catalog_filename(filename: &str) -> Result<String, String> {
     }
 }
 
+/// The filename a new catalogue named `name` is first offered under: a numeric
+/// name in the save format's id style, anything else slugged.
+#[tauri::command]
+pub fn new_catalog_filename(name: String, hex_ids: bool) -> String {
+    let name = name.trim();
+    let numeric = name.bytes().all(|b| b.is_ascii_digit());
+    let stem = match name.parse::<u64>() {
+        Ok(id) if numeric && hex_ids => format!("{id:#x}"),
+        Ok(id) if numeric => id.to_string(),
+        _ => name
+            .to_lowercase()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join("-"),
+    };
+    sanitise_catalog_filename(&stem).unwrap_or_else(|_| "decoder.toml".to_string())
+}
+
 /// Write a file via a temp name plus rename, so no reader can observe a partial
 /// file.
 ///
@@ -866,6 +884,18 @@ mod tests {
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).expect("write catalogue");
+    }
+
+    #[test]
+    fn a_new_catalogue_is_offered_a_bare_toml_filename() {
+        let offer = |name: &str, hex| new_catalog_filename(name.to_string(), hex);
+        assert_eq!(offer("  My  Pack ", false), "my-pack.toml");
+        assert_eq!(offer("256", true), "0x100.toml");
+        assert_eq!(offer("0256", false), "256.toml");
+        assert_eq!(offer("pack.TOML", false), "pack.toml");
+        assert_eq!(offer("", false), "decoder.toml");
+        assert_eq!(offer("a/b", false), "decoder.toml");
+        assert_eq!(offer(".hidden", false), "decoder.toml");
     }
 
     #[test]

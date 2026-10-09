@@ -254,6 +254,11 @@ export async function importCatalog(filename: string, content: string): Promise<
   return await invoke<string>("import_catalog", { filename, content });
 }
 
+/** The filename a new catalogue named `name` is first offered under. */
+export async function newCatalogFilename(name: string, hexIds: boolean): Promise<string> {
+  return await invoke<string>("new_catalog_filename", { name, hexIds });
+}
+
 /**
  * Duplicate a catalog with a new name
  */

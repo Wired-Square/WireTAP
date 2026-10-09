@@ -27,6 +27,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The session menu offers Pause only where the session can pause.** A live session, which cannot pause, used to offer Pause and then ignore it, leaving the session running. Pause now shows only for a session that can pause, such as a capture replay, and the greyed Change source on a live session says to stop or leave the session instead.
 - **A Dashboard gauge shows "—" and an empty arc for a signal that has never had a value.** It used to read 0.000 and draw the arc to zero, the same as a real zero. A real zero still reads 0.000.
 - **Level-bar, rotary and icon-state tooltips show "—" for a signal that has never had a value.** They used to read NaN.
+- **A new catalogue's suggested filename is always a plain name in the decoder directory.** A name ending in `.toml` is no longer offered as `name.toml.toml`, and a name with a path separator or a leading dot is offered as `decoder.toml` rather than a path outside the directory or a hidden file. You can still type any name in the save dialog.
 
 ## [0.14.0] - 2026-10-06
 

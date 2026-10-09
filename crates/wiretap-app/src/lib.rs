@@ -1196,6 +1196,7 @@ pub fn run() {
             catalog::save_binary_file,
             catalog::list_catalogs,
             catalog::import_catalog,
+            catalog::new_catalog_filename,
             catalog::duplicate_catalog,
             catalog::rename_catalog,
             catalog::delete_catalog,
