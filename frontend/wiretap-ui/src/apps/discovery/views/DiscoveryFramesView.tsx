@@ -1096,6 +1096,8 @@ function DiscoveryFramesView({
 
       {activeTab === 'filtered' && (
         <FilteredTabContent
+          captureId={effectiveBufferId}
+          sessionId={sessionId}
           displayFrameIdFormat={displayFrameIdFormat}
           displayTimeFormat={displayTimeFormat}
           isStreaming={isStreaming}
@@ -1170,11 +1172,12 @@ function DiscoveryFramesView({
     <BulkAddToTransmitDialog
       isOpen={showBulkAddDialog}
       onClose={() => setShowBulkAddDialog(false)}
+      captureId={effectiveBufferId}
     />
     <ReplayDialog
       isOpen={showReplayDialog}
       onClose={() => setShowReplayDialog(false)}
-      captureId={captureId ?? null}
+      captureId={effectiveBufferId}
     />
     </>
   );

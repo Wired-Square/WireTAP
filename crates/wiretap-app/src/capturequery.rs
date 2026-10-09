@@ -247,9 +247,8 @@ pub fn capture_query_frame_changes(
 ///
 /// Finds timestamps where a mirror frame's payload doesn't match its source frame
 /// within the given tolerance window (in microseconds).
-/// `compare_byte_indices` restricts the comparison to those payload byte
-/// indices — the mirror's inherited bytes. Omit (or pass empty) to compare
-/// the whole payload.
+/// With `catalog_path`, only the mirror's inherited bytes are compared; without
+/// it, the whole payload.
 #[tauri::command]
 pub fn capture_query_mirror_validation(
     capture_id: String,
@@ -260,11 +259,11 @@ pub fn capture_query_mirror_validation(
     start_time_us: Option<i64>,
     end_time_us: Option<i64>,
     limit: Option<i64>,
-    compare_byte_indices: Option<Vec<u8>>,
+    catalog_path: Option<String>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let query_start = std::time::Instant::now();
     let result_limit = limit.unwrap_or(10000);
-    let compare = crate::queryresults::compare_index_set(compare_byte_indices);
+    let compare = crate::queryresults::mirror_compare_set(catalog_path.as_deref(), mirror_frame_id)?;
 
     tlog!(
         "[capturequery] mirror_validation: capture_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",

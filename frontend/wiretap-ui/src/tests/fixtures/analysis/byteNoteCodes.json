@@ -1,0 +1,605 @@
+{
+  "down counter, mixed sensor with no strength, looping counter with modulo 0": {
+    "frame": [
+      {
+        "code": "counter",
+        "position": 0,
+        "direction": "down",
+        "step": 2,
+        "rollover": false,
+        "looping": null
+      },
+      {
+        "code": "counter",
+        "position": 3,
+        "direction": "up",
+        "step": 3,
+        "rollover": true,
+        "looping": {
+          "min": 1,
+          "max": 3,
+          "modulo": 0
+        }
+      },
+      {
+        "code": "sensor",
+        "position": 1,
+        "trend": "mixed",
+        "strength": 0.0,
+        "min": 3,
+        "max": 200
+      },
+      {
+        "code": "sensor",
+        "position": 2,
+        "trend": "increasing",
+        "strength": 0.5,
+        "min": 0,
+        "max": 15
+      }
+    ],
+    "cases": []
+  },
+  "endianness with no endian pattern, protocol absent": {
+    "frame": [
+      {
+        "code": "endianness",
+        "endianness": "big",
+        "patternCount": 0
+      },
+      {
+        "code": "varyingValues",
+        "count": 1
+      }
+    ],
+    "cases": []
+  },
+  "every role, length varying, burst": {
+    "frame": [
+      {
+        "code": "endianness",
+        "endianness": "little",
+        "patternCount": 1
+      },
+      {
+        "code": "varyingLength",
+        "min": 6,
+        "max": 8
+      },
+      {
+        "code": "burst",
+        "mux": false
+      },
+      {
+        "code": "statics",
+        "bytes": [
+          {
+            "position": 0,
+            "value": 31
+          }
+        ]
+      },
+      {
+        "code": "counter",
+        "position": 1,
+        "direction": "up",
+        "step": 1,
+        "rollover": true,
+        "looping": null
+      },
+      {
+        "code": "counter",
+        "position": 2,
+        "direction": "up",
+        "step": 1,
+        "rollover": true,
+        "looping": {
+          "min": 0,
+          "max": 9,
+          "modulo": 10
+        }
+      },
+      {
+        "code": "sensor",
+        "position": 3,
+        "trend": "decreasing",
+        "strength": 0.755,
+        "min": 10,
+        "max": 90
+      },
+      {
+        "code": "pattern",
+        "start": 4,
+        "len": 2,
+        "kind": "counter16",
+        "endianness": "little",
+        "rollover": false,
+        "correlatedRollover": false,
+        "slowUpperBytes": false,
+        "range": null,
+        "sampleText": null
+      },
+      {
+        "code": "pattern",
+        "start": 6,
+        "len": 2,
+        "kind": "text",
+        "endianness": null,
+        "rollover": false,
+        "correlatedRollover": false,
+        "slowUpperBytes": false,
+        "range": null,
+        "sampleText": "OK"
+      }
+    ],
+    "cases": []
+  },
+  "identical payload, serial protocol": {
+    "frame": [
+      {
+        "code": "identical",
+        "sampleCount": 3,
+        "payload": [
+          1,
+          171
+        ]
+      },
+      {
+        "code": "statics",
+        "bytes": [
+          {
+            "position": 0,
+            "value": 1
+          },
+          {
+            "position": 1,
+            "value": 171
+          }
+        ]
+      }
+    ],
+    "cases": []
+  },
+  "no samples": {
+    "frame": [
+      {
+        "code": "noSamples"
+      }
+    ],
+    "cases": []
+  },
+  "one-byte mux with more than six cases and more than four summaries": {
+    "frame": [
+      {
+        "code": "multiplexed",
+        "selector": "oneByte",
+        "cases": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "code": "caseSummary",
+        "value": 0,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 1,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 2,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 3,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 4,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 5,
+        "counters": 0,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 6,
+        "counters": 0,
+        "statics": 1
+      }
+    ],
+    "cases": [
+      {
+        "value": 0,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 1,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 2,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 3,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 4,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 5,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": 6,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 1,
+                "value": 6
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "one-byte mux, cases summarised and noted in short": {
+    "frame": [
+      {
+        "code": "endianness",
+        "endianness": "mixed",
+        "patternCount": 3
+      },
+      {
+        "code": "multiplexed",
+        "selector": "oneByte",
+        "cases": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "code": "caseSummary",
+        "value": 0,
+        "counters": 2,
+        "statics": 1
+      },
+      {
+        "code": "caseSummary",
+        "value": 1,
+        "counters": 1,
+        "statics": 0
+      }
+    ],
+    "cases": [
+      {
+        "value": 0,
+        "notes": [
+          {
+            "code": "statics",
+            "bytes": [
+              {
+                "position": 2,
+                "value": 17
+              }
+            ]
+          },
+          {
+            "code": "counter",
+            "position": 1,
+            "direction": "down",
+            "step": 1,
+            "rollover": true,
+            "looping": null
+          },
+          {
+            "code": "counter",
+            "position": 3,
+            "direction": "up",
+            "step": 1,
+            "rollover": false,
+            "looping": {
+              "min": 0,
+              "max": 14,
+              "modulo": 15
+            }
+          },
+          {
+            "code": "sensor",
+            "position": 4,
+            "trend": "decreasing",
+            "strength": 0.6,
+            "min": 4,
+            "max": 44
+          }
+        ]
+      },
+      {
+        "value": 1,
+        "notes": [
+          {
+            "code": "pattern",
+            "start": 1,
+            "len": 2,
+            "kind": "sensor16",
+            "endianness": "big",
+            "rollover": false,
+            "correlatedRollover": true,
+            "slowUpperBytes": true,
+            "range": [
+              3,
+              900
+            ],
+            "sampleText": null
+          },
+          {
+            "code": "pattern",
+            "start": 3,
+            "len": 2,
+            "kind": "counter16",
+            "endianness": "big",
+            "rollover": true,
+            "correlatedRollover": false,
+            "slowUpperBytes": false,
+            "range": null,
+            "sampleText": null
+          },
+          {
+            "code": "pattern",
+            "start": 5,
+            "len": 3,
+            "kind": "text",
+            "endianness": null,
+            "rollover": false,
+            "correlatedRollover": false,
+            "slowUpperBytes": false,
+            "range": null,
+            "sampleText": "abc"
+          }
+        ]
+      },
+      {
+        "value": 2,
+        "notes": [
+          {
+            "code": "pattern",
+            "start": 1,
+            "len": 4,
+            "kind": "sensor32",
+            "endianness": "little",
+            "rollover": false,
+            "correlatedRollover": false,
+            "slowUpperBytes": false,
+            "range": null,
+            "sampleText": null
+          }
+        ]
+      }
+    ]
+  },
+  "pattern bytes hide their counters and sensors but not their statics": {
+    "frame": [
+      {
+        "code": "statics",
+        "bytes": [
+          {
+            "position": 0,
+            "value": 0
+          }
+        ]
+      },
+      {
+        "code": "pattern",
+        "start": 0,
+        "len": 2,
+        "kind": "counter16",
+        "endianness": "big",
+        "rollover": true,
+        "correlatedRollover": false,
+        "slowUpperBytes": false,
+        "range": null,
+        "sampleText": null
+      },
+      {
+        "code": "pattern",
+        "start": 2,
+        "len": 2,
+        "kind": "sensor16",
+        "endianness": null,
+        "rollover": false,
+        "correlatedRollover": false,
+        "slowUpperBytes": false,
+        "range": null,
+        "sampleText": null
+      },
+      {
+        "code": "pattern",
+        "start": 4,
+        "len": 4,
+        "kind": "text",
+        "endianness": null,
+        "rollover": false,
+        "correlatedRollover": false,
+        "slowUpperBytes": false,
+        "range": null,
+        "sampleText": null
+      }
+    ],
+    "cases": []
+  },
+  "sensors spanning columns, with ranges": {
+    "frame": [
+      {
+        "code": "endianness",
+        "endianness": "mixed",
+        "patternCount": 2
+      },
+      {
+        "code": "pattern",
+        "start": 0,
+        "len": 2,
+        "kind": "sensor16",
+        "endianness": "big",
+        "rollover": true,
+        "correlatedRollover": true,
+        "slowUpperBytes": false,
+        "range": [
+          100,
+          700
+        ],
+        "sampleText": null
+      },
+      {
+        "code": "pattern",
+        "start": 2,
+        "len": 4,
+        "kind": "sensor32",
+        "endianness": "little",
+        "rollover": true,
+        "correlatedRollover": true,
+        "slowUpperBytes": true,
+        "range": [
+          5,
+          70000
+        ],
+        "sampleText": null
+      }
+    ],
+    "cases": []
+  },
+  "two-byte mux, burst": {
+    "frame": [
+      {
+        "code": "burst",
+        "mux": true
+      },
+      {
+        "code": "multiplexed",
+        "selector": "twoByte",
+        "cases": [
+          257,
+          258
+        ]
+      },
+      {
+        "code": "caseSummary",
+        "value": 257,
+        "counters": 1,
+        "statics": 0
+      }
+    ],
+    "cases": [
+      {
+        "value": 257,
+        "notes": [
+          {
+            "code": "counter",
+            "position": 2,
+            "direction": "up",
+            "step": 1,
+            "rollover": false,
+            "looping": null
+          }
+        ]
+      },
+      {
+        "value": 258,
+        "notes": []
+      }
+    ]
+  },
+  "varying values counted only when nothing else explains them": {
+    "frame": [
+      {
+        "code": "varyingValues",
+        "count": 2
+      }
+    ],
+    "cases": []
+  }
+}

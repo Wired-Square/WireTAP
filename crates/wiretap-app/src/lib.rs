@@ -2,12 +2,16 @@
 pub(crate) mod logging;
 mod adhoc;
 mod analysis;
+#[cfg(test)]
+mod analysis_ts;
+mod payload_source;
 mod byte_roles;
 mod app_registry;
 mod ble_provision;
 mod capture_db;
 mod capture_events;
 mod capturequery;
+mod capture_inventory;
 mod capture_store;
 mod captures;
 mod catalog;
@@ -1378,7 +1382,8 @@ pub fn run() {
             checksums::detect_checksum_cmd,
             checksum_discovery::discover_checksums_cmd,
             checksum_discovery::discover_checksums_in_capture_cmd,
-            byte_roles::profile_bytes_cmd,
+            byte_roles::payload_changes_cmd,
+            byte_roles::frame_order_cmd,
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,
             frame_export::export_frame_dump,
@@ -1474,7 +1479,7 @@ pub fn run() {
             apiclient::api_list_databases,
             apiclient::api_test_connection,
             apiclient::api_probe_backend,
-            analysis::query_frame_inventory,
+            payload_source::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
             gateway_admin::gateway_list_daemons,

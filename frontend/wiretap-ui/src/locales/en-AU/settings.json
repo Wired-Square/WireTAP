@@ -193,7 +193,7 @@
       "title": "Buffer Sizes",
       "discoveryHistory": {
         "label": "Discovery History Buffer",
-        "help": "Maximum number of frames to keep in memory during CAN Discovery"
+        "help": "How many of a live stream's most recent frames Frame Order and Payload Changes analyse"
       },
       "queryResultLimit": {
         "label": "Query Result Limit",

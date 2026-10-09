@@ -68,3 +68,40 @@ describe("setFrameInfoFromCapture", () => {
     expect([...useDiscoveryFrameStore.getState().selectedFrames]).toEqual(["modbus:256"]);
   });
 });
+
+describe("mergeFrameInfo (a live session's pushed inventory)", () => {
+  beforeEach(() => {
+    useDiscoveryFrameStore.getState().clearAll();
+  });
+
+  it("selects a key the first time it is seen, and leaves a deselected one alone", () => {
+    const store = useDiscoveryFrameStore.getState();
+    store.mergeFrameInfo([info("can", 0x100)]);
+    store.toggleFrameSelection("can:256", null, () => {});
+    store.mergeFrameInfo([info("can", 0x100, 12), info("can", 0x101)]);
+
+    const { selectedFrames, frameInfoMap } = useDiscoveryFrameStore.getState();
+    expect([...selectedFrames]).toEqual(["can:257"]);
+    expect(frameInfoMap.get("can:256")?.len).toBe(12);
+  });
+
+  it("auto-selects only what an active selection set names", () => {
+    useDiscoveryFrameStore.getState().mergeFrameInfo([info("can", 0x100), info("can", 0x101)], new Set(["can:257"]));
+    expect([...useDiscoveryFrameStore.getState().selectedFrames]).toEqual(["can:257"]);
+  });
+
+  it("forgets the keys a cleared inventory dropped", () => {
+    useDiscoveryFrameStore.getState().mergeFrameInfo([info("can", 0x100), info("can", 0x101)]);
+    useDiscoveryFrameStore.getState().mergeFrameInfo([info("can", 0x101)], null, ["can:256"]);
+
+    const { seenIds, selectedFrames, frameInfoMap } = useDiscoveryFrameStore.getState();
+    expect([[...seenIds], [...selectedFrames], [...frameInfoMap.keys()]]).toEqual([["can:257"], ["can:257"], ["can:257"]]);
+  });
+
+  it("writes nothing when the rows change nothing", () => {
+    useDiscoveryFrameStore.getState().mergeFrameInfo([info("can", 0x100)]);
+    const before = useDiscoveryFrameStore.getState();
+    useDiscoveryFrameStore.getState().mergeFrameInfo([info("can", 0x100)]);
+    expect(useDiscoveryFrameStore.getState()).toBe(before);
+  });
+});

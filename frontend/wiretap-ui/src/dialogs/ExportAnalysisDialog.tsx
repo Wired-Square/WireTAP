@@ -35,7 +35,7 @@ export default function ExportAnalysisDialog({
       open={open}
       title={t("exportAnalysis.title")}
       description={t("exportAnalysis.description", {
-        frameIds: results.uniqueFrameIds,
+        frameIds: results.frames.length,
         samples: results.frameCount.toLocaleString(i18n.language),
       })}
       defaultFilename="payload-analysis-report"

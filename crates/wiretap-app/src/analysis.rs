@@ -1,46 +1,29 @@
 // ui/crates/wiretap-app/src/analysis.rs
 //
-// Source-backed analysis levers. Works against either a SQLite capture
-// (`capture_id`) or a WireTAP backend (`profile_id`):
+// Source-backed analysis levers over a `PayloadSource` — a SQLite capture or a
+// WireTAP backend, whose impls are `payload_source.rs`'s:
 //
-//   - frame_inventory   — per-frame-id rollup (count, first/last, dlc)
-//   - byte_profile      — per-byte roles, patterns and mux cases for one frame
+//   - byte_profile(s)   — per-byte roles, patterns and mux cases
 //   - checksum_scan     — what explains each frame id, if anything
 //   - catalog_coverage  — diff a catalog against a source + confidence rollup
+//   - message_order     — per protocol and bus, over a `FrameSource`'s timed frames
 //
 // Most of these serve the MCP read tools and need no view open. `checksum_scan`
-// serves the Discovery panel as well, which is what stops the two from giving
-// different answers about one capture.
+// and `byte_profiles` serve the Discovery panels as well, which is what stops
+// the two from giving different answers about one capture.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::future::Future;
 
-use serde::Serialize;
-use tauri::AppHandle;
-use wiretap_analysis::{profile_bytes, ByteProfile};
+use serde::{Deserialize, Serialize};
+use wiretap_analysis::{analyse_order, profile_bytes, ByteProfile, FrameKey, OrderAnalysis, TimedFrame};
 use wiretap_catalog::model::Confidence;
 
 use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_db::InventoryRow;
-
-/// Where a query runs: a SQLite capture or a WireTAP backend profile.
-pub enum QuerySource {
-    Capture(String),
-    Backend(String),
-}
-
-/// Resolve the source from the dual `capture_id` / `profile_id` MCP params.
-pub fn resolve(
-    capture_id: Option<String>,
-    profile_id: Option<String>,
-) -> Result<QuerySource, String> {
-    match (capture_id, profile_id) {
-        (Some(c), None) => Ok(QuerySource::Capture(c)),
-        (None, Some(p)) => Ok(QuerySource::Backend(p)),
-        (Some(_), Some(_)) => Err("Provide exactly one of capture_id / profile_id, not both".into()),
-        (None, None) => Err("Provide one of capture_id or profile_id".into()),
-    }
-}
+use crate::capture_store::FrameSelection;
+use crate::io::FrameMessage;
 
 /// One frame's byte profile, as the Changes view and the MCP tools report it.
 #[derive(Debug, Clone, Serialize)]
@@ -67,104 +50,58 @@ impl FrameByteProfile {
     }
 }
 
-/// Parse an RFC3339 timestamp into epoch microseconds (capture timeline). Also
-/// accepts a bare integer treated as already-µs.
-pub fn iso_to_micros(s: &str) -> Option<i64> {
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-        return Some(dt.timestamp_micros());
-    }
-    s.trim().parse::<i64>().ok()
-}
-
-// ── Source-dispatching orchestrators ─────────────────────────────────────────
-
-pub async fn frame_inventory(
-    app: &AppHandle,
-    src: &QuerySource,
-    start_time: Option<String>,
-    end_time: Option<String>,
-) -> Result<Vec<InventoryRow>, String> {
-    match src {
-        QuerySource::Backend(pid) => {
-            crate::dbquery::db_frame_inventory(app, pid, start_time, end_time).await
-        }
-        QuerySource::Capture(cid) => crate::capture_db::frame_inventory(
-            cid,
-            start_time.as_deref().and_then(iso_to_micros),
-            end_time.as_deref().and_then(iso_to_micros),
-        ),
-    }
-}
-
-/// The Query app's per-id rollup, over either source. Time bounds are RFC3339.
-#[tauri::command]
-pub async fn query_frame_inventory(
-    app: AppHandle,
-    capture_id: Option<String>,
-    profile_id: Option<String>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-) -> Result<Vec<InventoryRow>, String> {
-    let src = resolve(capture_id, profile_id)?;
-    frame_inventory(&app, &src, start_time, end_time).await
-}
+// ── The orchestrators, over any `PayloadSource` ──────────────────────────────
 
 /// How a capture is sampled. Byte roles read consecutive pairs and want the most
 /// recent contiguous run; a checksum scan wants spread across the recording.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sampling {
     Spread,
     Recent,
 }
 
-/// Up to `sample_limit` payloads, oldest first. `protocol` is the identity's other
-/// half; `None` matches any.
-async fn fetch_payloads(
-    app: &AppHandle,
-    src: &QuerySource,
-    protocol: Option<&str>,
-    frame_id: u32,
-    is_extended: Option<bool>,
-    sample_limit: u32,
-    sampling: Sampling,
-) -> Result<Vec<Vec<u8>>, String> {
-    match (src, sampling) {
-        // No protocol and no stride: a backend profile reads one protocol, and a
-        // modulo window over a multi-month archive is a full scan where the
-        // tail query is an index seek. A capture is bounded and local, which is
-        // what makes striding it affordable.
-        (QuerySource::Backend(pid), _) => {
-            crate::dbquery::db_fetch_frame_payloads(app, pid, frame_id, is_extended, sample_limit)
-                .await
-        }
-        (QuerySource::Capture(cid), Sampling::Spread) => crate::capture_db::sample_frame_payloads(
-            cid,
-            protocol,
-            frame_id,
-            is_extended,
-            sample_limit,
-        ),
-        (QuerySource::Capture(cid), Sampling::Recent) => crate::capture_db::tail_frame_payloads(
-            cid,
-            protocol,
-            frame_id,
-            is_extended,
-            sample_limit,
-        ),
-    }
+/// Which payloads to read: up to `limit` of them, oldest first. `protocol` is the
+/// identity's other half and `is_extended` the tie-break; `None` matches any.
+#[derive(Clone, Copy, Debug)]
+pub struct PayloadQuery<'a> {
+    pub protocol: Option<&'a str>,
+    pub frame_id: u32,
+    pub is_extended: Option<bool>,
+    pub limit: u32,
+    pub sampling: Sampling,
+}
+
+/// A store of recorded frames the analysis levers read: what frames it holds and
+/// a sample of each one's payloads. Time bounds are RFC3339.
+pub trait PayloadSource: Sync {
+    fn inventory(
+        &self,
+        start_time: Option<&str>,
+        end_time: Option<&str>,
+    ) -> impl Future<Output = Result<Vec<InventoryRow>, String>> + Send;
+
+    fn payloads(
+        &self,
+        query: PayloadQuery<'_>,
+    ) -> impl Future<Output = Result<Vec<Vec<u8>>, String>> + Send;
 }
 
 pub async fn byte_profile(
-    app: &AppHandle,
-    src: &QuerySource,
+    source: &impl PayloadSource,
     protocol: Option<&str>,
     frame_id: u32,
     is_extended: Option<bool>,
     sample_limit: u32,
 ) -> Result<FrameByteProfile, String> {
-    let payloads =
-        fetch_payloads(app, src, protocol, frame_id, is_extended, sample_limit, Sampling::Recent)
-            .await?;
+    let payloads = source
+        .payloads(PayloadQuery {
+            protocol,
+            frame_id,
+            is_extended,
+            limit: sample_limit,
+            sampling: Sampling::Recent,
+        })
+        .await?;
     Ok(FrameByteProfile::new(protocol, frame_id, is_extended.unwrap_or(false), &payloads))
 }
 
@@ -217,17 +154,16 @@ fn selected_rows<'a>(
 /// The one implementation behind both doors — Discovery's Checksum Discovery
 /// panel and the `frame_checksum_scan` MCP tool — reading payloads straight out
 /// of the capture or Postgres rather than having them shipped in over IPC.
-/// `frame_inventory` decides which frames exist; each is then sampled and
+/// The source's inventory decides which frames exist; each is then sampled and
 /// analysed by the same crate code, so the two cannot give different answers
 /// about the same capture.
 pub async fn checksum_scan(
-    app: &AppHandle,
-    src: &QuerySource,
+    source: &impl PayloadSource,
     filter: &ScanFilter,
     sample_limit: u32,
     options: wiretap_analysis::ChecksumScanOptions,
 ) -> Result<wiretap_analysis::ChecksumScanResult, String> {
-    let inventory = frame_inventory(app, src, None, None).await?;
+    let inventory = source.inventory(None, None).await?;
 
     let mut result = wiretap_analysis::ChecksumScanResult {
         findings: Vec::new(),
@@ -242,16 +178,15 @@ pub async fn checksum_scan(
     let mut chunk: Vec<(wiretap_analysis::FrameKey, Vec<Vec<u8>>)> = Vec::new();
 
     for (row, is_extended) in selected_rows(&inventory, filter) {
-        let payloads = fetch_payloads(
-            app,
-            src,
-            Some(&row.protocol),
-            row.frame_id,
-            is_extended,
-            sample_limit,
-            Sampling::Spread,
-        )
-        .await?;
+        let payloads = source
+            .payloads(PayloadQuery {
+                protocol: Some(&row.protocol),
+                frame_id: row.frame_id,
+                is_extended,
+                limit: sample_limit,
+                sampling: Sampling::Spread,
+            })
+            .await?;
         chunk.push((
             wiretap_analysis::FrameKey::new(row.frame_id, row.is_extended),
             payloads,
@@ -279,26 +214,24 @@ pub struct ByteProfiles {
 /// The one implementation behind Discovery's Changes view and the MCP
 /// `get_discovery_analysis`, so the two describe a capture alike.
 pub async fn byte_profiles(
-    app: &AppHandle,
-    src: &QuerySource,
+    source: &impl PayloadSource,
     filter: &ScanFilter,
     sample_limit: u32,
     max_frames: usize,
 ) -> Result<ByteProfiles, String> {
-    let inventory = frame_inventory(app, src, None, None).await?;
+    let inventory = source.inventory(None, None).await?;
     let rows = selected_rows(&inventory, filter);
     let mut frames = Vec::with_capacity(rows.len().min(max_frames));
     for &(row, is_extended) in rows.iter().take(max_frames) {
-        let payloads = fetch_payloads(
-            app,
-            src,
-            Some(&row.protocol),
-            row.frame_id,
-            is_extended,
-            sample_limit,
-            Sampling::Recent,
-        )
-        .await?;
+        let payloads = source
+            .payloads(PayloadQuery {
+                protocol: Some(&row.protocol),
+                frame_id: row.frame_id,
+                is_extended,
+                limit: sample_limit,
+                sampling: Sampling::Recent,
+            })
+            .await?;
         frames.push(FrameByteProfile::new(
             Some(&row.protocol),
             row.frame_id,
@@ -307,6 +240,75 @@ pub async fn byte_profiles(
         ));
     }
     Ok(ByteProfiles { skipped_frames: rows.len().saturating_sub(max_frames), frames })
+}
+
+/// A store of recorded frames with their timing: a selection's frames, oldest
+/// first, the newest `newest` of them when given.
+pub trait FrameSource: Sync {
+    fn frames(
+        &self,
+        selection: &FrameSelection,
+        newest: Option<usize>,
+    ) -> impl Future<Output = Result<Vec<FrameMessage>, String>> + Send;
+}
+
+/// One protocol's message order.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ProtocolOrder {
+    pub protocol: String,
+    #[cfg_attr(test, ts(as = "crate::analysis_ts::OrderAnalysis"))]
+    pub order: OrderAnalysis,
+}
+
+/// The frame a cycle is walked from, in place of the likeliest start ids; under
+/// every protocol when none is named.
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct OrderStart {
+    #[serde(default)]
+    #[cfg_attr(test, ts(optional))]
+    pub protocol: Option<String>,
+    pub frame_id: u32,
+    pub is_extended: bool,
+}
+
+/// Each protocol's frames as message order reads them, oldest first.
+pub fn timed_by_protocol(frames: Vec<FrameMessage>) -> BTreeMap<String, Vec<TimedFrame>> {
+    let mut by_protocol: BTreeMap<String, Vec<TimedFrame>> = BTreeMap::new();
+    for f in frames {
+        by_protocol.entry(f.protocol).or_default().push(TimedFrame {
+            bus: f.bus,
+            key: FrameKey::new(f.frame_id, f.is_extended),
+            timestamp_us: f.timestamp_us,
+            payload: f.bytes,
+        });
+    }
+    for frames in by_protocol.values_mut() {
+        frames.sort_by_key(|f| f.timestamp_us);
+    }
+    by_protocol
+}
+
+/// Message order per protocol over a source's selected frames. The one
+/// implementation behind Discovery's Frame Order and the MCP `get_frame_order`.
+pub async fn message_order(
+    source: &impl FrameSource,
+    selection: &FrameSelection,
+    newest: Option<usize>,
+    start: Option<&OrderStart>,
+) -> Result<Vec<ProtocolOrder>, String> {
+    let frames = source.frames(selection, newest).await?;
+    Ok(timed_by_protocol(frames)
+        .into_iter()
+        .map(|(protocol, frames)| {
+            let start = start
+                .filter(|s| s.protocol.as_ref().is_none_or(|p| *p == protocol))
+                .map(|s| FrameKey::new(s.frame_id, s.is_extended));
+            ProtocolOrder { order: analyse_order(&frames, start), protocol }
+        })
+        .collect())
 }
 
 /// Frame ids fetched before a batch is analysed. Bounds resident payloads while
@@ -454,21 +456,17 @@ fn roll_up(inventory: &[InventoryRow], mask: u32) -> HashMap<u32, DataFrame<'_>>
     by_id
 }
 
+/// Diff `catalog`, reported under `catalog_name`, against a source.
 pub async fn catalog_coverage(
-    app: &AppHandle,
-    src: &QuerySource,
+    source: &impl PayloadSource,
     catalog_name: &str,
+    catalog: &wiretap_catalog::Catalog,
     include_byte_roles: bool,
     sample_limit: u32,
-    start_time: Option<String>,
-    end_time: Option<String>,
+    start_time: Option<&str>,
+    end_time: Option<&str>,
 ) -> Result<CoverageReport, String> {
-    // 1. Load + parse the catalog.
-    let entry = crate::catalog::find_catalog(app, catalog_name).await?;
-    let toml = crate::catalog::open_catalog(entry.path).await?;
-    let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| e.to_string())?;
-
-    // 2. Inventory the data source, keyed the way the catalogue is keyed.
+    // Inventory the data source, keyed the way the catalogue is keyed.
     //
     // A catalogue may declare a `frame_id_mask` — a J1939 one strips the source
     // address, so it names each message once and matches whichever node sent it.
@@ -476,11 +474,11 @@ pub async fn catalog_coverage(
     // measured at `present=0, missing=292` on a bus the catalogue decodes in
     // full. `decode_by_id` has always masked; this is the same rule applied to
     // the other side of the comparison.
-    let mask = wiretap_catalog::decode::frame_id_mask(&catalog).unwrap_or(u32::MAX);
-    let inventory = frame_inventory(app, src, start_time, end_time).await?;
+    let mask = wiretap_catalog::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
+    let inventory = source.inventory(start_time, end_time).await?;
     let data_by_id = roll_up(&inventory, mask);
 
-    // 3. Diff + confidence rollup.
+    // Diff + confidence rollup.
     let mut confidence = ConfidenceTally::default();
     let mut present = Vec::new();
     let mut missing = Vec::new();
@@ -500,20 +498,19 @@ pub async fn catalog_coverage(
                     // roles describing the same frames the row was counted from.
                     // Sampled by a raw id that actually occurs: under a mask the
                     // catalogue's own id never does.
-                    let payloads = fetch_payloads(
-                        app,
-                        src,
-                        None,
-                        data.top.frame_id,
-                        // The sampled row's own answer, not the catalogue's — a
-                        // disagreement here filters out the very id being
-                        // sampled and returns nothing.
-                        Some(data.top.is_extended),
-                        sample_limit,
-                        Sampling::Recent,
-                    )
-                    .await
-                    .unwrap_or_default();
+                    let payloads = source
+                        .payloads(PayloadQuery {
+                            protocol: None,
+                            frame_id: data.top.frame_id,
+                            // The sampled row's own answer, not the catalogue's — a
+                            // disagreement here filters out the very id being
+                            // sampled and returns nothing.
+                            is_extended: Some(data.top.is_extended),
+                            limit: sample_limit,
+                            sampling: Sampling::Recent,
+                        })
+                        .await
+                        .unwrap_or_default();
                     Some(profile_bytes(&payloads))
                 } else {
                     None
@@ -549,12 +546,12 @@ pub async fn catalog_coverage(
         }
     }
 
-    // 4. Data frames the catalog doesn't describe — read off the same rollup, so
-    //    all three sections of the report count the same things. Reported by the
-    //    id you would *add to the catalogue*: under a mask, one unknown message
-    //    sent by five nodes is one missing frame, not five. The raw id rides
-    //    along so it can still be found on the wire. (The rollup already merged
-    //    the std/extended pair, so there is nothing left to de-dup.)
+    // Data frames the catalog doesn't describe — read off the same rollup, so
+    // all three sections of the report count the same things. Reported by the
+    // id you would *add to the catalogue*: under a mask, one unknown message
+    // sent by five nodes is one missing frame, not five. The raw id rides
+    // along so it can still be found on the wire. (The rollup already merged
+    // the std/extended pair, so there is nothing left to de-dup.)
     let mut uncatalogued: Vec<UncataloguedFrame> = data_by_id
         .iter()
         .filter(|(id, _)| !catalog_ids.contains(id))
@@ -570,7 +567,7 @@ pub async fn catalog_coverage(
     uncatalogued.sort_by_key(|f| f.frame_id);
 
     Ok(CoverageReport {
-        catalog: entry.name.clone(),
+        catalog: catalog_name.to_owned(),
         catalog_frames: catalog.frames.len(),
         data_frames: data_by_id.len(),
         present,
@@ -578,6 +575,178 @@ pub async fn catalog_coverage(
         uncatalogued,
         confidence,
     })
+}
+
+#[cfg(test)]
+pub(crate) mod memory {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    /// Frames in arrival order. `Recent` reads the tail, `Spread` strides the lot.
+    #[derive(Default)]
+    pub struct MemorySource {
+        frames: Vec<FrameMessage>,
+        pub asked: Mutex<Vec<(u32, Option<bool>, Sampling)>>,
+    }
+
+    impl MemorySource {
+        /// A bus-0 frame stamped with its arrival index.
+        pub fn push(&mut self, protocol: &str, frame_id: u32, is_extended: bool, bytes: Vec<u8>) {
+            let timestamp_us = self.frames.len() as u64;
+            self.push_at(protocol, 0, frame_id, is_extended, timestamp_us, bytes);
+        }
+
+        pub fn push_at(
+            &mut self,
+            protocol: &str,
+            bus: u8,
+            frame_id: u32,
+            is_extended: bool,
+            timestamp_us: u64,
+            bytes: Vec<u8>,
+        ) {
+            self.frames.push(FrameMessage {
+                protocol: protocol.into(),
+                timestamp_us,
+                frame_id,
+                bus,
+                dlc: bytes.len() as u16,
+                bytes,
+                is_extended,
+                ..Default::default()
+            });
+        }
+    }
+
+    impl PayloadSource for MemorySource {
+        async fn inventory(
+            &self,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<Vec<InventoryRow>, String> {
+            let mut rows: Vec<InventoryRow> = Vec::new();
+            for f in &self.frames {
+                let t = f.timestamp_us as i64;
+                match rows.iter_mut().find(|r| {
+                    r.protocol == f.protocol && r.frame_id == f.frame_id && r.is_extended == f.is_extended
+                }) {
+                    Some(row) => {
+                        row.count += 1;
+                        row.last_us = t;
+                    }
+                    None => rows.push(InventoryRow::new(&f.protocol, f.frame_id, f.is_extended, 1, t, t, f.dlc)),
+                }
+            }
+            Ok(rows)
+        }
+
+        async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
+            self.asked.lock().unwrap().push((q.frame_id, q.is_extended, q.sampling));
+            let matching: Vec<Vec<u8>> = self
+                .frames
+                .iter()
+                .filter(|f| {
+                    f.frame_id == q.frame_id
+                        && q.protocol.is_none_or(|p| p == f.protocol)
+                        && q.is_extended.is_none_or(|e| e == f.is_extended)
+                })
+                .map(|f| f.bytes.clone())
+                .collect();
+            let limit = q.limit as usize;
+            Ok(match q.sampling {
+                Sampling::Recent => matching[matching.len().saturating_sub(limit)..].to_vec(),
+                Sampling::Spread => {
+                    let step = matching.len().div_ceil(limit.max(1)).max(1);
+                    matching.into_iter().step_by(step).collect()
+                }
+            })
+        }
+    }
+
+    impl FrameSource for MemorySource {
+        async fn frames(
+            &self,
+            selection: &FrameSelection,
+            newest: Option<usize>,
+        ) -> Result<Vec<FrameMessage>, String> {
+            let selected: Vec<FrameMessage> = self
+                .frames
+                .iter()
+                .filter(|f| selection.is_empty() || selection.contains(&f.protocol, f.frame_id))
+                .cloned()
+                .collect();
+            let skip = newest.map_or(0, |n| selected.len().saturating_sub(n));
+            Ok(selected[skip..].to_vec())
+        }
+    }
+}
+
+#[cfg(test)]
+mod orchestrator_tests {
+    use wiretap_analysis::{ByteRole, Direction};
+
+    use super::memory::MemorySource;
+    use super::*;
+
+    fn counter_source(frames: u8) -> MemorySource {
+        let mut source = MemorySource::default();
+        for i in 0..frames {
+            source.push("can", 0x100, false, vec![0xC0, i]);
+        }
+        source
+    }
+
+    #[tokio::test]
+    async fn byte_profiles_read_each_frames_most_recent_run() {
+        let source = counter_source(50);
+
+        let profiles = byte_profiles(&source, &ScanFilter::Ids(vec![]), 10, usize::MAX).await.unwrap();
+
+        let profile = &profiles.frames[0].profile;
+        assert_eq!(profile.sample_count, 10);
+        assert_eq!(profile.columns[1].stats.min, 40, "the newest ten, not the first");
+        assert!(matches!(
+            profile.columns[1].role,
+            ByteRole::Counter { direction: Direction::Up, step: 1, .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_checksum_scan_samples_across_the_recording() {
+        let source = counter_source(50);
+
+        checksum_scan(&source, &ScanFilter::Ids(vec![]), 10, Default::default()).await.unwrap();
+
+        assert_eq!(*source.asked.lock().unwrap(), vec![(0x100, None, Sampling::Spread)]);
+    }
+
+    #[tokio::test]
+    async fn only_an_id_seen_both_standard_and_extended_is_fetched_by_its_width() {
+        let mut source = MemorySource::default();
+        source.push("can", 0x100, false, vec![1]);
+        source.push("can", 0x100, true, vec![2]);
+        source.push("can", 0x200, false, vec![3]);
+
+        let profiles = byte_profiles(&source, &ScanFilter::Ids(vec![]), 10, usize::MAX).await.unwrap();
+
+        assert_eq!(profiles.frames.len(), 3);
+        let asked: Vec<_> = source.asked.lock().unwrap().iter().map(|a| (a.0, a.1)).collect();
+        assert_eq!(asked, vec![(0x100, Some(false)), (0x100, Some(true)), (0x200, None)]);
+    }
+
+    #[tokio::test]
+    async fn frames_past_max_frames_are_counted_not_profiled() {
+        let mut source = MemorySource::default();
+        for id in 0..5 {
+            source.push("can", id, false, vec![0]);
+        }
+
+        let profiles = byte_profiles(&source, &ScanFilter::Ids(vec![]), 10, 2).await.unwrap();
+
+        assert_eq!(profiles.frames.len(), 2);
+        assert_eq!(profiles.skipped_frames, 3);
+    }
 }
 
 #[cfg(test)]

@@ -11,9 +11,9 @@ import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useSessionStore } from '../../stores/sessionStore';
 import { type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
-import { keyOf, groupKeysByProtocol } from "../../utils/frameKey";
+import { groupKeysByProtocol } from "../../utils/frameKey";
 import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
-import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../stores/discoveryFrameStore";
+import { useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
@@ -73,7 +73,6 @@ function DiscoveryInner() {
 
 
   // ── Frame store ──
-  const frames = getDiscoveryFrameBuffer();
   const { frameInfoMap, selectedFrames, seenIds, streamStartTimeUs, captureMode } =
     useDiscoveryFrameStore(useShallow((s) => ({
       frameInfoMap: s.frameInfoMap,
@@ -82,8 +81,6 @@ function DiscoveryInner() {
       streamStartTimeUs: s.streamStartTimeUs,
       captureMode: s.captureMode,
     })));
-  // Subscribe to frameVersion so components re-render when the mutable capture data changes
-  useDiscoveryFrameStore((s) => s.frameVersion);
   const setStreamStartTimeUs = useDiscoveryFrameStore((s) => s.setStreamStartTimeUs);
   const clearAll = useDiscoveryFrameStore((s) => s.clearAll);
   const enableCaptureMode = useDiscoveryFrameStore((s) => s.enableCaptureMode);
@@ -151,11 +148,6 @@ function DiscoveryInner() {
   const showAppError = useSessionStore((s) => s.showAppError);
 
   // ── Coordinated actions (cross-store wrappers) ──
-  const addFrames = useCallback((newFrames: FrameMessage[], skipFramePicker?: boolean) => {
-    const { maxBuffer: mb, activeSelectionSetSelectedIds } = useDiscoveryUIStore.getState();
-    useDiscoveryFrameStore.getState().addFrames(newFrames, mb, skipFramePicker, activeSelectionSetSelectedIds);
-  }, []);
-
   const toggleFrameSelection = useCallback((id: string) => {
     const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
     useDiscoveryFrameStore.getState().toggleFrameSelection(id, asid, ssd);
@@ -199,9 +191,7 @@ function DiscoveryInner() {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
-    let protocol = protocolOf(useDiscoveryFrameStore.getState().frameInfoMap)
-      ?? getDiscoveryFrameBuffer()[0]?.protocol
-      ?? 'can';
+    let protocol = protocolOf(useDiscoveryFrameStore.getState().frameInfoMap) ?? 'can';
     if (useDiscoverySerialStore.getState().isSerialMode) {
       protocol = 'serial';
     }
@@ -274,14 +264,10 @@ function DiscoveryInner() {
     // Only add frames when actively running (not paused). When paused, frame emissions
     // are from stepping (position updates), not new data to accumulate.
     if (isPausedRef.current) return;
-    // In capture mode, useCaptureFrameView handles display — don't accumulate frames in memory
     if (inCaptureModeRef.current) return;
-    // In serial mode, skip frame picker updates until framing is accepted
-    // The frame picker will be populated with correct IDs when acceptFraming is called
-    const skipFramePicker = isSerialMode && !framingAccepted;
-    addFrames(receivedFrames, skipFramePicker);
+    useDiscoveryFrameStore.getState().noteStreamStart(receivedFrames);
     incrementBackendFrameCount(receivedFrames.length);
-  }, [addFrames, incrementBackendFrameCount, isSerialMode, framingAccepted]);
+  }, [incrementBackendFrameCount]);
 
   const handleError = useCallback((error: string) => {
     // Stream errors are shown centrally via sessionStore's global IO error dialog
@@ -600,6 +586,25 @@ function DiscoveryInner() {
     inCaptureModeRef.current = isCaptureMode || captureMode.enabled;
   }, [isCaptureMode, captureMode.enabled]);
 
+  // An id the inventory drops (a cleared capture) leaves the picker too. A serial
+  // session's picker waits for framing to be accepted, which fills it from the framed
+  // capture.
+  const frameInventory = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.frameInventory : undefined));
+  const mergedInventoryRef = useRef<typeof frameInventory>(undefined);
+  useEffect(() => {
+    if (!frameInventory || isCaptureMode || captureMode.enabled || (isSerialMode && !framingAccepted)) {
+      mergedInventoryRef.current = undefined;
+      return;
+    }
+    const merged = mergedInventoryRef.current;
+    mergedInventoryRef.current = frameInventory;
+    useDiscoveryFrameStore.getState().mergeFrameInfo(
+      frameInventory.values(),
+      useDiscoveryUIStore.getState().activeSelectionSetSelectedIds,
+      [...(merged?.keys() ?? [])].filter((fk) => !frameInventory.has(fk)),
+    );
+  }, [frameInventory, isCaptureMode, captureMode.enabled, isSerialMode, framingAccepted]);
+
   // Centralised IO picker handlers - ensures consistent behavior with other apps
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
@@ -696,9 +701,7 @@ function DiscoveryInner() {
   // used to sit here made a Function Code Probe against a Modbus device label itself CAN.
   // What an open tool tab implies is the frames view's business, not this value's — it also
   // names export files, which want the data's protocol and not the tab's.
-  const protocolLabel = frames[0]?.protocol
-    || protocolOf(frameInfoMap)
-    || capabilities?.traits?.protocols?.[0];
+  const protocolLabel = protocolOf(frameInfoMap) || capabilities?.traits?.protocols?.[0];
 
   // Every protocol the stream carries — the frames seen plus what the session
   // declares, so a tab exists before its first frame. A mixed stream lists both.
@@ -742,8 +745,8 @@ function DiscoveryInner() {
     if (captureMode.enabled) return captureMode.totalFrames;
     if (isSerialMode && framedCaptureId && backendFrameCount > 0) return backendFrameCount;
     if (isSerialMode && framedData.length > 0) return framedData.length;
-    return frames.length;
-  }, [exportDataMode, watchByteCount, captureMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, frames.length]);
+    return liveFrameCount;
+  }, [exportDataMode, watchByteCount, captureMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, liveFrameCount]);
 
   const exportDefaultFilename = useMemo(() => {
     // Not "can": this fires only when nothing said what the frames are, and naming
@@ -853,7 +856,7 @@ function DiscoveryInner() {
     captureModeTotalFrames: captureMode.totalFrames,
 
     // Frame state
-    frames,
+    liveFrameCount,
     framedData,
     framedCaptureId,
     frameInfoMap,
@@ -1163,7 +1166,7 @@ function DiscoveryInner() {
 
       <AnalysisProgressDialog
         isOpen={toolboxIsRunning}
-        frameCount={selectedFrames.size > 0 ? frames.filter(f => selectedFrames.has(keyOf(f))).length : 0}
+        frameCount={liveFrameCount}
         toolName={toolboxActiveView === 'changes' ? 'Payload Changes' : toolboxActiveView === 'message-order' ? 'Frame Order' : 'Analysis'}
       />
 
@@ -1180,7 +1183,7 @@ function DiscoveryInner() {
         onConfirm={handlers.confirmSpeedChange}
         title={t("speedChangeDialog.title")}
         message={t("speedChangeDialog.message", {
-          frames: frames.length.toLocaleString(i18n.language),
+          frames: liveFrameCount.toLocaleString(i18n.language),
           ids: frameInfoMap.size.toLocaleString(i18n.language),
         })}
         confirmText={t("speedChangeDialog.confirm")}
@@ -1251,7 +1254,7 @@ function DiscoveryInner() {
         isSerialMode={isSerialMode}
         isSerialProtocol={capabilities?.traits?.protocols?.includes("serial") ?? false}
         isFilteredView={framesViewActiveTab === 'filtered'}
-        serialFrameCount={backendFrameCount > 0 ? backendFrameCount : (framedData.length + frames.length)}
+        serialFrameCount={backendFrameCount || framedData.length}
         serialBytesCount={watchByteCount}
         serialBytesCaptureId={sessionBytesCaptureId}
         hasSource={hasSource}

@@ -124,6 +124,32 @@ pub struct SessionAnalysisParams {
     /// the first 64 frames are profiled and the rest counted in `skippedFrames`.
     #[serde(default)]
     pub frame_ids: Option<Vec<String>>,
+    /// Mirrors and bursts over the capture's newest this many frames; default
+    /// 100000, Discovery's default live window.
+    #[serde(default)]
+    pub newest: Option<usize>,
+}
+
+/// Message order of a session's capture.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct FrameOrderParams {
+    /// The session whose frame capture to analyse (from `list_sessions`).
+    pub session_id: String,
+    /// Optional: restrict to specific frame keys (e.g. `"can:256"`).
+    #[serde(default)]
+    pub frame_ids: Option<Vec<String>>,
+    /// Analyse the capture's newest this many frames; default 100000,
+    /// Discovery's default live window.
+    #[serde(default)]
+    pub newest: Option<usize>,
+    /// Optional: walk cycles from this frame id instead of the likeliest start ids.
+    #[serde(default)]
+    pub start_frame_id: Option<u32>,
+    /// The start id's protocol; without it, every protocol's.
+    #[serde(default)]
+    pub start_protocol: Option<String>,
+    #[serde(default)]
+    pub start_is_extended: bool,
 }
 
 // ── Live session reads ───────────────────────────────────────────────────────

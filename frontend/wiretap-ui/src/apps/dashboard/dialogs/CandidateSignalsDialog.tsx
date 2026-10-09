@@ -7,7 +7,7 @@ import { iconSm } from "../../../styles/spacing";
 import Dialog, { DialogBody } from "../../../components/Dialog";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
-import type { PayloadAnalysisResult, ByteRole } from "../../../utils/analysis/payloadAnalysis";
+import type { ByteColumn, ChangesFrame } from "../../../api/byteRoles";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button } from "../../../components/Button";
 import { PrimaryButton, SecondaryButton, Select, Input, Checkbox } from "../../../components/forms";
@@ -54,10 +54,10 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
   );
 
   // Find analysis results for selected frame
-  const analysisResult: PayloadAnalysisResult | undefined = useMemo(() => {
-    if (!changesResults?.analysisResults || !selectedFrameId) return undefined;
+  const analysisResult: ChangesFrame | undefined = useMemo(() => {
+    if (!changesResults || !selectedFrameId) return undefined;
     const fid = parseInt(selectedFrameId, 10);
-    return changesResults.analysisResults.find((r) => r.frameId === fid);
+    return changesResults.frames.find((r) => r.frameId === fid);
   }, [changesResults, selectedFrameId]);
 
   const toggleBitLength = useCallback((bits: number) => {
@@ -86,12 +86,12 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     const result: CandidateSignal[] = [];
 
     // Roles to include when using analysis hints
-    const interestingRoles = new Set<ByteRole>(["sensor", "value", "unknown"]);
+    const interestingRoles = new Set<ByteColumn["role"]>(["sensor", "value", "unknown"]);
 
     for (let offset = start; offset <= end; offset++) {
       // If using analysis hints, skip bytes classified as static or counter
       if (useAnalysisHints && analysisResult) {
-        const byteStat = analysisResult.byteStats.find((b) => b.byteIndex === offset);
+        const byteStat = analysisResult.columns.find((b) => b.position === offset);
         if (byteStat && !interestingRoles.has(byteStat.role)) continue;
       }
 

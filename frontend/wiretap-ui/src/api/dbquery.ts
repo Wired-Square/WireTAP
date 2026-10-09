@@ -117,9 +117,8 @@ export async function queryFrameChanges(
  * Compares payloads between mirror and source frames at matching timestamps
  * (within tolerance). Returns timestamps where payloads differ.
  *
- * `compareByteIndices` restricts the comparison to the mirror's inherited bytes
- * so the result agrees with the Decoder's live Match/Mismatch badge; omit it to
- * compare the whole payload.
+ * With `catalogPath`, Rust compares only the mirror's inherited bytes, as the
+ * Decoder's live Match/Mismatch badge does; without it, the whole payload.
  */
 export async function queryMirrorValidation(
   profileId: string,
@@ -131,7 +130,7 @@ export async function queryMirrorValidation(
   endTime?: string,
   limit?: number,
   queryId?: string,
-  compareByteIndices?: number[]
+  catalogPath?: string | null
 ): Promise<MirrorValidationQueryResult> {
   return invoke("db_query_mirror_validation", {
     profileId,
@@ -143,7 +142,7 @@ export async function queryMirrorValidation(
     endTime,
     limit,
     queryId,
-    compareByteIndices,
+    catalogPath,
   });
 }
 

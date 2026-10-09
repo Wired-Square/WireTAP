@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/tools/MessageOrderResultView.tsx
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, iconLg, flexRowGap2 } from "../../../../styles/spacing";
@@ -8,10 +8,18 @@ import { labelSmall, caption, captionMuted, sectionHeaderText, emptyStateContain
 import { borderDivider, textDanger, textDataCyan, textDataGreen, textDataOrange, textDataPurple, textMuted, textSecondary } from "../../../../styles";
 import { Table } from "../../../../components/Table";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import type { DetectedPattern, IntervalGroup, StartIdCandidate, MultiplexedFrame, BurstFrame, MultiBusFrame } from "../../../../utils/analysis/messageOrderAnalysis";
+import type { BurstTiming } from "../../../../generated/BurstTiming";
+import type { BusOrder } from "../../../../generated/BusOrder";
+import type { CyclePattern } from "../../../../generated/CyclePattern";
+import type { FrameKey } from "../../../../generated/FrameKey";
+import type { IntervalGroup } from "../../../../generated/IntervalGroup";
+import type { MultiBusFrame } from "../../../../generated/MultiBusFrame";
+import type { MuxTiming } from "../../../../generated/MuxTiming";
+import type { StartCandidate } from "../../../../generated/StartCandidate";
 import { useSettings } from "../../../../hooks/useSettings";
-import { formatFrameId } from "../../../../utils/frameIds";
-import { formatMs } from "../../../../utils/reportExport";
+import { formatFrameKey } from "../../../../utils/frameIds";
+import { protocolLabel } from "../../../../utils/profileTraits";
+import { formatMs, formatOptionalMs } from "../../../../utils/reportExport";
 import ExportReportDialog from "../../../../dialogs/ExportReportDialog";
 import { pickFileToSave } from "../../../../api/dialogs";
 import { saveCatalog } from "../../../../api/catalog";
@@ -34,8 +42,8 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { settings } = useSettings();
 
-  const handleSelectStartId = async (id: number) => {
-    updateOptions({ startMessageId: id });
+  const handleSelectStart = async (protocol: string, key: FrameKey) => {
+    updateOptions({ start: { protocol, frameId: key.frameId, isExtended: key.isExtended } });
     await runAnalysis();
   };
 
@@ -75,6 +83,10 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
     );
   }
 
+  const totalFrames = results.reduce((n, o) => n + o.order.totalFrames, 0);
+  const uniqueKeys = results.reduce((n, o) => n + o.order.uniqueKeys, 0);
+  const timeSpanMs = Math.max(0, ...results.map((o) => o.order.timeSpanMs));
+
   return (
     <div className={shell}>
       {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />}
@@ -83,51 +95,44 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
       <div className={`px-4 py-2 ${borderDivider} bg-surface`}>
         <div className="flex flex-wrap gap-4 text-xs">
           <span className="text-muted">
-            <span className="font-medium text-primary">{results.totalFramesAnalyzed.toLocaleString()}</span> {t("messageOrder.framesUnit")}
+            <span className="font-medium text-primary">{totalFrames.toLocaleString()}</span> {t("messageOrder.framesUnit")}
           </span>
           <span className="text-muted">
-            <span className="font-medium text-primary">{results.uniqueFrameIds}</span> {t("messageOrder.uniqueIdsUnit")}
+            <span className="font-medium text-primary">{uniqueKeys}</span> {t("messageOrder.uniqueIdsUnit")}
           </span>
           <span className="text-muted">
-            <span className="font-medium text-primary">{formatMs(results.timeSpanMs)}</span> {t("messageOrder.spanUnit")}
+            <span className="font-medium text-primary">{formatMs(timeSpanMs)}</span> {t("messageOrder.spanUnit")}
           </span>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 p-4 overflow-auto space-y-6">
-        {/* Detected Patterns */}
-        <PatternSection patterns={results.patterns} />
-
-        {/* Multiplexed Frames */}
-        <MultiplexedSection multiplexed={results.multiplexedFrames} />
-
-        {/* Burst/Transaction Frames */}
-        <BurstSection bursts={results.burstFrames} />
-
-        {/* Multi-Bus Frames */}
-        <MultiBusSection multiBus={results.multiBusFrames} />
-
-        {/* Start ID Candidates */}
-        <CandidatesSection
-          candidates={results.startIdCandidates}
-          onSelect={handleSelectStartId}
-        />
-
-        {/* Interval Groups */}
-        <IntervalSection
-          groups={results.intervalGroups}
-          multiplexedIds={new Set(results.multiplexedFrames.map(m => m.frameId))}
-          burstIds={new Set(results.burstFrames.map(b => b.frameId))}
-        />
+        {results.map(({ protocol, order }) => {
+          const format = (key: FrameKey) => formatFrameKey(protocol, key);
+          return (
+            <Fragment key={protocol}>
+              {order.buses.map((bus) => (
+                <BusSection
+                  key={bus.bus}
+                  protocol={protocol}
+                  bus={bus}
+                  format={format}
+                  onSelectStart={(key) => handleSelectStart(protocol, key)}
+                />
+              ))}
+              <MultiBusSection multiBus={order.multiBus} format={format} />
+            </Fragment>
+          );
+        })}
       </div>
 
       <ExportReportDialog
         open={showExportDialog}
         title={t("messageOrder.exportTitle")}
         description={t("messageOrder.exportDescription", {
-          ids: results.uniqueFrameIds,
-          samples: results.totalFramesAnalyzed.toLocaleString(),
+          ids: uniqueKeys,
+          samples: totalFrames.toLocaleString(),
         })}
         defaultFilename="frame-order-report"
         defaultPath={settings?.report_dir}
@@ -135,6 +140,45 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
         onExport={handleExport}
       />
     </div>
+  );
+}
+
+type Format = (key: FrameKey) => string;
+
+const keyId = (key: FrameKey) => `${key.frameId}:${key.isExtended}`;
+
+// ============================================================================
+// One bus
+// ============================================================================
+
+type BusSectionProps = {
+  protocol: string;
+  bus: BusOrder;
+  format: Format;
+  onSelectStart: (key: FrameKey) => void;
+};
+
+function BusSection({ protocol, bus, format, onSelectStart }: BusSectionProps) {
+  const { t } = useTranslation("discovery");
+  return (
+    <section className="space-y-6">
+      <div className="flex items-baseline gap-2 border-b border-default pb-1">
+        <h3 className="text-sm font-medium text-primary">
+          {t("messageOrder.busHeading", { protocol: protocolLabel(protocol), bus: bus.bus })}
+        </h3>
+        <span className={captionMuted}>{t("messageOrder.busFrames", { count: bus.frameCount })}</span>
+      </div>
+      <PatternSection patterns={bus.patterns} format={format} />
+      <MultiplexedSection multiplexed={bus.mux} format={format} />
+      <BurstSection bursts={bus.bursts} format={format} />
+      <CandidatesSection candidates={bus.startCandidates} format={format} onSelect={onSelectStart} />
+      <IntervalSection
+        groups={bus.intervalGroups}
+        format={format}
+        multiplexedIds={new Set(bus.mux.map(keyId))}
+        burstIds={new Set(bus.bursts.map(keyId))}
+      />
+    </section>
   );
 }
 
@@ -191,10 +235,11 @@ function Header({ onExport, hasResults, onClose }: HeaderProps) {
 // ============================================================================
 
 type PatternSectionProps = {
-  patterns: DetectedPattern[];
+  patterns: CyclePattern[];
+  format: Format;
 };
 
-function PatternSection({ patterns }: PatternSectionProps) {
+function PatternSection({ patterns, format }: PatternSectionProps) {
   const { t } = useTranslation("discovery");
   if (patterns.length === 0) {
     return (
@@ -220,7 +265,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
       </div>
       <div className="space-y-3">
         {patterns.map((pattern, idx) => (
-          <PatternCard key={idx} pattern={pattern} rank={idx + 1} />
+          <PatternCard key={idx} pattern={pattern} rank={idx + 1} format={format} />
         ))}
       </div>
     </section>
@@ -228,11 +273,12 @@ function PatternSection({ patterns }: PatternSectionProps) {
 }
 
 type PatternCardProps = {
-  pattern: DetectedPattern;
+  pattern: CyclePattern;
   rank: number;
+  format: Format;
 };
 
-function PatternCard({ pattern, rank }: PatternCardProps) {
+function PatternCard({ pattern, rank, format }: PatternCardProps) {
   const { t } = useTranslation("discovery");
   const confidencePercent = Math.round(pattern.confidence * 100);
   const isHighConfidence = pattern.confidence >= 0.8;
@@ -245,7 +291,7 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
             {t("messageOrder.patternRank", { rank })}
           </span>
           <span className={captionMuted}>
-            {t("messageOrder.patternStartsWith")} <span className="font-mono text-purple">{formatFrameId(pattern.startId)}</span>
+            {t("messageOrder.patternStartsWith")} <span className="font-mono text-purple">{format(pattern.start)}</span>
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
@@ -266,15 +312,15 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
 
       {/* Sequence */}
       <div className="flex flex-wrap gap-1 mb-2">
-        {pattern.sequence.map((id, i) => (
+        {pattern.sequence.map((key, i) => (
           <Badge key={i} tone={i === 0 ? "purple" : "neutral"} mono>
-            {formatFrameId(id)}
+            {format(key)}
           </Badge>
         ))}
       </div>
 
       <div className={captionMuted}>
-        {t("messageOrder.framesAvgCycle", { count: pattern.sequence.length, cycle: formatMs(pattern.avgCycleTimeMs) })}
+        {t("messageOrder.framesAvgCycle", { count: pattern.sequence.length, cycle: formatOptionalMs(pattern.cycleMs) })}
       </div>
     </Card>
   );
@@ -285,11 +331,12 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
 // ============================================================================
 
 type CandidatesSectionProps = {
-  candidates: StartIdCandidate[];
-  onSelect: (id: number) => void;
+  candidates: StartCandidate[];
+  format: Format;
+  onSelect: (key: FrameKey) => void;
 };
 
-function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
+function CandidatesSection({ candidates, format, onSelect }: CandidatesSectionProps) {
   const { t } = useTranslation("discovery");
   if (candidates.length === 0) {
     return null;
@@ -320,9 +367,9 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
           </thead>
           <tbody>
             {candidates.map((candidate) => (
-              <tr key={candidate.id}>
+              <tr key={keyId(candidate)}>
                 <td className={`font-mono ${textDataPurple}`}>
-                  {formatFrameId(candidate.id)}
+                  {format(candidate)}
                 </td>
                 <td className={`text-right ${textSecondary}`}>
                   {formatMs(candidate.maxGapBeforeMs)}
@@ -338,7 +385,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
                 </td>
                 <td className="text-right">
                   <Button
-                    onClick={() => onSelect(candidate.id)}
+                    onClick={() => onSelect(candidate)}
                     variant="link"
                     tone="purple"
                     className="text-xs"
@@ -360,10 +407,11 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
 // ============================================================================
 
 type MultiplexedSectionProps = {
-  multiplexed: MultiplexedFrame[];
+  multiplexed: MuxTiming[];
+  format: Format;
 };
 
-function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
+function MultiplexedSection({ multiplexed, format }: MultiplexedSectionProps) {
   const { t } = useTranslation("discovery");
   if (multiplexed.length === 0) {
     return null;
@@ -392,45 +440,34 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
             </tr>
           </thead>
           <tbody>
-            {multiplexed.map((mux) => (
-              <tr key={mux.frameId}>
-                <td className={`font-mono ${textDataOrange}`}>
-                  {formatFrameId(mux.frameId)}
-                </td>
-                <td className={textSecondary}>
-                  {mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`}
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {mux.selectorByte === -1 ? (
-                      // Two-byte mux: show as "b0.b1" format
-                      mux.selectorValues.map((val) => {
-                        const b0 = Math.floor(val / 256);
-                        const b1 = val % 256;
-                        return (
-                          <Badge key={val} tone="warning" size="sm" mono>
-                            {b0}.{b1}
-                          </Badge>
-                        );
-                      })
-                    ) : (
-                      // Single-byte mux
-                      mux.selectorValues.map((val) => (
+            {multiplexed.map((mux) => {
+              const twoByte = mux.selector === "twoByte";
+              return (
+                <tr key={keyId(mux)}>
+                  <td className={`font-mono ${textDataOrange}`}>
+                    {format(mux)}
+                  </td>
+                  <td className={textSecondary}>
+                    {twoByte ? "byte[0:1]" : "byte[0]"}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.keys(mux.occurrences).map(Number).map((val) => (
                         <Badge key={val} tone="warning" size="sm" mono>
-                          {val}
+                          {twoByte ? `${Math.floor(val / 256)}.${val % 256}` : val}
                         </Badge>
-                      ))
-                    )}
-                  </div>
-                </td>
-                <td className={`text-right font-medium ${textDataGreen}`}>
-                  {formatMs(mux.muxPeriodMs)}
-                </td>
-                <td className={`text-right ${textMuted}`}>
-                  {formatMs(mux.interMessageMs)}
-                </td>
-              </tr>
-            ))}
+                      ))}
+                    </div>
+                  </td>
+                  <td className={`text-right font-medium ${textDataGreen}`}>
+                    {formatOptionalMs(mux.muxPeriodMs)}
+                  </td>
+                  <td className={`text-right ${textMuted}`}>
+                    {formatMs(mux.interMessageMs)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </Card>
@@ -443,10 +480,11 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
 // ============================================================================
 
 type BurstSectionProps = {
-  bursts: BurstFrame[];
+  bursts: BurstTiming[];
+  format: Format;
 };
 
-function BurstSection({ bursts }: BurstSectionProps) {
+function BurstSection({ bursts, format }: BurstSectionProps) {
   const { t } = useTranslation("discovery");
   if (bursts.length === 0) {
     return null;
@@ -477,33 +515,33 @@ function BurstSection({ bursts }: BurstSectionProps) {
           </thead>
           <tbody>
             {bursts.map((burst) => (
-              <tr key={burst.frameId}>
+              <tr key={keyId(burst)}>
                 <td className={`font-mono ${textDataCyan}`}>
-                  {formatFrameId(burst.frameId)}
+                  {format(burst)}
                 </td>
                 <td>
                   <div className="flex flex-wrap gap-1">
-                    {burst.dlcVariation.map((dlc) => (
-                      <Badge key={dlc} tone="cyan" size="sm" mono>
-                        {dlc}
+                    {burst.lengths.map((len) => (
+                      <Badge key={len} tone="cyan" size="sm" mono>
+                        {len}
                       </Badge>
                     ))}
                   </div>
                 </td>
                 <td className={`text-right ${textSecondary}`}>
-                  {burst.burstCount === 1 ? "—" : `~${burst.burstCount}`}
+                  {burst.framesPerBurst === 1 ? "—" : `~${burst.framesPerBurst.toFixed(1)}`}
                 </td>
                 <td className={`text-right font-medium ${textDataGreen}`}>
                   {formatMs(burst.burstPeriodMs)}
                 </td>
                 <td className={`text-right ${textMuted}`}>
-                  {burst.burstCount > 1 ? formatMs(burst.interMessageMs) : "—"}
+                  {burst.framesPerBurst > 1 ? formatMs(burst.interMessageMs) : "—"}
                 </td>
                 <td>
                   <div className="flex flex-wrap gap-1">
                     {burst.flags.map((flag) => (
                       <Badge key={flag} size="sm">
-                        {flag}
+                        {t(`messageOrder.flags.${flag}`)}
                       </Badge>
                     ))}
                   </div>
@@ -523,9 +561,10 @@ function BurstSection({ bursts }: BurstSectionProps) {
 
 type MultiBusSectionProps = {
   multiBus: MultiBusFrame[];
+  format: Format;
 };
 
-function MultiBusSection({ multiBus }: MultiBusSectionProps) {
+function MultiBusSection({ multiBus, format }: MultiBusSectionProps) {
   const { t } = useTranslation("discovery");
   if (multiBus.length === 0) {
     return null;
@@ -552,31 +591,34 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
             </tr>
           </thead>
           <tbody>
-            {multiBus.map((frame) => (
-              <tr key={frame.frameId}>
-                <td className={`font-mono ${textDanger}`}>
-                  {formatFrameId(frame.frameId)}
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {frame.buses.map((bus) => (
-                      <Badge key={bus} tone="danger" size="sm" mono>
-                        {t("messageOrder.busLabel", { bus })}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {frame.buses.map((bus) => (
-                      <Badge key={bus} size="sm">
-                        {bus}: {frame.countPerBus[bus]}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {multiBus.map((frame) => {
+              const counts = Object.entries(frame.framesPerBus);
+              return (
+                <tr key={keyId(frame)}>
+                  <td className={`font-mono ${textDanger}`}>
+                    {format(frame)}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-1">
+                      {counts.map(([bus]) => (
+                        <Badge key={bus} tone="danger" size="sm" mono>
+                          {t("messageOrder.busLabel", { bus })}
+                        </Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-1">
+                      {counts.map(([bus, count]) => (
+                        <Badge key={bus} size="sm">
+                          {bus}: {count}
+                        </Badge>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </Card>
@@ -590,11 +632,12 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
 
 type IntervalSectionProps = {
   groups: IntervalGroup[];
-  multiplexedIds: Set<number>;
-  burstIds: Set<number>;
+  format: Format;
+  multiplexedIds: Set<string>;
+  burstIds: Set<string>;
 };
 
-function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionProps) {
+function IntervalSection({ groups, format, multiplexedIds, burstIds }: IntervalSectionProps) {
   const { t } = useTranslation("discovery");
   if (groups.length === 0) {
     return null;
@@ -619,22 +662,22 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                 ~{formatMs(group.intervalMs)}
               </span>
               <span className={captionMuted}>
-                {t("messageOrder.frameCount", { count: group.frameIds.length })}
+                {t("messageOrder.frameCount", { count: group.keys.length })}
               </span>
             </div>
             <div className="flex flex-wrap gap-1">
-              {group.frameIds.map((id) => {
-                const isMux = multiplexedIds.has(id);
-                const isBurst = burstIds.has(id);
+              {group.keys.map((key) => {
+                const isMux = multiplexedIds.has(keyId(key));
+                const isBurst = burstIds.has(keyId(key));
                 return (
                   <Badge
-                    key={id}
+                    key={keyId(key)}
                     tone={isMux ? "warning" : isBurst ? "cyan" : "neutral"}
                     size="sm"
                     mono
                     title={isMux ? t("messageOrder.tooltipMultiplexed") : isBurst ? t("messageOrder.tooltipBurst") : undefined}
                   >
-                    {formatFrameId(id)}
+                    {format(key)}
                     {(isMux || isBurst) && <span>⚡</span>}
                   </Badge>
                 );

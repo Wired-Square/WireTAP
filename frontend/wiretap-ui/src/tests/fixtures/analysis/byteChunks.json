@@ -1,0 +1,9 @@
+[
+  { "name": "one chunk when every gap is within the threshold", "gapUs": 1000, "timestamps": [0, 500, 1500, 2500], "expectedStarts": [0] },
+  { "name": "a gap equal to the threshold stays in the chunk", "gapUs": 1000, "timestamps": [0, 1000, 2001], "expectedStarts": [0, 2] },
+  { "name": "the gap is measured from the previous byte, not the chunk start", "gapUs": 1000, "timestamps": [0, 900, 1800, 2700, 5000, 5001], "expectedStarts": [0, 4] },
+  { "name": "9600 baud splits at every byte under the default gap", "gapUs": 1000, "timestamps": [0, 1042, 2084, 3126], "expectedStarts": [0, 1, 2, 3] },
+  { "name": "a step back in time stays in the chunk", "gapUs": 1000, "timestamps": [5000, 4000, 6500], "expectedStarts": [0, 2] },
+  { "name": "a zero gap splits unless timestamps repeat", "gapUs": 0, "timestamps": [10, 10, 11, 11], "expectedStarts": [0, 2] },
+  { "name": "no bytes, no chunks", "gapUs": 1000, "timestamps": [], "expectedStarts": [] }
+]

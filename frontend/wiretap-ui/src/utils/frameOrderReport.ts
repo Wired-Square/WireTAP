@@ -1,24 +1,68 @@
 // ui/src/utils/frameOrderReport.ts
-// Report generation for Frame Order analysis results
+// Report generation for Frame Order analysis results, one section per protocol and bus
 
-import type { MessageOrderResult } from './analysis/messageOrderAnalysis';
+import type { BusOrder } from '../generated/BusOrder';
+import type { FrameKey } from '../generated/FrameKey';
+import type { MultiBusFrame } from '../generated/MultiBusFrame';
+import type { MuxTiming } from '../generated/MuxTiming';
+import type { ProtocolOrder } from '../generated/ProtocolOrder';
 import type { ExportFormat } from './reportExport';
-import { formatMs, DARK_THEME_STYLES, PRINT_THEME_STYLES } from './reportExport';
-import { formatFrameId } from './frameIds';
+import { formatMs, formatOptionalMs, DARK_THEME_STYLES, PRINT_THEME_STYLES } from './reportExport';
+import { formatFrameKey } from './frameIds';
+import { protocolLabel } from './profileTraits';
+
+type Format = (key: FrameKey) => string;
+
+type Bus = { title: string; format: Format; bus: BusOrder };
+
+type Report = {
+  totalFrames: number;
+  uniqueKeys: number;
+  timeSpanMs: number;
+  buses: Bus[];
+  multiBus: { format: Format; frame: MultiBusFrame }[];
+};
+
+const MAX_CANDIDATES = 10;
+
+function report(orders: ProtocolOrder[]): Report {
+  const formatters = orders.map(({ protocol, order }) => ({ order, protocol, format: (key: FrameKey) => formatFrameKey(protocol, key) }));
+  return {
+    totalFrames: orders.reduce((n, o) => n + o.order.totalFrames, 0),
+    uniqueKeys: orders.reduce((n, o) => n + o.order.uniqueKeys, 0),
+    timeSpanMs: Math.max(0, ...orders.map((o) => o.order.timeSpanMs)),
+    buses: formatters.flatMap(({ order, protocol, format }) =>
+      order.buses.map((bus) => ({ title: `${protocolLabel(protocol)} · Bus ${bus.bus}`, format, bus }))
+    ),
+    multiBus: formatters.flatMap(({ order, format }) => order.multiBus.map((frame) => ({ format, frame }))),
+  };
+}
+
+const muxCases = (mux: MuxTiming, limit: number) => {
+  const values = Object.keys(mux.occurrences).map(Number);
+  const shown = values.slice(0, limit).map((v) => (mux.selector === 'twoByte' ? `${Math.floor(v / 256)}.${v % 256}` : String(v)));
+  return { shown, more: values.length > limit };
+};
+
+const selectorText = (mux: MuxTiming) => (mux.selector === 'twoByte' ? 'byte[0:1]' : 'byte[0]');
+
+const burstSize = (framesPerBurst: number) => (framesPerBurst === 1 ? '—' : `~${framesPerBurst.toFixed(1)}`);
+
+const busCounts = (frame: MultiBusFrame) => Object.entries(frame.framesPerBus);
 
 /**
  * Generate report content for Frame Order analysis
  */
-export function generateFrameOrderReport(results: MessageOrderResult, format: ExportFormat): string {
+export function generateFrameOrderReport(results: ProtocolOrder[], format: ExportFormat): string {
   switch (format) {
     case "text":
-      return generateTextReport(results);
+      return generateTextReport(report(results));
     case "markdown":
-      return generateMarkdownReport(results);
+      return generateMarkdownReport(report(results));
     case "html-screen":
-      return generateHtmlReport(results);
+      return generateHtmlReport(report(results));
     case "html-print":
-      return generatePrintReport(results);
+      return generatePrintReport(report(results));
     case "json":
       return JSON.stringify(results, null, 2);
   }
@@ -28,7 +72,7 @@ export function generateFrameOrderReport(results: MessageOrderResult, format: Ex
 // Text Report
 // ============================================================================
 
-function generateTextReport(results: MessageOrderResult): string {
+function generateTextReport(r: Report): string {
   const lines: string[] = [];
   const divider = "═".repeat(70);
   const thinDivider = "─".repeat(70);
@@ -38,107 +82,94 @@ function generateTextReport(results: MessageOrderResult): string {
   lines.push(divider);
   lines.push("");
 
-  // Summary
   lines.push("SUMMARY");
   lines.push(thinDivider);
-  lines.push(`  Total Frames Analyzed: ${results.totalFramesAnalyzed.toLocaleString()}`);
-  lines.push(`  Unique Frame IDs:      ${results.uniqueFrameIds}`);
-  lines.push(`  Time Span:             ${formatMs(results.timeSpanMs)}`);
+  lines.push(`  Total Frames Analysed: ${r.totalFrames.toLocaleString()}`);
+  lines.push(`  Unique Frame IDs:      ${r.uniqueKeys}`);
+  lines.push(`  Time Span:             ${formatMs(r.timeSpanMs)}`);
   lines.push("");
 
-  // Quick stats
-  if (results.patterns.length > 0) lines.push(`  Detected Patterns:     ${results.patterns.length}`);
-  if (results.multiplexedFrames.length > 0) lines.push(`  Multiplexed Frames:    ${results.multiplexedFrames.length}`);
-  if (results.burstFrames.length > 0) lines.push(`  Burst/Transaction:     ${results.burstFrames.length}`);
-  if (results.multiBusFrames.length > 0) lines.push(`  Multi-Bus Frames:      ${results.multiBusFrames.length}`);
-  if (results.intervalGroups.length > 0) lines.push(`  Interval Groups:       ${results.intervalGroups.length}`);
-  lines.push("");
+  for (const { title, format, bus } of r.buses) {
+    lines.push(divider);
+    lines.push(`  ${title.toUpperCase()} (${bus.frameCount.toLocaleString()} frames)`);
+    lines.push(divider);
+    lines.push("");
 
-  // Detected Patterns
-  if (results.patterns.length > 0) {
-    lines.push("DETECTED PATTERNS");
-    lines.push(thinDivider);
-    for (let i = 0; i < results.patterns.length; i++) {
-      const pattern = results.patterns[i];
-      lines.push(`  Pattern #${i + 1}`);
-      lines.push(`    Start ID:    ${formatFrameId(pattern.startId)}`);
-      lines.push(`    Sequence:    ${pattern.sequence.map((id) => formatFrameId(id)).join(" → ")}`);
-      lines.push(`    Occurrences: ${pattern.occurrences}`);
-      lines.push(`    Confidence:  ${Math.round(pattern.confidence * 100)}%`);
-      lines.push(`    Avg Cycle:   ${formatMs(pattern.avgCycleTimeMs)}`);
-      lines.push("");
+    if (bus.patterns.length > 0) {
+      lines.push("DETECTED PATTERNS");
+      lines.push(thinDivider);
+      bus.patterns.forEach((pattern, i) => {
+        lines.push(`  Pattern #${i + 1}`);
+        lines.push(`    Start ID:    ${format(pattern.start)}`);
+        lines.push(`    Sequence:    ${pattern.sequence.map(format).join(" → ")}`);
+        lines.push(`    Occurrences: ${pattern.occurrences}`);
+        lines.push(`    Confidence:  ${Math.round(pattern.confidence * 100)}%`);
+        lines.push(`    Cycle:       ${formatOptionalMs(pattern.cycleMs)}`);
+        lines.push("");
+      });
     }
-  }
 
-  // Multiplexed Frames
-  if (results.multiplexedFrames.length > 0) {
-    lines.push("MULTIPLEXED FRAMES");
-    lines.push(thinDivider);
-    for (const mux of results.multiplexedFrames) {
-      const selector = mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`;
-      const cases = mux.selectorByte === -1
-        ? mux.selectorValues.map(v => `${Math.floor(v / 256)}.${v % 256}`).join(", ")
-        : mux.selectorValues.join(", ");
-      lines.push(`  ${formatFrameId(mux.frameId)}`);
-      lines.push(`    Selector:    ${selector}`);
-      lines.push(`    Cases:       ${cases}`);
-      lines.push(`    Mux Period:  ${formatMs(mux.muxPeriodMs)}`);
-      lines.push(`    Inter-msg:   ${formatMs(mux.interMessageMs)}`);
-      lines.push("");
+    if (bus.mux.length > 0) {
+      lines.push("MULTIPLEXED FRAMES");
+      lines.push(thinDivider);
+      for (const mux of bus.mux) {
+        lines.push(`  ${format(mux)}`);
+        lines.push(`    Selector:    ${selectorText(mux)}`);
+        lines.push(`    Cases:       ${muxCases(mux, Infinity).shown.join(", ")}`);
+        lines.push(`    Mux Period:  ${formatOptionalMs(mux.muxPeriodMs)}`);
+        lines.push(`    Inter-msg:   ${formatMs(mux.interMessageMs)}`);
+        lines.push("");
+      }
     }
-  }
 
-  // Burst Frames
-  if (results.burstFrames.length > 0) {
-    lines.push("BURST/TRANSACTION FRAMES");
-    lines.push(thinDivider);
-    for (const burst of results.burstFrames) {
-      lines.push(`  ${formatFrameId(burst.frameId)}`);
-      lines.push(`    DLCs:        ${burst.dlcVariation.join(", ")}`);
-      lines.push(`    Burst Size:  ${burst.burstCount === 1 ? "—" : `~${burst.burstCount}`}`);
-      lines.push(`    Cycle:       ${formatMs(burst.burstPeriodMs)}`);
-      if (burst.flags.length > 0) {
-        lines.push(`    Flags:       ${burst.flags.join(", ")}`);
+    if (bus.bursts.length > 0) {
+      lines.push("BURST/TRANSACTION FRAMES");
+      lines.push(thinDivider);
+      for (const burst of bus.bursts) {
+        lines.push(`  ${format(burst)}`);
+        lines.push(`    Lengths:     ${burst.lengths.join(", ")}`);
+        lines.push(`    Burst Size:  ${burstSize(burst.framesPerBurst)}`);
+        lines.push(`    Cycle:       ${formatMs(burst.burstPeriodMs)}`);
+        if (burst.flags.length > 0) {
+          lines.push(`    Flags:       ${burst.flags.join(", ")}`);
+        }
+        lines.push("");
+      }
+    }
+
+    if (bus.intervalGroups.length > 0) {
+      lines.push("REPETITION PERIOD GROUPS");
+      lines.push(thinDivider);
+      for (const group of bus.intervalGroups) {
+        lines.push(`  ~${formatMs(group.intervalMs)} (${group.keys.length} frames)`);
+        lines.push(`    ${group.keys.map(format).join(", ")}`);
+        lines.push("");
+      }
+    }
+
+    if (bus.startCandidates.length > 0) {
+      lines.push("START ID CANDIDATES");
+      lines.push(thinDivider);
+      lines.push("  Frame ID     Max Gap    Avg Gap    Min Gap    Count");
+      lines.push("  " + "-".repeat(55));
+      for (const candidate of bus.startCandidates.slice(0, MAX_CANDIDATES)) {
+        const id = format(candidate).padEnd(10);
+        const max = formatMs(candidate.maxGapBeforeMs).padStart(10);
+        const avg = formatMs(candidate.avgGapBeforeMs).padStart(10);
+        const min = formatMs(candidate.minGapBeforeMs).padStart(10);
+        const n = String(candidate.occurrences).padStart(8);
+        lines.push(`  ${id}${max}${avg}${min}${n}`);
       }
       lines.push("");
     }
   }
 
-  // Multi-Bus Frames
-  if (results.multiBusFrames.length > 0) {
+  if (r.multiBus.length > 0) {
     lines.push("MULTI-BUS FRAMES");
     lines.push(thinDivider);
-    for (const frame of results.multiBusFrames) {
-      const busInfo = frame.buses.map(b => `Bus ${b}: ${frame.countPerBus[b]}`).join(", ");
-      lines.push(`  ${formatFrameId(frame.frameId)}: ${busInfo}`);
-    }
-    lines.push("");
-  }
-
-  // Interval Groups
-  if (results.intervalGroups.length > 0) {
-    lines.push("REPETITION PERIOD GROUPS");
-    lines.push(thinDivider);
-    for (const group of results.intervalGroups) {
-      lines.push(`  ~${formatMs(group.intervalMs)} (${group.frameIds.length} frames)`);
-      lines.push(`    ${group.frameIds.map((id) => formatFrameId(id)).join(", ")}`);
-      lines.push("");
-    }
-  }
-
-  // Start ID Candidates
-  if (results.startIdCandidates.length > 0) {
-    lines.push("START ID CANDIDATES");
-    lines.push(thinDivider);
-    lines.push("  Frame ID     Max Gap    Avg Gap    Min Gap    Count");
-    lines.push("  " + "-".repeat(55));
-    for (const candidate of results.startIdCandidates.slice(0, 10)) {
-      const id = formatFrameId(candidate.id).padEnd(10);
-      const max = formatMs(candidate.maxGapBeforeMs).padStart(10);
-      const avg = formatMs(candidate.avgGapBeforeMs).padStart(10);
-      const min = formatMs(candidate.minGapBeforeMs).padStart(10);
-      const count = String(candidate.occurrences).padStart(8);
-      lines.push(`  ${id}${max}${avg}${min}${count}`);
+    for (const { format, frame } of r.multiBus) {
+      const busInfo = busCounts(frame).map(([b, n]) => `Bus ${b}: ${n}`).join(", ");
+      lines.push(`  ${format(frame)}: ${busInfo}`);
     }
     lines.push("");
   }
@@ -154,7 +185,7 @@ function generateTextReport(results: MessageOrderResult): string {
 // Markdown Report
 // ============================================================================
 
-function generateMarkdownReport(results: MessageOrderResult): string {
+function generateMarkdownReport(r: Report): string {
   const lines: string[] = [];
 
   lines.push("# Frame Order Analysis Report");
@@ -163,95 +194,80 @@ function generateMarkdownReport(results: MessageOrderResult): string {
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("|--------|-------|");
-  lines.push(`| Total Frames | ${results.totalFramesAnalyzed.toLocaleString()} |`);
-  lines.push(`| Unique Frame IDs | ${results.uniqueFrameIds} |`);
-  lines.push(`| Time Span | ${formatMs(results.timeSpanMs)} |`);
-  if (results.patterns.length > 0) lines.push(`| Detected Patterns | ${results.patterns.length} |`);
-  if (results.multiplexedFrames.length > 0) lines.push(`| Multiplexed Frames | ${results.multiplexedFrames.length} |`);
-  if (results.burstFrames.length > 0) lines.push(`| Burst/Transaction | ${results.burstFrames.length} |`);
-  if (results.multiBusFrames.length > 0) lines.push(`| Multi-Bus Frames | ${results.multiBusFrames.length} |`);
+  lines.push(`| Total Frames | ${r.totalFrames.toLocaleString()} |`);
+  lines.push(`| Unique Frame IDs | ${r.uniqueKeys} |`);
+  lines.push(`| Time Span | ${formatMs(r.timeSpanMs)} |`);
+  const patterns = r.buses.reduce((n, b) => n + b.bus.patterns.length, 0);
+  if (patterns > 0) lines.push(`| Detected Patterns | ${patterns} |`);
+  if (r.multiBus.length > 0) lines.push(`| Multi-Bus Frames | ${r.multiBus.length} |`);
   lines.push("");
 
-  // Detected Patterns
-  if (results.patterns.length > 0) {
-    lines.push("## Detected Patterns");
+  for (const { title, format, bus } of r.buses) {
+    lines.push(`## ${title} (${bus.frameCount.toLocaleString()} frames)`);
     lines.push("");
-    for (let i = 0; i < results.patterns.length; i++) {
-      const pattern = results.patterns[i];
+
+    bus.patterns.forEach((pattern, i) => {
       lines.push(`### Pattern ${i + 1}`);
       lines.push("");
-      lines.push(`- **Start ID**: \`${formatFrameId(pattern.startId)}\``);
-      lines.push(`- **Sequence**: ${pattern.sequence.map(id => `\`${formatFrameId(id)}\``).join(" → ")}`);
+      lines.push(`- **Start ID**: \`${format(pattern.start)}\``);
+      lines.push(`- **Sequence**: ${pattern.sequence.map((k) => `\`${format(k)}\``).join(" → ")}`);
       lines.push(`- **Occurrences**: ${pattern.occurrences}`);
       lines.push(`- **Confidence**: ${Math.round(pattern.confidence * 100)}%`);
-      lines.push(`- **Avg Cycle**: ${formatMs(pattern.avgCycleTimeMs)}`);
+      lines.push(`- **Cycle**: ${formatOptionalMs(pattern.cycleMs)}`);
+      lines.push("");
+    });
+
+    if (bus.mux.length > 0) {
+      lines.push("### Multiplexed Frames");
+      lines.push("");
+      lines.push("| Frame ID | Selector | Cases | Mux Period | Inter-msg |");
+      lines.push("|----------|----------|-------|------------|-----------|");
+      for (const mux of bus.mux) {
+        const { shown, more } = muxCases(mux, 8);
+        lines.push(`| \`${format(mux)}\` | ${selectorText(mux)} | ${shown.join(", ")}${more ? "..." : ""} | ${formatOptionalMs(mux.muxPeriodMs)} | ${formatMs(mux.interMessageMs)} |`);
+      }
+      lines.push("");
+    }
+
+    if (bus.bursts.length > 0) {
+      lines.push("### Burst/Transaction Frames");
+      lines.push("");
+      lines.push("| Frame ID | Lengths | Burst Size | Cycle | Flags |");
+      lines.push("|----------|---------|------------|-------|-------|");
+      for (const burst of bus.bursts) {
+        lines.push(`| \`${format(burst)}\` | ${burst.lengths.join(", ")} | ${burstSize(burst.framesPerBurst)} | ${formatMs(burst.burstPeriodMs)} | ${burst.flags.join(", ") || "—"} |`);
+      }
+      lines.push("");
+    }
+
+    if (bus.intervalGroups.length > 0) {
+      lines.push("### Repetition Period Groups");
+      lines.push("");
+      for (const group of bus.intervalGroups) {
+        lines.push(`- **~${formatMs(group.intervalMs)}** (${group.keys.length} frames): ${group.keys.map((k) => `\`${format(k)}\``).join(", ")}`);
+      }
+      lines.push("");
+    }
+
+    if (bus.startCandidates.length > 0) {
+      lines.push("### Start ID Candidates");
+      lines.push("");
+      lines.push("| Frame ID | Max Gap | Avg Gap | Min Gap | Count |");
+      lines.push("|----------|---------|---------|---------|-------|");
+      for (const c of bus.startCandidates.slice(0, MAX_CANDIDATES)) {
+        lines.push(`| \`${format(c)}\` | ${formatMs(c.maxGapBeforeMs)} | ${formatMs(c.avgGapBeforeMs)} | ${formatMs(c.minGapBeforeMs)} | ${c.occurrences} |`);
+      }
       lines.push("");
     }
   }
 
-  // Multiplexed Frames
-  if (results.multiplexedFrames.length > 0) {
-    lines.push("## Multiplexed Frames");
-    lines.push("");
-    lines.push("| Frame ID | Selector | Cases | Mux Period | Inter-msg |");
-    lines.push("|----------|----------|-------|------------|-----------|");
-    for (const mux of results.multiplexedFrames) {
-      const selector = mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`;
-      const cases = mux.selectorByte === -1
-        ? mux.selectorValues.slice(0, 5).map(v => `${Math.floor(v / 256)}.${v % 256}`).join(", ") + (mux.selectorValues.length > 5 ? "..." : "")
-        : mux.selectorValues.slice(0, 8).join(", ") + (mux.selectorValues.length > 8 ? "..." : "");
-      lines.push(`| \`${formatFrameId(mux.frameId)}\` | ${selector} | ${cases} | ${formatMs(mux.muxPeriodMs)} | ${formatMs(mux.interMessageMs)} |`);
-    }
-    lines.push("");
-  }
-
-  // Burst Frames
-  if (results.burstFrames.length > 0) {
-    lines.push("## Burst/Transaction Frames");
-    lines.push("");
-    lines.push("| Frame ID | DLCs | Burst Size | Cycle | Flags |");
-    lines.push("|----------|------|------------|-------|-------|");
-    for (const burst of results.burstFrames) {
-      const size = burst.burstCount === 1 ? "—" : `~${burst.burstCount}`;
-      lines.push(`| \`${formatFrameId(burst.frameId)}\` | ${burst.dlcVariation.join(", ")} | ${size} | ${formatMs(burst.burstPeriodMs)} | ${burst.flags.join(", ") || "—"} |`);
-    }
-    lines.push("");
-  }
-
-  // Multi-Bus Frames
-  if (results.multiBusFrames.length > 0) {
+  if (r.multiBus.length > 0) {
     lines.push("## Multi-Bus Frames");
     lines.push("");
-    lines.push("| Frame ID | Buses | Count per Bus |");
-    lines.push("|----------|-------|---------------|");
-    for (const frame of results.multiBusFrames) {
-      const buses = frame.buses.map(b => `Bus ${b}`).join(", ");
-      const counts = frame.buses.map(b => `${b}: ${frame.countPerBus[b]}`).join(", ");
-      lines.push(`| \`${formatFrameId(frame.frameId)}\` | ${buses} | ${counts} |`);
-    }
-    lines.push("");
-  }
-
-  // Interval Groups
-  if (results.intervalGroups.length > 0) {
-    lines.push("## Repetition Period Groups");
-    lines.push("");
-    for (const group of results.intervalGroups) {
-      lines.push(`### ~${formatMs(group.intervalMs)} (${group.frameIds.length} frames)`);
-      lines.push("");
-      lines.push(group.frameIds.map(id => `\`${formatFrameId(id)}\``).join(", "));
-      lines.push("");
-    }
-  }
-
-  // Start ID Candidates
-  if (results.startIdCandidates.length > 0) {
-    lines.push("## Start ID Candidates");
-    lines.push("");
-    lines.push("| Frame ID | Max Gap | Avg Gap | Min Gap | Count |");
-    lines.push("|----------|---------|---------|---------|-------|");
-    for (const candidate of results.startIdCandidates.slice(0, 10)) {
-      lines.push(`| \`${formatFrameId(candidate.id)}\` | ${formatMs(candidate.maxGapBeforeMs)} | ${formatMs(candidate.avgGapBeforeMs)} | ${formatMs(candidate.minGapBeforeMs)} | ${candidate.occurrences} |`);
+    lines.push("| Frame ID | Count per Bus |");
+    lines.push("|----------|---------------|");
+    for (const { format, frame } of r.multiBus) {
+      lines.push(`| \`${format(frame)}\` | ${busCounts(frame).map(([b, n]) => `Bus ${b}: ${n}`).join(", ")} |`);
     }
     lines.push("");
   }
@@ -263,166 +279,122 @@ function generateMarkdownReport(results: MessageOrderResult): string {
 }
 
 // ============================================================================
-// HTML Report (Screen)
+// HTML Reports
 // ============================================================================
 
-function generateHtmlReport(results: MessageOrderResult): string {
+type HtmlStyle = {
+  styles: string;
+  card: string;
+  badge: (tone: string, text: string) => string;
+  id: (text: string) => string;
+};
+
+const SCREEN: HtmlStyle = {
+  styles: DARK_THEME_STYLES,
+  card: 'section-card',
+  badge: (tone, text) => `<span class="badge badge-${tone}">${text}</span>`,
+  id: (text) => `<span class="frame-id">${text}</span>`,
+};
+
+const PRINT: HtmlStyle = {
+  styles: PRINT_THEME_STYLES,
+  card: 'section-card no-break',
+  badge: (tone, text) => `<span class="badge badge-${tone}">${text}</span>`,
+  id: (text) => `<code>${text}</code>`,
+};
+
+function busHtml({ title, format, bus }: Bus, s: HtmlStyle): string {
+  let html = `<h2>${title} (${bus.frameCount.toLocaleString()} frames)</h2>`;
+
+  bus.patterns.forEach((pattern, i) => {
+    html += `
+    <div class="${s.card}">
+      <div><strong>Pattern #${i + 1}</strong> — starts with ${s.id(format(pattern.start))} · ${Math.round(pattern.confidence * 100)}% consistent</div>
+      <div>${pattern.sequence.map((k, idx) => s.badge(idx === 0 ? 'purple' : 'slate', format(k))).join(' ')}</div>
+      <div>${pattern.sequence.length} frames • ${pattern.occurrences}× seen • cycle: ${formatOptionalMs(pattern.cycleMs)}</div>
+    </div>`;
+  });
+
+  if (bus.mux.length > 0) {
+    html += `<h3>Multiplexed Frames</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Selector</th><th>Cases</th><th>Mux Period</th><th>Inter-msg</th></tr>`;
+    for (const mux of bus.mux) {
+      const { shown, more } = muxCases(mux, 8);
+      html += `
+      <tr><td>${s.id(format(mux))}</td><td>${selectorText(mux)}</td><td>${shown.map((v) => s.badge('orange', v)).join(' ')}${more ? '...' : ''}</td><td>${formatOptionalMs(mux.muxPeriodMs)}</td><td>${formatMs(mux.interMessageMs)}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  if (bus.bursts.length > 0) {
+    html += `<h3>Burst/Transaction Frames</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Lengths</th><th>Burst Size</th><th>Cycle</th><th>Flags</th></tr>`;
+    for (const burst of bus.bursts) {
+      html += `
+      <tr><td>${s.id(format(burst))}</td><td>${burst.lengths.map((n) => s.badge('cyan', String(n))).join(' ')}</td><td>${burstSize(burst.framesPerBurst)}</td><td>${formatMs(burst.burstPeriodMs)}</td><td>${burst.flags.map((f) => s.badge('slate', f)).join(' ') || '—'}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  if (bus.intervalGroups.length > 0) {
+    html += `<h3>Repetition Period Groups</h3>`;
+    for (const group of bus.intervalGroups) {
+      html += `
+    <div class="${s.card}">
+      <div><strong>~${formatMs(group.intervalMs)}</strong> (${group.keys.length} frames)</div>
+      <div>${group.keys.map((k) => s.badge('slate', format(k))).join(' ')}</div>
+    </div>`;
+    }
+  }
+
+  if (bus.startCandidates.length > 0) {
+    html += `<h3>Start ID Candidates</h3>
+    <table>
+      <tr><th>Frame ID</th><th>Max Gap</th><th>Avg Gap</th><th>Min Gap</th><th>Count</th></tr>`;
+    for (const c of bus.startCandidates.slice(0, MAX_CANDIDATES)) {
+      html += `
+      <tr><td>${s.id(format(c))}</td><td>${formatMs(c.maxGapBeforeMs)}</td><td>${formatMs(c.avgGapBeforeMs)}</td><td>${formatMs(c.minGapBeforeMs)}</td><td>${c.occurrences}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  return html;
+}
+
+function htmlReport(r: Report, s: HtmlStyle, preamble: string): string {
   let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Frame Order Analysis Report</title>
-  <style>${DARK_THEME_STYLES}</style>
+  <style>${s.styles}</style>
 </head>
 <body>
   <div class="container">
     <h1>Frame Order Analysis Report</h1>
-
+    ${preamble}
     <div class="summary-grid">
-      <div class="summary-card">
-        <div class="value">${results.totalFramesAnalyzed.toLocaleString()}</div>
-        <div class="label">Total Frames</div>
-      </div>
-      <div class="summary-card">
-        <div class="value">${results.uniqueFrameIds}</div>
-        <div class="label">Unique IDs</div>
-      </div>
-      <div class="summary-card">
-        <div class="value">${formatMs(results.timeSpanMs)}</div>
-        <div class="label">Time Span</div>
-      </div>
-      ${results.patterns.length > 0 ? `<div class="summary-card"><div class="value">${results.patterns.length}</div><div class="label">Patterns</div></div>` : ''}
-    </div>
-
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0;">
-      ${results.patterns.length > 0 ? '<span class="badge badge-purple">Patterns Detected</span>' : ''}
-      ${results.multiplexedFrames.length > 0 ? '<span class="badge badge-orange">Multiplexed</span>' : ''}
-      ${results.burstFrames.length > 0 ? '<span class="badge badge-cyan">Burst/Transaction</span>' : ''}
-      ${results.multiBusFrames.length > 0 ? '<span class="badge badge-pink">Multi-Bus</span>' : ''}
+      <div class="summary-card stat-item"><div class="value">${r.totalFrames.toLocaleString()}</div><div class="label">Total Frames</div></div>
+      <div class="summary-card stat-item"><div class="value">${r.uniqueKeys}</div><div class="label">Unique IDs</div></div>
+      <div class="summary-card stat-item"><div class="value">${formatMs(r.timeSpanMs)}</div><div class="label">Time Span</div></div>
+      <div class="summary-card stat-item"><div class="value">${r.buses.length}</div><div class="label">Buses</div></div>
     </div>
 `;
 
-  // Detected Patterns
-  if (results.patterns.length > 0) {
-    html += `<h2>Detected Patterns</h2>`;
-    for (let i = 0; i < results.patterns.length; i++) {
-      const pattern = results.patterns[i];
-      const confidence = Math.round(pattern.confidence * 100);
-      const isHigh = pattern.confidence >= 0.8;
-      html += `
-    <div class="section-card">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-        <span><strong>Pattern #${i + 1}</strong> — starts with <span class="frame-id">${formatFrameId(pattern.startId)}</span></span>
-        <span style="color: ${isHigh ? 'var(--accent-green)' : 'var(--accent-yellow)'};">${confidence}% consistent</span>
-      </div>
-      <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0;">
-        ${pattern.sequence.map((id, idx) => `<span class="badge ${idx === 0 ? 'badge-purple' : 'badge-slate'}">${formatFrameId(id)}</span>`).join('')}
-      </div>
-      <div style="color: var(--text-secondary); font-size: 0.875rem;">
-        ${pattern.sequence.length} frames • ${pattern.occurrences}× seen • avg cycle: ${formatMs(pattern.avgCycleTimeMs)}
-      </div>
-    </div>`;
-    }
-  }
+  html += r.buses.map((bus) => busHtml(bus, s)).join('\n');
 
-  // Multiplexed Frames
-  if (results.multiplexedFrames.length > 0) {
-    html += `<h2>Multiplexed Frames</h2>
-    <div class="section-card">
-      <table>
-        <tr><th>Frame ID</th><th>Selector</th><th>Cases</th><th>Mux Period</th><th>Inter-msg</th></tr>`;
-    for (const mux of results.multiplexedFrames) {
-      const selector = mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`;
-      const cases = mux.selectorByte === -1
-        ? mux.selectorValues.slice(0, 5).map(v => `<span class="badge badge-orange">${Math.floor(v / 256)}.${v % 256}</span>`).join(' ')
-        : mux.selectorValues.slice(0, 8).map(v => `<span class="badge badge-orange">${v}</span>`).join(' ');
-      html += `
-        <tr>
-          <td class="frame-id">${formatFrameId(mux.frameId)}</td>
-          <td>${selector}</td>
-          <td>${cases}${mux.selectorValues.length > 8 ? '...' : ''}</td>
-          <td style="color: var(--accent-green);">${formatMs(mux.muxPeriodMs)}</td>
-          <td style="color: var(--text-secondary);">${formatMs(mux.interMessageMs)}</td>
-        </tr>`;
-    }
-    html += `</table></div>`;
-  }
-
-  // Burst Frames
-  if (results.burstFrames.length > 0) {
-    html += `<h2>Burst/Transaction Frames</h2>
-    <div class="section-card">
-      <table>
-        <tr><th>Frame ID</th><th>DLCs</th><th>Burst Size</th><th>Cycle</th><th>Flags</th></tr>`;
-    for (const burst of results.burstFrames) {
-      const dlcs = burst.dlcVariation.map(d => `<span class="badge badge-cyan">${d}</span>`).join(' ');
-      const flags = burst.flags.map(f => `<span class="badge badge-slate">${f}</span>`).join(' ') || '—';
-      html += `
-        <tr>
-          <td class="frame-id">${formatFrameId(burst.frameId)}</td>
-          <td>${dlcs}</td>
-          <td>${burst.burstCount === 1 ? '—' : `~${burst.burstCount}`}</td>
-          <td style="color: var(--accent-green);">${formatMs(burst.burstPeriodMs)}</td>
-          <td>${flags}</td>
-        </tr>`;
-    }
-    html += `</table></div>`;
-  }
-
-  // Multi-Bus Frames
-  if (results.multiBusFrames.length > 0) {
+  if (r.multiBus.length > 0) {
     html += `<h2>Multi-Bus Frames</h2>
-    <div class="section-card">
-      <table>
-        <tr><th>Frame ID</th><th>Buses</th><th>Count per Bus</th></tr>`;
-    for (const frame of results.multiBusFrames) {
-      const buses = frame.buses.map(b => `<span class="badge badge-pink">Bus ${b}</span>`).join(' ');
-      const counts = frame.buses.map(b => `<span class="badge badge-slate">${b}: ${frame.countPerBus[b]}</span>`).join(' ');
+    <table>
+      <tr><th>Frame ID</th><th>Count per Bus</th></tr>`;
+    for (const { format, frame } of r.multiBus) {
       html += `
-        <tr>
-          <td class="frame-id">${formatFrameId(frame.frameId)}</td>
-          <td>${buses}</td>
-          <td>${counts}</td>
-        </tr>`;
+      <tr><td>${s.id(format(frame))}</td><td>${busCounts(frame).map(([b, n]) => s.badge('pink', `Bus ${b}: ${n}`)).join(' ')}</td></tr>`;
     }
-    html += `</table></div>`;
-  }
-
-  // Interval Groups
-  if (results.intervalGroups.length > 0) {
-    html += `<h2>Repetition Period Groups</h2>`;
-    for (const group of results.intervalGroups) {
-      html += `
-    <div class="section-card">
-      <div style="margin-bottom: 0.5rem;">
-        <span style="color: var(--accent-green); font-weight: bold;">~${formatMs(group.intervalMs)}</span>
-        <span style="color: var(--text-secondary);"> (${group.frameIds.length} frames)</span>
-      </div>
-      <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
-        ${group.frameIds.map(id => `<span class="badge badge-slate">${formatFrameId(id)}</span>`).join('')}
-      </div>
-    </div>`;
-    }
-  }
-
-  // Start ID Candidates
-  if (results.startIdCandidates.length > 0) {
-    html += `<h2>Start ID Candidates</h2>
-    <div class="section-card">
-      <table>
-        <tr><th>Frame ID</th><th>Max Gap</th><th>Avg Gap</th><th>Min Gap</th><th>Count</th></tr>`;
-    for (const candidate of results.startIdCandidates.slice(0, 10)) {
-      html += `
-        <tr>
-          <td class="frame-id">${formatFrameId(candidate.id)}</td>
-          <td>${formatMs(candidate.maxGapBeforeMs)}</td>
-          <td style="color: var(--text-secondary);">${formatMs(candidate.avgGapBeforeMs)}</td>
-          <td style="color: var(--text-secondary);">${formatMs(candidate.minGapBeforeMs)}</td>
-          <td style="color: var(--text-secondary);">${candidate.occurrences}</td>
-        </tr>`;
-    }
-    html += `</table></div>`;
+    html += `</table>`;
   }
 
   html += `
@@ -434,164 +406,16 @@ function generateHtmlReport(results: MessageOrderResult): string {
   return html;
 }
 
-// ============================================================================
-// HTML Report (Print)
-// ============================================================================
+function generateHtmlReport(r: Report): string {
+  return htmlReport(r, SCREEN, '');
+}
 
-function generatePrintReport(results: MessageOrderResult): string {
-  let html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Frame Order Analysis Report</title>
-  <style>${PRINT_THEME_STYLES}</style>
-</head>
-<body>
-  <h1>Frame Order Analysis Report</h1>
-
-  <div class="print-instructions">
-    <strong>To save as PDF:</strong> Use your browser's Print function (Ctrl+P / Cmd+P) and select "Save as PDF" as the destination.
-  </div>
-
-  <div class="summary-box">
-    <div class="summary-grid">
-      <div class="stat-item">
-        <div class="value">${results.totalFramesAnalyzed.toLocaleString()}</div>
-        <div class="label">Total Frames</div>
-      </div>
-      <div class="stat-item">
-        <div class="value">${results.uniqueFrameIds}</div>
-        <div class="label">Unique IDs</div>
-      </div>
-      <div class="stat-item">
-        <div class="value">${formatMs(results.timeSpanMs)}</div>
-        <div class="label">Time Span</div>
-      </div>
-      ${results.patterns.length > 0 ? `<div class="stat-item"><div class="value">${results.patterns.length}</div><div class="label">Patterns</div></div>` : ''}
-    </div>
-  </div>
-`;
-
-  // Detected Patterns
-  if (results.patterns.length > 0) {
-    html += `<h2>Detected Patterns</h2>`;
-    for (let i = 0; i < results.patterns.length; i++) {
-      const pattern = results.patterns[i];
-      const confidence = Math.round(pattern.confidence * 100);
-      html += `
-  <div class="section-card no-break">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 6pt;">
-      <span><strong>Pattern #${i + 1}</strong> — starts with <span class="frame-id">${formatFrameId(pattern.startId)}</span></span>
-      <span>${confidence}% consistent</span>
-    </div>
-    <div style="margin: 4pt 0;">
-      ${pattern.sequence.map((id, idx) => `<span class="badge ${idx === 0 ? 'badge-purple' : 'badge-slate'}">${formatFrameId(id)}</span>`).join(' ')}
-    </div>
-    <div style="font-size: 9pt; color: var(--text-secondary);">
-      ${pattern.sequence.length} frames • ${pattern.occurrences}× seen • avg cycle: ${formatMs(pattern.avgCycleTimeMs)}
-    </div>
-  </div>`;
-    }
-  }
-
-  // Multiplexed Frames
-  if (results.multiplexedFrames.length > 0) {
-    html += `<h2>Multiplexed Frames</h2>
-  <table>
-    <tr><th>Frame ID</th><th>Selector</th><th>Cases</th><th>Mux Period</th><th>Inter-msg</th></tr>`;
-    for (const mux of results.multiplexedFrames) {
-      const selector = mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`;
-      const cases = mux.selectorByte === -1
-        ? mux.selectorValues.slice(0, 5).map(v => `${Math.floor(v / 256)}.${v % 256}`).join(", ")
-        : mux.selectorValues.slice(0, 8).join(", ");
-      html += `
-    <tr>
-      <td><code>${formatFrameId(mux.frameId)}</code></td>
-      <td>${selector}</td>
-      <td>${cases}${mux.selectorValues.length > 8 ? '...' : ''}</td>
-      <td>${formatMs(mux.muxPeriodMs)}</td>
-      <td>${formatMs(mux.interMessageMs)}</td>
-    </tr>`;
-    }
-    html += `</table>`;
-  }
-
-  // Burst Frames
-  if (results.burstFrames.length > 0) {
-    html += `<h2>Burst/Transaction Frames</h2>
-  <table>
-    <tr><th>Frame ID</th><th>DLCs</th><th>Burst Size</th><th>Cycle</th><th>Flags</th></tr>`;
-    for (const burst of results.burstFrames) {
-      html += `
-    <tr>
-      <td><code>${formatFrameId(burst.frameId)}</code></td>
-      <td>${burst.dlcVariation.join(", ")}</td>
-      <td>${burst.burstCount === 1 ? '—' : `~${burst.burstCount}`}</td>
-      <td>${formatMs(burst.burstPeriodMs)}</td>
-      <td>${burst.flags.join(", ") || '—'}</td>
-    </tr>`;
-    }
-    html += `</table>`;
-  }
-
-  // Multi-Bus Frames
-  if (results.multiBusFrames.length > 0) {
-    html += `<h2>Multi-Bus Frames</h2>
-  <table>
-    <tr><th>Frame ID</th><th>Buses</th><th>Count per Bus</th></tr>`;
-    for (const frame of results.multiBusFrames) {
-      const buses = frame.buses.map(b => `Bus ${b}`).join(", ");
-      const counts = frame.buses.map(b => `${b}: ${frame.countPerBus[b]}`).join(", ");
-      html += `
-    <tr>
-      <td><code>${formatFrameId(frame.frameId)}</code></td>
-      <td>${buses}</td>
-      <td>${counts}</td>
-    </tr>`;
-    }
-    html += `</table>`;
-  }
-
-  // Interval Groups
-  if (results.intervalGroups.length > 0) {
-    html += `<h2>Repetition Period Groups</h2>`;
-    for (const group of results.intervalGroups) {
-      html += `
-  <div class="section-card no-break">
-    <div style="margin-bottom: 4pt;">
-      <strong>~${formatMs(group.intervalMs)}</strong>
-      <span style="color: var(--text-secondary);"> (${group.frameIds.length} frames)</span>
-    </div>
-    <div>
-      ${group.frameIds.map(id => `<code>${formatFrameId(id)}</code>`).join(' ')}
-    </div>
-  </div>`;
-    }
-  }
-
-  // Start ID Candidates
-  if (results.startIdCandidates.length > 0) {
-    html += `<h2>Start ID Candidates</h2>
-  <table>
-    <tr><th>Frame ID</th><th>Max Gap</th><th>Avg Gap</th><th>Min Gap</th><th>Count</th></tr>`;
-    for (const candidate of results.startIdCandidates.slice(0, 10)) {
-      html += `
-    <tr>
-      <td><code>${formatFrameId(candidate.id)}</code></td>
-      <td>${formatMs(candidate.maxGapBeforeMs)}</td>
-      <td>${formatMs(candidate.avgGapBeforeMs)}</td>
-      <td>${formatMs(candidate.minGapBeforeMs)}</td>
-      <td>${candidate.occurrences}</td>
-    </tr>`;
-    }
-    html += `</table>`;
-  }
-
-  html += `
-  <div class="footer">Generated by WireTAP</div>
-</body>
-</html>`;
-
-  return html;
+function generatePrintReport(r: Report): string {
+  return htmlReport(
+    r,
+    PRINT,
+    `<div class="print-instructions">
+      <strong>To save as PDF:</strong> Use your browser's Print function (Ctrl+P / Cmd+P) and select "Save as PDF" as the destination.
+    </div>`
+  );
 }

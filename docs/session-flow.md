@@ -1251,6 +1251,7 @@ Per-session (channel 1..254):
 | `ByteCounts`        | 0x19 | Live raw-byte total + the session's byte-capture id, pushed on the byte cadence (see [§ Raw serial bytes](#raw-serial-bytes--counted-not-streamed)) |
 | `ModbusScanState`   | 0x1A | Discovery sweep progress + device identification, throttled to 2 Hz (see [§ Modbus discovery](#modbus-discovery)) |
 | `BusStatus`         | 0x1F | JSON `BusStatusMsg`: every bus in trouble (after bus mapping) and the sends a transmit timeout lost. The whole list each time; a source's buses drop on its `Connected` or end, all of them when the session stops. The roster carries the same list as `bus_statuses` |
+| `FrameInventory`    | 0x22 | JSON `FrameInventoryMsg`: the capture's per-identity rollup — whole (`reset`) on subscribe and clear, then only changed rows on the frame cadence (see [§ Frame inventory](#frame-inventory)) |
 
 JSON-payload session messages go out through
 [`send_session_json`](../crates/wiretap-app/src/ws/dispatch.rs), which resolves the
@@ -1694,6 +1695,7 @@ ws::dispatch::send_new_frames(session_id)
       ├─ encode_frame_batch → binary FrameEnvelope stream → FrameData (0x01)
       ├─ if catalogue attached: decode_frame batch → DecodedSignals (0x14)
       ├─ push live total + unique counts → FrameCounts (0x16)
+      ├─ push changed inventory rows → FrameInventory (0x22)
       └─ send_to_channel
                     │
         ┌───────────┼────────────┬─────────────┐
@@ -1774,6 +1776,18 @@ frontend counting + `isWatching` latch that could stick at 0 after a restart. Th
 shared session-picker dot (`SessionButton`'s `ActivityDot`) derives a frames/sec rate
 from `frameCount` to pulse a sonar ripple in step with bus activity — the dashboard's
 old numeric "N frames" readout was dropped in favour of it.
+
+### Frame inventory
+
+Each capture also keeps its per-identity rollup in memory — max length, length
+mismatch, lowest bus, extended — by the same rules as `get_capture_frame_info`
+reads back from SQLite ([capture_inventory.rs](../crates/wiretap-app/src/capture_inventory.rs)).
+A row is marked unsent when an append changes it, and `send_new_frames` pushes the
+unsent rows as `FrameInventory` (0x22); in steady state nothing changes and nothing
+is sent. `reset_frame_offset` — on subscribe and on `clear_capture` — sends every
+row with `reset`, so a reader never needs a snapshot of its own. `sessionStore`
+holds the result as `Session.frameInventory`, dropped when the session's capture
+changes; Discovery's frame picker merges it.
 
 ### Subscription lifecycle
 

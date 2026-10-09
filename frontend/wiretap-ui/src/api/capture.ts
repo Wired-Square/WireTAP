@@ -444,9 +444,10 @@ export async function createFrameCaptureFromFrames(
 export async function getCaptureBytesPaginated(
   captureId: string,
   offset: number,
-  limit: number
+  limit: number,
+  chunkGapUs: number | null = null,
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_capture_bytes_paginated", { capture_id: captureId, offset, limit });
+  return invoke("get_capture_bytes_paginated", { capture_id: captureId, offset, limit, chunk_gap_us: chunkGapUs });
 }
 
 /**

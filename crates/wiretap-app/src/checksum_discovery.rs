@@ -7,11 +7,10 @@
 // asking "does this declared checksum hold?") cannot reach into an app binary.
 
 use serde::Deserialize;
-use tauri::AppHandle;
 
 use wiretap_analysis::{scan_frames, ChecksumScanOptions, ChecksumScanResult, FrameKey};
 
-use crate::analysis::{QuerySource, ScanFilter};
+use crate::analysis::ScanFilter;
 use crate::capture_store::{FrameSelection, ProtocolFrames};
 
 /// Payloads to read per frame id, for every door onto the scan — the MCP tool's
@@ -28,7 +27,6 @@ pub const DEFAULT_SAMPLE_LIMIT: u32 = 5000;
 /// reads 200 sampled payloads per frame id.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn discover_checksums_in_capture_cmd(
-    app: AppHandle,
     capture_id: String,
     selection: Vec<ProtocolFrames>,
     options: Option<ChecksumScanOptions>,
@@ -37,8 +35,7 @@ pub async fn discover_checksums_in_capture_cmd(
     // accepted; Discovery guards its own "nothing selected" case before calling.
     let filter = ScanFilter::Selection(FrameSelection::from_groups(selection));
     crate::analysis::checksum_scan(
-        &app,
-        &QuerySource::Capture(capture_id),
+        &crate::payload_source::Capture(&capture_id),
         &filter,
         DEFAULT_SAMPLE_LIMIT,
         options.unwrap_or_default(),
@@ -50,8 +47,6 @@ pub async fn discover_checksums_in_capture_cmd(
 /// of the fields the frontend sends.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DiscoveryFrame {
-    #[serde(default)]
-    pub protocol: Option<String>,
     pub frame_id: u32,
     pub bytes: Vec<u8>,
     #[serde(default)]

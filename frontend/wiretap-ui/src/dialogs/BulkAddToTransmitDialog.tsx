@@ -9,12 +9,9 @@ import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
-import {
-  getDiscoveryFrameBuffer,
-  useDiscoveryFrameStore,
-} from "../stores/discoveryFrameStore";
-import { parseFrameKey } from "../utils/frameKey";
-import type { FrameMessage } from "../types/frame";
+import { useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
+import { getCaptureLatestFrames } from "../api/capture";
+import { keyOf, parseFrameKey } from "../utils/frameKey";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 import { Button } from "../components/Button";
@@ -23,9 +20,11 @@ import { Select, Input, SecondaryButton, PrimaryButton } from "../components/for
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  /** The capture the frames' last-seen bytes are read from. */
+  captureId: string | null;
 }
 
-export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
+export default function BulkAddToTransmitDialog({ isOpen, onClose, captureId }: Props) {
   const { t } = useTranslation("dialogs");
   const addCanFramesBulk = useTransmitStore((s) => s.addCanFramesBulk);
   const getGroupNames = useTransmitStore((s) => s.getGroupNames);
@@ -85,18 +84,14 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
   const canConfirm = !!transmitSession && matchingIds.length > 0 && !rangeError;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!transmitSession || matchingIds.length === 0) return;
 
-    // Build last-seen bytes for each matching numeric ID by scanning the buffer once (O(n))
-    const matchingNumericSet = new Set(matchingIds.map(m => m.numId));
-    const lastSeenMap = new Map<number, FrameMessage>();
-    for (const f of getDiscoveryFrameBuffer()) {
-      if (matchingNumericSet.has(f.frame_id)) lastSeenMap.set(f.frame_id, f);
-    }
+    const latest = captureId ? await getCaptureLatestFrames(captureId).catch(() => []) : [];
+    const lastSeenMap = new Map(latest.map((f) => [keyOf(f), f]));
 
     const frames = matchingIds.map(({ fk, numId }) => {
-      const seen = lastSeenMap.get(numId);
+      const seen = lastSeenMap.get(fk);
       const info = frameInfoMap.get(fk);
       const dlc = seen?.dlc ?? info?.len ?? 8;
       return {

@@ -11,7 +11,6 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 use wiretap_analysis::hypothesis::{rank_fields, Candidate, CandidateReason, Sweep};
 use wiretap_decode::{Endianness, PayloadField, ScaledField};
 
@@ -358,18 +357,18 @@ fn merge_ranked(per_frame: Vec<(u32, Vec<Candidate>)>, factor: f64, offset: f64)
 /// profile of its most-seen raw id under the catalogue's frame-id mask.
 #[tauri::command]
 pub async fn rank_hypotheses(
-    app: AppHandle,
     session_id: String,
     request: RankRequest,
 ) -> Result<RankedHypotheses, String> {
-    use crate::analysis::{byte_profile, frame_inventory, QuerySource};
+    use crate::analysis::{byte_profile, PayloadSource};
+    use crate::payload_source::Capture;
 
     let capture_id = crate::capture_store::get_session_frame_capture_id(&session_id)
         .ok_or_else(|| format!("session '{session_id}' has no frame capture"))?;
     let mask = crate::ws::dispatch::attached_catalog(&session_id)
         .and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
-    let src = QuerySource::Capture(capture_id);
-    let inventory = frame_inventory(&app, &src, None, None).await?;
+    let src = Capture(&capture_id);
+    let inventory = src.inventory(None, None).await?;
     let mut per_frame = Vec::new();
     for &id in &request.frame_ids {
         let Some(row) = inventory
@@ -380,7 +379,6 @@ pub async fn rank_hypotheses(
             continue;
         };
         let profile = byte_profile(
-            &app,
             &src,
             Some(&row.protocol),
             row.frame_id,

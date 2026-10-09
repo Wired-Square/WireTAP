@@ -155,7 +155,7 @@ pub async fn db_query_mirror_validation(
     end_time: Option<String>,
     limit: Option<u32>,
     query_id: Option<String>,
-    compare_byte_indices: Option<Vec<u8>>,
+    catalog_path: Option<String>,
 ) -> Result<MirrorValidationQueryResult, String> {
     let profile = backend_profile(&app, &profile_id).await?;
     crate::apiclient::mirror_validation(
@@ -168,7 +168,7 @@ pub async fn db_query_mirror_validation(
         end_time,
         limit,
         query_id_or("mirror_validation", query_id),
-        compare_index_set(compare_byte_indices),
+        mirror_compare_set(catalog_path.as_deref(), mirror_frame_id)?,
     )
     .await
 }

@@ -5,8 +5,11 @@
 
 import { create } from 'zustand';
 import type { FrameMessage } from '../types/frame';
-import type { MessageOrderResult } from '../utils/analysis/messageOrderAnalysis';
-import type { PayloadAnalysisResult, MirrorGroup, TimestampedPayload } from '../utils/analysis/payloadAnalysis';
+import i18n from 'i18next';
+import type { ChangesFrame } from '../api/byteRoles';
+import type { OrderStart } from '../generated/OrderStart';
+import type { ProtocolMirrors } from '../generated/ProtocolMirrors';
+import type { ProtocolOrder } from '../generated/ProtocolOrder';
 import type { SerialFrameAnalysisResult } from '../utils/analysis/serialFrameAnalysis';
 import { detectSerialFraming, type FramingDetectionResult } from '../api/framingDetection';
 import { tlog } from '../api/settings';
@@ -40,6 +43,10 @@ export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-frami
 export type ChecksumScanSource = CaptureSelection | { frames: FrameMessage[] };
 
 export type CaptureSelection = { captureId: string; selection: ProtocolFrames[] };
+
+/** What Frame Order and Payload Changes read: a capture's selection, its newest
+ *  `newest` frames when live. */
+export type AnalysisWindow = CaptureSelection & { newest?: number };
 
 /** The `ToolboxState` slot each tool writes its output into. */
 export type ToolResultKey =
@@ -98,7 +105,7 @@ const NO_BORROWED_RESULTS = Object.fromEntries(
 ) as Partial<Record<ToolResultKey, null>>;
 
 export type MessageOrderOptions = {
-  startMessageId: number | null;
+  start: OrderStart | null;
 };
 
 export type ChangesOptions = {
@@ -120,10 +127,10 @@ export type ModbusTargetOptions = {
 
 export type ChangesResult = {
   tool: 'changes';
+  /** The frames read for mirrors and bursts. */
   frameCount: number;
-  uniqueFrameIds: number;
-  analysisResults: PayloadAnalysisResult[];
-  mirrorGroups: MirrorGroup[];
+  frames: ChangesFrame[];
+  mirrors: ProtocolMirrors[];
 };
 
 export type SerialFramingResult = {
@@ -218,7 +225,7 @@ export type ToolboxState = {
   changes: ChangesOptions;
   checksumDiscovery: ChecksumDiscoveryOptions;
   modbusTarget: ModbusTargetOptions;
-  messageOrderResults: MessageOrderResult | null;
+  messageOrderResults: ProtocolOrder[] | null;
   changesResults: ChangesResult | null;
   serialFramingResults: SerialFramingResult | null;
   serialPayloadResults: SerialPayloadResult | null;
@@ -245,7 +252,7 @@ interface DiscoveryToolboxState {
   updateChecksumDiscoveryOptions: (options: Partial<ChecksumDiscoveryOptions>) => void;
   updateModbusTarget: (options: Partial<ModbusTargetOptions>) => void;
   setIsRunning: (running: boolean) => void;
-  setMessageOrderResults: (results: MessageOrderResult | null) => void;
+  setMessageOrderResults: (results: ProtocolOrder[] | null) => void;
   setChangesResults: (results: ChangesResult | null) => void;
   setSerialFramingResults: (results: SerialFramingResult | null) => void;
   setSerialPayloadResults: (results: SerialPayloadResult | null) => void;
@@ -269,18 +276,15 @@ interface DiscoveryToolboxState {
   resetKnowledge: () => void;
   updateKnowledge: (knowledge: DecoderKnowledge) => void;
 
-  // Analysis runners - these need frame data passed in
+  // Analysis runners
   runMessageOrderAnalysis: (
-    frames: FrameMessage[],
+    source: AnalysisWindow,
     frameInfoMap: Map<string, FrameInfo>
-  ) => Promise<MessageOrderResult>;
+  ) => Promise<ProtocolOrder[] | null>;
 
-  /** `capture`, when the frames are in one, is where the byte roles read from;
-   *  `frames` still supply mirror detection. */
   runChangesAnalysis: (
-    frames: FrameMessage[],
-    frameInfoMap: Map<string, FrameInfo>,
-    capture?: CaptureSelection
+    source: AnalysisWindow,
+    frameInfoMap: Map<string, FrameInfo>
   ) => Promise<ChangesResult | null>;
 
   runSerialFramingAnalysis: (
@@ -316,6 +320,17 @@ function updateActiveScan(
   };
 }
 
+/** `knowledge`, with a frame for each discovered one when it has none yet. */
+function seededKnowledge(knowledge: DecoderKnowledge, frameInfoMap: Map<string, FrameInfo>): DecoderKnowledge {
+  if (knowledge.frames.size > 0) return knowledge;
+  const frames = new Map(knowledge.frames);
+  for (const [fk, info] of frameInfoMap) {
+    const { frameId } = parseFrameKey(fk);
+    frames.set(frameId, initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus));
+  }
+  return { ...knowledge, frames };
+}
+
 /** A tool's backend call failed: log it and stop showing the tool as running. */
 function failed(
   set: (fn: (state: DiscoveryToolboxState) => Partial<DiscoveryToolboxState>) => void,
@@ -332,7 +347,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
   toolbox: {
     isExpanded: false,
     activeView: 'frames',
-    messageOrder: { startMessageId: null },
+    messageOrder: { start: null },
     changes: { maxExamples: 30 },
     checksumDiscovery: {
       minSamples: 10,
@@ -573,118 +588,48 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
   updateKnowledge: (knowledge) => set({ knowledge }),
 
   // Analysis runners
-  runMessageOrderAnalysis: async (frames, frameInfoMap) => {
-    const { toolbox, knowledge } = get();
-
+  runMessageOrderAnalysis: async (source, frameInfoMap) => {
+    const { toolbox } = get();
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
-    // Allow React to render
-    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
-
-    // Lazy load analysis module
-    const { analyzeMessageOrder } = await import('../utils/analysis/messageOrderAnalysis');
-    const messageOrderResults = analyzeMessageOrder(frames, toolbox.messageOrder) as MessageOrderResult;
-
-    // Update knowledge with message order analysis results
-    let updatedKnowledge = knowledge;
-    if (updatedKnowledge.frames.size === 0) {
-      for (const [fk, info] of frameInfoMap) {
-        const { frameId } = parseFrameKey(fk);
-        updatedKnowledge.frames.set(
-          frameId,
-          initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)
-        );
-      }
+    const { frameOrder } = await import('../api/frameOrder');
+    let messageOrderResults;
+    try {
+      messageOrderResults = await frameOrder(source.captureId, source.selection, source.newest, toolbox.messageOrder.start);
+    } catch (e) {
+      return failed(set, 'Frame Order', e);
     }
 
-    updatedKnowledge = updateKnowledgeFromMessageOrder(updatedKnowledge, {
-      intervalGroups: messageOrderResults.intervalGroups,
-      multiplexedFrames: messageOrderResults.multiplexedFrames,
-      burstFrames: messageOrderResults.burstFrames,
-      multiBusFrames: messageOrderResults.multiBusFrames,
-    });
-
     set((state) => ({
-      knowledge: updatedKnowledge,
-      toolbox: {
-        ...state.toolbox,
-        isRunning: false,
-        messageOrderResults,
-      },
+      knowledge: updateKnowledgeFromMessageOrder(seededKnowledge(state.knowledge, frameInfoMap), messageOrderResults),
+      toolbox: { ...state.toolbox, isRunning: false, messageOrderResults },
     }));
-
-    // Switch to tool-specific tab to show results
     useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['message-order'].tabId);
-
     return messageOrderResults;
   },
 
-  runChangesAnalysis: async (frames, frameInfoMap, capture) => {
-    const { knowledge } = get();
-
+  runChangesAnalysis: async (source, frameInfoMap) => {
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
-    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
-
-    const { toPayloadAnalysisResult, detectMirrorFrames } = await import('../utils/analysis/payloadAnalysis');
-    const { profileBytes } = await import('../api/byteRoles');
-
-    const timestampedByIdMap = new Map<number, TimestampedPayload[]>();
-    for (const f of frames) {
-      let timestamped = timestampedByIdMap.get(f.frame_id);
-      if (!timestamped) {
-        timestamped = [];
-        timestampedByIdMap.set(f.frame_id, timestamped);
-      }
-      timestamped.push({ timestamp: f.timestamp_us, payload: f.bytes });
-    }
-
-    let profiles;
+    const { payloadChanges } = await import('../api/byteRoles');
+    let changes;
     try {
-      profiles = await profileBytes(capture ?? { frames });
+      changes = await payloadChanges(source.captureId, source.selection, source.newest);
     } catch (e) {
       return failed(set, 'Payload Changes', e);
     }
-    const analysisResults = profiles.map((p) =>
-      toPayloadAnalysisResult(p, knowledge.frames.get(p.frameId)?.isBurst ?? false)
-    );
-
-    const mirrorGroups = detectMirrorFrames(timestampedByIdMap);
-
     const changesResults: ChangesResult = {
       tool: 'changes',
-      frameCount: frames.length,
-      uniqueFrameIds: analysisResults.length,
-      analysisResults,
-      mirrorGroups,
+      frameCount: changes.frameCount,
+      frames: changes.frames,
+      mirrors: changes.mirrors,
     };
 
-    // Update knowledge
-    let updatedKnowledge = knowledge;
-    if (updatedKnowledge.frames.size === 0) {
-      for (const [fk, info] of frameInfoMap) {
-        const { frameId } = parseFrameKey(fk);
-        updatedKnowledge.frames.set(
-          frameId,
-          initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)
-        );
-      }
-    }
-
-    updatedKnowledge = updateKnowledgeFromPayloadAnalysis(updatedKnowledge, analysisResults);
-
     set((state) => ({
-      knowledge: updatedKnowledge,
-      toolbox: {
-        ...state.toolbox,
-        isRunning: false,
-        changesResults,
-      },
+      knowledge: updateKnowledgeFromPayloadAnalysis(seededKnowledge(state.knowledge, frameInfoMap), changes.frames, i18n.t.bind(i18n)),
+      toolbox: { ...state.toolbox, isRunning: false, changesResults },
     }));
-
-    // Switch to tool-specific tab to show results
     useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['changes'].tabId);
-
     return changesResults;
   },
 

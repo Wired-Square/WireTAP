@@ -130,6 +130,9 @@ wire_enum! {
         BusStatus        = 0x1F,
         Command          = 0x20,
         CommandResponse  = 0x21,
+        // A session's frame inventory as JSON (`FrameInventoryMsg`): every identity on
+        // subscribe or clear (`reset`), then only the rows that changed, on the frame cadence.
+        FrameInventory   = 0x22,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
         BridgeRequest    = 0x30,
         BridgeResponse   = 0x31,

@@ -26,7 +26,8 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
-use crate::analysis::QuerySource;
+use crate::analysis::PayloadSource;
+use crate::payload_source::{resolve, Capture, QuerySource};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -90,7 +91,7 @@ impl WireTapTools {
 
 /// Convert an optional RFC3339 time bound to capture-timeline microseconds.
 fn us(s: &Option<String>) -> Option<i64> {
-    s.as_deref().and_then(crate::analysis::iso_to_micros)
+    s.as_deref().and_then(crate::payload_source::iso_to_micros)
 }
 
 /// Widen an optional row limit to the i64 the capture engines take.
@@ -334,6 +335,19 @@ fn parse_frame_key(key: &str) -> Result<(&str, u32), String> {
         .ok_or_else(|| format!("Bad frame key '{key}' — expected protocol:id, e.g. \"can:256\""))
 }
 
+/// The frames an MCP analysis reads: the newest `newest`, or the panel's live
+/// window, Discovery's default history buffer.
+fn analysis_window(newest: Option<usize>) -> usize {
+    newest.unwrap_or(crate::settings::default_discovery_history_buffer() as usize)
+}
+
+fn frame_key_groups(keys: Option<Vec<String>>) -> Result<Vec<ProtocolFrames>, String> {
+    keys.unwrap_or_default()
+        .iter()
+        .map(|key| parse_frame_key(key).map(|(protocol, id)| ProtocolFrames::ids(protocol, vec![id])))
+        .collect()
+}
+
 /// The session's frame capture, which the live tools read.
 fn session_frame_capture(session_id: &str) -> Result<String, McpError> {
     crate::capture_store::get_session_frame_capture_id(session_id).ok_or_else(|| {
@@ -414,8 +428,7 @@ fn signal_key(s: &Value) -> (Option<i64>, &str) {
     )
 }
 
-/// Discovery's live map: the newest frame per `protocol:id` key, in the
-/// `LastFrameData` shape plus its stamp.
+/// The newest frame per `protocol:id` key: its bytes, bus, flags, length and stamp.
 fn latest_by_key(
     frames: Vec<FrameMessage>,
     wanted: Option<&HashSet<String>>,
@@ -668,35 +681,43 @@ impl WireTapTools {
             .and_then(ok_json)
     }
 
-    #[tool(description = "Per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux cases) of a session's frame capture, each frame over its most recent 5000 payloads. Headless — no view needed. Without frame_ids the first 64 frames are profiled and the rest counted in skippedFrames.")]
+    #[tool(description = "Per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux cases, and the notes Discovery shows as codes) of a session's frame capture, each frame over its most recent 5000 payloads, with mirror groups (ids carrying one changing payload together) and each frame's burst flag over the capture's newest `newest` frames (default 100000, Discovery's default live window; pass a larger newest to read more of a long capture). Headless — no view needed. Without frame_ids the first 64 frames are profiled and the rest counted in skippedFrames.")]
     async fn get_discovery_analysis(
         &self,
         Parameters(p): Parameters<SessionAnalysisParams>,
     ) -> Result<CallToolResult, McpError> {
         let capture_id = session_frame_capture(&p.session_id)?;
-        let groups = p
-            .frame_ids
-            .unwrap_or_default()
-            .iter()
-            .map(|key| parse_frame_key(key).map(|(protocol, id)| ProtocolFrames::ids(protocol, vec![id])))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(err)?;
+        let groups = frame_key_groups(p.frame_ids).map_err(err)?;
         let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
-        let profiles = crate::analysis::byte_profiles(
-            &self.app,
-            &QuerySource::Capture(capture_id.clone()),
-            &crate::analysis::ScanFilter::Selection(FrameSelection::from_groups(groups)),
-            crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT,
-            max_frames,
-        )
-        .await
-        .map_err(err)?;
+        let changes = crate::byte_roles::payload_changes(&Capture(&capture_id), groups, Some(analysis_window(p.newest)), max_frames)
+            .await
+            .map_err(err)?;
         ok_json(json!({
             "captureId": capture_id,
-            "frameCount": profiles.frames.len(),
-            "skippedFrames": profiles.skipped_frames,
-            "frames": profiles.frames,
+            "frameCount": changes.frames.len(),
+            "framesRead": changes.frame_count,
+            "skippedFrames": changes.skipped_frames,
+            "frames": changes.frames,
+            "mirrors": changes.mirrors,
         }))
+    }
+
+    #[tool(description = "Message order of a session's frame capture, per protocol and per bus: interval groups, start-id candidates, cycle patterns (the order frames follow a start id), mux and burst timing, and the ids seen on more than one bus. The same answer as Discovery's Frame Order. Headless. Optional frame_ids (\"can:256\") restrict it, newest sets how many of the capture's newest frames are read (default 100000, Discovery's default live window; pass a larger value to read more of a long capture), and start_frame_id (with start_is_extended, and start_protocol to name one protocol) walks cycles from that id.")]
+    async fn get_frame_order(
+        &self,
+        Parameters(p): Parameters<FrameOrderParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let selection = FrameSelection::from_groups(frame_key_groups(p.frame_ids).map_err(err)?);
+        let start = p.start_frame_id.map(|frame_id| crate::analysis::OrderStart {
+            protocol: p.start_protocol,
+            frame_id,
+            is_extended: p.start_is_extended,
+        });
+        let orders = crate::analysis::message_order(&Capture(&capture_id), &selection, Some(analysis_window(p.newest)), start.as_ref())
+            .await
+            .map_err(err)?;
+        ok_json(json!({ "captureId": capture_id, "protocols": orders }))
     }
 
     #[tool(
@@ -753,8 +774,10 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameInventoryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
-        let rows = crate::analysis::frame_inventory(&self.app, &src, p.start_time, p.end_time)
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let rows = src
+            .reader(&self.app)
+            .inventory(p.start_time.as_deref(), p.end_time.as_deref())
             .await
             .map_err(err)?;
         ok_json(json!({ "frames": rows.len(), "inventory": rows }))
@@ -765,10 +788,9 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteProfileParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let profile = crate::analysis::byte_profile(
-            &self.app,
-            &src,
+            &src.reader(&self.app),
             p.protocol.as_deref(),
             p.frame_id,
             p.is_extended,
@@ -786,7 +808,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ChecksumScanParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         // Every field named rather than `..Default::default()`: an option added
         // to the crate must be a build failure here, not a setting silently
         // unreachable from MCP.
@@ -799,7 +821,7 @@ impl WireTapTools {
         };
         let filter = crate::analysis::ScanFilter::Ids(p.frame_ids.unwrap_or_default());
         let result =
-            crate::analysis::checksum_scan(&self.app, &src, &filter, p.sample_limit, options)
+            crate::analysis::checksum_scan(&src.reader(&self.app), &filter, p.sample_limit, options)
                 .await
                 .map_err(err)?;
         ok_json(result)
@@ -810,15 +832,18 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<CatalogCoverageParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let entry = crate::catalog::find_catalog(&self.app, &p.catalog).await.map_err(err)?;
+        let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
+        let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| err(e.to_string()))?;
         let report = crate::analysis::catalog_coverage(
-            &self.app,
-            &src,
-            &p.catalog,
+            &src.reader(&self.app),
+            &entry.name,
+            &catalog,
             p.include_byte_roles,
             p.sample_limit,
-            p.start_time,
-            p.end_time,
+            p.start_time.as_deref(),
+            p.end_time.as_deref(),
         )
         .await
         .map_err(err)?;
@@ -832,7 +857,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_byte_changes(
                     self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended,
@@ -851,7 +876,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_frame_changes(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, p.limit, None,
@@ -869,7 +894,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_distribution(
                     self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended, p.start_time, p.end_time, None,
@@ -887,7 +912,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<GapQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_gap_analysis(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.gap_threshold_ms,
@@ -906,7 +931,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrequencyQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_frequency(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.bucket_size_ms,
@@ -925,7 +950,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_first_last(
                     self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, None,
@@ -943,7 +968,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<MuxQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
             QuerySource::Backend(pid) => {
                 crate::dbquery::db_query_mux_statistics(
                     self.app.clone(), pid, p.frame_id, p.mux_selector_byte, p.is_extended,
@@ -1603,10 +1628,16 @@ fn scan_status(published: Option<String>, session_state: Option<&crate::io::IOSt
 
 #[cfg(test)]
 mod tests {
-    use super::{modbus_write_json, parse_frame_key, scan_status};
+    use super::{analysis_window, modbus_write_json, parse_frame_key, scan_status};
     use crate::io::IOState;
     use std::time::Duration;
     use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
+
+    #[test]
+    fn an_analysis_reads_discoverys_default_window_unless_told_otherwise() {
+        assert_eq!(analysis_window(None), 100_000);
+        assert_eq!(analysis_window(Some(5_000_000)), 5_000_000);
+    }
 
     #[test]
     fn a_frame_key_is_protocol_and_decimal_id() {

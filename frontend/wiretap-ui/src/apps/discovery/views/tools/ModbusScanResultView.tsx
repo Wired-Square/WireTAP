@@ -9,10 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type { ModbusScanResults } from "../../../../stores/discoveryToolboxStore";
-import {
-  useDiscoveryFrameStore,
-  getLastFrameDataMap,
-} from "../../../../stores/discoveryFrameStore";
+import { useSessionStore } from "../../../../stores/sessionStore";
 import {
   bgDataView,
   borderDefault,
@@ -26,7 +23,6 @@ import { Table } from "../../../../components/Table";
 import { iconSm } from "../../../../styles/spacing";
 import { getCaptureLatestFrames } from "../../../../api/capture";
 import { bytesToHex } from "../../../../utils/byteUtils";
-import { parseFrameKey } from "../../../../utils/frameKey";
 import { interpretPair, interpretRegister, type WordOrder } from "../../../../utils/modbusValues";
 import CheckboxField from "../../../../components/forms/CheckboxField";
 import { Button, IconButton } from "../../../../components/Button";
@@ -45,17 +41,6 @@ type ScanRow = { address: number; bytes: number[]; bus: number };
 
 const EMPTY_ROWS = new Map<number, ScanRow>();
 
-/** The Modbus registers currently in the shared frame store, newest value per address. */
-function liveModbusRows(): Map<number, ScanRow> {
-  const byAddress = new Map<number, ScanRow>();
-  for (const [key, data] of getLastFrameDataMap()) {
-    const { protocol, frameId } = parseFrameKey(key);
-    if (protocol !== "modbus") continue;
-    byAddress.set(frameId, { address: frameId, bytes: data.bytes, bus: data.bus });
-  }
-  return byAddress;
-}
-
 
 export default function ModbusScanResultView({
   results,
@@ -70,55 +55,42 @@ export default function ModbusScanResultView({
   const [wordOrder, setWordOrder] = useState<WordOrder>("big");
   const [showWide, setShowWide] = useState(false);
 
-  /**
-   * Whose frames are in the shared store right now.
-   *
-   * While Discovery is joined to this sweep, its registers stream into the
-   * shared frame store like any other source's, and the store already keeps the
-   * latest value per key, maintained incrementally on each flush — reading that
-   * is free, and it is what makes the table fill live. Start a second sweep and
-   * the store is cleared and refilled with *that* one's registers, so this tab
-   * has to fall back to the capture it wrote, or it would silently show the
-   * newer sweep's values under the older sweep's heading.
-   */
+  // While Discovery is joined to this sweep, its frame count moves as registers land,
+  // and each move re-reads the newest value per register from the sweep's capture.
   const isLive = sessionId === currentSessionId;
-  // Subscribed only while this sweep owns the frame store. A finished tab that
-  // kept the subscription would rebuild its whole table on every flush of an
-  // unrelated session, twice a second, for a result that cannot change.
-  const frameVersion = useDiscoveryFrameStore((s) => (isLive ? s.frameVersion : 0));
-  const [captured, setCaptured] = useState<Map<number, ScanRow>>(EMPTY_ROWS);
+  const liveCaptureId = useSessionStore((s) => (isLive ? s.sessions[sessionId]?.capture.id ?? null : null));
+  const frameCount = useSessionStore((s) => (isLive ? s.sessions[sessionId]?.frameCount ?? 0 : 0));
+  const readCaptureId = captureId ?? liveCaptureId;
+  const [byAddress, setByAddress] = useState<Map<number, ScanRow>>(EMPTY_ROWS);
 
   useEffect(() => {
-    if (isLive || !captureId) return;
+    if (!readCaptureId) {
+      setByAddress(EMPTY_ROWS);
+      return;
+    }
     let cancelled = false;
     // One row per register, reduced in SQLite: a sweep writes each register once
     // *per pass*, so asking for every row would ship 20× the data for the same
     // table. See `getCaptureLatestFrames`.
-    getCaptureLatestFrames(captureId)
+    getCaptureLatestFrames(readCaptureId)
       .then((frames) => {
         if (cancelled) return;
-        setCaptured(
+        setByAddress(
           new Map(frames.map((f) => [f.frame_id, { address: f.frame_id, bytes: f.bytes, bus: f.bus }]))
         );
       })
       .catch(() => {
         // A capture that has been cleaned up leaves the tab empty, not broken.
-        if (!cancelled) setCaptured(EMPTY_ROWS);
+        if (!cancelled) setByAddress(EMPTY_ROWS);
       });
     return () => {
       cancelled = true;
     };
-  }, [isLive, captureId]);
+  }, [readCaptureId, frameCount]);
 
   // A repeated sweep writes each register once per pass; the table shows the
   // current value, and what changed between passes is the Changes tool's job.
-  const { rows, byAddress } = useMemo(() => {
-    const byAddress = isLive ? liveModbusRows() : captured;
-    const rows = [...byAddress.values()].sort((a, b) => a.address - b.address);
-    return { rows, byAddress };
-    // frameVersion is the store's reactivity counter for its mutable buffers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frameVersion, isLive, captured]);
+  const rows = useMemo(() => [...byAddress.values()].sort((a, b) => a.address - b.address), [byAddress]);
 
   // One line whichever phase the sweep is in. Before the first progress tick it
   // is empty — the tab opens with the sweep, so the table's own placeholder is

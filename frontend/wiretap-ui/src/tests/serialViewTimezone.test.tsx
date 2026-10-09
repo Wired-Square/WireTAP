@@ -11,7 +11,7 @@ const LOCAL_1435 = "2026-09-29 14:35:00.123456";
 const UTC_0435 = "2026-09-29 04:35:00.123456";
 
 vi.mock("../api/capture", () => ({
-  getCaptureBytesPaginated: vi.fn(async () => ({ bytes: [{ byte: 0x41, timestamp_us: UTC_0435_US, bus: 0 }] })),
+  getCaptureBytesPaginated: vi.fn(async () => ({ bytes: [{ byte: 0x41, timestamp_us: UTC_0435_US, bus: 0 }], chunk_starts: [] })),
   getCaptureMetadataById: vi.fn(async () => null),
   findCaptureBytesOffsetForTimestamp: vi.fn(),
   getCaptureFramesPaginatedFiltered: vi.fn(async () => ({

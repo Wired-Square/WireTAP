@@ -4,6 +4,8 @@ import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import { toolPanelLabel } from "../../../../styles/typography";
 import { Input } from "../../../../components/forms";
 
+const MAX_STANDARD_ID = 0x7ff;
+
 export default function MessageOrderToolPanel() {
   const options = useDiscoveryStore((s) => s.toolbox.messageOrder);
   const updateOptions = useDiscoveryStore((s) => s.updateMessageOrderOptions);
@@ -17,15 +19,15 @@ export default function MessageOrderToolPanel() {
         <Input
           type="text"
           placeholder="Auto-detect"
-          value={options.startMessageId !== null ? `0x${options.startMessageId.toString(16).toUpperCase()}` : ""}
+          value={options.start ? `0x${options.start.frameId.toString(16).toUpperCase()}` : ""}
           onChange={(e) => {
             const val = e.target.value.trim();
             if (!val) {
-              updateOptions({ startMessageId: null });
+              updateOptions({ start: null });
             } else {
               const parsed = parseInt(val, val.toLowerCase().startsWith("0x") ? 16 : 10);
               if (!isNaN(parsed)) {
-                updateOptions({ startMessageId: parsed });
+                updateOptions({ start: { frameId: parsed, isExtended: parsed > MAX_STANDARD_ID } });
               }
             }
           }}

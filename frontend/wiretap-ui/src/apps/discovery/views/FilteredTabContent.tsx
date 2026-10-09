@@ -9,7 +9,7 @@ import { Filter } from "lucide-react";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { keyOf, groupKeysByProtocol } from "../../../utils/frameKey";
-import { getCaptureFramesPaginatedFiltered } from "../../../api/capture";
+import { useCaptureFrameView } from "../hooks/useCaptureFrameView";
 import { FrameDataTable, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import { PaginationToolbar } from "../components";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
@@ -17,15 +17,17 @@ import { bgDataView } from "../../../styles";
 import { emptyStateText } from "../../../styles/typography";
 import { formatFrameId } from "../../../utils/frameIds";
 import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
-import type { FrameMessage } from "../../../types/frame";
 import type { FrameRow } from "../components";
 import type { CaptureMetadata } from "../../../api/capture";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import type React from "react";
-import { pageCount, resolvePageSize, type PageSize } from "../../../utils/pageSize";
+import { resolvePageSize, type PageSize } from "../../../utils/pageSize";
 import type { TimeDisplayFormat } from "../../../types/common";
 
 type Props = {
+  /** The capture the Frames tab reads; this tab reads the same one. */
+  captureId: string | null;
+  sessionId?: string | null;
   displayFrameIdFormat: "hex" | "decimal";
   displayTimeFormat: TimeDisplayFormat;
   isStreaming: boolean;
@@ -35,6 +37,8 @@ type Props = {
 };
 
 export default function FilteredTabContent({
+  captureId,
+  sessionId,
   displayFrameIdFormat,
   displayTimeFormat,
   isStreaming,
@@ -42,11 +46,11 @@ export default function FilteredTabContent({
   captureMetadata,
   useLocalTimezone = false,
 }: Props) {
-  const frames = useDiscoveryStore((s) => s.frames);
   const frameVersion = useDiscoveryStore((s) => s.frameVersion);
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
   const captureMode = useDiscoveryStore((s) => s.captureMode);
+  const renderFrozen = useDiscoveryStore((s) => s.renderFrozen);
   const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
 
   // Column visibility (for header context menu)
@@ -60,16 +64,10 @@ export default function FilteredTabContent({
   const toggleShowSourceColumn = useDiscoveryUIStore((s) => s.toggleShowSourceColumn);
   const toggleShowBusColumn = useDiscoveryUIStore((s) => s.toggleShowBusColumn);
 
-  const [currentPage, setCurrentPage] = useState(0);
   // Auto by default; the table measures itself and reports how many rows fit.
   const [pageSizeSetting, setPageSizeSetting] = useState<PageSize>("auto");
   const [autoRows, setAutoRows] = useState<number | null>(null);
   const pageSize = resolvePageSize(pageSizeSetting, autoRows);
-
-  // Buffer mode state
-  const [bufferFrames, setBufferFrames] = useState<FrameRow[]>([]);
-  const [bufferTotalCount, setBufferTotalCount] = useState(0);
-  const [bufferLoading, setBufferLoading] = useState(false);
 
   // Context menu state (frame rows)
   const [contextMenu, setContextMenu] = useState<{
@@ -113,6 +111,19 @@ export default function FilteredTabContent({
     [filteredOutKeys]
   );
 
+  const view = useCaptureFrameView({
+    captureId: filteredOutKeys.size > 0 ? captureId : null,
+    sessionId,
+    isStreaming,
+    selectedFrames: filteredOutSelection,
+    pageSize,
+    tailSize: pageSize === null ? null : Math.min(pageSize, 200),
+    isCapturePlayback: captureMode.enabled,
+    frozen: renderFrozen,
+    revision: frameVersion,
+  });
+  const { currentPage, setCurrentPage } = view;
+
   // Effective start time for delta calculations
   const effectiveStartTimeUs = useMemo(() => {
     if (captureMode.enabled && captureMetadata?.start_time_us != null) {
@@ -140,117 +151,24 @@ export default function FilteredTabContent({
     [displayTimeFormat, effectiveStartTimeUs, useLocalTimezone]
   );
 
-  // Non-buffer mode: filter frames from the in-memory buffer
-  const localResult = useMemo(() => {
-    if (captureMode.enabled || filteredOutKeys.size === 0) return null;
-    // Auto fit not measured yet — the tail limit and the slice below both come back empty.
-    if (pageSize === null) return null;
-
-    const matching: FrameMessage[] = [];
-
-    if (isStreaming) {
-      // During streaming: show the most recent matching frames (tail)
-      const limit = pageSize;
-      for (let i = frames.length - 1; i >= 0 && matching.length < limit; i--) {
-        if (filteredOutKeys.has(keyOf(frames[i]))) {
-          matching.push(frames[i]);
-        }
-      }
-      matching.reverse();
-    } else {
-      // Stopped: collect all matching frames for pagination
-      for (const f of frames) {
-        if (filteredOutKeys.has(keyOf(f))) {
-          matching.push(f);
-        }
-      }
-    }
-
-    return matching;
-  }, [captureMode.enabled, filteredOutKeys, frameVersion, isStreaming, pageSize]);
-
-  // Paginate the local result
-  const localPage = useMemo(() => {
-    if (!localResult || pageSize === null) return { frames: [] as FrameRow[], totalCount: 0 };
-
-    const totalCount = localResult.length;
-    let slice: FrameMessage[];
-    if (isStreaming) {
-      slice = localResult; // Already limited during streaming
-    } else {
-      const start = currentPage * pageSize;
-      slice = localResult.slice(start, start + pageSize);
-    }
-
-    const withHex: FrameRow[] = slice.map((f) => ({
-      ...f,
-      hexBytes: f.bytes.map((b) =>
-        b.toString(16).padStart(2, "0").toUpperCase()
-      ),
-    }));
-
-    return { frames: withHex, totalCount };
-  }, [localResult, currentPage, pageSize, isStreaming]);
-
-  // Buffer mode: fetch filtered-out frames from backend
-  useEffect(() => {
-    if (!captureMode.enabled || isStreaming || filteredOutKeys.size === 0) return;
-    if (pageSize === null) return; // auto size not measured yet
-
-    let cancelled = false;
-    const fetchPage = async () => {
-      setBufferLoading(true);
-      try {
-        const offset = currentPage * pageSize;
-        const response = await getCaptureFramesPaginatedFiltered(
-          captureMetadata?.id ?? '',
-          offset,
-          pageSize,
-          filteredOutSelection
-        );
-        if (cancelled) return;
-        const withHex: FrameRow[] = response.frames.map((f: FrameMessage) => ({
-          ...f,
-          hexBytes: f.bytes.map((b: number) =>
-            b.toString(16).padStart(2, "0").toUpperCase()
-          ),
-        }));
-        setBufferFrames(withHex);
-        setBufferTotalCount(response.total_count);
-      } catch (e) {
-        console.error("[FilteredTabContent] Failed to fetch buffer page:", e);
-      } finally {
-        if (!cancelled) setBufferLoading(false);
-      }
-    };
-
-    fetchPage();
-    return () => {
-      cancelled = true;
-    };
-  }, [captureMode.enabled, isStreaming, filteredOutKeys, filteredOutSelection, currentPage, pageSize]);
-
   // Reset page when selection changes
   useEffect(() => {
     setCurrentPage(0);
-  }, [selectedFrames]);
+  }, [selectedFrames, setCurrentPage]);
 
-  // Determine which data to display
-  const displayFrames = captureMode.enabled ? bufferFrames : localPage.frames;
+  const displayFrames: FrameRow[] = view.frames;
 
   // Close context menus on page change
   useEffect(() => {
     setContextMenu(null);
     setHeaderContextMenu(null);
   }, [currentPage, displayFrames]);
-  const totalCount = captureMode.enabled ? bufferTotalCount : localPage.totalCount;
-  const totalPages = pageCount(totalCount, pageSize);
-  const loading = captureMode.enabled ? bufferLoading : false;
+  const loading = view.isLoading;
 
   const handlePageSizeChange = useCallback((size: PageSize) => {
     setPageSizeSetting(size);
     setCurrentPage(0);
-  }, []);
+  }, [setCurrentPage]);
 
   // Frame context menu items
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -296,7 +214,7 @@ export default function FilteredTabContent({
       {!isStreaming && (
         <PaginationToolbar
           currentPage={currentPage}
-          totalPages={totalPages}
+          totalPages={view.totalPages}
           pageSize={pageSizeSetting}
           pageSizeOptions={FRAME_PAGE_SIZE_OPTIONS}
           allowAuto
@@ -309,6 +227,7 @@ export default function FilteredTabContent({
       <FrameDataTable
         displayTimeFormat={displayTimeFormat}
         frames={displayFrames}
+        captureIndices={view.captureIndices}
         formatTime={formatTime}
         showRef={showRefColumn}
         showAscii={showAsciiColumn}

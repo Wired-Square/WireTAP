@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import type { ByteStats, PayloadAnalysisResult } from "../utils/analysis/payloadAnalysis";
+import type { ByteColumn, ChangesFrame } from "../api/byteRoles";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null), Channel: class {} }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -22,28 +22,40 @@ const { useDiscoveryToolboxStore } = await import("../stores/discoveryToolboxSto
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const byte = (byteIndex: number, role: ByteStats["role"], sampleCount = 100): ByteStats => ({
-  byteIndex,
+const byte = (position: number, role: "static" | "sensor", sampleCount = 100): ByteColumn => ({
+  position,
+  distinctValues: 50,
   min: 0,
   max: 200,
-  distinctCount: 50,
+  constantValue: null,
+  changes: 0,
+  transitions: 0,
+  entropyBits: 0,
   sampleCount,
-  role,
-  ...(role === "static" ? { staticValue: 0 } : {}),
-  ...(role === "sensor" ? { sensorTrend: "increasing" as const } : {}),
+  ...(role === "static"
+    ? { role, value: 0 }
+    : { role, trend: "increasing" as const, strength: 0, rollover: false }),
 });
 
-const frame: PayloadAnalysisResult = {
+const frame: ChangesFrame = {
+  protocol: "can",
   frameId: 0x123,
   isExtended: false,
+  frameIdHex: "0x123",
   sampleCount: 100,
-  byteStats: [byte(0, "static"), byte(1, "sensor"), byte(2, "static"), byte(3, "sensor", 40), byte(4, "sensor")],
-  multiBytePatterns: [{ startByte: 1, length: 3, pattern: "text", sampleText: "abc" }],
-  notes: [],
-  analyzedFromByte: 0,
-  analyzedToByteExclusive: 5,
-  isBurstFrame: false,
-  isMuxFrame: false,
+  minLen: 5,
+  maxLen: 5,
+  identical: null,
+  analysedFrom: 0,
+  columns: [byte(0, "static"), byte(1, "sensor"), byte(2, "static"), byte(3, "sensor", 40), byte(4, "sensor")],
+  patterns: [{
+    start: 1, len: 3, kind: "text", endianness: null, rollover: false, correlatedRollover: false,
+    slowUpperBytes: false, range: null, sampleText: "abc",
+  }],
+  endianness: null,
+  mux: null,
+  notes: { frame: [], cases: [] },
+  burst: false,
 };
 
 describe("Payload Changes text pattern", () => {
@@ -53,9 +65,8 @@ describe("Payload Changes text pattern", () => {
     useDiscoveryToolboxStore.getState().setChangesResults({
       tool: "changes",
       frameCount: 100,
-      uniqueFrameIds: 1,
-      analysisResults: [frame],
-      mirrorGroups: [],
+      frames: [frame],
+      mirrors: [],
     });
     root = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () => root.render(<ChangesResultView />));

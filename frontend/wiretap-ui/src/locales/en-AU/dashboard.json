@@ -114,7 +114,28 @@
       "endiannessAgrees": "byte order agrees",
       "endiannessMixed": "mixed byte order",
       "noProfile": "no analysis data",
-      "none": "low interest"
+      "none": "low interest",
+      "roles": {
+        "static": "static",
+        "counter": "counter",
+        "sensor": "sensor",
+        "value": "value",
+        "unknown": "unknown"
+      },
+      "pattern": {
+        "exact": {
+          "counter16": "a 16-bit counter",
+          "sensor16": "a 16-bit sensor",
+          "sensor32": "a 32-bit sensor",
+          "text": "text"
+        },
+        "overlap": {
+          "counter16": "overlaps a 16-bit counter",
+          "sensor16": "overlaps a 16-bit sensor",
+          "sensor32": "overlaps a 32-bit sensor",
+          "text": "overlaps text"
+        }
+      }
     }
   },
   "candidates": {

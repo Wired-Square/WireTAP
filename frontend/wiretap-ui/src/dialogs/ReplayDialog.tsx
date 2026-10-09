@@ -10,10 +10,9 @@ import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
-import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
-import { getCaptureFramesPaginatedById } from "../api/capture";
+import { getCaptureFramesPaginatedById, getCaptureMetadataById } from "../api/capture";
 import { toReplayFrame, type ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
 import { Input, Select, Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
@@ -40,14 +39,13 @@ const BUS_OPTIONS = [0, 1, 2, 3, 4] as const;
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  /** Capture ID for capture-first mode (when frames are stored in the Rust backend) */
-  captureId?: string | null;
+  /** The capture the frames are replayed from. */
+  captureId: string | null;
 }
 
 export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const { t, i18n } = useTranslation("dialogs");
   const startReplay = useTransmitStore((s) => s.startReplay);
-  const captureMode = useDiscoveryFrameStore((s) => s.captureMode);
   const sessions = useSessionStore((s) => s.sessions);
 
   // Transmit-capable sessions currently connected
@@ -72,15 +70,23 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   // Reset state when dialog opens; snapshot capture length at open time
   useEffect(() => {
     if (!isOpen) return;
-    const len = captureMode.enabled ? captureMode.totalFrames : getDiscoveryFrameBuffer().length;
-    setBufferLength(len);
+    let cancelled = false;
+    setBufferLength(0);
+    if (captureId) {
+      void getCaptureMetadataById(captureId).then((meta) => {
+        if (cancelled || !meta) return;
+        setBufferLength(meta.count);
+        setEndRaw(String(meta.count));
+      });
+    }
     setStartRaw("1");
-    setEndRaw(String(len));
+    setEndRaw("1");
     setSpeed(1);
     setCustomSpeed("1");
     setLoop(false);
     setIsStarting(false);
     setTargetBus("original");
+    return () => { cancelled = true; };
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-select the first (or only) transmit session
@@ -119,25 +125,24 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
       ? t("replay.errors.startEnd")
       : null;
 
-  // Slice capture by 1-based index range; preserves order and duplicate frame IDs
-  const replayFrames = useMemo<ReplayFrame[]>(() => {
-    if (!isOpen || rangeError || startIdx === null || endIdx === null || captureMode.enabled) return [];
-    const buffer = getDiscoveryFrameBuffer();
-    return buffer.slice(startIdx - 1, endIdx).map(toReplayFrame);
-  }, [isOpen, startIdx, endIdx, rangeError, captureMode.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  const expectedCount = startIdx !== null && endIdx !== null && !rangeError ? endIdx - startIdx + 1 : 0;
 
-  const frameCount = replayFrames.length;
-  const spanUs =
-    frameCount >= 2
-      ? replayFrames[frameCount - 1].timestamp_us - replayFrames[0].timestamp_us
-      : 0;
+  // The range's first and last frames, for the time it spans.
+  const [spanUs, setSpanUs] = useState(0);
+  useEffect(() => {
+    setSpanUs(0);
+    if (!isOpen || !captureId || expectedCount < 2 || startIdx === null || endIdx === null) return;
+    let cancelled = false;
+    void Promise.all([
+      getCaptureFramesPaginatedById(captureId, startIdx - 1, 1),
+      getCaptureFramesPaginatedById(captureId, endIdx - 1, 1),
+    ]).then(([first, last]) => {
+      if (cancelled || !first.frames[0] || !last.frames[0]) return;
+      setSpanUs(last.frames[0].timestamp_us - first.frames[0].timestamp_us);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, captureId, startIdx, endIdx, expectedCount]);
   const effectiveSpanUs = speed > 0 ? spanUs / speed : spanUs;
-
-  const expectedCount = captureMode.enabled
-    ? startIdx !== null && endIdx !== null && !rangeError
-      ? endIdx - startIdx + 1
-      : 0
-    : frameCount;
 
   const handleSpeedPreset = (v: number) => {
     setSpeed(v);
@@ -162,14 +167,9 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
     const replayId = `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setIsStarting(true);
     try {
-      let frames: ReplayFrame[];
-      if (captureMode.enabled && captureId) {
-        const count = endIdx - startIdx + 1;
-        const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, count);
-        frames = response.frames.map(toReplayFrame);
-      } else {
-        frames = replayFrames;
-      }
+      if (!captureId) return;
+      const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, expectedCount);
+      const frames: ReplayFrame[] = response.frames.map(toReplayFrame);
       if (frames.length === 0) return;
       await startReplay(selectedSessionId, replayId, applyBusOverride(frames), speed, loop);
       useTransmitStore.setState({ activeTab: "replay" });
@@ -238,14 +238,10 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                 <p className="text-xs text-danger">{rangeError}</p>
               ) : bufferLength === 0 ? (
                 <p className={helpText}>{t("replay.noFrames")}</p>
-              ) : captureMode.enabled ? (
-                <p className={helpText}>
-                  {t("replay.selectedSummary", { count: expectedCount })}
-                </p>
               ) : (
                 <p className={helpText}>
                   {t("replay.spanSummary", {
-                    count: frameCount,
+                    count: expectedCount,
                     span: spanUs > 0 ? formatDuration(spanUs) : "—",
                   })}
                   {effectiveSpanUs !== spanUs && effectiveSpanUs > 0 && speed !== 1

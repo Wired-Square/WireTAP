@@ -7,8 +7,8 @@ import type { HypothesisParams } from "../../../stores/dashboardStore";
 export function reasonText(t: TFunction, reasons: CandidateReason[]): string {
   const text = reasons.map((r) => {
     switch (r.code) {
-      case "role": return t("hypothesis.reasons.role", { role: r.role });
-      case "pattern": return r.kind;
+      case "role": return t("hypothesis.reasons.role", { role: t(`hypothesis.reasons.roles.${r.role}`) });
+      case "pattern": return t(`hypothesis.reasons.pattern.${r.exact ? "exact" : "overlap"}.${r.kind}`);
       default: return t(`hypothesis.reasons.${r.code}`);
     }
   });

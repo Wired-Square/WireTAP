@@ -6,7 +6,7 @@ import {
   type MuxKnowledge,
   createDefaultSignalsForFrame,
 } from './decoderKnowledge';
-import type { MultiBytePattern } from './analysis/payloadAnalysis';
+import type { MultiBytePattern } from '../generated/MultiBytePattern';
 import type { EditOp, HeaderField, SerialConfigFields } from '../types/catalogEdit';
 import type { Endianness, Protocol } from '../types/catalogModel';
 

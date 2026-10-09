@@ -53,9 +53,13 @@ describe("hypothesis text", () => {
     expect(reasonText(t, [
       { code: "role", role: "sensor" },
       { code: "pattern", kind: "sensor16", exact: true },
+      { code: "pattern", kind: "text", exact: false },
       { code: "endiannessAgrees" },
       { code: "highVariance" },
-    ])).toBe("hypothesis.reasons.role:sensor, sensor16, hypothesis.reasons.endiannessAgrees, hypothesis.reasons.highVariance");
+    ])).toBe(
+      "hypothesis.reasons.role:hypothesis.reasons.roles.sensor, hypothesis.reasons.pattern.exact.sensor16, "
+        + "hypothesis.reasons.pattern.overlap.text, hypothesis.reasons.endiannessAgrees, hypothesis.reasons.highVariance",
+    );
     expect(reasonText(t, [])).toBe("hypothesis.reasons.none");
   });
 });
