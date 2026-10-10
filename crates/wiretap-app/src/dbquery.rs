@@ -6,7 +6,7 @@
 use tauri::AppHandle;
 
 use crate::capture_db::InventoryRow;
-use crate::settings::{load_settings, IOProfile};
+use crate::settings::{IOProfile, SettingsSource};
 use wiretap_gateway::DatabaseActivityResult;
 
 /// Resolve a profile id to a WireTAP backend profile.
@@ -14,9 +14,9 @@ use wiretap_gateway::DatabaseActivityResult;
 /// A database-backed source is a `wiretap` profile and nothing else. Anything
 /// else reaching here is a caller passing the wrong profile, not a source this
 /// module should try to open.
-pub async fn backend_profile(app: &AppHandle, profile_id: &str) -> Result<IOProfile, String> {
-    let settings = load_settings(app.clone())
-        .await
+pub async fn backend_profile(settings: &dyn SettingsSource, profile_id: &str) -> Result<IOProfile, String> {
+    let settings = settings
+        .load()
         .map_err(|e| format!("Failed to load settings: {}", e))?;
     let profile = settings
         .io_profiles
@@ -34,23 +34,23 @@ pub async fn backend_profile(app: &AppHandle, profile_id: &str) -> Result<IOProf
 }
 
 pub async fn db_frame_inventory(
-    app: &AppHandle,
+    settings: &dyn SettingsSource,
     profile_id: &str,
     start_us: Option<i64>,
     end_us: Option<i64>,
 ) -> Result<Vec<InventoryRow>, String> {
-    let profile = backend_profile(app, profile_id).await?;
+    let profile = backend_profile(settings, profile_id).await?;
     crate::apiclient::frame_inventory(&profile, start_us, end_us).await
 }
 
 pub async fn db_fetch_frame_payloads(
-    app: &AppHandle,
+    settings: &dyn SettingsSource,
     profile_id: &str,
     frame_id: u32,
     is_extended: Option<bool>,
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let profile = backend_profile(app, profile_id).await?;
+    let profile = backend_profile(settings, profile_id).await?;
     crate::apiclient::fetch_frame_payloads(&profile, frame_id, is_extended, limit).await
 }
 

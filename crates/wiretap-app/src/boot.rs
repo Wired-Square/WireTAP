@@ -165,11 +165,7 @@ pub(crate) fn boot_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::erro
     // and swallowed.
     match &startup_settings {
         Ok(s) if s.mcp_server_enabled => {
-            if let Err(e) = mcp::start(
-                app.handle().clone(),
-                mcp::McpRunningConfig::from_settings(s),
-                s.mcp_server_token.clone(),
-            ) {
+            if let Err(e) = mcp::commands::start_from(app.handle(), s) {
                 tlog!("[mcp] Failed to start: {}", e);
             }
         }

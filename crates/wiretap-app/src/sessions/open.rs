@@ -113,7 +113,7 @@ pub async fn open_session(
 /// `open_session` without a webview. A subscriber is on one session at a time, so
 /// the one it leaves is torn down if this empties it.
 pub async fn open_from(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     session_id: Option<&str>,
     subscriber_id: &str,
     app_name: Option<&str>,
@@ -125,12 +125,12 @@ pub async fn open_from(
     let named = (subscriber_id.to_string(), app_name.map(str::to_string));
     let create = |session_id: String| async move {
         match opts.sources.take() {
-            Some(sources) => create_from_sources(app, &session_id, sources, opts.modbus_polls.take(), named).await,
+            Some(sources) => create_from_sources(source, &session_id, sources, opts.modbus_polls.take(), named).await,
             None => {
-                let settings = settings::load_settings(app.clone()).await?;
+                let settings = source.load()?;
                 match source_of(&settings, &session_id, opts.source_id.take())? {
                     Source::Capture(capture_id) => create_from_capture(&session_id, capture_id, opts.speed, named).await,
-                    Source::Profile(profile) => create_from_profile(app, &settings, &session_id, profile, opts, named).await,
+                    Source::Profile(profile) => create_from_profile(source, &settings, &session_id, profile, opts, named).await,
                 }
             }
         }
@@ -138,8 +138,7 @@ pub async fn open_from(
     match (session_id, source_id) {
         (Some(id), _) => open_or_join(id, subscriber_id, app_name, connect_only, replaces, create(id.to_string())).await,
         (None, Some(source_id)) if !replaces => {
-            let settings = settings::load_settings(app.clone()).await?;
-            open_source(&source_id, &settings, subscriber_id, app_name, connect_only, create).await
+            open_source(&source_id, &source.load()?, subscriber_id, app_name, connect_only, create).await
         }
         _ => Err(SessionRefusal::NotFound { message: "No session id, and no single source to open".into() }),
     }
@@ -237,7 +236,7 @@ async fn create_from_capture(
 }
 
 async fn create_from_profile(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     settings: &AppSettings,
     session_id: &str,
     profile: IOProfile,
@@ -249,14 +248,14 @@ async fn create_from_profile(
     profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[], Some(session_id))?;
     crate::telemetry::emit_feature_usage("io_source_start", &profile.kind);
 
-    let reader = profile_reader(app, settings, session_id, &profile, opts)?;
+    let reader = profile_reader(source, settings, session_id, &profile, opts)?;
     claim_session_profile(session_id, &profile.id).await;
     let result = create_session(session_id.to_string(), reader, Some(subscriber_id), app_name, None, vec![]).await;
     Ok(Created { starts: result.is_new, bus_mappings: None })
 }
 
 fn profile_reader(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     settings: &AppSettings,
     session_id: &str,
     profile: &IOProfile,
@@ -271,7 +270,7 @@ fn profile_reader(
             settings.modbus_max_register_errors,
         )?;
         return Ok(Box::new(IOBroker::single_source(
-            settings::saved_profiles(app),
+            source.saved_profiles(),
             session_id.to_string(),
             source_config,
         )?));
@@ -319,7 +318,7 @@ fn profile_reader(
 /// Merge `sources` into one session under `session_id`, replacing any session
 /// already there so the buses are the ones asked for now.
 async fn create_from_sources(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     session_id: &str,
     sources: Vec<MultiSourceInput>,
     modbus_polls: Option<String>,
@@ -328,7 +327,7 @@ async fn create_from_sources(
     if sources.is_empty() {
         return Err("At least one source is required".to_string().into());
     }
-    let settings = settings::load_settings(app.clone()).await?;
+    let settings = source.load()?;
     let parsed_polls = parse_modbus_polls(modbus_polls.as_deref())?;
     let mut source_configs = resolve_source_configs(sources, &settings, 0)?;
     for config in &mut source_configs {
@@ -366,7 +365,7 @@ async fn create_from_sources(
     let display_names = source_configs.iter().map(|c| c.display_name.clone()).collect();
     let bus_mappings = source_configs.iter().map(|c| (c.profile_id.clone(), c.bus_mappings.clone())).collect();
     let stored_configs = source_configs.clone();
-    let reader = IOBroker::new(settings::saved_profiles(app), session_id.to_string(), source_configs)?;
+    let reader = IOBroker::new(source.saved_profiles(), session_id.to_string(), source_configs)?;
 
     register_session_profiles(session_id, &profile_ids);
     let mut seen = std::collections::HashSet::new();

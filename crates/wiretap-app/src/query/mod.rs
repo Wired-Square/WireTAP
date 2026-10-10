@@ -14,7 +14,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 use wiretap_gateway::{
     ByteChangeQueryResult, ByteChangeResult, DistributionQueryResult, DistributionResult,
     FirstLastQueryResult, FirstLastResult, FrameChangeQueryResult, FrameChangeResult,
@@ -25,6 +24,7 @@ use wiretap_gateway::{
 
 use crate::capture_db::InventoryRow;
 use crate::payload_source::QuerySource;
+use crate::settings::SettingsSource;
 
 pub use queue::QueryQueue;
 
@@ -147,7 +147,7 @@ pub fn new_query_id() -> String {
 /// Run one query. Setting `cancel` stops a capture query; a backend query is
 /// cancelled by its `query_id`.
 pub async fn run(
-    app: &AppHandle,
+    settings: &dyn SettingsSource,
     request: &QueryRequest,
     query_id: &str,
     cancel: &Arc<AtomicBool>,
@@ -164,13 +164,13 @@ pub async fn run(
             .map_err(|e| e.to_string())?
         }
         QuerySource::Backend(profile_id) => {
-            gateway::run(app, profile_id, &spec, query_id, compare.as_ref()).await
+            gateway::run(settings, profile_id, &spec, query_id, compare.as_ref()).await
         }
     }
 }
 
 /// The statements `run` would send, without sending them.
-pub async fn preview(app: &AppHandle, request: &QueryRequest) -> Result<Vec<String>, String> {
+pub async fn preview(settings: &dyn SettingsSource, request: &QueryRequest) -> Result<Vec<String>, String> {
     let spec = with_default_limit(request.spec.clone());
     match &request.source {
         QuerySource::Capture(capture_id) => Ok(capture::statements(capture_id, &spec)
@@ -179,7 +179,7 @@ pub async fn preview(app: &AppHandle, request: &QueryRequest) -> Result<Vec<Stri
             .collect()),
         QuerySource::Backend(profile_id) => {
             let narrowed = mirror_compare(&spec, request.catalog_path.as_deref())?.is_some();
-            gateway::preview(app, profile_id, &spec, narrowed).await
+            gateway::preview(settings, profile_id, &spec, narrowed).await
         }
     }
 }

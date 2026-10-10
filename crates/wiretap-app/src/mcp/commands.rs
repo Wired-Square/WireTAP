@@ -1,8 +1,31 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+use std::sync::Arc;
+
 use tauri::AppHandle;
 
-use crate::settings;
+use crate::catalog::{self, CatalogFile};
+use crate::settings::{self, AppSettings};
+
+impl super::Host for AppHandle {
+    fn settings_saved(&self, settings: &AppSettings) {
+        settings::announce_saved(self, settings);
+    }
+
+    fn catalogs(&self) -> Vec<CatalogFile> {
+        catalog::cached_catalogs(self)
+    }
+
+    fn catalogs_changed(&self) {
+        catalog::refresh_catalog_cache(self);
+    }
+}
+
+/// Start the MCP server with the gates, port and token `s` names.
+pub(crate) fn start_from(app: &AppHandle, s: &AppSettings) -> Result<(), String> {
+    let ctx = super::McpContext::new(crate::boot::Paths::resolve(app)?, Arc::new(app.clone()));
+    super::start(ctx, super::McpRunningConfig::from_settings(s), s.mcp_server_token.clone())
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,12 +69,7 @@ pub fn get_mcp_status(app: AppHandle) -> McpStatus {
 pub fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String> {
     super::stop();
     if enabled {
-        let s = settings::load_settings_sync(&app)?;
-        super::start(
-            app.clone(),
-            super::McpRunningConfig::from_settings(&s),
-            s.mcp_server_token.clone(),
-        )?;
+        start_from(&app, &settings::load_settings_sync(&app)?)?;
     }
     Ok(McpStatus::current(&app))
 }

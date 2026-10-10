@@ -535,14 +535,16 @@ impl Default for AppSettings {
 }
 
 fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| format!("Failed to get app config dir: {}", e))?;
-    settings_path_in(&app_dir)
+    settings_path_in(&config_dir(app)?)
 }
 
-fn settings_path_in(app_dir: &Path) -> Result<PathBuf, String> {
+fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map_err(|e| format!("Failed to get app config dir: {}", e))
+}
+
+pub(crate) fn settings_path_in(app_dir: &Path) -> Result<PathBuf, String> {
     std::fs::create_dir_all(app_dir)
         .map_err(|e| format!("Failed to create app config dir: {}", e))?;
 
@@ -831,11 +833,20 @@ fn write_settings_file(path: &Path, settings: &AppSettings) -> Result<(), String
 /// Every reader's settings: migrated, defaulted and clamped, with this run's
 /// ad-hoc devices overlaid.
 pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
-    let path = get_settings_path(app)?;
     let documents = app.path().document_dir().ok();
-    let Loaded { mut settings, retired, written } = load_from(&path, documents.as_deref())?;
+    load_settings_in(&config_dir(app)?, documents.as_deref(), |s| announce_saved(app, s))
+}
+
+/// `load_settings_sync` over resolved directories; `on_rewrite` sees a file a
+/// migration rewrote, before this run's ad-hoc devices are overlaid.
+pub(crate) fn load_settings_in(
+    config_dir: &Path,
+    documents: Option<&Path>,
+    on_rewrite: impl FnOnce(&AppSettings),
+) -> Result<AppSettings, String> {
+    let Loaded { mut settings, retired, written } = load_from(&settings_path_in(config_dir)?, documents)?;
     if written {
-        announce_saved(app, &settings);
+        on_rewrite(&settings);
     }
     announce_retired(&retired);
     crate::io::ephemeral::overlay(&mut settings.io_profiles);
@@ -845,9 +856,8 @@ pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
 /// `load_settings_sync` without the announcement a rewrite makes, for a boot
 /// with no `AppHandle` yet; the flag says whether the file was rewritten.
 pub(crate) fn load_settings_at(config_dir: &Path, documents: Option<&Path>) -> Result<(AppSettings, bool), String> {
-    let Loaded { mut settings, retired, written } = load_from(&settings_path_in(config_dir)?, documents)?;
-    announce_retired(&retired);
-    crate::io::ephemeral::overlay(&mut settings.io_profiles);
+    let mut written = false;
+    let settings = load_settings_in(config_dir, documents, |_| written = true)?;
     Ok((settings, written))
 }
 
@@ -880,16 +890,32 @@ impl AppSettings {
     }
 }
 
-/// The saved profiles as a broker reads them: from the settings file as it is
-/// at each read.
+/// Where a reader's settings come from: the app, or a host holding its `Paths`.
+pub trait SettingsSource: Send + Sync {
+    fn load(&self) -> Result<AppSettings, String>;
+    /// The saved profiles as a broker reads them: from the settings file as it
+    /// is at each read.
+    fn saved_profiles(&self) -> crate::io::ProfileLoader;
+}
+
+impl SettingsSource for AppHandle {
+    fn load(&self) -> Result<AppSettings, String> {
+        load_settings_sync(self)
+    }
+
+    fn saved_profiles(&self) -> crate::io::ProfileLoader {
+        saved_profiles(self)
+    }
+}
+
 pub fn saved_profiles(app: &AppHandle) -> crate::io::ProfileLoader {
     let app = app.clone();
     std::sync::Arc::new(move || load_settings_sync(&app).map(|s| s.io_profiles))
 }
 
 /// The saved profile with this id, from the settings file as it is now.
-pub fn profile_by_id(app: &AppHandle, profile_id: &str) -> Result<IOProfile, String> {
-    load_settings_sync(app)?.profile(profile_id).cloned()
+pub fn profile_by_id(settings: &dyn SettingsSource, profile_id: &str) -> Result<IOProfile, String> {
+    settings.load()?.profile(profile_id).cloned()
 }
 
 #[tauri::command]
@@ -943,15 +969,17 @@ fn drop_ephemeral_profiles(settings: &mut AppSettings) {
 
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<(), String> {
-    let settings_path = get_settings_path(&app)?;
-    clamp_settings(&mut settings);
-    drop_ephemeral_profiles(&mut settings);
-    {
-        let _file = SETTINGS_FILE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        write_settings_file(&settings_path, &settings)?;
-    }
+    save_settings_to(&get_settings_path(&app)?, &mut settings)?;
     announce_saved(&app, &settings);
     Ok(())
+}
+
+/// `save_settings` without the announcement, leaving `settings` as written.
+pub(crate) fn save_settings_to(path: &Path, settings: &mut AppSettings) -> Result<(), String> {
+    clamp_settings(settings);
+    drop_ephemeral_profiles(settings);
+    let _file = SETTINGS_FILE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    write_settings_file(path, settings)
 }
 
 pub(crate) fn announce_saved(app: &AppHandle, settings: &AppSettings) {

@@ -346,9 +346,9 @@ pub fn stop_group(group: &str) {
 }
 
 /// The queue's record of `session_id`: its first profile, by name.
-pub fn session_row(app: &tauri::AppHandle, session_id: &str) -> QueueRowSession {
+pub fn session_row(settings: &dyn crate::settings::SettingsSource, session_id: &str) -> QueueRowSession {
     let profile_id = crate::sessions::get_session_profile_ids(session_id).into_iter().next().unwrap_or_default();
-    let profile_name = crate::settings::profile_by_id(app, &profile_id).map_or_else(|_| profile_id.clone(), |p| p.name);
+    let profile_name = crate::settings::profile_by_id(settings, &profile_id).map_or_else(|_| profile_id.clone(), |p| p.name);
     QueueRowSession { session_id: session_id.to_string(), profile_id, profile_name }
 }
 

@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use tauri::AppHandle;
+use crate::settings::SettingsSource;
 use wiretap_gateway::{
     ByteChangeQueryResult, ByteChangesParams, DistributionParams, DistributionQueryResult,
     FirstLastParams, FirstLastQueryResult, FrameChangeQueryResult, FrameChangesParams,
@@ -170,18 +170,18 @@ fn narrow(answer: &mut MirrorValidationQueryResult, compare: &BTreeSet<usize>, l
     answer.stats.results_count = answer.results.len() as u64;
 }
 
-async fn api(app: &AppHandle, profile_id: &str) -> Result<ApiProfile, String> {
-    apiclient::resolve(&crate::dbquery::backend_profile(app, profile_id).await?)
+async fn api(settings: &dyn SettingsSource, profile_id: &str) -> Result<ApiProfile, String> {
+    apiclient::resolve(&crate::dbquery::backend_profile(settings, profile_id).await?)
 }
 
 pub async fn run(
-    app: &AppHandle,
+    settings: &dyn SettingsSource,
     profile_id: &str,
     spec: &QuerySpec,
     query_id: &str,
     compare: Option<&BTreeSet<usize>>,
 ) -> Result<QueryOutcome, String> {
-    let api = api(app, profile_id).await?;
+    let api = api(settings, profile_id).await?;
     let request = request(&api, spec, Some(query_id), compare.is_some())?;
     let mut outcome = match &request {
         Request::Get(path) => {
@@ -195,8 +195,8 @@ pub async fn run(
     Ok(outcome)
 }
 
-pub async fn preview(app: &AppHandle, profile_id: &str, spec: &QuerySpec, narrowed: bool) -> Result<Vec<String>, String> {
-    Ok(vec![request(&api(app, profile_id).await?, spec, None, narrowed)?.text()])
+pub async fn preview(settings: &dyn SettingsSource, profile_id: &str, spec: &QuerySpec, narrowed: bool) -> Result<Vec<String>, String> {
+    Ok(vec![request(&api(settings, profile_id).await?, spec, None, narrowed)?.text()])
 }
 
 #[cfg(test)]

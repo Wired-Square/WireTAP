@@ -598,21 +598,24 @@ fn restart_watcher(_app: &AppHandle) -> Result<(), String> {
 /// one-off scan only if the cache was never built (shouldn't happen post-setup).
 #[tauri::command]
 pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
+    Ok(cached_catalogs(&app))
+}
+
+pub fn cached_catalogs(app: &AppHandle) -> Vec<CatalogFile> {
     {
         let cache = app.state::<CatalogCache>();
         let st = cache.state.lock().unwrap();
         if st.dir.is_some() {
-            return Ok(st.catalogs.clone());
+            return st.catalogs.clone();
         }
     }
-    Ok(refresh_catalog_cache(&app))
+    refresh_catalog_cache(app)
 }
 
 /// The catalogue a caller named, by filename, display name or bare filename
 /// without its `.toml`.
-pub async fn find_catalog(app: &AppHandle, name: &str) -> Result<CatalogFile, String> {
-    let catalogs = list_catalogs(app.clone()).await?;
-    catalog_named(&catalogs, name)
+pub fn find_catalog(catalogs: &[CatalogFile], name: &str) -> Result<CatalogFile, String> {
+    catalog_named(catalogs, name)
         .cloned()
         .ok_or_else(|| format!("Catalog '{name}' not found — use list_catalogs"))
 }

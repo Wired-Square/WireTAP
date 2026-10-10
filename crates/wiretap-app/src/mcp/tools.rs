@@ -27,6 +27,7 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 use super::types::*;
 use super::McpRunningConfig;
 use crate::payload_source::{resolve, Capture};
+use crate::settings::SettingsSource;
 use wiretap_gateway::{QuerySpec, RowWindow};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
@@ -37,7 +38,7 @@ const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct WireTapTools {
-    pub(super) app: tauri::AppHandle,
+    pub(super) ctx: super::McpContext,
 }
 
 /// The tool set only changes with the permission gates, which force a server
@@ -100,11 +101,11 @@ fn window(start_time: &Option<String>, end_time: &Option<String>) -> Result<RowW
 /// Rejects path separators / traversal and ensures a `.toml` suffix. Returns the
 /// path and whether it already exists.
 fn resolve_catalog_path(
-    app: &tauri::AppHandle,
+    settings: &dyn SettingsSource,
     filename: &str,
 ) -> Result<(std::path::PathBuf, bool), McpError> {
     let name = crate::catalog::sanitise_catalog_filename(filename).map_err(err)?;
-    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
+    let settings = settings.load().map_err(err)?;
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();
     Ok((path, exists))
@@ -183,19 +184,19 @@ fn modbus_write_json(
 }
 
 fn modbus_endpoint_of(
-    app: &tauri::AppHandle,
+    settings: &dyn SettingsSource,
     profile_id: &str,
 ) -> Result<(String, u16, u8), McpError> {
-    let profile = crate::settings::profile_by_id(app, profile_id).map_err(err)?;
+    let profile = crate::settings::profile_by_id(settings, profile_id).map_err(err)?;
     Ok(crate::io::modbus_endpoint(&profile))
 }
 
 /// The session's Modbus source profile, which names its device and keys its poll.
 fn session_modbus_profile(
-    app: &tauri::AppHandle,
+    settings: &dyn SettingsSource,
     session_id: &str,
 ) -> Result<crate::settings::IOProfile, McpError> {
-    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
+    let settings = settings.load().map_err(err)?;
     crate::io::modbus_tcp::session_modbus_profile(&settings, session_id)
         .cloned()
         .ok_or_else(|| err(format!("Session '{session_id}' has no Modbus source profile")))
@@ -217,7 +218,7 @@ impl WireTapTools {
         t: &ModbusTargetParams,
     ) -> Result<(String, u16, u8), McpError> {
         let base = match &t.profile_id {
-            Some(id) => modbus_endpoint_of(&self.app, id)?,
+            Some(id) => modbus_endpoint_of(&self.ctx, id)?,
             None => ("127.0.0.1".to_string(), 502, 1),
         };
         if t.profile_id.is_none() && t.host.is_none() {
@@ -249,8 +250,7 @@ impl WireTapTools {
             None => crate::sessions::mint_session_id(crate::sessions::MODBUS_SCAN_SESSION_PREFIX).await,
         };
 
-        crate::sessions::create_modbus_scan_session(
-            self.app.clone(),
+        crate::sessions::create_scan_session(
             sid.clone(),
             job,
             None,
@@ -258,7 +258,7 @@ impl WireTapTools {
             Some("mcp".to_string()),
             // An agent sweeping a device that something else is polling may well be
             // doing so deliberately, and it has no parameter to override a refusal with.
-            Some(true),
+            None,
         )
         .await
         .map_err(err)?;
@@ -581,7 +581,7 @@ impl WireTapTools {
 
     #[tool(description = "List configured IO profiles (id, name, kind). Connection secrets are redacted.")]
     async fn list_io_profiles(&self) -> Result<CallToolResult, McpError> {
-        let settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
+        let settings = self.ctx.load().map_err(err)?;
         let profiles: Vec<_> = settings
             .io_profiles
             .iter()
@@ -602,15 +602,9 @@ impl WireTapTools {
 
     #[tool(description = "Get app version and platform info.")]
     async fn get_app_info(&self) -> Result<CallToolResult, McpError> {
-        let version = self
-            .app
-            .config()
-            .version
-            .clone()
-            .unwrap_or_else(|| "unknown".to_string());
         ok_json(json!({
             "name": "WireTAP",
-            "version": version,
+            "version": env!("CARGO_PKG_VERSION"),
             "platform": std::env::consts::OS,
             "arch": std::env::consts::ARCH,
         }))
@@ -653,7 +647,7 @@ impl WireTapTools {
 
     #[tool(description = "List the decoder catalogs (TOML) in the decoder directory, with name, filename, path and git sync status.")]
     async fn list_catalogs(&self) -> Result<CallToolResult, McpError> {
-        ok_json(crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?)
+        ok_json(self.ctx.host.catalogs())
     }
 
     #[tool(description = "Read a decoder catalog's TOML by filename or display name (resolved within the decoder directory).")]
@@ -661,9 +655,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ReadCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let cat = crate::catalog::find_catalog(&self.app, &p.name)
-            .await
-            .map_err(err)?;
+        let cat = self.ctx.find_catalog(&p.name).map_err(err)?;
         let toml = crate::catalog::open_catalog(cat.path.clone())
             .await
             .map_err(err)?;
@@ -677,7 +669,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ReadCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let cat = crate::catalog::find_catalog(&self.app, &p.name).await.map_err(err)?;
+        let cat = self.ctx.find_catalog(&p.name).map_err(err)?;
         let toml = crate::catalog::open_catalog(cat.path).await.map_err(err)?;
         let markdown = crate::report::catalog::render(&toml, crate::report::ReportFormat::Markdown).map_err(err)?;
         Ok(ok_text(markdown))
@@ -705,7 +697,7 @@ impl WireTapTools {
             "discrete" => wiretap_catalog::RegisterType::Discrete,
             other => return Err(err(format!("Unknown register_type '{other}' (use holding/input/coil/discrete)"))),
         };
-        let profile = session_modbus_profile(&self.app, &p.session_id)?;
+        let profile = session_modbus_profile(&self.ctx, &p.session_id)?;
         let (start, count) = (p.address, p.count.max(1));
         let request = ReadRequest { register_type, start, count, unit: None };
         let r = transient_connection(&profile).read(request).await;
@@ -851,7 +843,7 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let profile = crate::analysis::byte_profile(
-            &src.reader(&self.app),
+            &src.reader(&self.ctx),
             p.protocol.as_deref(),
             p.frame_id,
             p.is_extended,
@@ -882,7 +874,7 @@ impl WireTapTools {
         };
         let filter = crate::analysis::ScanFilter::Ids(p.frame_ids.unwrap_or_default());
         let result =
-            crate::analysis::checksum_scan(&src.reader(&self.app), &filter, p.sample_limit, options)
+            crate::analysis::checksum_scan(&src.reader(&self.ctx), &filter, p.sample_limit, options)
                 .await
                 .map_err(err)?;
         ok_json(result)
@@ -894,11 +886,11 @@ impl WireTapTools {
         Parameters(p): Parameters<CatalogCoverageParams>,
     ) -> Result<CallToolResult, McpError> {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
-        let entry = crate::catalog::find_catalog(&self.app, &p.catalog).await.map_err(err)?;
+        let entry = self.ctx.find_catalog(&p.catalog).map_err(err)?;
         let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
         let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| err(e.to_string()))?;
         let report = crate::analysis::catalog_coverage(
-            &src.reader(&self.app),
+            &src.reader(&self.ctx),
             &entry.name,
             &catalog,
             p.include_byte_roles,
@@ -1027,7 +1019,7 @@ impl WireTapTools {
         let source = resolve(capture_id, profile_id).map_err(err)?;
         let request = crate::query::QueryRequest { source, spec, catalog_path: None };
         let id = crate::query::new_query_id();
-        crate::query::run(&self.app, &request, &id, &Default::default()).await.map_err(err)
+        crate::query::run(&self.ctx, &request, &id, &Default::default()).await.map_err(err)
     }
 
     async fn query(
@@ -1068,7 +1060,7 @@ impl WireTapTools {
         Parameters(p): Parameters<RepeatTransmitStartParams>,
     ) -> Result<CallToolResult, McpError> {
         let row = crate::transmit_queue::NewQueueRow {
-            session: crate::transmit_queue::session_row(&self.app, &p.session_id),
+            session: crate::transmit_queue::session_row(&self.ctx, &p.session_id),
             payload: crate::transmit_queue::QueuePayload::Can { frame: p.frame },
             interval_ms: p.interval_ms,
             group: None,
@@ -1186,7 +1178,7 @@ impl WireTapTools {
         if p.values.is_empty() {
             return Err(err("No values to write".to_string()));
         }
-        let profile = session_modbus_profile(&self.app, &p.session_id)?;
+        let profile = session_modbus_profile(&self.ctx, &p.session_id)?;
         let writer = crate::io::modbus_tcp::poll::poll_writer(&p.session_id, &profile.id);
         let a = p.address;
         let result = match p.register_type.to_lowercase().as_str() {
@@ -1238,7 +1230,7 @@ impl WireTapTools {
             },
             modbus_ranges,
         };
-        let result = super::session::open(self.app.clone(), p.profile_id, p.session_id, opts)
+        let result = super::session::open(&self.ctx, p.profile_id, p.session_id, opts)
             .await
             .map_err(err)?;
         ok_json(result)
@@ -1511,7 +1503,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<CreateCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let (path, exists) = resolve_catalog_path(&self.app, &p.filename)?;
+        let (path, exists) = resolve_catalog_path(&self.ctx, &p.filename)?;
         if exists {
             return Err(err(format!(
                 "Catalog '{}' already exists — use update_catalog to overwrite",
@@ -1520,9 +1512,7 @@ impl WireTapTools {
         }
         let content = catalog_text(|| Ok(String::new()), p.content, p.ops).map_err(err)?;
         validate_or_reject(&content)?;
-        crate::catalog::save_catalog(self.app.clone(), path.to_string_lossy().into_owned(), content)
-            .await
-            .map_err(err)?;
+        self.ctx.save_catalog(&path.to_string_lossy(), content).map_err(err)?;
         ok_json(json!({ "created": true, "path": path.to_string_lossy() }))
     }
 
@@ -1542,23 +1532,16 @@ impl WireTapTools {
             .map(str::trim)
             .filter(|s| !s.is_empty())
         {
-            Some(want) => Some(
-                crate::catalog::find_catalog(&self.app, want)
-                    .await
-                    .map_err(err)?
-                    .filename,
-            ),
+            Some(want) => Some(self.ctx.find_catalog(want).map_err(err)?.filename),
             None => None,
         };
 
-        let mut settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
+        let mut settings = self.ctx.load().map_err(err)?;
         let profile = settings.profile_mut(&p.profile_id).map_err(err)?;
         profile.preferred_catalog = resolved.clone();
         let name = profile.name.clone();
 
-        crate::settings::save_settings(self.app.clone(), settings)
-            .await
-            .map_err(err)?;
+        self.ctx.save_settings(settings).map_err(err)?;
 
         ok_json(json!({
             "profile_id": p.profile_id,
@@ -1580,13 +1563,11 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<UpdateCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let cat = crate::catalog::find_catalog(&self.app, &p.filename)
-            .await
-            .map_err(err)?;
+        let cat = self.ctx.find_catalog(&p.filename).map_err(err)?;
         let on_disk = || std::fs::read_to_string(&cat.path).map_err(|e| format!("Failed to read catalog: {e}"));
         let content = catalog_text(on_disk, p.content, p.ops).map_err(err)?;
         validate_or_reject(&content)?;
-        crate::catalog::save_catalog(self.app.clone(), cat.path.clone(), content).await.map_err(err)?;
+        self.ctx.save_catalog(&cat.path, content).map_err(err)?;
         ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
     }
 }
@@ -1633,7 +1614,7 @@ impl WireTapTools {
         Parameters(p): Parameters<DashboardParams>,
     ) -> Result<CallToolResult, McpError> {
         validate_dashboard_or_reject(&p.content)?;
-        let settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
+        let settings = self.ctx.load().map_err(err)?;
         let path = crate::dashboard::write_dashboard(&settings.decoder_dir, &p.filename, &p.content)
             .map_err(err)?;
         ok_json(json!({ "saved": true, "path": path }))
@@ -1993,5 +1974,284 @@ bit_length = 8
             vendored == wslib_ai_mcp::dom::OPS_TS,
             "re-copy crates/wslib-ai-mcp/js/dom-ops.ts from wslib-ai-rs to frontend/wiretap-ui/src/services/domOps.ts"
         );
+    }
+}
+
+#[cfg(test)]
+mod context_tests {
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use wslib_ai_mcp::rmcp::handler::server::wrapper::Parameters;
+    use wslib_ai_mcp::rmcp::model::CallToolResult;
+    use serde_json::{json, Value};
+
+    use super::{McpError, WireTapTools};
+    use crate::boot::Paths;
+    use crate::catalog::CatalogFile;
+    use crate::catalog_share::registry::SyncStatus;
+    use crate::mcp::{Host, McpContext};
+    use crate::settings::{self, AppSettings, IOProfile, SettingsSource};
+
+    const CATALOG: &str = "[meta]\nname = \"Meter\"\nversion = 1\n";
+
+    #[derive(Default)]
+    struct FakeHost {
+        saved: Mutex<Vec<AppSettings>>,
+        catalogs: Mutex<Vec<CatalogFile>>,
+        changed: AtomicUsize,
+    }
+
+    impl Host for FakeHost {
+        fn settings_saved(&self, settings: &AppSettings) {
+            self.saved.lock().unwrap().push(settings.clone());
+        }
+        fn catalogs(&self) -> Vec<CatalogFile> {
+            self.catalogs.lock().unwrap().clone()
+        }
+        fn catalogs_changed(&self) {
+            self.changed.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    struct Fixture {
+        root: PathBuf,
+        host: Arc<FakeHost>,
+        tools: WireTapTools,
+    }
+
+    impl Fixture {
+        /// Every directory the settings name lands under `root`, never the real Documents.
+        fn new(name: &str) -> Self {
+            let root = std::env::temp_dir().join(format!("wiretap-mcp-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            let paths = Paths { data: root.join("data"), config: root.join("config"), documents: Some(root.join("Documents")) };
+            let host = Arc::new(FakeHost::default());
+            let tools = WireTapTools { ctx: McpContext::new(paths, host.clone()) };
+            Self { root, host, tools }
+        }
+
+        fn with_profiles(name: &str, profiles: Vec<IOProfile>) -> Self {
+            let fixture = Self::new(name);
+            let mut s = fixture.tools.ctx.load().unwrap();
+            s.io_profiles = profiles;
+            settings::save_settings_to(&settings::settings_path_in(&fixture.root.join("config")).unwrap(), &mut s).unwrap();
+            fixture.host.saved.lock().unwrap().clear();
+            fixture
+        }
+
+        fn decoder_dir(&self) -> PathBuf {
+            self.root.join("Documents/WireTAP/Decoders")
+        }
+
+        fn add_catalog(&self, filename: &str) -> CatalogFile {
+            let path = self.decoder_dir().join(filename);
+            std::fs::write(&path, CATALOG).unwrap();
+            let file = CatalogFile {
+                name: "Meter".into(),
+                filename: filename.into(),
+                path: path.to_string_lossy().into_owned(),
+                sync_status: SyncStatus::LocalOnly,
+                tracked_repo_count: 0,
+            };
+            self.host.catalogs.lock().unwrap().push(file.clone());
+            file
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn profile(id: &str, kind: &str, connection: Value) -> IOProfile {
+        IOProfile {
+            id: id.into(),
+            name: format!("{id} name"),
+            kind: kind.into(),
+            connection: serde_json::from_value(connection).unwrap(),
+            ..Default::default()
+        }
+    }
+
+    fn params<T: serde::de::DeserializeOwned>(value: Value) -> Parameters<T> {
+        Parameters(serde_json::from_value(value).unwrap())
+    }
+
+    fn text(result: Result<CallToolResult, McpError>) -> String {
+        result.unwrap().content[0].as_text().expect("text block").text.clone()
+    }
+
+    fn json_of(result: Result<CallToolResult, McpError>) -> Value {
+        serde_json::from_str(&text(result)).unwrap()
+    }
+
+    fn message(result: Result<CallToolResult, McpError>) -> String {
+        result.unwrap_err().message.into_owned()
+    }
+
+    fn read(path: impl AsRef<Path>) -> String {
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_load_that_rewrites_the_file_is_announced_to_the_host() {
+        let fixture = Fixture::new("rewrite");
+        let first = fixture.tools.ctx.load().unwrap();
+        let second = fixture.tools.ctx.load().unwrap();
+        let saved = fixture.host.saved.lock().unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].install_id, first.install_id);
+        assert_eq!(second.install_id, first.install_id);
+        assert_eq!(first.decoder_dir, fixture.decoder_dir().to_string_lossy());
+    }
+
+    #[tokio::test]
+    async fn io_profiles_are_listed_from_the_settings_file_with_their_connection_keys() {
+        let meter = profile("mcp-list-meter", "modbus_tcp", json!({ "port": 502, "host": "10.0.0.9" }));
+        let fixture = Fixture::with_profiles("list", vec![meter]);
+        let listed = json_of(fixture.tools.list_io_profiles().await);
+        let mine: Vec<&Value> = listed["profiles"].as_array().unwrap().iter().filter(|p| p["id"] == "mcp-list-meter").collect();
+        assert_eq!(
+            mine,
+            [&json!({ "id": "mcp-list-meter", "name": "mcp-list-meter name", "kind": "modbus_tcp", "preferred_catalog": null, "connection_keys": ["host", "port"] })]
+        );
+    }
+
+    #[tokio::test]
+    async fn app_info_reports_the_crate_version() {
+        let fixture = Fixture::new("info");
+        assert_eq!(
+            json_of(fixture.tools.get_app_info().await),
+            json!({ "name": "WireTAP", "version": env!("CARGO_PKG_VERSION"), "platform": std::env::consts::OS, "arch": std::env::consts::ARCH })
+        );
+    }
+
+    #[tokio::test]
+    async fn catalogues_are_listed_and_named_from_the_hosts_cache() {
+        let fixture = Fixture::with_profiles("catalogs", vec![]);
+        let cat = fixture.add_catalog("meter.toml");
+        let listed = json_of(fixture.tools.list_catalogs().await);
+        assert_eq!(listed, json!([{ "name": "Meter", "filename": "meter.toml", "path": cat.path, "syncStatus": "localOnly", "trackedRepoCount": 0 }]));
+
+        let read = json_of(fixture.tools.read_catalog(params(json!({ "name": "meter" }))).await);
+        assert_eq!(read, json!({ "name": "Meter", "filename": "meter.toml", "path": cat.path, "toml": CATALOG }));
+        assert_eq!(
+            message(fixture.tools.read_catalog(params(json!({ "name": "absent" }))).await),
+            "Catalog 'absent' not found — use list_catalogs"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_created_catalogue_lands_in_the_decoder_dir_and_refreshes_the_cache() {
+        let fixture = Fixture::with_profiles("create", vec![]);
+        let made = json_of(fixture.tools.create_catalog(params(json!({ "filename": "fresh", "content": CATALOG }))).await);
+        let path = fixture.decoder_dir().join("fresh.toml");
+        assert_eq!(made, json!({ "created": true, "path": path.to_string_lossy() }));
+        assert_eq!(read(&path), CATALOG);
+        assert_eq!(fixture.host.changed.load(Ordering::Relaxed), 1);
+
+        assert_eq!(
+            message(fixture.tools.create_catalog(params(json!({ "filename": "fresh.toml", "content": CATALOG }))).await),
+            "Catalog 'fresh.toml' already exists — use update_catalog to overwrite"
+        );
+        assert_eq!(fixture.host.changed.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn an_updated_catalogue_is_overwritten_where_the_cache_names_it() {
+        let fixture = Fixture::with_profiles("update", vec![]);
+        let cat = fixture.add_catalog("meter.toml");
+        let edited = CATALOG.replace("version = 1", "version = 2");
+        let updated = json_of(fixture.tools.update_catalog(params(json!({ "filename": "Meter", "content": edited }))).await);
+        assert_eq!(updated, json!({ "updated": true, "filename": "meter.toml", "path": cat.path }));
+        assert_eq!(read(&cat.path), edited);
+        assert_eq!(fixture.host.changed.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn binding_a_catalogue_saves_the_settings_and_announces_them() {
+        let meter = profile("mcp-bind-meter", "modbus_tcp", json!({ "host": "10.0.0.9" }));
+        let fixture = Fixture::with_profiles("bind", vec![meter]);
+        fixture.add_catalog("meter.toml");
+
+        let bound = json_of(fixture.tools.set_profile_catalog(params(json!({ "profile_id": "mcp-bind-meter", "catalog": "Meter" }))).await);
+        assert_eq!(bound, json!({ "profile_id": "mcp-bind-meter", "profile_name": "mcp-bind-meter name", "preferred_catalog": "meter.toml" }));
+        let stored = fixture.tools.ctx.load().unwrap();
+        assert_eq!(stored.profile("mcp-bind-meter").unwrap().preferred_catalog.as_deref(), Some("meter.toml"));
+        let saved = fixture.host.saved.lock().unwrap().clone();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].profile("mcp-bind-meter").unwrap().preferred_catalog.as_deref(), Some("meter.toml"));
+
+        assert_eq!(
+            message(fixture.tools.set_profile_catalog(params(json!({ "profile_id": "mcp-bind-meter", "catalog": "absent" }))).await),
+            "Catalog 'absent' not found — use list_catalogs"
+        );
+        assert_eq!(
+            message(fixture.tools.set_profile_catalog(params(json!({ "profile_id": "nobody", "catalog": null }))).await),
+            "Profile 'nobody' not found"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dashboard_is_written_under_the_decoder_dir() {
+        let fixture = Fixture::with_profiles("dashboard", vec![]);
+        let content = json!({ "schema": "wiretap.dashboard/1", "panels": [], "layout": [] }).to_string();
+        let saved = json_of(fixture.tools.create_dashboard(params(json!({ "filename": "board", "content": content }))).await);
+        let path = fixture.decoder_dir().join("dashboards/board.dashboard.json");
+        assert_eq!(saved, json!({ "saved": true, "path": path.to_string_lossy() }));
+        assert_eq!(read(&path), content);
+    }
+
+    #[tokio::test]
+    async fn tools_that_resolve_a_profile_name_what_is_missing() {
+        let meter = profile("mcp-missing-meter", "modbus_tcp", json!({ "host": "10.0.0.9" }));
+        let fixture = Fixture::with_profiles("missing", vec![meter]);
+        let tools = &fixture.tools;
+
+        assert_eq!(
+            message(tools.modbus_read(params(json!({ "session_id": "m_nobody", "address": 0 }))).await),
+            "Session 'm_nobody' has no Modbus source profile"
+        );
+        assert_eq!(
+            message(tools.open_session(params(json!({ "profile_id": "nobody" }))).await),
+            "Profile 'nobody' not found"
+        );
+        assert_eq!(
+            message(tools.open_session(params(json!({ "profile_id": "mcp-missing-meter" }))).await),
+            "Modbus profile 'mcp-missing-meter' has no preferred_catalog and no register_ranges \
+             — pass register_ranges to poll an address range, or bind a catalogue with set_profile_catalog"
+        );
+        assert_eq!(
+            message(tools.frame_byte_profile(params(json!({ "profile_id": "nobody", "frame_id": 1 }))).await),
+            "Profile not found: nobody"
+        );
+        assert_eq!(
+            message(tools.frame_byte_profile(params(json!({ "profile_id": "mcp-missing-meter", "frame_id": 1 }))).await),
+            "Profile 'mcp-missing-meter name' is a modbus_tcp source, not a WireTAP backend"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_opened_profile_reads_its_devices_through_the_mcps_settings() {
+        let device = profile(
+            "mcp-open-virtual",
+            "virtual",
+            json!({ "traffic_type": "can", "loopback": true, "signal_generator": false }),
+        );
+        let fixture = Fixture::with_profiles("open", vec![device]);
+        let sid = "f_mcp_open_virtual";
+        let opened = fixture.tools.open_session(params(json!({ "profile_id": "mcp-open-virtual", "session_id": sid }))).await;
+        let source_profiles = crate::sessions::get_session_profile_ids(sid);
+        let _ = crate::io::destroy_session(sid, false).await;
+
+        let opened = json_of(opened);
+        assert_eq!(
+            (&opened["session_id"], &opened["profile_id"], &opened["state"], &opened["catalog_path"]),
+            (&json!(sid), &json!("mcp-open-virtual"), &json!({ "type": "Running" }), &Value::Null)
+        );
+        assert_eq!(source_profiles, ["mcp-open-virtual"]);
     }
 }

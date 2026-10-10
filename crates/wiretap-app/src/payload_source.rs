@@ -1,14 +1,13 @@
 // ui/crates/wiretap-app/src/payload_source.rs
 //
 // The app's `PayloadSource`s: a SQLite capture, and a WireTAP backend profile
-// reached through the settings `AppHandle` holds.
-
-use tauri::AppHandle;
+// reached through the settings.
 
 use crate::analysis::{FrameSource, PayloadQuery, PayloadSource, Sampling};
 use crate::capture_db::InventoryRow;
 use crate::capture_store::FrameSelection;
 use crate::io::FrameMessage;
+use crate::settings::SettingsSource;
 
 /// Where a query runs: a SQLite capture or a WireTAP backend profile.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -33,10 +32,10 @@ pub fn resolve(
 }
 
 impl QuerySource {
-    pub fn reader<'a>(&'a self, app: &'a AppHandle) -> AppSource<'a> {
+    pub fn reader<'a>(&'a self, settings: &'a dyn SettingsSource) -> AppSource<'a> {
         match self {
             QuerySource::Capture(id) => AppSource::Capture(Capture(id)),
-            QuerySource::Backend(profile_id) => AppSource::Gateway(Gateway { app, profile_id }),
+            QuerySource::Backend(profile_id) => AppSource::Gateway(Gateway { settings, profile_id }),
         }
     }
 }
@@ -96,13 +95,13 @@ impl FrameSource for Capture<'_> {
 }
 
 pub struct Gateway<'a> {
-    app: &'a AppHandle,
+    settings: &'a dyn SettingsSource,
     profile_id: &'a str,
 }
 
 impl PayloadSource for Gateway<'_> {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
-        crate::dbquery::db_frame_inventory(self.app, self.profile_id, start_us, end_us).await
+        crate::dbquery::db_frame_inventory(self.settings, self.profile_id, start_us, end_us).await
     }
 
     // No protocol and no stride: a backend profile reads one protocol, and a
@@ -111,7 +110,7 @@ impl PayloadSource for Gateway<'_> {
     // makes striding it affordable.
     async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
         crate::dbquery::db_fetch_frame_payloads(
-            self.app,
+            self.settings,
             self.profile_id,
             q.frame_id,
             q.is_extended,
