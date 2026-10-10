@@ -167,6 +167,10 @@ pub struct TestConfig {
 }
 
 impl TestConfig {
+    fn send_rate_hz(&self) -> f64 {
+        if self.rate_hz > 0.0 { self.rate_hz } else { 100.0 }
+    }
+
     /// One CAN frame, ready to hand to the session.
     fn can(&self, frame_id: u32, data: Vec<u8>, is_extended: bool, is_fd: bool) -> TransmitPayload {
         TransmitPayload::CanFrame(CanTransmitFrame {
@@ -321,6 +325,9 @@ pub struct IOTestState {
     pub peer: Option<PeerInfo>,
     /// Per-length-code results, for a Sweep run.
     pub sweep: Option<Vec<SweepRow>>,
+    /// The frames this run will send, for the TX gauge's scale; `None` when
+    /// unpaced (throughput) or not an initiator's run.
+    pub expected_tx: Option<u64>,
     /// Phase results for Auto mode.
     pub auto_results: Option<Vec<AutoPhaseResult>>,
     /// Current phase label for Auto mode (e.g. "Echo (1/5)").
@@ -580,6 +587,7 @@ impl RunStats {
             remote: self.remote.clone(),
             peer: self.peer.clone(),
             sweep: (!self.sweep.is_empty()).then(|| self.sweep.clone()),
+            expected_tx: None,
             auto_results: publish.auto.as_ref().map(|a| a.done.to_vec()),
             auto_phase: publish.auto.as_ref().map(|a| a.label.clone()),
         }
@@ -708,7 +716,10 @@ impl<'a> Run<'a> {
     }
 
     fn state(&self, status: TestStatus) -> IOTestState {
-        self.stats.state(self.publish, status, &self.tracker)
+        IOTestState {
+            expected_tx: expected_tx(self.config),
+            ..self.stats.state(self.publish, status, &self.tracker)
+        }
     }
 
     fn emit(&self, status: TestStatus) {
@@ -928,15 +939,9 @@ impl<'a> Run<'a> {
     /// link. Returns whether it gave up on a session that stopped transmitting.
     async fn stream(&mut self) -> bool {
         let config = self.config;
-        let interval = if config.rate_hz > 0.0 {
-            Duration::from_secs_f64(1.0 / config.rate_hz)
-        } else {
-            Duration::from_millis(10)
-        };
+        let interval = Duration::from_secs_f64(1.0 / config.send_rate_hz());
         let duration = Duration::from_secs_f64(config.duration_sec);
-        // Stop sending 1s before the end to drain in-flight responses. For very
-        // short tests (<3s), use a third of the duration instead.
-        let drain_secs = if config.duration_sec >= 3.0 { 1.0 } else { config.duration_sec / 3.0 };
+        let drain_secs = drain_secs(config.duration_sec);
         let send_deadline = Duration::from_secs_f64(config.duration_sec - drain_secs);
 
         let start = Instant::now();
@@ -1045,6 +1050,33 @@ impl<'a> Run<'a> {
 // Auto test orchestrator
 // ============================================================================
 
+/// Sending stops this long before the end so in-flight responses can drain: a
+/// second, or a third of a run shorter than three.
+fn drain_secs(duration_sec: f64) -> f64 {
+    if duration_sec >= 3.0 { 1.0 } else { duration_sec / 3.0 }
+}
+
+fn expected_tx(config: &TestConfig) -> Option<u64> {
+    match config.mode {
+        TestMode::Throughput | TestMode::Auto => None,
+        TestMode::Sweep => Some(tp::sweep_codes(config.use_fd).count() as u64),
+        _ => Some(
+            (config.send_rate_hz() * (config.duration_sec - drain_secs(config.duration_sec))).ceil()
+                as u64,
+        ),
+    }
+}
+
+fn suite_status(cancelled: bool, phases_passed: &[bool], total: usize) -> TestStatus {
+    if cancelled {
+        TestStatus::Stopped
+    } else if phases_passed.len() == total && phases_passed.iter().all(|&p| p) {
+        TestStatus::Completed
+    } else {
+        TestStatus::Failed
+    }
+}
+
 async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: &AtomicBool) {
     let mut results: Vec<AutoPhaseResult> = Vec::new();
 
@@ -1119,15 +1151,9 @@ async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: 
         }
     }
 
-    let all_passed = results.len() == total && results.iter().all(|r| r.passed);
     let total_elapsed: f64 = results.iter().map(|r| r.elapsed_sec).sum();
-    let status = if cancel.load(Ordering::SeqCst) {
-        TestStatus::Stopped
-    } else if all_passed {
-        TestStatus::Completed
-    } else {
-        TestStatus::Failed
-    };
+    let passed: Vec<bool> = results.iter().map(|r| r.passed).collect();
+    let status = suite_status(cancel.load(Ordering::SeqCst), &passed, total);
 
     tlog!(
         "[io_test] '{}' auto {:?}: {} phases, elapsed={:.1}s",
@@ -1152,6 +1178,7 @@ async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: 
         remote: results.iter().rev().find_map(|r| r.remote.clone()),
         peer,
         sweep: results.iter().find_map(|r| r.sweep.clone()),
+        expected_tx: None,
         auto_results: Some(results),
         auto_phase: None,
     };
@@ -1512,6 +1539,40 @@ pub(crate) mod tests {
         assert_eq!(state.status, TestStatus::Failed);
         assert!(state.errors.iter().any(|e| e.contains("send queue full")), "{:?}", state.errors);
         assert!(started.elapsed() < Duration::from_secs(3), "gave up before the send phase ended");
+    }
+
+    /// `testPatternGauge.json`'s `expected_tx` and `testPatternSuite.json`'s `rust` column.
+    #[test]
+    fn expected_tx_and_suite_status_match_the_rule_tables() {
+        for row in crate::small_twin_tables::rows("testPatternGauge.json") {
+            let config = TestConfig {
+                mode: serde_json::from_value(row["mode"].clone()).unwrap(),
+                rate_hz: row["rate_hz"].as_f64().unwrap(),
+                duration_sec: row["duration_sec"].as_f64().unwrap(),
+                use_fd: row["use_fd"].as_bool().unwrap(),
+                ..config(TestMode::Echo, false)
+            };
+            assert_eq!(expected_tx(&config), row["expected_tx"].as_u64(), "{row}");
+        }
+        for row in crate::small_twin_tables::rows("testPatternSuite.json") {
+            let passed: Vec<bool> =
+                row["phases_passed"].as_array().unwrap().iter().map(|p| p.as_bool().unwrap()).collect();
+            let status = suite_status(row["cancelled"].as_bool().unwrap(), &passed, 5);
+            assert_eq!(serde_json::to_value(status).unwrap(), row["rust"], "{row}");
+        }
+    }
+
+    /// The TX gauge's scale is the run's own `expected_tx`, so an answered run
+    /// fills it.
+    #[tokio::test]
+    async fn an_echo_run_reaches_its_expected_tx() {
+        let mut config = config(TestMode::Echo, false);
+        config.duration_sec = 1.0;
+        let state = run("test_echo_gauge", Wire::Peer(Responder::new(0, 0)), &config).await;
+
+        let expected = state.expected_tx.expect("a paced run has an expected count");
+        assert!(state.tx_count <= expected, "{} > {expected}", state.tx_count);
+        assert!(state.tx_count * 10 >= expected * 9, "{} of {expected}", state.tx_count);
     }
 
     /// Two taps on one session are independent. Dropping every tap for the

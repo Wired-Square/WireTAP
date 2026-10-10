@@ -1,64 +1,35 @@
 // src/apps/query/stores/queryStore.ts
 //
-// Zustand store for the Query app. Manages query configuration, execution state,
-// results display, and query queue.
+// Zustand store for the Query app: the form, the catalogue it reads, and this
+// window's view of the queue Rust runs.
 
 import { create } from "zustand";
 import { REFRESH_ACTIVITY_DELAY_MS } from "../../../constants";
 import {
-  queryByteChanges,
-  queryFrameChanges,
-  queryMirrorValidation,
-  queryMuxStatistics,
-  queryFirstLast,
-  queryFrequency,
-  queryDistribution,
-  queryGapAnalysis,
-  queryPatternSearch,
-  queryFrameInventory,
-  cancelQuery,
   queryActivity,
   cancelBackend,
   terminateBackend,
   type DatabaseActivity,
-  type DatabaseActivityResult,
-  type MuxStatisticsResult,
-  type FirstLastResult,
-  type FrequencyBucket,
-  type DistributionResult,
-  type GapResult,
-  type PatternSearchResult,
-  type InventoryRow,
 } from "../../../api/dbquery";
 import {
-  queryByteChangesCapture,
-  queryFrameChangesCapture,
-  queryMirrorValidationCapture,
-  queryMuxStatisticsCapture,
-  queryFirstLastCapture,
-  queryFrequencyCapture,
-  queryDistributionCapture,
-  queryGapAnalysisCapture,
-  queryPatternSearchCapture,
-} from "../../../api/capturequery";
+  enqueueQuery as enqueue,
+  getQueryResult,
+  removeQuery,
+  type QueryItem,
+  type QueryOutcome,
+  type QueryQueue,
+  type QuerySource,
+  type QuerySpec,
+} from "../../../api/query";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
-import type { Catalog } from "../../../types/catalogModel";
+import { datetimeLocalToMicros } from "../../../utils/timeFormat";
+import type { Catalog, Frame } from "../../../types/catalogModel";
+import { framesById } from "../../../utils/catalogFrames";
 
-export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult, InventoryRow };
+export type { DatabaseActivity };
 
-/** Available query types */
-export type QueryType =
-  | "byte_changes"
-  | "frame_changes"
-  | "mirror_validation"
-  | "mux_statistics"
-  | "first_last"
-  | "frequency"
-  | "distribution"
-  | "gap_analysis"
-  | "pattern_search"
-  | "frame_inventory";
+export type QueryType = QuerySpec["type"];
 
 /** Query type metadata for UI display */
 export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: string }> = {
@@ -104,53 +75,6 @@ export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: st
   },
 };
 
-/** A single byte change result */
-export interface ByteChangeResult {
-  timestamp_us: number;
-  old_value: number;
-  new_value: number;
-}
-
-/** A single frame change result */
-export interface FrameChangeResult {
-  timestamp_us: number;
-  old_payload: number[];
-  new_payload: number[];
-  changed_indices: number[];
-}
-
-/** A single mirror validation result */
-export interface MirrorValidationResult {
-  mirror_timestamp_us: number;
-  source_timestamp_us: number;
-  mirror_payload: number[];
-  source_payload: number[];
-  mismatch_indices: number[];
-}
-
-/** Query statistics returned with results */
-export interface QueryStats {
-  /** Number of rows fetched from the database */
-  rows_scanned: number;
-  /** Number of results after filtering */
-  results_count: number;
-  /** Query execution time in milliseconds */
-  execution_time_ms: number;
-}
-
-/** Union type for query results */
-export type QueryResult =
-  | ByteChangeResult[]
-  | FrameChangeResult[]
-  | MirrorValidationResult[]
-  | MuxStatisticsResult
-  | FirstLastResult
-  | FrequencyBucket[]
-  | DistributionResult[]
-  | GapResult[]
-  | PatternSearchResult[]
-  | InventoryRow[];
-
 /** Query parameters */
 export interface QueryParams {
   frameId: number;
@@ -188,50 +112,6 @@ export const CONTEXT_PRESETS: { label: string; beforeMs: number; afterMs: number
   { label: "±1m", beforeMs: 60000, afterMs: 60000 },
 ];
 
-/** Queue item status */
-export type QueryStatus = "pending" | "running" | "completed" | "error";
-
-/** Time bounds for query */
-export interface QueryTimeBounds {
-  startTime: string;
-  endTime: string;
-  maxFrames?: number;
-}
-
-/** A queued query with its configuration and results */
-export interface QueuedQuery {
-  /** Unique identifier for this queue item */
-  id: string;
-  /** Query type (byte_changes, frame_changes, etc.) */
-  queryType: QueryType;
-  /** Query parameters at time of submission */
-  queryParams: QueryParams;
-  /** Profile ID for the database connection (backend queries) */
-  profileId: string;
-  /** Buffer ID for buffer queries (when set, routes to SQLite instead of the backend) */
-  captureId?: string;
-  /** Current status */
-  status: QueryStatus;
-  /** When the query was submitted */
-  submittedAt: number;
-  /** When the query started running */
-  startedAt?: number;
-  /** When the query completed */
-  completedAt?: number;
-  /** Error message if status is 'error' */
-  errorMessage?: string;
-  /** Query results (null until completed) */
-  results: QueryResult | null;
-  /** Query statistics (null until completed) */
-  stats: QueryStats | null;
-  /** Display name for the query (auto-generated) */
-  displayName: string;
-  /** Time bounds (optional) */
-  timeBounds?: QueryTimeBounds;
-  /** Result limit for this query */
-  resultLimit: number;
-}
-
 /** Format frame ID with leading zeros (3 digits for standard, 8 for extended) */
 function formatFrameId(frameId: number, isExtended: boolean | null): string {
   // When isExtended is null (no filter), default to standard display (3 digits)
@@ -251,11 +131,9 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
   } else if (queryType === "frame_inventory") {
     name = typeLabel;
   } else if (queryType === "pattern_search") {
-    const patternHex = queryParams.pattern.length > 0
-      ? queryParams.pattern
-          .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
-          .join(" ")
-      : "(empty)";
+    const patternHex = queryParams.pattern
+      .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+      .join(" ");
     name = `${typeLabel} - ${patternHex}`;
   } else {
     const frameHex = formatFrameId(queryParams.frameId, queryParams.isExtended);
@@ -276,8 +154,6 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
   return name;
 }
 
-export { formatFrameId };
-
 /** Selected signal from catalog for query targeting */
 export interface SelectedSignal {
   frameId: number;
@@ -287,31 +163,76 @@ export interface SelectedSignal {
   byteIndex: number; // Derived: Math.floor(startBit / 8)
 }
 
+/**
+ * The form as a spec: bounds read at the form's edge in its timezone, the limit
+ * on the types that take one. Throws for a bound that is not a time or an empty
+ * pattern, before anything is sent.
+ */
+export function buildQuerySpec(queryType: QueryType, p: QueryParams, bounds: TimeBounds | null, limit: number): QuerySpec {
+  const mode = bounds?.timezoneMode ?? "local";
+  const window = {
+    start_us: datetimeLocalToMicros(bounds?.startTime ?? "", mode),
+    end_us: datetimeLocalToMicros(bounds?.endTime ?? "", mode),
+  };
+  const frame = { frame_id: p.frameId, is_extended: p.isExtended, ...window };
+  switch (queryType) {
+    case "byte_changes":
+      return { type: queryType, ...frame, byte_index: p.byteIndex, limit };
+    case "frame_changes":
+      return { type: queryType, ...frame, limit };
+    case "mirror_validation":
+      return {
+        type: queryType,
+        mirror_frame_id: p.mirrorFrameId,
+        source_frame_id: p.sourceFrameId,
+        is_extended: p.isExtended,
+        ...window,
+        tolerance_ms: p.toleranceMs,
+        limit,
+      };
+    case "mux_statistics":
+      return {
+        type: queryType,
+        ...frame,
+        mux_selector_byte: p.muxSelectorByte,
+        include_16bit: p.include16Bit,
+        payload_length: p.payloadLength,
+        limit,
+      };
+    case "first_last":
+      return { type: queryType, ...frame };
+    case "frequency":
+      return { type: queryType, ...frame, bucket_size_ms: p.bucketSizeMs, limit };
+    case "distribution":
+      return { type: queryType, ...frame, byte_index: p.byteIndex };
+    case "gap_analysis":
+      return { type: queryType, ...frame, gap_threshold_ms: p.gapThresholdMs, limit };
+    case "pattern_search":
+      if (p.pattern.length === 0) throw new Error("Enter a pattern to search for");
+      return { type: queryType, ...window, pattern: p.pattern, pattern_mask: p.patternMask, limit };
+    case "frame_inventory":
+      return { type: queryType, ...window, limit };
+  }
+}
+
+/** The types whose spec carries a result limit. */
+export const takesLimit = (queryType: QueryType) =>
+  !["first_last", "distribution"].includes(queryType);
+
 interface QueryState {
-  // Profile state (synced with session manager)
   ioProfile: string | null;
 
-  // Query configuration
   queryType: QueryType;
   queryParams: QueryParams;
-
-  // Context window for ingest
   contextWindow: ContextWindow;
-
-  // Query execution state (for backwards compat - now managed via queue)
-  isRunning: boolean;
   error: string | null;
 
-  // Results (legacy - now managed via queue)
-  results: QueryResult | null;
-  resultCount: number;
-  lastQueryStats: QueryStats | null;
-
-  // Queue state
-  queue: QueuedQuery[];
+  /** Rust's queue as last pushed, and the results fetched for it. */
+  queue: QueryItem[];
+  queueRevision: number;
+  outcomes: Record<string, QueryOutcome>;
   selectedQueryId: string | null;
 
-  // Catalog state
   catalogPath: string | null;
   catalog: Catalog | null;
   selectedSignal: SelectedSignal | null;
@@ -325,35 +246,28 @@ interface QueryState {
     lastRefresh: number | null;
   };
 
-  // Actions
   setIoProfile: (profile: string | null) => void;
   setQueryType: (type: QueryType) => void;
   updateQueryParams: (params: Partial<QueryParams>) => void;
   setContextWindow: (window: ContextWindow) => void;
-  setIsRunning: (running: boolean) => void;
   setError: (error: string | null) => void;
-  setResults: (results: QueryResult | null, stats?: QueryStats) => void;
-  clearResults: () => void;
-  reset: () => void;
 
-  // Queue actions
-  enqueueQuery: (sourceId: string, sourceType: "backend" | "capture", timeBounds?: TimeBounds | null, resultLimit?: number) => string;
-  updateQueueItem: (id: string, updates: Partial<QueuedQuery>) => void;
+  enqueueQuery: (source: QuerySource, timeBounds: TimeBounds | null, resultLimit?: number) => Promise<void>;
+  applyQueue: (queue: QueryQueue) => void;
+  loadOutcome: (id: string) => Promise<void>;
   removeQueueItem: (id: string) => void;
-  clearQueue: () => void;
   setSelectedQueryId: (id: string | null) => void;
-  processNextQuery: () => Promise<void>;
 
-  // Catalog actions
   setCatalogPath: (path: string | null) => void;
   setCatalog: (catalog: Catalog | null) => void;
   setSelectedSignal: (signal: SelectedSignal | null) => void;
 
-  // Activity actions (Stats tab)
   refreshActivity: (profileId: string) => Promise<void>;
   cancelRunningQuery: (profileId: string, pid: number) => Promise<boolean>;
   terminateSession: (profileId: string, pid: number) => Promise<boolean>;
 }
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const initialQueryParams: QueryParams = {
   frameId: 0,
@@ -377,27 +291,21 @@ const initialContextWindow: ContextWindow = {
 };
 
 export const useQueryStore = create<QueryState>((set, get) => ({
-  // Initial state
   ioProfile: null,
   queryType: "byte_changes",
   queryParams: initialQueryParams,
   contextWindow: initialContextWindow,
-  isRunning: false,
   error: null,
-  results: null,
-  resultCount: 0,
-  lastQueryStats: null,
 
-  // Queue state
   queue: [],
+  queueRevision: -1,
+  outcomes: {},
   selectedQueryId: null,
 
-  // Catalog state
   catalogPath: null,
   catalog: null,
   selectedSignal: null,
 
-  // Activity state (Stats tab)
   activity: {
     queries: [],
     sessions: [],
@@ -406,10 +314,9 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     lastRefresh: null,
   },
 
-  // Actions
   setIoProfile: (profile) => set({ ioProfile: profile }),
 
-  setQueryType: (type) => set({ queryType: type, results: null, resultCount: 0, lastQueryStats: null, error: null }),
+  setQueryType: (type) => set({ queryType: type, error: null }),
 
   updateQueryParams: (params) =>
     set((state) => ({
@@ -418,506 +325,63 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
   setContextWindow: (window) => set({ contextWindow: window }),
 
-  setIsRunning: (running) => set({ isRunning: running }),
+  setError: (error) => set({ error }),
 
-  setError: (error) => set({ error, isRunning: false }),
-
-  setResults: (results, stats) =>
-    set({
-      results,
-      resultCount: Array.isArray(results)
-        ? results.length
-        : results && typeof results === "object" && "cases" in results
-          ? (results as MuxStatisticsResult).cases.length
-          : 0,
-      lastQueryStats: stats ?? null,
-      isRunning: false,
-      error: null,
-    }),
-
-  clearResults: () => set({ results: null, resultCount: 0, lastQueryStats: null, error: null }),
-
-  reset: () =>
-    set({
-      queryType: "byte_changes",
-      queryParams: initialQueryParams,
-      contextWindow: initialContextWindow,
-      isRunning: false,
-      error: null,
-      results: null,
-      resultCount: 0,
-      lastQueryStats: null,
-      queue: [],
-      selectedQueryId: null,
-      catalogPath: null,
-      catalog: null,
-      selectedSignal: null,
-    }),
-
-  // Queue actions
-  enqueueQuery: (sourceId: string, sourceType: "backend" | "capture", inputBounds?: TimeBounds | null, resultLimit?: number) => {
-    const { queryType, queryParams } = get();
-    const id = `query_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    // Convert TimeBounds to QueryTimeBounds (only if times are set)
-    const timeBounds: QueryTimeBounds | undefined =
-      inputBounds?.startTime || inputBounds?.endTime
-        ? {
-            startTime: inputBounds.startTime,
-            endTime: inputBounds.endTime,
-            maxFrames: inputBounds.maxFrames,
-          }
-        : undefined;
-
-    const displayName = generateQueryDisplayName(queryType, queryParams);
-
-    // Use provided limit or fall back to settings
+  enqueueQuery: async (source, timeBounds, resultLimit) => {
+    const { queryType, queryParams, catalogPath } = get();
     const limit = resultLimit ?? useSettingsStore.getState().buffers.queryResultLimit;
-
-    const newItem: QueuedQuery = {
-      id,
-      queryType,
-      queryParams: { ...queryParams },
-      profileId: sourceType === "backend" ? sourceId : "",
-      captureId: sourceType === "capture" ? sourceId : undefined,
-      status: "pending",
-      submittedAt: Date.now(),
-      results: null,
-      stats: null,
-      displayName,
-      timeBounds,
-      resultLimit: limit,
-    };
-
-    set((state) => ({
-      queue: [...state.queue, newItem],
-    }));
-
-    // Auto-start processing if nothing is running
-    setTimeout(() => get().processNextQuery(), 0);
-
-    return id;
-  },
-
-  updateQueueItem: (id: string, updates: Partial<QueuedQuery>) => {
-    set((state) => ({
-      queue: state.queue.map((item) =>
-        item.id === id ? { ...item, ...updates } : item
-      ),
-    }));
-  },
-
-  removeQueueItem: (id: string) => {
-    const { queue } = get();
-    const item = queue.find((q) => q.id === id);
-
-    // If the query is running, cancel it on the backend
-    if (item?.status === "running") {
-      cancelQuery(id).catch((e) => {
-        console.warn(`Failed to cancel query ${id}:`, e);
-      });
-    }
-
-    set((state) => ({
-      queue: state.queue.filter((q) => q.id !== id),
-      selectedQueryId: state.selectedQueryId === id ? null : state.selectedQueryId,
-    }));
-  },
-
-  clearQueue: () => {
-    set({ queue: [], selectedQueryId: null });
-  },
-
-  setSelectedQueryId: (id: string | null) => {
-    set({ selectedQueryId: id });
-  },
-
-  processNextQuery: async () => {
-    const { queue, updateQueueItem, setIsRunning } = get();
-
-    // Check if anything is already running
-    if (queue.some((q) => q.status === "running")) {
-      return;
-    }
-
-    // Find next pending query
-    const nextQuery = queue.find((q) => q.status === "pending");
-    if (!nextQuery) {
-      setIsRunning(false);
-      return;
-    }
-
-    // Mark as running
-    setIsRunning(true);
-    updateQueueItem(nextQuery.id, {
-      status: "running",
-      startedAt: Date.now(),
-    });
-
     try {
-      let results: QueryResult | null = null;
-      let stats: QueryStats | undefined;
-
-      const { profileId, captureId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
-
-      if (captureId) {
-        // ── Buffer query path (SQLite) ──
-        // Convert ISO time bounds to microseconds for buffer queries
-        const toMicroseconds = (dt: string | undefined): number | undefined => {
-          if (!dt) return undefined;
-          try {
-            const date = new Date(dt);
-            if (isNaN(date.getTime())) return undefined;
-            return date.getTime() * 1000;
-          } catch {
-            return undefined;
-          }
-        };
-
-        const startTimeUs = toMicroseconds(timeBounds?.startTime);
-        const endTimeUs = toMicroseconds(timeBounds?.endTime);
-
-        switch (queryType) {
-          case "byte_changes": {
-            const response = await queryByteChangesCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.byteIndex,
-              queryParams.isExtended,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frame_changes": {
-            const response = await queryFrameChangesCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "mirror_validation": {
-            const response = await queryMirrorValidationCapture(
-              captureId,
-              queryParams.mirrorFrameId,
-              queryParams.sourceFrameId,
-              queryParams.isExtended,
-              queryParams.toleranceMs * 1000, // Convert ms → µs for buffer queries
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-              get().catalogPath,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "mux_statistics": {
-            const response = await queryMuxStatisticsCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.muxSelectorByte,
-              queryParams.isExtended,
-              queryParams.include16Bit,
-              queryParams.payloadLength,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "first_last": {
-            const response = await queryFirstLastCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              startTimeUs,
-              endTimeUs,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frequency": {
-            const response = await queryFrequencyCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              queryParams.bucketSizeMs,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "distribution": {
-            const response = await queryDistributionCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.byteIndex,
-              queryParams.isExtended,
-              startTimeUs,
-              endTimeUs,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "gap_analysis": {
-            const response = await queryGapAnalysisCapture(
-              captureId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              queryParams.gapThresholdMs,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "pattern_search": {
-            const response = await queryPatternSearchCapture(
-              captureId,
-              queryParams.pattern,
-              queryParams.patternMask,
-              startTimeUs,
-              endTimeUs,
-              resultLimit,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frame_inventory": {
-            // The command reads a bare integer as microseconds.
-            results = await queryFrameInventory(
-              { captureId },
-              startTimeUs?.toString(),
-              endTimeUs?.toString(),
-            );
-            break;
-          }
-        }
-      } else {
-        // ── Backend query path ──
-        // Convert datetime-local format to ISO-8601 for the backend
-        // datetime-local is "YYYY-MM-DDTHH:mm" but backend needs full ISO timestamp
-        const toIsoTimestamp = (dt: string | undefined): string | undefined => {
-          if (!dt) return undefined;
-          try {
-            // Parse as local time and convert to ISO
-            const date = new Date(dt);
-            if (isNaN(date.getTime())) return undefined;
-            return date.toISOString();
-          } catch {
-            return undefined;
-          }
-        };
-
-        // Only pass non-empty time bounds to the backend (empty strings cause serialization errors)
-        const startTime = toIsoTimestamp(timeBounds?.startTime);
-        const endTime = toIsoTimestamp(timeBounds?.endTime);
-
-        switch (queryType) {
-          case "byte_changes": {
-            const response = await queryByteChanges(
-              profileId,
-              queryParams.frameId,
-              queryParams.byteIndex,
-              queryParams.isExtended,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frame_changes": {
-            const response = await queryFrameChanges(
-              profileId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "mirror_validation": {
-            const response = await queryMirrorValidation(
-              profileId,
-              queryParams.mirrorFrameId,
-              queryParams.sourceFrameId,
-              queryParams.isExtended,
-              queryParams.toleranceMs,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id,
-              get().catalogPath,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "mux_statistics": {
-            const response = await queryMuxStatistics(
-              profileId,
-              queryParams.frameId,
-              queryParams.muxSelectorByte,
-              queryParams.isExtended,
-              queryParams.include16Bit,
-              queryParams.payloadLength,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "first_last": {
-            const response = await queryFirstLast(
-              profileId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              startTime,
-              endTime,
-              nextQuery.id,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frequency": {
-            const response = await queryFrequency(
-              profileId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              queryParams.bucketSizeMs,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "distribution": {
-            const response = await queryDistribution(
-              profileId,
-              queryParams.frameId,
-              queryParams.byteIndex,
-              queryParams.isExtended,
-              startTime,
-              endTime,
-              nextQuery.id,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "gap_analysis": {
-            const response = await queryGapAnalysis(
-              profileId,
-              queryParams.frameId,
-              queryParams.isExtended,
-              queryParams.gapThresholdMs,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "pattern_search": {
-            const response = await queryPatternSearch(
-              profileId,
-              queryParams.pattern,
-              queryParams.patternMask,
-              startTime,
-              endTime,
-              resultLimit,
-              nextQuery.id,
-            );
-            results = response.results;
-            stats = response.stats;
-            break;
-          }
-
-          case "frame_inventory": {
-            results = await queryFrameInventory({ profileId }, startTime, endTime);
-            break;
-          }
-        }
-      }
-
-      updateQueueItem(nextQuery.id, {
-        status: "completed",
-        completedAt: Date.now(),
-        results,
-        stats: stats ?? null,
+      const spec = buildQuerySpec(queryType, queryParams, timeBounds, limit);
+      await enqueue(generateQueryDisplayName(queryType, queryParams), {
+        source,
+        spec,
+        ...(catalogPath ? { catalog_path: catalogPath } : {}),
       });
     } catch (e) {
-      updateQueueItem(nextQuery.id, {
-        status: "error",
-        completedAt: Date.now(),
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
+      set({ error: message(e) });
     }
-
-    // Process next query in queue
-    setTimeout(() => get().processNextQuery(), 0);
   },
 
-  // Catalog actions
+  applyQueue: (queue) => {
+    if (queue.revision <= get().queueRevision) return;
+    const ids = new Set(queue.items.map((item) => item.id));
+    set((state) => ({
+      queue: queue.items,
+      queueRevision: queue.revision,
+      outcomes: Object.fromEntries(Object.entries(state.outcomes).filter(([id]) => ids.has(id))),
+      selectedQueryId: state.selectedQueryId && ids.has(state.selectedQueryId) ? state.selectedQueryId : null,
+    }));
+  },
+
+  loadOutcome: async (id) => {
+    if (get().outcomes[id]) return;
+    try {
+      const outcome = await getQueryResult(id);
+      set((state) => ({ outcomes: { ...state.outcomes, [id]: outcome } }));
+    } catch (e) {
+      console.warn(`Failed to read query ${id}:`, e);
+    }
+  },
+
+  removeQueueItem: (id) => {
+    removeQuery(id).catch((e) => console.warn(`Failed to remove query ${id}:`, e));
+  },
+
+  setSelectedQueryId: (id) => set({ selectedQueryId: id }),
+
   setCatalogPath: (path: string | null) => {
     set({ catalogPath: path });
   },
-
   setCatalog: (catalog: Catalog | null) => {
-    set({ catalog, selectedSignal: null });
+    const frames = catalog ? framesById(catalog) : new Map<number, Frame>();
+    const { queryParams } = get();
+    const lowestId = Math.min(...frames.keys());
+    const frame = frames.has(queryParams.frameId) ? undefined : frames.get(lowestId);
+    set({
+      catalog,
+      selectedSignal: null,
+      ...(frame && { queryParams: { ...queryParams, frameId: lowestId, isExtended: frame.isExtended ?? false } }),
+    });
   },
 
   setSelectedSignal: (signal: SelectedSignal | null) => {

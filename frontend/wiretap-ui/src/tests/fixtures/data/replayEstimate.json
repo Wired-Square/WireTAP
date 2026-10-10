@@ -1,0 +1,15 @@
+{
+  "note": "`rust` is replay.rs pass_duration_us (per-gap, rounded, capped at 5 s, speed floored at 0.001), which ReplayDialog.tsx shows before a start since D3 (`replay_estimate`). The TypeScript `spanUs / speed` it replaced (D1's `ts` column) is gone with T10.",
+  "rows": [
+    { "name": "steady 10 ms", "timestamps_us": [0, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000], "speed": 1, "rust": 100000 },
+    { "name": "steady 10 ms at 2x", "timestamps_us": [0, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000], "speed": 2, "rust": 50000 },
+    { "name": "a 60 s gap", "timestamps_us": [0, 10000, 60010000], "speed": 1, "rust": 5010000 },
+    { "name": "a 60 s gap at 10x", "timestamps_us": [0, 10000, 60010000], "speed": 10, "rust": 5001000 },
+    { "name": "a 2 s gap at 0.25x", "timestamps_us": [0, 2000000], "speed": 0.25, "rust": 5000000 },
+    { "name": "speed zero", "timestamps_us": [0, 10000, 60010000], "speed": 0, "rust": 10000000 },
+    { "name": "speed below the floor", "timestamps_us": [0, 1000], "speed": 0.0005, "rust": 1000000 },
+    { "name": "out-of-order timestamps", "timestamps_us": [0, 50000, 20000, 100000], "speed": 1, "rust": 130000 },
+    { "name": "sub-microsecond gaps at 3x", "timestamps_us": [0, 1, 2, 3], "speed": 3, "rust": 0 },
+    { "name": "one frame", "timestamps_us": [5000], "speed": 1, "rust": 0 }
+  ]
+}

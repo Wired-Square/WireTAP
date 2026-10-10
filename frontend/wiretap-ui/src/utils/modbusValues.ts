@@ -31,9 +31,9 @@ export interface RegisterPairView {
   f32: number;
 }
 
-/** Big-endian u16 from a register's two bytes. Missing bytes read as zero. */
+/** Big-endian u16 from a register's bytes; a short register reads the bits it has, as wiretap-decode does. */
 function toU16(bytes: number[]): number {
-  return (((bytes[0] ?? 0) << 8) | (bytes[1] ?? 0)) >>> 0;
+  return bytes.slice(0, 2).reduce((value, byte) => (value << 8) | byte, 0);
 }
 
 /** Every reading of one register's bytes that a discovery table shows at once. */

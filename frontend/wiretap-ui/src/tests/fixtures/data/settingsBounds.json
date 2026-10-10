@@ -1,0 +1,154 @@
+{
+  "note": "`ts` is settings/bounds.ts SETTINGS_BOUNDS[key]; `rust` is what settings.rs clamp_settings does to `field` (null: not clamped). Checked by settingsGoldens.test.ts and settings::tests::clamp_settings_matches_the_bounds_table.",
+  "bounds": [
+    {
+      "key": "discoveryHistorySize",
+      "field": "discovery_history_buffer",
+      "ts": {
+        "min": 1000,
+        "max": 10000000,
+        "step": 10000
+      },
+      "rust": {
+        "min": 1000,
+        "max": 10000000
+      }
+    },
+    {
+      "key": "queryResultLimit",
+      "field": "query_result_limit",
+      "ts": {
+        "min": 100,
+        "max": 100000,
+        "step": 1000
+      },
+      "rust": {
+        "min": 100,
+        "max": 100000
+      }
+    },
+    {
+      "key": "graphBufferSize",
+      "field": "graph_buffer_size",
+      "ts": {
+        "min": 1000,
+        "max": 100000,
+        "step": 1000
+      },
+      "rust": {
+        "min": 1000,
+        "max": 100000
+      }
+    },
+    {
+      "key": "decoderMaxUnmatchedFrames",
+      "field": "decoder_max_unmatched_frames",
+      "ts": {
+        "min": 100,
+        "max": 10000,
+        "step": 100
+      },
+      "rust": {
+        "min": 100,
+        "max": 10000
+      }
+    },
+    {
+      "key": "decoderMaxFilteredFrames",
+      "field": "decoder_max_filtered_frames",
+      "ts": {
+        "min": 100,
+        "max": 10000,
+        "step": 100
+      },
+      "rust": {
+        "min": 100,
+        "max": 10000
+      }
+    },
+    {
+      "key": "decoderMaxDecodedFrames",
+      "field": "decoder_max_decoded_frames",
+      "ts": {
+        "min": 100,
+        "max": 5000,
+        "step": 100
+      },
+      "rust": {
+        "min": 100,
+        "max": 5000
+      }
+    },
+    {
+      "key": "decoderMaxDecodedPerSource",
+      "field": "decoder_max_decoded_per_source",
+      "ts": {
+        "min": 500,
+        "max": 20000,
+        "step": 500
+      },
+      "rust": {
+        "min": 500,
+        "max": 20000
+      }
+    },
+    {
+      "key": "transmitMaxHistory",
+      "field": "transmit_max_history",
+      "ts": {
+        "min": 100,
+        "max": 10000,
+        "step": 100
+      },
+      "rust": {
+        "min": 100,
+        "max": 10000
+      }
+    },
+    {
+      "key": "modbusMaxRegisterErrors",
+      "field": "modbus_max_register_errors",
+      "ts": {
+        "min": 0,
+        "max": 1000,
+        "step": 1
+      },
+      "rust": {
+        "min": 0,
+        "max": 1000
+      }
+    },
+    {
+      "key": "smpPort",
+      "field": "smp_port",
+      "ts": {
+        "min": 1,
+        "max": 65535,
+        "step": 1
+      },
+      "rust": {
+        "min": 1,
+        "max": 65535
+      }
+    },
+    {
+      "key": "mcpServerPort",
+      "field": "mcp_server_port",
+      "ts": {
+        "min": 1024,
+        "max": 65535,
+        "step": 1
+      },
+      "rust": {
+        "min": 1024,
+        "max": 65535
+      }
+    },
+    {
+      "key": null,
+      "field": "session_manager_stats_interval",
+      "ts": null,
+      "rust": null
+    }
+  ]
+}

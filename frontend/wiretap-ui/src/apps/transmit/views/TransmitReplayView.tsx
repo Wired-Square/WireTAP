@@ -43,7 +43,6 @@ export default function TransmitReplayView({ useLocalTimezone, sessionId }: Tran
   const replayProgress = useTransmitStore((s) => s.replayProgress);
   const allReplayLog = useTransmitStore((s) => s.replayLog);
   const activeReplays = useTransmitStore((s) => s.activeReplays);
-  const replayCache = useTransmitStore((s) => s.replayCache);
   const stopReplay = useTransmitStore((s) => s.stopReplay);
   const restartReplay = useTransmitStore((s) => s.restartReplay);
   const clearReplayLog = useTransmitStore((s) => s.clearReplayLog);
@@ -186,13 +185,12 @@ export default function TransmitReplayView({ useLocalTimezone, sessionId }: Tran
               <tbody>
                 {replayLog.map((entry) => {
                   const isTerminal = entry.kind === "completed" || entry.kind === "stoppedByUser" || entry.kind === "deviceError";
-                  const canRestart = isTerminal && replayCache.has(entry.replayId);
                   return (
                     <ReplayLogRow
                       key={entry.id}
                       entry={entry}
                       useLocalTimezone={useLocalTimezone}
-                      onRestart={canRestart ? () => restartReplay(entry.replayId) : undefined}
+                      onRestart={isTerminal ? () => restartReplay(entry.replayId) : undefined}
                     />
                   );
                 })}

@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "name": "normalizeSettings(Rust's served defaults)",
+      "input": null,
+      "expected": {
+        "onlyRust": [],
+        "onlyTs": [],
+        "differ": {}
+      }
+    }
+  ]
+}

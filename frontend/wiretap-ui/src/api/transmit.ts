@@ -6,13 +6,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CanTransmitFrame } from "../generated/CanTransmitFrame";
 import type { FrameMessage } from "../generated/FrameMessage";
-import type { RepeatGroupMember } from "../generated/RepeatGroupMember";
-import type { RepeatGroupStartedEvent } from "../generated/RepeatGroupStartedEvent";
-import type { RepeatStartedEvent } from "../generated/RepeatStartedEvent";
-import type { RepeatStoppedEvent } from "../generated/RepeatStoppedEvent";
+import type { NewQueueRow } from "../generated/NewQueueRow";
+import type { QueuePayload } from "../generated/QueuePayload";
+import type { QueueRow } from "../generated/QueueRow";
+import type { QueueRowEdit } from "../generated/QueueRowEdit";
+import type { ReplayEstimate } from "../generated/ReplayEstimate";
 import type { ReplayEvent } from "../generated/ReplayEvent";
-import type { ReplayFrame } from "../generated/ReplayFrame";
+import type { ReplaySource } from "../generated/ReplaySource";
 import type { ReplayState } from "../generated/ReplayState";
+import type { TransmitQueue } from "../generated/TransmitQueue";
 import type { SerialFraming } from "../generated/SerialFraming";
 import type { TransmitProfile } from "../generated/TransmitProfile";
 import type { TransmitResult } from "../generated/TransmitResult";
@@ -20,13 +22,16 @@ import type { WriterCapabilities } from "../generated/WriterCapabilities";
 
 export type {
   CanTransmitFrame,
-  RepeatGroupMember,
-  RepeatStartedEvent,
-  RepeatStoppedEvent,
+  NewQueueRow,
+  QueuePayload,
+  QueueRow,
+  QueueRowEdit,
+  ReplayEstimate,
   ReplayEvent,
-  ReplayFrame,
+  ReplaySource,
   ReplayState,
   SerialFraming,
+  TransmitQueue,
   TransmitProfile,
   TransmitResult,
   WriterCapabilities,
@@ -42,15 +47,6 @@ export function serialFraming(mode: SerialFramingMode, delimiter: number[]): Ser
   return mode === "delimiter" ? { mode, delimiter } : { mode };
 }
 
-/**
- * Repeat-transmit lifecycle event pushed over the WebSocket
- * (`MsgType.RepeatEvent`), discriminated by `kind`.
- */
-export type RepeatEvent =
-  | ({ kind: "started" } & RepeatStartedEvent)
-  | ({ kind: "stopped" } & RepeatStoppedEvent)
-  | ({ kind: "group_started" } & RepeatGroupStartedEvent);
-
 export type ReceivedFrame = Pick<FrameMessage, "frame_id" | "bytes" | "is_extended" | "dlc"> &
   Partial<Pick<FrameMessage, "bus" | "is_fd" | "is_brs" | "is_rtr">>;
 
@@ -65,10 +61,6 @@ export function toTransmitFrame(f: ReceivedFrame): CanTransmitFrame {
     is_brs: f.is_brs ?? false,
     is_rtr: f.is_rtr ?? false,
   };
-}
-
-export function toReplayFrame(f: ReceivedFrame & Pick<FrameMessage, "timestamp_us">): ReplayFrame {
-  return { timestamp_us: f.timestamp_us, frame: toTransmitFrame(f) };
 }
 
 // ============================================================================
@@ -125,100 +117,49 @@ export async function ioTransmitSerial(
   return invoke("io_transmit_serial", { sessionId, bytes, framing });
 }
 
-/**
- * Start repeat transmission through an IO session.
- * @param sessionId - IO session to use
- * @param queueId - Unique ID for this repeat task
- * @param frame - CAN frame to repeat
- * @param intervalMs - Interval between transmissions in milliseconds
- */
-export async function ioStartRepeatTransmit(
-  sessionId: string,
-  queueId: string,
-  frame: CanTransmitFrame,
-  intervalMs: number
-): Promise<void> {
-  return invoke("io_start_repeat_transmit", {
-    sessionId,
-    queueId,
-    frame,
-    intervalMs,
-  });
-}
-
-/**
- * Stop repeat transmission for a queue item (IO session).
- * @param queueId - ID of the repeat task to stop
- */
-export async function ioStopRepeatTransmit(queueId: string): Promise<void> {
-  return invoke("io_stop_repeat_transmit", { queueId });
-}
-
-/**
- * Stop all repeat transmissions for an IO session.
- * @param sessionId - Session to stop all repeats for
- */
-export async function ioStopAllRepeats(sessionId: string): Promise<void> {
-  return invoke("io_stop_all_repeats", { sessionId });
-}
-
-/**
- * Start repeat transmission for serial bytes through an IO session.
- * @param sessionId - IO session to use
- * @param queueId - Unique ID for this repeat task
- * @param bytes - Payload to repeat, before framing
- * @param framing - How the backend frames the payload
- * @param intervalMs - Interval between transmissions in milliseconds
- */
-export async function ioStartSerialRepeatTransmit(
-  sessionId: string,
-  queueId: string,
-  bytes: number[],
-  framing: SerialFraming,
-  intervalMs: number
-): Promise<void> {
-  return invoke("io_start_serial_repeat_transmit", {
-    sessionId,
-    queueId,
-    bytes,
-    framing,
-    intervalMs,
-  });
-}
-
 // ============================================================================
-// IO Session Group Repeat API
+// Transmit queue — process state in Rust, pushed whole as `MsgType.TransmitQueue`
 // ============================================================================
-//
-// Group repeat transmits multiple frames in sequence within a single loop.
-// All frames are sent A→B→C with no delay between them, then the system
-// waits for the interval before repeating the sequence.
 
-/**
- * Start a group repeat, which may span sessions. Each cycle sends every
- * member's frames in order with no delay between them, then waits the interval.
- */
-export async function ioStartRepeatGroup(
-  groupId: string,
-  members: RepeatGroupMember[],
-  intervalMs: number
-): Promise<void> {
-  return invoke("io_start_repeat_group", { groupId, members, intervalMs });
+export async function getTransmitQueue(): Promise<TransmitQueue> {
+  return invoke("transmit_queue_get");
 }
 
-/**
- * Stop repeat transmission for a group.
- * @param groupId - ID of the group to stop
- */
-export async function ioStopRepeatGroup(groupId: string): Promise<void> {
-  return invoke("io_stop_repeat_group", { groupId });
+export async function addToTransmitQueue(rows: NewQueueRow[]): Promise<string[]> {
+  return invoke("transmit_queue_add", { rows });
 }
 
-/**
- * Stop all group repeat transmissions.
- */
-export async function ioStopAllGroupRepeats(): Promise<void> {
-  return invoke("io_stop_all_group_repeats");
+export async function editQueueRow(id: string, edit: QueueRowEdit): Promise<void> {
+  return invoke("transmit_queue_edit", { id, edit });
+}
+
+export async function removeQueueRow(id: string): Promise<void> {
+  return invoke("transmit_queue_remove", { id });
+}
+
+export async function clearTransmitQueue(): Promise<void> {
+  return invoke("transmit_queue_clear");
+}
+
+export async function startQueueRow(id: string): Promise<void> {
+  return invoke("transmit_queue_start", { id });
+}
+
+export async function stopQueueRow(id: string): Promise<void> {
+  return invoke("transmit_queue_stop", { id });
+}
+
+/** Sends the group's enabled CAN rows in queue order, every interval of its first row. */
+export async function startQueueGroup(group: string): Promise<void> {
+  return invoke("transmit_group_start", { group });
+}
+
+export async function stopQueueGroup(group: string): Promise<void> {
+  return invoke("transmit_group_stop", { group });
+}
+
+export async function stopAllQueueRepeats(): Promise<void> {
+  return invoke("transmit_queue_stop_all");
 }
 
 // ============================================================================
@@ -226,23 +167,28 @@ export async function ioStopAllGroupRepeats(): Promise<void> {
 // ============================================================================
 
 /**
- * Start a time-accurate replay of captured frames.
- * Frames are transmitted in order with delays derived from original timestamps / speed.
+ * Start a time-accurate replay of a capture range through a session.
  * Progress and completion are surfaced via the `ReplayState` WS message.
- * @param sessionId - Target session to transmit on
- * @param replayId - Unique ID for this replay (used to stop it)
- * @param frames - Frames to replay, sorted by timestamp_us ascending
- * @param speed - Playback speed multiplier (1.0 = realtime, 2.0 = twice as fast)
- * @param loopReplay - Whether to loop indefinitely
+ * @returns how many frames it plays
  */
 export async function ioStartReplay(
   sessionId: string,
   replayId: string,
-  frames: ReplayFrame[],
+  source: ReplaySource,
   speed: number,
   loopReplay: boolean
-): Promise<void> {
-  return invoke("io_start_replay", { sessionId, replayId, frames, speed, loopReplay });
+): Promise<number> {
+  return invoke("io_start_replay", { sessionId, replayId, source, speed, loopReplay });
+}
+
+/** Play a replay again from its start, with what it was started with. */
+export async function ioRestartReplay(replayId: string): Promise<number> {
+  return invoke("io_restart_replay", { replayId });
+}
+
+/** How long a replay of `source` would take at `speed`, by the schedule it keeps. */
+export async function replayEstimate(source: ReplaySource, speed: number): Promise<ReplayEstimate> {
+  return invoke("replay_estimate", { source, speed });
 }
 
 /**

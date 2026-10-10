@@ -3,18 +3,15 @@
 import { useRef, useEffect, useCallback, useMemo } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
-import { useDashboardStore, readTimeSeries, getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { emptyStateText } from "../../../../../styles/typography";
-import { computeHistogram } from "../../../utils/dashboardHistogram";
+import { readHistograms, type HistogramBin } from "../../../../../api/dashboardHistory";
+import { useHistoryQuery } from "../../../widgets/useHistoryQuery";
+import { getCssVar } from "../useUPlotPanel";
 
 interface Props {
   panel: DashboardPanel;
   canvasRef?: React.MutableRefObject<(() => HTMLCanvasElement | null) | null>;
-}
-
-/** Read CSS variable value from the document */
-function getCssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 /** Make a semi-transparent version of a hex colour */
@@ -23,55 +20,28 @@ function withAlpha(hex: string, alpha: number): string {
   return hex.length === 7 ? hex + a : hex;
 }
 
-function buildHistogramData(
-  panel: DashboardPanel,
-  buffers: Map<string, import("../../../../../stores/dashboardStore").SignalTimeSeries>,
-): { data: uPlot.AlignedData; labels: string[] } {
-  const binCount = panel.histogramBins ?? 20;
-  const allCentres = new Set<number>();
-  const signalBins: Array<{ centres: number[]; counts: number[]; label: string }> = [];
-
-  for (const sig of panel.signals) {
-    const key = `${sig.frameId}:${sig.signalName}`;
-    const series = buffers.get(key);
-    if (!series || series.count === 0) {
-      signalBins.push({ centres: [], counts: [], label: getSignalLabel(sig) });
-      continue;
-    }
-    const { values } = readTimeSeries(series);
-    const bins = computeHistogram(values, binCount);
-    const centres = bins.map((b) => b.centre);
-    const counts = bins.map((b) => b.count);
-    for (const c of centres) allCentres.add(c);
-    signalBins.push({ centres, counts, label: getSignalLabel(sig) });
-  }
-
-  // Build aligned data: shared X-axis (bin centres), one Y per signal
-  const sortedCentres = Array.from(allCentres).sort((a, b) => a - b);
-  if (sortedCentres.length === 0) {
-    return { data: [[]] as uPlot.AlignedData, labels: [] };
-  }
-
-  const data: (number | null)[][] = [sortedCentres];
-  const labels: string[] = [];
-
-  for (const sb of signalBins) {
-    const lookup = new Map<number, number>();
-    for (let i = 0; i < sb.centres.length; i++) {
-      lookup.set(sb.centres[i], sb.counts[i]);
-    }
-    data.push(sortedCentres.map((c) => lookup.get(c) ?? null));
-    labels.push(sb.label);
-  }
-
-  return { data: data as uPlot.AlignedData, labels };
+/** Each signal's bins on one x of every bin centre, a count where a signal has that bin. */
+function histogramData(perSignal: HistogramBin[][]): uPlot.AlignedData {
+  const centres = [...new Set(perSignal.flat().map((b) => b.centre))].sort((a, b) => a - b);
+  if (centres.length === 0) return [[]];
+  return [
+    centres,
+    ...perSignal.map((bins) => {
+      const counts = new Map(bins.map((b) => [b.centre, b.count]));
+      return centres.map((c) => counts.get(c) ?? null);
+    }),
+  ];
 }
 
 export default function HistogramPanel({ panel, canvasRef }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
-  const dataVersion = useDashboardStore((s) => s.dataVersion);
-  const seriesBuffers = useDashboardStore((s) => s.seriesBuffers);
+  const bins = panel.histogramBins ?? 20;
+  const signalsKey = panel.signals.map((s) => `${s.frameId}:${s.signalName}`).join("|");
+  const histograms = useHistoryQuery(`${signalsKey}#${bins}`, (sessionId) => readHistograms(sessionId, panel.signals, bins));
+  const data = useMemo(() => histogramData(histograms ?? []), [histograms]);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   // Expose canvas for PNG export
   useEffect(() => {
@@ -155,19 +125,14 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
 
     const rect = el.getBoundingClientRect();
     const opts = buildOpts(rect.width, rect.height);
-    const { data } = buildHistogramData(panel, seriesBuffers);
-    const chart = new uPlot(opts, data, el);
+    const chart = new uPlot(opts, dataRef.current, el);
     chartRef.current = chart;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel.signals.length, sigKey, panel.histogramBins]);
 
-  // Update data when dataVersion changes
   useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart || panel.signals.length === 0) return;
-    const { data } = buildHistogramData(panel, useDashboardStore.getState().seriesBuffers);
-    chart.setData(data);
-  }, [dataVersion, panel]);
+    chartRef.current?.setData(data);
+  }, [data]);
 
   // Handle resize
   useEffect(() => {

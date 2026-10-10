@@ -1,0 +1,35 @@
+{
+  "note": "`ts` is the label the frame def editor offers for the value type (from the generated VALUE_TYPE_NAMES); `toml` is what rules.rs cmd_frame_def_add writes into the device's board TOML (framelink frame_def::value_type_name), null where check_signal_type refuses the type.",
+  "rows": [
+    {
+      "value_type": 0,
+      "ts": "Unsigned",
+      "toml": "unsigned"
+    },
+    {
+      "value_type": 1,
+      "ts": "Signed",
+      "toml": "signed"
+    },
+    {
+      "value_type": 2,
+      "ts": "Float",
+      "toml": "float"
+    },
+    {
+      "value_type": 3,
+      "ts": "Bool",
+      "toml": "bool"
+    },
+    {
+      "value_type": 4,
+      "ts": "Array",
+      "toml": "array"
+    },
+    {
+      "value_type": 5,
+      "ts": null,
+      "toml": null
+    }
+  ]
+}

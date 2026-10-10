@@ -17,8 +17,8 @@ import type { ReplayState } from "../../../api/transmit";
  * - TransmitUpdated (0x0B): history written or cleared — refetch count
  * - ReplayState (0x0C): Replay lifecycle/progress — full state in JSON payload
  *
- * Repeat-transmit lifecycle (MsgType.RepeatEvent) is handled window-globally by
- * useRepeatQueueEvents, not here.
+ * The queue (MsgType.TransmitQueue) is kept level window-globally by
+ * useTransmitQueueSync, not here.
  */
 export function useTransmitHistorySubscription(): void {
   const handleReplayLifecycle = useTransmitStore((s) => s.handleReplayLifecycle);

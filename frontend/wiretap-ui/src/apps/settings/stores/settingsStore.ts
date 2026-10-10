@@ -11,7 +11,6 @@ import {
 import { listen } from '@tauri-apps/api/event';
 import type { DirectoryValidation } from '../../../generated/DirectoryValidation';
 import { WINDOW_EVENTS } from '../../../events/registry';
-import { getOrCreateDefaultDirs } from '../../../utils/defaultPaths';
 import {
   getAllSelectionSets,
   type SelectionSet,
@@ -31,7 +30,6 @@ export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | 
 // consumers still import from here.
 import {
   normalizeSettings,
-  isProfileKind,
   defaultSignalColours,
   defaultThemeColours,
   defaultFrameEditorColours,
@@ -50,7 +48,6 @@ import {
 import type {
   AppSettings,
   IOProfile,
-  FrameLinkConnection,
   SignalColours,
   ThemeMode,
   ThemeColours,
@@ -310,7 +307,6 @@ interface SettingsState {
   setTelemetryConsentGiven: (value: boolean) => void;
   setUsageAnalyticsEnabled: (value: boolean) => void;
   setUsageAnalyticsConsentGiven: (value: boolean) => void;
-  setInstallId: (value: string) => void;
   setModbusMaxRegisterErrors: (value: number) => void;
   setSmpPort: (port: number) => void;
   setLanguage: (lang: string) => void;
@@ -339,75 +335,6 @@ const scheduleSave = (save: () => Promise<void>) => {
 
 // Only the latest rebase applies: an older read landing last would roll back a newer one.
 let rebaseGeneration = 0;
-
-/**
- * Migrate old-style per-interface FrameLink profiles into grouped device profiles.
- * Old format: one IOProfile per interface with connection.interface_index.
- * New format: one IOProfile per device with connection.interfaces[].
- * Returns { profiles, removedIds } where removedIds are IDs that were merged away.
- */
-function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[]; removedIds: Set<string> } {
-  type FrameLinkProfile = Extract<IOProfile, { kind: "framelink" }>;
-
-  const isOldStyleFrameLink = (p: IOProfile): p is FrameLinkProfile =>
-    isProfileKind(p, "framelink") && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces);
-
-  const oldStyle = profiles.filter(isOldStyleFrameLink);
-  if (oldStyle.length === 0) return { profiles, removedIds: new Set() };
-
-  const rest = profiles.filter((p) => !isOldStyleFrameLink(p));
-
-  // Group by (host, device_id) or (host, port) if no device_id
-  const groups = new Map<string, FrameLinkProfile[]>();
-  for (const p of oldStyle) {
-    const c = p.connection;
-    const key = `${c.host}:${c.device_id ?? c.port ?? "120"}`;
-    const group = groups.get(key);
-    if (group) group.push(p);
-    else groups.set(key, [p]);
-  }
-
-  const merged: IOProfile[] = [];
-  const removedIds = new Set<string>();
-  for (const group of groups.values()) {
-    const first = group[0];
-    const fc = first.connection;
-    // Derive device label: strip interface suffix from first profile name
-    const ifaceName = fc.interface_name ?? "";
-    const deviceLabel = ifaceName && first.name.endsWith(ifaceName)
-      ? first.name.slice(0, -ifaceName.length).trim() || fc.device_id || first.name
-      : fc.device_id ?? first.name;
-
-    const connection: FrameLinkConnection = {
-      host: fc.host,
-      port: fc.port ?? "120",
-      timeout: fc.timeout,
-      device_id: fc.device_id,
-      interfaces: group
-        .map((p) => ({
-          index: p.connection.interface_index as number,
-          iface_type: (p.connection.interface_type as number) ?? 1,
-          name: p.connection.interface_name ?? `IF${p.connection.interface_index}`,
-        }))
-        .sort((a, b) => a.index - b.index),
-    };
-
-    merged.push({
-      id: first.id,
-      name: deviceLabel,
-      kind: "framelink",
-      connection,
-      preferred_catalog: first.preferred_catalog,
-    } satisfies IOProfile);
-
-    // Track removed IDs (all except the first which we kept)
-    for (let i = 1; i < group.length; i++) {
-      removedIds.add(group[i].id);
-    }
-  }
-
-  return { profiles: [...rest, ...merged], removedIds };
-}
 
 /**
  * Build the persisted snake_case AppSettings payload from store state. The
@@ -523,42 +450,7 @@ function carriedValidations(before: SettingsState['locations'], next: AppSetting
   };
 }
 
-/** Read settings.json, migrated and normalised, without writing anything back. */
-async function readSettings() {
-  const raw = await loadSettingsApi();
-
-  let defaultDirs: { decoders: string; dumps: string; reports: string } | null = null;
-  if (!raw.decoder_dir || !raw.dump_dir || !raw.report_dir) {
-    try {
-      defaultDirs = await getOrCreateDefaultDirs();
-    } catch (err) {
-      console.warn('Could not get/create default directories:', err);
-    }
-  }
-
-  // Migrate old per-interface FrameLink profiles to grouped device profiles
-  const migration = migrateFrameLinkProfiles(raw.io_profiles || []);
-  let defaultRead = raw.default_read_profile ?? null;
-  let defaultWrites = raw.default_write_profiles ?? [];
-  if (migration.removedIds.size > 0) {
-    // If default profiles were merged away, clear them (the surviving profile ID is kept)
-    if (defaultRead && migration.removedIds.has(defaultRead)) {
-      defaultRead = null;
-    }
-    defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
-  }
-
-  const normalized = normalizeSettings(
-    {
-      ...raw,
-      io_profiles: migration.profiles,
-      default_read_profile: defaultRead,
-      default_write_profiles: defaultWrites,
-    },
-    defaultDirs,
-  );
-  return { raw, normalized, migrated: migration.removedIds.size > 0 };
-}
+const readSettings = async () => normalizeSettings(await loadSettingsApi());
 
 type SettingsSlices = Pick<SettingsState, 'locations' | 'ioProfiles' | 'display' | 'buffers' | 'general' | 'mcp'>;
 
@@ -744,26 +636,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Loading actions
   loadSettings: async () => {
     try {
-      const { raw, normalized, migrated } = await readSettings();
+      const normalized = await readSettings();
       const [decoderValidation, dumpValidation, reportValidation] = await Promise.all(
         [normalized.decoder_dir, normalized.dump_dir, normalized.report_dir].map(validateDir),
       );
       set(settingsSlices(normalized, { decoderValidation, dumpValidation, reportValidation }));
 
-      // Baseline for dirty-tracking. Build it from the just-applied slices via
-      // the same buildAppSettings the dirty check uses, so a clean load is never
-      // spuriously dirty. When a migration ran, seed the baseline with the
-      // pre-migration profiles so hasUnsavedChanges() fires and the migrated
-      // form is re-persisted below.
-      const baseline = buildAppSettings(get());
-      set({
-        originalSettings: migrated ? { ...baseline, io_profiles: raw.io_profiles || [] } : baseline,
-      });
-
-      // Persist migrated settings so old profiles are not re-migrated next load
-      if (migrated) {
-        scheduleSave(get().saveSettings);
-      }
+      // Baseline for dirty-tracking, built by the same buildAppSettings the
+      // dirty check uses, so a clean load is never spuriously dirty.
+      set({ originalSettings: buildAppSettings(get()) });
 
       // Update backend wake settings cache (desktop)
       setWakeSettingsApi(
@@ -784,7 +665,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().originalSettings) return;
     let normalized: AppSettings;
     try {
-      ({ normalized } = await readSettings());
+      normalized = await readSettings();
     } catch (error) {
       console.error('Failed to reload settings:', error);
       return;
@@ -1257,13 +1138,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setUsageAnalyticsConsentGiven: (value) => {
     set((state) => ({
       general: { ...state.general, usageAnalyticsConsentGiven: value },
-    }));
-    scheduleSave(get().saveSettings);
-  },
-
-  setInstallId: (value) => {
-    set((state) => ({
-      general: { ...state.general, installId: value },
     }));
     scheduleSave(get().saveSettings);
   },

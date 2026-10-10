@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/list/ListPanel.tsx
 
-import { useDashboardStore, getSignalLabel, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { getSignalLabel, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { useSignalValues } from "../../../widgets/useSignalValues";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
 import { formatValue } from "../../../utils/dashboardFormat";
@@ -13,18 +14,7 @@ interface Props {
 export default function ListPanel({ panel }: Props) {
   const { settings } = useSettings();
 
-  // Subscribe to data updates via stable selectors (avoid returning new arrays)
-  const dataVersion = useDashboardStore((s) => s.dataVersion);
-  const seriesBuffers = useDashboardStore((s) => s.seriesBuffers);
-
-  // Compute values in the component body — re-runs when dataVersion changes
-  void dataVersion;
-  const signalValues = panel.signals.map((sig) => {
-    const key = `${sig.frameId}:${sig.signalName}`;
-    return { key, value: seriesBuffers.get(key)?.latestValue };
-  });
-
-  const numericValues = signalValues.map((v) => v.value);
+  const values = useSignalValues(panel.signals);
 
   if (panel.signals.length === 0) {
     return (
@@ -37,13 +27,13 @@ export default function ListPanel({ panel }: Props) {
   return (
     <PanelTooltip
       signals={panel.signals}
-      values={numericValues}
+      values={values}
       settings={settings}
       className="h-full overflow-y-auto px-2 py-1"
     >
       {panel.signals.map((signal, i) => (
         <div
-          key={signalValues[i].key}
+          key={`${signal.frameId}:${signal.signalName}`}
           className="flex items-center gap-2 py-1 border-b border-default last:border-b-0"
         >
           {/* Confidence dot */}
@@ -59,7 +49,7 @@ export default function ListPanel({ panel }: Props) {
 
           {/* Value */}
           <span className="text-xs font-mono font-medium text-primary tabular-nums shrink-0">
-            {formatValue(signalValues[i].value)}
+            {formatValue(values[i])}
           </span>
 
           {/* Unit */}

@@ -14,6 +14,6 @@ pub use backend_api::{BackendApiConfig, BackendApiSource, BackendApiSourceOption
 pub use capture::{step_frame, CaptureSource, StepResult, CAPTURE_SOURCE_TYPE};
 pub use candump::{is_candump_file, parse_candump_files, CandumpImport, SkippedLine};
 pub use csv::{
-    parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    Delimiter, SequenceGap, TimestampUnit,
+    parse_csv_with_mapping, preview_csv_file, preview_timestamps, CsvColumnMapping, CsvPreview,
+    CsvTimestampPreview, Delimiter, SequenceGap, TimestampUnit,
 };

@@ -616,8 +616,8 @@ WireTAP rename sit under `com.candor.io-profiles`. `get_credential` falls back t
 that namespace, copies the value into the live one and deletes the old entry, so
 a secret migrates on its way to being used; `migrate_legacy_io_profile_credentials`
 additionally sweeps entries nothing ever reads, called via `spawn_blocking` from
-`setup` — deliberately **off** the pre-first-paint path, because `setup` already
-`block_on`s `load_settings` and keyring access is OS IPC that can block or prompt.
+`setup` — deliberately **off** the pre-first-paint path, because `setup` reads
+settings synchronously and keyring access is OS IPC that can block or prompt.
 Deletes clear both namespaces, or the fallback would resurrect a deleted secret.
 `credentials.rs`'s module doc names the deletable unit; remove it once 0.10 is
 well established.
@@ -1537,11 +1537,10 @@ catalogue interval (else `[meta.can].default_interval`, else 1000 ms) **× 2**;
 outside that the previous verdict stands. Three consecutive failing comparisons
 latch invalid — one differing sample is usually skew on a moving signal.
 
-The offline equivalents (`db_query_mirror_validation`,
-`capture_query_mirror_validation`, and the `apiclient` passthrough) take a
-`compare_byte_indices` argument carrying the same inherited byte set, so the
-Query app agrees with the Decoder's badge. Omitted or empty, they compare the
-whole payload — the right answer for a caller with no catalogue.
+The Query app's mirror validation (`query::run`, a capture or a backend) reads
+the same inherited byte set from the request's `catalog_path`, so it agrees
+with the Decoder's badge; a backend's whole-payload answer is narrowed, then
+limited, on this side. Without a catalogue it compares the whole payload.
 
 Decoding lives entirely in the crate, and so does parsing: the frontend's
 `catalogParser.ts` no longer parses TOML — `loadCatalog` calls `catalog.parse`
@@ -1996,11 +1995,18 @@ method using a `TransmitPayload` enum. The Transmit app chooses its view from
 protocols → `SerialTransmitView`) and gates the send itself on
 `tx_frames` / `tx_bytes`.
 
-**Repeating transmits share one cadence.** `io_start_repeat_transmit` and the
-serial and group variants in [transmit.rs](../crates/wiretap-app/src/transmit.rs)
-are the same skeleton — fire immediately, then once per interval, stopping on a
-cancel flag and skipping ticks while paused — and that timing triad lives in one
-place, `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
+**The Transmit queue is process state.** Its rows (session, frame or serial
+bytes, interval, enabled, group, origin) live in
+[transmit_queue.rs](../crates/wiretap-app/src/transmit_queue.rs), not in a
+webview: every window and the MCP read and edit one queue through the
+`transmit_queue_*` commands, and each change pushes the whole queue as
+`TransmitQueue` (0x0F) on the global channel, so a reload or a second window
+reads it back with `transmit_queue_get`. A repeat — one row or a group's
+enabled CAN rows in queue order — runs as one task that sends each row in turn,
+then waits the interval; a row it sends refuses edits until it stops, and a
+permanent failure stops it and leaves the reason on its rows. The timing triad
+(fire immediately, then once per interval, stopping on a cancel flag) lives in
+`Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
 callers write `while cadence.next().await.is_some() { … }`. Modbus TCP register
 polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
 `PollTask` ([io/modbus_tcp/poll.rs](../crates/wiretap-app/src/io/modbus_tcp/poll.rs)).

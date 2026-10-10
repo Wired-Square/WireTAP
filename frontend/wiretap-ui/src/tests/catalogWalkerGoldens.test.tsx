@@ -35,7 +35,6 @@ vi.mock("../components/BitPreview", () => ({
 }));
 
 import { formatFrameId, parseCanIdToNumber } from "../apps/catalog/utils";
-import { sortMuxCaseKeys } from "../utils/muxCaseMatch";
 import { catalogToTree } from "../apps/catalog/tree/catalogToTree";
 import type { TomlNode } from "../apps/catalog/types";
 import type { Catalog } from "../types/catalogModel";
@@ -74,11 +73,6 @@ function findNode(nodes: TomlNode[], path: string[]): TomlNode {
 
 function idCases(): GoldenCase[] {
   return [
-    {
-      name: "mux case key order",
-      input: ["10", "2", "0-3", "1,2", "abc", "-1", "B", "a", "0x10", "2-5"],
-      expected: sortMuxCaseKeys(["10", "2", "0-3", "1,2", "abc", "-1", "B", "a", "0x10", "2-5"]),
-    },
     {
       name: "id parsing and the editor's id formatting",
       input: ["0x7FF", "0x800", "0x1FFFFFFF", "2047", " 256 ", "0X10", "-1", "status", "", "1e3"],

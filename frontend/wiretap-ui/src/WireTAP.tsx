@@ -93,7 +93,6 @@ export default function WireTAP() {
   const setUsageAnalyticsEnabled = useSettingsStore((s) => s.setUsageAnalyticsEnabled);
   const setUsageAnalyticsConsentGiven = useSettingsStore((s) => s.setUsageAnalyticsConsentGiven);
   const installId = useSettingsStore((s) => s.general.installId);
-  const setInstallId = useSettingsStore((s) => s.setInstallId);
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
@@ -128,14 +127,6 @@ export default function WireTAP() {
       initMcpBridge();
     }
   }, [settingsLoaded]);
-
-  // Generate a random anonymous per-install id once, so Sentry can count
-  // distinct installs. Persists through the normal settings-save path.
-  useEffect(() => {
-    if (settingsLoaded && !installId) {
-      setInstallId(crypto.randomUUID());
-    }
-  }, [settingsLoaded, installId, setInstallId]);
 
   // Show crash-report consent dialog on first boot (or upgrade without the setting)
   useEffect(() => {

@@ -173,6 +173,25 @@ pub struct DecodedSignalsParams {
     pub frame_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SignalHistoryParams {
+    /// A session a Dashboard window watches (from `list_sessions`).
+    pub session_id: String,
+    /// The masked frame id, decimal.
+    pub frame_id: u32,
+    /// The signal's name as the catalogue (or an ad-hoc `byte[i]` / `hyp_*` name) gives it.
+    pub signal: String,
+    /// Optional: one wire only, by protocol (`can`, `modbus`, `serial`, …).
+    #[serde(default)]
+    pub protocol: Option<String>,
+    /// Optional: one wire only, by bus.
+    #[serde(default)]
+    pub bus: Option<u8>,
+    /// Optional: only the newest N values.
+    #[serde(default)]
+    pub last: Option<usize>,
+}
+
 // ── Control (gated behind `mcp_allow_control`) ───────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -195,8 +214,27 @@ pub struct RepeatTransmitStartParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RepeatTransmitStopParams {
-    /// The `queue_id` returned by `repeat_transmit_start`.
+    /// The row's `queue_id`, from `repeat_transmit_start` or `get_transmit_queue`.
     pub queue_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueAction {
+    Start,
+    Stop,
+    Remove,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TransmitQueueActParams {
+    pub action: QueueAction,
+    /// The row to act on, from `get_transmit_queue`.
+    #[serde(default)]
+    pub queue_id: Option<String>,
+    /// The group to start or stop, instead of a row.
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 /// Bytes to put into a byte capture, as a serial port would have produced them.
@@ -698,6 +736,9 @@ pub struct FrameInventoryParams {
     /// Optional RFC3339 upper time bound (exclusive).
     #[serde(default)]
     pub end_time: Option<String>,
+    /// Max frame ids to return (default 10000, as the Query panel's).
+    #[serde(default)]
+    pub limit: Option<u32>,
 }
 
 /// Per-byte static/counter/sensor roles for one frame id.

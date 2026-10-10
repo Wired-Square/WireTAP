@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// `WINDOW_EVENTS.SETTINGS_CHANGED` in `src/events/registry.ts`.
@@ -25,12 +25,12 @@ pub struct IOProfile {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
+    #[serde(default = "default_config_path")]
     pub config_path: String,
+    #[serde(default)]
     pub decoder_dir: String,
+    #[serde(default)]
     pub dump_dir: String,
-    /// Directory analysis reports are written to. Optional in older settings
-    /// files (added later), so it defaults to empty and is filled from the
-    /// platform documents dir by `Default`/`with_defaults`.
     #[serde(default)]
     pub report_dir: String,
     #[serde(default)]
@@ -132,8 +132,8 @@ pub struct AppSettings {
     // Diagnostics
     #[serde(default = "default_log_level")]
     pub log_level: String, // "off" | "info" | "debug" | "verbose"
-    /// Backward compat: old settings files may have this instead of log_level
-    #[serde(default)]
+    /// Read from old settings files, which had this instead of log_level; never written.
+    #[serde(default, skip_serializing)]
     pub enable_file_logging: bool,
 
     // Privacy / telemetry
@@ -146,8 +146,7 @@ pub struct AppSettings {
     pub usage_analytics_enabled: bool,
     #[serde(default = "default_usage_analytics_consent_given")]
     pub usage_analytics_consent_given: bool,
-    /// Random anonymous per-install identifier, generated once by the frontend
-    /// so Sentry can count distinct installs. Empty until first generated.
+    /// Random anonymous per-install identifier, so Sentry can count distinct installs.
     #[serde(default)]
     pub install_id: String,
 
@@ -228,6 +227,9 @@ pub struct AppSettings {
     pub mcp_server_token: String,
 }
 
+fn default_config_path() -> String {
+    "config/wiretap.toml".to_string()
+}
 fn default_display_frame_id_format() -> String {
     "hex".to_string()
 }
@@ -445,7 +447,7 @@ impl Default for AppSettings {
         let report_path = documents_dir.join("Reports");
 
         Self {
-            config_path: "config/wiretap.toml".to_string(),
+            config_path: default_config_path(),
             decoder_dir: decoder_path.to_string_lossy().to_string(),
             dump_dir: dump_path.to_string_lossy().to_string(),
             report_dir: report_path.to_string_lossy().to_string(),
@@ -532,27 +534,6 @@ impl Default for AppSettings {
     }
 }
 
-impl AppSettings {
-    /// Create settings with defaults using Tauri's path APIs.
-    /// This works correctly on all platforms including iOS.
-    pub fn with_defaults(app: &AppHandle) -> Result<Self, String> {
-        let documents_dir = app
-            .path()
-            .document_dir()
-            .map_err(|e| format!("Failed to get document directory: {}", e))?
-            .join("WireTAP");
-
-        // Only the directory paths need Tauri's iOS-correct document dir; every
-        // other field matches `Default`, so pull those in via `..Self::default()`.
-        Ok(Self {
-            decoder_dir: documents_dir.join("Decoders").to_string_lossy().to_string(),
-            dump_dir: documents_dir.join("Dumps").to_string_lossy().to_string(),
-            report_dir: documents_dir.join("Reports").to_string_lossy().to_string(),
-            ..Self::default()
-        })
-    }
-}
-
 fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     let app_dir = app
         .path()
@@ -565,46 +546,303 @@ fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_dir.join("settings.json"))
 }
 
-/// Check if directory paths are stale (e.g., pointing to old iOS container UUIDs).
-/// Returns true if paths need to be regenerated.
-fn paths_are_stale(settings: &AppSettings, app: &AppHandle) -> bool {
-    // Get the current document directory
-    let current_doc_dir = match app.path().document_dir() {
-        Ok(dir) => dir,
-        Err(_) => return false, // Can't check, assume OK
-    };
+/// Held across every read-migrate-write and every save, so a migration never
+/// writes back over a save that landed after its read.
+static SETTINGS_FILE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    let decoder_path = PathBuf::from(&settings.decoder_dir);
-
-    // On iOS, paths contain container UUIDs that change on reinstall.
-    // Check if the saved path starts with the current document directory.
-    // If not, the path is stale and needs regeneration.
-    if !decoder_path.starts_with(&current_doc_dir) {
-        tlog!(
-            "[settings] Detected stale paths: decoder_dir {:?} doesn't start with {:?}",
-            decoder_path, current_doc_dir
-        );
-        return true;
+/// A scalar field that cannot be read takes its default instead of failing the
+/// whole file. A list or object that cannot be read still fails it, so the
+/// rewrite that follows a repair can never drop the profiles.
+fn parse_settings(text: &str) -> Result<(AppSettings, bool), String> {
+    let raw: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("Failed to parse settings: {}", e))?;
+    if let Ok(settings) = serde_json::from_value(raw.clone()) {
+        return Ok((settings, false));
     }
-
-    false
+    let serde_json::Value::Object(mut fields) = raw else {
+        return Err("Failed to parse settings: not an object".to_string());
+    };
+    fields.retain(|key, value| {
+        let alone = serde_json::Map::from_iter([(key.clone(), value.clone())]);
+        let readable = serde_json::from_value::<AppSettings>(alone.into()).is_ok();
+        if !readable && !(value.is_array() || value.is_object()) {
+            tlog!("[settings] {} could not be read ({}); using its default", key, value);
+            return false;
+        }
+        true
+    });
+    serde_json::from_value(serde_json::Value::Object(fields))
+        .map(|settings| (settings, true))
+        .map_err(|e| format!("Failed to parse settings: {}", e))
 }
 
-/// Load settings synchronously (for use during app setup, before the async runtime
-/// is fully available). Does not perform migrations or first-run initialisation —
-/// those happen when the frontend calls `load_settings` via Tauri command.
+/// Brings settings written by any earlier version to the current shape: legacy
+/// fields folded, empty fields defaulted, directories placed under `documents`,
+/// FrameLink interfaces merged into devices, kinds canonical, numbers clamped.
+/// True if anything changed.
+fn migrate(settings: &mut AppSettings, documents: Option<&Path>) -> bool {
+    let before = serde_json::to_value(&*settings).expect("settings serialise");
+
+    if settings.enable_file_logging && settings.log_level == "off" {
+        settings.log_level = "info".to_string();
+    }
+    settings.enable_file_logging = false;
+
+    if let Some(documents) = documents {
+        place_directories(settings, documents);
+    }
+    fill_empty_strings(settings);
+    for format in [&mut settings.display_frame_id_format, &mut settings.save_frame_id_format] {
+        if format != "decimal" {
+            *format = "hex".to_string();
+        }
+    }
+    if settings.frame_editor_colours.len() != 8 {
+        settings.frame_editor_colours = default_frame_editor_colours();
+    }
+    merge_framelink_interfaces(settings);
+    canonicalise_kinds(&mut settings.io_profiles);
+    clamp_settings(settings);
+
+    serde_json::to_value(&*settings).expect("settings serialise") != before
+}
+
+/// Empty directories, and all three when the decoder directory is not under
+/// `documents` (an iOS container path goes stale on reinstall), are placed in
+/// `documents/WireTAP`.
+fn place_directories(settings: &mut AppSettings, documents: &Path) {
+    let stale = !Path::new(&settings.decoder_dir).starts_with(documents);
+    if stale {
+        tlog!("[settings] decoder_dir {:?} is not under {:?}; regenerating the directories", settings.decoder_dir, documents);
+    }
+    let wiretap = documents.join("WireTAP");
+    for (dir, name) in [
+        (&mut settings.decoder_dir, "Decoders"),
+        (&mut settings.dump_dir, "Dumps"),
+        (&mut settings.report_dir, "Reports"),
+    ] {
+        if stale || dir.is_empty() {
+            *dir = wiretap.join(name).to_string_lossy().into_owned();
+        }
+    }
+}
+
+fn fill_empty_strings(settings: &mut AppSettings) {
+    let defaults = serde_json::to_value(AppSettings::default()).expect("settings serialise");
+    let mut value = serde_json::to_value(&*settings).expect("settings serialise");
+    let mut changed = false;
+    for (key, field) in value.as_object_mut().expect("settings are an object") {
+        if let Some(default) = defaults.get(key).filter(|d| *field == "" && **d != "") {
+            *field = default.clone();
+            changed = true;
+        }
+    }
+    if changed {
+        *settings = serde_json::from_value(value).expect("settings round-trip");
+    }
+}
+
+/// Folds the per-interface FrameLink profiles of older versions (one profile per
+/// interface, `interface_index` on the connection) into one profile per device,
+/// in the place of its first interface and under its id. A default read or
+/// write profile naming a merged-away interface follows it to the device.
+fn merge_framelink_interfaces(settings: &mut AppSettings) {
+    use serde_json::Value;
+    type Connection = HashMap<String, Value>;
+
+    fn present<'a>(c: &'a Connection, key: &str) -> Option<&'a Value> {
+        c.get(key).filter(|v| !v.is_null())
+    }
+    fn spelt(v: Option<&Value>) -> String {
+        match v {
+            None => "undefined".to_string(),
+            Some(Value::String(s)) => s.clone(),
+            Some(v) => v.to_string(),
+        }
+    }
+    let legacy = |p: &IOProfile| {
+        p.kind == "framelink"
+            && present(&p.connection, "interface_index").is_some()
+            && !p.connection.get("interfaces").is_some_and(Value::is_array)
+    };
+
+    let profiles = &settings.io_profiles;
+    let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+    for (i, p) in profiles.iter().enumerate().filter(|(_, p)| legacy(p)) {
+        let c = &p.connection;
+        let device = present(c, "device_id").or_else(|| present(c, "port")).map_or("120".to_string(), |v| spelt(Some(v)));
+        let key = format!("{}:{}", spelt(c.get("host")), device);
+        match groups.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, members)) => members.push(i),
+            None => groups.push((key, vec![i])),
+        }
+    }
+    if groups.is_empty() {
+        return;
+    }
+
+    let mut merged: HashMap<usize, IOProfile> = HashMap::new();
+    let mut survivor: HashMap<String, String> = HashMap::new();
+    for (_, members) in &groups {
+        let first = &profiles[members[0]];
+        let fc = &first.connection;
+        let interface_name = present(fc, "interface_name").and_then(Value::as_str).unwrap_or("");
+        let device_id = present(fc, "device_id").and_then(Value::as_str);
+        let name = match first.name.strip_suffix(interface_name).filter(|_| !interface_name.is_empty()) {
+            Some(stem) => [stem.trim(), device_id.unwrap_or("")]
+                .into_iter()
+                .find(|s| !s.is_empty())
+                .unwrap_or(&first.name),
+            None => device_id.unwrap_or(&first.name),
+        }
+        .to_string();
+
+        let mut connection: Connection = ["host", "device_id"]
+            .into_iter()
+            .filter_map(|key| fc.get(key).map(|v| (key.to_string(), v.clone())))
+            .collect();
+        connection.insert("port".into(), present(fc, "port").cloned().unwrap_or_else(|| "120".into()));
+        if let Some(timeout) = members.iter().find_map(|&i| profiles[i].connection.get("timeout")) {
+            connection.insert("timeout".into(), timeout.clone());
+        }
+        let mut interfaces: Vec<Value> = members
+            .iter()
+            .map(|&i| {
+                let c = &profiles[i].connection;
+                let index = &c["interface_index"];
+                serde_json::json!({
+                    "index": index,
+                    "iface_type": present(c, "interface_type").cloned().unwrap_or_else(|| 1.into()),
+                    "name": present(c, "interface_name").cloned().unwrap_or_else(|| format!("IF{}", spelt(Some(index))).into()),
+                })
+            })
+            .collect();
+        interfaces.sort_by(|a, b| a["index"].as_f64().partial_cmp(&b["index"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
+        connection.insert("interfaces".into(), interfaces.into());
+
+        for &i in &members[1..] {
+            survivor.insert(profiles[i].id.clone(), first.id.clone());
+        }
+        merged.insert(
+            members[0],
+            IOProfile {
+                id: first.id.clone(),
+                name,
+                kind: "framelink".to_string(),
+                connection,
+                preferred_catalog: members.iter().find_map(|&i| profiles[i].preferred_catalog.clone()),
+                ephemeral: false,
+            },
+        );
+    }
+
+    let profiles = std::mem::take(&mut settings.io_profiles);
+    settings.io_profiles = profiles
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, p)| merged.remove(&i).or_else(|| (!survivor.contains_key(&p.id)).then_some(p)))
+        .collect();
+
+    let follow = |id: &String| survivor.get(id).cloned().unwrap_or_else(|| id.clone());
+    settings.default_read_profile = settings.default_read_profile.as_ref().map(follow);
+    let mut writes: Vec<String> = Vec::new();
+    for id in settings.default_write_profiles.iter().map(follow) {
+        if !writes.contains(&id) {
+            writes.push(id);
+        }
+    }
+    settings.default_write_profiles = writes;
+}
+
+/// Direct PostgreSQL profiles no longer open anything — a database-backed
+/// source is a WireTAP backend now — so they are dropped rather than left for
+/// every picker to hide and every reader to reject.
+fn retire_postgres_profiles(settings: &mut AppSettings) -> Vec<IOProfile> {
+    let (retired, kept): (Vec<_>, Vec<_>) =
+        std::mem::take(&mut settings.io_profiles).into_iter().partition(|p| p.kind == "postgres");
+    settings.io_profiles = kept;
+    retired
+}
+
+/// Deletes the retired profiles' credentials and says so once, because a
+/// profile disappearing silently is worse than one that fails.
+fn announce_retired(retired: &[IOProfile]) {
+    if retired.is_empty() {
+        return;
+    }
+    for p in retired {
+        let _ = crate::credentials::delete_all_credentials(&p.id);
+    }
+    let names: Vec<&str> = retired.iter().map(|p| p.name.as_str()).collect();
+    let notice = format!(
+        "Removed {} direct PostgreSQL source{} ({}). WireTAP now reaches a database \
+         through a WireTAP backend profile; add one under Settings → Data I/O.",
+        names.len(),
+        if names.len() == 1 { "" } else { "s" },
+        names.join(", ")
+    );
+    tlog!("[settings] {}", notice);
+    crate::record_startup_notice(notice);
+}
+
+fn ensure_install_id(settings: &mut AppSettings) -> bool {
+    if !settings.install_id.is_empty() {
+        return false;
+    }
+    settings.install_id = uuid::Uuid::new_v4().to_string();
+    true
+}
+
+struct Loaded {
+    settings: AppSettings,
+    retired: Vec<IOProfile>,
+    written: bool,
+}
+
+/// The settings file migrated, rewritten once if migrating changed it. A
+/// missing file is a first run: defaults, written out.
+fn load_from(path: &Path, documents: Option<&Path>) -> Result<Loaded, String> {
+    let _file = SETTINGS_FILE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let (mut settings, mut written) = match std::fs::read_to_string(path) {
+        Ok(text) => parse_settings(&text)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (parse_settings("{}")?.0, true),
+        Err(e) => return Err(format!("Failed to read settings: {}", e)),
+    };
+    let retired = retire_postgres_profiles(&mut settings);
+    written |= !retired.is_empty();
+    written |= migrate(&mut settings, documents);
+    written |= ensure_install_id(&mut settings);
+    if written {
+        write_settings_file(path, &settings)?;
+    }
+    Ok(Loaded { settings, retired, written })
+}
+
+fn write_settings_file(path: &Path, settings: &AppSettings) -> Result<(), String> {
+    initialize_directories(settings)?;
+    let content = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+    std::fs::write(path, content).map_err(|e| format!("Failed to write settings: {}", e))
+}
+
+/// Every reader's settings: migrated, defaulted and clamped, with this run's
+/// ad-hoc devices overlaid.
+pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
+    let path = get_settings_path(app)?;
+    let documents = app.path().document_dir().ok();
+    let Loaded { mut settings, retired, written } = load_from(&path, documents.as_deref())?;
+    if written {
+        announce_saved(app, &settings);
+    }
+    announce_retired(&retired);
+    crate::io::ephemeral::overlay(&mut settings.io_profiles);
+    Ok(settings)
+}
+
 /// Fold the legacy kind spellings the settings file has carried onto their
-/// canonical form, in memory.
-///
-/// The one place this happens. Before it, `"gvret-tcp"` reached every consumer
-/// verbatim and each decided for itself whether to accept it — so a profile
-/// saved under the old spelling was admitted to a session by `is_realtime_device`
-/// and its reader started, then refused by `route_can_frame` as an
-/// "unsupported profile kind". Eleven sites spelled the alias pair out; the ones
-/// that forgot were the bug.
-///
-/// Not written back: the file keeps whatever it had, and the next ordinary save
-/// migrates it. A read must not rewrite what it read.
+/// canonical form. Before this, `"gvret-tcp"` reached every consumer verbatim
+/// and the sites that forgot the alias admitted a profile to a session, then
+/// refused to transmit on it.
 fn canonicalise_kinds(profiles: &mut [IOProfile]) {
     for p in profiles.iter_mut() {
         let canonical = crate::io::device_kinds::canonical_kind(&p.kind);
@@ -612,21 +850,6 @@ fn canonicalise_kinds(profiles: &mut [IOProfile]) {
             p.kind = canonical.to_string();
         }
     }
-}
-
-pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
-    let settings_path = get_settings_path(app)?;
-    let mut settings = if settings_path.exists() {
-        let content = std::fs::read_to_string(&settings_path)
-            .map_err(|e| format!("Failed to read settings: {}", e))?;
-        serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse settings: {}", e))?
-    } else {
-        AppSettings::default()
-    };
-    canonicalise_kinds(&mut settings.io_profiles);
-    crate::io::ephemeral::overlay(&mut settings.io_profiles);
-    Ok(settings)
 }
 
 impl AppSettings {
@@ -659,119 +882,43 @@ pub fn profile_by_id(app: &AppHandle, profile_id: &str) -> Result<IOProfile, Str
 
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
-    let settings_path = get_settings_path(&app)?;
-
-    if settings_path.exists() {
-        let content = std::fs::read_to_string(&settings_path)
-            .map_err(|e| format!("Failed to read settings: {}", e))?;
-
-        let mut settings: AppSettings = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse settings: {}", e))?;
-
-        // Migrate enable_file_logging → log_level (backward compat)
-        if settings.enable_file_logging && settings.log_level == "off" {
-            settings.log_level = "info".to_string();
-            settings.enable_file_logging = false;
-        }
-
-        // report_dir was added after decoder_dir/dump_dir; older settings files
-        // won't contain it. Fill from platform defaults so it's always populated.
-        if settings.report_dir.is_empty() {
-            let fresh_defaults = AppSettings::with_defaults(&app)?;
-            settings.report_dir = fresh_defaults.report_dir;
-        }
-
-        // Direct PostgreSQL profiles no longer open anything — a database-backed
-        // source is a WireTAP backend now. Drop them rather than leaving a kind
-        // in the settings file that every picker hides and every reader rejects,
-        // and say so once, because a profile disappearing silently is worse than
-        // one that fails.
-        let mut dropped: Vec<String> = Vec::new();
-        settings.io_profiles.retain(|p| {
-            if p.kind != "postgres" {
-                return true;
-            }
-            let _ = crate::credentials::delete_all_credentials(&p.id);
-            dropped.push(p.name.clone());
-            false
-        });
-        if !dropped.is_empty() {
-            let notice = format!(
-                "Removed {} direct PostgreSQL source{} ({}). WireTAP now reaches a database \
-                 through a WireTAP backend profile; add one under Settings → Data I/O.",
-                dropped.len(),
-                if dropped.len() == 1 { "" } else { "s" },
-                dropped.join(", ")
-            );
-            tlog!("[settings] {}", notice);
-            crate::record_startup_notice(notice);
-            save_settings(app.clone(), settings.clone()).await?;
-        }
-
-        // Check for stale paths (e.g., old iOS container UUIDs after reinstall)
-        if paths_are_stale(&settings, &app) {
-            tlog!("[settings] Regenerating stale directory paths");
-            let fresh_defaults = AppSettings::with_defaults(&app)?;
-            settings.decoder_dir = fresh_defaults.decoder_dir;
-            settings.dump_dir = fresh_defaults.dump_dir;
-            settings.report_dir = fresh_defaults.report_dir;
-            // Re-initialize directories and save updated settings
-            initialize_directories(&settings)?;
-            save_settings(app, settings.clone()).await?;
-        }
-
-        canonicalise_kinds(&mut settings.io_profiles);
-        // Last, so the internal saves above persist only what is on disk.
-        crate::io::ephemeral::overlay(&mut settings.io_profiles);
-        Ok(settings)
-    } else {
-        // First run: create default settings and directories
-        // Use with_defaults() for iOS-compatible path resolution
-        let mut settings = AppSettings::with_defaults(&app)?;
-        initialize_directories(&settings)?;
-        save_settings(app, settings.clone()).await?;
-        crate::io::ephemeral::overlay(&mut settings.io_profiles);
-        Ok(settings)
-    }
+    load_settings_sync(&app)
 }
 
 fn initialize_directories(settings: &AppSettings) -> Result<(), String> {
-    // Create decoder directory
-    let decoder_path = PathBuf::from(&settings.decoder_dir);
-    std::fs::create_dir_all(&decoder_path)
-        .map_err(|e| format!("Failed to create decoder directory: {}", e))?;
-
-    // Create dump directory
-    let dump_path = PathBuf::from(&settings.dump_dir);
-    std::fs::create_dir_all(&dump_path)
-        .map_err(|e| format!("Failed to create dump directory: {}", e))?;
-
-    // Create report directory (skip if unset — filled by load_settings/frontend)
-    if !settings.report_dir.is_empty() {
-        let report_path = PathBuf::from(&settings.report_dir);
-        std::fs::create_dir_all(&report_path)
-            .map_err(|e| format!("Failed to create report directory: {}", e))?;
+    for dir in [&settings.decoder_dir, &settings.dump_dir, &settings.report_dir] {
+        if !dir.is_empty() {
+            std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create directory {}: {}", dir, e))?;
+        }
     }
-
     Ok(())
 }
 
-/// Clamp numeric settings into the ranges the UI enforces (kept in step with
-/// `SETTINGS_BOUNDS` in src/settings/bounds.ts). Authoritative — applied on every
-/// save so an out-of-range value (from an older file or a hand edit) is corrected.
-fn clamp_settings(settings: &mut AppSettings) {
-    settings.discovery_history_buffer = settings.discovery_history_buffer.clamp(1_000, 10_000_000);
-    settings.query_result_limit = settings.query_result_limit.clamp(100, 100_000);
-    settings.graph_buffer_size = settings.graph_buffer_size.clamp(1_000, 100_000);
-    settings.decoder_max_unmatched_frames = settings.decoder_max_unmatched_frames.clamp(100, 10_000);
-    settings.decoder_max_filtered_frames = settings.decoder_max_filtered_frames.clamp(100, 10_000);
-    settings.decoder_max_decoded_frames = settings.decoder_max_decoded_frames.clamp(100, 5_000);
-    settings.decoder_max_decoded_per_source =
-        settings.decoder_max_decoded_per_source.clamp(500, 20_000);
-    settings.transmit_max_history = settings.transmit_max_history.clamp(100, 10_000);
-    settings.modbus_max_register_errors = settings.modbus_max_register_errors.clamp(0, 1_000);
-    settings.smp_port = settings.smp_port.clamp(1, 65_535);
-    settings.mcp_server_port = settings.mcp_server_port.clamp(1_024, 65_535);
+/// One table drives `clamp_settings` (every load and save) and the ranges the
+/// settings UI reads from `src/generated/settingRanges.ts`.
+macro_rules! setting_ranges {
+    ($($field:ident: $min:literal..=$max:literal),* $(,)?) => {
+        #[cfg(test)]
+        pub(crate) const SETTING_RANGES: &[(&str, u32, u32)] = &[$((stringify!($field), $min, $max)),*];
+
+        fn clamp_settings(settings: &mut AppSettings) {
+            $(settings.$field = settings.$field.clamp($min, $max);)*
+        }
+    };
+}
+
+setting_ranges! {
+    discovery_history_buffer: 1_000..=10_000_000,
+    query_result_limit: 100..=100_000,
+    graph_buffer_size: 1_000..=100_000,
+    decoder_max_unmatched_frames: 100..=10_000,
+    decoder_max_filtered_frames: 100..=10_000,
+    decoder_max_decoded_frames: 100..=5_000,
+    decoder_max_decoded_per_source: 500..=20_000,
+    transmit_max_history: 100..=10_000,
+    modbus_max_register_errors: 0..=1_000,
+    smp_port: 1..=65_535,
+    mcp_server_port: 1_024..=65_535,
 }
 
 /// Ad-hoc devices are a run-lifetime thing. `load_settings` overlays them onto
@@ -785,35 +932,27 @@ fn drop_ephemeral_profiles(settings: &mut AppSettings) {
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<(), String> {
     let settings_path = get_settings_path(&app)?;
-
-    // Clamp numeric settings to their allowed ranges before persisting.
     clamp_settings(&mut settings);
-
     drop_ephemeral_profiles(&mut settings);
+    {
+        let _file = SETTINGS_FILE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        write_settings_file(&settings_path, &settings)?;
+    }
+    announce_saved(&app, &settings);
+    Ok(())
+}
 
-    // Ensure directories exist when saving
-    initialize_directories(&settings)?;
-
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-
-    std::fs::write(&settings_path, content)
-        .map_err(|e| format!("Failed to write settings: {}", e))?;
-
+fn announce_saved(app: &AppHandle, settings: &AppSettings) {
     // Rebuild the catalogue cache + re-point the watcher if the decoder dir moved.
-    crate::catalog::handle_decoder_dir_change(&app, &settings.decoder_dir);
+    crate::catalog::handle_decoder_dir_change(app, &settings.decoder_dir);
 
     // Keep the cached telemetry consent + install id in sync (read on every emit).
-    crate::telemetry::refresh_consent(&settings);
+    crate::telemetry::refresh_consent(settings);
+    crate::dashboard_history::set_capacity(settings.graph_buffer_size);
 
     // Every window's settings store rebases on this, so a write from any path
     // (another window, a device reconfigure, MCP) is not undone by its next save.
-    let _ = app.emit(
-        SETTINGS_CHANGED_EVENT,
-        serde_json::json!({ "settings": &settings }),
-    );
-
-    Ok(())
+    let _ = app.emit(SETTINGS_CHANGED_EVENT, serde_json::json!({ "settings": settings }));
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -859,13 +998,6 @@ pub async fn validate_directory(path: String) -> Result<DirectoryValidation, Str
         writable,
         error,
     })
-}
-
-#[tauri::command]
-pub async fn create_directory(path: String) -> Result<(), String> {
-    let dir_path = PathBuf::from(&path);
-    std::fs::create_dir_all(&dir_path)
-        .map_err(|e| format!("Failed to create directory: {}", e))
 }
 
 #[tauri::command]
@@ -952,6 +1084,7 @@ pub async fn check_for_updates(app: AppHandle) -> Result<Option<UpdateInfo>, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     fn profile(kind: &str) -> IOProfile {
         IOProfile {
@@ -1220,5 +1353,253 @@ mod tests {
         ok.query_result_limit = 5_000;
         clamp_settings(&mut ok);
         assert_eq!(ok.query_result_limit, 5_000);
+    }
+
+    const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures");
+
+    fn clamped(field: &str, value: u64) -> Option<u64> {
+        let mut raw = serde_json::to_value(AppSettings::default()).unwrap();
+        raw[field] = value.into();
+        let mut settings: AppSettings = serde_json::from_value(raw).ok()?;
+        clamp_settings(&mut settings);
+        serde_json::to_value(settings).unwrap()[field].as_u64()
+    }
+
+    fn widest(field: &str) -> u64 {
+        [u64::from(u32::MAX), u64::from(u16::MAX)]
+            .into_iter()
+            .find(|&v| clamped(field, v).is_some())
+            .expect("an integer field")
+    }
+
+    /// Asserts `value` against the fixture at `file`; `WRITE_DATA_FIXTURES=1` rewrites it.
+    fn golden(file: &str, value: &serde_json::Value) {
+        let path = format!("{FIXTURES}/data/{file}");
+        if std::env::var_os("WRITE_DATA_FIXTURES").is_some() {
+            std::fs::write(&path, serde_json::to_string_pretty(value).unwrap() + "\n").unwrap();
+        }
+        let fixture: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("fixture")).expect("json");
+        assert_eq!(*value, fixture, "{file}");
+    }
+
+    /// `settingsGoldens.test.ts` checks the frontend changes nothing of this.
+    /// The directories depend on the host, so they are blanked.
+    #[test]
+    fn defaults_match_the_fixture() {
+        let mut defaults = serde_json::to_value(AppSettings::default()).unwrap();
+        for dir in ["decoder_dir", "dump_dir", "report_dir"] {
+            defaults[dir] = "".into();
+        }
+        golden("settingsDefaults.rust.json", &defaults);
+    }
+
+    fn served(raw: &serde_json::Value) -> serde_json::Value {
+        let (mut settings, _) = parse_settings(&raw.to_string()).expect("readable");
+        migrate(&mut settings, Some(Path::new("/Documents")));
+        serde_json::to_value(settings).unwrap()
+    }
+
+    /// Objects with their keys sorted, so a rewritten fixture does not churn with
+    /// a profile connection's hash order.
+    fn sorted(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(map) => {
+                let map: BTreeMap<String, serde_json::Value> = map.into_iter().map(|(k, v)| (k, sorted(v))).collect();
+                serde_json::to_value(map).unwrap()
+            }
+            serde_json::Value::Array(items) => items.into_iter().map(sorted).collect(),
+            v => v,
+        }
+    }
+
+    fn cases(file: &str) -> Vec<serde_json::Value> {
+        let text = std::fs::read_to_string(format!("{FIXTURES}/data/{file}")).expect("fixture");
+        let fixture: serde_json::Value = serde_json::from_str(&text).expect("json");
+        fixture["cases"].as_array().expect("cases").clone()
+    }
+
+    /// What a settings file reads as once Rust has parsed and migrated it: the
+    /// first case in full, the rest as the keys that differ from it.
+    #[test]
+    fn served_settings_match_the_normalise_golden() {
+        let mut cases = cases("settingsNormalise.json");
+        let defaults = served(&serde_json::json!({}));
+        for case in &mut cases {
+            let raw = case["input"].get("raw").unwrap_or(&case["input"]).clone();
+            let settings = served(&raw);
+            case["expected"] = if raw == serde_json::json!({}) {
+                settings
+            } else {
+                let changed: serde_json::Map<_, _> = settings
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .filter(|(k, v)| defaults[k.as_str()] != **v)
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                changed.into()
+            };
+        }
+        golden("settingsNormalise.json", &serde_json::json!({ "cases": cases }));
+    }
+
+    #[test]
+    fn framelink_merge_matches_the_golden() {
+        let mut cases = cases("settingsMigrateFrameLink.json");
+        for case in &mut cases {
+            let input: Vec<IOProfile> = serde_json::from_value(case["input"].clone()).expect("profiles");
+            let mut settings = AppSettings { io_profiles: input.clone(), ..AppSettings::default() };
+            merge_framelink_interfaces(&mut settings);
+            let mut profiles = serde_json::to_value(&settings.io_profiles).unwrap();
+            for p in profiles.as_array_mut().unwrap() {
+                if p["preferred_catalog"].is_null() {
+                    p.as_object_mut().unwrap().remove("preferred_catalog");
+                }
+            }
+            let removed: Vec<&str> = input
+                .iter()
+                .map(|p| p.id.as_str())
+                .filter(|id| settings.io_profiles.iter().all(|p| p.id != *id))
+                .collect();
+            case["expected"] = sorted(serde_json::json!({ "profiles": profiles, "removedIds": removed }));
+        }
+        golden("settingsMigrateFrameLink.json", &serde_json::json!({ "cases": cases }));
+    }
+
+    fn legacy_framelink(id: &str, index: u64) -> IOProfile {
+        IOProfile {
+            id: id.into(),
+            name: format!("Bench CAN{index}"),
+            kind: "framelink".into(),
+            connection: serde_json::from_value(serde_json::json!({
+                "host": "10.0.0.5", "device_id": "FL1", "interface_index": index, "interface_name": format!("CAN{index}"),
+            }))
+            .unwrap(),
+            preferred_catalog: None,
+            ephemeral: false,
+        }
+    }
+
+    #[test]
+    fn default_profiles_follow_a_merged_interface_to_its_device() {
+        let mut settings = AppSettings {
+            io_profiles: vec![legacy_framelink("p1", 1), legacy_framelink("p2", 2)],
+            default_read_profile: Some("p2".into()),
+            default_write_profiles: vec!["p2".into(), "p1".into(), "other".into()],
+            ..AppSettings::default()
+        };
+        merge_framelink_interfaces(&mut settings);
+        assert_eq!(settings.io_profiles.len(), 1);
+        assert_eq!(settings.default_read_profile.as_deref(), Some("p1"));
+        assert_eq!(settings.default_write_profiles, ["p1", "other"]);
+    }
+
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("wiretap-settings-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+        fn file(&self) -> PathBuf {
+            self.0.join("settings.json")
+        }
+        fn load(&self) -> Result<Loaded, String> {
+            load_from(&self.file(), Some(&self.0.join("Documents")))
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn a_first_run_writes_defaults_with_directories_and_an_install_id() {
+        let scratch = Scratch::new("first-run");
+        let loaded = scratch.load().unwrap();
+        assert!(loaded.written);
+        let decoders = scratch.0.join("Documents/WireTAP/Decoders");
+        assert_eq!(loaded.settings.decoder_dir, decoders.to_string_lossy());
+        assert!(decoders.is_dir());
+        assert_eq!(loaded.settings.install_id.len(), 36);
+
+        let again = scratch.load().unwrap();
+        assert!(!again.written, "a migrated file is not rewritten");
+        assert_eq!(again.settings.install_id, loaded.settings.install_id);
+    }
+
+    #[test]
+    fn an_old_file_is_migrated_once_for_every_reader() {
+        let scratch = Scratch::new("old-file");
+        let mut postgres = profile("postgres");
+        postgres.id = "pg".into();
+        let raw = serde_json::json!({
+            "config_path": "",
+            "io_profiles": [postgres, legacy_framelink("p1", 1), legacy_framelink("p2", 2), profile("gvret-tcp")],
+            "default_read_profile": "p2",
+            "query_result_limit": 5,
+            "smp_port": 70_000,
+            "enable_file_logging": true,
+            "log_level": "off",
+            "display_frame_id_format": "Decimal",
+        });
+        std::fs::write(scratch.file(), raw.to_string()).unwrap();
+
+        let loaded = scratch.load().unwrap();
+        assert!(loaded.written);
+        assert_eq!(loaded.retired.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["pg"]);
+        let on_disk: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(scratch.file()).unwrap()).unwrap();
+        assert_eq!(on_disk, serde_json::to_value(&loaded.settings).unwrap());
+        let s = &loaded.settings;
+        assert_eq!(s.io_profiles.iter().map(|p| p.kind.as_str()).collect::<Vec<_>>(), ["framelink", "gvret_tcp"]);
+        assert_eq!(s.default_read_profile.as_deref(), Some("p1"));
+        assert_eq!((s.query_result_limit, s.smp_port), (100, default_smp_port()));
+        assert_eq!((s.log_level.as_str(), s.config_path.as_str()), ("info", "config/wiretap.toml"));
+        assert_eq!(s.display_frame_id_format, "hex");
+        assert!(on_disk.get("enable_file_logging").is_none());
+
+        assert!(!scratch.load().unwrap().written);
+    }
+
+    #[test]
+    fn an_unreadable_profile_list_fails_the_load_and_writes_nothing() {
+        let scratch = Scratch::new("bad-profiles");
+        let text = r#"{"io_profiles": [{"id": 1}], "query_result_limit": "500"}"#;
+        std::fs::write(scratch.file(), text).unwrap();
+        assert!(scratch.load().is_err());
+        assert_eq!(std::fs::read_to_string(scratch.file()).unwrap(), text);
+    }
+
+    /// The `rust` column of the table `bounds.ts` is checked against; a numeric
+    /// field missing from the table must not be clamped at all.
+    #[test]
+    fn clamp_settings_matches_the_bounds_table() {
+        let text = std::fs::read_to_string(format!("{FIXTURES}/data/settingsBounds.json")).expect("table");
+        let table: serde_json::Value = serde_json::from_str(&text).expect("json");
+        let rows = table["bounds"].as_array().expect("bounds");
+        for row in rows {
+            let field = row["field"].as_str().expect("field");
+            let top = widest(field);
+            let (min, max) = match &row["rust"] {
+                serde_json::Value::Null => (0, top),
+                bound => (bound["min"].as_u64().unwrap(), bound["max"].as_u64().unwrap()),
+            };
+            assert_eq!(clamped(field, 0), Some(min), "{field} below");
+            assert_eq!(clamped(field, top), Some(max), "{field} above");
+        }
+
+        let listed: Vec<&str> = rows.iter().map(|row| row["field"].as_str().unwrap()).collect();
+        let defaults = serde_json::to_value(AppSettings::default()).unwrap();
+        for (field, value) in defaults.as_object().unwrap() {
+            if value.is_u64() && !listed.contains(&field.as_str()) {
+                let top = widest(field);
+                assert_eq!((clamped(field, 0), clamped(field, top)), (Some(0), Some(top)), "{field} is clamped but not in the table");
+            }
+        }
     }
 }

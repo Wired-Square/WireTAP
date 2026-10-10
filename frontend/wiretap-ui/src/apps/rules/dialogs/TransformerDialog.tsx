@@ -10,7 +10,8 @@ import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
 import SignalCombobox from "../components/SignalCombobox";
 import { useRulesStore } from "../stores/rulesStore";
-import { FRAME_DEF_ID_DEVICE, DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
+import { FRAME_DEF_ID_DEVICE, DEFAULT_SIGNAL_MASK } from "../utils/framelinkConstants";
+import { useNextIdField } from "../hooks/useFrameLinkAnswers";
 import { formatHexId } from "../utils/formatHex";
 import { Button, IconButton } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
@@ -45,18 +46,17 @@ export default function TransformerDialog({
   const { t } = useTranslation("rules");
   const selectableSignals = useRulesStore((s) => s.selectableSignals);
 
-  const [transformerId, setTransformerId] = useState(() => nextAvailableId(usedIds));
+  const [transformerId, setTransformerId] = useNextIdField(usedIds, "rule", isOpen);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
   useEffect(() => {
     if (isOpen) {
-      setTransformerId(nextAvailableId(usedIds));
       setName("");
       setDescription("");
     }
-  }, [isOpen, usedIds]);
+  }, [isOpen]);
   const [sourceFrameDefId, setSourceFrameDefId] = useState(
     frameDefs[0]?.frame_def_id ?? 0,
   );

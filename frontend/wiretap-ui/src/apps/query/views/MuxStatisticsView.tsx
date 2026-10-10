@@ -10,8 +10,8 @@ import type {
   MuxCaseStats,
   BytePositionStats,
   Word16Stats,
-} from "../../../api/dbquery";
-import type { QueryStats } from "../stores/queryStore";
+  QueryStats,
+} from "../../../api/query";
 import { bgPrimary, borderDivider, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple } from "../../../styles/colourTokens";
 import { Table } from "../../../components/Table";
 

@@ -1,0 +1,444 @@
+{
+  "note": "`preview_us` and `span_us` are what the column mapper's preview reads (csv.rs preview_timestamps over the cells, offsets in input order); `rust_us` is parse_csv_with_mapping's frame timestamp_us per input row, and must equal `preview_us`; `rust_suggested_unit` is suggest_timestamp_unit. `ts_preview` is PreviewTable.tsx formatOffset of `preview_us`. `npx vitest run -u` rewrites the ts column, WRITE_DATA_FIXTURES=1 the others.",
+  "rows": [
+    {
+      "cells": [
+        "1000",
+        "2000",
+        "3500"
+      ],
+      "name": "integer microseconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "1000",
+        "2500"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "1000",
+        "2500"
+      ],
+      "span_us": "2500",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.001,000 s",
+        "0.002,500 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "100",
+        "250",
+        "1100"
+      ],
+      "name": "integer milliseconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "150000",
+        "1000000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "150000",
+        "1000000"
+      ],
+      "span_us": "1000000",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.150,000 s",
+        "1.000,000 s"
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "cells": [
+        "5",
+        "7",
+        "65"
+      ],
+      "name": "integer seconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "2000000",
+        "60000000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "2000000",
+        "60000000"
+      ],
+      "span_us": "60000000",
+      "ts_preview": [
+        "0.000,000 s",
+        "2.000,000 s",
+        "1.000 min"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "cells": [
+        "1000",
+        "2500",
+        "1000999"
+      ],
+      "name": "integer nanoseconds below a microsecond",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "1",
+        "999"
+      ],
+      "rust_suggested_unit": "nanoseconds",
+      "rust_us": [
+        "0",
+        "1",
+        "999"
+      ],
+      "span_us": "999",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.000,001 s",
+        "0.000,999 s"
+      ],
+      "unit": "nanoseconds"
+    },
+    {
+      "cells": [
+        "1700000000000000",
+        "1700000000001000"
+      ],
+      "name": "epoch microseconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "1000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "1000"
+      ],
+      "span_us": "1000",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.001,000 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "1700000000000000123",
+        "1700000000000001456"
+      ],
+      "name": "epoch nanoseconds past f64 precision",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "1"
+      ],
+      "rust_suggested_unit": "nanoseconds",
+      "rust_us": [
+        "0",
+        "1"
+      ],
+      "span_us": "1",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.000,001 s"
+      ],
+      "unit": "nanoseconds"
+    },
+    {
+      "cells": [
+        "(1700000000.005000)",
+        "(1700000000.015250)"
+      ],
+      "name": "candump parenthesised float seconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "10250"
+      ],
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "0",
+        "10250"
+      ],
+      "span_us": "10250",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.010,250 s"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "cells": [
+        "0.005000",
+        "0.015250",
+        "1.000001"
+      ],
+      "name": "float seconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
+      "span_us": "995001",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.010,250 s",
+        "0.995,001 s"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "cells": [
+        "0.005000",
+        "0.015250",
+        "1.000001"
+      ],
+      "name": "float seconds with milliseconds chosen",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
+      "span_us": "995001",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.010,250 s",
+        "0.995,001 s"
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "cells": [
+        "0",
+        "0.5",
+        "1.25"
+      ],
+      "name": "integer first row then floats",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "0",
+        "1000000"
+      ],
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "0",
+        "0",
+        "1000000"
+      ],
+      "span_us": "1000000",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.000,000 s",
+        "1.000,000 s"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "cells": [
+        "-1700000000000000",
+        "-1700000000001000"
+      ],
+      "name": "negated integer epoch microseconds",
+      "negate": true,
+      "preview_us": [
+        "1700000000000000",
+        "1700000000001000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "1700000000000000",
+        "1700000000001000"
+      ],
+      "span_us": "1000",
+      "ts_preview": [
+        "19675.926 d",
+        "19675.926 d"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "-10.5",
+        "-10.0",
+        "-9.25"
+      ],
+      "name": "negated float seconds",
+      "negate": true,
+      "preview_us": [
+        "1250000",
+        "750000",
+        "0"
+      ],
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "1250000",
+        "750000",
+        "0"
+      ],
+      "span_us": "1250000",
+      "ts_preview": [
+        "1.250,000 s",
+        "0.750,000 s",
+        "0.000,000 s"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "cells": [
+        "-300",
+        "-200",
+        "-100"
+      ],
+      "name": "negative integers not negated",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "100",
+        "200"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "100",
+        "200"
+      ],
+      "span_us": "200",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.000,100 s",
+        "0.000,200 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "1000",
+        "",
+        "abc",
+        "3000"
+      ],
+      "name": "blank and unreadable cells",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "0",
+        "1000",
+        "2000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "0",
+        "1000",
+        "2000"
+      ],
+      "span_us": "2000",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.000,000 s",
+        "0.001,000 s",
+        "0.002,000 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "3000",
+        "1000",
+        "2000"
+      ],
+      "name": "rows out of order",
+      "negate": false,
+      "preview_us": [
+        "2000",
+        "0",
+        "1000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "2000",
+        "0",
+        "1000"
+      ],
+      "span_us": "2000",
+      "ts_preview": [
+        "0.002,000 s",
+        "0.000,000 s",
+        "0.001,000 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "0x10",
+        "0x20"
+      ],
+      "name": "hex stamps",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "1000"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "1000"
+      ],
+      "span_us": "1000",
+      "ts_preview": [
+        "0.000,000 s",
+        "0.001,000 s"
+      ],
+      "unit": "microseconds"
+    },
+    {
+      "cells": [
+        "0",
+        "18446744073710"
+      ],
+      "name": "seconds past u64 microseconds",
+      "negate": false,
+      "preview_us": [
+        "0",
+        "18446744073709551615"
+      ],
+      "rust_suggested_unit": "microseconds",
+      "rust_us": [
+        "0",
+        "18446744073709551615"
+      ],
+      "span_us": "18446744073709551615",
+      "ts_preview": [
+        "0.000,000 s",
+        "213503982.335 d"
+      ],
+      "unit": "seconds"
+    }
+  ]
+}

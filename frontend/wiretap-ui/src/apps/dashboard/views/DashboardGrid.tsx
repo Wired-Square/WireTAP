@@ -3,12 +3,12 @@
 import { GridLayout, useContainerWidth, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import { useTranslation } from "react-i18next";
-import { useDashboardStore, type LayoutItem, type DashboardPanel } from "../../../stores/dashboardStore";
+import { useDashboardStore, flowSignals, getSignalLabel, type LayoutItem, type DashboardPanel } from "../../../stores/dashboardStore";
 import PanelWrapper from "./panels/PanelWrapper";
 import { getWidget, FALLBACK_WIDGET } from "../widgets/registry";
 import { useCallback, useMemo, useRef } from "react";
 import { emptyStateContainer, emptyStateText } from "../../../styles/typography";
-import { buildPanelCsv, buildFlowPanelCsv } from "../utils/dashboardExport";
+import { exportHistoryCsv, readSeries } from "../../../api/dashboardHistory";
 import { pickFileToSave, PNG_FILTERS, SVG_FILTERS } from "../../../api/dialogs";
 import { saveCatalog } from "../../../api/catalog";
 import {
@@ -17,7 +17,6 @@ import {
   exportSvgElementAsPng,
   exportChartAsSvg,
 } from "../utils/dashboardExportImage";
-import { BYTE_NAMES } from "../../../generated/byteNames";
 
 interface Props {
   onOpenPanelConfig: (panelId: string) => void;
@@ -33,8 +32,7 @@ const dragConfig = {
   handle: ".drag-handle",
 };
 
-/** Byte colour palette (shared with FlowViewPanel) */
-const BYTE_COLOURS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#f97316','#ec4899'];
+const chartSignals = (panel: DashboardPanel) => (panel.type === "flow" ? flowSignals(panel) : panel.signals);
 
 export default function DashboardGrid({ onOpenPanelConfig }: Props) {
   const { t } = useTranslation("dashboard");
@@ -61,14 +59,14 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     [updateLayout],
   );
 
-  // CSV export
   const handleExport = useCallback(async (panelId: string) => {
-    const panel = useDashboardStore.getState().panels.find((p) => p.id === panelId);
-    if (!panel) return;
+    const { panels, sessionId } = useDashboardStore.getState();
+    const panel = panels.find((p) => p.id === panelId);
+    if (!panel || !sessionId) return;
 
-    const csv = panel.type === 'flow'
-      ? buildFlowPanelCsv(panel, useDashboardStore.getState().seriesBuffers)
-      : buildPanelCsv(panel, useDashboardStore.getState().seriesBuffers);
+    const signals = chartSignals(panel);
+    const headers = signals.map((sig) => (sig.unit ? `${getSignalLabel(sig)} (${sig.unit})` : getSignalLabel(sig)));
+    const csv = await exportHistoryCsv(sessionId, signals, headers);
     if (!csv) return;
 
     const path = await pickFileToSave({
@@ -133,21 +131,15 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     }
 
     // Canvas-based panels — generate SVG from data
-    if (panel.type === 'line-chart' || panel.type === 'flow' || panel.type === 'histogram') {
-      const signals = panel.type === 'flow'
-        ? Array.from({ length: panel.byteCount ?? 8 }, (_, i) => ({
-            frameId: panel.targetFrameId!,
-            signalName: BYTE_NAMES[i],
-            colour: BYTE_COLOURS[i % 8],
-          }))
-        : panel.signals;
-
+    const sessionId = useDashboardStore.getState().sessionId;
+    if (sessionId && (panel.type === 'line-chart' || panel.type === 'flow' || panel.type === 'histogram')) {
+      const signals = chartSignals(panel);
       const containerEl = document.querySelector(`[data-panel-id="${panelId}"]`);
       const rect = containerEl?.getBoundingClientRect();
 
       await exportChartAsSvg({
         signals,
-        buffers: useDashboardStore.getState().seriesBuffers,
+        series: await readSeries(sessionId, signals),
         width: rect?.width ?? 800,
         height: rect?.height ?? 400,
         path,

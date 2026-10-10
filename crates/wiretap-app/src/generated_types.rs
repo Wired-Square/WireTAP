@@ -50,8 +50,20 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<wiretap_decode::PayloadField>(), byte_names()),
             ),
             (
+                PathBuf::from("settingRanges.ts"),
+                (TypeId::of::<crate::settings::AppSettings>(), setting_ranges()),
+            ),
+            (
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
+            ),
+            (
+                PathBuf::from("canFdLengths.ts"),
+                (TypeId::of::<crate::io::CanTransmitFrame>(), can_fd_lengths()),
+            ),
+            (
+                PathBuf::from("framelinkNames.ts"),
+                (TypeId::of::<framelink::protocol::frame_def::FrameSignalDef>(), framelink_names()),
             ),
         ]),
     };
@@ -87,6 +99,10 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
     r.visit::<crate::adhoc::AdhocBatch>();
+    r.visit::<crate::dashboard_history::SignalRef>();
+    r.visit::<crate::dashboard_history::SeriesWindow>();
+    r.visit::<crate::dashboard_history::AlignedSeries>();
+    r.visit::<wiretap_analysis::dashboard::HistogramBin>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.visit::<crate::settings::DirectoryValidation>();
@@ -101,6 +117,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::capture_store::TailResponse>();
     r.visit::<crate::io::CsvColumnMapping>();
     r.visit::<crate::io::CsvPreview>();
+    r.visit::<crate::io::CsvTimestampPreview>();
     r.visit::<crate::framing::BackendFramingConfig>();
     r.visit::<crate::framing::FramingResult>();
     r.visit::<crate::framing::SerialIds>();
@@ -128,16 +145,19 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::catalog_share::publish::PublishResult>();
     r.visit::<crate::catalog_share::registry::GitIdentity>();
     r.visit::<crate::capture_db::InventoryRow>();
+    r.visit::<crate::query::QueryQueue>();
+    r.visit::<crate::query::QueryOutcome>();
+    r.visit::<crate::query::QueryRequest>();
     r.visit::<crate::gateway_admin::GatewayDaemon>();
     r.visit::<crate::gateway_admin::AssignmentOutcome>();
-    r.visit::<crate::replay::ReplayFrame>();
+    r.visit::<crate::replay::ReplayEstimate>();
+    r.visit::<crate::replay::ReplaySource>();
     r.visit::<crate::replay::ReplayState>();
-    r.visit::<crate::transmit::RepeatGroupMember>();
-    r.visit::<crate::transmit::RepeatGroupStartedEvent>();
-    r.visit::<crate::transmit::RepeatStartedEvent>();
-    r.visit::<crate::transmit::RepeatStoppedEvent>();
     r.visit::<crate::transmit::SerialFraming>();
     r.visit::<crate::transmit::TransmitProfile>();
+    r.visit::<crate::transmit_queue::NewQueueRow>();
+    r.visit::<crate::transmit_queue::QueueRowEdit>();
+    r.visit::<crate::transmit_queue::TransmitQueue>();
     r.visit::<crate::io::framelink::FrameLinkProbeResult>();
     r.visit::<crate::io::framelink::SignalReadResult>();
     r.visit::<crate::io::framelink::rules::BridgeDescriptor>();
@@ -145,6 +165,8 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::framelink::rules::FrameDefDescriptor>();
     r.visit::<crate::io::framelink::rules::GeneratorDescriptor>();
     r.visit::<crate::io::framelink::rules::TransformerDescriptor>();
+    r.visit::<crate::io::framelink::rules::SignalPlacement>();
+    r.visit::<crate::io::framelink::rules::FrameLinkIdKind>();
     r.visit::<crate::io_test::IOTestState>();
     r.visit::<crate::io_test::TestConfig>();
     r.visit::<crate::flashers::DetectedChip>();
@@ -207,6 +229,25 @@ fn checksum_algorithms() -> String {
     format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
 }
 
+/// The payload lengths a CAN FD frame can carry, one per length code.
+fn can_fd_lengths() -> String {
+    format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wiretap_protocol::FD_DLC_LEN)
+}
+
+/// FrameLink's interface and signal value-type names, by their wire codes.
+fn framelink_names() -> String {
+    use framelink::protocol::{frame_def::value_type_name, types::interface_name};
+    let interfaces: String = (0..=u8::MAX)
+        .map(|code| (code, interface_name(code)))
+        .filter(|(_, name)| *name != "Unknown")
+        .map(|(code, name)| format!("  {code}: {name:?},\n"))
+        .collect();
+    let value_types: Vec<_> = (0..=u8::MAX).map(value_type_name).take_while(|name| *name != "unknown").collect();
+    format!(
+        "{HEADER}\nexport const INTERFACE_TYPE_NAMES: Record<number, string> = {{\n{interfaces}}};\n\nexport const VALUE_TYPE_NAMES = {value_types:?} as const;\n"
+    )
+}
+
 /// Each byte of the longest payload as `wiretap_decode::byte_name` spells a
 /// one-byte field, for the panels that chart every byte.
 fn byte_names() -> String {
@@ -214,6 +255,15 @@ fn byte_names() -> String {
         .map(|i| format!("  \"{}\",\n", wiretap_decode::byte_name(i, 8, wiretap_decode::Endianness::Little)))
         .collect();
     format!("{HEADER}\nexport const BYTE_NAMES = [\n{names}] as const;\n")
+}
+
+/// The numeric settings `clamp_settings` bounds, by field.
+fn setting_ranges() -> String {
+    let rows: String = crate::settings::SETTING_RANGES
+        .iter()
+        .map(|(field, min, max)| format!("  {field}: {{ min: {min}, max: {max} }},\n"))
+        .collect();
+    format!("{HEADER}\nexport const SETTING_RANGES = {{\n{rows}}} as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {
@@ -441,11 +491,27 @@ fn ws_json_bodies_serialise_as_declared() {
         "protocol": "can", "timestamp_us": 5, "frame_id": 1, "bus": 0, "dlc": 1, "bytes": [7],
     }))
     .unwrap();
-    let [(_, payload)] = crate::adhoc::batch_messages(session, &[frame], None).try_into().unwrap();
-    crate::adhoc::forget_session(session);
+    let history = crate::dashboard_history::get(session).unwrap();
+    let mut history = history.lock().unwrap();
+    crate::adhoc::record(session, std::slice::from_ref(&frame), None, &mut history);
+    history.record_toggles(std::slice::from_ref(&frame), None);
+    let [(_, payload)] = crate::adhoc::batch_messages(session, &[frame], None, Some(&history)).try_into().unwrap();
+    drop(history);
     let batch: serde_json::Value = serde_json::from_slice(&payload).unwrap();
     assert_declared::<crate::adhoc::AdhocBatch>(&batch);
     assert!(!batch["values"].as_array().unwrap().is_empty() && !batch["toggles"].as_array().unwrap().is_empty());
+    let query = |op: &str| {
+        crate::dashboard_history::dispatch(op, json!({ "session_id": session, "signals": signals, "bins": 4 })).unwrap()
+    };
+    query("dashboard.series").as_array().unwrap().iter().for_each(assert_declared::<crate::dashboard_history::SeriesWindow>);
+    assert_declared::<crate::dashboard_history::AlignedSeries>(&query("dashboard.aligned"));
+    query("dashboard.histogram")
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|bins| bins.as_array().unwrap())
+        .for_each(assert_declared::<wiretap_analysis::dashboard::HistogramBin>);
+    crate::adhoc::forget_session(session);
 
     use crate::io::modbus_tcp::scanner::ModbusScanState;
     let state = |capture_id: Option<&str>| ModbusScanState {
@@ -762,4 +828,69 @@ fn byte_note_codes_fixture_is_the_libs_answer() {
         std::env::var_os("WIRETAP_GEN_TYPES").is_some(),
         "byteNoteCodes.json was stale and has been rewritten; commit it"
     );
+}
+
+#[test]
+fn query_shapes_serialise_as_declared() {
+    use crate::query::tests::{fixture, form_specs, results_named};
+    use crate::query::{queue::*, QueryOutcome, QueryRequest};
+    use wiretap_gateway::{
+        ByteChangeResult, BytePositionStats, DistributionResult, FirstLastResult, FrameChangeResult, FrequencyBucket,
+        GapResult, MirrorValidationResult, MuxCaseStats, MuxStatisticsResult, PatternSearchResult, QuerySpec, QueryStats,
+        Word16Stats,
+    };
+
+    for (_, spec) in form_specs() {
+        assert_declared::<QuerySpec>(&serde_json::to_value(&spec).unwrap());
+    }
+    let stats = QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0 };
+    assert_declared::<QueryStats>(&serde_json::to_value(&stats).unwrap());
+    for case in fixture("queryCsv.json")["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let results = results_named(name, case["input"].clone());
+        let json = serde_json::to_value(&results).unwrap();
+        for row in json.as_array().cloned().unwrap_or_else(|| vec![json.clone()]).iter() {
+            match name {
+                "byte_changes" => assert_declared::<ByteChangeResult>(row),
+                "frame_changes" => assert_declared::<FrameChangeResult>(row),
+                "mirror_validation" => assert_declared::<MirrorValidationResult>(row),
+                "mux_statistics" => {
+                    assert_declared::<MuxStatisticsResult>(row);
+                    for c in each(row, "cases") {
+                        assert_declared::<MuxCaseStats>(c);
+                        each(c, "byte_stats").for_each(assert_declared::<BytePositionStats>);
+                        each(c, "word16_stats").for_each(assert_declared::<Word16Stats>);
+                    }
+                }
+                "first_last" => assert_declared::<FirstLastResult>(row),
+                "frequency" => assert_declared::<FrequencyBucket>(row),
+                "distribution" => assert_declared::<DistributionResult>(row),
+                "gap_analysis" => assert_declared::<GapResult>(row),
+                "pattern_search" => assert_declared::<PatternSearchResult>(row),
+                _ => assert_declared::<crate::capture_db::InventoryRow>(row),
+            }
+        }
+        assert_serialises_as_declared(&[QueryOutcome { results, stats: Some(stats.clone()), sql: vec!["SELECT 1".into()], truncated: true }]);
+    }
+    let (_, spec) = form_specs().remove(0);
+    let request = QueryRequest {
+        source: crate::payload_source::QuerySource::Capture("c".into()),
+        spec,
+        catalog_path: Some("x.toml".into()),
+    };
+    assert_serialises_as_declared(std::slice::from_ref(&request));
+    let item = QueryItem {
+        id: "q".into(),
+        label: "Byte Changes".into(),
+        request,
+        status: QueryStatus::Completed,
+        submitted_at_ms: 1,
+        started_at_ms: Some(2),
+        completed_at_ms: None,
+        error: None,
+        result_count: Some(3),
+        stats: None,
+    };
+    assert_serialises_as_declared(&[QueryQueue { revision: 1, items: vec![item] }]);
+    assert_serialises_as_declared(&[QueryStatus::Pending, QueryStatus::Running, QueryStatus::Error]);
 }

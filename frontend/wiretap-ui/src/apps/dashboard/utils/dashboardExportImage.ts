@@ -3,12 +3,8 @@
 // Image export utilities for graph panels (PNG, SVG, interactive SVG).
 
 import { saveBinaryFile, saveCatalog } from "../../../api/catalog";
-import {
-  readTimeSeries,
-  getSignalLabel,
-  type SignalRef,
-  type SignalTimeSeries,
-} from "../../../stores/dashboardStore";
+import { getSignalLabel, type SignalRef } from "../../../stores/dashboardStore";
+import type { SeriesWindow } from "../../../api/dashboardHistory";
 
 // ─────────────────────────────────────────
 // PNG export (canvas-based panels)
@@ -102,7 +98,8 @@ export async function exportSvgElementAsPng(
 
 interface ChartExportOptions {
   signals: SignalRef[];
-  buffers: Map<string, SignalTimeSeries>;
+  /** One per signal, in order. */
+  series: SeriesWindow[];
   width: number;
   height: number;
   path: string;
@@ -114,18 +111,12 @@ interface ChartExportOptions {
  * This produces a clean vector export with polylines, axes, and grid.
  */
 export async function exportChartAsSvg(opts: ChartExportOptions): Promise<void> {
-  const { signals, buffers, width, height, path, interactive } = opts;
+  const { signals, series, width, height, path, interactive } = opts;
   const padding = { top: 20, right: 20, bottom: 40, left: 60 };
   const plotW = width - padding.left - padding.right;
   const plotH = height - padding.top - padding.bottom;
 
-  // Read all series data
-  const seriesData = signals.map((sig) => {
-    const key = `${sig.frameId}:${sig.signalName}`;
-    const series = buffers.get(key);
-    if (series && series.count > 0) return readTimeSeries(series);
-    return { timestamps: [] as number[], values: [] as number[] };
-  });
+  const seriesData = series.map(({ t, v }) => ({ timestamps: t, values: v }));
 
   // Compute global time and value ranges
   let tMin = Infinity, tMax = -Infinity, vMin = Infinity, vMax = -Infinity;

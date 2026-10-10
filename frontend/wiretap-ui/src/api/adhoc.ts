@@ -19,10 +19,6 @@ export async function setAdhocSignals(sessionId: string, signals: AdhocSignalRef
   await wsTransport.command("adhoc.set", { session_id: sessionId, signals, heatmaps });
 }
 
-export async function resetAdhocToggles(sessionId: string): Promise<void> {
-  await wsTransport.command("adhoc.reset", { session_id: sessionId });
-}
-
 export async function clearAdhocSignals(sessionId: string): Promise<void> {
   await wsTransport.command("adhoc.clear", { session_id: sessionId });
 }

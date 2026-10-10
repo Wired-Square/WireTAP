@@ -14,37 +14,24 @@ import {
   type PlacedSignal,
   type FrameHeader,
   type FrameDefPayload,
-  nextSignalId,
   nextSignalColour,
   normaliseRange,
   serialiseFrameDef,
   canSave,
   validateSignalType,
-  buildBitOwnerMap,
-  checkOverlap,
   getSignalColours,
   BYTE_ORDER_LE,
   VALUE_TYPE_UNSIGNED,
 } from "../utils/bitGrid";
 import BitGrid from "../components/BitGrid";
+import { useBitOwners, useNextFrameLinkId } from "../hooks/useFrameLinkAnswers";
+import { INTERFACE_TYPE_NAMES } from "../../../generated/framelinkNames";
 import SignalList from "../components/SignalList";
 import SignalProperties from "../components/SignalProperties";
 import { formatHexId } from "../utils/formatHex";
 import { IconButton } from "../../../components/Button";
 import { PrimaryButton } from "../../../components/forms";
 import { Card } from "../../../components/Card";
-
-// ============================================================================
-// Interface type name lookup
-// ============================================================================
-
-const INTERFACE_TYPE_NAMES: Record<number, string> = {
-  1: "CAN",
-  2: "CAN FD",
-  3: "RS-485",
-  4: "RS-232",
-  5: "LIN",
-};
 
 // ============================================================================
 // Reducer types and implementation
@@ -64,7 +51,7 @@ interface EditorState {
 type EditorAction =
   | { type: "SET_ANCHOR"; bit: number }
   | { type: "CLEAR_ANCHOR" }
-  | { type: "ADD_SIGNAL"; startBit: number; bitLength: number }
+  | { type: "ADD_SIGNAL"; signalId: number; startBit: number; bitLength: number }
   | { type: "UPDATE_SIGNAL"; index: number; field: keyof PlacedSignal; value: string | number }
   | { type: "DELETE_SIGNAL"; index: number }
   | { type: "SELECT_SIGNAL"; index: number | null };
@@ -83,7 +70,7 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
     case "ADD_SIGNAL": {
       const newSignal: PlacedSignal = {
-        signalId: nextSignalId(state.signals),
+        signalId: action.signalId,
         name: "",
         startBit: action.startBit,
         bitLength: action.bitLength,
@@ -201,11 +188,9 @@ export default function FrameDefEditor({
     [state.signals],
   );
 
-  // Memoised owner map for bit-click handler
-  const ownerMap = useMemo(
-    () => buildBitOwnerMap(state.signals, payloadBytes),
-    [state.signals, payloadBytes],
-  );
+  const ownerMap = useBitOwners(state.signals, payloadBytes);
+  const usedSignalIds = useMemo(() => new Set(state.signals.map((s) => s.signalId)), [state.signals]);
+  const nextSignalId = useNextFrameLinkId(usedSignalIds, "signal");
 
   // --- Bit click handler ---
   const onBitClick = useCallback(
@@ -231,12 +216,12 @@ export default function FrameDefEditor({
 
       // Anchor is set and clicked bit differs: try to add signal
       const { startBit, bitLength } = normaliseRange(state.selectionAnchor, bit);
-      const overlaps = checkOverlap(startBit, bitLength, BYTE_ORDER_LE, state.signals, payloadBytes);
-      if (!overlaps) {
-        dispatch({ type: "ADD_SIGNAL", startBit, bitLength });
+      const overlaps = ownerMap.slice(startBit, startBit + bitLength).some((owner) => owner !== null);
+      if (!overlaps && nextSignalId !== null) {
+        dispatch({ type: "ADD_SIGNAL", signalId: nextSignalId, startBit, bitLength });
       }
     },
-    [ownerMap, state.selectionAnchor, state.signals, payloadBytes],
+    [ownerMap, state.selectionAnchor, nextSignalId],
   );
 
   // --- Byte click handler ---
@@ -252,9 +237,9 @@ export default function FrameDefEditor({
         }
       }
       // No owner — add an 8-bit signal covering the full byte
-      dispatch({ type: "ADD_SIGNAL", startBit: baseBit, bitLength: 8 });
+      if (nextSignalId !== null) dispatch({ type: "ADD_SIGNAL", signalId: nextSignalId, startBit: baseBit, bitLength: 8 });
     },
-    [ownerMap],
+    [ownerMap, nextSignalId],
   );
 
   // --- Signal list selection handler ---
@@ -380,6 +365,7 @@ export default function FrameDefEditor({
             <BitGrid
               payloadBytes={payloadBytes}
               signals={state.signals}
+              ownerMap={ownerMap}
               selectionAnchor={state.selectionAnchor}
               selectedSignalIndex={state.selectedSignalIndex}
               onBitClick={onBitClick}

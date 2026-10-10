@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::capture_store::CaptureKind;
+use crate::dashboard_history::History;
 use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
-use crate::transmit::{RepeatGroupStartedEvent, RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
 use crate::capture_inventory::FrameInventoryMsg;
 use crate::ws::server::{ws_server, WsServer};
@@ -375,9 +375,9 @@ const MAX_RENDERED_TUNNEL_MESSAGES: usize = 500;
 pub(crate) type TunnelMessage = (wiretap_catalog::ModbusRtuMessage, Option<u64>);
 
 /// Encode a frame batch against `catalog` into the `DecodedSignals` JSON
-/// payload. `with_unrouted` adds an entry for every frame the catalogue did not
-/// decode, saying why; without it only decoded frames are sent. Returns an
-/// empty vec when there is nothing to send.
+/// payload, recording what decoded into `history`. `with_unrouted` adds an entry
+/// for every frame the catalogue did not decode, saying why; without it only
+/// decoded frames are sent. Returns an empty vec when there is nothing to send.
 fn encode_decoded_batch(
     session_id: &str,
     frames: &[FrameMessage],
@@ -385,6 +385,7 @@ fn encode_decoded_batch(
     verdicts: Option<&MirrorVerdicts>,
     tunnels: Option<&SharedTunnels>,
     with_unrouted: bool,
+    mut history: Option<&mut History>,
 ) -> Vec<u8> {
     let mask = wiretap_catalog::decode::frame_id_mask(catalog);
 
@@ -422,6 +423,9 @@ fn encode_decoded_batch(
                 .map(DecodedSignalsEntry::Decoded)
                 .or_else(|| with_unrouted.then(|| unrouted_entry(UnroutedKind::Unmatched, f)))
         };
+        if let (Some(history), Some(DecodedSignalsEntry::Decoded(decoded))) = (history.as_deref_mut(), &entry) {
+            history.record_decoded(f, decoded);
+        }
         out.extend(entry);
     }
     if out.is_empty() {
@@ -704,7 +708,11 @@ pub fn reset_decode_state(session_id: &str) {
         }
     }
     reset_tunnels(session_id);
-    crate::adhoc::reset_toggles(session_id);
+    if let Some(history) = crate::dashboard_history::get(session_id) {
+        if let Ok(mut history) = history.lock() {
+            history.reset_toggles();
+        }
+    }
 }
 
 /// Clear frame offset for a session.
@@ -754,7 +762,21 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
     // reset keeps that true for any future caller.
     reset_tunnels(session_id);
     let tunnels = tunnel_decoders(session_id);
-    let decoded = encode_decoded_batch(session_id, &frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), false);
+    let shared = crate::dashboard_history::get(session_id);
+    let mut history = shared.as_ref().and_then(|h| h.lock().ok());
+    if let Some(history) = history.as_deref_mut() {
+        history.drop_catalogue_series();
+    }
+    let decoded = encode_decoded_batch(
+        session_id,
+        &frames,
+        &catalog,
+        verdicts.as_ref(),
+        tunnels.as_ref(),
+        false,
+        history.as_deref_mut(),
+    );
+    drop(history);
     let Ok(name_len) = u16::try_from(subscriber.len()) else { return };
     let payload = [&name_len.to_be_bytes(), subscriber.as_bytes(), &decoded].concat();
     server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedBacklog, channel, &payload));
@@ -764,22 +786,33 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
 pub fn send_frames(session_id: &str, frames: &[FrameMessage]) {
     let Some(server) = ws_server() else { return };
     let Some(channel) = server.channel_for_session(session_id) else { return };
-    for (kind, payload) in frame_batch_messages(session_id, frames) {
+    let shared = crate::dashboard_history::get(session_id);
+    let mut history = shared.as_ref().and_then(|h| h.lock().ok());
+    for (kind, payload) in frame_batch_messages(session_id, frames, history.as_deref_mut()) {
         server.send_to_channel(channel, protocol::encode_message(kind, channel, &payload));
     }
     let mask = attached_catalog(session_id).and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
-    for (conn_id, payload) in crate::adhoc::batch_messages(session_id, frames, mask) {
+    if let Some(history) = history.as_deref_mut() {
+        crate::adhoc::record(session_id, frames, mask, history);
+        history.record_toggles(frames, mask);
+    }
+    for (conn_id, payload) in crate::adhoc::batch_messages(session_id, frames, mask, history.as_deref()) {
         server.send_to_conn(conn_id, protocol::encode_message(MsgType::AdhocSignals, channel, &payload));
     }
 }
 
 /// Live capture and playback both deliver through here, so neither can skip the decode.
-fn frame_batch_messages(session_id: &str, frames: &[FrameMessage]) -> Vec<(MsgType, Vec<u8>)> {
+fn frame_batch_messages(
+    session_id: &str,
+    frames: &[FrameMessage],
+    history: Option<&mut History>,
+) -> Vec<(MsgType, Vec<u8>)> {
     let mut messages = vec![(MsgType::FrameData, protocol::encode_frame_batch(frames))];
     if let Some(catalog) = attached_catalog(session_id) {
         let verdicts = mirror_verdicts(session_id, frames);
         let tunnels = tunnel_decoders(session_id);
-        let decoded = encode_decoded_batch(session_id, frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), true);
+        let decoded =
+            encode_decoded_batch(session_id, frames, &catalog, verdicts.as_ref(), tunnels.as_ref(), true, history);
         if !decoded.is_empty() {
             messages.push((MsgType::DecodedSignals, decoded));
         }
@@ -912,6 +945,7 @@ pub async fn dispatch_command(
             crate::ws::smp::dispatch(name, params).await
         }
         name if name.starts_with("adhoc.") => crate::adhoc::dispatch_adhoc_command(name, params, conn_id),
+        name if name.starts_with("dashboard.") => crate::dashboard_history::dispatch(name, params),
         name if name.starts_with("catalog.") => {
             crate::catalog::dispatch_catalog_command(name, params, conn_id).await
         }
@@ -961,35 +995,14 @@ pub fn send_replay_state(state: &crate::replay::ReplayState) {
     send_json_to_all(MsgType::ReplayState, state);
 }
 
-/// Repeat-transmit lifecycle payload, pushed on the global channel as
-/// kind-discriminated JSON: `started` carries the full queue row, `stopped`
-/// carries the queue id and reason. The frontend decodes the union by `kind`,
-/// mirroring how `OtaEvent` discriminates its union.
-#[derive(serde::Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum RepeatEventPayload<'a> {
-    Started(&'a RepeatStartedEvent),
-    Stopped(&'a RepeatStoppedEvent),
-    GroupStarted(&'a RepeatGroupStartedEvent),
+/// Push the whole Transmit queue after a change (global, channel 0).
+pub fn send_transmit_queue(queue: &crate::transmit_queue::TransmitQueue) {
+    send_json_to_all(MsgType::TransmitQueue, queue);
 }
 
-fn send_repeat_event(payload: &RepeatEventPayload<'_>) {
-    send_json_to_all(MsgType::RepeatEvent, payload);
-}
-
-/// Announce a repeat transmit that started outside the Transmit UI (e.g. an MCP
-/// agent) so it appears as a queue row.
-pub fn send_repeat_started(event: &RepeatStartedEvent) {
-    send_repeat_event(&RepeatEventPayload::Started(event));
-}
-
-/// Announce a repeat transmit that stopped (agent stop or permanent error).
-pub fn send_repeat_stopped(event: &RepeatStoppedEvent) {
-    send_repeat_event(&RepeatEventPayload::Stopped(event));
-}
-
-pub fn send_repeat_group_started(event: &RepeatGroupStartedEvent) {
-    send_repeat_event(&RepeatEventPayload::GroupStarted(event));
+/// Push the whole Query queue after a change (global, channel 0).
+pub fn send_query_queue(queue: &crate::query::QueryQueue) {
+    send_json_to_all(MsgType::QueryQueue, queue);
 }
 
 #[derive(serde::Serialize)]
@@ -1408,7 +1421,7 @@ bit_length = 16
         frames: &[FrameMessage],
         with_unrouted: bool,
     ) -> Vec<serde_json::Value> {
-        let json = encode_decoded_batch("routing", frames, catalog, None, None, with_unrouted);
+        let json = encode_decoded_batch("routing", frames, catalog, None, None, with_unrouted, None);
         if json.is_empty() {
             return Vec::new();
         }
@@ -1599,7 +1612,7 @@ bit_length = 8
         ] {
             frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
         }
-        let json = encode_decoded_batch(session, &frames, &catalog, None, tunnels.as_ref(), true);
+        let json = encode_decoded_batch(session, &frames, &catalog, None, tunnels.as_ref(), true, None);
         detach_catalog(session);
 
         let batch: Vec<serde_json::Value> = serde_json::from_slice(&json).expect("JSON array");
@@ -1640,8 +1653,8 @@ bit_length = 8
         let frames: Vec<_> = (0..300u32)
             .map(|i| can(0x100 + (i % 30), u64::from(i) * 1_000, vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]))
             .collect();
-        let decoded_only = encode_decoded_batch("size", &frames, &catalog, None, None, false).len();
-        let routed = encode_decoded_batch("size", &frames, &catalog, None, None, true).len();
+        let decoded_only = encode_decoded_batch("size", &frames, &catalog, None, None, false, None).len();
+        let routed = encode_decoded_batch("size", &frames, &catalog, None, None, true, None).len();
         eprintln!(
             "DecodedSignals bytes per 300-frame batch: decoded only {decoded_only}, routed {routed} ({:.2}x)",
             routed as f64 / decoded_only as f64
@@ -1655,7 +1668,7 @@ bit_length = 8
     fn a_playback_batch_carries_its_decode_at_the_captures_stamp() {
         let session = "playback-decode";
         attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
-        let messages = frame_batch_messages(session, &[can(0x1A5, 1_234_567, vec![7; 8])]);
+        let messages = frame_batch_messages(session, &[can(0x1A5, 1_234_567, vec![7; 8])], None);
         detach_catalog(session);
 
         let decoded = messages
@@ -1704,6 +1717,43 @@ bit_length = 8
         assert_eq!(payload[..2], [0, 14]);
         assert_eq!(&payload[2..16], b"main_dashboard");
         assert!(serde_json::from_slice::<Vec<serde_json::Value>>(&payload[16..]).is_ok_and(|d| !d.is_empty()));
+    }
+
+    #[test]
+    fn a_watched_session_records_its_history_and_an_attach_backlog_replaces_it_once() {
+        use crate::ws::server::outbox;
+        use serde_json::json;
+        const CHANNEL: u8 = 203;
+        const WINDOW: usize = 7_002;
+        let session = "dashboard-history-recording";
+        crate::capture_db::use_in_memory_database();
+        crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
+        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        let watch = json!({ "session_id": session, "signals": [{ "frameId": 0x100, "name": "byte[1]" }], "heatmaps": [0x100] });
+        crate::adhoc::dispatch_adhoc_command("adhoc.set", watch, WINDOW).unwrap();
+        let on_bus_1 = FrameMessage { bus: 1, ..can(0x1A5, 1_000, vec![1, 10, 0, 0, 0, 0, 0, 0]) };
+        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3_000, vec![3, 30, 0, 0, 0, 0, 0, 0]), on_bus_1]);
+        outbox::subscribe(session, CHANNEL);
+        let values = |name: &str| {
+            let series = crate::dashboard_history::dispatch(
+                "dashboard.series",
+                json!({ "session_id": session, "signals": [{ "frameId": 0x100, "name": name }] }),
+            )
+            .unwrap();
+            series[0]["v"].clone()
+        };
+
+        send_new_frames(session);
+        assert_eq!((values("Level"), values("byte[1]")), (json!([1.0, 3.0]), json!([10.0, 30.0])));
+
+        redecode_delivered(session, WINDOW, "main_dashboard");
+        assert_eq!((values("Level"), values("byte[1]")), (json!([1.0, 3.0]), json!([10.0, 30.0])));
+        let toggles = crate::dashboard_history::dispatch("dashboard.bitChanges", json!({ "session_id": session })).unwrap();
+        assert_eq!(toggles[0]["frames"], 2);
+
+        crate::adhoc::dispatch_adhoc_command("adhoc.clear", json!({ "session_id": session }), WINDOW).unwrap();
+        detach_catalog(session);
+        assert_eq!(values("Level"), json!([]));
     }
 
     #[test]
@@ -1798,7 +1848,7 @@ factor = 1e10
         let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
         let unmatched = FrameMessage { source_address: Some(0x42), ..can(0x18EE0042, 7, vec![9]) };
         let headered_batch =
-            encode_decoded_batch("golden", &[can(0x18EF0042, 5, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), unmatched], &headered, None, None, true);
+            encode_decoded_batch("golden", &[can(0x18EF0042, 5, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), unmatched], &headered, None, None, true, None);
 
         let mirror_entry = golden_mirror_entry(|entry| serde_json::to_vec(entry).unwrap());
 
@@ -1814,7 +1864,7 @@ factor = 1e10
         ] {
             frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
         }
-        let tunnel_batch = encode_decoded_batch(session, &frames, &tunnelled, None, tunnels.as_ref(), true);
+        let tunnel_batch = encode_decoded_batch(session, &frames, &tunnelled, None, tunnels.as_ref(), true, None);
         detach_catalog(session);
 
         let serial = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
@@ -1825,6 +1875,7 @@ factor = 1e10
             None,
             None,
             true,
+            None,
         );
 
         [headered_batch, mirror_entry, tunnel_batch, serial_batch]
@@ -1854,7 +1905,7 @@ factor = 1e10
         let fd = |id| FrameMessage { is_fd: true, is_brs: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
         let rtr = |id| FrameMessage { is_rtr: true, dlc: 6, ..can(id, 0, vec![]) };
         let frames = [fd(0x18EF0042), fd(0x18EE0042), rtr(0x18EF0042), rtr(0x18EE0042)];
-        let bytes = encode_decoded_batch("can-flags", &frames, &headered, None, None, true);
+        let bytes = encode_decoded_batch("can-flags", &frames, &headered, None, None, true, None);
         let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
 
         let seen: Vec<_> =
@@ -1885,7 +1936,7 @@ factor = 1e10
     fn decoded_and_unmatched_entries_carry_the_frames_esi_flag() {
         let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
         let esi = |id| FrameMessage { is_fd: true, is_esi: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
-        let bytes = encode_decoded_batch("can-esi", &[esi(0x18EF0042), esi(0x18EE0042)], &headered, None, None, true);
+        let bytes = encode_decoded_batch("can-esi", &[esi(0x18EF0042), esi(0x18EE0042)], &headered, None, None, true, None);
         let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
         let seen: Vec<_> = entries.iter().map(|e| serde_json::json!([e["kind"], e["isEsi"]])).collect();
         assert_eq!(seen, [serde_json::json!([null, true]), serde_json::json!(["unmatched", true])]);

@@ -3,7 +3,7 @@
 // Queue management view for repeat transmit.
 // Supports individual item repeat and group repeat (multiple items in sequence).
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ComponentProps } from "react";
 import { Play, Square, Trash2, StopCircle, Users, AlertCircle, Link } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTransmitStore, GVRET_BUSES } from "../../../stores/transmitStore";
@@ -13,6 +13,7 @@ import {
   bgDataView,
   bgSuccess,
   borderDefault,
+  textDanger,
   textDataAmber,
   textDataGreen,
   textDataMuted,
@@ -27,6 +28,33 @@ import { formatBusLabel } from "../../../utils/busFormat";
 import { Button, IconButton } from "../../../components/Button";
 import { Select, Input, Checkbox } from "../../../components/forms";
 import { Table } from "../../../components/Table";
+import type { QueueRow } from "../../../api/transmit";
+
+/**
+ * An input over a value Rust holds: edits stay local while typing and go to Rust
+ * on blur or Enter, so a push in between cannot overwrite a half-typed value.
+ * It shows Rust's value until the push, so a refused edit reverts.
+ */
+function CommitInput({ value, onCommit, ...props }: Omit<ComponentProps<typeof Input>, "value" | "defaultValue"> & {
+  value: string;
+  onCommit: (value: string) => void;
+}) {
+  return (
+    <Input
+      {...props}
+      key={value}
+      defaultValue={value}
+      onBlur={(e) => {
+        if (e.target.value === value) return;
+        onCommit(e.target.value);
+        e.target.value = value;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 interface TransmitQueueViewProps {
   outputBusToSource: Map<number, BusSourceInfo>;
@@ -46,14 +74,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
   const startRepeat = useTransmitStore((s) => s.startRepeat);
   const stopRepeat = useTransmitStore((s) => s.stopRepeat);
   const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
-  const updateQueueInterval = useTransmitStore((s) => s.updateQueueInterval);
-  const toggleQueueEnabled = useTransmitStore((s) => s.toggleQueueEnabled);
-  const updateQueueItemBus = useTransmitStore((s) => s.updateQueueItemBus);
-  const updateQueueItemSession = useTransmitStore((s) => s.updateQueueItemSession);
-  const setItemGroup = useTransmitStore((s) => s.setItemGroup);
+  const editQueueRow = useTransmitStore((s) => s.editQueueRow);
   const startGroupRepeat = useTransmitStore((s) => s.startGroupRepeat);
   const stopGroupRepeat = useTransmitStore((s) => s.stopGroupRepeat);
-  const stopAllGroupRepeats = useTransmitStore((s) => s.stopAllGroupRepeats);
 
 
   // Compute first enabled item in each group (for showing group controls)
@@ -62,24 +85,15 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
   const firstEnabledInGroup = useMemo(() => {
     const result = new Map<string, string>(); // groupName -> first enabled item id
     for (const item of queue) {
-      if (item.groupName && item.enabled && !result.has(item.groupName)) {
-        result.set(item.groupName, item.id);
+      if (item.group && item.enabled && !result.has(item.group)) {
+        result.set(item.group, item.id);
       }
     }
     return result;
   }, [queue]);
 
   // Check if any item is repeating
-  const hasActiveRepeats = queue.some((item) => item.isRepeating);
-  const hasActiveGroupRepeats = activeGroups.size > 0;
-
-  // Handle stop all (both individual and group repeats)
-  const handleStopAll = useCallback(async () => {
-    // Stop individual repeats
-    await stopAllRepeats();
-    // Stop group repeats
-    await stopAllGroupRepeats();
-  }, [stopAllRepeats, stopAllGroupRepeats]);
+  const hasActiveRepeats = queue.some((item) => item.repeating) || activeGroups.size > 0;
 
   // Handle clear queue
   const handleClearQueue = useCallback(async () => {
@@ -110,13 +124,6 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
     [activeGroups, startGroupRepeat, stopGroupRepeat]
   );
 
-  // Handle group name change
-  const handleGroupChange = useCallback(
-    (queueId: string, value: string) => {
-      setItemGroup(queueId, value.trim() || undefined);
-    },
-    [setItemGroup]
-  );
 
   // Handle remove item
   const handleRemove = useCallback(
@@ -126,21 +133,10 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
     [removeFromQueue]
   );
 
-  // Handle interval change
-  const handleIntervalChange = useCallback(
-    (queueId: string, value: string) => {
-      const interval = parseInt(value, 10);
-      if (!isNaN(interval) && interval >= 1) {
-        updateQueueInterval(queueId, interval);
-      }
-    },
-    [updateQueueInterval]
-  );
-
   // Format frame for display
-  const formatFrame = (item: (typeof queue)[0]) => {
-    if (item.type === "can" && item.canFrame) {
-      const frame = item.canFrame;
+  const formatFrame = ({ payload }: QueueRow) => {
+    if (payload.kind === "can") {
+      const { frame } = payload;
       const idStr = frame.is_extended
         ? `0x${frame.frame_id.toString(16).toUpperCase().padStart(8, "0")}`
         : `0x${frame.frame_id.toString(16).toUpperCase().padStart(3, "0")}`;
@@ -157,21 +153,17 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
         ].filter((f): f is string => Boolean(f)),
         bus: frame.bus,
       };
-    } else if (item.type === "serial" && item.serialBytes) {
-      const dataStr = item.serialBytes.slice(0, 8).map(byteToHex).join(" ");
-      const truncated = item.serialBytes.length > 8 ? "..." : "";
-      return {
-        type: "Serial",
-        id: null,
-        details: `[${item.serialBytes.length}] ${dataStr}${truncated}`,
-        flags:
-          item.serialFraming && item.serialFraming.mode !== "raw"
-            ? [item.serialFraming.mode.toUpperCase()]
-            : [],
-        bus: null,
-      };
     }
-    return null;
+    const { bytes, framing } = payload;
+    const dataStr = bytes.slice(0, 8).map(byteToHex).join(" ");
+    const truncated = bytes.length > 8 ? "..." : "";
+    return {
+      type: "Serial",
+      id: null,
+      details: `[${bytes.length}] ${dataStr}${truncated}`,
+      flags: framing.mode !== "raw" ? [framing.mode.toUpperCase()] : [],
+      bus: null,
+    };
   };
 
   // Empty state
@@ -203,9 +195,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
 
         <div className="flex-1" />
 
-        {(hasActiveRepeats || hasActiveGroupRepeats) && (
+        {hasActiveRepeats && (
           <Button
-            onClick={handleStopAll}
+            onClick={stopAllRepeats}
             variant="solid"
             tone="danger"
             title={t("queue.stopAllTooltip")}
@@ -241,15 +233,16 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
           <tbody>
             {queue.map((item) => {
               const formatted = formatFrame(item);
-              if (!formatted) return null;
+              const canFrame = item.payload.kind === "can" ? item.payload.frame : null;
 
               // Group state
-              const isInGroup = Boolean(item.groupName);
-              const isGroupRepeating = item.groupName ? activeGroups.has(item.groupName) : false;
-              const isFirstEnabledInGroup = item.groupName ? firstEnabledInGroup.get(item.groupName) === item.id : false;
+              const isInGroup = Boolean(item.group);
+              const isGroupRepeating = item.group ? activeGroups.has(item.group) : false;
+              const isFirstEnabledInGroup = item.group ? firstEnabledInGroup.get(item.group) === item.id : false;
+              const locked = item.repeating || isGroupRepeating;
 
               // Check item's session state (not active session)
-              const itemSession = sessions[item.sessionId];
+              const itemSession = sessions[item.session_id];
               const isOrphaned = !itemSession || itemSession.lifecycleState === "disconnected";
               const isItemSessionConnected = itemSession?.lifecycleState === "connected";
 
@@ -257,8 +250,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
               // For CAN items, check can_transmit; for serial items, check can_transmit_serial
               const hasCanTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.traits.tx_frames);
               const hasSerialTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.traits.tx_bytes);
-              const hasIOSession = item.type === "serial" ? hasSerialTransmit : hasCanTransmit;
-              const canStartIndividual = !isInGroup && item.enabled && !item.isRepeating && hasIOSession;
+              const hasIOSession = canFrame ? hasCanTransmit : hasSerialTransmit;
+              const canStartIndividual = !isInGroup && item.enabled && !item.repeating && hasIOSession;
               const canStartGroup = isInGroup && isFirstEnabledInGroup && item.enabled && !isGroupRepeating && hasCanTransmit;
 
               return (
@@ -270,17 +263,17 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       isFirstEnabledInGroup ? (
                         isGroupRepeating ? (
                           <Button
-                            onClick={() => handleToggleGroupRepeat(item.groupName!)}
+                            onClick={() => handleToggleGroupRepeat(item.group!)}
                             variant="solid"
                             tone="danger"
                             size="sm"
-                            title={`Stop group '${item.groupName}'`}
+                            title={`Stop group '${item.group}'`}
                           >
                             <Square size={12} fill="currentColor" />
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => handleToggleGroupRepeat(item.groupName!)}
+                            onClick={() => handleToggleGroupRepeat(item.group!)}
                             disabled={!canStartGroup}
                             variant="solid"
                             tone="success"
@@ -288,7 +281,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             title={
                               !hasIOSession
                                 ? "Group repeat requires an IO session (start Discovery or Decoder first)"
-                                : `Start group '${item.groupName}'`
+                                : `Start group '${item.group}'`
                             }
                           >
                             <Play size={12} fill="currentColor" />
@@ -302,7 +295,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       )
                     ) : (
                       // Individual item: normal play/stop
-                      item.isRepeating ? (
+                      item.repeating ? (
                         <Button
                           onClick={() => handleToggleRepeat(item.id, true)}
                           variant="solid"
@@ -340,11 +333,16 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             <AlertCircle size={12} />
                           </span>
                         )}
+                        {item.last_error && (
+                          <span className={textDanger} title={item.last_error}>
+                            <AlertCircle size={12} />
+                          </span>
+                        )}
                         <span
                           className={`${textSecondary} text-xs truncate max-w-25`}
-                          title={formatBusLabel(item.profileName, item.canFrame?.bus, outputBusToSource)}
+                          title={formatBusLabel(item.profile_name, canFrame?.bus, outputBusToSource)}
                         >
-                          {formatBusLabel(item.profileName, item.canFrame?.bus, outputBusToSource)}
+                          {formatBusLabel(item.profile_name, canFrame?.bus, outputBusToSource)}
                         </span>
                         {item.origin === "agent" && (
                           <Badge tone="primary" size="sm" className="uppercase tracking-wide" title={t("queue.agentRepeat")}>
@@ -352,13 +350,11 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           </Badge>
                         )}
                       </div>
-                      {item.type === "can" && item.canFrame && (
+                      {canFrame && (
                         <Select
-                          value={item.canFrame.bus}
-                          onChange={(e) =>
-                            updateQueueItemBus(item.id, parseInt(e.target.value))
-                          }
-                          disabled={item.isRepeating || isGroupRepeating}
+                          value={canFrame.bus}
+                          onChange={(e) => editQueueRow(item.id, { bus: parseInt(e.target.value) })}
+                          disabled={locked}
                           size="sm"
                           className="w-16"
                         >
@@ -404,13 +400,11 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   {/* Interval */}
                   <td>
                     <div className="flex items-center gap-1">
-                      <Input
+                      <CommitInput
                         type="number"
-                        value={item.repeatIntervalMs}
-                        onChange={(e) =>
-                          handleIntervalChange(item.id, e.target.value)
-                        }
-                        disabled={item.isRepeating || isGroupRepeating}
+                        value={String(item.interval_ms)}
+                        onCommit={(value) => editQueueRow(item.id, { interval_ms: parseInt(value, 10) || 0 })}
+                        disabled={locked}
                         min={1}
                         size="sm"
                         className="w-16"
@@ -421,11 +415,11 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
 
                   {/* Group */}
                   <td>
-                    <Input
+                    <CommitInput
                       type="text"
-                      value={item.groupName ?? ""}
-                      onChange={(e) => handleGroupChange(item.id, e.target.value)}
-                      disabled={item.isRepeating || isGroupRepeating}
+                      value={item.group ?? ""}
+                      onCommit={(group) => editQueueRow(item.id, { group })}
+                      disabled={locked}
                       placeholder={t("queue.groupPlaceholder")}
                       size="sm"
                       className="w-20"
@@ -438,14 +432,22 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                     <div className="flex items-center gap-1.5">
                       <Checkbox
                         checked={item.enabled}
-                        onChange={() => toggleQueueEnabled(item.id)}
-                        disabled={item.isRepeating || isGroupRepeating}
+                        onChange={() => editQueueRow(item.id, { enabled: !item.enabled })}
+                        disabled={locked}
                         size="sm"
                         title={item.enabled ? t("queue.actions.disableItem") : t("queue.actions.enableItem")}
                       />
                       {isOrphaned && activeSession && (
                         <IconButton
-                          onClick={() => updateQueueItemSession(item.id, activeSession)}
+                          onClick={() =>
+                            editQueueRow(item.id, {
+                              session: {
+                                session_id: activeSession.id,
+                                profile_id: activeSession.profileId,
+                                profile_name: activeSession.profileName,
+                              },
+                            })
+                          }
                           size="sm"
                           title={`Assign to ${activeSession.profileName}`}
                         >
@@ -454,7 +456,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       )}
                       <IconButton
                         onClick={() => handleRemove(item.id)}
-                        disabled={item.isRepeating}
+                        disabled={item.repeating}
                         tone="danger"
                         size="sm"
                         title={t("queue.actions.removeFromQueue")}

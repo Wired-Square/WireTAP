@@ -9,9 +9,11 @@ import type { BridgeDescriptor } from "../generated/BridgeDescriptor";
 import type { BridgeFilterDescriptor } from "../generated/BridgeFilterDescriptor";
 import type { DeviceSignalDescriptor } from "../generated/DeviceSignalDescriptor";
 import type { FrameDefDescriptor } from "../generated/FrameDefDescriptor";
+import type { FrameLinkIdKind } from "../generated/FrameLinkIdKind";
 import type { GeneratorDescriptor } from "../generated/GeneratorDescriptor";
 import type { SignalDefDescriptor } from "../generated/SignalDefDescriptor";
 import type { SignalMappingDescriptor } from "../generated/SignalMappingDescriptor";
+import type { SignalPlacement } from "../generated/SignalPlacement";
 import type { SignalReadResult } from "../generated/SignalReadResult";
 import type { TransformerDescriptor } from "../generated/TransformerDescriptor";
 import type { FrameLinkProbeResult as ProbeResult } from "../generated/FrameLinkProbeResult";
@@ -21,6 +23,7 @@ export type {
   BridgeFilterDescriptor,
   DeviceSignalDescriptor,
   FrameDefDescriptor,
+  FrameLinkIdKind,
   GeneratorDescriptor,
   ProbeResult,
   SignalDefDescriptor,
@@ -43,6 +46,20 @@ export function framelinkProbe(
   port: number,
 ): Promise<ProbeResult> {
   return wsTransport.command("framelink.probe", { host, port });
+}
+
+// ============================================================================
+// Editor helpers (no device)
+// ============================================================================
+
+/** Which signal (by index) owns each payload bit, Motorola signals snaking as the device lays them out. */
+export function framelinkBitOwners(signals: SignalPlacement[], payloadBytes: number): Promise<(number | null)[]> {
+  return wsTransport.command("framelink.bit_owners", { signals, payload_bytes: payloadBytes });
+}
+
+/** The lowest id not in `used`: rule ids from 0, signal ids from 1. */
+export function framelinkNextId(used: number[], kind: FrameLinkIdKind): Promise<number> {
+  return wsTransport.command("framelink.next_id", { used, kind });
 }
 
 // ============================================================================

@@ -1,10 +1,9 @@
 // ui/src/settings/bounds.ts
 //
-// Numeric bounds for the settings inputs — a single source of truth for the
-// min/max/step the UI enforces. The Rust backend clamps the same fields to the
-// same ranges on save (crates/wiretap-app/src/settings.rs `clamp_settings`), which is the
-// authoritative guard; the UI values here just drive the input attributes and
-// reject-on-out-of-range behaviour. Keep the two in step.
+// The settings inputs' min/max/step. The ranges are Rust's (`clamp_settings`,
+// generated); the step is how the input moves.
+
+import { SETTING_RANGES } from "../generated/settingRanges";
 
 export interface NumericBound {
   min: number;
@@ -13,17 +12,17 @@ export interface NumericBound {
 }
 
 export const SETTINGS_BOUNDS = {
-  discoveryHistorySize: { min: 1_000, max: 10_000_000, step: 10_000 },
-  queryResultLimit: { min: 100, max: 100_000, step: 1_000 },
-  graphBufferSize: { min: 1_000, max: 100_000, step: 1_000 },
-  decoderMaxUnmatchedFrames: { min: 100, max: 10_000, step: 100 },
-  decoderMaxFilteredFrames: { min: 100, max: 10_000, step: 100 },
-  decoderMaxDecodedFrames: { min: 100, max: 5_000, step: 100 },
-  decoderMaxDecodedPerSource: { min: 500, max: 20_000, step: 500 },
-  transmitMaxHistory: { min: 100, max: 10_000, step: 100 },
-  modbusMaxRegisterErrors: { min: 0, max: 1_000, step: 1 },
-  smpPort: { min: 1, max: 65_535, step: 1 },
-  mcpServerPort: { min: 1_024, max: 65_535, step: 1 },
+  discoveryHistorySize: { ...SETTING_RANGES.discovery_history_buffer, step: 10_000 },
+  queryResultLimit: { ...SETTING_RANGES.query_result_limit, step: 1_000 },
+  graphBufferSize: { ...SETTING_RANGES.graph_buffer_size, step: 1_000 },
+  decoderMaxUnmatchedFrames: { ...SETTING_RANGES.decoder_max_unmatched_frames, step: 100 },
+  decoderMaxFilteredFrames: { ...SETTING_RANGES.decoder_max_filtered_frames, step: 100 },
+  decoderMaxDecodedFrames: { ...SETTING_RANGES.decoder_max_decoded_frames, step: 100 },
+  decoderMaxDecodedPerSource: { ...SETTING_RANGES.decoder_max_decoded_per_source, step: 500 },
+  transmitMaxHistory: { ...SETTING_RANGES.transmit_max_history, step: 100 },
+  modbusMaxRegisterErrors: { ...SETTING_RANGES.modbus_max_register_errors, step: 1 },
+  smpPort: { ...SETTING_RANGES.smp_port, step: 1 },
+  mcpServerPort: { ...SETTING_RANGES.mcp_server_port, step: 1 },
 } as const satisfies Record<string, NumericBound>;
 
 export type SettingsBoundKey = keyof typeof SETTINGS_BOUNDS;

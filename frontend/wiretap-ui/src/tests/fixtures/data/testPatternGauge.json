@@ -1,0 +1,77 @@
+{
+  "note": "`expected_tx` is io_test.rs expected_tx: the frames a run will send — ceil(rate × (duration − drain_secs)) when paced, one per length code for a sweep, none for unpaced throughput. `gauge_max` is TestPattern.tsx's TX gauge scale before any frame is sent: the expected count itself, so the needle reaches full scale; a run with none auto-scales from the live count.",
+  "rows": [
+    {
+      "mode": "echo",
+      "rate_hz": 100,
+      "duration_sec": 10,
+      "use_fd": false,
+      "expected_tx": 900,
+      "gauge_max": 900
+    },
+    {
+      "mode": "latency",
+      "rate_hz": 10,
+      "duration_sec": 10,
+      "use_fd": false,
+      "expected_tx": 90,
+      "gauge_max": 90
+    },
+    {
+      "mode": "reliability",
+      "rate_hz": 100,
+      "duration_sec": 60,
+      "use_fd": false,
+      "expected_tx": 5900,
+      "gauge_max": 5900
+    },
+    {
+      "mode": "echo",
+      "rate_hz": 200,
+      "duration_sec": 2,
+      "use_fd": false,
+      "expected_tx": 267,
+      "gauge_max": 267
+    },
+    {
+      "mode": "echo",
+      "rate_hz": 200,
+      "duration_sec": 1,
+      "use_fd": false,
+      "expected_tx": 134,
+      "gauge_max": 134
+    },
+    {
+      "mode": "loopback",
+      "rate_hz": 1000,
+      "duration_sec": 5,
+      "use_fd": false,
+      "expected_tx": 4000,
+      "gauge_max": 4000
+    },
+    {
+      "mode": "sweep",
+      "rate_hz": 100,
+      "duration_sec": 10,
+      "use_fd": false,
+      "expected_tx": 9,
+      "gauge_max": 9
+    },
+    {
+      "mode": "sweep",
+      "rate_hz": 100,
+      "duration_sec": 10,
+      "use_fd": true,
+      "expected_tx": 16,
+      "gauge_max": 16
+    },
+    {
+      "mode": "throughput",
+      "rate_hz": 0,
+      "duration_sec": 10,
+      "use_fd": false,
+      "expected_tx": null,
+      "gauge_max": 100
+    }
+  ]
+}

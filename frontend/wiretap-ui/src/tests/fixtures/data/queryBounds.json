@@ -1,0 +1,89 @@
+{
+  "note": "A start bound as typed under TZ=Australia/Melbourne. us: what the Query form sends (datetimeLocalToMicros in the field's timezone mode; refused = the form refuses it, null = no bound). rust: payload_source::parse_bound, what the MCP makes of the same text (refused = an error, not a dropped bound).",
+  "rows": [
+    {
+      "input": "2026-03-01T10:00",
+      "mode": "local",
+      "us": 1772319600000000,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-03-01T10:00",
+      "mode": "utc",
+      "us": 1772359200000000,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-03-01T10:00:30.5",
+      "mode": "local",
+      "us": 1772319630500000,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-03-01T10:00:30.123456",
+      "mode": "utc",
+      "us": 1772359230123456,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-04-05T02:30",
+      "mode": "local",
+      "us": 1775316600000000,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-10-04T02:30",
+      "mode": "local",
+      "us": "refused",
+      "rust": "refused"
+    },
+    {
+      "input": "2026-10-04T02:30",
+      "mode": "utc",
+      "us": 1791081000000000,
+      "rust": "refused"
+    },
+    {
+      "input": "2026-02-30T10:00",
+      "mode": "utc",
+      "us": "refused",
+      "rust": "refused"
+    },
+    {
+      "input": "2026-03-01",
+      "mode": "local",
+      "us": "refused",
+      "rust": "refused"
+    },
+    {
+      "input": "2026-03-01T00:00:00Z",
+      "mode": "local",
+      "us": "refused",
+      "rust": 1772323200000000
+    },
+    {
+      "input": "2026-03-01T10:00:00+10:30",
+      "mode": "local",
+      "us": "refused",
+      "rust": 1772321400000000
+    },
+    {
+      "input": "1772319600000000",
+      "mode": "local",
+      "us": "refused",
+      "rust": 1772319600000000
+    },
+    {
+      "input": "not a date",
+      "mode": "local",
+      "us": "refused",
+      "rust": "refused"
+    },
+    {
+      "input": "",
+      "mode": "local",
+      "us": null,
+      "rust": "refused"
+    }
+  ]
+}

@@ -338,6 +338,20 @@ fn get_timeout(params: &Value) -> f64 {
 // JSON → protocol struct parsers
 // ============================================================================
 
+fn check_signal_type(bit_length: u16, value_type: u8) -> Result<(), String> {
+    use frame_def::*;
+    match value_type {
+        VALUE_TYPE_BOOL if bit_length != 1 => Err("Bool requires exactly 1 bit".into()),
+        VALUE_TYPE_FLOAT if bit_length != 32 => Err("Float requires exactly 32 bits".into()),
+        VALUE_TYPE_ARRAY if !bit_length.is_multiple_of(8) => Err("Array requires a multiple of 8 bits".into()),
+        VALUE_TYPE_UNSIGNED | VALUE_TYPE_SIGNED if bit_length > 64 => {
+            Err("Maximum 64 bits for integer signals".into())
+        }
+        VALUE_TYPE_UNSIGNED..=VALUE_TYPE_ARRAY => Ok(()),
+        unknown => Err(format!("Unknown value type {unknown}")),
+    }
+}
+
 fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
     let frame_def_id = v["frame_def_id"].as_u64().ok_or("Missing frame_def_id")? as u16;
     let interface_type = v["interface_type"].as_u64().ok_or("Missing interface_type")? as u8;
@@ -356,7 +370,7 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
         }
     };
 
-    let signals = v["signals"]
+    let signals: Vec<frame_def::FrameSignalDef> = v["signals"]
         .as_array()
         .map(|arr| {
             arr.iter()
@@ -374,6 +388,10 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
                 .collect()
         })
         .unwrap_or_default();
+    for signal in &signals {
+        check_signal_type(signal.bit_length, signal.value_type)
+            .map_err(|e| format!("Signal 0x{:04X}: {e}", signal.signal_id))?;
+    }
 
     Ok(FrameDefInfo {
         frame_def_id,
@@ -552,6 +570,10 @@ pub async fn dispatch_framelink_command(
         // Selectable signals
         "framelink.signals.selectable" => cmd_signals_selectable(params).await,
 
+        // Editor helpers (no device)
+        "framelink.bit_owners" => cmd_bit_owners(params),
+        "framelink.next_id" => cmd_next_id(params),
+
         _ => Err(format!("Unknown framelink command: {op_name}")),
     }
 }
@@ -626,14 +648,13 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
         let signals_from_ui: Vec<EditableFrameSignal> = info.signals.iter().zip(signal_names.iter())
             .map(|(proto_sig, (_sig_id, name))| {
                 let byte_order = if proto_sig.byte_order == 0 { "le" } else { "be" };
-                let value_type = if proto_sig.value_type == 0 { "unsigned" } else { "signed" };
                 EditableFrameSignal {
                     slug: format!("0x{:04X}", proto_sig.signal_id),
                     name: name.clone(),
                     start_bit: proto_sig.start_bit,
                     bit_length: proto_sig.bit_length,
                     byte_order: byte_order.to_string(),
-                    value_type: value_type.to_string(),
+                    value_type: frame_def::value_type_name(proto_sig.value_type).to_string(),
                     scale: proto_sig.scale,
                     offset: proto_sig.offset,
                     unit: String::new(),
@@ -1348,4 +1369,112 @@ async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
             .await
             .map_err(|e| format!("Failed to list selectable signals: {e}"))?;
     serde_json::to_value(&signals).map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Editor helpers
+// ============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SignalPlacement {
+    pub start_bit: u16,
+    pub bit_length: u16,
+    pub byte_order: u8,
+}
+
+/// Which signal (by index) owns each bit of the payload.
+fn bit_owners(signals: &[SignalPlacement], payload_bytes: usize) -> Vec<Option<usize>> {
+    let mut owners = vec![None; payload_bytes * 8];
+    for (index, signal) in signals.iter().enumerate() {
+        for bit in frame_def::signal_bit_positions(signal.start_bit, signal.bit_length, signal.byte_order) {
+            if let Some(owner) = owners.get_mut(usize::from(bit)) {
+                *owner = Some(index);
+            }
+        }
+    }
+    owners
+}
+
+/// Rule ids (frame defs, bridges, transformers, generators) start at 0, as the
+/// crate allocates them; signal ids start at 1, as the FrameLink TUI does.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum FrameLinkIdKind {
+    Rule,
+    Signal,
+}
+
+fn next_id(used: &[u16], kind: FrameLinkIdKind) -> u16 {
+    let used = used.iter().copied();
+    match kind {
+        FrameLinkIdKind::Rule => framelink::protocol::next_free_id(used),
+        FrameLinkIdKind::Signal => framelink::protocol::next_free_id(used.chain([0])),
+    }
+}
+
+fn param<T: serde::de::DeserializeOwned>(params: &Value, key: &str) -> Result<T, String> {
+    serde_json::from_value(params[key].clone()).map_err(|e| format!("Invalid '{key}': {e}"))
+}
+
+fn cmd_bit_owners(params: Value) -> Result<Value, String> {
+    let signals: Vec<SignalPlacement> = param(&params, "signals")?;
+    let payload_bytes: usize = param(&params, "payload_bytes")?;
+    Ok(serde_json::json!(bit_owners(&signals, payload_bytes)))
+}
+
+fn cmd_next_id(params: Value) -> Result<Value, String> {
+    let used: Vec<u16> = param(&params, "used")?;
+    Ok(serde_json::json!(next_id(&used, param(&params, "kind")?)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::small_twin_tables::rows;
+
+    #[test]
+    fn value_types_and_their_checks_match_the_rule_table() {
+        for row in rows("framelinkValueTypes.json") {
+            let value_type = row["value_type"].as_u64().unwrap() as u8;
+            if row["toml"].is_null() {
+                assert!(check_signal_type(8, value_type).is_err(), "{row}");
+            } else {
+                assert_eq!(frame_def::value_type_name(value_type), row["toml"], "{row}");
+            }
+        }
+        for row in rows("framelinkSignalTypes.json") {
+            let checked = check_signal_type(row["bit_length"].as_u64().unwrap() as u16, row["value_type"].as_u64().unwrap() as u8);
+            assert_eq!(checked.err().map(Value::from).unwrap_or(Value::Null), row["error"], "{row}");
+        }
+    }
+
+    #[test]
+    fn next_ids_match_the_rule_table() {
+        for row in rows("framelinkNextId.json") {
+            let used: Vec<u16> = serde_json::from_value(row["used"].clone()).unwrap();
+            assert_eq!(next_id(&used, FrameLinkIdKind::Rule), row["rule"], "{row}");
+            assert_eq!(next_id(&used, FrameLinkIdKind::Signal), row["signal"], "{row}");
+        }
+    }
+
+    #[test]
+    fn a_motorola_signal_owns_the_bits_it_snakes_across() {
+        let placement = |start_bit, bit_length, byte_order| SignalPlacement { start_bit, bit_length, byte_order };
+        let owners = bit_owners(&[placement(7, 12, 1), placement(16, 4, 0), placement(60, 8, 0)], 8);
+        let owned = |index| (0..64).filter(|&bit| owners[bit] == Some(index)).collect::<Vec<_>>();
+        assert_eq!(owned(0), [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]);
+        assert_eq!(owned(1), [16, 17, 18, 19]);
+        assert_eq!(owned(2), [60, 61, 62, 63], "bits past the payload are dropped");
+    }
+
+    #[test]
+    fn a_frame_def_with_a_mistyped_signal_is_refused() {
+        let def = serde_json::json!({
+            "frame_def_id": 1, "interface_type": 1, "can_id": 0x100, "dlc": 8,
+            "signals": [{ "signal_id": 2, "start_bit": 0, "bit_length": 8, "value_type": 2 }],
+        });
+        assert_eq!(parse_frame_def_info(&def).unwrap_err(), "Signal 0x0002: Float requires exactly 32 bits");
+    }
 }

@@ -519,8 +519,8 @@ pub fn start_catalog_cache(app: &AppHandle) {
 /// React to a settings save: if the decoder directory changed, rebuild the cache
 /// for the new directory and re-point the filesystem watcher.
 pub fn handle_decoder_dir_change(app: &AppHandle, new_dir: &str) {
-    // `try_state`, not `state`: save_settings can run during early setup (via
-    // load_settings' first-run init) before the cache is managed.
+    // `try_state`, not `state`: a settings write can happen during early setup
+    // (a load that migrates the file) before the cache is managed.
     let Some(cache) = app.try_state::<CatalogCache>() else {
         return;
     };
@@ -1141,7 +1141,7 @@ mod tests {
         }
     }
 
-    /// The `rust` column of the table `muxCaseMatch.ts` is checked against.
+    /// Which keys the crate reads as mux cases.
     #[test]
     fn mux_case_keys_match_the_rule_table() {
         let table: serde_json::Value = serde_json::from_str(&fixture("catalog/muxCaseKeys.json")).expect("table");

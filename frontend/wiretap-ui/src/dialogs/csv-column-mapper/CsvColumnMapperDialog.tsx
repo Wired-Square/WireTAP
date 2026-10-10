@@ -11,9 +11,11 @@ import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import PreviewTable from "./PreviewTable";
 import {
   previewCsv,
+  previewCsvTimestamps,
   importCsvWithMapping,
   importCsvBatchWithMapping,
   type CsvPreview,
+  type CsvTimestampPreview,
   type CsvColumnMapping,
   type CsvColumnRole,
   type TimestampUnit,
@@ -104,6 +106,7 @@ export default function CsvColumnMapperDialog({
   const [timestampUnit, setTimestampUnit] = useState<TimestampUnit>("microseconds");
   const [negateTimestamps, setNegateTimestamps] = useState(false);
   const [showImportedTs, setShowImportedTs] = useState(false);
+  const [timestampPreview, setTimestampPreview] = useState<CsvTimestampPreview | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<CsvImportResult | null>(null);
   const [copied, setCopied] = useState(false);
@@ -297,47 +300,34 @@ export default function CsvColumnMapperDialog({
   const hasTimestamp = mappings.some((m) => m.role === "timestamp");
   const canImport = hasFrameId && !isLoading && !isImporting;
 
-  // Estimated capture duration based on selected timestamp unit and preview data
+  const tsColIndex = mappings.find((m) => m.role === "timestamp")?.column_index;
+
+  useEffect(() => {
+    setTimestampPreview(null);
+    if (!preview || tsColIndex === undefined) return;
+    let cancelled = false;
+    previewCsvTimestamps(preview.rows.map((row) => row[tsColIndex] ?? ""), timestampUnit, negateTimestamps)
+      .then((result) => {
+        if (!cancelled) setTimestampPreview(result);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preview, tsColIndex, timestampUnit, negateTimestamps]);
+
   const estimatedDuration = useMemo(() => {
-    if (!hasTimestamp || !preview || preview.rows.length < 2) return null;
-
-    const tsColIndex = mappings.find((m) => m.role === "timestamp")?.column_index;
-    if (tsColIndex === undefined) return null;
-
-    const timestamps = preview.rows
-      .map((row) => row[tsColIndex])
-      .filter(Boolean)
-      .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n));
-
-    if (timestamps.length < 2) return null;
-
-    const min = Math.min(...timestamps);
-    const max = Math.max(...timestamps);
-    const range = Math.abs(max - min);
-
-    let durationSecs: number;
-    switch (timestampUnit) {
-      case "seconds":
-        durationSecs = range;
-        break;
-      case "milliseconds":
-        durationSecs = range / 1_000;
-        break;
-      case "microseconds":
-        durationSecs = range / 1_000_000;
-        break;
-      case "nanoseconds":
-        durationSecs = range / 1_000_000_000;
-        break;
-    }
+    if (!timestampPreview || timestampPreview.timestamps_us.length < 2) return null;
+    const durationSecs = timestampPreview.span_us / 1_000_000;
 
     if (durationSecs < 1) return t("csvColumnMapper.duration.ms", { ms: Math.round(durationSecs * 1000) });
     if (durationSecs < 60) return t("csvColumnMapper.duration.s", { s: durationSecs.toFixed(1) });
     if (durationSecs < 3600) return t("csvColumnMapper.duration.min", { min: (durationSecs / 60).toFixed(1) });
     if (durationSecs < 86400) return t("csvColumnMapper.duration.h", { h: (durationSecs / 3600).toFixed(1) });
     return t("csvColumnMapper.duration.d", { d: (durationSecs / 86400).toFixed(1) });
-  }, [hasTimestamp, preview, mappings, timestampUnit, t]);
+  }, [timestampPreview, t]);
 
   return (
     <Dialog
@@ -412,9 +402,7 @@ export default function CsvColumnMapperDialog({
               mappings={mappings}
               hasHeader={hasHeader}
               onMappingChange={handleMappingChange}
-              timestampUnit={timestampUnit}
-              negateTimestamps={negateTimestamps}
-              showImportedTs={showImportedTs}
+              importedTimestampsUs={showImportedTs ? timestampPreview?.timestamps_us ?? null : null}
             />
 
             {/* Timestamp options */}

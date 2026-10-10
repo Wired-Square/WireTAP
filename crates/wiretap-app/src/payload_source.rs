@@ -11,6 +11,9 @@ use crate::capture_store::FrameSelection;
 use crate::io::FrameMessage;
 
 /// Where a query runs: a SQLite capture or a WireTAP backend profile.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
 pub enum QuerySource {
     Capture(String),
     Backend(String),
@@ -38,28 +41,20 @@ impl QuerySource {
     }
 }
 
-/// Parse an RFC3339 timestamp into epoch microseconds (capture timeline). Also
-/// accepts a bare integer treated as already-µs.
-pub fn iso_to_micros(s: &str) -> Option<i64> {
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-        return Some(dt.timestamp_micros());
-    }
-    s.trim().parse::<i64>().ok()
+/// A time bound typed into the MCP: RFC3339 with an offset, or integer epoch
+/// microseconds. Anything else is refused rather than dropped.
+pub fn parse_bound(s: &str) -> Result<i64, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.timestamp_micros())
+        .or_else(|_| s.trim().parse::<i64>())
+        .map_err(|_| format!("time bound {s:?} is neither RFC3339 with an offset nor integer microseconds"))
 }
 
 pub struct Capture<'a>(pub &'a str);
 
 impl PayloadSource for Capture<'_> {
-    async fn inventory(
-        &self,
-        start_time: Option<&str>,
-        end_time: Option<&str>,
-    ) -> Result<Vec<InventoryRow>, String> {
-        crate::capture_db::frame_inventory(
-            self.0,
-            start_time.and_then(iso_to_micros),
-            end_time.and_then(iso_to_micros),
-        )
+    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
+        crate::query::capture::frame_inventory(self.0, start_us, end_us)
     }
 
     async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
@@ -106,18 +101,8 @@ pub struct Gateway<'a> {
 }
 
 impl PayloadSource for Gateway<'_> {
-    async fn inventory(
-        &self,
-        start_time: Option<&str>,
-        end_time: Option<&str>,
-    ) -> Result<Vec<InventoryRow>, String> {
-        crate::dbquery::db_frame_inventory(
-            self.app,
-            self.profile_id,
-            start_time.map(str::to_owned),
-            end_time.map(str::to_owned),
-        )
-        .await
+    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
+        crate::dbquery::db_frame_inventory(self.app, self.profile_id, start_us, end_us).await
     }
 
     // No protocol and no stride: a backend profile reads one protocol, and a
@@ -142,14 +127,10 @@ pub enum AppSource<'a> {
 }
 
 impl PayloadSource for AppSource<'_> {
-    async fn inventory(
-        &self,
-        start_time: Option<&str>,
-        end_time: Option<&str>,
-    ) -> Result<Vec<InventoryRow>, String> {
+    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
         match self {
-            AppSource::Capture(s) => s.inventory(start_time, end_time).await,
-            AppSource::Gateway(s) => s.inventory(start_time, end_time).await,
+            AppSource::Capture(s) => s.inventory(start_us, end_us).await,
+            AppSource::Gateway(s) => s.inventory(start_us, end_us).await,
         }
     }
 
@@ -161,17 +142,25 @@ impl PayloadSource for AppSource<'_> {
     }
 }
 
-/// The Query app's per-id rollup, over either source. Time bounds are RFC3339.
-#[tauri::command]
-pub async fn query_frame_inventory(
-    app: AppHandle,
-    capture_id: Option<String>,
-    profile_id: Option<String>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-) -> Result<Vec<InventoryRow>, String> {
-    resolve(capture_id, profile_id)?
-        .reader(&app)
-        .inventory(start_time.as_deref(), end_time.as_deref())
-        .await
+#[cfg(test)]
+mod tests {
+    use super::parse_bound;
+
+    /// The `rust` column of the bounds table: what the MCP makes of each input.
+    #[test]
+    fn parse_bound_matches_the_bounds_table() {
+        let table: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../frontend/wiretap-ui/src/tests/fixtures/data/queryBounds.json"
+            ))
+            .expect("table"),
+        )
+        .expect("table json");
+        for row in table["rows"].as_array().expect("rows") {
+            let input = row["input"].as_str().expect("input");
+            let expected = row["rust"].as_i64().ok_or("refused");
+            assert_eq!(parse_bound(input).map_err(|_| "refused"), expected, "{input:?}");
+        }
+    }
 }

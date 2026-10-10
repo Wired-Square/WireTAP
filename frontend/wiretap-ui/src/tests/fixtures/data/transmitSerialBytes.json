@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "name": "\"\"",
+      "input": "",
+      "expected": {
+        "hexToBytes": []
+      }
+    },
+    {
+      "name": "\"AABB\"",
+      "input": "AABB",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187
+        ]
+      }
+    },
+    {
+      "name": "\"aa bb cc\"",
+      "input": "aa bb cc",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187,
+          204
+        ]
+      }
+    },
+    {
+      "name": "\"AABBC\"",
+      "input": "AABBC",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187,
+          12
+        ]
+      }
+    },
+    {
+      "name": "\"0xAA\"",
+      "input": "0xAA",
+      "expected": {
+        "hexToBytes": [
+          170
+        ]
+      }
+    },
+    {
+      "name": "\"0xAA0xBB\"",
+      "input": "0xAA0xBB",
+      "expected": {
+        "hexToBytes": [
+          170,
+          11,
+          11
+        ]
+      }
+    },
+    {
+      "name": "\"AA,BB\"",
+      "input": "AA,BB",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187
+        ]
+      }
+    },
+    {
+      "name": "\"A G\"",
+      "input": "A G",
+      "expected": {
+        "hexToBytes": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "\"AG\"",
+      "input": "AG",
+      "expected": {
+        "hexToBytes": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "\"GG\"",
+      "input": "GG",
+      "expected": {
+        "hexToBytes": []
+      }
+    },
+    {
+      "name": "\"aa\\tbb\\ncc\"",
+      "input": "aa\tbb\ncc",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187,
+          204
+        ]
+      }
+    },
+    {
+      "name": "\"AA-BB\"",
+      "input": "AA-BB",
+      "expected": {
+        "hexToBytes": [
+          170,
+          187
+        ]
+      }
+    }
+  ]
+}

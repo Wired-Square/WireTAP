@@ -1,0 +1,412 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": []
+            },
+            "id": "g",
+            "kind": "framelink",
+            "name": "g"
+          }
+        ],
+        "removedIds": []
+      },
+      "input": [
+        {
+          "connection": {
+            "host": "h",
+            "interfaces": []
+          },
+          "id": "g",
+          "kind": "framelink",
+          "name": "g"
+        }
+      ],
+      "name": "no legacy profiles"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "device_id": "FL1",
+              "host": "10.0.0.5",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 1,
+                  "name": "CAN1"
+                },
+                {
+                  "iface_type": 3,
+                  "index": 2,
+                  "name": "CAN2"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "p2",
+            "kind": "framelink",
+            "name": "Bench"
+          }
+        ],
+        "removedIds": [
+          "p1"
+        ]
+      },
+      "input": [
+        {
+          "connection": {
+            "device_id": "FL1",
+            "host": "10.0.0.5",
+            "interface_index": 2,
+            "interface_name": "CAN2",
+            "interface_type": 3
+          },
+          "id": "p2",
+          "kind": "framelink",
+          "name": "Bench CAN2"
+        },
+        {
+          "connection": {
+            "device_id": "FL1",
+            "host": "10.0.0.5",
+            "interface_index": 1,
+            "interface_name": "CAN1"
+          },
+          "id": "p1",
+          "kind": "framelink",
+          "name": "Bench CAN1"
+        }
+      ],
+      "name": "two interfaces of one device merge under the first id"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "IF0"
+                }
+              ],
+              "port": "121"
+            },
+            "id": "a",
+            "kind": "framelink",
+            "name": "a"
+          },
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "IF0"
+                },
+                {
+                  "iface_type": 1,
+                  "index": 1,
+                  "name": "IF1"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "b",
+            "kind": "framelink",
+            "name": "b"
+          }
+        ],
+        "removedIds": [
+          "c"
+        ]
+      },
+      "input": [
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 0,
+            "port": "121"
+          },
+          "id": "a",
+          "kind": "framelink",
+          "name": "a"
+        },
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 0
+          },
+          "id": "b",
+          "kind": "framelink",
+          "name": "b"
+        },
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 1,
+            "port": "120"
+          },
+          "id": "c",
+          "kind": "framelink",
+          "name": "c"
+        }
+      ],
+      "name": "no device id groups by port, which defaults to 120"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "device_id": "DEV",
+              "host": "h1",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "CAN0"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "a",
+            "kind": "framelink",
+            "name": "DEV"
+          },
+          {
+            "connection": {
+              "host": "h2",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "CAN0"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "b",
+            "kind": "framelink",
+            "name": "Other"
+          }
+        ],
+        "removedIds": []
+      },
+      "input": [
+        {
+          "connection": {
+            "device_id": "DEV",
+            "host": "h1",
+            "interface_index": 0,
+            "interface_name": "CAN0"
+          },
+          "id": "a",
+          "kind": "framelink",
+          "name": "Something"
+        },
+        {
+          "connection": {
+            "host": "h2",
+            "interface_index": 0,
+            "interface_name": "CAN0"
+          },
+          "id": "b",
+          "kind": "framelink",
+          "name": "Other"
+        }
+      ],
+      "name": "a name not ending in the interface name becomes the device id, else the name"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "CAN0"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "a",
+            "kind": "framelink",
+            "name": "CAN0"
+          }
+        ],
+        "removedIds": []
+      },
+      "input": [
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 0,
+            "interface_name": "CAN0"
+          },
+          "id": "a",
+          "kind": "framelink",
+          "name": "CAN0"
+        }
+      ],
+      "name": "a name equal to the interface name falls back to the device id, else the name"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "host": "h",
+              "interface_index": 0,
+              "interfaces": []
+            },
+            "id": "a",
+            "kind": "framelink",
+            "name": "a"
+          }
+        ],
+        "removedIds": []
+      },
+      "input": [
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 0,
+            "interfaces": []
+          },
+          "id": "a",
+          "kind": "framelink",
+          "name": "a"
+        }
+      ],
+      "name": "an interfaces array makes a profile new-style even with interface_index"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "IF0"
+                }
+              ],
+              "port": "120",
+              "timeout": "5"
+            },
+            "id": "old",
+            "kind": "framelink",
+            "name": "old"
+          },
+          {
+            "connection": {},
+            "id": "s",
+            "kind": "slcan",
+            "name": "S"
+          },
+          {
+            "connection": {
+              "host": "h",
+              "interfaces": []
+            },
+            "id": "new",
+            "kind": "framelink",
+            "name": "new"
+          }
+        ],
+        "removedIds": []
+      },
+      "input": [
+        {
+          "connection": {
+            "host": "h",
+            "interface_index": 0,
+            "timeout": "5"
+          },
+          "id": "old",
+          "kind": "framelink",
+          "name": "old"
+        },
+        {
+          "connection": {},
+          "id": "s",
+          "kind": "slcan",
+          "name": "S"
+        },
+        {
+          "connection": {
+            "host": "h",
+            "interfaces": []
+          },
+          "id": "new",
+          "kind": "framelink",
+          "name": "new"
+        }
+      ],
+      "name": "a merged device keeps its first interface’s place among the others"
+    },
+    {
+      "expected": {
+        "profiles": [
+          {
+            "connection": {
+              "interfaces": [
+                {
+                  "iface_type": 1,
+                  "index": 0,
+                  "name": "IF0"
+                },
+                {
+                  "iface_type": 1,
+                  "index": 1,
+                  "name": "IF1"
+                }
+              ],
+              "port": "120"
+            },
+            "id": "a",
+            "kind": "framelink",
+            "name": "a"
+          }
+        ],
+        "removedIds": [
+          "b"
+        ]
+      },
+      "input": [
+        {
+          "connection": {
+            "interface_index": 0
+          },
+          "id": "a",
+          "kind": "framelink",
+          "name": "a"
+        },
+        {
+          "connection": {
+            "interface_index": 1
+          },
+          "id": "b",
+          "kind": "framelink",
+          "name": "b"
+        }
+      ],
+      "name": "no host groups under undefined"
+    }
+  ]
+}

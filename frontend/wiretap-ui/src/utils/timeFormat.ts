@@ -127,6 +127,32 @@ export function localToUtc(localTime: string): string | undefined {
   return date.toISOString();
 }
 
+const DATETIME_LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/;
+
+/**
+ * A datetime-local field's value as epoch µs, read in UTC or local time; `null`
+ * when empty. A repeated local time is its earlier instant; a local time skipped
+ * by a daylight-saving change, or anything not a datetime-local value, throws.
+ */
+export function datetimeLocalToMicros(value: string, mode: "local" | "utc"): number | null {
+  if (!value) return null;
+  const match = DATETIME_LOCAL.exec(value);
+  if (!match) throw new Error(`"${value}" is not a date and time`);
+  const typed = match.slice(1, 7).map((part) => Number(part ?? 0));
+  const [y, mo, d, h, mi, s] = typed;
+  const at = mode === "utc" ? new Date(Date.UTC(y, mo - 1, d, h, mi, s)) : new Date(y, mo - 1, d, h, mi, s);
+  const read =
+    mode === "utc"
+      ? [at.getUTCFullYear(), at.getUTCMonth() + 1, at.getUTCDate(), at.getUTCHours(), at.getUTCMinutes(), at.getUTCSeconds()]
+      : [at.getFullYear(), at.getMonth() + 1, at.getDate(), at.getHours(), at.getMinutes(), at.getSeconds()];
+  if (read.some((part, i) => part !== typed[i])) {
+    throw new Error(
+      mode === "local" ? `${value} does not exist in local time (a daylight-saving change skips it)` : `"${value}" is not a date and time`,
+    );
+  }
+  return at.getTime() * 1000 + Number((match[7] ?? "").padEnd(6, "0"));
+}
+
 /**
  * Convert epoch microseconds to datetime-local format for input fields.
  * @param microseconds - Unix timestamp in microseconds

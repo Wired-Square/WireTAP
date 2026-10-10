@@ -87,7 +87,8 @@ wire_enum! {
         ReplayState      = 0x0C,
         TestPatternState = 0x0D,
         OtaEvent         = 0x0E,
-        RepeatEvent      = 0x0F,
+        // The whole Transmit queue as JSON (`TransmitQueue`) after every change.
+        TransmitQueue    = 0x0F,
         Subscribe        = 0x10,
         Unsubscribe      = 0x11,
         SubscribeAck     = 0x12,
@@ -133,6 +134,8 @@ wire_enum! {
         // A session's frame inventory as JSON (`FrameInventoryMsg`): every identity on
         // subscribe or clear (`reset`), then only the rows that changed, on the frame cadence.
         FrameInventory   = 0x22,
+        // The whole Query queue as JSON (`QueryQueue`) after every change.
+        QueryQueue       = 0x23,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
         BridgeRequest    = 0x30,
         BridgeResponse   = 0x31,

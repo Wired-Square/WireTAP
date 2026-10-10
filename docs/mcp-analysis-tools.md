@@ -66,8 +66,8 @@ they are converted to the capture's microsecond timeline automatically.
 
 The live tools (`get_discovery_analysis`, `get_frame_order`, `get_decoded_signals`,
 `get_live_frame_map`) take a `session_id` instead and read that session's frame
-capture. Every read tool is **headless**: it reads the data store directly, so no
-window need be open. Only `open_app` and the DOM tools drive the window.
+capture. Every read tool but `get_signal_history` is **headless**: it reads the
+data store directly, so no window need be open. Only `open_app` and the DOM tools drive the window.
 
 ## Tools
 
@@ -94,11 +94,23 @@ is_rtr, is_brs, is_esi, dlc, timestampUs }`; an RTR's `dlc` is the length it ask
 for. `frame_ids` restricts it to those keys. A session with no frame
 capture is an error.
 
+### `get_signal_history`
+One signal's history as the Dashboard holds it: `{ t, v, stats }`, oldest first,
+`t` in seconds, and `stats` `{ min, max, mean, count, latest, latestT }` over every
+value held (null with none). The history is kept per session while a Dashboard
+window watches it, up to the Dashboard buffer size per signal, so this is the one
+read tool that needs a window. `frame_id` is the masked decimal id, `signal` the
+catalogue's name or an ad-hoc `byte[i]` / `hyp_*` name; a signal arriving on
+several protocols or buses reads merged in time order unless `protocol` or `bus`
+names one. `last` keeps the newest N values; the stats still cover all of them.
+
 ### `frame_inventory`
 Per-frame-id rollup: `count`, `first_us` / `last_us`, `max_dlc`, `is_extended` and
 `protocol`, with a `frame_id_hex`. The "what frame ids exist and how often" lever.
 Optional time bounds. **On a large archive this is a full-table GROUP BY — pass
 `start_time` / `end_time` to scope it.**
+At most `limit` ids, lowest first (default 10 000, as the Query panel's);
+`truncated` is true when the limit cut the answer.
 
 Frame identity is **(protocol, frame_id)**: a mixed capture holds CAN `0x100` and
 Modbus register 256 under the same number, and they are separate rows. A

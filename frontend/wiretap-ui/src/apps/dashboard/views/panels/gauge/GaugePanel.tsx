@@ -1,7 +1,7 @@
 // ui/src/apps/dashboard/views/panels/gauge/GaugePanel.tsx
 
 import { useRef, useEffect } from "react";
-import { useDashboardStore, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { useDashboardStore, getConfidenceColour, signalKey, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { formatValue } from "../../../utils/dashboardFormat";
 import { polarToCartesian, describeArc } from "../../../widgets/svgArc";
@@ -36,16 +36,8 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
     };
   }, [svgRefProp]);
 
-  // Subscribe to data updates via stable selectors (avoid returning new arrays)
-  const dataVersion = useDashboardStore((s) => s.dataVersion);
-  const seriesBuffers = useDashboardStore((s) => s.seriesBuffers);
-
-  // Compute values in the component body — re-runs when dataVersion changes
-  void dataVersion;
-  const values = panel.signals.map((sig) => {
-    const key = `${sig.frameId}:${sig.signalName}`;
-    return seriesBuffers.get(key)?.latestValue;
-  });
+  const latest = useDashboardStore((s) => s.latest);
+  const values = panel.signals.map((sig) => latest.get(signalKey(sig.frameId, sig.signalName)));
 
   const { minValue, maxValue } = panel;
   const range = maxValue - minValue;

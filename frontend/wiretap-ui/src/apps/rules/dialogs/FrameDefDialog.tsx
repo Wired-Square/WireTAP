@@ -6,7 +6,7 @@ import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
 import { textSecondary } from "../../../styles";
 import type { FrameHeader } from "../utils/bitGrid";
-import { nextAvailableId } from "../utils/framelinkConstants";
+import { useNextIdField } from "../hooks/useFrameLinkAnswers";
 import { formatHexId } from "../utils/formatHex";
 import { SecondaryButton, PrimaryButton, Input, Select, Checkbox } from "../../../components/forms";
 import { Alert } from "../../../components/Alert";
@@ -33,19 +33,17 @@ export default function FrameDefDialog({
   usedIds,
 }: FrameDefDialogProps) {
   const { t } = useTranslation("rules");
-  const [frameDefId, setFrameDefId] = useState(() => nextAvailableId(usedIds));
+  const [frameDefId, setFrameDefId] = useNextIdField(usedIds, "rule", isOpen);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  // Re-compute next available ID and reset fields when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setFrameDefId(nextAvailableId(usedIds));
       setName("");
       setDescription("");
     }
-  }, [isOpen, usedIds]);
+  }, [isOpen]);
   const [interfaceType, setInterfaceType] = useState(
     interfaces[0]?.iface_type ?? 1,
   );

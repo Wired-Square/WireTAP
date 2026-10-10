@@ -26,6 +26,7 @@
     "loading": "Loading…"
   },
   "results": {
+    "sqlThatRan": "SQL that ran",
     "noQueryHeading": "No Query Selected",
     "noQueryDescription": "Select a completed query from the Queue tab to view its results.",
     "noResultsHeading": "No Results",
@@ -39,6 +40,7 @@
     "totalFrames": "{{count}} total frames",
     "rowsScanned": " · {{rows}} rows in {{ms}}ms",
     "foundCount": "{{count}} {{label}} found",
+    "truncated": " · stopped at the limit, more may exist",
     "exportTooltip": "Export results to CSV",
     "ingest": "Ingest",
     "ingestAll": "Ingest All",
@@ -166,9 +168,8 @@
     "timeBounds": "Time Bounds",
     "sqlPreview": "SQL Query Preview",
     "sqlPreviewToggle": "Toggle SQL query preview",
-    "scanUpTo": "Scan up to",
     "limitResults": "Limit results to",
-    "rows": "rows",
+    "results": "results",
     "addToQueue": "Add to Queue"
   },
   "queue": {

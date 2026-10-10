@@ -5,7 +5,7 @@
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use tokio::sync::watch;
 
 use crate::io::{self, CanTransmitFrame};
@@ -15,8 +15,7 @@ use crate::io::{self, CanTransmitFrame};
 // ============================================================================
 
 /// A single frame with its original capture timestamp, used for time-accurate replay.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[derive(Clone, Debug)]
 pub struct ReplayFrame {
     /// Original capture timestamp (microseconds since UNIX epoch).
     pub timestamp_us: u64,
@@ -39,6 +38,45 @@ impl From<&io::FrameMessage> for ReplayFrame {
             },
         }
     }
+}
+
+/// The frames a replay plays: `count` from `offset` in a capture, CAN only,
+/// every one on `bus` when it is set.
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields = nullable))]
+pub struct ReplaySource {
+    pub capture_id: String,
+    pub offset: usize,
+    pub count: usize,
+    pub bus: Option<u8>,
+}
+
+impl ReplaySource {
+    fn frames(&self) -> Vec<ReplayFrame> {
+        let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&self.capture_id, self.offset, self.count);
+        frames
+            .iter()
+            .filter(|f| f.protocol == "can" || f.protocol == "canfd")
+            .map(|f| {
+                let mut replay = ReplayFrame::from(f);
+                if let Some(bus) = self.bus {
+                    replay.frame.bus = bus;
+                }
+                replay
+            })
+            .collect()
+    }
+}
+
+/// What a replay of a source would take, before it starts.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ReplayEstimate {
+    pub frame_count: usize,
+    /// Last frame's timestamp less the first's.
+    pub span_us: u64,
+    /// One pass on the replay's schedule at the asked speed.
+    pub pass_duration_us: u64,
 }
 
 /// Active replay task handle.
@@ -84,11 +122,17 @@ pub struct ReplayState {
 
 // Maximum inter-frame sleep to avoid hanging on large timestamp gaps (5 seconds).
 const MAX_SLEEP_US: u64 = 5_000_000;
+const MIN_SPEED: f64 = 0.001;
 
 const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 
 fn scheduled_gap_us(delta_us: u64, speed: f64) -> u64 {
     (((delta_us as f64) / speed).round() as u64).min(MAX_SLEEP_US)
+}
+
+fn pass_duration_us(frames: &[ReplayFrame], speed: f64) -> u64 {
+    let speed = speed.max(MIN_SPEED);
+    frames.windows(2).map(|pair| scheduled_gap_us(pair[1].timestamp_us.saturating_sub(pair[0].timestamp_us), speed)).sum()
 }
 
 /// When each frame of one replay pass is due, measured from the pass's start so
@@ -124,11 +168,8 @@ struct Replay {
 
 impl Replay {
     fn new(session_id: String, replay_id: String, frames: Vec<ReplayFrame>, speed: f64, loop_replay: bool) -> Self {
-        let speed = speed.max(0.001);
-        let pass_duration_us = frames
-            .windows(2)
-            .map(|pair| scheduled_gap_us(pair[1].timestamp_us.saturating_sub(pair[0].timestamp_us), speed))
-            .sum();
+        let speed = speed.max(MIN_SPEED);
+        let pass_duration_us = pass_duration_us(&frames, speed);
         Self { replay_id, session_id, frames, speed, loop_replay, pass_duration_us }
     }
 
@@ -169,31 +210,12 @@ impl Replay {
                     result = send => result,
                 };
 
-                let (success, error) = match &result {
-                    Ok(r) => (r.success, r.error.clone()),
-                    Err(e) => (false, Some(e.clone())),
-                };
-                let is_permanent = match &result {
-                    Ok(r) => !r.success && r.error.as_deref().is_some_and(crate::transmit::is_permanent_error),
-                    Err(e) => crate::transmit::transmit_refusal_is_permanent(session_id, e).await,
-                };
-                crate::transmit_history::write_entry(
-                    session_id, "can",
-                    Some(frame.frame_id as i64),
-                    Some(frame.data.len() as i64),
-                    &frame.data,
-                    frame.bus as i64,
-                    frame.is_extended,
-                    frame.is_fd,
-                    success,
-                    error.as_deref(),
-                );
-                if is_permanent {
-                    let error = error.unwrap_or_else(|| "Device error".to_string());
+                crate::transmit::record_can(session_id, frame, &result);
+                if let Some(error) = crate::transmit::permanent_failure(session_id, &result).await {
                     tlog!("[replay] Stopping replay '{}' due to permanent error: {}", self.replay_id, error);
                     break 'outer ReplayEvent::Failed { error };
                 }
-                if success {
+                if result.as_ref().is_ok_and(|r| r.success) {
                     frames_sent += 1;
                 } else {
                     frames_failed += 1;
@@ -223,7 +245,38 @@ impl Replay {
 // Tauri Commands
 // ============================================================================
 
-/// Start a time-accurate replay of a sequence of frames.
+/// What a replay was started with, kept so it can be played again.
+#[derive(Clone)]
+struct Recipe {
+    session_id: String,
+    source: ReplaySource,
+    speed: f64,
+    loop_replay: bool,
+}
+
+const RECIPES_KEPT: usize = 64;
+
+static RECIPES: Lazy<std::sync::Mutex<VecDeque<(String, Recipe)>>> = Lazy::new(Default::default);
+
+fn recipes() -> std::sync::MutexGuard<'static, VecDeque<(String, Recipe)>> {
+    RECIPES.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// How long a replay of `source` would take at `speed`, by the schedule it would keep.
+#[tauri::command]
+pub fn replay_estimate(source: ReplaySource, speed: f64) -> ReplayEstimate {
+    estimate(&source.frames(), speed)
+}
+
+fn estimate(frames: &[ReplayFrame], speed: f64) -> ReplayEstimate {
+    let span_us = match (frames.first(), frames.last()) {
+        (Some(first), Some(last)) => last.timestamp_us.saturating_sub(first.timestamp_us),
+        _ => 0,
+    };
+    ReplayEstimate { frame_count: frames.len(), span_us, pass_duration_us: pass_duration_us(frames, speed) }
+}
+
+/// Start a time-accurate replay of `source` through a session.
 ///
 /// Frames are transmitted in order with delays derived from their original timestamps
 /// divided by `speed`. A speed of 1.0 is realtime; 2.0 is twice as fast.
@@ -233,25 +286,48 @@ impl Replay {
 pub async fn io_start_replay(
     session_id: String,
     replay_id: String,
-    frames: Vec<ReplayFrame>,
+    source: ReplaySource,
     speed: f64,
     loop_replay: bool,
-) -> Result<(), String> {
+) -> Result<usize, String> {
+    start(replay_id, Recipe { session_id, source, speed, loop_replay }).await
+}
+
+/// Play a replay again from its start, with what it was started with.
+#[tauri::command]
+pub async fn io_restart_replay(replay_id: String) -> Result<usize, String> {
+    let recipe = recipes().iter().find(|(id, _)| *id == replay_id).map(|(_, r)| r.clone());
+    start(replay_id, recipe.ok_or("This replay can no longer be restarted")?).await
+}
+
+/// Starts a replay and returns how many frames it plays.
+async fn start(replay_id: String, recipe: Recipe) -> Result<usize, String> {
+    let frames = recipe.source.frames();
     if frames.is_empty() {
         return Err("No frames to replay".to_string());
     }
+    let count = frames.len();
 
     // The old run's last event goes out before this run's first.
     io_stop_replay(replay_id.clone()).await?;
 
+    {
+        let mut kept = recipes();
+        kept.retain(|(id, _)| *id != replay_id);
+        if kept.len() == RECIPES_KEPT {
+            kept.pop_front();
+        }
+        kept.push_back((replay_id.clone(), recipe.clone()));
+    }
+
     let (cancel, cancelled) = watch::channel(false);
-    let replay = Replay::new(session_id, replay_id.clone(), frames, speed, loop_replay);
+    let replay = Replay::new(recipe.session_id, replay_id.clone(), frames, recipe.speed, recipe.loop_replay);
     let handle = tauri::async_runtime::spawn(async move {
         replay.run(cancelled, crate::ws::dispatch::send_replay_state).await;
         IO_REPLAY_TASKS.lock().await.remove(&replay.replay_id);
     });
     IO_REPLAY_TASKS.lock().await.insert(replay_id, ReplayTask { cancel, handle });
-    Ok(())
+    Ok(count)
 }
 
 /// Stop an active replay by ID, returning once it has reported its stop.
@@ -333,6 +409,58 @@ mod tests {
         assert_eq!(replay(1.0).pass_duration_us, 10_000 + MAX_SLEEP_US);
         assert_eq!(replay(10.0).pass_duration_us, 1_000 + MAX_SLEEP_US);
         assert_eq!(replay(0.0).pass_duration_us, 2 * MAX_SLEEP_US, "a speed of zero is floored, not divided by");
+    }
+
+    /// The `rust` column of the table `ReplayDialog.tsx`'s estimate is checked against.
+    #[test]
+    fn the_pass_estimate_matches_the_rule_table() {
+        let table: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../frontend/wiretap-ui/src/tests/fixtures/data/replayEstimate.json"
+        ))
+        .expect("table");
+        for row in table["rows"].as_array().expect("rows") {
+            let timestamps: Vec<u64> =
+                row["timestamps_us"].as_array().expect("timestamps").iter().map(|t| t.as_u64().expect("u64")).collect();
+            let speed = row["speed"].as_f64().expect("speed");
+            let replay = Replay::new("s".into(), "r".into(), frames(&timestamps), speed, false);
+            assert_eq!(Some(replay.pass_duration_us), row["rust"].as_u64(), "{}", row["name"]);
+        }
+    }
+
+    fn capture_of(frames: &[(&str, u64)]) -> String {
+        crate::capture_db::use_in_memory_database();
+        let id = crate::capture_store::create_standalone_capture(crate::capture_store::CaptureKind::Frames, "replay".into());
+        let frames = frames
+            .iter()
+            .map(|&(protocol, timestamp_us)| io::FrameMessage { protocol: protocol.into(), timestamp_us, frame_id: 0x100, dlc: 1, bytes: vec![1], ..Default::default() })
+            .collect();
+        crate::capture_store::append_frames_to_capture(&id, frames);
+        id
+    }
+
+    #[test]
+    fn an_estimate_reads_the_range_as_the_replay_plays_it() {
+        let capture_id = capture_of(&[("can", 0), ("can", 10_000), ("modbus", 20_000), ("canfd", 60_010_000), ("can", 70_000_000)]);
+        let source = ReplaySource { capture_id, offset: 0, count: 4, bus: Some(2) };
+
+        assert_eq!(
+            replay_estimate(source.clone(), 1.0),
+            ReplayEstimate { frame_count: 3, span_us: 60_010_000, pass_duration_us: 10_000 + MAX_SLEEP_US }
+        );
+        assert!(source.frames().iter().all(|f| f.frame.bus == 2));
+    }
+
+    #[tokio::test]
+    async fn a_restart_plays_what_the_replay_was_started_with() {
+        let id = "f_replay_restart";
+        crate::io_test::tests::open_virtual_loopback(id).await;
+        let source = ReplaySource { capture_id: capture_of(&[("can", 0), ("can", 0)]), offset: 0, count: 2, bus: None };
+
+        assert_eq!(io_start_replay(id.into(), "r_restart".into(), source, 1.0, false).await, Ok(2));
+        assert_eq!(io_restart_replay("r_restart".into()).await, Ok(2));
+        assert!(io_restart_replay("r_never_started".into()).await.is_err());
+        io_stop_replay("r_restart".into()).await.unwrap();
+        crate::io::destroy_session(id, false).await.ok();
     }
 
     /// Runs a replay through `session_id`, cancelling it once `stop_when` holds

@@ -10,7 +10,6 @@ mod app_registry;
 mod ble_provision;
 mod capture_db;
 mod capture_events;
-mod capturequery;
 mod capture_inventory;
 mod capture_store;
 mod captures;
@@ -19,12 +18,13 @@ mod catalog_share;
 mod apiclient;
 mod gateway_admin;
 mod dashboard;
+mod dashboard_history;
 mod drafting;
 mod checksum_discovery;
 mod checksums;
 mod credentials;
 mod dbquery;
-mod queryresults;
+mod query;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
 mod flashers;
@@ -33,6 +33,8 @@ mod framing;
 mod framing_detect;
 #[cfg(test)]
 mod generated_types;
+#[cfg(test)]
+mod small_twin_tables;
 pub mod io;
 mod profile_tracker;
 mod sessions;
@@ -43,6 +45,7 @@ mod serial_terminal;
 mod store_manager;
 mod transmit;
 mod transmit_history;
+mod transmit_queue;
 mod replay;
 mod report;
 mod io_test;
@@ -978,6 +981,14 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
     Ok(McpStatus::current(&app))
 }
 
+/// A fresh bearer token for the MCP server: 24 random bytes as hex.
+#[tauri::command]
+fn generate_mcp_token() -> Result<String, String> {
+    let mut bytes = [0u8; 24];
+    getrandom::fill(&mut bytes).map_err(|e| format!("No randomness for a token: {e}"))?;
+    Ok(hex::encode(bytes))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Pipe `tracing` events from framelink (and any other crate that
@@ -1007,33 +1018,22 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_safe_area_insets_css::init());
 
     let builder = builder.setup(|app| {
-            // Start file logging as early as possible (before anything else logs).
-            // Read the settings file synchronously to check the log level.
-            if let Ok(settings_dir) = app.path().app_config_dir() {
-                let settings_path = settings_dir.join("settings.json");
-                if settings_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&settings_path) {
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                            // Read log_level, falling back to enable_file_logging for backward compat
-                            let level = json.get("log_level")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| {
-                                    if json.get("enable_file_logging").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                        "info".to_string()
-                                    } else {
-                                        "off".to_string()
-                                    }
-                                });
-                            logging::set_log_level(&level);
-                            if level != "off" {
-                                if let Ok(doc_dir) = app.path().document_dir() {
-                                    let reports_dir = doc_dir.join("WireTAP").join("Reports");
-                                    if let Err(e) = logging::init_file_logging(&reports_dir) {
-                                        tlog!("[setup] Failed to init file logging: {}", e);
-                                    }
-                                }
-                            }
+            // One read serves setup: it migrates and writes the file if it needs
+            // it, and on first run creates the directories the catalogue cache scans.
+            let startup_settings = settings::load_settings_sync(app.handle());
+            if let Err(e) = &startup_settings {
+                tlog!("[setup] Failed to load settings during startup: {}", e);
+            }
+
+            // Start file logging as early as possible.
+            if let Ok(s) = &startup_settings {
+                dashboard_history::set_capacity(s.graph_buffer_size);
+                logging::set_log_level(&s.log_level);
+                if s.log_level != "off" {
+                    if let Ok(doc_dir) = app.path().document_dir() {
+                        let reports_dir = doc_dir.join("WireTAP").join("Reports");
+                        if let Err(e) = logging::init_file_logging(&reports_dir) {
+                            tlog!("[setup] Failed to init file logging: {}", e);
                         }
                     }
                 }
@@ -1046,9 +1046,7 @@ pub fn run() {
 
             // Initialise the SQLite-backed capture database
             if let Ok(data_dir) = app.path().app_data_dir() {
-                let clear_on_start = settings::load_settings_sync(app.handle())
-                    .map(|s| s.clear_captures_on_start)
-                    .unwrap_or(true);
+                let clear_on_start = startup_settings.as_ref().map_or(true, |s| s.clear_captures_on_start);
                 if let Err(e) = capture_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise capture database: {}", e);
                     record_startup_error(format!(
@@ -1120,40 +1118,28 @@ pub fn run() {
 
             // Start MCP server if enabled in settings (opt-in; port conflict must
             // not crash the app, so failures are logged and swallowed).
-            match settings::load_settings_sync(app.handle()) {
+            match &startup_settings {
                 Ok(s) if s.mcp_server_enabled => {
                     if let Err(e) = mcp::start(
                         app.handle().clone(),
-                        mcp::McpRunningConfig::from_settings(&s),
+                        mcp::McpRunningConfig::from_settings(s),
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);
                     }
                 }
-                Ok(_) => {}
-                Err(e) => tlog!("[mcp] Could not load settings to start server: {}", e),
+                _ => {}
             }
 
-            // Resolve settings synchronously, before the catalogue cache warms below —
-            // the cache scans decoder_dir, so that directory has to exist and be known
-            // by then.
-            //
-            // load_settings (not load_settings_sync) is required: on first run it
-            // resolves decoder_dir via with_defaults(), creates the directory, and
-            // persists settings.json. Its only .await is save_settings, whose body is
-            // plain synchronous file IO, so block_on does no real async work.
-            match tauri::async_runtime::block_on(settings::load_settings(app.handle().clone())) {
-                Ok(app_settings) => {
-                    // Drain pre-rebrand keyring entries into the current namespace.
-                    // Deliberately off this blocking path: keyring access is OS IPC
-                    // (and can prompt), while nothing needs it before first paint —
-                    // get_credential migrates any secret on its way to being used.
-                    let profiles = app_settings.io_profiles;
-                    tauri::async_runtime::spawn_blocking(move || {
-                        credentials::migrate_legacy_io_profile_credentials(&profiles);
-                    });
-                }
-                Err(e) => tlog!("[setup] Failed to load settings during startup: {}", e),
+            // Drain pre-rebrand keyring entries into the current namespace.
+            // Deliberately off this blocking path: keyring access is OS IPC
+            // (and can prompt), while nothing needs it before first paint —
+            // get_credential migrates any secret on its way to being used.
+            if let Ok(s) = startup_settings {
+                let profiles = s.io_profiles;
+                tauri::async_runtime::spawn_blocking(move || {
+                    credentials::migrate_legacy_io_profile_credentials(&profiles);
+                });
             }
 
             // Warm the backend-owned catalogue cache (and start watching the
@@ -1239,7 +1225,6 @@ pub fn run() {
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,
-            settings::create_directory,
             settings::get_app_version,
             settings::check_for_updates,
             // Session-based reader API
@@ -1317,6 +1302,7 @@ pub fn run() {
             captures::detect_candump,
             captures::import_candump,
             captures::preview_csv,
+            captures::preview_csv_timestamps,
             captures::import_csv_with_mapping,
             captures::import_csv_batch_with_mapping,
             captures::get_capture_metadata,
@@ -1402,17 +1388,20 @@ pub fn run() {
             transmit::io_transmit_serial,
             transmit::io_set_framing,
             transmit::get_io_session_capabilities,
-            transmit::io_start_repeat_transmit,
-            transmit::io_stop_repeat_transmit,
-            transmit::io_stop_all_repeats,
-            // IO session serial repeat
-            transmit::io_start_serial_repeat_transmit,
-            // IO session group repeat (multiple frames in one loop)
-            transmit::io_start_repeat_group,
-            transmit::io_stop_repeat_group,
-            transmit::io_stop_all_group_repeats,
+            transmit_queue::transmit_queue_get,
+            transmit_queue::transmit_queue_add,
+            transmit_queue::transmit_queue_edit,
+            transmit_queue::transmit_queue_remove,
+            transmit_queue::transmit_queue_clear,
+            transmit_queue::transmit_queue_start,
+            transmit_queue::transmit_queue_stop,
+            transmit_queue::transmit_group_start,
+            transmit_queue::transmit_group_stop,
+            transmit_queue::transmit_queue_stop_all,
             // Time-accurate frame replay
             replay::io_start_replay,
+            replay::io_restart_replay,
+            replay::replay_estimate,
             replay::io_stop_replay,
             replay::io_stop_all_replays,
             // Direct serial-terminal (Serial app) — desktop only
@@ -1469,17 +1458,13 @@ pub fn run() {
             store_manager::store_delete,
             store_manager::store_has,
             store_manager::store_keys,
-            // Database Query API (Query app)
-            dbquery::db_query_byte_changes,
-            dbquery::db_query_frame_changes,
-            dbquery::db_query_mirror_validation,
-            dbquery::db_query_mux_statistics,
-            dbquery::db_query_first_last,
-            dbquery::db_query_frequency,
-            dbquery::db_query_distribution,
-            dbquery::db_query_gap_analysis,
-            dbquery::db_query_pattern_search,
-            dbquery::db_cancel_query,
+            // Query app: one query path, its queue, and the backend's Stats tab
+            query::queue::query_enqueue,
+            query::queue::query_queue_get,
+            query::queue::query_remove,
+            query::queue::query_result,
+            query::queue::query_preview,
+            query::queue::query_export_csv,
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
@@ -1487,7 +1472,6 @@ pub fn run() {
             apiclient::api_list_databases,
             apiclient::api_test_connection,
             apiclient::api_probe_backend,
-            payload_source::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
             gateway_admin::gateway_list_daemons,
@@ -1498,15 +1482,6 @@ pub fn run() {
             capture_events::capture_events_add,
             capture_events::capture_events_update,
             capture_events::capture_events_delete,
-            capturequery::capture_query_byte_changes,
-            capturequery::capture_query_frame_changes,
-            capturequery::capture_query_mirror_validation,
-            capturequery::capture_query_mux_statistics,
-            capturequery::capture_query_first_last,
-            capturequery::capture_query_frequency,
-            capturequery::capture_query_distribution,
-            capturequery::capture_query_gap_analysis,
-            capturequery::capture_query_pattern_search,
                         // Unified Device Scan API
                         device_scan::device_scan_start,
                         device_scan::device_scan_stop,
@@ -1531,6 +1506,7 @@ pub fn run() {
                         // MCP server control
                         get_mcp_status,
                         toggle_mcp_server,
+                        generate_mcp_token,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

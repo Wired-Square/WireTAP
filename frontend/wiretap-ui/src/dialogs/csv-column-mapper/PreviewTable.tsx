@@ -7,11 +7,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-  CsvColumnRole,
-  CsvColumnMapping,
-  TimestampUnit,
-} from "../../api/capture";
+import type { CsvColumnRole, CsvColumnMapping } from "../../api/capture";
 import {
   textMuted,
   textDataGreen,
@@ -65,7 +61,7 @@ function roleColour(role: CsvColumnRole): string {
 
 /** Format a duration in seconds to a compact string with microsecond precision.
  *  Separates ms and µs groups with a comma: `0.247,307 s` */
-function formatOffset(secs: number): string {
+export function formatOffset(secs: number): string {
   if (secs < 60) {
     const fixed = secs.toFixed(6);
     // Insert a thin space between the ms and µs groups: "0.247307" → "0.247 307"
@@ -80,22 +76,14 @@ function formatOffset(secs: number): string {
   return `${(secs / 86400).toFixed(3)} d`;
 }
 
-const UNIT_DIVISORS: Record<TimestampUnit, number> = {
-  seconds: 1,
-  milliseconds: 1_000,
-  microseconds: 1_000_000,
-  nanoseconds: 1_000_000_000,
-};
-
 type Props = {
   headers: string[] | null;
   rows: string[][];
   mappings: CsvColumnMapping[];
   hasHeader: boolean;
   onMappingChange: (columnIndex: number, role: CsvColumnRole) => void;
-  timestampUnit: TimestampUnit;
-  negateTimestamps: boolean;
-  showImportedTs: boolean;
+  /** The importer's stamp for each row, shown in the timestamp column when set. */
+  importedTimestampsUs: number[] | null;
 };
 
 /** Max data rows to display in the preview */
@@ -107,9 +95,7 @@ export default function PreviewTable({
   mappings,
   hasHeader,
   onMappingChange,
-  timestampUnit,
-  negateTimestamps,
-  showImportedTs,
+  importedTimestampsUs,
 }: Props) {
   const { t } = useTranslation("dialogs");
   const numColumns = mappings.length;
@@ -140,31 +126,11 @@ export default function PreviewTable({
   const tsColIndex = mappings.find((m) => m.role === "timestamp")
     ?.column_index;
 
-  // Compute interpreted offsets for each visible row when preview is active
-  const interpretedOffsets: string[] = (() => {
-    if (!showImportedTs || tsColIndex === undefined) return [];
-    const divisor = UNIT_DIVISORS[timestampUnit];
-    const rawValues = visibleRows.map((row) => {
-      const s = row[tsColIndex];
-      if (!s) return NaN;
-      const v = Number(s);
-      return negateTimestamps ? Math.abs(v) : v;
-    });
-    const validValues = rawValues.filter((v) => !isNaN(v));
-    if (validValues.length === 0) return rawValues.map(() => "—");
-    const minVal = Math.min(...validValues);
-    return rawValues.map((v) => {
-      if (isNaN(v)) return "—";
-      const offset = (v - minVal) / divisor;
-      return formatOffset(offset);
-    });
-  })();
+  const showImportedTs = importedTimestampsUs !== null && tsColIndex !== undefined;
 
-  /** Get the display value for a cell, substituting timestamp preview when active */
   const getCellValue = (row: string[], colIdx: number, rowIdx: number): string => {
-    if (showImportedTs && colIdx === tsColIndex && interpretedOffsets[rowIdx]) {
-      return interpretedOffsets[rowIdx];
-    }
+    const us = importedTimestampsUs?.[rowIdx];
+    if (showImportedTs && colIdx === tsColIndex && us !== undefined) return formatOffset(us / 1_000_000);
     return row[colIdx] ?? "";
   };
 

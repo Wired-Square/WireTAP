@@ -45,9 +45,7 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
   }, [svgRef, mode]);
 
   // Scene mode reads reactively from the store.
-  const dataVersion = useDashboardStore((s) => s.dataVersion);
-  const buffers = useDashboardStore((s) => s.seriesBuffers);
-  void dataVersion;
+  const latest = useDashboardStore((s) => s.latest);
 
   const [markup, setMarkup] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +75,7 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
     return <WidgetEmpty>Add custom SVG code in Configure</WidgetEmpty>;
   }
 
-  const valueOf = (key: string) => buffers.get(key)?.latestValue ?? NaN;
+  const valueOf = (key: string) => latest.get(key) ?? NaN;
 
   return (
     <div className="relative h-full w-full">

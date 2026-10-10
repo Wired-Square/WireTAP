@@ -21,6 +21,7 @@ import { WIDGET_META } from '../apps/dashboard/widgets/widgetMeta';
 import type { WidgetConfig } from '../apps/dashboard/widgets/configTypes';
 import { widgetForSignal } from '../apps/dashboard/widgets/autoWidget';
 import type { DashboardFileContent } from '../utils/dashboards';
+import { BYTE_NAMES } from '../generated/byteNames';
 
 // ─────────────────────────────────────────
 // Types
@@ -31,8 +32,8 @@ export type PanelType =
   | 'line-chart' | 'gauge' | 'list' | 'flow' | 'heatmap' | 'histogram'
   | 'icon-state' | 'rotary' | 'level-bar' | 'bitfield' | 'raw-canvas' | 'custom-svg';
 
-/** Colour palette for signal lines */
-const SIGNAL_COLOURS = [
+/** One colour per series, in panel order: signal lines and flow bytes alike. */
+export const SERIES_COLOURS = [
   '#3b82f6', // blue
   '#ef4444', // red
   '#22c55e', // green
@@ -55,6 +56,21 @@ export interface SignalRef {
   yAxis?: 'left' | 'right';
 }
 
+/** The key a signal's latest value is held under, and a custom widget names it by. */
+export function signalKey(frameId: number, signalName: string): string {
+  return `${frameId}:${signalName}`;
+}
+
+/** A flow panel's byte columns on its target frame. */
+export function flowSignals(panel: Pick<DashboardPanel, 'targetFrameId' | 'byteCount'>): SignalRef[] {
+  if (panel.targetFrameId == null) return [];
+  return Array.from({ length: panel.byteCount ?? 8 }, (_, i) => ({
+    frameId: panel.targetFrameId!,
+    signalName: BYTE_NAMES[i],
+    colour: SERIES_COLOURS[i % SERIES_COLOURS.length],
+  }));
+}
+
 /** Get the display label for a signal (friendly name if set, otherwise raw signal name) */
 export function getSignalLabel(signal: SignalRef): string {
   return signal.displayName || signal.signalName;
@@ -74,24 +90,6 @@ export function getConfidenceColour(
     default: return settings.signal_colour_none || '#94a3b8';
   }
 }
-
-/** Circular buffer for time-series data for one signal */
-export interface SignalTimeSeries {
-  timestamps: Float64Array;
-  values: Float64Array;
-  writeIndex: number;
-  count: number;
-  latestValue: number;
-  latestTimestamp: number;
-  /** Running statistics (reset on clearData) */
-  min: number;
-  max: number;
-  sum: number;
-  sampleCount: number;
-}
-
-/** Default time-series buffer capacity (configurable via settings) */
-let timeseriesCapacity = 10_000;
 
 /** A panel definition stored in the layout */
 export interface DashboardPanel {
@@ -127,16 +125,6 @@ export interface LayoutItem {
   h: number;
 }
 
-/** Signal value entry for batch push */
-export interface SignalValueEntry {
-  frameId: number;
-  signalName: string;
-  value: number;
-  timestamp: number;
-  /** From an attach's backlog, which replaces the signal's series rather than adding to it. */
-  replace?: boolean;
-}
-
 /** Parameters for a hypothesis candidate signal */
 export interface HypothesisParams {
   /** Bit-level start offset within the frame payload */
@@ -156,25 +144,6 @@ export interface HypothesisParams {
 // ─────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────
-
-function createTimeSeries(): SignalTimeSeries {
-  return {
-    timestamps: new Float64Array(timeseriesCapacity),
-    values: new Float64Array(timeseriesCapacity),
-    writeIndex: 0,
-    count: 0,
-    latestValue: 0,
-    latestTimestamp: 0,
-    min: Infinity,
-    max: -Infinity,
-    sum: 0,
-    sampleCount: 0,
-  };
-}
-
-function makeSignalKey(frameId: number, signalName: string): string {
-  return `${frameId}:${signalName}`;
-}
 
 let panelCounter = 0;
 function generatePanelId(): string {
@@ -218,6 +187,8 @@ interface DashboardState {
   serialConfig: SerialFrameConfig | null;
 
   // ── IO Session ──
+  /** The session whose history the panels read. */
+  sessionId: string | null;
   ioProfile: string | null;
   playbackSpeed: number;
 
@@ -225,9 +196,10 @@ interface DashboardState {
   panels: DashboardPanel[];
   layout: LayoutItem[];
 
-  // ── Time-series Data ──
-  seriesBuffers: Map<string, SignalTimeSeries>;
-  /** Monotonically increasing version counter — panels subscribe to this to know when to re-read buffers */
+  // ── Signal data (the history is Rust's) ──
+  /** The last value each signal key arrived with, for the instruments. */
+  latest: Map<string, number>;
+  /** Bumped per delivery: charts re-read the history when it changes. */
   dataVersion: number;
 
   // ── Chart interaction ──
@@ -253,9 +225,9 @@ interface DashboardState {
   /** Track the active catalogue path without parsing. */
   setCatalogPath: (path: string | null) => void;
   initFromSettings: (decoderDir?: string) => Promise<void>;
+  setSessionId: (sessionId: string | null) => void;
   setIoProfile: (profile: string | null) => void;
   setPlaybackSpeed: (speed: number) => void;
-  setBufferCapacity: (capacity: number) => void;
 
   // Panel management
   addPanel: (type: PanelType) => string;
@@ -288,7 +260,7 @@ interface DashboardState {
   restoreLastSession: () => Promise<void>;
 
   // Data ingestion
-  pushSignalValues: (entries: SignalValueEntry[]) => void;
+  setLatest: (values: Map<string, number>) => void;
   clearData: () => void;
 
   // Raw byte tracking (flow view / heatmap)
@@ -307,6 +279,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   protocol: 'can',
   serialConfig: null,
 
+  sessionId: null,
   ioProfile: null,
   playbackSpeed: 1,
 
@@ -314,7 +287,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   layout: [],
   savedLayouts: [],
 
-  seriesBuffers: new Map(),
+  latest: new Map(),
   dataVersion: 0,
   zoomResetVersion: 0,
   discoveredFrameIds: new Set(),
@@ -355,12 +328,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     await get().restoreLastSession();
   },
 
+  setSessionId: (sessionId) => set({ sessionId }),
   setIoProfile: (profile) => set({ ioProfile: profile }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
-  setBufferCapacity: (capacity) => {
-    const clamped = Math.max(1_000, Math.min(100_000, capacity));
-    timeseriesCapacity = clamped;
-  },
 
   // ── Panel management ──
 
@@ -423,7 +393,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         id,
         type: widget.type,
         title: signalName,
-        signals: [{ frameId, signalName, unit: meta.unit, colour: SIGNAL_COLOURS[0], confidence }],
+        signals: [{ frameId, signalName, unit: meta.unit, colour: SERIES_COLOURS[0], confidence }],
         minValue: widget.minValue ?? 0,
         maxValue: widget.maxValue ?? 100,
         ...(widget.widgetConfig ? { widgetConfig: widget.widgetConfig } : {}),
@@ -508,8 +478,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     if (panel.signals.some((s) => s.frameId === frameId && s.signalName === signalName)) return;
 
     // Assign next colour from palette
-    const colourIndex = panel.signals.length % SIGNAL_COLOURS.length;
-    const colour = SIGNAL_COLOURS[colourIndex];
+    const colour = SERIES_COLOURS[panel.signals.length % SERIES_COLOURS.length];
 
     const confidence = signalConfidence(frames.get(frameId), signalName);
 
@@ -696,7 +665,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({
       panels: structuredClone(savedLayout.panels),
       layout: structuredClone(savedLayout.layout),
-      seriesBuffers: new Map(),
+      latest: new Map(),
       dataVersion: 0,
       discoveredFrameIds: new Set(),
       bitChangeCounts: new Map(),
@@ -746,53 +715,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   // ── Data ingestion ──
 
-  pushSignalValues: (entries) => {
-    const { seriesBuffers } = get();
-    // Mutate in place for performance — a ring buffer is replaced only by a backlog
-    const newBuffers = new Map(seriesBuffers);
-    let created = false;
-    const replacing = new Set<string>();
-
-    for (const { frameId, signalName, value, timestamp, replace } of entries) {
-      const key = makeSignalKey(frameId, signalName);
-      let series = newBuffers.get(key);
-      if (replace && !replacing.has(key)) {
-        replacing.add(key);
-        series = undefined;
-      }
-      if (!series) {
-        series = createTimeSeries();
-        newBuffers.set(key, series);
-        created = true;
-      }
-
-      const cap = series.timestamps.length;
-      series.timestamps[series.writeIndex] = timestamp;
-      series.values[series.writeIndex] = value;
-      series.writeIndex = (series.writeIndex + 1) % cap;
-      if (series.count < cap) series.count++;
-      series.latestValue = value;
-      series.latestTimestamp = timestamp;
-
-      // Running statistics
-      if (value < series.min) series.min = value;
-      if (value > series.max) series.max = value;
-      series.sum += value;
-      series.sampleCount++;
-    }
-
-    // Only replace the map reference if we created new entries, otherwise
-    // just bump the version to trigger re-renders via the dataVersion selector
-    if (created) {
-      set((state) => ({ seriesBuffers: newBuffers, dataVersion: state.dataVersion + 1 }));
-    } else {
-      set((state) => ({ dataVersion: state.dataVersion + 1 }));
-    }
+  setLatest: (values) => {
+    if (values.size === 0) return;
+    const latest = new Map(get().latest);
+    for (const [key, value] of values) latest.set(key, value);
+    set((state) => ({ latest, dataVersion: state.dataVersion + 1 }));
   },
 
   clearData: () => {
     set({
-      seriesBuffers: new Map(),
+      latest: new Map(),
       dataVersion: 0,
       discoveredFrameIds: new Set(),
       bitChangeCounts: new Map(),
@@ -830,75 +762,3 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     scheduleAutoSave();
   },
 }));
-
-// ─────────────────────────────────────────
-// Ring buffer read helpers (used by chart components)
-// ─────────────────────────────────────────
-
-/**
- * Extract chronologically ordered data from a ring buffer.
- * Returns [timestamps, values] arrays of length series.count.
- */
-export function readTimeSeries(series: SignalTimeSeries): { timestamps: number[]; values: number[] } {
-  const { count, writeIndex, timestamps, values } = series;
-  const cap = timestamps.length;
-  const startIdx = count < cap ? 0 : writeIndex;
-
-  const ts = new Array<number>(count);
-  const vs = new Array<number>(count);
-  for (let i = 0; i < count; i++) {
-    const idx = (startIdx + i) % cap;
-    ts[i] = timestamps[idx];
-    vs[i] = values[idx];
-  }
-  return { timestamps: ts, values: vs };
-}
-
-/**
- * Build uPlot-compatible AlignedData from multiple signal ring buffers.
- * Returns [timestamps, ...seriesValues] where each is a number[].
- * Signals may have different update rates; we use the first signal's timestamps
- * as the shared x-axis and interpolate others to match.
- */
-export function buildAlignedData(
-  signals: SignalRef[],
-  buffers: Map<string, SignalTimeSeries>,
-): (number[] | null[])[] {
-  if (signals.length === 0) return [[]];
-
-  // Use first signal with data as the time base
-  let baseKey: string | null = null;
-  let baseSeries: SignalTimeSeries | null = null;
-  for (const sig of signals) {
-    const key = makeSignalKey(sig.frameId, sig.signalName);
-    const s = buffers.get(key);
-    if (s && s.count > 0) {
-      baseKey = key;
-      baseSeries = s;
-      break;
-    }
-  }
-
-  if (!baseSeries || !baseKey) return [[]];
-
-  const base = readTimeSeries(baseSeries);
-  const data: (number[] | null[])[] = [base.timestamps];
-
-  for (const sig of signals) {
-    const key = makeSignalKey(sig.frameId, sig.signalName);
-    if (key === baseKey) {
-      data.push(base.values);
-    } else {
-      const s = buffers.get(key);
-      if (s && s.count > 0) {
-        const read = readTimeSeries(s);
-        data.push(read.values);
-      } else {
-        // No data yet for this signal
-        data.push(new Array(base.timestamps.length).fill(null));
-      }
-    }
-  }
-
-  return data;
-}

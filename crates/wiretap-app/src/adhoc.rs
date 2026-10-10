@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use wiretap_analysis::hypothesis::{rank_fields, Candidate, CandidateReason, Sweep};
 use wiretap_decode::{parse_byte_name, Endianness, PayloadField, ScaledField};
 
+use crate::dashboard_history::{self, HeatmapCounts, History};
 use crate::io::FrameMessage;
 
 /// The most candidates the explorer lists, best first across every frame.
@@ -51,44 +52,14 @@ impl SignalRef {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(rename_all = "camelCase")]
-struct BitToggles {
-    /// Per bit, `byte * 8 + bit`, over the longest payload seen.
-    counts: Vec<u32>,
-    frames: u64,
-    #[serde(skip)]
-    last: Vec<u8>,
-}
-
-impl BitToggles {
-    /// The first payload sets the baseline; bytes it lacked compare against 0.
-    fn record(&mut self, bytes: &[u8]) {
-        if self.last.len() < bytes.len() {
-            self.last.resize(bytes.len(), 0);
-            self.counts.resize(bytes.len() * 8, 0);
-        }
-        for (i, (&now, was)) in bytes.iter().zip(self.last.iter_mut()).enumerate() {
-            let changed = if self.frames == 0 { 0 } else { now ^ *was };
-            for bit in (0..8).filter(|bit| changed >> bit & 1 == 1) {
-                self.counts[i * 8 + bit] += 1;
-            }
-            *was = now;
-        }
-        self.frames += 1;
-    }
-}
-
 /// What one Dashboard window charts from one session, by masked frame id.
 #[derive(Default)]
 struct Watch {
     fields: HashMap<u32, HashMap<PayloadField, Vec<(String, ScaledField)>>>,
-    toggles: HashMap<u32, BitToggles>,
+    heatmaps: Vec<u32>,
 }
 
 impl Watch {
-    /// Replace the fields and heatmap frames, keeping the counts of frames still mapped.
     fn set(&mut self, signals: &[SignalRef], heatmaps: &[u32]) -> usize {
         self.fields.clear();
         let mut registered = 0;
@@ -100,18 +71,15 @@ impl Watch {
                 registered += 1;
             }
         }
-        self.toggles.retain(|id, _| heatmaps.contains(id));
-        for id in heatmaps {
-            self.toggles.entry(*id).or_default();
-        }
+        self.heatmaps = heatmaps.to_vec();
         registered
     }
 
-    fn reset_toggles(&mut self) {
-        self.toggles.values_mut().for_each(|t| *t = BitToggles::default());
+    fn named(&self, id: u32) -> impl Iterator<Item = &(String, ScaledField)> {
+        self.fields.get(&id).into_iter().flat_map(HashMap::values).flatten()
     }
 
-    fn batch(&mut self, frames: &[FrameMessage], mask: Option<u32>) -> AdhocBatch {
+    fn batch(&self, frames: &[FrameMessage], mask: Option<u32>, history: Option<&History>) -> AdhocBatch {
         let mut batch = AdhocBatch::default();
         let mut seen = HashSet::new();
         for f in frames {
@@ -119,24 +87,17 @@ impl Watch {
             if seen.insert(id) {
                 batch.frame_ids.push(id);
             }
-            for names in self.fields.get(&id).into_iter().flat_map(HashMap::values) {
-                for (name, field) in names {
-                    if let Some(value) = field.decode(&f.bytes) {
-                        batch.values.push(AdhocValue { frame_id: id, t: f.timestamp_us, name: name.clone(), value });
-                    }
+            for (name, field) in self.named(id) {
+                if let Some(value) = field.decode(&f.bytes) {
+                    batch.values.push(AdhocValue { frame_id: id, t: f.timestamp_us, name: name.clone(), value });
                 }
-            }
-            if let Some(toggles) = self.toggles.get_mut(&id) {
-                toggles.record(&f.bytes);
             }
         }
         batch.toggles = batch
             .frame_ids
             .iter()
-            .filter_map(|&frame_id| {
-                let counts = self.toggles.get(&frame_id)?.clone();
-                Some(HeatmapCounts { frame_id, counts })
-            })
+            .filter(|id| self.heatmaps.contains(id))
+            .filter_map(|&id| history?.heatmap(id))
             .collect();
         batch
     }
@@ -163,15 +124,6 @@ struct AdhocValue {
     value: f64,
 }
 
-#[derive(Debug, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(rename_all = "camelCase")]
-struct HeatmapCounts {
-    frame_id: u32,
-    #[serde(flatten)]
-    counts: BitToggles,
-}
-
 type SharedWatch = Arc<Mutex<Watch>>;
 
 /// Watches by session, then by the WS connection (window) that set them.
@@ -186,30 +138,49 @@ fn watches(session_id: &str) -> Vec<(usize, SharedWatch)> {
         .unwrap_or_default()
 }
 
+/// Record every window's ad-hoc fields into the session's history, once per name.
+pub fn record(session_id: &str, frames: &[FrameMessage], mask: Option<u32>, history: &mut History) {
+    let watches = watches(session_id);
+    let locked: Vec<_> = watches.iter().filter_map(|(_, w)| w.lock().ok()).collect();
+    let mut fields: HashMap<u32, HashMap<&str, &ScaledField>> = HashMap::new();
+    for watch in &locked {
+        for &id in watch.fields.keys() {
+            for (name, field) in watch.named(id) {
+                fields.entry(id).or_default().entry(name.as_str()).or_insert(field);
+            }
+        }
+    }
+    for f in frames {
+        let id = mask.map_or(f.frame_id, |m| f.frame_id & m);
+        for (name, field) in fields.get(&id).into_iter().flatten() {
+            if let Some(value) = field.decode(&f.bytes) {
+                history.record(f, id, name, value, true);
+            }
+        }
+    }
+}
+
 /// Each watching connection's `AdhocSignals` payload for a frame batch.
-pub fn batch_messages(session_id: &str, frames: &[FrameMessage], mask: Option<u32>) -> Vec<(usize, Vec<u8>)> {
+pub fn batch_messages(
+    session_id: &str,
+    frames: &[FrameMessage],
+    mask: Option<u32>,
+    history: Option<&History>,
+) -> Vec<(usize, Vec<u8>)> {
     watches(session_id)
         .into_iter()
         .filter_map(|(conn_id, watch)| {
-            let batch = watch.lock().ok()?.batch(frames, mask);
+            let batch = watch.lock().ok()?.batch(frames, mask, history);
             Some((conn_id, serde_json::to_vec(&batch).ok()?))
         })
         .collect()
-}
-
-/// Zero every heatmap's counts, where the frame stream restarts or jumps.
-pub fn reset_toggles(session_id: &str) {
-    for (_, watch) in watches(session_id) {
-        if let Ok(mut watch) = watch.lock() {
-            watch.reset_toggles();
-        }
-    }
 }
 
 pub fn forget_session(session_id: &str) {
     if let Ok(mut m) = WATCHES.write() {
         m.remove(session_id);
     }
+    dashboard_history::forget(session_id);
 }
 
 pub fn forget_connection(conn_id: usize) {
@@ -217,12 +188,17 @@ pub fn forget_connection(conn_id: usize) {
         m.values_mut().for_each(|session| {
             session.remove(&conn_id);
         });
-        m.retain(|_, session| !session.is_empty());
+        m.retain(|session_id, session| {
+            if session.is_empty() {
+                dashboard_history::forget(session_id);
+            }
+            !session.is_empty()
+        });
     }
 }
 
-/// `adhoc.set` { session_id, signals, heatmaps }, `adhoc.reset` and `adhoc.clear` { session_id },
-/// each for the calling window only.
+/// `adhoc.set` { session_id, signals, heatmaps } and `adhoc.clear` { session_id },
+/// each for the calling window only. A session keeps its history while any window watches it.
 pub fn dispatch_adhoc_command(
     op_name: &str,
     params: serde_json::Value,
@@ -240,21 +216,17 @@ pub fn dispatch_adhoc_command(
     let mut all = WATCHES.write().map_err(|e| e.to_string())?;
     match op_name {
         "adhoc.set" => {
+            dashboard_history::open(&p.session_id);
             let watch = all.entry(p.session_id).or_default().entry(conn_id).or_default();
             let registered = watch.lock().map_err(|e| e.to_string())?.set(&p.signals, &p.heatmaps);
             Ok(serde_json::json!({ "registered": registered }))
-        }
-        "adhoc.reset" => {
-            if let Some(watch) = all.get(&p.session_id).and_then(|s| s.get(&conn_id)) {
-                watch.lock().map_err(|e| e.to_string())?.reset_toggles();
-            }
-            Ok(serde_json::Value::Null)
         }
         "adhoc.clear" => {
             if let Some(session) = all.get_mut(&p.session_id) {
                 session.remove(&conn_id);
                 if session.is_empty() {
                     all.remove(&p.session_id);
+                    dashboard_history::forget(&p.session_id);
                 }
             }
             Ok(serde_json::Value::Null)
@@ -384,6 +356,7 @@ pub async fn rank_hypotheses(
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+    use wiretap_analysis::dashboard::BitToggles;
     use wiretap_analysis::hypothesis::RoleKind;
 
     /// Captured from the TypeScript decode and bit-toggle counting before they were deleted.
@@ -492,7 +465,7 @@ mod tests {
         let huge = json!({ "startBit": 0, "bitLength": 64, "endianness": "little", "signed": false, "factor": 1e30, "offset": 0.0 });
         assert_eq!(watch.set(&[signal(1, "hyp_1_b0_64le", Some(huge)), signal(1, "byte[0]", None)], &[]), 2);
 
-        let batch = watch.batch(&[frame(1, 0, vec![0xFF; 8])], None);
+        let batch = watch.batch(&[frame(1, 0, vec![0xFF; 8])], None, None);
 
         let values: Vec<_> = batch.values.iter().map(|v| (v.name.as_str(), v.value)).collect();
         assert_eq!(values, vec![("byte[0]", 255.0)]);
@@ -514,10 +487,10 @@ mod tests {
         );
         assert_eq!(registered, 3);
 
-        let batch = watch.batch(
-            &[frame(0x1100, 10, vec![0x0D, 0x2E]), frame(0x200, 20, vec![1]), frame(0x2100, 30, vec![0x0C, 0x2E])],
-            Some(0xFFF),
-        );
+        let frames = [frame(0x1100, 10, vec![0x0D, 0x2E]), frame(0x200, 20, vec![1]), frame(0x2100, 30, vec![0x0C, 0x2E])];
+        let mut history = History::default();
+        history.record_toggles(&frames, Some(0xFFF));
+        let batch = watch.batch(&frames, Some(0xFFF), Some(&history));
 
         assert_eq!(batch.frame_ids, vec![0x100, 0x200]);
         let mut values: Vec<_> = batch.values.iter().map(|v| (v.t, v.name.as_str(), v.value)).collect();
@@ -533,48 +506,70 @@ mod tests {
                 (30, "hyp_100_b0_16be", 311.8),
             ]
         );
-        assert_eq!(batch.toggles.len(), 1);
-        assert_eq!((batch.toggles[0].counts.frames, batch.toggles[0].counts.counts[0]), (2, 1));
+        assert_eq!(
+            serde_json::to_value(&batch.toggles).unwrap(),
+            json!([{ "frameId": 0x100, "counts": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "frames": 2 }])
+        );
     }
 
     #[test]
-    fn resetting_the_fields_keeps_the_counts_of_heatmaps_still_shown() {
+    fn a_window_is_sent_the_toggles_of_its_own_heatmaps_only() {
         let mut watch = Watch::default();
-        watch.set(&[], &[1, 2]);
-        watch.batch(&[frame(1, 0, vec![0]), frame(1, 0, vec![1]), frame(2, 0, vec![0])], None);
-        watch.set(&[signal(1, "byte[0]", None)], &[1, 3]);
-        assert_eq!(watch.toggles[&1].frames, 2);
-        assert_eq!(watch.toggles[&3], BitToggles::default());
-        assert!(!watch.toggles.contains_key(&2));
+        watch.set(&[], &[1]);
+        let frames = [frame(1, 0, vec![0]), frame(1, 0, vec![1]), frame(2, 0, vec![0])];
+        let mut history = History::default();
+        history.record_toggles(&frames, None);
+
+        let batch = watch.batch(&frames, None, Some(&history));
+
+        assert_eq!(batch.frame_ids, vec![1, 2]);
+        let sent: Vec<_> = batch.toggles.iter().map(|t| serde_json::to_value(t).unwrap()["frameId"].clone()).collect();
+        assert_eq!(sent, vec![json!(1)]);
+        assert!(history.heatmap(2).is_some());
     }
 
     #[test]
-    fn each_window_sets_resets_and_clears_only_its_own_watch() {
-        let session = "adhoc-windows";
-        let command = |op: &str, conn_id, heatmaps: &[u32]| {
-            dispatch_adhoc_command(op, json!({ "session_id": session, "heatmaps": heatmaps }), conn_id).unwrap()
+    fn every_window_s_fields_are_recorded_once_per_name() {
+        let session = "adhoc-record";
+        let set = |conn_id, names: &[&str]| {
+            let signals: Vec<_> = names.iter().map(|n| json!({ "frameId": 1, "name": n })).collect();
+            dispatch_adhoc_command("adhoc.set", json!({ "session_id": session, "signals": signals }), conn_id).unwrap();
         };
-        command("adhoc.set", 1, &[7]);
-        command("adhoc.set", 2, &[7]);
-        let frames = [frame(7, 0, vec![0]), frame(7, 0, vec![1])];
-        assert_eq!(batch_messages(session, &frames, None).len(), 2);
+        set(1, &["byte[0]"]);
+        set(2, &["byte[0]", "byte[1]"]);
+        let mut history = History::default();
 
-        command("adhoc.reset", 1, &[]);
-        let frames_counted = |conn_id| {
-            let watches = watches(session);
-            let (_, watch) = watches.iter().find(|(c, _)| *c == conn_id).unwrap();
-            let frames = watch.lock().unwrap().toggles[&7].frames;
-            frames
-        };
-        assert_eq!((frames_counted(1), frames_counted(2)), (0, 2));
+        record(session, &[frame(1, 5, vec![7, 9])], None, &mut history);
 
-        command("adhoc.clear", 1, &[]);
-        assert_eq!(batch_messages(session, &frames, None).len(), 1);
-        command("adhoc.set", 3, &[]);
-        forget_connection(3);
-        assert_eq!(batch_messages(session, &frames, None).len(), 1);
+        let r = |name: &str| dashboard_history::SignalRef { frame_id: 1, name: name.into(), protocol: None, bus: None };
+        assert_eq!(history.values(&r("byte[0]")), vec![7.0]);
+        assert_eq!(history.values(&r("byte[1]")), vec![9.0]);
         forget_session(session);
-        assert!(batch_messages(session, &frames, None).is_empty());
+    }
+
+
+    #[test]
+    fn each_window_sets_and_clears_only_its_own_watch_and_the_history_lasts_while_one_watches() {
+        let session = "adhoc-windows";
+        let command = |op: &str, conn_id| {
+            dispatch_adhoc_command(op, json!({ "session_id": session }), conn_id).unwrap()
+        };
+        command("adhoc.set", 1);
+        command("adhoc.set", 2);
+        let frames = [frame(7, 0, vec![0])];
+        assert_eq!(batch_messages(session, &frames, None, None).len(), 2);
+        assert!(dashboard_history::get(session).is_some());
+
+        command("adhoc.clear", 1);
+        assert_eq!(batch_messages(session, &frames, None, None).len(), 1);
+        command("adhoc.set", 3);
+        forget_connection(3);
+        assert_eq!(batch_messages(session, &frames, None, None).len(), 1);
+        assert!(dashboard_history::get(session).is_some());
+
+        forget_connection(2);
+        assert!(batch_messages(session, &frames, None, None).is_empty());
+        assert!(dashboard_history::get(session).is_none());
     }
 
     fn candidate(start_bit: u32, score: u8) -> Candidate {

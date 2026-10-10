@@ -20,6 +20,7 @@ import { getIOKindLabel } from "../../utils/ioKindLabel";
 import { getTimeRangeCapableProfiles } from "../../utils/profileTraits";
 
 import { useDialogManager } from "../../hooks/useDialogManager";
+import { useQueryQueueSync } from "./hooks/useQueryQueueSync";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
 import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
@@ -79,11 +80,15 @@ function QueryInner() {
   const queueCount = queue.length;
   const pendingCount = queue.filter((q) => q.status === "pending").length;
   const selectedQuery = queue.find((q) => q.id === selectedQueryId) ?? null;
-  const selectedQueryResultCount = selectedQuery?.results
-    ? Array.isArray(selectedQuery.results)
-      ? selectedQuery.results.length
-      : (selectedQuery.results as { cases: unknown[] }).cases?.length ?? 0
-    : 0;
+  const selectedOutcome = useQueryStore((s) => (selectedQueryId ? s.outcomes[selectedQueryId] ?? null : null));
+  const loadOutcome = useQueryStore((s) => s.loadOutcome);
+  const selectedQueryResultCount = selectedQuery?.result_count ?? 0;
+
+  useQueryQueueSync();
+
+  useEffect(() => {
+    if (selectedQuery?.status === "completed") loadOutcome(selectedQuery.id);
+  }, [selectedQuery?.id, selectedQuery?.status, loadOutcome]);
 
   // Dialog management
   const dialogs = useDialogManager([
@@ -258,19 +263,18 @@ function QueryInner() {
 
   // Get time range from selected query results for an event or an ingest
   const getSelectedQueryTimeRange = useCallback(() => {
-    if (!selectedQuery?.results) return null;
+    const found = selectedOutcome?.results;
     // Mux statistics results are an object, not a timestamped array
-    if (!Array.isArray(selectedQuery.results)) return null;
-    if (selectedQuery.results.length === 0) return null;
+    if (!Array.isArray(found) || found.length === 0) return null;
     // An inventory row spans first→last; everything else is one instant.
-    const results = selectedQuery.results as ({ timestamp_us: number } | { first_us: number; last_us: number })[];
+    const results = found as ({ timestamp_us: number } | { first_us: number; last_us: number })[];
     const starts = results.map((r) => ("first_us" in r ? r.first_us : r.timestamp_us));
     const ends = results.map((r) => ("last_us" in r ? r.last_us : r.timestamp_us));
     return {
       minTimestampUs: Math.min(...starts),
       maxTimestampUs: Math.max(...ends),
     };
-  }, [selectedQuery]);
+  }, [selectedOutcome]);
 
   // Handle ingest all results wrapper (gets time range from selected query)
   const handleIngestAllResultsWrapper = useCallback(async () => {
@@ -397,6 +401,7 @@ function QueryInner() {
         {activeTab === "results" && (
           <ResultsPanel
             selectedQuery={selectedQuery}
+            outcome={selectedOutcome}
             onIngestEvent={handlers.handleIngestAroundEvent}
             onIngestAll={handleIngestAllResultsWrapper}
             onExport={handleExportQueryWrapper}

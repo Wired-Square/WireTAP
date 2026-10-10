@@ -1,0 +1,425 @@
+{
+  "cases": [
+    {
+      "name": "byte_changes unbounded",
+      "input": {
+        "queryType": "byte_changes",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "byte_changes",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "byte_index": 2,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "byte_changes bounded",
+      "input": {
+        "queryType": "byte_changes",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "byte_changes",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "byte_index": 2,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "frame_changes unbounded",
+      "input": {
+        "queryType": "frame_changes",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frame_changes",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "frame_changes bounded",
+      "input": {
+        "queryType": "frame_changes",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frame_changes",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "mirror_validation unbounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "mirror_validation",
+        "mirror_frame_id": 257,
+        "source_frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "tolerance_ms": 50,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "mirror_validation bounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "mirror_validation",
+        "mirror_frame_id": 257,
+        "source_frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "tolerance_ms": 50,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "mux_statistics unbounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "mux_statistics",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "mux_selector_byte": 0,
+        "include_16bit": true,
+        "payload_length": 8,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "mux_statistics bounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "mux_statistics",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "mux_selector_byte": 0,
+        "include_16bit": true,
+        "payload_length": 8,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "first_last unbounded",
+      "input": {
+        "queryType": "first_last",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "first_last",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null
+      }
+    },
+    {
+      "name": "first_last bounded",
+      "input": {
+        "queryType": "first_last",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "first_last",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000
+      }
+    },
+    {
+      "name": "frequency unbounded",
+      "input": {
+        "queryType": "frequency",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frequency",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "bucket_size_ms": 1000,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "frequency bounded",
+      "input": {
+        "queryType": "frequency",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frequency",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "bucket_size_ms": 1000,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "distribution unbounded",
+      "input": {
+        "queryType": "distribution",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "distribution",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "byte_index": 2
+      }
+    },
+    {
+      "name": "distribution bounded",
+      "input": {
+        "queryType": "distribution",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "distribution",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "byte_index": 2
+      }
+    },
+    {
+      "name": "gap_analysis unbounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "gap_analysis",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": null,
+        "end_us": null,
+        "gap_threshold_ms": 100,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "gap_analysis bounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "gap_analysis",
+        "frame_id": 256,
+        "is_extended": true,
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "gap_threshold_ms": 100,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "pattern_search unbounded",
+      "input": {
+        "queryType": "pattern_search",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "pattern_search",
+        "start_us": null,
+        "end_us": null,
+        "pattern": [
+          170,
+          187
+        ],
+        "pattern_mask": [
+          255,
+          0
+        ],
+        "limit": 5000
+      }
+    },
+    {
+      "name": "pattern_search bounded",
+      "input": {
+        "queryType": "pattern_search",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "pattern_search",
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "pattern": [
+          170,
+          187
+        ],
+        "pattern_mask": [
+          255,
+          0
+        ],
+        "limit": 5000
+      }
+    },
+    {
+      "name": "frame_inventory unbounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "timeBounds": null,
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frame_inventory",
+        "start_us": null,
+        "end_us": null,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "frame_inventory bounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": {
+        "type": "frame_inventory",
+        "start_us": 1772319600000000,
+        "end_us": 1772319900000000,
+        "limit": 5000
+      }
+    },
+    {
+      "name": "byte_changes bounded in UTC",
+      "input": {
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "",
+          "timezoneMode": "utc"
+        }
+      },
+      "expected": {
+        "type": "byte_changes",
+        "frame_id": 256,
+        "is_extended": null,
+        "start_us": 1772359200000000,
+        "end_us": null,
+        "byte_index": 2,
+        "limit": 5000
+      }
+    }
+  ]
+}

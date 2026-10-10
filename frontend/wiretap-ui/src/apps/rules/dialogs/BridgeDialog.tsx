@@ -1,13 +1,13 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, HelpCircle } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { labelDefault } from "../../../styles/typography";
 import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
-import { nextAvailableId } from "../utils/framelinkConstants";
+import { useNextIdField } from "../hooks/useFrameLinkAnswers";
 import { formatHexId } from "../utils/formatHex";
 import { ID_MASK_29, parseHex } from "../utils/canMask";
 import BridgeFilterHelp from "./BridgeFilterHelp";
@@ -42,12 +42,9 @@ export default function BridgeDialog({
   usedIds,
 }: BridgeDialogProps) {
   const { t } = useTranslation("rules");
-  const [bridgeId, setBridgeId] = useState(() => nextAvailableId(usedIds));
+  const [bridgeId, setBridgeId] = useNextIdField(usedIds, "rule", isOpen);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) setBridgeId(nextAvailableId(usedIds));
-  }, [isOpen, usedIds]);
   const [sourceInterface, setSourceInterface] = useState(interfaces[0]?.index ?? 0);
   const [destInterface, setDestInterface] = useState(interfaces[1]?.index ?? interfaces[0]?.index ?? 0);
   const [bidirectional, setBidirectional] = useState(true);

@@ -1,38 +1,41 @@
 // ui/src/stores/transmitStore.ts
 //
-// Zustand store for Transmit app state management.
-// Handles CAN/Serial transmission, queue management, and history tracking.
-// Uses sessionStore for IO session management.
+// Zustand store for the Transmit app: the editors, the replay log and a view of
+// the Transmit queue, which is Rust's process state (`transmit_queue.rs`) pushed
+// to every window over WS.
 
 import { create } from "zustand";
 import {
   type CanTransmitFrame,
-  type TransmitProfile,
-  type TransmitResult,
-  type ReplayFrame,
+  type NewQueueRow,
+  type QueuePayload,
+  type QueueRow,
+  type QueueRowEdit,
+  type ReceivedFrame,
+  type ReplaySource,
   type ReplayState,
-  type RepeatGroupMember,
-  type RepeatStartedEvent,
-  type SerialFraming,
   type SerialFramingMode,
+  type TransmitProfile,
+  type TransmitQueue,
+  type TransmitResult,
+  addToTransmitQueue,
+  clearTransmitQueue,
+  editQueueRow,
   getTransmitCapableProfiles,
-  // IO session-based transmit
-  ioTransmitCanFrame,
-  ioStartRepeatTransmit,
-  ioStartSerialRepeatTransmit,
-  serialFraming,
-  ioStopRepeatTransmit,
-  ioStopAllRepeats,
-  // IO session group repeat
-  ioStartRepeatGroup,
-  ioStopRepeatGroup,
-  ioStopAllGroupRepeats,
-  // Replay
+  ioRestartReplay,
   ioStartReplay,
   ioStopReplay,
+  ioTransmitCanFrame,
+  removeQueueRow,
+  serialFraming,
+  startQueueGroup,
+  startQueueRow,
+  stopAllQueueRepeats,
+  stopQueueGroup,
+  stopQueueRow,
   toTransmitFrame,
-  type ReceivedFrame,
 } from "../api/transmit";
+import { hexToBytes } from "../utils/byteUtils";
 
 import { useSessionStore, type Session } from "./sessionStore";
 
@@ -57,36 +60,6 @@ export const GVRET_BUSES = [
   { value: 3, label: "Bus 3" },
   { value: 4, label: "Bus 4" },
 ] as const;
-
-/** Queue item for repeat transmit */
-export interface TransmitQueueItem {
-  /** Unique ID for this queue item */
-  id: string;
-  /** Profile ID to use for transmission */
-  profileId: string;
-  /** Display name for the profile */
-  profileName: string;
-  /** Type of transmission */
-  type: "can" | "serial";
-  /** CAN frame (if type is 'can') */
-  canFrame?: CanTransmitFrame;
-  /** Serial payload before framing (if type is 'serial') */
-  serialBytes?: number[];
-  /** How the backend frames `serialBytes` (if type is 'serial') */
-  serialFraming?: SerialFraming;
-  /** Repeat interval in milliseconds (0 = single shot) */
-  repeatIntervalMs: number;
-  /** Whether this item is currently repeating */
-  isRepeating: boolean;
-  /** Whether this item is enabled */
-  enabled: boolean;
-  /** Group name for grouped repeat (items with same group are sent together in sequence) */
-  groupName?: string;
-  /** Who added this item. `"agent"` rows come from an MCP client, not the UI. */
-  origin?: "user" | "agent";
-  /** The backend session this row transmits through */
-  sessionId: string;
-}
 
 /** Progress info for an active replay */
 export interface ReplayProgressInfo {
@@ -131,8 +104,6 @@ export interface ReplayLogEntry {
   passDurationUs?: number;
 }
 
-// IOSessionConnection type removed - now using sessionStore for session management
-
 /** CAN frame editor state */
 export interface CanEditorState {
   /** Frame ID as hex string (e.g., "123" or "12345678") */
@@ -168,17 +139,20 @@ export interface SerialEditorState {
 // Store
 // ============================================================================
 
+type QueueRowSession = Pick<Session, "id" | "profileId" | "profileName">;
+
 export interface TransmitState {
   // ---- Data ----
   /** Available transmit-capable profiles */
   profiles: TransmitProfile[];
-  // NOTE: IO session is now managed by sessionStore, accessed via useSessionStore
-  /** Transmit queue */
-  queue: TransmitQueueItem[];
+  /** The process's Transmit queue, as Rust last pushed it */
+  queue: QueueRow[];
+  /** The revision of `queue`; an older push is ignored */
+  queueRevision: number;
+  /** Groups repeating now */
+  activeGroups: Set<string>;
   /** Changes on every transmit history write or clear (the TransmitUpdated signal) */
   historyRevision: number;
-  /** Active group repeats (group names currently repeating) */
-  activeGroups: Set<string>;
 
   // ---- UI ----
   /** Active tab */
@@ -203,8 +177,6 @@ export interface TransmitState {
   loadProfiles: () => Promise<void>;
   /** Set active tab */
   setActiveTab: (tab: TransmitTab) => void;
-  /** Clean up on unmount */
-  cleanup: () => Promise<void>;
 
   // CAN Editor Actions
   /** Update CAN editor field */
@@ -223,52 +195,29 @@ export interface TransmitState {
   updateSerialEditor: (updates: Partial<SerialEditorState>) => void;
   /** Reset serial editor to defaults */
   resetSerialEditor: () => void;
-  /** Parse hex input to bytes */
-  parseSerialBytes: () => number[];
 
-  // Queue Actions
-  /** Add current CAN frame to queue */
-  addCanToQueue: () => void;
-  /** Add multiple CAN frames to queue (bulk, from Discovery) */
-  addCanFramesBulk: (frames: ReceivedFrame[], session: QueueRowSession, intervalMs?: number, groupName?: string) => void;
-  /** Add current serial bytes to queue */
-  addSerialToQueue: () => void;
-  /** Remove item from queue */
-  removeFromQueue: (queueId: string) => void;
-  /** Clear entire queue */
-  clearQueue: () => void;
-  /** Start repeat for queue item */
+  // Queue Actions — each asks Rust, which pushes the changed queue to every window
+  /** Take a queue Rust pushed or answered, unless an newer one is held */
+  applyQueue: (queue: TransmitQueue) => void;
+  /** Add the editor's CAN frame to the queue */
+  addCanToQueue: () => Promise<void>;
+  /** Add received CAN frames to the queue (bulk, from Discovery) */
+  addCanFramesBulk: (frames: ReceivedFrame[], session: QueueRowSession, intervalMs?: number, groupName?: string) => Promise<void>;
+  /** Add the editor's serial bytes to the queue */
+  addSerialToQueue: () => Promise<void>;
+  /** Change a row; Rust refuses one that is sending */
+  editQueueRow: (queueId: string, edit: QueueRowEdit) => Promise<void>;
+  removeFromQueue: (queueId: string) => Promise<void>;
+  clearQueue: () => Promise<void>;
   startRepeat: (queueId: string) => Promise<void>;
-  /** Stop repeat for queue item */
   stopRepeat: (queueId: string) => Promise<void>;
-  /** Mark a row or group stopped (called by backend event, no API call needed) */
-  markRepeatStopped: (queueId: string) => void;
-  /** Mark a group repeating (called by the backend's group-started event) */
-  markGroupRepeating: (groupName: string) => void;
-  /** Upsert a queue item for a repeat started outside the UI (e.g. an MCP agent) */
-  addExternalRepeat: (ev: RepeatStartedEvent) => void;
-  /** Stop all repeats */
+  /** Stop every repeat and group in the queue */
   stopAllRepeats: () => Promise<void>;
-  /** Update queue item repeat interval */
-  updateQueueInterval: (queueId: string, intervalMs: number) => void;
-  /** Toggle queue item enabled state */
-  toggleQueueEnabled: (queueId: string) => void;
-  /** Update queue item bus (CAN only) */
-  updateQueueItemBus: (queueId: string, bus: number) => void;
-  /** Reassign queue item to a different session */
-  updateQueueItemSession: (queueId: string, session: QueueRowSession) => void;
-  /** Set group name for a queue item */
-  setItemGroup: (queueId: string, groupName: string | undefined) => void;
-  /** Get all unique group names in the queue */
-  getGroupNames: () => string[];
-  /** Start group repeat (transmits all items in group as a sequence) */
+  /** Start a group: its enabled CAN rows in queue order, every interval of the first */
   startGroupRepeat: (groupName: string) => Promise<void>;
-  /** Stop group repeat */
   stopGroupRepeat: (groupName: string) => Promise<void>;
-  /** Stop all group repeats */
-  stopAllGroupRepeats: () => Promise<void>;
-  /** Check if a group is currently repeating */
-  isGroupRepeating: (groupName: string) => boolean;
+  /** Unique group names in the queue, sorted */
+  getGroupNames: () => string[];
 
   // Replay Actions
   /** Active replay IDs */
@@ -277,13 +226,11 @@ export interface TransmitState {
   replayProgress: Map<string, ReplayProgressInfo>;
   /** Replay lifecycle log (started/completed/stopped/error entries) */
   replayLog: ReplayLogEntry[];
-  /** Cached replay params keyed by replayId — used to support restart */
-  replayCache: Map<string, { sessionId: string; frames: ReplayFrame[]; speed: number; loop: boolean }>;
-  /** Start a time-accurate frame replay */
-  startReplay: (sessionId: string, replayId: string, frames: ReplayFrame[], speed: number, loop: boolean) => Promise<void>;
+  /** Start a time-accurate replay of a capture range */
+  startReplay: (sessionId: string, replayId: string, source: ReplaySource, speed: number, loop: boolean) => Promise<void>;
   /** Stop a specific replay */
   stopReplay: (replayId: string) => Promise<void>;
-  /** Restart a replay from the beginning using its cached params */
+  /** Play a replay again with what it was started with */
   restartReplay: (replayId: string) => Promise<void>;
   /** Applies a replay's `ReplayState` push: its progress, its log and whether it is active */
   handleReplayLifecycle: (state: ReplayState) => void;
@@ -327,33 +274,34 @@ const getActiveSession = () => {
   return activeSessionId ? sessions[activeSessionId] : null;
 };
 
-type QueueRowSession = Pick<Session, "id" | "profileId" | "profileName">;
-
 const mintId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-function patchRows(
-  queue: TransmitQueueItem[],
-  matches: (q: TransmitQueueItem) => boolean,
-  patch: Partial<TransmitQueueItem> | ((q: TransmitQueueItem) => Partial<TransmitQueueItem>)
-): TransmitQueueItem[] {
-  return queue.map((q) => (matches(q) ? { ...q, ...(typeof patch === "function" ? patch(q) : patch) } : q));
-}
-
-const byId = (queueId: string) => (q: TransmitQueueItem) => q.id === queueId;
-const inGroup = (groupName: string) => (q: TransmitQueueItem) => q.groupName === groupName;
-
-function groupStopped(state: TransmitState, groupName: string): Partial<TransmitState> {
-  const activeGroups = new Set(state.activeGroups);
-  activeGroups.delete(groupName);
-  return { activeGroups, queue: patchRows(state.queue, inGroup(groupName), { isRepeating: false }) };
-}
 
 const TERMINAL_LOG_KIND = { finished: "completed", stopped: "stoppedByUser", failed: "deviceError" } as const;
 
-function syncQueuedMarks(queue: TransmitQueueItem[], sessionIds: Iterable<string>) {
+const NO_SESSION = "No IO session connected. Use 'Data Source' to connect.";
+
+function syncQueuedMarks(queue: QueueRow[], sessionIds: Iterable<string>) {
   const { setHasQueuedMessages } = useSessionStore.getState();
   for (const id of new Set(sessionIds)) {
-    setHasQueuedMessages(id, queue.some((q) => q.sessionId === id));
+    setHasQueuedMessages(id, queue.some((q) => q.session_id === id));
+  }
+}
+
+const newRow = (session: QueueRowSession, payload: QueuePayload, intervalMs: number, group?: string): NewQueueRow => ({
+  session_id: session.id,
+  profile_id: session.profileId,
+  profile_name: session.profileName,
+  payload,
+  interval_ms: intervalMs,
+  group: group || null,
+});
+
+/** Awaits a backend call, putting its refusal in the store's `error`. */
+async function reporting(call: Promise<unknown>) {
+  try {
+    await call;
+  } catch (e) {
+    useTransmitStore.setState({ error: String(e) });
   }
 }
 
@@ -361,12 +309,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   // ---- Initial State ----
   profiles: [],
   queue: [],
-  historyRevision: 0,
+  queueRevision: -1,
   activeGroups: new Set(),
+  historyRevision: 0,
   activeReplays: new Set(),
   replayProgress: new Map(),
   replayLog: [],
-  replayCache: new Map(),
   activeTab: "frame",
   isLoading: false,
   error: null,
@@ -386,21 +334,6 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-
-  cleanup: async () => {
-    // Stop all repeats if there's an active session
-    const session = getActiveSession();
-    if (session) {
-      await ioStopAllRepeats(session.id).catch(() => {});
-      await ioStopAllGroupRepeats().catch(() => {});
-    }
-
-    const state = get();
-    set({
-      queue: patchRows(state.queue, () => true, { isRepeating: false }),
-      activeGroups: new Set(),
-    });
-  },
 
   // CAN Editor Actions
   updateCanEditor: (updates) => {
@@ -508,404 +441,56 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
   resetSerialEditor: () => set({ serialEditor: { ...DEFAULT_SERIAL_EDITOR } }),
 
-  parseSerialBytes: () => {
-    const state = get();
-    const hex = state.serialEditor.hexInput.replace(/\s/g, "");
-    const bytes: number[] = [];
-
-    for (let i = 0; i < hex.length; i += 2) {
-      const byte = parseInt(hex.slice(i, i + 2), 16);
-      if (!isNaN(byte)) {
-        bytes.push(byte);
-      }
-    }
-
-    return bytes;
+  // Queue Actions
+  applyQueue: ({ revision, rows, active_groups }) => {
+    const held = get();
+    if (revision <= held.queueRevision) return;
+    set({ queue: rows, queueRevision: revision, activeGroups: new Set(active_groups) });
+    syncQueuedMarks(rows, [...held.queue, ...rows].map((q) => q.session_id));
   },
 
-  // Queue Actions
-  addCanToQueue: () => {
-    const state = get();
+  addCanToQueue: async () => {
     const session = getActiveSession();
-
-    if (!session) {
-      set({ error: "No IO session connected. Use 'Data Source' to connect." });
-      return;
-    }
-
+    if (!session) return set({ error: NO_SESSION });
     const frame = get().buildCanFrame();
     if (!frame) return;
-
-    const item: TransmitQueueItem = {
-      id: mintId("queue"),
-      profileId: session.profileId,
-      profileName: session.profileName,
-      type: "can",
-      canFrame: frame,
-      repeatIntervalMs: state.queueRepeatIntervalMs,
-      isRepeating: false,
-      enabled: true,
-      sessionId: session.id,
-    };
-
-    set({ queue: [...state.queue, item] });
-    useSessionStore.getState().setHasQueuedMessages(session.id, true);
+    await reporting(addToTransmitQueue([newRow(session, { kind: "can", frame }, get().queueRepeatIntervalMs)]));
   },
 
   addCanFramesBulk: (frames, session, intervalMs, groupName) => {
-    const state = get();
-    const newItems: TransmitQueueItem[] = frames.map((f) => ({
-      id: mintId("queue"),
-      profileId: session.profileId,
-      profileName: session.profileName,
-      sessionId: session.id,
-      type: "can" as const,
-      canFrame: toTransmitFrame({ ...f, bytes: f.bytes.slice(0, f.dlc) }),
-      repeatIntervalMs: intervalMs ?? state.queueRepeatIntervalMs,
-      isRepeating: false,
-      enabled: true,
-      groupName: groupName || undefined,
-    }));
-    set({ queue: [...state.queue, ...newItems] });
-    useSessionStore.getState().setHasQueuedMessages(session.id, true);
-  },
-
-  addSerialToQueue: () => {
-    const state = get();
-    const session = getActiveSession();
-    const { serialEditor, queueRepeatIntervalMs } = state;
-
-    if (!session) {
-      set({ error: "No IO session connected. Use 'Data Source' to connect." });
-      return;
-    }
-
-    const rawBytes = get().parseSerialBytes();
-    if (rawBytes.length === 0) return;
-
-    const item: TransmitQueueItem = {
-      id: mintId("queue"),
-      profileId: session.profileId,
-      profileName: session.profileName,
-      type: "serial",
-      serialBytes: rawBytes,
-      serialFraming: serialFraming(serialEditor.framingMode, serialEditor.delimiter),
-      repeatIntervalMs: queueRepeatIntervalMs,
-      isRepeating: false,
-      enabled: true,
-      sessionId: session.id,
-    };
-
-    set({ queue: [...state.queue, item] });
-    useSessionStore.getState().setHasQueuedMessages(session.id, true);
-  },
-
-  removeFromQueue: (queueId) => {
-    const state = get();
-    const item = state.queue.find((q) => q.id === queueId);
-
-    // Stop repeat if running
-    if (item?.isRepeating) {
-      ioStopRepeatTransmit(queueId).catch(() => {});
-    }
-
-    set({ queue: state.queue.filter((q) => q.id !== queueId) });
-    if (item) syncQueuedMarks(get().queue, [item.sessionId]);
-  },
-
-  clearQueue: async () => {
-    const state = get();
-    const sessionIds = state.queue.map((q) => q.sessionId);
-
-    // Stop all repeats
-    for (const item of state.queue) {
-      if (item.isRepeating) {
-        await ioStopRepeatTransmit(item.id).catch(() => {});
-      }
-    }
-
-    set({ queue: [] });
-    syncQueuedMarks([], sessionIds);
-  },
-
-  startRepeat: async (queueId) => {
-    const state = get();
-    const item = state.queue.find((q) => q.id === queueId);
-    if (!item || item.isRepeating) return;
-
-    const session = useSessionStore.getState().sessions[item.sessionId];
-
-    if (!session || session.lifecycleState !== "connected") {
-      set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
-      return;
-    }
-
-    // Check capabilities based on item type
-    if (item.type === "can") {
-      if (!session.capabilities?.traits.tx_frames) {
-        set({ error: `Session '${item.profileName}' does not support CAN transmit` });
-        return;
-      }
-      if (!item.canFrame) {
-        set({ error: "CAN frame is missing" });
-        return;
-      }
-    } else if (item.type === "serial") {
-      if (!session.capabilities?.traits.tx_bytes) {
-        set({ error: `Session '${item.profileName}' does not support serial transmit` });
-        return;
-      }
-      if (!item.serialBytes || item.serialBytes.length === 0) {
-        set({ error: "Serial bytes are missing" });
-        return;
-      }
-    }
-
-    try {
-      if (item.type === "can" && item.canFrame) {
-        await ioStartRepeatTransmit(
-          session.id,
-          queueId,
-          item.canFrame,
-          item.repeatIntervalMs
-        );
-      } else if (item.type === "serial" && item.serialBytes) {
-        await ioStartSerialRepeatTransmit(
-          session.id,
-          queueId,
-          item.serialBytes,
-          item.serialFraming ?? { mode: "raw" },
-          item.repeatIntervalMs
-        );
-      }
-
-      set({ queue: patchRows(state.queue, byId(queueId), { isRepeating: true }) });
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
-
-  stopRepeat: async (queueId) => {
-    const state = get();
-    const item = state.queue.find((q) => q.id === queueId);
-    if (!item || !item.isRepeating) return;
-
-    try {
-      await ioStopRepeatTransmit(queueId);
-
-      set({ queue: patchRows(state.queue, byId(queueId), { isRepeating: false }) });
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
-
-  // Called by backend event when repeat stops due to permanent error
-  // No API call needed since backend already stopped
-  markRepeatStopped: (queueId) => {
-    const state = get();
-    set(
-      state.activeGroups.has(queueId)
-        ? groupStopped(state, queueId)
-        : { queue: patchRows(state.queue, byId(queueId), { isRepeating: false }) }
+    const interval = intervalMs ?? get().queueRepeatIntervalMs;
+    const rows = frames.map((f) =>
+      newRow(session, { kind: "can", frame: toTransmitFrame({ ...f, bytes: f.bytes.slice(0, f.dlc) }) }, interval, groupName)
     );
+    return reporting(addToTransmitQueue(rows));
   },
 
-  markGroupRepeating: (groupName) => {
-    const state = get();
-    set({
-      activeGroups: new Set([...state.activeGroups, groupName]),
-      queue: patchRows(state.queue, (q) => q.groupName === groupName && q.enabled && q.type === "can", { isRepeating: true }),
-    });
-  },
-
-  // Every repeat start is announced by the backend, the UI's own included. A row
-  // the queue already holds keeps its fields (group, notes) and is marked
-  // repeating; an agent's arrives here for the first time and is added.
-  addExternalRepeat: (ev) => {
-    const { queue_id, session_id, profile_id, profile_name, interval_ms, origin, ...canFrame } = ev;
-    const state = get();
-    const exists = state.queue.some((q) => q.id === queue_id);
-    const item: TransmitQueueItem = {
-      id: queue_id,
-      profileId: profile_id,
-      profileName: profile_name,
-      type: "can",
-      canFrame,
-      repeatIntervalMs: interval_ms,
-      isRepeating: true,
-      enabled: true,
-      origin: origin === "agent" ? "agent" : "user",
-      sessionId: session_id,
-    };
-    set({
-      queue: exists
-        ? patchRows(state.queue, byId(queue_id), { isRepeating: true, repeatIntervalMs: interval_ms, sessionId: session_id })
-        : [...state.queue, item],
-    });
-    useSessionStore.getState().setHasQueuedMessages(session_id, true);
-  },
-
-  stopAllRepeats: async () => {
-    const state = get();
+  addSerialToQueue: async () => {
     const session = getActiveSession();
-
-    if (session) {
-      try {
-        await ioStopAllRepeats(session.id);
-      } catch {
-        // Continue to update UI state even if backend call fails
-      }
-    }
-
-    set({ queue: patchRows(state.queue, () => true, { isRepeating: false }) });
+    if (!session) return set({ error: NO_SESSION });
+    const { serialEditor, queueRepeatIntervalMs } = get();
+    const bytes = hexToBytes(serialEditor.hexInput);
+    if (bytes.length === 0) return;
+    const framing = serialFraming(serialEditor.framingMode, serialEditor.delimiter);
+    await reporting(addToTransmitQueue([newRow(session, { kind: "serial", bytes, framing }, queueRepeatIntervalMs)]));
   },
 
-  updateQueueInterval: (queueId, intervalMs) => {
-    set({ queue: patchRows(get().queue, byId(queueId), { repeatIntervalMs: intervalMs }) });
-  },
+  editQueueRow: (queueId, edit) => reporting(editQueueRow(queueId, edit)),
+  removeFromQueue: (queueId) => reporting(removeQueueRow(queueId)),
+  clearQueue: () => reporting(clearTransmitQueue()),
+  startRepeat: (queueId) => reporting(startQueueRow(queueId)),
+  stopRepeat: (queueId) => reporting(stopQueueRow(queueId)),
+  stopAllRepeats: () => reporting(stopAllQueueRepeats()),
+  startGroupRepeat: (groupName) => reporting(startQueueGroup(groupName)),
+  stopGroupRepeat: (groupName) => reporting(stopQueueGroup(groupName)),
 
-  toggleQueueEnabled: (queueId) => {
-    const state = get();
-    const item = state.queue.find((q) => q.id === queueId);
-    if (!item) return;
-
-    // If disabling while repeating, stop the repeat
-    if (item.enabled && item.isRepeating) {
-      ioStopRepeatTransmit(queueId).catch(() => {});
-    }
-
-    set({ queue: patchRows(state.queue, byId(queueId), { enabled: !item.enabled, isRepeating: false }) });
-  },
-
-  updateQueueItemBus: (queueId, bus) => {
-    set({
-      queue: patchRows(get().queue, (q) => q.id === queueId && q.type === "can" && !!q.canFrame, (q) => ({
-        canFrame: { ...q.canFrame!, bus },
-      })),
-    });
-  },
-
-  updateQueueItemSession: (queueId, session) => {
-    const state = get();
-    const item = state.queue.find((q) => q.id === queueId);
-    if (!item) return;
-
-    set({
-      queue: patchRows(state.queue, byId(queueId), {
-        sessionId: session.id,
-        profileId: session.profileId,
-        profileName: session.profileName,
-      }),
-    });
-    syncQueuedMarks(get().queue, [item.sessionId, session.id]);
-  },
-
-  // Group Actions
-  setItemGroup: (queueId, groupName) => {
-    set({ queue: patchRows(get().queue, byId(queueId), { groupName: groupName || undefined }) });
-  },
-
-  getGroupNames: () => {
-    const state = get();
-    const groups = new Set<string>();
-    for (const item of state.queue) {
-      if (item.groupName) {
-        groups.add(item.groupName);
-      }
-    }
-    return Array.from(groups).sort();
-  },
-
-  isGroupRepeating: (groupName) => {
-    return get().activeGroups.has(groupName);
-  },
-
-  startGroupRepeat: async (groupName) => {
-    const state = get();
-
-    // Already repeating?
-    if (state.activeGroups.has(groupName)) {
-      return;
-    }
-
-    // Get all enabled CAN items in this group, in queue order
-    const groupItems = state.queue.filter(
-      (q) => q.groupName === groupName && q.enabled && q.type === "can" && q.canFrame
-    );
-
-    if (groupItems.length === 0) {
-      set({ error: `No enabled CAN frames in group '${groupName}'` });
-      return;
-    }
-
-    const { sessions } = useSessionStore.getState();
-    const members: RepeatGroupMember[] = [];
-    for (const item of groupItems) {
-      const session = sessions[item.sessionId];
-      if (!session || session.lifecycleState !== "connected") {
-        set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
-        return;
-      }
-      if (!session.capabilities?.traits.tx_frames) {
-        set({ error: `Session '${item.profileName}' does not support transmit` });
-        return;
-      }
-      const last = members[members.length - 1];
-      if (last?.session_id === session.id) last.frames.push(item.canFrame!);
-      else members.push({ session_id: session.id, frames: [item.canFrame!] });
-    }
-
-    try {
-      await ioStartRepeatGroup(groupName, members, groupItems[0].repeatIntervalMs);
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
-
-  stopGroupRepeat: async (groupName) => {
-    const state = get();
-
-    if (!state.activeGroups.has(groupName)) {
-      return;
-    }
-
-    try {
-      await ioStopRepeatGroup(groupName);
-      set(groupStopped(state, groupName));
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
-
-  stopAllGroupRepeats: async () => {
-    const state = get();
-
-    if (state.activeGroups.size === 0) {
-      return;
-    }
-
-    try {
-      await ioStopAllGroupRepeats();
-
-      set({ activeGroups: new Set(), queue: patchRows(state.queue, (q) => !!q.groupName, { isRepeating: false }) });
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
+  getGroupNames: () => [...new Set(get().queue.flatMap((q) => (q.group ? [q.group] : [])))].sort(),
 
   // Replay Actions
-  startReplay: async (sessionId, replayId, frames, speed, loop) => {
-    try {
-      await ioStartReplay(sessionId, replayId, frames, speed, loop);
-      set((state) => ({ replayCache: new Map(state.replayCache).set(replayId, { sessionId, frames, speed, loop }) }));
-    } catch (e) {
-      set({ error: String(e) });
-    }
-  },
+  startReplay: (sessionId, replayId, source, speed, loop) =>
+    reporting(ioStartReplay(sessionId, replayId, source, speed, loop)),
 
-  stopReplay: async (replayId) => {
-    await ioStopReplay(replayId).catch((e) => set({ error: String(e) }));
-  },
+  stopReplay: (replayId) => reporting(ioStopReplay(replayId)),
 
   handleReplayLifecycle: (replayState) => {
     const { replay_id: replayId, session_id: sessionId, event, frames_sent: framesSent, total_frames: totalFrames, speed, loop_replay: loopReplay, pass } = replayState;
@@ -945,12 +530,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     });
   },
 
-  restartReplay: async (replayId) => {
-    const cached = get().replayCache.get(replayId);
-    if (!cached) return;
-    const { sessionId, frames, speed, loop } = cached;
-    await ioStartReplay(sessionId, replayId, frames, speed, loop).catch((e) => set({ error: String(e) }));
-  },
+  restartReplay: (replayId) => reporting(ioRestartReplay(replayId)),
 
   clearReplayLog: (sessionId) =>
     set((state) => ({ replayLog: state.replayLog.filter((e) => e.sessionId !== sessionId) })),

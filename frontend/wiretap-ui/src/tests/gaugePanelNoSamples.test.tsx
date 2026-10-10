@@ -36,7 +36,7 @@ describe("the gauge panel", () => {
   });
 
   it("a real zero reads as zero", async () => {
-    useDashboardStore.getState().pushSignalValues([{ frameId: 0x100, signalName: "Zero", value: 0, timestamp: 1 }]);
+    useDashboardStore.getState().setLatest(new Map([["256:Zero", 0]]));
     expect(await readout("Zero")).toEqual({ value: "0.000", valueArcs: 1 });
   });
 });

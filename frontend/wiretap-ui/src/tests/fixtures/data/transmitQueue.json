@@ -1,0 +1,554 @@
+{
+  "cases": [
+    {
+      "name": "addCanToQueue with no active session",
+      "input": {
+        "activeSessionId": null
+      },
+      "expected": {
+        "error": "No IO session connected. Use 'Data Source' to connect.",
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addCanToQueue from the default editor",
+      "input": "defaults",
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 291,
+                      "data": [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": false
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addCanToQueue with an id the editor cannot build is silently dropped",
+      "input": {
+        "frameId": "800"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addCanFramesBulk slices bytes to dlc, blank group is none, interval defaults to the editor's",
+      "input": {
+        "frames": [
+          {
+            "frame_id": 256,
+            "bytes": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "bus": 0,
+            "is_extended": false,
+            "dlc": 2
+          },
+          {
+            "frame_id": 512,
+            "bytes": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "bus": 0,
+            "is_extended": false,
+            "dlc": 3,
+            "is_rtr": true
+          }
+        ],
+        "group": ""
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "b",
+                  "profile_id": "profile_b",
+                  "profile_name": "name_b",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 256,
+                      "data": [
+                        1,
+                        2
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": false
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                },
+                {
+                  "session_id": "b",
+                  "profile_id": "profile_b",
+                  "profile_name": "name_b",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 512,
+                      "data": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": true
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addCanFramesBulk with an interval and group",
+      "input": {
+        "intervalMs": 50,
+        "group": "g1"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 256,
+                      "data": [
+                        1,
+                        2
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": false
+                    }
+                  },
+                  "interval_ms": 50,
+                  "group": "g1"
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue with no bytes adds nothing",
+      "input": {
+        "hexInput": "zz"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue raw framing",
+      "input": {
+        "hexInput": "AA BB C"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      170,
+                      187,
+                      12
+                    ],
+                    "framing": {
+                      "mode": "raw"
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue reads separators as hexToBytes does",
+      "input": {
+        "hexInput": "AA-BB,CC"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      170,
+                      187,
+                      204
+                    ],
+                    "framing": {
+                      "mode": "raw"
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue delimiter framing keeps the editor's delimiter",
+      "input": {
+        "hexInput": "01",
+        "framingMode": "delimiter"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      1
+                    ],
+                    "framing": {
+                      "mode": "delimiter",
+                      "delimiter": [
+                        13,
+                        10
+                      ]
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "each queue action is one command",
+      "input": "edit, start, stop, group start and stop, stop all, remove, clear",
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_edit",
+            "args": {
+              "id": "tx-1",
+              "edit": {
+                "enabled": false
+              }
+            }
+          },
+          {
+            "cmd": "transmit_queue_start",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_queue_stop",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_group_start",
+            "args": {
+              "group": "g"
+            }
+          },
+          {
+            "cmd": "transmit_group_stop",
+            "args": {
+              "group": "g"
+            }
+          },
+          {
+            "cmd": "transmit_queue_stop_all"
+          },
+          {
+            "cmd": "transmit_queue_remove",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_queue_clear"
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "a command Rust refuses lands in error",
+      "input": "start refused",
+      "expected": {
+        "error": "This row is disabled",
+        "invoked": [
+          {
+            "cmd": "transmit_queue_start",
+            "args": {
+              "id": "tx-1"
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "a pushed queue replaces the view and marks its sessions; an older one is ignored",
+      "input": "revision 2, then revision 1",
+      "expected": {
+        "error": null,
+        "invoked": [],
+        "queue": [
+          "tx-1",
+          "tx-2"
+        ],
+        "queueRevision": 2,
+        "activeGroups": [
+          "g"
+        ],
+        "queuedMarks": {
+          "a": true,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "getGroupNames is the queue's groups, unique and sorted",
+      "input": {
+        "groups": [
+          "b",
+          "a",
+          "b",
+          null
+        ]
+      },
+      "expected": {
+        "error": "[\"a\",\"b\"]",
+        "invoked": [],
+        "queue": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "queueRevision": 1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": true,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "a replay starts from a capture range and restarts by its id",
+      "input": {
+        "replayId": "r1",
+        "speed": 2,
+        "loop": true
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "io_start_replay",
+            "args": {
+              "sessionId": "a",
+              "replayId": "r1",
+              "source": {
+                "capture_id": "c",
+                "offset": 4,
+                "count": 10,
+                "bus": 1
+              },
+              "speed": 2,
+              "loopReplay": true
+            }
+          },
+          {
+            "cmd": "io_restart_replay",
+            "args": {
+              "replayId": "r1"
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    }
+  ]
+}

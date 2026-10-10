@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "name": "0",
+      "input": 0,
+      "expected": "0 ms"
+    },
+    {
+      "name": "999",
+      "input": 999,
+      "expected": "1 ms"
+    },
+    {
+      "name": "1000",
+      "input": 1000,
+      "expected": "1 ms"
+    },
+    {
+      "name": "999499",
+      "input": 999499,
+      "expected": "999 ms"
+    },
+    {
+      "name": "999500",
+      "input": 999500,
+      "expected": "1000 ms"
+    },
+    {
+      "name": "1000000",
+      "input": 1000000,
+      "expected": "1.00 s"
+    },
+    {
+      "name": "59999000",
+      "input": 59999000,
+      "expected": "60.00 s"
+    },
+    {
+      "name": "60000000",
+      "input": 60000000,
+      "expected": "1m 0.0s"
+    },
+    {
+      "name": "61500000",
+      "input": 61500000,
+      "expected": "1m 1.5s"
+    },
+    {
+      "name": "3600000000",
+      "input": 3600000000,
+      "expected": "60m 0.0s"
+    }
+  ]
+}

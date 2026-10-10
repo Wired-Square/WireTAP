@@ -1,7 +1,7 @@
 // ui/src/apps/dashboard/views/panels/bitfield/BitfieldPanel.tsx
 
 import { useRef } from "react";
-import { useDashboardStore, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { useDashboardStore, signalKey, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import { formatFrameId } from "../../../../../utils/frameIds";
@@ -21,10 +21,7 @@ export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
   const svgElRef = useRef<SVGSVGElement>(null);
   useSvgExportRef(svgElRef, svgRefProp);
 
-  // Re-render on new data; read each byte's latest value from the shared buffers.
-  const dataVersion = useDashboardStore((s) => s.dataVersion);
-  const buffers = useDashboardStore((s) => s.seriesBuffers);
-  void dataVersion;
+  const latest = useDashboardStore((s) => s.latest);
 
   const cfg = panel.widgetConfig?.bitfield;
   const frameId = panel.targetFrameId;
@@ -39,7 +36,7 @@ export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
 
   const bytes: number[] = [];
   for (let i = 0; i < byteCount; i++) {
-    bytes.push(buffers.get(`${frameId}:${BYTE_NAMES[i]}`)?.latestValue ?? 0);
+    bytes.push(latest.get(signalKey(frameId, BYTE_NAMES[i])) ?? 0);
   }
 
   const svgW = LABEL_W + 8 * (CELL + GAP);

@@ -1,0 +1,183 @@
+{
+  "cases": [
+    {
+      "expected": [
+        ""
+      ],
+      "input": {
+        "headers": [],
+        "pushes": [],
+        "signals": []
+      },
+      "name": "No signals"
+    },
+    {
+      "expected": [
+        ""
+      ],
+      "input": {
+        "headers": [
+          "a"
+        ],
+        "pushes": [],
+        "signals": [
+          "1:a"
+        ]
+      },
+      "name": "Signals without data"
+    },
+    {
+      "expected": [
+        "timestamp,Speed (km/h),rpm",
+        "2023-11-14T22:13:20.000000Z,10,",
+        "2023-11-14T22:13:20.250000Z,,900",
+        "2023-11-14T22:13:20.500000Z,11,950",
+        ""
+      ],
+      "input": {
+        "headers": [
+          "Speed (km/h)",
+          "rpm"
+        ],
+        "pushes": [
+          [
+            "1:speed",
+            1700000000,
+            10
+          ],
+          [
+            "1:speed",
+            1700000000.5,
+            11
+          ],
+          [
+            "1:rpm",
+            1700000000.25,
+            900
+          ],
+          [
+            "1:rpm",
+            1700000000.5,
+            950
+          ]
+        ],
+        "signals": [
+          "1:speed",
+          "1:rpm"
+        ]
+      },
+      "name": "Union of timestamps, blanks where a series has none; the header as the panel labels it"
+    },
+    {
+      "expected": [
+        "timestamp,\"a,\"\"b\"\" (V)\"",
+        "1970-01-01T00:00:02.000000Z,0.30000000000000004",
+        ""
+      ],
+      "input": {
+        "headers": [
+          "a,\"b\" (V)"
+        ],
+        "pushes": [
+          [
+            "1:a,\"b\"",
+            2,
+            0.30000000000000004
+          ]
+        ],
+        "signals": [
+          "1:a,\"b\""
+        ]
+      },
+      "name": "A header with a comma or quote is quoted"
+    },
+    {
+      "expected": [
+        "timestamp,a",
+        "1970-01-01T00:00:05.000000Z,2",
+        ""
+      ],
+      "input": {
+        "headers": [
+          "a"
+        ],
+        "pushes": [
+          [
+            "1:a",
+            5,
+            1
+          ],
+          [
+            "1:a",
+            5,
+            2
+          ]
+        ],
+        "signals": [
+          "1:a"
+        ]
+      },
+      "name": "A repeated timestamp in one series keeps the later value and one row"
+    },
+    {
+      "expected": [
+        "timestamp,a",
+        "1970-01-01T00:00:01.000100Z,1",
+        "1970-01-01T00:00:01.000200Z,2",
+        ""
+      ],
+      "input": {
+        "headers": [
+          "a"
+        ],
+        "pushes": [
+          [
+            "1:a",
+            1.0001,
+            1
+          ],
+          [
+            "1:a",
+            1.0002,
+            2
+          ]
+        ],
+        "signals": [
+          "1:a"
+        ]
+      },
+      "name": "Sub-millisecond stamps print to the microsecond (H7)"
+    },
+    {
+      "expected": [
+        "timestamp,byte_0_8b_le,byte_1_8b_le",
+        "1970-01-01T00:00:01.000000Z,170,",
+        "1970-01-01T00:00:02.000000Z,,85",
+        ""
+      ],
+      "input": {
+        "headers": [
+          "byte_0_8b_le",
+          "byte_1_8b_le"
+        ],
+        "pushes": [
+          [
+            "256:byte_0_8b_le",
+            1,
+            170
+          ],
+          [
+            "256:byte_1_8b_le",
+            2,
+            85
+          ]
+        ],
+        "signals": [
+          "256:byte_0_8b_le",
+          "256:byte_1_8b_le"
+        ]
+      },
+      "name": "Byte columns of a flow panel"
+    }
+  ]
+}

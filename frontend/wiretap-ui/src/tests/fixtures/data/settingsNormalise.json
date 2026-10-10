@@ -1,0 +1,312 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "binary_one_colour": "#14b8a6",
+        "binary_unused_colour": "#64748b",
+        "binary_zero_colour": "#94a3b8",
+        "buffer_storage": "sqlite",
+        "clear_captures_on_start": true,
+        "config_path": "config/wiretap.toml",
+        "decoder_dir": "/Documents/WireTAP/Decoders",
+        "decoder_max_decoded_frames": 500,
+        "decoder_max_decoded_per_source": 2000,
+        "decoder_max_filtered_frames": 1000,
+        "decoder_max_unmatched_frames": 1000,
+        "default_frame_type": "can",
+        "default_read_profile": null,
+        "default_write_profiles": [],
+        "discovery_history_buffer": 100000,
+        "display_frame_id_format": "hex",
+        "display_time_format": "human",
+        "display_timezone": "local",
+        "dump_dir": "/Documents/WireTAP/Dumps",
+        "frame_editor_colours": [
+          "#22d3ee",
+          "#4ade80",
+          "#facc15",
+          "#c084fc",
+          "#60a5fa",
+          "#f87171",
+          "#67e8f9",
+          "#86efac"
+        ],
+        "graph_buffer_size": 10000,
+        "install_id": "",
+        "io_profiles": [],
+        "keep_display_awake": false,
+        "language": "en-AU",
+        "log_level": "off",
+        "mcp_allow_catalog_modify": false,
+        "mcp_allow_catalog_write": false,
+        "mcp_allow_control": false,
+        "mcp_allow_dashboard_write": false,
+        "mcp_allow_session_control": false,
+        "mcp_allow_ui_control": false,
+        "mcp_server_enabled": false,
+        "mcp_server_port": 8787,
+        "mcp_server_token": "",
+        "modbus_max_register_errors": 3,
+        "prevent_idle_sleep": true,
+        "query_result_limit": 10000,
+        "report_dir": "/Documents/WireTAP/Reports",
+        "save_frame_id_format": "hex",
+        "session_manager_stats_interval": 60,
+        "signal_colour_high": "#22c55e",
+        "signal_colour_low": "#f59e0b",
+        "signal_colour_medium": "#3b82f6",
+        "signal_colour_none": "#94a3b8",
+        "smp_port": 1337,
+        "telemetry_consent_given": false,
+        "telemetry_enabled": false,
+        "theme_accent_danger": "#dc2626",
+        "theme_accent_primary": "#2563eb",
+        "theme_accent_success": "#16a34a",
+        "theme_accent_warning": "#d97706",
+        "theme_bg_primary_dark": "#0f172a",
+        "theme_bg_primary_light": "#ffffff",
+        "theme_bg_surface_dark": "#1e293b",
+        "theme_bg_surface_light": "#f8fafc",
+        "theme_border_default_dark": "#334155",
+        "theme_border_default_light": "#e2e8f0",
+        "theme_data_bg_dark": "#111827",
+        "theme_data_bg_light": "#f8fafc",
+        "theme_data_text_primary_dark": "#e5e7eb",
+        "theme_data_text_primary_light": "#0f172a",
+        "theme_mode": "auto",
+        "theme_text_primary_dark": "#ffffff",
+        "theme_text_primary_light": "#0f172a",
+        "theme_text_secondary_dark": "#cbd5e1",
+        "theme_text_secondary_light": "#334155",
+        "transmit_max_history": 1000,
+        "usage_analytics_consent_given": false,
+        "usage_analytics_enabled": false
+      },
+      "input": {},
+      "name": "empty input gives the defaults"
+    },
+    {
+      "expected": {},
+      "input": {
+        "dirs": {
+          "decoders": "/dec",
+          "dumps": "/dmp",
+          "reports": "/rep"
+        },
+        "raw": {
+          "decoder_dir": "",
+          "dump_dir": "/d"
+        }
+      },
+      "name": "falsy directories take the default dirs"
+    },
+    {
+      "expected": {
+        "buffer_storage": "x",
+        "clear_captures_on_start": false,
+        "log_level": "info"
+      },
+      "input": {
+        "raw": {
+          "capture_storage": "x",
+          "clear_buffers_on_start": false,
+          "enable_file_logging": true,
+          "log_level": "off"
+        }
+      },
+      "name": "legacy and unknown keys are dropped"
+    },
+    {
+      "expected": {
+        "graph_buffer_size": 100000,
+        "mcp_server_port": 1024,
+        "query_result_limit": 100,
+        "smp_port": 1
+      },
+      "input": {
+        "raw": {
+          "graph_buffer_size": 1000000000,
+          "mcp_server_port": 80,
+          "modbus_max_register_errors": -1,
+          "query_result_limit": 5,
+          "smp_port": 0
+        }
+      },
+      "name": "out-of-range numbers are not clamped"
+    },
+    {
+      "expected": {
+        "session_manager_stats_interval": 0
+      },
+      "input": {
+        "raw": {
+          "config_path": "",
+          "install_id": "",
+          "session_manager_stats_interval": 0,
+          "signal_colour_none": "",
+          "theme_accent_primary": ""
+        }
+      },
+      "name": "zero and empty string survive ?? but not ||"
+    },
+    {
+      "expected": {},
+      "input": {
+        "raw": {
+          "display_frame_id_format": "HEX",
+          "save_frame_id_format": "Decimal"
+        }
+      },
+      "name": "id formats coerce anything but decimal to hex"
+    },
+    {
+      "expected": {
+        "default_frame_type": "lin",
+        "display_time_format": "bogus",
+        "display_timezone": "mars",
+        "log_level": "loud",
+        "theme_mode": "neon"
+      },
+      "input": {
+        "raw": {
+          "default_frame_type": "lin",
+          "display_time_format": "bogus",
+          "display_timezone": "mars",
+          "log_level": "loud",
+          "theme_mode": "neon"
+        }
+      },
+      "name": "other enums pass through unchecked"
+    },
+    {
+      "expected": {},
+      "input": {
+        "raw": {
+          "default_read_profile": null,
+          "default_write_profiles": null,
+          "log_level": null,
+          "prevent_idle_sleep": null
+        }
+      },
+      "name": "null takes the default"
+    },
+    {
+      "expected": {},
+      "input": {
+        "raw": {
+          "language": 7,
+          "prevent_idle_sleep": "yes",
+          "query_result_limit": "500"
+        }
+      },
+      "name": "wrong types pass through"
+    },
+    {
+      "expected": {},
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "#1",
+            "#2",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7"
+          ]
+        }
+      },
+      "name": "frame editor colours of seven are replaced"
+    },
+    {
+      "expected": {},
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "#1",
+            "#2",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7",
+            "#8",
+            "#9"
+          ]
+        }
+      },
+      "name": "frame editor colours of nine are replaced"
+    },
+    {
+      "expected": {
+        "frame_editor_colours": [
+          "",
+          "x",
+          "#3",
+          "#4",
+          "#5",
+          "#6",
+          "#7",
+          "#8"
+        ]
+      },
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "",
+            "x",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7",
+            "#8"
+          ]
+        }
+      },
+      "name": "frame editor colours of eight are kept, unchecked"
+    },
+    {
+      "expected": {
+        "io_profiles": [
+          {
+            "connection": {},
+            "ephemeral": true,
+            "id": "a",
+            "kind": "slcan",
+            "name": "A",
+            "preferred_catalog": null
+          },
+          {
+            "connection": {},
+            "id": "b",
+            "kind": "slcan",
+            "name": "B",
+            "preferred_catalog": null
+          }
+        ]
+      },
+      "input": {
+        "raw": {
+          "io_profiles": [
+            {
+              "connection": {},
+              "ephemeral": true,
+              "id": "a",
+              "kind": "slcan",
+              "name": "A"
+            },
+            {
+              "connection": {},
+              "ephemeral": false,
+              "id": "b",
+              "kind": "slcan",
+              "name": "B"
+            }
+          ]
+        }
+      },
+      "name": "ephemeral profiles are dropped"
+    }
+  ]
+}

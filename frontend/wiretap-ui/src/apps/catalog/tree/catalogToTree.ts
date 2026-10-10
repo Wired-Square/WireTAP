@@ -4,7 +4,6 @@
 // path into the document (what the edit ops target) and the part of the model
 // it shows. Nothing is renamed or re-derived here.
 
-import { sortMuxCaseKeys } from "../../../utils/muxCaseMatch";
 import type { Catalog, Frame, Signal, Mux, FrameChecksum, NodeDef } from "../../../types/catalogModel";
 import type { TomlNode, TomlNodeType, ProtocolType } from "../types";
 
@@ -28,7 +27,7 @@ function signalNode(signal: Signal, index: number, framePath: string[], prefix: 
 }
 
 function muxNode(mux: Mux, framePath: string[], muxPath: string[], inherited: boolean): TomlNode {
-  const cases = sortMuxCaseKeys(Object.keys(mux.cases)).map((caseValue): TomlNode => {
+  const cases = mux.caseOrder.map((caseValue): TomlNode => {
     const muxCase = mux.cases[caseValue];
     const casePrefix = ["mux", ...muxPath, caseValue];
     const children = muxCase.signals.map((s, i) => signalNode(s, i, framePath, casePrefix, inherited)).sort(byStartBit);
