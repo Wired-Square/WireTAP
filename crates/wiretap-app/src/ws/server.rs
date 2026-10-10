@@ -767,3 +767,47 @@ pub(crate) mod outbox {
         wanted.into_iter().map(|(recipient, data)| (recipient, data[HEADER_SIZE..].to_vec())).collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_session_keeps_its_channel_and_channels_count_up_from_one() {
+        let mut map = ChannelMap::new();
+        assert_eq!(map.allocate("a"), Ok(1));
+        assert_eq!(map.allocate("b"), Ok(2));
+        assert_eq!(map.allocate("a"), Ok(1));
+    }
+
+    #[test]
+    fn a_released_channel_is_reused_only_after_the_counter_wraps() {
+        let mut map = ChannelMap::new();
+        map.allocate("a").unwrap();
+        map.allocate("b").unwrap();
+        map.release(1);
+        assert_eq!(map.allocate("c"), Ok(3));
+        for n in 4..=254 {
+            assert_eq!(map.allocate(&format!("s{n}")), Ok(n));
+        }
+        assert_eq!(map.allocate("wrapped"), Ok(1));
+    }
+
+    #[test]
+    fn the_255th_session_is_refused() {
+        let mut map = ChannelMap::new();
+        for n in 1..=254u8 {
+            assert_eq!(map.allocate(&format!("s{n}")), Ok(n));
+        }
+        assert_eq!(map.allocate("one-too-many"), Err("No channels available (254 sessions active)".to_string()));
+        map.release(100);
+        assert_eq!(map.allocate("one-too-many"), Ok(100));
+    }
+
+    #[test]
+    fn a_token_is_32_lowercase_hex_digits() {
+        let token = generate_token();
+        assert_eq!(token.len(), 32);
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+}

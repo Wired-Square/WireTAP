@@ -1634,4 +1634,37 @@ pub(crate) mod tests {
         assert!(!sweep.is_extended);
         assert_eq!(sweep.frame_id, tp::SWEEP_REQUEST_BASE + 9);
     }
+
+    #[tokio::test]
+    async fn a_virtual_loopback_echo_keeps_the_id_bus_and_fd_but_drops_brs() {
+        const SESSION: &str = "test_virtual_codec";
+        open_virtual_loopback(SESSION).await;
+        let sent = io::CanTransmitFrame {
+            frame_id: 0x1ABC_DEF0,
+            data: (1..=12).collect(),
+            bus: 0,
+            is_extended: true,
+            is_fd: true,
+            is_brs: true,
+            is_rtr: false,
+        };
+        let transmitted = io::transmit_frame(SESSION, &sent).await;
+        let capture = crate::capture_store::get_session_frame_capture_id(SESSION).unwrap();
+        let echo = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).and_then(|f| f.into_iter().next()) {
+                    return frame;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        io::destroy_session(SESSION, false).await.ok();
+
+        assert!(transmitted.unwrap().success);
+        let echo = echo.expect("the frame came back");
+        assert_eq!((echo.frame_id, echo.bus, echo.dlc, echo.bytes), (sent.frame_id, 0, 12, sent.data));
+        assert_eq!((echo.is_extended, echo.is_fd, echo.is_brs), (true, true, false));
+        assert_eq!(echo.direction.as_deref(), Some("rx"));
+    }
 }

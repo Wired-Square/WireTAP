@@ -2641,4 +2641,72 @@ mod tests {
             assert_eq!(m.version, i as i64 + 1, "MIGRATIONS must be contiguous from 1");
         }
     }
+
+    fn global_capture(name: &str, frames: &[(u32, &[u8])]) -> String {
+        use_in_memory_database();
+        let id = crate::capture_store::create_standalone_capture(crate::capture_store::CaptureKind::Frames, name.into());
+        let frames = frames
+            .iter()
+            .enumerate()
+            .map(|(i, &(frame_id, bytes))| FrameMessage {
+                protocol: "can".into(),
+                timestamp_us: i as u64,
+                frame_id,
+                dlc: bytes.len() as u16,
+                bytes: bytes.to_vec(),
+                ..Default::default()
+            })
+            .collect();
+        crate::capture_store::append_frames_to_capture(&id, frames);
+        id
+    }
+
+    fn search(id: &str, query: &str, search_id: bool, search_data: bool) -> Vec<usize> {
+        search_frames(id, query, search_id, search_data, &FrameSelection::default()).unwrap()
+    }
+
+    #[test]
+    fn a_search_matches_a_substring_of_the_unpadded_lowercase_hex_id() {
+        let id = global_capture("search-id", &[(0x100, &[]), (0x210, &[]), (0x7AB, &[])]);
+        assert_eq!(search(&id, "10", true, false), vec![0, 1]);
+        assert_eq!(search(&id, "0x7AB", true, false), vec![2]);
+        assert_eq!(search(&id, "", true, false), Vec::<usize>::new());
+        assert_eq!(search(&id, "10", false, false), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn a_data_search_matches_hex_across_byte_boundaries_in_either_case() {
+        let id = global_capture("search-data", &[(1, &[0xDE, 0xAD]), (2, &[0xBE, 0xEF]), (3, &[0x0E, 0xAD])]);
+        assert_eq!(search(&id, "ead", false, true), vec![0, 2]);
+        assert_eq!(search(&id, "EADB", false, true), Vec::<usize>::new());
+        assert_eq!(search(&id, "2", true, true), vec![1]);
+    }
+
+    #[test]
+    fn like_wildcards_in_a_query_are_not_escaped() {
+        let id = global_capture("search-wildcards", &[(0x100, &[0x01]), (0x200, &[0x02])]);
+        assert_eq!(search(&id, "_", true, false), vec![0, 1]);
+        assert_eq!(search(&id, "1%0", true, false), vec![0]);
+        assert_eq!(search(&id, "'", true, true), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn a_search_offset_counts_only_the_selected_frames() {
+        let id = global_capture("search-selection", &[(0x100, &[]), (0x200, &[]), (0x100, &[])]);
+        let only_0x100 = FrameSelection::from_groups(vec![ProtocolFrames {
+            protocol: "can".into(),
+            frame_ids: vec![0x100],
+            all_ids: false,
+        }]);
+        assert_eq!(search_frames(&id, "100", true, false, &only_0x100).unwrap(), vec![0, 1]);
+    }
+
+    #[test]
+    fn all_frames_come_back_in_insertion_order_with_their_bytes() {
+        let id = global_capture("all-frames", &[(0x200, &[1, 2]), (0x100, &[3])]);
+        let frames = get_all_frames(&id).unwrap();
+        let summary: Vec<_> = frames.iter().map(|f| (f.frame_id, f.bytes.clone(), f.timestamp_us)).collect();
+        assert_eq!(summary, vec![(0x200, vec![1, 2], 0), (0x100, vec![3], 1)]);
+        assert!(get_all_frames("no-such-capture").unwrap().is_empty());
+    }
 }

@@ -65,3 +65,42 @@ impl Cadence {
         (!self.cancel.load(Ordering::Relaxed)).then_some(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::time::Instant;
+
+    #[tokio::test(start_paused = true)]
+    async fn the_first_tick_is_immediate_and_the_rest_are_an_interval_apart() {
+        let mut cadence = Cadence::new(1_000, Arc::new(AtomicBool::new(false)));
+        let start = Instant::now();
+        cadence.next().await.unwrap();
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        cadence.next().await.unwrap();
+        assert_eq!(start.elapsed(), Duration::from_millis(1_000));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_cancel_set_mid_interval_is_seen_within_one_poll() {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut cadence = Cadence::new(10_000, cancel.clone());
+        cadence.next().await.unwrap();
+        let start = Instant::now();
+        tokio::spawn({
+            let cancel = cancel.clone();
+            async move {
+                sleep(Duration::from_millis(250)).await;
+                cancel.store(true, Ordering::Relaxed);
+            }
+        });
+        assert!(cadence.next().await.is_none());
+        assert_eq!(start.elapsed(), Duration::from_millis(300));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_cancel_set_before_the_first_tick_stops_at_once() {
+        let mut cadence = Cadence::new(1_000, Arc::new(AtomicBool::new(true)));
+        assert!(cadence.next().await.is_none());
+    }
+}

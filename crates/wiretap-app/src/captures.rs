@@ -240,14 +240,7 @@ pub async fn import_csv_batch_with_mapping(
 
         // Detect inter-file sequence gap (between previous file's last seq and this file's first)
         if let (Some(prev_last), Some(cur_first)) = (prev_file_last_seq, result.first_seq) {
-            let gap = if cur_first > prev_last {
-                cur_first - prev_last - 1
-            } else if prev_last > 0 && cur_first < prev_last / 2 {
-                // Wraparound
-                cur_first
-            } else {
-                0
-            };
+            let gap = inter_file_gap(prev_last, cur_first);
             if gap > 0 {
                 all_sequence_gaps.push(io::SequenceGap {
                     line: 1,
@@ -300,6 +293,17 @@ pub async fn import_csv_batch_with_mapping(
         total_dropped,
         wrap_points,
     })
+}
+
+fn inter_file_gap(prev_last: u64, cur_first: u64) -> u64 {
+    if cur_first > prev_last {
+        cur_first - prev_last - 1
+    } else if prev_last > 0 && cur_first < prev_last / 2 {
+        // Wraparound
+        cur_first
+    } else {
+        0
+    }
 }
 
 /// Detect sequence wraparound points from gaps.
@@ -638,6 +642,48 @@ pub async fn list_orphaned_captures() -> Vec<CaptureMetadata> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_gap_between_files_counts_the_sequence_numbers_skipped() {
+        assert_eq!(inter_file_gap(10, 11), 0);
+        assert_eq!(inter_file_gap(10, 15), 4);
+        assert_eq!(inter_file_gap(10, 10), 0);
+    }
+
+    #[test]
+    fn a_wrap_between_files_counts_only_the_numbers_after_zero() {
+        assert_eq!(inter_file_gap(1000, 0), 0);
+        assert_eq!(inter_file_gap(1000, 5), 5);
+        assert_eq!(inter_file_gap(65_535, 3), 3);
+    }
+
+    #[test]
+    fn a_short_step_back_between_files_is_no_gap() {
+        assert_eq!(inter_file_gap(1000, 600), 0);
+        assert_eq!(inter_file_gap(1000, 500), 0);
+        assert_eq!(inter_file_gap(1000, 499), 499);
+    }
+
+    fn gap(from_seq: u64, to_seq: u64) -> io::SequenceGap {
+        io::SequenceGap { line: 1, from_seq, to_seq, dropped: 0, filename: None }
+    }
+
+    #[test]
+    fn a_wrap_point_is_a_jump_back_below_half_listed_once() {
+        let gaps = [gap(10, 15), gap(1000, 3), gap(1000, 400), gap(1000, 600), gap(255, 2)];
+        assert_eq!(detect_wrap_points(&gaps), vec![1000, 255]);
+        assert!(detect_wrap_points(&[gap(0, 0)]).is_empty());
+    }
+
+    #[test]
+    fn a_batch_is_named_for_the_common_prefix_of_its_filenames() {
+        let paths = |names: &[&str]| names.iter().map(|n| format!("/data/{n}")).collect::<Vec<_>>();
+        assert_eq!(build_batch_name(&paths(&["run_01.csv", "run_02.csv"])), "run_0 (2 files)");
+        assert_eq!(build_batch_name(&paths(&["log-a.csv", "log-b.csv"])), "log (2 files)");
+        assert_eq!(build_batch_name(&paths(&["abcd1.csv", "xyz.csv"])), "2 files merged");
+        assert_eq!(build_batch_name(&paths(&["only.csv"])), "only.csv (1 files)");
+        assert_eq!(build_batch_name(&[]), "0 files merged");
+    }
 
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]

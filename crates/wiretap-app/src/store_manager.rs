@@ -180,8 +180,10 @@ fn schedule_save() {
 /// Initialise the store manager with the app handle.
 /// Call this once during app setup.
 pub fn initialise(app: &AppHandle) -> Result<(), String> {
-    let path = get_store_path(app)?;
+    initialise_at(get_store_path(app)?)
+}
 
+fn initialise_at(path: PathBuf) -> Result<(), String> {
     let mut manager = STORE_MANAGER
         .write()
         .map_err(|e| format!("Failed to acquire write lock: {}", e))?;
@@ -346,4 +348,37 @@ pub fn store_has(key: String) -> bool {
 #[tauri::command]
 pub fn store_keys() -> Vec<String> {
     keys()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn the_store_loads_migrates_and_saves_its_file() {
+        let dir = std::env::temp_dir().join(format!("wiretap-store-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ui-state.json");
+        fs::write(&path, r#"{"kept": 1, "favorites.timeRanges": [1]}"#).unwrap();
+        fs::write(dir.join("selection-sets.dat"), r#"{"selectionSets": ["a"]}"#).unwrap();
+
+        initialise_at(path.clone()).unwrap();
+        assert_eq!(get("kept"), Some(json!(1)));
+        assert!(!has("favorites.timeRanges"));
+        assert_eq!(get("selectionSets.all"), Some(json!(["a"])));
+
+        set("added", json!("x")).unwrap();
+        assert!(delete("kept").unwrap());
+        assert!(!delete("kept").unwrap());
+        flush().unwrap();
+
+        let saved: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved, json!({"added": "x", "selectionSets.all": ["a"]}));
+        assert!(!path.with_extension("json.tmp").exists());
+
+        fs::write(&path, "not json").unwrap();
+        assert!(initialise_at(path).unwrap_err().starts_with("Failed to parse store file"));
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }

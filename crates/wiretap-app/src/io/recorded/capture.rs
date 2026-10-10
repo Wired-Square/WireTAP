@@ -928,3 +928,127 @@ async fn run_capture_stream(
         session_id, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::capture_store::{create_standalone_capture, CaptureKind, FrameSelection, ProtocolFrames};
+
+    fn capture_of(name: &str, frames: &[(u64, u32)]) -> String {
+        crate::capture_db::use_in_memory_database();
+        let id = create_standalone_capture(CaptureKind::Frames, name.to_string());
+        let frames = frames
+            .iter()
+            .map(|&(timestamp_us, frame_id)| FrameMessage {
+                protocol: "can".into(),
+                timestamp_us,
+                frame_id,
+                ..Default::default()
+            })
+            .collect();
+        capture_store::append_frames_to_capture(&id, frames);
+        id
+    }
+
+    fn step(capture: &str, index: Option<usize>, timestamp: Option<i64>, backward: bool) -> Option<(usize, i64)> {
+        step_frame("f_step_test", capture, index, timestamp, backward, &FrameSelection::default())
+            .unwrap()
+            .map(|r| (r.frame_index, r.timestamp_us))
+    }
+
+    const THREE: &[(u64, u32)] = &[(10, 0x100), (20, 0x200), (30, 0x100)];
+
+    #[test]
+    fn an_empty_capture_cannot_be_stepped() {
+        let id = capture_of("step-empty", &[]);
+        let err = step_frame("f_step_test", &id, None, None, false, &FrameSelection::default()).unwrap_err();
+        assert_eq!(err, "Capture is empty");
+    }
+
+    #[test]
+    fn a_step_moves_one_frame_from_the_index_given() {
+        let id = capture_of("step-index", THREE);
+        assert_eq!(step(&id, Some(0), None, false), Some((1, 20)));
+        assert_eq!(step(&id, Some(2), None, true), Some((1, 20)));
+    }
+
+    #[test]
+    fn a_step_past_either_end_is_none() {
+        let id = capture_of("step-ends", THREE);
+        assert_eq!(step(&id, Some(2), None, false), None);
+        assert_eq!(step(&id, Some(0), None, true), None);
+    }
+
+    #[test]
+    fn an_index_past_the_end_is_clamped_to_the_last_frame() {
+        let id = capture_of("step-clamp", THREE);
+        assert_eq!(step(&id, Some(99), None, true), Some((1, 20)));
+    }
+
+    #[test]
+    fn with_no_position_a_step_starts_at_the_end_it_leaves_and_skips_that_frame() {
+        let id = capture_of("step-no-position", THREE);
+        assert_eq!(step(&id, None, None, false), Some((1, 20)));
+        assert_eq!(step(&id, None, None, true), Some((1, 20)));
+    }
+
+    #[test]
+    fn a_timestamp_resolves_to_the_first_frame_at_or_after_it() {
+        let id = capture_of("step-timestamp", THREE);
+        assert_eq!(step(&id, None, Some(15), false), Some((2, 30)));
+        assert_eq!(step(&id, None, Some(15), true), Some((0, 10)));
+    }
+
+    #[test]
+    fn a_timestamp_past_the_last_frame_falls_back_to_the_end_it_leaves() {
+        let id = capture_of("step-late-timestamp", THREE);
+        assert_eq!(step(&id, None, Some(99), false), Some((1, 20)));
+        assert_eq!(step(&id, None, Some(99), true), Some((1, 20)));
+    }
+
+    #[test]
+    fn a_selection_skips_the_frames_it_leaves_out() {
+        let id = capture_of("step-selection", THREE);
+        let only_0x100 = FrameSelection::from_groups(vec![ProtocolFrames {
+            protocol: "can".into(),
+            frame_ids: vec![0x100],
+            all_ids: false,
+        }]);
+        let result = step_frame("f_step_test", &id, Some(0), None, false, &only_0x100).unwrap().unwrap();
+        assert_eq!((result.frame_index, result.timestamp_us), (2, 30));
+    }
+
+    async fn play_to_end(source: &mut CaptureSource, limit: Duration) -> Option<Duration> {
+        let started = std::time::Instant::now();
+        source.start().await.unwrap();
+        let ended = tokio::time::timeout(limit, async {
+            while source.state() != IOState::Paused {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await;
+        let elapsed = started.elapsed();
+        source.stop().await.unwrap();
+        ended.ok().map(|_| elapsed)
+    }
+
+    fn spread(count: usize, span_us: u64) -> Vec<(u64, u32)> {
+        (0..count).map(|i| (i as u64 * span_us / count as u64, 0x100)).collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn at_unlimited_speed_a_capture_plays_through_its_chunks_and_pauses_at_the_end() {
+        let id = capture_of("play-unlimited", &spread(4500, 60_000_000));
+        let mut source = CaptureSource::new("f_play_unlimited".into(), id, 0.0);
+        let elapsed = play_to_end(&mut source, Duration::from_secs(10)).await.expect("reached the end");
+        assert!(elapsed < Duration::from_secs(10));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn at_1x_playback_takes_as_long_as_the_capture_spans() {
+        let id = capture_of("play-paced", &spread(30, 400_000));
+        let mut source = CaptureSource::new("f_play_paced".into(), id, 1.0);
+        let elapsed = play_to_end(&mut source, Duration::from_secs(5)).await.expect("reached the end");
+        assert!(elapsed >= Duration::from_millis(350), "finished in {elapsed:?}");
+    }
+}

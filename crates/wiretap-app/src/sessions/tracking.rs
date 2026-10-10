@@ -227,3 +227,36 @@ mod origin_profile_tests {
         assert!(get_session_origin_profile_ids("s_gone").is_empty());
     }
 }
+
+#[cfg(test)]
+mod probe_cache_tests {
+    use super::*;
+
+    fn probe(success: bool) -> DeviceProbeResult {
+        DeviceProbeResult {
+            success,
+            source_type: "gvret".into(),
+            is_multi_bus: true,
+            bus_count: 2,
+            primary_info: None,
+            secondary_info: None,
+            supports_fd: None,
+            error: (!success).then(|| "offline".into()),
+        }
+    }
+
+    #[test]
+    fn only_a_successful_probe_is_cached_until_cleared() {
+        cache_probe_result("p_failed", &probe(false));
+        assert!(get_cached_probe("p_failed").is_none());
+
+        cache_probe_result("p_ok", &probe(true));
+        assert_eq!(get_cached_probe("p_ok").map(|r| r.bus_count), Some(2));
+
+        cache_probe_result("p_ok", &probe(false));
+        assert!(get_cached_probe("p_ok").is_some(), "a later failure leaves the success cached");
+
+        clear_probe_cache("p_ok");
+        assert!(get_cached_probe("p_ok").is_none());
+    }
+}
