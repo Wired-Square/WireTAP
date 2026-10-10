@@ -21,6 +21,7 @@ import {
   type TimestampUnit,
   type Delimiter,
   type CaptureMetadata,
+  type CsvImportProgress,
   type CsvImportResult,
 } from "../../api/capture";
 import { caption, textMuted, bgSurface, borderDefault, textSecondary } from "../../styles";
@@ -257,7 +258,7 @@ export default function CsvColumnMapperDialog({
 
       if (isMultiFile && allFilePaths) {
         // Listen for per-file progress events
-        unlistenRef.current = await listen<{ file_index: number; total_files: number; filename: string }>(
+        unlistenRef.current = await listen<CsvImportProgress>(
           "csv-import-progress",
           (event) => {
             setImportProgress(

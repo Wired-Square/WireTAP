@@ -15,6 +15,7 @@ import type { CaptureKind } from "../generated/CaptureKind";
 import type { CaptureMetadata } from "../generated/CaptureMetadata";
 import type { CsvColumnMapping } from "../generated/CsvColumnMapping";
 import type { CsvColumnRole } from "../generated/CsvColumnRole";
+import type { CsvImportProgress } from "../generated/CsvImportProgress";
 import type { CsvImportResult } from "../generated/CsvImportResult";
 import type { CsvPreview } from "../generated/CsvPreview";
 import type { CsvTimestampPreview } from "../generated/CsvTimestampPreview";
@@ -42,6 +43,7 @@ export type {
   CaptureMetadata,
   CsvColumnMapping,
   CsvColumnRole,
+  CsvImportProgress,
   CsvImportResult,
   CsvPreview,
   CsvTimestampPreview,

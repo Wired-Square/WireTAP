@@ -218,6 +218,7 @@ pub struct CsvLayout<'a> {
 
 /// The file of a batch about to be parsed.
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CsvImportProgress {
     pub file_index: usize,
     pub total_files: usize,

@@ -109,6 +109,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::profiles::DeviceWriteError>();
     r.visit::<crate::io::traits::ProfileTraitsTable>();
     r.visit::<crate::captures::CandumpImportResult>();
+    r.visit::<crate::captures::CsvImportProgress>();
     r.visit::<crate::captures::CsvImportResult>();
     r.visit::<crate::captures::PaginatedBytesResponse>();
     r.visit::<crate::captures::PaginatedFramesResponse>();
@@ -148,6 +149,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::query::QueryQueue>();
     r.visit::<crate::query::QueryOutcome>();
     r.visit::<crate::query::QueryRequest>();
+    r.visit::<crate::apiclient::ImportProgress>();
     r.visit::<crate::gateway_admin::GatewayDaemon>();
     r.visit::<crate::gateway_admin::AssignmentOutcome>();
     r.visit::<crate::replay::ReplayEstimate>();

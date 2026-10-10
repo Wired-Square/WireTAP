@@ -414,6 +414,7 @@ use wiretap_protocol::{can::CanFrame, import};
 const IMPORT_PAGE: usize = 50_000;
 
 #[derive(serde::Serialize, Clone)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "CaptureUploadProgress"))]
 pub(crate) struct ImportProgress {
     capture_id: String,
     sent: usize,
