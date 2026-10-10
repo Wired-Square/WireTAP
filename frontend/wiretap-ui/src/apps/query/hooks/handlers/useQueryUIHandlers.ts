@@ -118,7 +118,7 @@ function fmtByte(v: number): string {
 }
 
 /** Build CSV string from a completed query's results */
-function buildQueryCsv(query: QueuedQuery): string | null {
+export function buildQueryCsv(query: QueuedQuery): string | null {
   const { queryType, results } = query;
   if (!results) return null;
 

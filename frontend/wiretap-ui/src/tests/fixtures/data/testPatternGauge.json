@@ -1,0 +1,101 @@
+{
+  "note": "`ts` is TestPattern.tsx gaugeExpectedTx (the TX gauge's scale is nearestRound of it; 0 auto-scales from the live count). `rust` is the most frames io_test.rs stream() can send: ceil(rate × (duration − drain_secs)); null where stream() is not the sender (sweep sends one request per length code, throughput is unpaced).",
+  "rows": [
+    {
+      "mode": "echo",
+      "rate_hz": 100,
+      "duration_sec": 10,
+      "ts": {
+        "expected_tx": 1000,
+        "gauge_max": 1000
+      },
+      "rust": {
+        "max_tx": 900
+      }
+    },
+    {
+      "mode": "latency",
+      "rate_hz": 10,
+      "duration_sec": 10,
+      "ts": {
+        "expected_tx": 100,
+        "gauge_max": 100
+      },
+      "rust": {
+        "max_tx": 90
+      }
+    },
+    {
+      "mode": "reliability",
+      "rate_hz": 100,
+      "duration_sec": 60,
+      "ts": {
+        "expected_tx": 6000,
+        "gauge_max": 10000
+      },
+      "rust": {
+        "max_tx": 5900
+      }
+    },
+    {
+      "mode": "echo",
+      "rate_hz": 200,
+      "duration_sec": 2,
+      "ts": {
+        "expected_tx": 400,
+        "gauge_max": 500
+      },
+      "rust": {
+        "max_tx": 267
+      }
+    },
+    {
+      "mode": "echo",
+      "rate_hz": 200,
+      "duration_sec": 1,
+      "ts": {
+        "expected_tx": 200,
+        "gauge_max": 200
+      },
+      "rust": {
+        "max_tx": 134
+      }
+    },
+    {
+      "mode": "loopback",
+      "rate_hz": 1000,
+      "duration_sec": 5,
+      "ts": {
+        "expected_tx": 5000,
+        "gauge_max": 5000
+      },
+      "rust": {
+        "max_tx": 4000
+      }
+    },
+    {
+      "mode": "sweep",
+      "rate_hz": 100,
+      "duration_sec": 10,
+      "ts": {
+        "expected_tx": 1000,
+        "gauge_max": 1000
+      },
+      "rust": {
+        "max_tx": null
+      }
+    },
+    {
+      "mode": "throughput",
+      "rate_hz": 0,
+      "duration_sec": 10,
+      "ts": {
+        "expected_tx": 0,
+        "gauge_max": null
+      },
+      "rust": {
+        "max_tx": null
+      }
+    }
+  ]
+}

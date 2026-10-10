@@ -1,0 +1,20 @@
+{
+  "cases": [
+    {
+      "name": "normalizeSettings({}) against AppSettings::default()",
+      "input": null,
+      "expected": {
+        "onlyRust": [
+          "enable_file_logging"
+        ],
+        "onlyTs": [],
+        "differ": {
+          "config_path": {
+            "ts": "",
+            "rust": "config/wiretap.toml"
+          }
+        }
+      }
+    }
+  ]
+}

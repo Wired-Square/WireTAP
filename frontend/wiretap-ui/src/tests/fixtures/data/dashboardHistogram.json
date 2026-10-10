@@ -1,0 +1,352 @@
+{
+  "cases": [
+    {
+      "name": "Empty values",
+      "input": {
+        "values": [],
+        "binCount": 10
+      },
+      "expected": []
+    },
+    {
+      "name": "Zero bins",
+      "input": {
+        "values": [
+          "1",
+          "2",
+          "3"
+        ],
+        "binCount": 0
+      },
+      "expected": []
+    },
+    {
+      "name": "Negative bins",
+      "input": {
+        "values": [
+          "1",
+          "2",
+          "3"
+        ],
+        "binCount": -1
+      },
+      "expected": []
+    },
+    {
+      "name": "One distinct value: one bin [v, v+1) whatever the bin count",
+      "input": {
+        "values": [
+          "4",
+          "4",
+          "4"
+        ],
+        "binCount": 10
+      },
+      "expected": [
+        {
+          "min": 4,
+          "max": 5,
+          "centre": 4,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "Uniform 0..9 in 10 bins",
+      "input": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9"
+        ],
+        "binCount": 10
+      },
+      "expected": [
+        {
+          "min": 0,
+          "max": 0.9,
+          "centre": 0.45,
+          "count": 1
+        },
+        {
+          "min": 0.9,
+          "max": 1.8,
+          "centre": 1.35,
+          "count": 1
+        },
+        {
+          "min": 1.8,
+          "max": 2.7,
+          "centre": 2.25,
+          "count": 1
+        },
+        {
+          "min": 2.7,
+          "max": 3.6,
+          "centre": 3.15,
+          "count": 1
+        },
+        {
+          "min": 3.6,
+          "max": 4.5,
+          "centre": 4.05,
+          "count": 1
+        },
+        {
+          "min": 4.5,
+          "max": 5.4,
+          "centre": 4.95,
+          "count": 1
+        },
+        {
+          "min": 5.4,
+          "max": 6.3,
+          "centre": 5.8500000000000005,
+          "count": 1
+        },
+        {
+          "min": 6.3,
+          "max": 7.2,
+          "centre": 6.75,
+          "count": 1
+        },
+        {
+          "min": 7.2,
+          "max": 8.1,
+          "centre": 7.65,
+          "count": 1
+        },
+        {
+          "min": 8.1,
+          "max": 9,
+          "centre": 8.55,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "The max lands in the last bin (closed on the right)",
+      "input": {
+        "values": [
+          "0",
+          "10"
+        ],
+        "binCount": 4
+      },
+      "expected": [
+        {
+          "min": 0,
+          "max": 2.5,
+          "centre": 1.25,
+          "count": 1
+        },
+        {
+          "min": 2.5,
+          "max": 5,
+          "centre": 3.75,
+          "count": 0
+        },
+        {
+          "min": 5,
+          "max": 7.5,
+          "centre": 6.25,
+          "count": 0
+        },
+        {
+          "min": 7.5,
+          "max": 10,
+          "centre": 8.75,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Float steps: 0.1 widths",
+      "input": {
+        "values": [
+          "0",
+          "0.3",
+          "0.7",
+          "1"
+        ],
+        "binCount": 10
+      },
+      "expected": [
+        {
+          "min": 0,
+          "max": 0.1,
+          "centre": 0.05,
+          "count": 1
+        },
+        {
+          "min": 0.1,
+          "max": 0.2,
+          "centre": 0.15000000000000002,
+          "count": 0
+        },
+        {
+          "min": 0.2,
+          "max": 0.30000000000000004,
+          "centre": 0.25,
+          "count": 1
+        },
+        {
+          "min": 0.30000000000000004,
+          "max": 0.4,
+          "centre": 0.35000000000000003,
+          "count": 0
+        },
+        {
+          "min": 0.4,
+          "max": 0.5,
+          "centre": 0.45,
+          "count": 0
+        },
+        {
+          "min": 0.5,
+          "max": 0.6000000000000001,
+          "centre": 0.55,
+          "count": 0
+        },
+        {
+          "min": 0.6000000000000001,
+          "max": 0.7000000000000001,
+          "centre": 0.65,
+          "count": 1
+        },
+        {
+          "min": 0.7000000000000001,
+          "max": 0.8,
+          "centre": 0.75,
+          "count": 0
+        },
+        {
+          "min": 0.8,
+          "max": 0.9,
+          "centre": 0.8500000000000001,
+          "count": 0
+        },
+        {
+          "min": 0.9,
+          "max": 1,
+          "centre": 0.9500000000000001,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Negative range",
+      "input": {
+        "values": [
+          "-5",
+          "-3",
+          "-1"
+        ],
+        "binCount": 2
+      },
+      "expected": [
+        {
+          "min": -5,
+          "max": -3,
+          "centre": -4,
+          "count": 1
+        },
+        {
+          "min": -3,
+          "max": -1,
+          "centre": -2,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "More bins than values",
+      "input": {
+        "values": [
+          "1",
+          "2"
+        ],
+        "binCount": 5
+      },
+      "expected": [
+        {
+          "min": 1,
+          "max": 1.2,
+          "centre": 1.1,
+          "count": 1
+        },
+        {
+          "min": 1.2,
+          "max": 1.4,
+          "centre": 1.3,
+          "count": 0
+        },
+        {
+          "min": 1.4,
+          "max": 1.6,
+          "centre": 1.5,
+          "count": 0
+        },
+        {
+          "min": 1.6,
+          "max": 1.8,
+          "centre": 1.7000000000000002,
+          "count": 0
+        },
+        {
+          "min": 1.8,
+          "max": 2,
+          "centre": 1.9,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "A fractional bin count throws",
+      "input": {
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "binCount": 2.5
+      },
+      "expected": {
+        "threw": "TypeError: Cannot read properties of undefined (reading 'count')"
+      }
+    },
+    {
+      "name": "A NaN value throws (its bin index is NaN)",
+      "input": {
+        "values": [
+          "1",
+          "NaN",
+          "3"
+        ],
+        "binCount": 2
+      },
+      "expected": {
+        "threw": "TypeError: Cannot read properties of undefined (reading 'count')"
+      }
+    },
+    {
+      "name": "Infinity gives no bins",
+      "input": {
+        "values": [
+          "1",
+          "Infinity"
+        ],
+        "binCount": 2
+      },
+      "expected": []
+    }
+  ]
+}

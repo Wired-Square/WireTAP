@@ -1,0 +1,60 @@
+{
+  "cases": [
+    {
+      "name": "Each batch replaces a frame's counts wholesale; other frames are kept",
+      "input": [
+        [
+          {
+            "frameId": 256,
+            "counts": [
+              1,
+              0,
+              2
+            ],
+            "frames": 3
+          }
+        ],
+        [
+          {
+            "frameId": 256,
+            "counts": [
+              5
+            ],
+            "frames": 9
+          },
+          {
+            "frameId": 512,
+            "counts": [
+              0
+            ],
+            "frames": 1
+          }
+        ]
+      ],
+      "expected": {
+        "256": {
+          "counts": [
+            5
+          ],
+          "totalFrames": 9
+        },
+        "512": {
+          "counts": [
+            0
+          ],
+          "totalFrames": 1
+        }
+      }
+    },
+    {
+      "name": "An empty batch changes nothing (same map)",
+      "input": [],
+      "expected": true
+    },
+    {
+      "name": "clearData empties the counts",
+      "input": null,
+      "expected": {}
+    }
+  ]
+}

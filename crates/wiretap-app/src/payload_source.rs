@@ -175,3 +175,25 @@ pub async fn query_frame_inventory(
         .inventory(start_time.as_deref(), end_time.as_deref())
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::iso_to_micros;
+
+    /// The `rust` column of the bounds table `queryStore.ts` is checked against.
+    #[test]
+    fn iso_to_micros_matches_the_bounds_table() {
+        let table: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../frontend/wiretap-ui/src/tests/fixtures/data/queryBounds.json"
+            ))
+            .expect("table"),
+        )
+        .expect("table json");
+        for row in table["rows"].as_array().expect("rows") {
+            let input = row["input"].as_str().expect("input");
+            assert_eq!(iso_to_micros(input), row["rust"].as_i64(), "{input:?}");
+        }
+    }
+}

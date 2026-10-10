@@ -38,7 +38,7 @@ import { Card } from "../../../components/Card";
 // Interface type name lookup
 // ============================================================================
 
-const INTERFACE_TYPE_NAMES: Record<number, string> = {
+export const INTERFACE_TYPE_NAMES: Record<number, string> = {
   1: "CAN",
   2: "CAN FD",
   3: "RS-485",

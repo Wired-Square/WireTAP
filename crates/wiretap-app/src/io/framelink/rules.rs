@@ -595,6 +595,11 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
     serde_json::to_value(&descriptors).map_err(|e| e.to_string())
 }
 
+/// The value type `cmd_frame_def_add` writes into the device's board TOML.
+fn editable_value_type(value_type: u8) -> &'static str {
+    if value_type == 0 { "unsigned" } else { "signed" }
+}
+
 async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
@@ -626,14 +631,13 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
         let signals_from_ui: Vec<EditableFrameSignal> = info.signals.iter().zip(signal_names.iter())
             .map(|(proto_sig, (_sig_id, name))| {
                 let byte_order = if proto_sig.byte_order == 0 { "le" } else { "be" };
-                let value_type = if proto_sig.value_type == 0 { "unsigned" } else { "signed" };
                 EditableFrameSignal {
                     slug: format!("0x{:04X}", proto_sig.signal_id),
                     name: name.clone(),
                     start_bit: proto_sig.start_bit,
                     bit_length: proto_sig.bit_length,
                     byte_order: byte_order.to_string(),
-                    value_type: value_type.to_string(),
+                    value_type: editable_value_type(proto_sig.value_type).to_string(),
                     scale: proto_sig.scale,
                     offset: proto_sig.offset,
                     unit: String::new(),
@@ -1348,4 +1352,18 @@ async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
             .await
             .map_err(|e| format!("Failed to list selectable signals: {e}"))?;
     serde_json::to_value(&signals).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::editable_value_type;
+
+    /// The `rust` column of `framelinkValueTypes.json`.
+    #[test]
+    fn persisted_value_types_match_the_rule_table() {
+        for row in crate::small_twin_tables::rows("framelinkValueTypes.json") {
+            let value_type = row["value_type"].as_u64().unwrap() as u8;
+            assert_eq!(editable_value_type(value_type), row["rust"], "{row}");
+        }
+    }
 }

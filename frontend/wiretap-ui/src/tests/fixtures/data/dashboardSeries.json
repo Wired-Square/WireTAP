@@ -1,0 +1,428 @@
+{
+  "cases": [
+    {
+      "name": "A short series reads in push order",
+      "input": {
+        "samples": [
+          [
+            1,
+            5
+          ],
+          [
+            2,
+            -3
+          ],
+          [
+            3,
+            7
+          ]
+        ]
+      },
+      "expected": {
+        "capacity": 1000,
+        "count": 3,
+        "writeIndex": 3,
+        "latest": [
+          3,
+          7
+        ],
+        "stats": {
+          "min": -3,
+          "max": 7,
+          "sum": 9,
+          "sampleCount": 3,
+          "mean": 3
+        },
+        "windowMin": -3,
+        "windowMax": 7,
+        "head": [
+          [
+            1,
+            5
+          ],
+          [
+            2,
+            -3
+          ],
+          [
+            3,
+            7
+          ]
+        ],
+        "tail": [
+          [
+            1,
+            5
+          ],
+          [
+            2,
+            -3
+          ],
+          [
+            3,
+            7
+          ]
+        ],
+        "read": {
+          "timestamps": [
+            1,
+            2,
+            3
+          ],
+          "values": [
+            5,
+            -3,
+            7
+          ]
+        }
+      }
+    },
+    {
+      "name": "Out-of-order timestamps are stored as pushed, not sorted",
+      "input": {
+        "samples": [
+          [
+            3,
+            1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      },
+      "expected": {
+        "timestamps": [
+          3,
+          1,
+          2
+        ],
+        "values": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "Exactly full: write index wraps to 0",
+      "input": {
+        "capacity": 1000,
+        "pushes": 1000
+      },
+      "expected": {
+        "capacity": 1000,
+        "count": 1000,
+        "writeIndex": 0,
+        "latest": [
+          999,
+          999
+        ],
+        "stats": {
+          "min": 0,
+          "max": 999,
+          "sum": 499500,
+          "sampleCount": 1000,
+          "mean": 499.5
+        },
+        "windowMin": 0,
+        "windowMax": 999,
+        "head": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            2
+          ]
+        ],
+        "tail": [
+          [
+            997,
+            997
+          ],
+          [
+            998,
+            998
+          ],
+          [
+            999,
+            999
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Past capacity: the oldest are evicted; min/max/sum still cover every sample ever pushed",
+      "input": {
+        "capacity": 1000,
+        "pushes": 1250,
+        "values": "0..1249 ascending"
+      },
+      "expected": {
+        "capacity": 1000,
+        "count": 1000,
+        "writeIndex": 250,
+        "latest": [
+          1249,
+          1249
+        ],
+        "stats": {
+          "min": 0,
+          "max": 1249,
+          "sum": 780625,
+          "sampleCount": 1250,
+          "mean": 624.5
+        },
+        "windowMin": 250,
+        "windowMax": 1249,
+        "head": [
+          [
+            250,
+            250
+          ],
+          [
+            251,
+            251
+          ],
+          [
+            252,
+            252
+          ]
+        ],
+        "tail": [
+          [
+            1247,
+            1247
+          ],
+          [
+            1248,
+            1248
+          ],
+          [
+            1249,
+            1249
+          ]
+        ]
+      }
+    },
+    {
+      "name": "An evicted extreme stays the running min",
+      "input": {
+        "capacity": 1000,
+        "pushes": "one -100 then 1,000 zeros"
+      },
+      "expected": {
+        "capacity": 1000,
+        "count": 1000,
+        "writeIndex": 1,
+        "latest": [
+          1000,
+          0
+        ],
+        "stats": {
+          "min": -100,
+          "max": 0,
+          "sum": -100,
+          "sampleCount": 1001,
+          "mean": -0.0999000999000999
+        },
+        "windowMin": 0,
+        "windowMax": 0,
+        "head": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ],
+        "tail": [
+          [
+            998,
+            0
+          ],
+          [
+            999,
+            0
+          ],
+          [
+            1000,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "setBufferCapacity clamps to 1,000..100,000",
+      "input": {
+        "requested": [
+          10,
+          250000
+        ]
+      },
+      "expected": {
+        "low": 1000,
+        "high": 100000
+      }
+    },
+    {
+      "name": "A capacity change reaches only series created afterwards",
+      "input": {
+        "before": 1000,
+        "after": 2000
+      },
+      "expected": {
+        "oldAfterChange": 1000,
+        "new": 2000,
+        "oldAfterClearData": 2000
+      }
+    },
+    {
+      "name": "A backlog (replace) starts the series afresh, once per batch, and resets the statistics",
+      "input": {
+        "first": [
+          [
+            1,
+            50
+          ],
+          [
+            2,
+            60
+          ]
+        ],
+        "backlog": [
+          [
+            10,
+            1
+          ],
+          [
+            11,
+            2
+          ]
+        ],
+        "then": [
+          [
+            12,
+            3
+          ]
+        ]
+      },
+      "expected": {
+        "capacity": 1000,
+        "count": 3,
+        "writeIndex": 3,
+        "latest": [
+          12,
+          3
+        ],
+        "stats": {
+          "min": 1,
+          "max": 3,
+          "sum": 6,
+          "sampleCount": 3,
+          "mean": 2
+        },
+        "windowMin": 1,
+        "windowMax": 3,
+        "head": [
+          [
+            10,
+            1
+          ],
+          [
+            11,
+            2
+          ],
+          [
+            12,
+            3
+          ]
+        ],
+        "tail": [
+          [
+            10,
+            1
+          ],
+          [
+            11,
+            2
+          ],
+          [
+            12,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Two signals of one frame and the same name on two frames are separate keys",
+      "input": {
+        "samples": [
+          "1:a",
+          "1:b",
+          "2:a"
+        ]
+      },
+      "expected": [
+        "1:a",
+        "1:b",
+        "2:a"
+      ]
+    },
+    {
+      "name": "A NaN value: min/max skip it, sum and mean become NaN",
+      "input": {
+        "samples": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            null
+          ],
+          [
+            3,
+            3
+          ]
+        ]
+      },
+      "expected": {
+        "min": 1,
+        "max": 3,
+        "sum": "NaN",
+        "sampleCount": 3,
+        "latestValue": "3"
+      }
+    },
+    {
+      "name": "dataVersion bumps once per push call, and clearData resets it to 0",
+      "input": {
+        "pushes": 3
+      },
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        0
+      ]
+    }
+  ]
+}

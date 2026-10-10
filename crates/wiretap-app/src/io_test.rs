@@ -934,9 +934,7 @@ impl<'a> Run<'a> {
             Duration::from_millis(10)
         };
         let duration = Duration::from_secs_f64(config.duration_sec);
-        // Stop sending 1s before the end to drain in-flight responses. For very
-        // short tests (<3s), use a third of the duration instead.
-        let drain_secs = if config.duration_sec >= 3.0 { 1.0 } else { config.duration_sec / 3.0 };
+        let drain_secs = drain_secs(config.duration_sec);
         let send_deadline = Duration::from_secs_f64(config.duration_sec - drain_secs);
 
         let start = Instant::now();
@@ -1045,6 +1043,22 @@ impl<'a> Run<'a> {
 // Auto test orchestrator
 // ============================================================================
 
+/// Sending stops this long before the end so in-flight responses can drain: a
+/// second, or a third of a run shorter than three.
+fn drain_secs(duration_sec: f64) -> f64 {
+    if duration_sec >= 3.0 { 1.0 } else { duration_sec / 3.0 }
+}
+
+fn suite_status(cancelled: bool, phases_passed: &[bool], total: usize) -> TestStatus {
+    if cancelled {
+        TestStatus::Stopped
+    } else if phases_passed.len() == total && phases_passed.iter().all(|&p| p) {
+        TestStatus::Completed
+    } else {
+        TestStatus::Failed
+    }
+}
+
 async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: &AtomicBool) {
     let mut results: Vec<AutoPhaseResult> = Vec::new();
 
@@ -1119,15 +1133,9 @@ async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: 
         }
     }
 
-    let all_passed = results.len() == total && results.iter().all(|r| r.passed);
     let total_elapsed: f64 = results.iter().map(|r| r.elapsed_sec).sum();
-    let status = if cancel.load(Ordering::SeqCst) {
-        TestStatus::Stopped
-    } else if all_passed {
-        TestStatus::Completed
-    } else {
-        TestStatus::Failed
-    };
+    let passed: Vec<bool> = results.iter().map(|r| r.passed).collect();
+    let status = suite_status(cancel.load(Ordering::SeqCst), &passed, total);
 
     tlog!(
         "[io_test] '{}' auto {:?}: {} phases, elapsed={:.1}s",
@@ -1512,6 +1520,39 @@ pub(crate) mod tests {
         assert_eq!(state.status, TestStatus::Failed);
         assert!(state.errors.iter().any(|e| e.contains("send queue full")), "{:?}", state.errors);
         assert!(started.elapsed() < Duration::from_secs(3), "gave up before the send phase ended");
+    }
+
+    /// The `rust` columns of `testPatternGauge.json` and `testPatternSuite.json`.
+    #[test]
+    fn the_send_window_and_suite_status_match_the_rule_tables() {
+        for row in crate::small_twin_tables::rows("testPatternGauge.json") {
+            let Some(max_tx) = row["rust"]["max_tx"].as_f64() else { continue };
+            let (rate, duration) = (row["rate_hz"].as_f64().unwrap(), row["duration_sec"].as_f64().unwrap());
+            assert_eq!((rate * (duration - drain_secs(duration))).ceil(), max_tx, "{row}");
+        }
+        for row in crate::small_twin_tables::rows("testPatternSuite.json") {
+            let passed: Vec<bool> =
+                row["phases_passed"].as_array().unwrap().iter().map(|p| p.as_bool().unwrap()).collect();
+            let status = suite_status(row["cancelled"].as_bool().unwrap(), &passed, 5);
+            assert_eq!(serde_json::to_value(status).unwrap(), row["rust"], "{row}");
+        }
+    }
+
+    /// The TX gauge's scale is `rate × duration`; the run stops sending a drain
+    /// window early, so the needle cannot reach it.
+    #[tokio::test]
+    async fn an_echo_run_sends_fewer_frames_than_the_gauge_expects() {
+        let mut config = config(TestMode::Echo, false);
+        config.duration_sec = 1.0;
+        let state = run("test_echo_gauge", Wire::Peer(Responder::new(0, 0)), &config).await;
+
+        let row = crate::small_twin_tables::rows("testPatternGauge.json")
+            .into_iter()
+            .find(|r| r["mode"] == "echo" && r["rate_hz"] == 200 && r["duration_sec"] == 1)
+            .expect("the echo 200 Hz × 1 s row");
+        assert!(state.tx_count > 0);
+        assert!(state.tx_count <= row["rust"]["max_tx"].as_u64().unwrap(), "{}", state.tx_count);
+        assert!(state.tx_count < row["ts"]["expected_tx"].as_u64().unwrap());
     }
 
     /// Two taps on one session are independent. Dropping every tap for the

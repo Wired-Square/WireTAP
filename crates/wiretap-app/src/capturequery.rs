@@ -982,3 +982,75 @@ pub fn capture_query_pattern_search(
         results,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    const CAPTURE: &str = "d1-sql-golden";
+    const GOLDEN: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../frontend/wiretap-ui/src/tests/fixtures/data/querySql.capture.json"
+    );
+
+    static EXECUTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    fn record(sql: &str) {
+        if sql.contains(CAPTURE) {
+            EXECUTED.lock().unwrap().push(sql.split_whitespace().collect::<Vec<_>>().join(" "));
+        }
+    }
+
+    fn executed_by(run: &dyn Fn()) -> Vec<String> {
+        EXECUTED.lock().unwrap().clear();
+        run();
+        std::mem::take(&mut *EXECUTED.lock().unwrap())
+    }
+
+    /// The statements each capture query runs, beside which the TS preview
+    /// (`querySqlPreview.json`) is read. `WRITE_DATA_FIXTURES=1` rewrites it.
+    #[test]
+    fn capture_queries_run_the_golden_sql() {
+        crate::capture_db::use_in_memory_database();
+        crate::capture_db::trace_statements(Some(record));
+
+        let mut cases = Vec::new();
+        for (bounds, ext, start, end) in [
+            ("unbounded", None, None, None),
+            ("bounded", Some(true), Some(1_000_000i64), Some(2_000_000i64)),
+        ] {
+            let c = || CAPTURE.to_string();
+            let limit = Some(5000);
+            let mut case = |query: &str, run: &dyn Fn()| {
+                cases.push(serde_json::json!({ "name": format!("{query} {bounds}"), "sql": executed_by(run) }));
+            };
+            case("byte_changes", &|| drop(capture_query_byte_changes(c(), 0x100, 2, ext, start, end, limit)));
+            case("frame_changes", &|| drop(capture_query_frame_changes(c(), 0x100, ext, start, end, limit)));
+            case("mirror_validation", &|| {
+                drop(capture_query_mirror_validation(c(), 0x101, 0x100, ext, 50_000, start, end, limit, None))
+            });
+            case("mux_statistics", &|| drop(capture_query_mux_statistics(c(), 0x100, 0, ext, true, 8, start, end, limit)));
+            case("first_last", &|| drop(capture_query_first_last(c(), 0x100, ext, start, end)));
+            case("frequency", &|| drop(capture_query_frequency(c(), 0x100, ext, 1000, start, end, limit)));
+            case("distribution", &|| drop(capture_query_distribution(c(), 0x100, 2, ext, start, end)));
+            case("gap_analysis", &|| drop(capture_query_gap_analysis(c(), 0x100, ext, 100.0, start, end, limit)));
+            case("pattern_search", &|| {
+                drop(capture_query_pattern_search(c(), vec![0xAA, 0xBB], vec![0xFF, 0x00], start, end, limit))
+            });
+            case("frame_inventory", &|| drop(crate::capture_db::frame_inventory(CAPTURE, start, end)));
+        }
+        crate::capture_db::trace_statements(None);
+
+        let served = serde_json::json!({
+            "note": "Statements each capture query executes (rusqlite trace, parameters expanded, whitespace collapsed). Unbounded: no is_extended, no bounds; bounded: is_extended true, 1000000..2000000 µs. Limit 5000.",
+            "cases": cases,
+        });
+        if std::env::var_os("WRITE_DATA_FIXTURES").is_some() {
+            std::fs::write(GOLDEN, serde_json::to_string_pretty(&served).unwrap() + "\n").unwrap();
+        }
+        let golden: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(GOLDEN).expect("golden")).expect("golden json");
+        assert_eq!(served, golden);
+    }
+}

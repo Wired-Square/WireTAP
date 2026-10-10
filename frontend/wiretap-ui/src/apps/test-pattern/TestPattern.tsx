@@ -39,6 +39,7 @@ import type {
   AutoPhaseResult,
   PeerInfo,
   SweepRow,
+  TestMode,
   TestStatus,
 } from "../../api/testPattern";
 import { wsTransport } from "../../services/wsTransport";
@@ -172,10 +173,7 @@ export default function TestPattern() {
       use_extended: useExtended,
     };
 
-    // Pre-calculate expected TX for gauge scale
-    // For throughput mode (unlimited rate), use 0 to signal auto-scale
-    const expected = mode === "throughput" ? 0 : Math.ceil(rateHz * durationSec);
-    setExpectedTxCount(expected);
+    setExpectedTxCount(gaugeExpectedTx(mode, rateHz, durationSec));
 
     try {
       setTestId(id);
@@ -348,8 +346,13 @@ function formatGaugeMax(v: number): string {
   return String(v);
 }
 
+/** The TX gauge's scale, fixed at start; 0 (throughput) auto-scales from the live value. */
+export function gaugeExpectedTx(mode: TestMode, rateHz: number, durationSec: number): number {
+  return mode === "throughput" ? 0 : Math.ceil(rateHz * durationSec);
+}
+
 /** Round up to a "nice" gauge maximum. */
-function nearestRound(v: number): number {
+export function nearestRound(v: number): number {
   if (v <= 0) return 100;
   const mag = Math.pow(10, Math.floor(Math.log10(v)));
   const norm = v / mag;
@@ -875,7 +878,7 @@ function AutoResults({ state }: { state: IOTestState }) {
   );
 }
 
-function AutoSummary({ results, elapsed }: { results: AutoPhaseResult[]; elapsed: number }) {
+export function AutoSummary({ results, elapsed }: { results: AutoPhaseResult[]; elapsed: number }) {
   const allPassed = results.every((r) => r.passed);
   const echoResult = results.find((r) => r.phase === "Echo");
   const latResult = results.find((r) => r.phase === "Latency");

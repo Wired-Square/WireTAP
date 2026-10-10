@@ -1,0 +1,240 @@
+{
+  "cases": [
+    {
+      "name": "No signals",
+      "input": {
+        "panel": {
+          "signals": []
+        },
+        "pushes": []
+      },
+      "expected": [
+        ""
+      ]
+    },
+    {
+      "name": "Signals without data",
+      "input": {
+        "panel": {
+          "signals": [
+            {
+              "frameId": 1,
+              "signalName": "a"
+            }
+          ]
+        },
+        "pushes": []
+      },
+      "expected": [
+        ""
+      ]
+    },
+    {
+      "name": "Union of timestamps, blanks where a series has none; unit and display name in the header",
+      "input": {
+        "panel": {
+          "signals": [
+            {
+              "frameId": 1,
+              "signalName": "speed",
+              "unit": "km/h",
+              "displayName": "Speed"
+            },
+            {
+              "frameId": 1,
+              "signalName": "rpm"
+            }
+          ]
+        },
+        "pushes": [
+          [
+            "1:speed",
+            1700000000,
+            10
+          ],
+          [
+            "1:speed",
+            1700000000.5,
+            11
+          ],
+          [
+            "1:rpm",
+            1700000000.25,
+            900
+          ],
+          [
+            "1:rpm",
+            1700000000.5,
+            950
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,Speed (km/h),rpm",
+        "2023-11-14T22:13:20.000Z,10,",
+        "2023-11-14T22:13:20.250Z,,900",
+        "2023-11-14T22:13:20.500Z,11,950",
+        ""
+      ]
+    },
+    {
+      "name": "A header with a comma or quote is quoted; a NaN value prints NaN",
+      "input": {
+        "panel": {
+          "signals": [
+            {
+              "frameId": 1,
+              "signalName": "a,\"b\"",
+              "unit": "V"
+            }
+          ]
+        },
+        "pushes": [
+          [
+            "1:a,\"b\"",
+            1,
+            "NaN"
+          ],
+          [
+            "1:a,\"b\"",
+            2,
+            0.30000000000000004
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,\"a,\"\"b\"\" (V)\"",
+        "1970-01-01T00:00:01.000Z,NaN",
+        "1970-01-01T00:00:02.000Z,0.30000000000000004",
+        ""
+      ]
+    },
+    {
+      "name": "A repeated timestamp in one series keeps the later value and one row",
+      "input": {
+        "panel": {
+          "signals": [
+            {
+              "frameId": 1,
+              "signalName": "a"
+            }
+          ]
+        },
+        "pushes": [
+          [
+            "1:a",
+            5,
+            1
+          ],
+          [
+            "1:a",
+            5,
+            2
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,a",
+        "1970-01-01T00:00:05.000Z,2",
+        ""
+      ]
+    },
+    {
+      "name": "Sub-millisecond stamps print the same ISO time (ms precision) on two rows",
+      "input": {
+        "panel": {
+          "signals": [
+            {
+              "frameId": 1,
+              "signalName": "a"
+            }
+          ]
+        },
+        "pushes": [
+          [
+            "1:a",
+            1.0001,
+            1
+          ],
+          [
+            "1:a",
+            1.0002,
+            2
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,a",
+        "1970-01-01T00:00:01.000Z,1",
+        "1970-01-01T00:00:01.000Z,2",
+        ""
+      ]
+    },
+    {
+      "name": "Flow with no target frame",
+      "input": {
+        "panel": {
+          "signals": []
+        },
+        "pushes": []
+      },
+      "expected": [
+        ""
+      ]
+    },
+    {
+      "name": "Flow defaults to 8 byte columns named byte_N_8b_le",
+      "input": {
+        "panel": {
+          "signals": [],
+          "targetFrameId": 256
+        },
+        "pushes": [
+          [
+            "256:byte_0_8b_le",
+            1,
+            170
+          ],
+          [
+            "256:byte_7_8b_le",
+            2,
+            85
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,byte_0_8b_le,byte_1_8b_le,byte_2_8b_le,byte_3_8b_le,byte_4_8b_le,byte_5_8b_le,byte_6_8b_le,byte_7_8b_le",
+        "1970-01-01T00:00:01.000Z,170,,,,,,,",
+        "1970-01-01T00:00:02.000Z,,,,,,,,85",
+        ""
+      ]
+    },
+    {
+      "name": "Flow byteCount narrows the columns; a byte past it is not exported",
+      "input": {
+        "panel": {
+          "signals": [],
+          "targetFrameId": 256,
+          "byteCount": 2
+        },
+        "pushes": [
+          [
+            "256:byte_1_8b_le",
+            1,
+            1
+          ],
+          [
+            "256:byte_3_8b_le",
+            2,
+            3
+          ]
+        ]
+      },
+      "expected": [
+        "timestamp,byte_0_8b_le,byte_1_8b_le",
+        "1970-01-01T00:00:01.000Z,,1",
+        ""
+      ]
+    }
+  ]
+}

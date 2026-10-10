@@ -1,0 +1,309 @@
+{
+  "cases": [
+    {
+      "name": "empty input gives the defaults",
+      "input": {},
+      "expected": {
+        "config_path": "",
+        "decoder_dir": "",
+        "dump_dir": "",
+        "report_dir": "",
+        "io_profiles": [],
+        "default_read_profile": null,
+        "default_write_profiles": [],
+        "display_frame_id_format": "hex",
+        "save_frame_id_format": "hex",
+        "display_time_format": "human",
+        "display_timezone": "local",
+        "default_frame_type": "can",
+        "signal_colour_none": "#94a3b8",
+        "signal_colour_low": "#f59e0b",
+        "signal_colour_medium": "#3b82f6",
+        "signal_colour_high": "#22c55e",
+        "binary_one_colour": "#14b8a6",
+        "binary_zero_colour": "#94a3b8",
+        "binary_unused_colour": "#64748b",
+        "frame_editor_colours": [
+          "#22d3ee",
+          "#4ade80",
+          "#facc15",
+          "#c084fc",
+          "#60a5fa",
+          "#f87171",
+          "#67e8f9",
+          "#86efac"
+        ],
+        "discovery_history_buffer": 100000,
+        "query_result_limit": 10000,
+        "session_manager_stats_interval": 60,
+        "graph_buffer_size": 10000,
+        "decoder_max_unmatched_frames": 1000,
+        "decoder_max_filtered_frames": 1000,
+        "decoder_max_decoded_frames": 500,
+        "decoder_max_decoded_per_source": 2000,
+        "transmit_max_history": 1000,
+        "theme_mode": "auto",
+        "theme_bg_primary_light": "#ffffff",
+        "theme_bg_surface_light": "#f8fafc",
+        "theme_text_primary_light": "#0f172a",
+        "theme_text_secondary_light": "#334155",
+        "theme_border_default_light": "#e2e8f0",
+        "theme_data_bg_light": "#f8fafc",
+        "theme_data_text_primary_light": "#0f172a",
+        "theme_bg_primary_dark": "#0f172a",
+        "theme_bg_surface_dark": "#1e293b",
+        "theme_text_primary_dark": "#ffffff",
+        "theme_text_secondary_dark": "#cbd5e1",
+        "theme_border_default_dark": "#334155",
+        "theme_data_bg_dark": "#111827",
+        "theme_data_text_primary_dark": "#e5e7eb",
+        "theme_accent_primary": "#2563eb",
+        "theme_accent_success": "#16a34a",
+        "theme_accent_danger": "#dc2626",
+        "theme_accent_warning": "#d97706",
+        "prevent_idle_sleep": true,
+        "keep_display_awake": false,
+        "log_level": "off",
+        "telemetry_enabled": false,
+        "telemetry_consent_given": false,
+        "usage_analytics_enabled": false,
+        "usage_analytics_consent_given": false,
+        "install_id": "",
+        "clear_captures_on_start": true,
+        "buffer_storage": "sqlite",
+        "modbus_max_register_errors": 3,
+        "smp_port": 1337,
+        "language": "en-AU",
+        "mcp_server_enabled": false,
+        "mcp_allow_control": false,
+        "mcp_allow_session_control": false,
+        "mcp_allow_catalog_write": false,
+        "mcp_allow_catalog_modify": false,
+        "mcp_allow_dashboard_write": false,
+        "mcp_allow_ui_control": false,
+        "mcp_server_port": 8787,
+        "mcp_server_token": ""
+      }
+    },
+    {
+      "name": "falsy directories take the default dirs",
+      "input": {
+        "raw": {
+          "decoder_dir": "",
+          "dump_dir": "/d"
+        },
+        "dirs": {
+          "decoders": "/dec",
+          "dumps": "/dmp",
+          "reports": "/rep"
+        }
+      },
+      "expected": {
+        "decoder_dir": "/dec",
+        "dump_dir": "/d",
+        "report_dir": "/rep"
+      }
+    },
+    {
+      "name": "legacy and unknown keys are dropped",
+      "input": {
+        "raw": {
+          "enable_file_logging": true,
+          "log_level": "off",
+          "capture_storage": "x",
+          "clear_buffers_on_start": false
+        }
+      },
+      "expected": {}
+    },
+    {
+      "name": "out-of-range numbers are not clamped",
+      "input": {
+        "raw": {
+          "query_result_limit": 5,
+          "smp_port": 0,
+          "mcp_server_port": 80,
+          "graph_buffer_size": 1000000000,
+          "modbus_max_register_errors": -1
+        }
+      },
+      "expected": {
+        "query_result_limit": 5,
+        "graph_buffer_size": 1000000000,
+        "modbus_max_register_errors": -1,
+        "smp_port": 0,
+        "mcp_server_port": 80
+      }
+    },
+    {
+      "name": "zero and empty string survive ?? but not ||",
+      "input": {
+        "raw": {
+          "session_manager_stats_interval": 0,
+          "install_id": "",
+          "config_path": "",
+          "signal_colour_none": "",
+          "theme_accent_primary": ""
+        }
+      },
+      "expected": {
+        "session_manager_stats_interval": 0
+      }
+    },
+    {
+      "name": "id formats coerce anything but decimal to hex",
+      "input": {
+        "raw": {
+          "display_frame_id_format": "HEX",
+          "save_frame_id_format": "Decimal"
+        }
+      },
+      "expected": {}
+    },
+    {
+      "name": "other enums pass through unchecked",
+      "input": {
+        "raw": {
+          "display_time_format": "bogus",
+          "display_timezone": "mars",
+          "theme_mode": "neon",
+          "default_frame_type": "lin",
+          "log_level": "loud"
+        }
+      },
+      "expected": {
+        "display_time_format": "bogus",
+        "display_timezone": "mars",
+        "default_frame_type": "lin",
+        "theme_mode": "neon",
+        "log_level": "loud"
+      }
+    },
+    {
+      "name": "null takes the default",
+      "input": {
+        "raw": {
+          "log_level": null,
+          "prevent_idle_sleep": null,
+          "default_read_profile": null,
+          "default_write_profiles": null
+        }
+      },
+      "expected": {}
+    },
+    {
+      "name": "wrong types pass through",
+      "input": {
+        "raw": {
+          "query_result_limit": "500",
+          "prevent_idle_sleep": "yes",
+          "language": 7
+        }
+      },
+      "expected": {
+        "query_result_limit": "500",
+        "prevent_idle_sleep": "yes",
+        "language": 7
+      }
+    },
+    {
+      "name": "frame editor colours of seven are replaced",
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "#1",
+            "#2",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7"
+          ]
+        }
+      },
+      "expected": {}
+    },
+    {
+      "name": "frame editor colours of nine are replaced",
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "#1",
+            "#2",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7",
+            "#8",
+            "#9"
+          ]
+        }
+      },
+      "expected": {}
+    },
+    {
+      "name": "frame editor colours of eight are kept, unchecked",
+      "input": {
+        "raw": {
+          "frame_editor_colours": [
+            "",
+            "x",
+            "#3",
+            "#4",
+            "#5",
+            "#6",
+            "#7",
+            "#8"
+          ]
+        }
+      },
+      "expected": {
+        "frame_editor_colours": [
+          "",
+          "x",
+          "#3",
+          "#4",
+          "#5",
+          "#6",
+          "#7",
+          "#8"
+        ]
+      }
+    },
+    {
+      "name": "ephemeral profiles are dropped",
+      "input": {
+        "raw": {
+          "io_profiles": [
+            {
+              "id": "a",
+              "name": "A",
+              "kind": "slcan",
+              "connection": {},
+              "ephemeral": true
+            },
+            {
+              "id": "b",
+              "name": "B",
+              "kind": "slcan",
+              "connection": {},
+              "ephemeral": false
+            }
+          ]
+        }
+      },
+      "expected": {
+        "io_profiles": [
+          {
+            "id": "b",
+            "name": "B",
+            "kind": "slcan",
+            "connection": {},
+            "ephemeral": false
+          }
+        ]
+      }
+    }
+  ]
+}

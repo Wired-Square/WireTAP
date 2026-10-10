@@ -1,0 +1,1740 @@
+{
+  "cases": [
+    {
+      "name": "byte_changes capture unbounded",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_byte_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes capture bounded",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_byte_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_changes capture unbounded",
+      "input": {
+        "queryType": "frame_changes",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_frame_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Changes - 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_changes capture bounded",
+      "input": {
+        "queryType": "frame_changes",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_frame_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Changes - 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation capture unbounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_mirror_validation",
+            "args": {
+              "captureId": "cap-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceUs": 50000,
+              "limit": 5000,
+              "catalogPath": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation capture bounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_mirror_validation",
+            "args": {
+              "captureId": "cap-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceUs": 50000,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000,
+              "catalogPath": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mux_statistics capture unbounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_mux_statistics",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "muxSelectorByte": 0,
+              "isExtended": null,
+              "include16bit": true,
+              "payloadLength": 8,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mux Statistics - 0x100 [mux byte 0]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mux_statistics capture bounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_mux_statistics",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "muxSelectorByte": 0,
+              "isExtended": null,
+              "include16bit": true,
+              "payloadLength": 8,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mux Statistics - 0x100 [mux byte 0]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "first_last capture unbounded",
+      "input": {
+        "queryType": "first_last",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_first_last",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "First/Last Occurrence - 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "first_last capture bounded",
+      "input": {
+        "queryType": "first_last",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_first_last",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "First/Last Occurrence - 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frequency capture unbounded",
+      "input": {
+        "queryType": "frequency",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_frequency",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "bucketSizeMs": 1000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Frequency - 0x100 [1000ms buckets]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frequency capture bounded",
+      "input": {
+        "queryType": "frequency",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_frequency",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "bucketSizeMs": 1000,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Frequency - 0x100 [1000ms buckets]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "distribution capture unbounded",
+      "input": {
+        "queryType": "distribution",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_distribution",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Value Distribution - 0x100 [byte 2]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "distribution capture bounded",
+      "input": {
+        "queryType": "distribution",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_distribution",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Value Distribution - 0x100 [byte 2]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "gap_analysis capture unbounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_gap_analysis",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "gapThresholdMs": 100,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Gap Analysis - 0x100 [>100ms]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "gap_analysis capture bounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_gap_analysis",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "isExtended": null,
+              "gapThresholdMs": 100,
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Gap Analysis - 0x100 [>100ms]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search capture unbounded",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_pattern_search",
+            "args": {
+              "captureId": "cap-1",
+              "pattern": [
+                170,
+                187
+              ],
+              "patternMask": [
+                255,
+                0
+              ],
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - AA ??",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search capture bounded",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_pattern_search",
+            "args": {
+              "captureId": "cap-1",
+              "pattern": [
+                170,
+                187
+              ],
+              "patternMask": [
+                255,
+                0
+              ],
+              "startTimeUs": 1772319600000000,
+              "endTimeUs": 1772319900000000,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - AA ??",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_inventory capture unbounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "query_frame_inventory",
+            "args": {
+              "captureId": "cap-1"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Inventory",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_inventory capture bounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "source": "capture",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "query_frame_inventory",
+            "args": {
+              "captureId": "cap-1",
+              "startTime": "1772319600000000",
+              "endTime": "1772319900000000"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Inventory",
+          "profileId": "",
+          "captureId": "cap-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes capture isExtended true",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "capture",
+        "timeBounds": null,
+        "params": {
+          "isExtended": true
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_byte_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": true,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x00000100 [byte 2] (ext)",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes capture isExtended false",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "capture",
+        "timeBounds": null,
+        "params": {
+          "isExtended": false
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_byte_changes",
+            "args": {
+              "captureId": "cap-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": false,
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation capture with a catalogue",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "capture",
+        "timeBounds": null,
+        "catalogPath": "/catalogs/x.toml"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_mirror_validation",
+            "args": {
+              "captureId": "cap-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceUs": 50000,
+              "limit": 5000,
+              "catalogPath": "/catalogs/x.toml"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search capture empty pattern",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "capture",
+        "params": {
+          "pattern": [],
+          "patternMask": []
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "capture_query_pattern_search",
+            "args": {
+              "captureId": "cap-1",
+              "pattern": [],
+              "patternMask": [],
+              "limit": 5000
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - (empty)",
+          "profileId": "",
+          "captureId": "cap-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes backend unbounded",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_byte_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes backend bounded",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_byte_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_changes backend unbounded",
+      "input": {
+        "queryType": "frame_changes",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_frame_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Changes - 0x100",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_changes backend bounded",
+      "input": {
+        "queryType": "frame_changes",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_frame_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Changes - 0x100",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation backend unbounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_mirror_validation",
+            "args": {
+              "profileId": "profile-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceMs": 50,
+              "limit": 5000,
+              "queryId": "<id>",
+              "catalogPath": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation backend bounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_mirror_validation",
+            "args": {
+              "profileId": "profile-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceMs": 50,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>",
+              "catalogPath": null
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mux_statistics backend unbounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_mux_statistics",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "muxSelectorByte": 0,
+              "isExtended": null,
+              "include16bit": true,
+              "payloadLength": 8,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mux Statistics - 0x100 [mux byte 0]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mux_statistics backend bounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_mux_statistics",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "muxSelectorByte": 0,
+              "isExtended": null,
+              "include16bit": true,
+              "payloadLength": 8,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mux Statistics - 0x100 [mux byte 0]",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "first_last backend unbounded",
+      "input": {
+        "queryType": "first_last",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_first_last",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "First/Last Occurrence - 0x100",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "first_last backend bounded",
+      "input": {
+        "queryType": "first_last",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_first_last",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "First/Last Occurrence - 0x100",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frequency backend unbounded",
+      "input": {
+        "queryType": "frequency",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_frequency",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "bucketSizeMs": 1000,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Frequency - 0x100 [1000ms buckets]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frequency backend bounded",
+      "input": {
+        "queryType": "frequency",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_frequency",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "bucketSizeMs": 1000,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Frequency - 0x100 [1000ms buckets]",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "distribution backend unbounded",
+      "input": {
+        "queryType": "distribution",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_distribution",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Value Distribution - 0x100 [byte 2]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "distribution backend bounded",
+      "input": {
+        "queryType": "distribution",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_distribution",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": null,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Value Distribution - 0x100 [byte 2]",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "gap_analysis backend unbounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_gap_analysis",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "gapThresholdMs": 100,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Gap Analysis - 0x100 [>100ms]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "gap_analysis backend bounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_gap_analysis",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "isExtended": null,
+              "gapThresholdMs": 100,
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Gap Analysis - 0x100 [>100ms]",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search backend unbounded",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_pattern_search",
+            "args": {
+              "profileId": "profile-1",
+              "pattern": [
+                170,
+                187
+              ],
+              "patternMask": [
+                255,
+                0
+              ],
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - AA ??",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search backend bounded",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_pattern_search",
+            "args": {
+              "profileId": "profile-1",
+              "pattern": [
+                170,
+                187
+              ],
+              "patternMask": [
+                255,
+                0
+              ],
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z",
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - AA ??",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_inventory backend unbounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "query_frame_inventory",
+            "args": {
+              "profileId": "profile-1"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Inventory",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "frame_inventory backend bounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "source": "backend",
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "params": "default"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "query_frame_inventory",
+            "args": {
+              "profileId": "profile-1",
+              "startTime": "2026-02-28T23:00:00.000Z",
+              "endTime": "2026-02-28T23:05:00.000Z"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Frame Inventory",
+          "profileId": "profile-1",
+          "timeBounds": {
+            "startTime": "2026-03-01T10:00",
+            "endTime": "2026-03-01T10:05"
+          },
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes backend isExtended true",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "backend",
+        "timeBounds": null,
+        "params": {
+          "isExtended": true
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_byte_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": true,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x00000100 [byte 2] (ext)",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "byte_changes backend isExtended false",
+      "input": {
+        "queryType": "byte_changes",
+        "source": "backend",
+        "timeBounds": null,
+        "params": {
+          "isExtended": false
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_byte_changes",
+            "args": {
+              "profileId": "profile-1",
+              "frameId": 256,
+              "byteIndex": 2,
+              "isExtended": false,
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Byte Changes - 0x100 [byte 2]",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "mirror_validation backend with a catalogue",
+      "input": {
+        "queryType": "mirror_validation",
+        "source": "backend",
+        "timeBounds": null,
+        "catalogPath": "/catalogs/x.toml"
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_mirror_validation",
+            "args": {
+              "profileId": "profile-1",
+              "mirrorFrameId": 257,
+              "sourceFrameId": 256,
+              "isExtended": null,
+              "toleranceMs": 50,
+              "limit": 5000,
+              "queryId": "<id>",
+              "catalogPath": "/catalogs/x.toml"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Mirror Validation - 0x101 ↔ 0x100",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "name": "pattern_search backend empty pattern",
+      "input": {
+        "queryType": "pattern_search",
+        "source": "backend",
+        "params": {
+          "pattern": [],
+          "patternMask": []
+        }
+      },
+      "expected": {
+        "calls": [
+          {
+            "cmd": "db_query_pattern_search",
+            "args": {
+              "profileId": "profile-1",
+              "pattern": [],
+              "patternMask": [],
+              "limit": 5000,
+              "queryId": "<id>"
+            }
+          }
+        ],
+        "queued": {
+          "displayName": "Pattern Search - (empty)",
+          "profileId": "profile-1",
+          "resultLimit": 5000,
+          "status": "completed"
+        }
+      }
+    }
+  ]
+}

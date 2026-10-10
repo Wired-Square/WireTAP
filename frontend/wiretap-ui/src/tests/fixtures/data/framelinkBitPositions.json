@@ -1,0 +1,129 @@
+{
+  "note": "bitGrid.ts signalBitPositions and framelink frame_def::signal_bit_positions must both return `positions` (byte_order 1 = BE/Motorola).",
+  "rows": [
+    {
+      "start_bit": 7,
+      "bit_length": 8,
+      "byte_order": 1,
+      "positions": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "start_bit": 7,
+      "bit_length": 12,
+      "byte_order": 1,
+      "positions": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0,
+        15,
+        14,
+        13,
+        12
+      ]
+    },
+    {
+      "start_bit": 0,
+      "bit_length": 2,
+      "byte_order": 1,
+      "positions": [
+        0,
+        15
+      ]
+    },
+    {
+      "start_bit": 3,
+      "bit_length": 4,
+      "byte_order": 1,
+      "positions": [
+        3,
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "start_bit": 63,
+      "bit_length": 4,
+      "byte_order": 1,
+      "positions": [
+        63,
+        62,
+        61,
+        60
+      ]
+    },
+    {
+      "start_bit": 12,
+      "bit_length": 16,
+      "byte_order": 1,
+      "positions": [
+        12,
+        11,
+        10,
+        9,
+        8,
+        23,
+        22,
+        21,
+        20,
+        19,
+        18,
+        17,
+        16,
+        31,
+        30,
+        29
+      ]
+    },
+    {
+      "start_bit": 0,
+      "bit_length": 8,
+      "byte_order": 0,
+      "positions": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "start_bit": 60,
+      "bit_length": 8,
+      "byte_order": 0,
+      "positions": [
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ]
+    },
+    {
+      "start_bit": 5,
+      "bit_length": 0,
+      "byte_order": 1,
+      "positions": []
+    }
+  ]
+}

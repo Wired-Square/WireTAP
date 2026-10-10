@@ -1,0 +1,100 @@
+{
+  "note": "Each CAN FD payload length. `ts`: offered by constants.ts CAN_FD_DLC_VALUES (the FD length dropdown). `rust`: a length wiretap_protocol::dlc carries exactly (dlc_to_len(len_to_dlc(len), true) == len).",
+  "rows": [
+    {
+      "length": 0,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 1,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 2,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 3,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 4,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 5,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 6,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 7,
+      "ts": false,
+      "rust": true
+    },
+    {
+      "length": 8,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 12,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 16,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 20,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 24,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 32,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 48,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 64,
+      "ts": true,
+      "rust": true
+    },
+    {
+      "length": 9,
+      "ts": false,
+      "rust": false
+    },
+    {
+      "length": 40,
+      "ts": false,
+      "rust": false
+    },
+    {
+      "length": 65,
+      "ts": false,
+      "rust": false
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "note": "`ts` is FrameDefEditor.tsx INTERFACE_TYPE_NAMES (null falls to the i18n frameDefEditor.interfaceTypeFmt); `rust` is framelink protocol::types::interface_name, served as interface_type_name.",
+  "rows": [
+    {
+      "interface_type": 0,
+      "ts": null,
+      "rust": "Unknown"
+    },
+    {
+      "interface_type": 1,
+      "ts": "CAN",
+      "rust": "CAN"
+    },
+    {
+      "interface_type": 2,
+      "ts": "CAN FD",
+      "rust": "CAN FD"
+    },
+    {
+      "interface_type": 3,
+      "ts": "RS-485",
+      "rust": "RS-485"
+    },
+    {
+      "interface_type": 4,
+      "ts": "RS-232",
+      "rust": "RS-232"
+    },
+    {
+      "interface_type": 5,
+      "ts": "LIN",
+      "rust": "LIN"
+    },
+    {
+      "interface_type": 6,
+      "ts": null,
+      "rust": "Unknown"
+    }
+  ]
+}

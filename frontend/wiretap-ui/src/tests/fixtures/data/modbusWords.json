@@ -1,0 +1,212 @@
+{
+  "note": "`ts` is modbusValues.ts interpretRegister (u16, s16 of `first`) and interpretPair; `rust` is wiretap-decode extract_field over `first` alone (u16, s16) and over `first` ++ `second` as a 32-bit register field with that word order (u32, s32). The crate has no f32 reading, so its `f32` is null; a NaN `ts` f32 is null too.",
+  "rows": [
+    {
+      "name": "telemetry pair, high word first",
+      "first": [
+        9,
+        56
+      ],
+      "second": [
+        1,
+        244
+      ],
+      "word_order": "big",
+      "ts": {
+        "u16": 2360,
+        "s16": 2360,
+        "u32": 154665460,
+        "s32": 154665460,
+        "f32": 2.2149112715414792e-33
+      },
+      "rust": {
+        "u16": 2360,
+        "s16": 2360,
+        "u32": 154665460,
+        "s32": 154665460,
+        "f32": null
+      }
+    },
+    {
+      "name": "telemetry pair, low word first",
+      "first": [
+        9,
+        56
+      ],
+      "second": [
+        1,
+        244
+      ],
+      "word_order": "little",
+      "ts": {
+        "u16": 2360,
+        "s16": 2360,
+        "u32": 32770360,
+        "s32": 32770360,
+        "f32": 8.964467250770265e-38
+      },
+      "rust": {
+        "u16": 2360,
+        "s16": 2360,
+        "u32": 32770360,
+        "s32": 32770360,
+        "f32": null
+      }
+    },
+    {
+      "name": "all ones",
+      "first": [
+        255,
+        255
+      ],
+      "second": [
+        255,
+        254
+      ],
+      "word_order": "big",
+      "ts": {
+        "u16": 65535,
+        "s16": -1,
+        "u32": 4294967294,
+        "s32": -2,
+        "f32": null
+      },
+      "rust": {
+        "u16": 65535,
+        "s16": -1,
+        "u32": 4294967294,
+        "s32": -2,
+        "f32": null
+      }
+    },
+    {
+      "name": "all ones, low word first",
+      "first": [
+        255,
+        255
+      ],
+      "second": [
+        255,
+        254
+      ],
+      "word_order": "little",
+      "ts": {
+        "u16": 65535,
+        "s16": -1,
+        "u32": 4294901759,
+        "s32": -65537,
+        "f32": null
+      },
+      "rust": {
+        "u16": 65535,
+        "s16": -1,
+        "u32": 4294901759,
+        "s32": -65537,
+        "f32": null
+      }
+    },
+    {
+      "name": "236.0 as f32, high word first",
+      "first": [
+        67,
+        108
+      ],
+      "second": [
+        0,
+        0
+      ],
+      "word_order": "big",
+      "ts": {
+        "u16": 17260,
+        "s16": 17260,
+        "u32": 1131151360,
+        "s32": 1131151360,
+        "f32": 236.0
+      },
+      "rust": {
+        "u16": 17260,
+        "s16": 17260,
+        "u32": 1131151360,
+        "s32": 1131151360,
+        "f32": null
+      }
+    },
+    {
+      "name": "236.0 as f32, low word first",
+      "first": [
+        0,
+        0
+      ],
+      "second": [
+        67,
+        108
+      ],
+      "word_order": "little",
+      "ts": {
+        "u16": 0,
+        "s16": 0,
+        "u32": 1131151360,
+        "s32": 1131151360,
+        "f32": 236.0
+      },
+      "rust": {
+        "u16": 0,
+        "s16": 0,
+        "u32": 1131151360,
+        "s32": 1131151360,
+        "f32": null
+      }
+    },
+    {
+      "name": "sign bit in the low register",
+      "first": [
+        0,
+        1
+      ],
+      "second": [
+        128,
+        0
+      ],
+      "word_order": "big",
+      "ts": {
+        "u16": 1,
+        "s16": 1,
+        "u32": 98304,
+        "s32": 98304,
+        "f32": 1.3775324423698682e-40
+      },
+      "rust": {
+        "u16": 1,
+        "s16": 1,
+        "u32": 98304,
+        "s32": 98304,
+        "f32": null
+      }
+    },
+    {
+      "name": "a one-byte register",
+      "first": [
+        18
+      ],
+      "second": [
+        52,
+        86
+      ],
+      "word_order": "big",
+      "ts": {
+        "u16": 4608,
+        "s16": 4608,
+        "u32": 302003286,
+        "s32": 302003286,
+        "f32": 4.0454187370803055e-28
+      },
+      "rust": {
+        "u16": 18,
+        "s16": 18,
+        "u32": 1193046,
+        "s32": 1193046,
+        "f32": null
+      }
+    }
+  ]
+}

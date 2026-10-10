@@ -1,0 +1,1056 @@
+{
+  "cases": [
+    {
+      "name": "byte_changes capture unbounded",
+      "input": {
+        "queryType": "byte_changes",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "WITH ordered AS (",
+        "  SELECT timestamp_us, payload,",
+        "    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload",
+        "  FROM frames",
+        "  WHERE frame_id = 256",
+        ")",
+        "SELECT timestamp_us, prev_payload, payload",
+        "FROM ordered",
+        "WHERE prev_payload IS NOT NULL",
+        "  -- Filter in Rust: byte[2] changed",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "byte_changes capture bounded",
+      "input": {
+        "queryType": "byte_changes",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "WITH ordered AS (",
+        "  SELECT timestamp_us, payload,",
+        "    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload",
+        "  FROM frames",
+        "  WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        ")",
+        "SELECT timestamp_us, prev_payload, payload",
+        "FROM ordered",
+        "WHERE prev_payload IS NOT NULL",
+        "  -- Filter in Rust: byte[2] changed",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "frame_changes capture unbounded",
+      "input": {
+        "queryType": "frame_changes",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "WITH ordered AS (",
+        "  SELECT timestamp_us, payload,",
+        "    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload",
+        "  FROM frames",
+        "  WHERE frame_id = 256",
+        ")",
+        "SELECT timestamp_us, prev_payload, payload",
+        "FROM ordered",
+        "WHERE prev_payload IS NOT NULL",
+        "  AND prev_payload != payload",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "frame_changes capture bounded",
+      "input": {
+        "queryType": "frame_changes",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "WITH ordered AS (",
+        "  SELECT timestamp_us, payload,",
+        "    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload",
+        "  FROM frames",
+        "  WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        ")",
+        "SELECT timestamp_us, prev_payload, payload",
+        "FROM ordered",
+        "WHERE prev_payload IS NOT NULL",
+        "  AND prev_payload != payload",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mirror_validation capture unbounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (two-pointer match in Rust)",
+        "-- Mirror frames:",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 257",
+        "",
+        "-- Source frames:",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 256",
+        "",
+        "-- Tolerance: 50ms (50000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mirror_validation capture bounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (two-pointer match in Rust)",
+        "-- Mirror frames:",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 257 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "",
+        "-- Source frames:",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "",
+        "-- Tolerance: 50ms (50000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mux_statistics capture unbounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "SELECT payload FROM frames",
+        "WHERE frame_id = 256",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Group by payload[0], compute stats in Rust"
+      ]
+    },
+    {
+      "name": "mux_statistics capture bounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "SELECT payload FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Group by payload[0], compute stats in Rust"
+      ]
+    },
+    {
+      "name": "first_last capture unbounded",
+      "input": {
+        "queryType": "first_last",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 256",
+        "ORDER BY rowid ASC LIMIT 1",
+        "-- + ORDER BY rowid DESC LIMIT 1 + COUNT(*)"
+      ]
+    },
+    {
+      "name": "first_last capture bounded",
+      "input": {
+        "queryType": "first_last",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query",
+        "SELECT timestamp_us, payload FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid ASC LIMIT 1",
+        "-- + ORDER BY rowid DESC LIMIT 1 + COUNT(*)"
+      ]
+    },
+    {
+      "name": "frequency capture unbounded",
+      "input": {
+        "queryType": "frequency",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (intervals computed in Rust)",
+        "SELECT timestamp_us FROM frames",
+        "WHERE frame_id = 256",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Bucket size: 1000ms (1000000µs)"
+      ]
+    },
+    {
+      "name": "frequency capture bounded",
+      "input": {
+        "queryType": "frequency",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (intervals computed in Rust)",
+        "SELECT timestamp_us FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Bucket size: 1000ms (1000000µs)"
+      ]
+    },
+    {
+      "name": "distribution capture unbounded",
+      "input": {
+        "queryType": "distribution",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (distribution computed in Rust)",
+        "SELECT payload FROM frames",
+        "WHERE frame_id = 256",
+        "ORDER BY rowid",
+        "-- Extract byte[2], count distinct values"
+      ]
+    },
+    {
+      "name": "distribution capture bounded",
+      "input": {
+        "queryType": "distribution",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (distribution computed in Rust)",
+        "SELECT payload FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid",
+        "-- Extract byte[2], count distinct values"
+      ]
+    },
+    {
+      "name": "gap_analysis capture unbounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (gaps detected in Rust)",
+        "SELECT timestamp_us FROM frames",
+        "WHERE frame_id = 256",
+        "ORDER BY rowid",
+        "-- Find gaps > 100ms (100000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "gap_analysis capture bounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite buffer query (gaps detected in Rust)",
+        "SELECT timestamp_us FROM frames",
+        "WHERE frame_id = 256 AND is_extended = 1",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid",
+        "-- Find gaps > 100ms (100000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "pattern_search capture unbounded",
+      "input": {
+        "queryType": "pattern_search",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite capture query (pattern matching in Rust)",
+        "SELECT timestamp_us, frame_id, is_extended, payload",
+        "FROM frames",
+        "WHERE capture_id = ?",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Pattern: AA ??"
+      ]
+    },
+    {
+      "name": "pattern_search capture bounded",
+      "input": {
+        "queryType": "pattern_search",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite capture query (pattern matching in Rust)",
+        "SELECT timestamp_us, frame_id, is_extended, payload",
+        "FROM frames",
+        "WHERE capture_id = ?",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "ORDER BY rowid",
+        "LIMIT 5,000",
+        "-- Pattern: AA ??"
+      ]
+    },
+    {
+      "name": "frame_inventory capture unbounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite capture query",
+        "SELECT protocol, frame_id, is_extended, COUNT(*) AS count,",
+        "  MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc",
+        "FROM frames",
+        "WHERE capture_id = ?",
+        "GROUP BY protocol, frame_id, is_extended",
+        "ORDER BY frame_id"
+      ]
+    },
+    {
+      "name": "frame_inventory capture bounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "isBufferSource": true,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- SQLite capture query",
+        "SELECT protocol, frame_id, is_extended, COUNT(*) AS count,",
+        "  MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc",
+        "FROM frames",
+        "WHERE capture_id = ?",
+        "     AND timestamp_us >= <start_us>",
+        "     AND timestamp_us <= <end_us>",
+        "GROUP BY protocol, frame_id, is_extended",
+        "ORDER BY frame_id"
+      ]
+    },
+    {
+      "name": "byte_changes backend unbounded",
+      "input": {
+        "queryType": "byte_changes",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH ordered_frames AS (",
+        "  SELECT ts,",
+        "    get_byte_safe(data_bytes, 2) as curr_byte,",
+        "    LAG(get_byte_safe(data_bytes, 2)) OVER (ORDER BY ts) as prev_byte",
+        "  FROM can_frame",
+        "  WHERE id = 256",
+        "  ORDER BY ts",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,",
+        "  prev_byte, curr_byte",
+        "FROM ordered_frames",
+        "WHERE prev_byte IS NOT NULL",
+        "  AND curr_byte IS NOT NULL",
+        "  AND prev_byte IS DISTINCT FROM curr_byte",
+        "ORDER BY ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "byte_changes backend bounded",
+      "input": {
+        "queryType": "byte_changes",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH ordered_frames AS (",
+        "  SELECT ts,",
+        "    get_byte_safe(data_bytes, 2) as curr_byte,",
+        "    LAG(get_byte_safe(data_bytes, 2)) OVER (ORDER BY ts) as prev_byte",
+        "  FROM can_frame",
+        "  WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "  ORDER BY ts",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,",
+        "  prev_byte, curr_byte",
+        "FROM ordered_frames",
+        "WHERE prev_byte IS NOT NULL",
+        "  AND curr_byte IS NOT NULL",
+        "  AND prev_byte IS DISTINCT FROM curr_byte",
+        "ORDER BY ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "frame_changes backend unbounded",
+      "input": {
+        "queryType": "frame_changes",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH ordered_frames AS (",
+        "  SELECT ts, data_bytes,",
+        "    LAG(data_bytes) OVER (ORDER BY ts) as prev_data",
+        "  FROM can_frame",
+        "  WHERE id = 256",
+        "  ORDER BY ts",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,",
+        "  prev_data, data_bytes",
+        "FROM ordered_frames",
+        "WHERE prev_data IS NOT NULL",
+        "  AND prev_data IS DISTINCT FROM data_bytes",
+        "ORDER BY ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "frame_changes backend bounded",
+      "input": {
+        "queryType": "frame_changes",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH ordered_frames AS (",
+        "  SELECT ts, data_bytes,",
+        "    LAG(data_bytes) OVER (ORDER BY ts) as prev_data",
+        "  FROM can_frame",
+        "  WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "  ORDER BY ts",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,",
+        "  prev_data, data_bytes",
+        "FROM ordered_frames",
+        "WHERE prev_data IS NOT NULL",
+        "  AND prev_data IS DISTINCT FROM data_bytes",
+        "ORDER BY ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mirror_validation backend unbounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH mirror_frames AS (",
+        "  SELECT ts, data_bytes FROM can_frame",
+        "  WHERE id = 257",
+        "),",
+        "source_frames AS (",
+        "  SELECT ts, data_bytes FROM can_frame",
+        "  WHERE id = 256",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM m.ts) * 1000000)::float8 as mirror_ts,",
+        "  (EXTRACT(EPOCH FROM s.ts) * 1000000)::float8 as source_ts,",
+        "  m.data_bytes as mirror_payload,",
+        "  s.data_bytes as source_payload",
+        "FROM mirror_frames m",
+        "JOIN source_frames s",
+        "  ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < 50",
+        "WHERE m.data_bytes IS DISTINCT FROM s.data_bytes",
+        "ORDER BY m.ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mirror_validation backend bounded",
+      "input": {
+        "queryType": "mirror_validation",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "WITH mirror_frames AS (",
+        "  SELECT ts, data_bytes FROM can_frame",
+        "  WHERE id = 257 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "),",
+        "source_frames AS (",
+        "  SELECT ts, data_bytes FROM can_frame",
+        "  WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        ")",
+        "SELECT",
+        "  (EXTRACT(EPOCH FROM m.ts) * 1000000)::float8 as mirror_ts,",
+        "  (EXTRACT(EPOCH FROM s.ts) * 1000000)::float8 as source_ts,",
+        "  m.data_bytes as mirror_payload,",
+        "  s.data_bytes as source_payload",
+        "FROM mirror_frames m",
+        "JOIN source_frames s",
+        "  ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < 50",
+        "WHERE m.data_bytes IS DISTINCT FROM s.data_bytes",
+        "ORDER BY m.ts",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "mux_statistics backend unbounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "SELECT",
+        "  get_byte_safe(data_bytes, 0) as mux_value,",
+        "  data_bytes",
+        "FROM can_frame",
+        "WHERE id = 256",
+        "LIMIT 5,000",
+        "-- Group by mux_value, compute per-byte stats in Rust"
+      ]
+    },
+    {
+      "name": "mux_statistics backend bounded",
+      "input": {
+        "queryType": "mux_statistics",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "SELECT",
+        "  get_byte_safe(data_bytes, 0) as mux_value,",
+        "  data_bytes",
+        "FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "LIMIT 5,000",
+        "-- Group by mux_value, compute per-byte stats in Rust"
+      ]
+    },
+    {
+      "name": "first_last backend unbounded",
+      "input": {
+        "queryType": "first_last",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- First occurrence:",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8, data_bytes",
+        "FROM can_frame",
+        "WHERE id = 256",
+        "ORDER BY ts ASC LIMIT 1",
+        "",
+        "-- Last occurrence:",
+        "SELECT ... ORDER BY ts DESC LIMIT 1",
+        "",
+        "-- Total count:",
+        "SELECT COUNT(*) FROM can_frame",
+        "WHERE id = 256"
+      ]
+    },
+    {
+      "name": "first_last backend bounded",
+      "input": {
+        "queryType": "first_last",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- First occurrence:",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8, data_bytes",
+        "FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "ORDER BY ts ASC LIMIT 1",
+        "",
+        "-- Last occurrence:",
+        "SELECT ... ORDER BY ts DESC LIMIT 1",
+        "",
+        "-- Total count:",
+        "SELECT COUNT(*) FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz"
+      ]
+    },
+    {
+      "name": "frequency backend unbounded",
+      "input": {
+        "queryType": "frequency",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Intervals computed in Rust, bucketed by 1000ms",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us",
+        "FROM can_frame",
+        "WHERE id = 256",
+        "ORDER BY ts",
+        "LIMIT 5,000",
+        "-- Bucket size: 1000ms (1000000µs)"
+      ]
+    },
+    {
+      "name": "frequency backend bounded",
+      "input": {
+        "queryType": "frequency",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Intervals computed in Rust, bucketed by 1000ms",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us",
+        "FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "ORDER BY ts",
+        "LIMIT 5,000",
+        "-- Bucket size: 1000ms (1000000µs)"
+      ]
+    },
+    {
+      "name": "distribution backend unbounded",
+      "input": {
+        "queryType": "distribution",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "SELECT",
+        "  get_byte_safe(data_bytes, 2) as value,",
+        "  COUNT(*) as count",
+        "FROM can_frame",
+        "WHERE id = 256",
+        "GROUP BY value",
+        "ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "distribution backend bounded",
+      "input": {
+        "queryType": "distribution",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "SELECT",
+        "  get_byte_safe(data_bytes, 2) as value,",
+        "  COUNT(*) as count",
+        "FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "GROUP BY value",
+        "ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "gap_analysis backend unbounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Gaps detected in Rust from ordered timestamps",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us",
+        "FROM can_frame",
+        "WHERE id = 256",
+        "ORDER BY ts",
+        "-- Find gaps > 100ms (100000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "gap_analysis backend bounded",
+      "input": {
+        "queryType": "gap_analysis",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Gaps detected in Rust from ordered timestamps",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us",
+        "FROM can_frame",
+        "WHERE id = 256 AND extended = true",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "ORDER BY ts",
+        "-- Find gaps > 100ms (100000µs)",
+        "LIMIT 5,000"
+      ]
+    },
+    {
+      "name": "pattern_search backend unbounded",
+      "input": {
+        "queryType": "pattern_search",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Pattern matching in Rust",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8,",
+        "  id, extended, data_bytes",
+        "FROM can_frame",
+        "WHERE 1=1",
+        "ORDER BY ts",
+        "LIMIT 5,000",
+        "-- Pattern: AA ??"
+      ]
+    },
+    {
+      "name": "pattern_search backend bounded",
+      "input": {
+        "queryType": "pattern_search",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Pattern matching in Rust",
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8,",
+        "  id, extended, data_bytes",
+        "FROM can_frame",
+        "WHERE 1=1",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "ORDER BY ts",
+        "LIMIT 5,000",
+        "-- Pattern: AA ??"
+      ]
+    },
+    {
+      "name": "frame_inventory backend unbounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "",
+          "endTime": "",
+          "timezoneMode": "local"
+        },
+        "isExtended": null,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Served from the hourly rollup when no time range is set",
+        "SELECT id, extended, sum(frame_count) AS count,",
+        "  min(first_ts) AS first_us, max(last_ts) AS last_us, max(max_dlc) AS max_dlc",
+        "FROM capture_frame_hourly",
+        "WHERE protocol = <profile protocol>",
+        "GROUP BY id, extended",
+        "ORDER BY id, extended"
+      ]
+    },
+    {
+      "name": "frame_inventory backend bounded",
+      "input": {
+        "queryType": "frame_inventory",
+        "isBufferSource": false,
+        "timeBounds": {
+          "startTime": "2026-03-01T10:00",
+          "endTime": "2026-03-01T10:05",
+          "timezoneMode": "local"
+        },
+        "isExtended": true,
+        "limit": 5000
+      },
+      "expected": [
+        "-- Served from the hourly rollup when no time range is set",
+        "SELECT id, extended, sum(frame_count) AS count,",
+        "  min(first_ts) AS first_us, max(last_ts) AS last_us, max(max_dlc) AS max_dlc",
+        "FROM capture_frame_hourly",
+        "WHERE protocol = <profile protocol>",
+        "     AND ts >= '2026-03-01T10:00'::timestamptz",
+        "     AND ts < '2026-03-01T10:05'::timestamptz",
+        "GROUP BY id, extended",
+        "ORDER BY id, extended"
+      ]
+    }
+  ]
+}

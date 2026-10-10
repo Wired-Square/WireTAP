@@ -17,7 +17,7 @@ import { toReplayFrame, type ReplayFrame } from "../api/transmit";
 import { Button } from "../components/Button";
 import { Input, Select, Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
 import { Alert } from "../components/Alert";
-function formatDuration(us: number): string {
+export function formatDuration(us: number): string {
   const ms = us / 1000;
   if (ms < 1000) return `${ms.toFixed(0)} ms`;
   const s = ms / 1000;
@@ -25,6 +25,8 @@ function formatDuration(us: number): string {
   const m = Math.floor(s / 60);
   return `${m}m ${(s % 60).toFixed(1)}s`;
 }
+
+export const replayEstimateUs = (spanUs: number, speed: number) => (speed > 0 ? spanUs / speed : spanUs);
 
 const SPEED_PRESETS = [
   { label: "0.25×", value: 0.25 },
@@ -142,7 +144,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
     });
     return () => { cancelled = true; };
   }, [isOpen, captureId, startIdx, endIdx, expectedCount]);
-  const effectiveSpanUs = speed > 0 ? spanUs / speed : spanUs;
+  const effectiveSpanUs = replayEstimateUs(spanUs, speed);
 
   const handleSpeedPreset = (v: number) => {
     setSpeed(v);

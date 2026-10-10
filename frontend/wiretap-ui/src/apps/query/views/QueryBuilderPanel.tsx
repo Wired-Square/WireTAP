@@ -12,6 +12,7 @@ import {
   useQueryStore,
   QUERY_TYPE_INFO,
   CONTEXT_PRESETS,
+  type QueryParams,
   type QueryType,
   type SelectedSignal,
 } from "../stores/queryStore";
@@ -53,6 +54,306 @@ interface Props {
   onTimeBoundsChange: (bounds: TimeBounds) => void;
   /** Active frame-id display format (Auto/Hex/Dec toggle in the top bar) */
   displayIdFormat: FrameIdFormat;
+}
+
+export function buildSqlPreview(
+  queryType: QueryType,
+  queryParams: QueryParams,
+  timeBounds: TimeBounds,
+  limitOverride: number,
+  isBufferSource: boolean,
+): string {
+  const frameId = queryParams.frameId;
+  const byteIndex = queryParams.byteIndex;
+
+  if (isBufferSource) {
+    // SQLite-flavoured preview for buffer queries
+    const extendedClause = queryParams.isExtended !== null
+      ? ` AND is_extended = ${queryParams.isExtended ? 1 : 0}`
+      : "";
+
+    let timeConditions = "";
+    if (timeBounds.startTime) {
+      timeConditions += `\n     AND timestamp_us >= <start_us>`;
+    }
+    if (timeBounds.endTime) {
+      timeConditions += `\n     AND timestamp_us <= <end_us>`;
+    }
+
+    if (queryType === "byte_changes") {
+      return `-- SQLite buffer query
+WITH ordered AS (
+  SELECT timestamp_us, payload,
+    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
+  FROM frames
+  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+)
+SELECT timestamp_us, prev_payload, payload
+FROM ordered
+WHERE prev_payload IS NOT NULL
+  -- Filter in Rust: byte[${byteIndex}] changed
+LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "frame_changes") {
+      return `-- SQLite buffer query
+WITH ordered AS (
+  SELECT timestamp_us, payload,
+    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
+  FROM frames
+  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+)
+SELECT timestamp_us, prev_payload, payload
+FROM ordered
+WHERE prev_payload IS NOT NULL
+  AND prev_payload != payload
+LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "mirror_validation") {
+      const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
+      return `-- SQLite buffer query (two-pointer match in Rust)
+-- Mirror frames:
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${mirrorFrameId}${extendedClause}${timeConditions}
+
+-- Source frames:
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${sourceFrameId}${extendedClause}${timeConditions}
+
+-- Tolerance: ${toleranceMs}ms (${toleranceMs * 1000}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "mux_statistics") {
+      const { muxSelectorByte } = queryParams;
+      return `-- SQLite buffer query
+SELECT payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Group by payload[${muxSelectorByte}], compute stats in Rust`;
+    }
+
+    if (queryType === "first_last") {
+      return `-- SQLite buffer query
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid ASC LIMIT 1
+-- + ORDER BY rowid DESC LIMIT 1 + COUNT(*)`;
+    }
+
+    if (queryType === "frequency") {
+      const bucketUs = queryParams.bucketSizeMs * 1000;
+      return `-- SQLite buffer query (intervals computed in Rust)
+SELECT timestamp_us FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
+    }
+
+    if (queryType === "distribution") {
+      return `-- SQLite buffer query (distribution computed in Rust)
+SELECT payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+-- Extract byte[${byteIndex}], count distinct values`;
+    }
+
+    if (queryType === "gap_analysis") {
+      const thresholdUs = queryParams.gapThresholdMs * 1000;
+      return `-- SQLite buffer query (gaps detected in Rust)
+SELECT timestamp_us FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+-- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "pattern_search") {
+      const patternStr = queryParams.pattern
+        .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+        .join(" ") || "(empty)";
+      return `-- SQLite capture query (pattern matching in Rust)
+SELECT timestamp_us, frame_id, is_extended, payload
+FROM frames
+WHERE capture_id = ?${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Pattern: ${patternStr}`;
+    }
+
+    if (queryType === "frame_inventory") {
+      return `-- SQLite capture query
+SELECT protocol, frame_id, is_extended, COUNT(*) AS count,
+  MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc
+FROM frames
+WHERE capture_id = ?${timeConditions}
+GROUP BY protocol, frame_id, is_extended
+ORDER BY frame_id`;
+    }
+
+    return `-- Query type "${queryType}" not yet implemented for captures`;
+  }
+
+  // Backend preview
+  const extendedClause = queryParams.isExtended !== null
+    ? ` AND extended = ${queryParams.isExtended}`
+    : "";
+
+  let timeConditions = "";
+  if (timeBounds.startTime) {
+    timeConditions += `\n     AND ts >= '${timeBounds.startTime}'::timestamptz`;
+  }
+  if (timeBounds.endTime) {
+    timeConditions += `\n     AND ts < '${timeBounds.endTime}'::timestamptz`;
+  }
+
+  if (queryType === "byte_changes") {
+    return `WITH ordered_frames AS (
+  SELECT ts,
+    get_byte_safe(data_bytes, ${byteIndex}) as curr_byte,
+    LAG(get_byte_safe(data_bytes, ${byteIndex})) OVER (ORDER BY ts) as prev_byte
+  FROM can_frame
+  WHERE id = ${frameId}${extendedClause}${timeConditions}
+  ORDER BY ts
+)
+SELECT
+  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,
+  prev_byte, curr_byte
+FROM ordered_frames
+WHERE prev_byte IS NOT NULL
+  AND curr_byte IS NOT NULL
+  AND prev_byte IS DISTINCT FROM curr_byte
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}`;
+  }
+
+  if (queryType === "frame_changes") {
+    return `WITH ordered_frames AS (
+  SELECT ts, data_bytes,
+    LAG(data_bytes) OVER (ORDER BY ts) as prev_data
+  FROM can_frame
+  WHERE id = ${frameId}${extendedClause}${timeConditions}
+  ORDER BY ts
+)
+SELECT
+  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,
+  prev_data, data_bytes
+FROM ordered_frames
+WHERE prev_data IS NOT NULL
+  AND prev_data IS DISTINCT FROM data_bytes
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}`;
+  }
+
+  if (queryType === "mirror_validation") {
+    const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
+    return `WITH mirror_frames AS (
+  SELECT ts, data_bytes FROM can_frame
+  WHERE id = ${mirrorFrameId}${extendedClause}${timeConditions}
+),
+source_frames AS (
+  SELECT ts, data_bytes FROM can_frame
+  WHERE id = ${sourceFrameId}${extendedClause}${timeConditions}
+)
+SELECT
+  (EXTRACT(EPOCH FROM m.ts) * 1000000)::float8 as mirror_ts,
+  (EXTRACT(EPOCH FROM s.ts) * 1000000)::float8 as source_ts,
+  m.data_bytes as mirror_payload,
+  s.data_bytes as source_payload
+FROM mirror_frames m
+JOIN source_frames s
+  ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < ${toleranceMs}
+WHERE m.data_bytes IS DISTINCT FROM s.data_bytes
+ORDER BY m.ts
+LIMIT ${limitOverride.toLocaleString()}`;
+  }
+
+  if (queryType === "mux_statistics") {
+    const { muxSelectorByte } = queryParams;
+    return `SELECT
+  get_byte_safe(data_bytes, ${muxSelectorByte}) as mux_value,
+  data_bytes
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+LIMIT ${limitOverride.toLocaleString()}
+-- Group by mux_value, compute per-byte stats in Rust`;
+  }
+
+  if (queryType === "first_last") {
+    return `-- First occurrence:
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8, data_bytes
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts ASC LIMIT 1
+
+-- Last occurrence:
+SELECT ... ORDER BY ts DESC LIMIT 1
+
+-- Total count:
+SELECT COUNT(*) FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}`;
+  }
+
+  if (queryType === "frequency") {
+    const bucketUs = queryParams.bucketSizeMs * 1000;
+    return `-- Intervals computed in Rust, bucketed by ${queryParams.bucketSizeMs}ms
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}
+-- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
+  }
+
+  if (queryType === "distribution") {
+    return `SELECT
+  get_byte_safe(data_bytes, ${byteIndex}) as value,
+  COUNT(*) as count
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+GROUP BY value
+ORDER BY count DESC`;
+  }
+
+  if (queryType === "gap_analysis") {
+    const thresholdUs = queryParams.gapThresholdMs * 1000;
+    return `-- Gaps detected in Rust from ordered timestamps
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts
+-- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+  }
+
+  if (queryType === "pattern_search") {
+    const patternStr = queryParams.pattern
+      .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+      .join(" ") || "(empty)";
+    return `-- Pattern matching in Rust
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8,
+  id, extended, data_bytes
+FROM can_frame
+WHERE 1=1${timeConditions}
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}
+-- Pattern: ${patternStr}`;
+  }
+
+  if (queryType === "frame_inventory") {
+    return `-- Served from the hourly rollup when no time range is set
+SELECT id, extended, sum(frame_count) AS count,
+  min(first_ts) AS first_us, max(last_ts) AS last_us, max(max_dlc) AS max_dlc
+FROM capture_frame_hourly
+WHERE protocol = <profile protocol>${timeConditions}
+GROUP BY id, extended
+ORDER BY id, extended`;
+  }
+
+  return `-- Query type "${queryType}" not yet implemented`;
 }
 
 export default function QueryBuilderPanel({
@@ -335,300 +636,10 @@ export default function QueryBuilderPanel({
   // Whether we're targeting a buffer (SQLite) vs a WireTAP backend
   const isBufferSource = !!captureId;
 
-  // Generate SQL query preview
-  const sqlPreview = useMemo(() => {
-    const frameId = queryParams.frameId;
-    const byteIndex = queryParams.byteIndex;
-
-    if (isBufferSource) {
-      // SQLite-flavoured preview for buffer queries
-      const extendedClause = queryParams.isExtended !== null
-        ? ` AND is_extended = ${queryParams.isExtended ? 1 : 0}`
-        : "";
-
-      let timeConditions = "";
-      if (timeBounds.startTime) {
-        timeConditions += `\n     AND timestamp_us >= <start_us>`;
-      }
-      if (timeBounds.endTime) {
-        timeConditions += `\n     AND timestamp_us <= <end_us>`;
-      }
-
-      if (queryType === "byte_changes") {
-        return `-- SQLite buffer query
-WITH ordered AS (
-  SELECT timestamp_us, payload,
-    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
-  FROM frames
-  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-)
-SELECT timestamp_us, prev_payload, payload
-FROM ordered
-WHERE prev_payload IS NOT NULL
-  -- Filter in Rust: byte[${byteIndex}] changed
-LIMIT ${limitOverride.toLocaleString()}`;
-      }
-
-      if (queryType === "frame_changes") {
-        return `-- SQLite buffer query
-WITH ordered AS (
-  SELECT timestamp_us, payload,
-    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
-  FROM frames
-  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-)
-SELECT timestamp_us, prev_payload, payload
-FROM ordered
-WHERE prev_payload IS NOT NULL
-  AND prev_payload != payload
-LIMIT ${limitOverride.toLocaleString()}`;
-      }
-
-      if (queryType === "mirror_validation") {
-        const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
-        return `-- SQLite buffer query (two-pointer match in Rust)
--- Mirror frames:
-SELECT timestamp_us, payload FROM frames
-WHERE frame_id = ${mirrorFrameId}${extendedClause}${timeConditions}
-
--- Source frames:
-SELECT timestamp_us, payload FROM frames
-WHERE frame_id = ${sourceFrameId}${extendedClause}${timeConditions}
-
--- Tolerance: ${toleranceMs}ms (${toleranceMs * 1000}µs)
-LIMIT ${limitOverride.toLocaleString()}`;
-      }
-
-      if (queryType === "mux_statistics") {
-        const { muxSelectorByte } = queryParams;
-        return `-- SQLite buffer query
-SELECT payload FROM frames
-WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY rowid
-LIMIT ${limitOverride.toLocaleString()}
--- Group by payload[${muxSelectorByte}], compute stats in Rust`;
-      }
-
-      if (queryType === "first_last") {
-        return `-- SQLite buffer query
-SELECT timestamp_us, payload FROM frames
-WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY rowid ASC LIMIT 1
--- + ORDER BY rowid DESC LIMIT 1 + COUNT(*)`;
-      }
-
-      if (queryType === "frequency") {
-        const bucketUs = queryParams.bucketSizeMs * 1000;
-        return `-- SQLite buffer query (intervals computed in Rust)
-SELECT timestamp_us FROM frames
-WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY rowid
-LIMIT ${limitOverride.toLocaleString()}
--- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
-      }
-
-      if (queryType === "distribution") {
-        return `-- SQLite buffer query (distribution computed in Rust)
-SELECT payload FROM frames
-WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY rowid
--- Extract byte[${byteIndex}], count distinct values`;
-      }
-
-      if (queryType === "gap_analysis") {
-        const thresholdUs = queryParams.gapThresholdMs * 1000;
-        return `-- SQLite buffer query (gaps detected in Rust)
-SELECT timestamp_us FROM frames
-WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY rowid
--- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
-LIMIT ${limitOverride.toLocaleString()}`;
-      }
-
-      if (queryType === "pattern_search") {
-        const patternStr = queryParams.pattern
-          .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
-          .join(" ") || "(empty)";
-        return `-- SQLite capture query (pattern matching in Rust)
-SELECT timestamp_us, frame_id, is_extended, payload
-FROM frames
-WHERE capture_id = ?${timeConditions}
-ORDER BY rowid
-LIMIT ${limitOverride.toLocaleString()}
--- Pattern: ${patternStr}`;
-      }
-
-      if (queryType === "frame_inventory") {
-        return `-- SQLite capture query
-SELECT protocol, frame_id, is_extended, COUNT(*) AS count,
-  MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc
-FROM frames
-WHERE capture_id = ?${timeConditions}
-GROUP BY protocol, frame_id, is_extended
-ORDER BY frame_id`;
-      }
-
-      return `-- Query type "${queryType}" not yet implemented for captures`;
-    }
-
-    // Backend preview
-    const extendedClause = queryParams.isExtended !== null
-      ? ` AND extended = ${queryParams.isExtended}`
-      : "";
-
-    let timeConditions = "";
-    if (timeBounds.startTime) {
-      timeConditions += `\n     AND ts >= '${timeBounds.startTime}'::timestamptz`;
-    }
-    if (timeBounds.endTime) {
-      timeConditions += `\n     AND ts < '${timeBounds.endTime}'::timestamptz`;
-    }
-
-    if (queryType === "byte_changes") {
-      return `WITH ordered_frames AS (
-  SELECT ts,
-    get_byte_safe(data_bytes, ${byteIndex}) as curr_byte,
-    LAG(get_byte_safe(data_bytes, ${byteIndex})) OVER (ORDER BY ts) as prev_byte
-  FROM can_frame
-  WHERE id = ${frameId}${extendedClause}${timeConditions}
-  ORDER BY ts
-)
-SELECT
-  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,
-  prev_byte, curr_byte
-FROM ordered_frames
-WHERE prev_byte IS NOT NULL
-  AND curr_byte IS NOT NULL
-  AND prev_byte IS DISTINCT FROM curr_byte
-ORDER BY ts
-LIMIT ${limitOverride.toLocaleString()}`;
-    }
-
-    if (queryType === "frame_changes") {
-      return `WITH ordered_frames AS (
-  SELECT ts, data_bytes,
-    LAG(data_bytes) OVER (ORDER BY ts) as prev_data
-  FROM can_frame
-  WHERE id = ${frameId}${extendedClause}${timeConditions}
-  ORDER BY ts
-)
-SELECT
-  (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us,
-  prev_data, data_bytes
-FROM ordered_frames
-WHERE prev_data IS NOT NULL
-  AND prev_data IS DISTINCT FROM data_bytes
-ORDER BY ts
-LIMIT ${limitOverride.toLocaleString()}`;
-    }
-
-    if (queryType === "mirror_validation") {
-      const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
-      return `WITH mirror_frames AS (
-  SELECT ts, data_bytes FROM can_frame
-  WHERE id = ${mirrorFrameId}${extendedClause}${timeConditions}
-),
-source_frames AS (
-  SELECT ts, data_bytes FROM can_frame
-  WHERE id = ${sourceFrameId}${extendedClause}${timeConditions}
-)
-SELECT
-  (EXTRACT(EPOCH FROM m.ts) * 1000000)::float8 as mirror_ts,
-  (EXTRACT(EPOCH FROM s.ts) * 1000000)::float8 as source_ts,
-  m.data_bytes as mirror_payload,
-  s.data_bytes as source_payload
-FROM mirror_frames m
-JOIN source_frames s
-  ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < ${toleranceMs}
-WHERE m.data_bytes IS DISTINCT FROM s.data_bytes
-ORDER BY m.ts
-LIMIT ${limitOverride.toLocaleString()}`;
-    }
-
-    if (queryType === "mux_statistics") {
-      const { muxSelectorByte } = queryParams;
-      return `SELECT
-  get_byte_safe(data_bytes, ${muxSelectorByte}) as mux_value,
-  data_bytes
-FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}
-LIMIT ${limitOverride.toLocaleString()}
--- Group by mux_value, compute per-byte stats in Rust`;
-    }
-
-    if (queryType === "first_last") {
-      return `-- First occurrence:
-SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8, data_bytes
-FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY ts ASC LIMIT 1
-
--- Last occurrence:
-SELECT ... ORDER BY ts DESC LIMIT 1
-
--- Total count:
-SELECT COUNT(*) FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}`;
-    }
-
-    if (queryType === "frequency") {
-      const bucketUs = queryParams.bucketSizeMs * 1000;
-      return `-- Intervals computed in Rust, bucketed by ${queryParams.bucketSizeMs}ms
-SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
-FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY ts
-LIMIT ${limitOverride.toLocaleString()}
--- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
-    }
-
-    if (queryType === "distribution") {
-      return `SELECT
-  get_byte_safe(data_bytes, ${byteIndex}) as value,
-  COUNT(*) as count
-FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}
-GROUP BY value
-ORDER BY count DESC`;
-    }
-
-    if (queryType === "gap_analysis") {
-      const thresholdUs = queryParams.gapThresholdMs * 1000;
-      return `-- Gaps detected in Rust from ordered timestamps
-SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
-FROM can_frame
-WHERE id = ${frameId}${extendedClause}${timeConditions}
-ORDER BY ts
--- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
-LIMIT ${limitOverride.toLocaleString()}`;
-    }
-
-    if (queryType === "pattern_search") {
-      const patternStr = queryParams.pattern
-        .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
-        .join(" ") || "(empty)";
-      return `-- Pattern matching in Rust
-SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8,
-  id, extended, data_bytes
-FROM can_frame
-WHERE 1=1${timeConditions}
-ORDER BY ts
-LIMIT ${limitOverride.toLocaleString()}
--- Pattern: ${patternStr}`;
-    }
-
-    if (queryType === "frame_inventory") {
-      return `-- Served from the hourly rollup when no time range is set
-SELECT id, extended, sum(frame_count) AS count,
-  min(first_ts) AS first_us, max(last_ts) AS last_us, max(max_dlc) AS max_dlc
-FROM capture_frame_hourly
-WHERE protocol = <profile protocol>${timeConditions}
-GROUP BY id, extended
-ORDER BY id, extended`;
-    }
-
-    return `-- Query type "${queryType}" not yet implemented`;
-  }, [queryType, queryParams, timeBounds, limitOverride, isBufferSource]);
+  const sqlPreview = useMemo(
+    () => buildSqlPreview(queryType, queryParams, timeBounds, limitOverride, isBufferSource),
+    [queryType, queryParams, timeBounds, limitOverride, isBufferSource]
+  );
 
   // ── Reusable field fragments ──
 

@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "name": "\"\"",
+      "input": "",
+      "expected": {
+        "parseSerialBytes": [],
+        "hexToBytes": [],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"AABB\"",
+      "input": "AABB",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          187
+        ],
+        "hexToBytes": [
+          170,
+          187
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"aa bb cc\"",
+      "input": "aa bb cc",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          187,
+          204
+        ],
+        "hexToBytes": [
+          170,
+          187,
+          204
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"AABBC\"",
+      "input": "AABBC",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          187,
+          12
+        ],
+        "hexToBytes": [
+          170,
+          187,
+          12
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"0xAA\"",
+      "input": "0xAA",
+      "expected": {
+        "parseSerialBytes": [
+          170
+        ],
+        "hexToBytes": [
+          170
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"0xAA0xBB\"",
+      "input": "0xAA0xBB",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          187
+        ],
+        "hexToBytes": [
+          170,
+          11,
+          11
+        ],
+        "agree": false
+      }
+    },
+    {
+      "name": "\"AA,BB\"",
+      "input": "AA,BB",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          11
+        ],
+        "hexToBytes": [
+          170,
+          187
+        ],
+        "agree": false
+      }
+    },
+    {
+      "name": "\"A G\"",
+      "input": "A G",
+      "expected": {
+        "parseSerialBytes": [
+          10
+        ],
+        "hexToBytes": [
+          10
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"AG\"",
+      "input": "AG",
+      "expected": {
+        "parseSerialBytes": [
+          10
+        ],
+        "hexToBytes": [
+          10
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"GG\"",
+      "input": "GG",
+      "expected": {
+        "parseSerialBytes": [],
+        "hexToBytes": [],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"aa\\tbb\\ncc\"",
+      "input": "aa\tbb\ncc",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          187,
+          204
+        ],
+        "hexToBytes": [
+          170,
+          187,
+          204
+        ],
+        "agree": true
+      }
+    },
+    {
+      "name": "\"AA-BB\"",
+      "input": "AA-BB",
+      "expected": {
+        "parseSerialBytes": [
+          170,
+          -11,
+          11
+        ],
+        "hexToBytes": [
+          170,
+          187
+        ],
+        "agree": false
+      }
+    }
+  ]
+}

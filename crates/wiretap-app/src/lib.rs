@@ -33,6 +33,8 @@ mod framing;
 mod framing_detect;
 #[cfg(test)]
 mod generated_types;
+#[cfg(test)]
+mod small_twin_tables;
 pub mod io;
 mod profile_tracker;
 mod sessions;

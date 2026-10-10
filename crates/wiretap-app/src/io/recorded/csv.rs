@@ -1263,4 +1263,53 @@ mod tests {
         assert_eq!(seeded("trace.csv"), Protocol::Can);
         assert_eq!(seeded("serial-trace.csv"), Protocol::Can);
     }
+
+    /// The `rust_*` columns of the table the column mapper's preview is checked against.
+    #[test]
+    fn the_importer_matches_the_preview_table() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures/data/csvPreviewTimestamps.json");
+        let mut table: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let write = std::env::var_os("WRITE_DATA_FIXTURES").is_some();
+        let mappings = [
+            CsvColumnMapping { column_index: 0, role: CsvColumnRole::FrameId },
+            CsvColumnMapping { column_index: 1, role: CsvColumnRole::Timestamp },
+        ];
+        for row in table["rows"].as_array_mut().unwrap() {
+            let name = row["name"].as_str().unwrap().to_string();
+            let cells: Vec<String> = serde_json::from_value(row["cells"].clone()).unwrap();
+            let unit: TimestampUnit = serde_json::from_value(row["unit"].clone()).unwrap();
+            let body: String = cells.iter().enumerate().map(|(i, cell)| format!("{},{cell}\n", i + 1)).collect();
+            let csv = temp_csv("preview-table.csv", &body);
+            let frames = parse_csv_with_mapping(
+                csv.to_str().unwrap(),
+                &mappings,
+                false,
+                unit,
+                row["negate"].as_bool().unwrap(),
+                Delimiter::Comma,
+                Protocol::Can,
+            )
+            .unwrap()
+            .frames;
+            let mut by_row: Vec<String> = vec![String::new(); cells.len()];
+            for frame in &frames {
+                by_row[frame.frame_id as usize - 1] = frame.timestamp_us.to_string();
+            }
+            let samples: Vec<Vec<String>> = cells.iter().map(|cell| vec![String::new(), cell.clone()]).collect();
+            let rust = serde_json::json!({
+                "rust_us": by_row,
+                "rust_suggested_unit": suggest_timestamp_unit(&samples, Some(1)),
+            });
+            if write {
+                for (key, value) in rust.as_object().unwrap() {
+                    row[key] = value.clone();
+                }
+            }
+            assert_eq!(row["rust_us"], rust["rust_us"], "{name}");
+            assert_eq!(row["rust_suggested_unit"], rust["rust_suggested_unit"], "{name}");
+        }
+        if write {
+            std::fs::write(path, serde_json::to_string_pretty(&table).unwrap() + "\n").unwrap();
+        }
+    }
 }

@@ -1,0 +1,73 @@
+{
+  "note": "`rust` is io_test.rs suite_status(cancelled, phases_passed, 5). `ts` is the verdict TestPattern.tsx's AutoSummary prints for that status and those phase results (null: no summary is shown).",
+  "phases": [
+    "Echo",
+    "Sweep",
+    "Latency",
+    "Throughput",
+    "Reliability"
+  ],
+  "rows": [
+    {
+      "name": "every phase passed",
+      "cancelled": false,
+      "phases_passed": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "rust": "completed",
+      "ts": "ALL PASS"
+    },
+    {
+      "name": "stopped after two passing phases",
+      "cancelled": true,
+      "phases_passed": [
+        true,
+        true
+      ],
+      "rust": "stopped",
+      "ts": "ALL PASS"
+    },
+    {
+      "name": "stopped during Echo",
+      "cancelled": true,
+      "phases_passed": [
+        false
+      ],
+      "rust": "stopped",
+      "ts": "FAILURES DETECTED"
+    },
+    {
+      "name": "stopped before any phase",
+      "cancelled": true,
+      "phases_passed": [],
+      "rust": "stopped",
+      "ts": null
+    },
+    {
+      "name": "Echo failed, the rest skipped",
+      "cancelled": false,
+      "phases_passed": [
+        false
+      ],
+      "rust": "failed",
+      "ts": "FAILURES DETECTED"
+    },
+    {
+      "name": "Latency failed",
+      "cancelled": false,
+      "phases_passed": [
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "rust": "failed",
+      "ts": "FAILURES DETECTED"
+    }
+  ]
+}

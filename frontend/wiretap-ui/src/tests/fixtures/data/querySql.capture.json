@@ -1,0 +1,131 @@
+{
+  "cases": [
+    {
+      "name": "byte_changes unbounded",
+      "sql": [
+        "WITH ordered AS ( SELECT timestamp_us, payload, LAG(payload) OVER (ORDER BY rowid) as prev_payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid ) SELECT timestamp_us, prev_payload, payload FROM ordered WHERE prev_payload IS NOT NULL LIMIT 50000"
+      ]
+    },
+    {
+      "name": "frame_changes unbounded",
+      "sql": [
+        "WITH ordered AS ( SELECT timestamp_us, payload, LAG(payload) OVER (ORDER BY rowid) as prev_payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid ) SELECT timestamp_us, prev_payload, payload FROM ordered WHERE prev_payload IS NOT NULL AND prev_payload != payload ORDER BY timestamp_us LIMIT 5000"
+      ]
+    },
+    {
+      "name": "mirror_validation unbounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 257 ORDER BY timestamp_us",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY timestamp_us"
+      ]
+    },
+    {
+      "name": "mux_statistics unbounded",
+      "sql": [
+        "SELECT payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid LIMIT 5000"
+      ]
+    },
+    {
+      "name": "first_last unbounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid ASC LIMIT 1",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid DESC LIMIT 1",
+        "SELECT COUNT(*), x'00' FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256"
+      ]
+    },
+    {
+      "name": "frequency unbounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid LIMIT 5000"
+      ]
+    },
+    {
+      "name": "distribution unbounded",
+      "sql": [
+        "SELECT payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "gap_analysis unbounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "pattern_search unbounded",
+      "sql": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd1-sql-golden' ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "frame_inventory unbounded",
+      "sql": [
+        "SELECT protocol, frame_id, is_extended, COUNT(*) AS cnt, MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(MAX(dlc, length(payload))) AS max_dlc FROM frames WHERE capture_id = 'd1-sql-golden' GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended"
+      ]
+    },
+    {
+      "name": "byte_changes bounded",
+      "sql": [
+        "WITH ordered AS ( SELECT timestamp_us, payload, LAG(payload) OVER (ORDER BY rowid) as prev_payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid ) SELECT timestamp_us, prev_payload, payload FROM ordered WHERE prev_payload IS NOT NULL LIMIT 50000"
+      ]
+    },
+    {
+      "name": "frame_changes bounded",
+      "sql": [
+        "WITH ordered AS ( SELECT timestamp_us, payload, LAG(payload) OVER (ORDER BY rowid) as prev_payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid ) SELECT timestamp_us, prev_payload, payload FROM ordered WHERE prev_payload IS NOT NULL AND prev_payload != payload ORDER BY timestamp_us LIMIT 5000"
+      ]
+    },
+    {
+      "name": "mirror_validation bounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 257 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY timestamp_us",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY timestamp_us"
+      ]
+    },
+    {
+      "name": "mux_statistics bounded",
+      "sql": [
+        "SELECT payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid LIMIT 5000"
+      ]
+    },
+    {
+      "name": "first_last bounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid ASC LIMIT 1",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid DESC LIMIT 1",
+        "SELECT COUNT(*), x'00' FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000"
+      ]
+    },
+    {
+      "name": "frequency bounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid LIMIT 5000"
+      ]
+    },
+    {
+      "name": "distribution bounded",
+      "sql": [
+        "SELECT payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "gap_analysis bounded",
+      "sql": [
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "pattern_search bounded",
+      "sql": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd1-sql-golden' AND timestamp_us >= 1000000 AND timestamp_us < 2000000 ORDER BY rowid"
+      ]
+    },
+    {
+      "name": "frame_inventory bounded",
+      "sql": [
+        "SELECT protocol, frame_id, is_extended, COUNT(*) AS cnt, MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(MAX(dlc, length(payload))) AS max_dlc FROM frames WHERE capture_id = 'd1-sql-golden' AND timestamp_us >= 1000000 AND timestamp_us < 2000000 GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended"
+      ]
+    }
+  ],
+  "note": "Statements each capture query executes (rusqlite trace, parameters expanded, whitespace collapsed). Unbounded: no is_extended, no bounds; bounded: is_extended true, 1000000..2000000 µs. Limit 5000."
+}

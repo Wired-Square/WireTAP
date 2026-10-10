@@ -335,6 +335,22 @@ mod tests {
         assert_eq!(replay(0.0).pass_duration_us, 2 * MAX_SLEEP_US, "a speed of zero is floored, not divided by");
     }
 
+    /// The `rust` column of the table `ReplayDialog.tsx`'s estimate is checked against.
+    #[test]
+    fn the_pass_estimate_matches_the_rule_table() {
+        let table: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../frontend/wiretap-ui/src/tests/fixtures/data/replayEstimate.json"
+        ))
+        .expect("table");
+        for row in table["rows"].as_array().expect("rows") {
+            let timestamps: Vec<u64> =
+                row["timestamps_us"].as_array().expect("timestamps").iter().map(|t| t.as_u64().expect("u64")).collect();
+            let speed = row["speed"].as_f64().expect("speed");
+            let replay = Replay::new("s".into(), "r".into(), frames(&timestamps), speed, false);
+            assert_eq!(Some(replay.pass_duration_us), row["rust"].as_u64(), "{}", row["name"]);
+        }
+    }
+
     /// Runs a replay through `session_id`, cancelling it once `stop_when` holds
     /// for the events so far, and returns every event but the progress ticks.
     async fn events(

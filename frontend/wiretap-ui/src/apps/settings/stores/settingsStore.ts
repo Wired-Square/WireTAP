@@ -346,7 +346,7 @@ let rebaseGeneration = 0;
  * New format: one IOProfile per device with connection.interfaces[].
  * Returns { profiles, removedIds } where removedIds are IDs that were merged away.
  */
-function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[]; removedIds: Set<string> } {
+export function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[]; removedIds: Set<string> } {
   type FrameLinkProfile = Extract<IOProfile, { kind: "framelink" }>;
 
   const isOldStyleFrameLink = (p: IOProfile): p is FrameLinkProfile =>

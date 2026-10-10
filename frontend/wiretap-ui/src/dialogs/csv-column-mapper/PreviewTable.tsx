@@ -65,7 +65,7 @@ function roleColour(role: CsvColumnRole): string {
 
 /** Format a duration in seconds to a compact string with microsecond precision.
  *  Separates ms and µs groups with a comma: `0.247,307 s` */
-function formatOffset(secs: number): string {
+export function formatOffset(secs: number): string {
   if (secs < 60) {
     const fixed = secs.toFixed(6);
     // Insert a thin space between the ms and µs groups: "0.247307" → "0.247 307"
@@ -86,6 +86,22 @@ const UNIT_DIVISORS: Record<TimestampUnit, number> = {
   microseconds: 1_000_000,
   nanoseconds: 1_000_000_000,
 };
+
+/** Each cell's offset in seconds from the smallest readable stamp; `null` for a blank or unreadable cell. */
+export function previewOffsetSecs(
+  cells: (string | undefined)[],
+  unit: TimestampUnit,
+  negate: boolean,
+): (number | null)[] {
+  const rawValues = cells.map((s) => {
+    if (!s) return NaN;
+    const v = Number(s);
+    return negate ? Math.abs(v) : v;
+  });
+  const validValues = rawValues.filter((v) => !isNaN(v));
+  const minVal = Math.min(...validValues);
+  return rawValues.map((v) => (isNaN(v) ? null : (v - minVal) / UNIT_DIVISORS[unit]));
+}
 
 type Props = {
   headers: string[] | null;
@@ -143,21 +159,8 @@ export default function PreviewTable({
   // Compute interpreted offsets for each visible row when preview is active
   const interpretedOffsets: string[] = (() => {
     if (!showImportedTs || tsColIndex === undefined) return [];
-    const divisor = UNIT_DIVISORS[timestampUnit];
-    const rawValues = visibleRows.map((row) => {
-      const s = row[tsColIndex];
-      if (!s) return NaN;
-      const v = Number(s);
-      return negateTimestamps ? Math.abs(v) : v;
-    });
-    const validValues = rawValues.filter((v) => !isNaN(v));
-    if (validValues.length === 0) return rawValues.map(() => "—");
-    const minVal = Math.min(...validValues);
-    return rawValues.map((v) => {
-      if (isNaN(v)) return "—";
-      const offset = (v - minVal) / divisor;
-      return formatOffset(offset);
-    });
+    const offsets = previewOffsetSecs(visibleRows.map((row) => row[tsColIndex]), timestampUnit, negateTimestamps);
+    return offsets.map((offset) => (offset === null ? "—" : formatOffset(offset)));
   })();
 
   /** Get the display value for a cell, substituting timestamp preview when active */

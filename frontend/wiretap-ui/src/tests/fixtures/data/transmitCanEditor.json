@@ -1,0 +1,685 @@
+{
+  "cases": [
+    {
+      "name": "defaults",
+      "input": [],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "dlc 12 turns FD on and pads data",
+      "input": [
+        {
+          "dlc": 12
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 12,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": true,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": true,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "dlc down truncates data",
+      "input": [
+        {
+          "dlc": 3
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 3,
+          "data": [
+            255,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "FD on clears RTR",
+      "input": [
+        {
+          "isRtr": true
+        },
+        {
+          "isFd": true
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": true,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": true,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "FD off clears BRS",
+      "input": [
+        {
+          "isFd": true,
+          "isBrs": true
+        },
+        {
+          "isFd": false
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "FD off with dlc 12 is forced back on",
+      "input": [
+        {
+          "dlc": 12
+        },
+        {
+          "isFd": false
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 12,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": true,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": true,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "standard id 7FF builds",
+      "input": [
+        {
+          "frameId": "7FF"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "7FF",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 2047,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "standard id 800 does not build",
+      "input": [
+        {
+          "frameId": "800"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "800",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": null
+      }
+    },
+    {
+      "name": "extended id 1FFFFFFF builds",
+      "input": [
+        {
+          "frameId": "1FFFFFFF",
+          "isExtended": true
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "1FFFFFFF",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": true,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 536870911,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": true,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "extended id 20000000 does not build",
+      "input": [
+        {
+          "frameId": "20000000",
+          "isExtended": true
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "20000000",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": true,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": null
+      }
+    },
+    {
+      "name": "id with trailing junk parses its prefix",
+      "input": [
+        {
+          "frameId": "12G"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "12G",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 18,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "id with 0x prefix",
+      "input": [
+        {
+          "frameId": "0x123"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "0x123",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "negative id builds",
+      "input": [
+        {
+          "frameId": "-1"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "-1",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": -1,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    },
+    {
+      "name": "unparseable id",
+      "input": [
+        {
+          "frameId": "zz"
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "zz",
+          "dlc": 8,
+          "data": [
+            255,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": null
+      }
+    },
+    {
+      "name": "data longer than dlc is sliced",
+      "input": [
+        {
+          "data": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        }
+      ],
+      "expected": {
+        "editor": {
+          "frameId": "123",
+          "dlc": 8,
+          "data": [
+            255,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "bus": 0,
+          "isExtended": false,
+          "isFd": false,
+          "isBrs": false,
+          "isRtr": false
+        },
+        "frame": {
+          "frame_id": 291,
+          "data": [
+            255,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "bus": 0,
+          "is_extended": false,
+          "is_fd": false,
+          "is_brs": false,
+          "is_rtr": false
+        }
+      }
+    }
+  ]
+}

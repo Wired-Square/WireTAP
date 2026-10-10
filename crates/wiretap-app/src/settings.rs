@@ -1221,4 +1221,66 @@ mod tests {
         clamp_settings(&mut ok);
         assert_eq!(ok.query_result_limit, 5_000);
     }
+
+    const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures");
+
+    fn clamped(field: &str, value: u64) -> Option<u64> {
+        let mut raw = serde_json::to_value(AppSettings::default()).unwrap();
+        raw[field] = value.into();
+        let mut settings: AppSettings = serde_json::from_value(raw).ok()?;
+        clamp_settings(&mut settings);
+        serde_json::to_value(settings).unwrap()[field].as_u64()
+    }
+
+    fn widest(field: &str) -> u64 {
+        [u64::from(u32::MAX), u64::from(u16::MAX)]
+            .into_iter()
+            .find(|&v| clamped(field, v).is_some())
+            .expect("an integer field")
+    }
+
+    /// `normalizeSettings({})` is compared with this in `settingsGoldens.test.ts`.
+    /// The directories depend on the host, so they are blanked.
+    #[test]
+    fn defaults_match_the_fixture() {
+        let path = format!("{FIXTURES}/data/settingsDefaults.rust.json");
+        let mut defaults = serde_json::to_value(AppSettings::default()).unwrap();
+        for dir in ["decoder_dir", "dump_dir", "report_dir"] {
+            defaults[dir] = "".into();
+        }
+        if std::env::var_os("WRITE_DATA_FIXTURES").is_some() {
+            std::fs::write(&path, serde_json::to_string_pretty(&defaults).unwrap() + "\n").unwrap();
+        }
+        let golden: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("fixture")).expect("json");
+        assert_eq!(defaults, golden);
+    }
+
+    /// The `rust` column of the table `bounds.ts` is checked against; a numeric
+    /// field missing from the table must not be clamped at all.
+    #[test]
+    fn clamp_settings_matches_the_bounds_table() {
+        let text = std::fs::read_to_string(format!("{FIXTURES}/data/settingsBounds.json")).expect("table");
+        let table: serde_json::Value = serde_json::from_str(&text).expect("json");
+        let rows = table["bounds"].as_array().expect("bounds");
+        for row in rows {
+            let field = row["field"].as_str().expect("field");
+            let top = widest(field);
+            let (min, max) = match &row["rust"] {
+                serde_json::Value::Null => (0, top),
+                bound => (bound["min"].as_u64().unwrap(), bound["max"].as_u64().unwrap()),
+            };
+            assert_eq!(clamped(field, 0), Some(min), "{field} below");
+            assert_eq!(clamped(field, top), Some(max), "{field} above");
+        }
+
+        let listed: Vec<&str> = rows.iter().map(|row| row["field"].as_str().unwrap()).collect();
+        let defaults = serde_json::to_value(AppSettings::default()).unwrap();
+        for (field, value) in defaults.as_object().unwrap() {
+            if value.is_u64() && !listed.contains(&field.as_str()) {
+                let top = widest(field);
+                assert_eq!((clamped(field, 0), clamped(field, top)), (Some(0), Some(top)), "{field} is clamped but not in the table");
+            }
+        }
+    }
 }

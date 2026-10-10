@@ -1,4 +1,4 @@
-// Shared by the P4 catalogue goldens: each golden file holds its cases' inputs
+// Shared by the P4 catalogue and P5 data goldens: each golden file holds its cases' inputs
 // and what the TypeScript returned, rewritten by `npx vitest run -u`.
 
 import { readFileSync } from "node:fs";
@@ -24,9 +24,9 @@ export function asJson(value: unknown): unknown {
   );
 }
 
-export async function expectGolden(file: string, cases: GoldenCase[]) {
+export async function expectGolden(file: string, cases: GoldenCase[], dir = "catalog") {
   const text = JSON.stringify({ cases: asJson(cases) }, null, 2) + "\n";
-  await expect(text).toMatchFileSnapshot(resolve(fixtures, "catalog", file));
+  await expect(text).toMatchFileSnapshot(resolve(fixtures, dir, file));
 }
 
 /** Renders `hook` once in jsdom and returns what it returned. */

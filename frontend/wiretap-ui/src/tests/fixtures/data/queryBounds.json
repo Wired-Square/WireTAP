@@ -1,0 +1,85 @@
+{
+  "note": "A start bound as typed (TimeBoundsInput, datetime-local) under TZ=Australia/Melbourne. captureUs: queryStore toMicroseconds, sent as startTimeUs; captureInventory: the same as a decimal string to query_frame_inventory; gatewayIso: toIsoTimestamp, sent as startTime to db_query_*. rust: payload_source::iso_to_micros(input), the MCP path and the inventory reader (null = the bound is dropped).",
+  "rows": [
+    {
+      "input": "2026-03-01T10:00",
+      "mode": "local",
+      "captureUs": 1772319600000000,
+      "captureInventory": "1772319600000000",
+      "gatewayIso": "2026-02-28T23:00:00.000Z",
+      "rust": null
+    },
+    {
+      "input": "2026-03-01T10:00:30.5",
+      "mode": "local",
+      "captureUs": 1772319630500000,
+      "captureInventory": "1772319630500000",
+      "gatewayIso": "2026-02-28T23:00:30.500Z",
+      "rust": null
+    },
+    {
+      "input": "2026-03-01T10:00",
+      "mode": "utc",
+      "captureUs": 1772319600000000,
+      "captureInventory": "1772319600000000",
+      "gatewayIso": "2026-02-28T23:00:00.000Z",
+      "rust": null
+    },
+    {
+      "input": "2026-03-01T00:00:00Z",
+      "mode": "local",
+      "captureUs": 1772323200000000,
+      "captureInventory": "1772323200000000",
+      "gatewayIso": "2026-03-01T00:00:00.000Z",
+      "rust": 1772323200000000
+    },
+    {
+      "input": "2026-03-01T10:00:00+10:30",
+      "mode": "local",
+      "captureUs": 1772321400000000,
+      "captureInventory": "1772321400000000",
+      "gatewayIso": "2026-02-28T23:30:00.000Z",
+      "rust": 1772321400000000
+    },
+    {
+      "input": "2026-04-05T02:30",
+      "mode": "local",
+      "captureUs": 1775316600000000,
+      "captureInventory": "1775316600000000",
+      "gatewayIso": "2026-04-04T15:30:00.000Z",
+      "rust": null
+    },
+    {
+      "input": "2026-10-04T02:30",
+      "mode": "local",
+      "captureUs": 1791045000000000,
+      "captureInventory": "1791045000000000",
+      "gatewayIso": "2026-10-03T16:30:00.000Z",
+      "rust": null
+    },
+    {
+      "input": "2026-03-01",
+      "mode": "local",
+      "captureUs": 1772323200000000,
+      "captureInventory": "1772323200000000",
+      "gatewayIso": "2026-03-01T00:00:00.000Z",
+      "rust": null
+    },
+    {
+      "input": "1772319600000000",
+      "mode": "local",
+      "captureUs": null,
+      "captureInventory": null,
+      "gatewayIso": null,
+      "rust": 1772319600000000
+    },
+    {
+      "input": "not a date",
+      "mode": "local",
+      "captureUs": null,
+      "captureInventory": null,
+      "gatewayIso": null,
+      "rust": null
+    }
+  ]
+}

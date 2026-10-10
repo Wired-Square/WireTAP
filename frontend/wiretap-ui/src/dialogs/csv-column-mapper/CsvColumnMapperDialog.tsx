@@ -83,6 +83,28 @@ export type CsvColumnMapperDialogProps = {
   onImportComplete: (metadata: CaptureMetadata) => void;
 };
 
+/** The span of the readable stamps in seconds, read as integers in `unit`; `null` with fewer than two. */
+export function estimateDurationSecs(cells: (string | undefined)[], unit: TimestampUnit): number | null {
+  const timestamps = cells
+    .filter(Boolean)
+    .map((s) => parseInt(s as string, 10))
+    .filter((n) => !isNaN(n));
+
+  if (timestamps.length < 2) return null;
+
+  const range = Math.abs(Math.max(...timestamps) - Math.min(...timestamps));
+  switch (unit) {
+    case "seconds":
+      return range;
+    case "milliseconds":
+      return range / 1_000;
+    case "microseconds":
+      return range / 1_000_000;
+    case "nanoseconds":
+      return range / 1_000_000_000;
+  }
+}
+
 export default function CsvColumnMapperDialog({
   isOpen,
   filePath,
@@ -304,33 +326,8 @@ export default function CsvColumnMapperDialog({
     const tsColIndex = mappings.find((m) => m.role === "timestamp")?.column_index;
     if (tsColIndex === undefined) return null;
 
-    const timestamps = preview.rows
-      .map((row) => row[tsColIndex])
-      .filter(Boolean)
-      .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n));
-
-    if (timestamps.length < 2) return null;
-
-    const min = Math.min(...timestamps);
-    const max = Math.max(...timestamps);
-    const range = Math.abs(max - min);
-
-    let durationSecs: number;
-    switch (timestampUnit) {
-      case "seconds":
-        durationSecs = range;
-        break;
-      case "milliseconds":
-        durationSecs = range / 1_000;
-        break;
-      case "microseconds":
-        durationSecs = range / 1_000_000;
-        break;
-      case "nanoseconds":
-        durationSecs = range / 1_000_000_000;
-        break;
-    }
+    const durationSecs = estimateDurationSecs(preview.rows.map((row) => row[tsColIndex]), timestampUnit);
+    if (durationSecs === null) return null;
 
     if (durationSecs < 1) return t("csvColumnMapper.duration.ms", { ms: Math.round(durationSecs * 1000) });
     if (durationSecs < 60) return t("csvColumnMapper.duration.s", { s: durationSecs.toFixed(1) });

@@ -333,6 +333,11 @@ pub(crate) fn use_in_memory_database() {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn trace_statements(trace: Option<fn(&str)>) {
+    DB.lock().unwrap().as_mut().expect("database").trace(trace);
+}
+
 
 /// Drop every non-persistent capture's rows, then any rows left without a
 /// metadata row at all.
