@@ -10,7 +10,7 @@
 // (`wiretap_gateway::Protocol`) and this module says so on every request that is
 // not CAN.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use serde::de::DeserializeOwned;
@@ -18,19 +18,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 use wiretap_gateway::{
-    ByteChangesParams, DistributionParams, Event, EventPatch, EventsResponse, FirstLastParams,
-    FrameChangesParams, FrameFilter, FrequencyParams, GapAnalysisParams, ImportResult,
-    InventoryEntry, InventoryResponse, MirrorValidationParams, MuxStatisticsParams, NewEvent,
-    PatternSearchParams, PayloadsParams, PayloadsResponse, Protocol, SignalResponse, TimeBounds,
+    DatabaseActivityResult, Event, EventPatch, EventsResponse, FrameFilter, ImportResult,
+    InventoryEntry, InventoryResponse, NewEvent, PayloadsParams, PayloadsResponse, Protocol,
+    SignalResponse, TimeBounds,
 };
 
 use crate::capture_events::CaptureEvent;
 use crate::credentials::{self, get_credential};
-use crate::queryresults::{
-    differing_byte_indices, ByteChangeQueryResult, DatabaseActivityResult, DistributionQueryResult,
-    FirstLastQueryResult, FrameChangeQueryResult, FrequencyQueryResult, GapAnalysisQueryResult,
-    MirrorValidationQueryResult, MuxStatisticsQueryResult, PatternSearchQueryResult,
-};
 use crate::settings::IOProfile;
 
 /// The one client for the WireTAP backend gateway — queries here and the frame
@@ -143,11 +137,11 @@ impl ApiProfile {
 
     /// The gateway's default goes unsaid, so a CAN profile's requests carry
     /// no `protocol` key, as before the column existed.
-    fn wire_protocol(&self) -> Option<Protocol> {
+    pub(crate) fn wire_protocol(&self) -> Option<Protocol> {
         (self.protocol != Protocol::Can).then_some(self.protocol)
     }
 
-    fn filter(
+    pub(crate) fn filter(
         &self,
         frame_id: u32,
         is_extended: Option<bool>,
@@ -234,7 +228,7 @@ async fn get<T: DeserializeOwned>(api: &ApiProfile, path: &str) -> Result<T, Str
 }
 
 /// POST a query body, registering it for cancellation under `query_id`.
-async fn post_query<T: DeserializeOwned>(
+pub(crate) async fn post_query<T: DeserializeOwned>(
     api: &ApiProfile,
     path: &str,
     body: &impl Serialize,
@@ -281,221 +275,6 @@ pub async fn cancel_query(query_id: &str) -> bool {
     true
 }
 
-// ---------------------------------------------------------------------------
-// Query functions — signatures mirror the dbquery commands
-// ---------------------------------------------------------------------------
-
-#[allow(clippy::too_many_arguments)]
-pub async fn byte_changes(
-    profile: &IOProfile,
-    frame_id: u32,
-    byte_index: u8,
-    is_extended: Option<bool>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<ByteChangeQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = ByteChangesParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        byte_index,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/byte-changes", &body, &query_id).await
-}
-
-pub async fn frame_changes(
-    profile: &IOProfile,
-    frame_id: u32,
-    is_extended: Option<bool>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<FrameChangeQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = FrameChangesParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/frame-changes", &body, &query_id).await
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn mirror_validation(
-    profile: &IOProfile,
-    mirror_frame_id: u32,
-    source_frame_id: u32,
-    is_extended: Option<bool>,
-    tolerance_ms: u32,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-    compare: Option<BTreeSet<usize>>,
-) -> Result<MirrorValidationQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = MirrorValidationParams {
-        protocol: api.wire_protocol(),
-        mirror_frame_id,
-        source_frame_id,
-        is_extended,
-        tolerance_ms,
-        start_time,
-        end_time,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    let mut out: MirrorValidationQueryResult =
-        post_query(&api, "/query/mirror-validation", &body, &query_id).await?;
-
-    // The gateway compares whole payloads and has no catalogue, so narrowing to
-    // the mirror's inherited bytes happens here. Note this filters *after* the
-    // remote applied `limit`, so `limit` counts whole-payload differences and
-    // you get the subset of those that also differ on an inherited byte — the
-    // local Postgres path has the same shape, whereas a capture query limits
-    // the filtered rows. `stats` still describes the remote's pre-filter work
-    // apart from `results_count`.
-    if let Some(compare) = compare {
-        out.results.retain_mut(|r| {
-            r.mismatch_indices = differing_byte_indices(
-                &r.mirror_payload,
-                &r.source_payload,
-                Some(&compare),
-            );
-            !r.mismatch_indices.is_empty()
-        });
-        out.stats.results_count = out.results.len() as u64;
-    }
-    Ok(out)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn mux_statistics(
-    profile: &IOProfile,
-    frame_id: u32,
-    mux_selector_byte: u8,
-    is_extended: Option<bool>,
-    include_16bit: bool,
-    payload_length: u8,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<MuxStatisticsQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = MuxStatisticsParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        mux_selector_byte,
-        include_16bit,
-        payload_length,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/mux-statistics", &body, &query_id).await
-}
-
-pub async fn first_last(
-    profile: &IOProfile,
-    frame_id: u32,
-    is_extended: Option<bool>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    query_id: String,
-) -> Result<FirstLastQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = FirstLastParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/first-last", &body, &query_id).await
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn frequency(
-    profile: &IOProfile,
-    frame_id: u32,
-    is_extended: Option<bool>,
-    bucket_size_ms: u32,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<FrequencyQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = FrequencyParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        bucket_size_ms,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/frequency", &body, &query_id).await
-}
-
-pub async fn distribution(
-    profile: &IOProfile,
-    frame_id: u32,
-    byte_index: u8,
-    is_extended: Option<bool>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    query_id: String,
-) -> Result<DistributionQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = DistributionParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        byte_index,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/distribution", &body, &query_id).await
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn gap_analysis(
-    profile: &IOProfile,
-    frame_id: u32,
-    is_extended: Option<bool>,
-    gap_threshold_ms: f64,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<GapAnalysisQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = GapAnalysisParams {
-        filter: api.filter(frame_id, is_extended, start_time, end_time),
-        gap_threshold_ms,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/gap-analysis", &body, &query_id).await
-}
-
-pub async fn pattern_search(
-    profile: &IOProfile,
-    pattern: Vec<u8>,
-    pattern_mask: Vec<u8>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    limit: Option<u32>,
-    query_id: String,
-) -> Result<PatternSearchQueryResult, String> {
-    let api = resolve(profile)?;
-    let body = PatternSearchParams {
-        protocol: api.wire_protocol(),
-        pattern,
-        pattern_mask,
-        start_time,
-        end_time,
-        limit,
-        query_id: Some(query_id.clone()),
-    };
-    post_query(&api, "/query/pattern-search", &body, &query_id).await
-}
-
 pub async fn activity(profile: &IOProfile) -> Result<DatabaseActivityResult, String> {
     let api = resolve(profile)?;
     get(&api, "/activity").await
@@ -527,28 +306,26 @@ fn inventory_max_len(entry: &InventoryEntry, protocol: Protocol) -> u16 {
     })
 }
 
+/// A bound as the gateway takes it.
+pub(crate) fn rfc3339(us: i64) -> Result<String, String> {
+    chrono::DateTime::from_timestamp_micros(us)
+        .map(|t| t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
+        .ok_or_else(|| format!("time bound {us} µs is out of range"))
+}
+
+pub(crate) fn inventory_path(api: &ApiProfile, start: Option<&str>, end: Option<&str>) -> String {
+    let bounds: Vec<String> = [("start", start), ("end", end)]
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|v| format!("{key}={}", urlencoding(v))))
+        .collect();
+    let query = if bounds.is_empty() { String::new() } else { format!("?{}", bounds.join("&")) };
+    format!("/inventory{query}{}", protocol_query(api.protocol, bounds.is_empty()))
+}
+
 /// Every entry is the profile's protocol — the gateway groups one protocol at
 /// a time, and a Modbus row's `frame_id` is its unit/function word.
-pub async fn frame_inventory(
-    profile: &IOProfile,
-    start_time: Option<String>,
-    end_time: Option<String>,
-) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
-    let api = resolve(profile)?;
-    let mut path = String::from("/inventory");
-    let mut params = Vec::new();
-    if let Some(s) = &start_time {
-        params.push(format!("start={}", urlencoding(s)));
-    }
-    if let Some(e) = &end_time {
-        params.push(format!("end={}", urlencoding(e)));
-    }
-    if !params.is_empty() {
-        path.push('?');
-        path.push_str(&params.join("&"));
-    }
-    path.push_str(&protocol_query(api.protocol, params.is_empty()));
-    let resp: InventoryResponse = get(&api, &path).await?;
+pub(crate) async fn read_inventory(api: &ApiProfile, path: &str) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
+    let resp: InventoryResponse = get(api, path).await?;
     Ok(resp
         .entries
         .into_iter()
@@ -564,6 +341,17 @@ pub async fn frame_inventory(
             )
         })
         .collect())
+}
+
+pub async fn frame_inventory(
+    profile: &IOProfile,
+    start_us: Option<i64>,
+    end_us: Option<i64>,
+) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
+    let api = resolve(profile)?;
+    let start = start_us.map(rfc3339).transpose()?;
+    let end = end_us.map(rfc3339).transpose()?;
+    read_inventory(&api, &inventory_path(&api, start.as_deref(), end.as_deref())).await
 }
 
 pub async fn fetch_frame_payloads(
@@ -964,21 +752,23 @@ pub(crate) fn urlencoding(s: &str) -> String {
 }
 
 #[cfg(test)]
+pub(crate) fn test_api(protocol: Protocol) -> ApiProfile {
+    ApiProfile {
+        profile_id: "p".into(),
+        base_url: "http://g:8423".into(),
+        api_key: String::new(),
+        database: "db".into(),
+        protocol,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    use wiretap_gateway::{ByteChangesParams, PatternSearchParams};
 
     fn conn(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
         pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
-    }
-
-    fn api(protocol: Protocol) -> ApiProfile {
-        ApiProfile {
-            profile_id: "p".into(),
-            base_url: "http://g:8423".into(),
-            api_key: String::new(),
-            database: "db".into(),
-            protocol,
-        }
     }
 
     #[test]
@@ -1038,7 +828,7 @@ mod tests {
     fn a_query_body_names_the_protocol_only_when_it_is_not_can() {
         let body = |protocol| {
             serde_json::to_value(ByteChangesParams {
-                filter: api(protocol).filter(613, Some(false), Some("s".into()), None),
+                filter: test_api(protocol).filter(613, Some(false), Some("s".into()), None),
                 byte_index: 2,
                 limit: Some(10),
                 query_id: Some("q".into()),
@@ -1056,7 +846,7 @@ mod tests {
 
         let pattern = |protocol| {
             serde_json::to_value(PatternSearchParams {
-                protocol: api(protocol).wire_protocol(),
+                protocol: test_api(protocol).wire_protocol(),
                 pattern: vec![1],
                 pattern_mask: vec![0xff],
                 start_time: None,
@@ -1211,7 +1001,7 @@ mod tests {
             id
         };
         let (base_url, requests) = recording_gateway().await;
-        let gateway = ApiProfile { base_url, ..api(Protocol::Can) };
+        let gateway = ApiProfile { base_url, ..test_api(Protocol::Can) };
 
         assert!(import_capture(&gateway, &capture_of("modbus"), "fresh", true, |_| {}).await.is_err());
         assert!(requests.lock().unwrap().is_empty(), "{:?}", requests.lock().unwrap());

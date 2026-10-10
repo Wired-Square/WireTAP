@@ -1,28 +1,30 @@
 {
   "cases": [
     {
-      "name": "byte_changes",
-      "input": [
-        {
-          "timestamp_us": 1000000,
-          "old_value": 15,
-          "new_value": 160
-        }
-      ],
       "expected": [
         "timestamp_us,old_value,new_value",
         "1000000,0x0F,0xA0",
         ""
-      ]
-    },
-    {
-      "name": "frame_changes",
+      ],
       "input": [
         {
-          "timestamp_us": 1000000,
-          "old_payload": [
+          "new_value": 160,
+          "old_value": 15,
+          "timestamp_us": 1000000
+        }
+      ],
+      "name": "byte_changes"
+    },
+    {
+      "expected": [
+        "timestamp_us,changed_count,changed_indices,old_payload,new_payload",
+        "1000000,2,1 3,01 02 03,01 09 03 04",
+        ""
+      ],
+      "input": [
+        {
+          "changed_indices": [
             1,
-            2,
             3
           ],
           "new_payload": [
@@ -31,222 +33,219 @@
             3,
             4
           ],
-          "changed_indices": [
+          "old_payload": [
             1,
+            2,
             3
-          ]
+          ],
+          "timestamp_us": 1000000
         }
       ],
-      "expected": [
-        "timestamp_us,changed_count,changed_indices,old_payload,new_payload",
-        "1000000,2,1 3,01 02 03,01 09 03 04",
-        ""
-      ]
+      "name": "frame_changes"
     },
     {
-      "name": "mirror_validation",
+      "expected": [
+        "mirror_timestamp_us,source_timestamp_us,mismatch_count,mismatch_indices,mirror_payload,source_payload",
+        "1000100,1000000,1,1,01 02,01 03",
+        ""
+      ],
       "input": [
         {
-          "mirror_timestamp_us": 1000100,
-          "source_timestamp_us": 1000000,
           "mirror_payload": [
             1,
             2
+          ],
+          "mirror_timestamp_us": 1000100,
+          "mismatch_indices": [
+            1
           ],
           "source_payload": [
             1,
             3
           ],
-          "mismatch_indices": [
-            1
-          ]
+          "source_timestamp_us": 1000000
         }
       ],
-      "expected": [
-        "mirror_timestamp_us,source_timestamp_us,mismatch_count,mismatch_indices,mirror_payload,source_payload",
-        "1000100,1000000,1,1,01 02,01 03",
-        ""
-      ]
+      "name": "mirror_validation"
     },
     {
-      "name": "mux_statistics",
+      "expected": [
+        "mux_value,frame_count,byte_index,bits,endianness,min,max,avg,distinct_count,sample_count",
+        "1,3,1,8,,0,255,85.3333,3,3",
+        "1,3,2,8,,7,7,7,1,3",
+        "1,3,1,16,le,0,1,0.5,2,",
+        ""
+      ],
       "input": {
-        "mux_byte": 0,
-        "total_frames": 3,
         "cases": [
           {
-            "mux_value": 1,
-            "frame_count": 3,
             "byte_stats": [
               {
-                "byte_index": 1,
-                "min": 0,
-                "max": 255,
                 "avg": 85.3333,
+                "byte_index": 1,
                 "distinct_count": 3,
+                "max": 255,
+                "min": 0,
                 "sample_count": 3
               },
               {
-                "byte_index": 2,
-                "min": 7,
-                "max": 7,
                 "avg": 7,
+                "byte_index": 2,
                 "distinct_count": 1,
+                "max": 7,
+                "min": 7,
                 "sample_count": 3
               }
             ],
+            "frame_count": 3,
+            "mux_value": 1,
             "word16_stats": [
               {
-                "start_byte": 1,
-                "endianness": "le",
-                "min": 0,
-                "max": 1,
                 "avg": 0.5,
-                "distinct_count": 2
+                "distinct_count": 2,
+                "endianness": "le",
+                "max": 1,
+                "min": 0,
+                "start_byte": 1
               }
             ]
           }
-        ]
+        ],
+        "mux_byte": 0,
+        "total_frames": 3
       },
-      "expected": [
-        "mux_value,frame_count,byte_index,min,max,avg,distinct_count,sample_count",
-        "1,3,1,0,255,85.33,3,3",
-        "1,3,2,7,7,7,1,3",
-        ""
-      ]
+      "name": "mux_statistics"
     },
     {
-      "name": "first_last",
+      "expected": [
+        "position,timestamp_us,payload,total_count",
+        "first,1000000,DE AD,42",
+        "last,9000000,BE EF,42",
+        ""
+      ],
       "input": {
-        "first_timestamp_us": 1000000,
         "first_payload": [
           222,
           173
         ],
-        "last_timestamp_us": 9000000,
+        "first_timestamp_us": 1000000,
         "last_payload": [
           190,
           239
         ],
+        "last_timestamp_us": 9000000,
         "total_count": 42
       },
-      "expected": [
-        "position,timestamp_us,payload",
-        "first,1000000,DE AD",
-        "last,9000000,BE EF",
-        "",
-        "total_count,42",
-        ""
-      ]
+      "name": "first_last"
     },
     {
-      "name": "frequency",
-      "input": [
-        {
-          "bucket_start_us": 0,
-          "frame_count": 11,
-          "min_interval_us": 9000,
-          "max_interval_us": 11000,
-          "avg_interval_us": 10000.456
-        }
-      ],
       "expected": [
         "bucket_start_us,frame_count,min_interval_us,max_interval_us,avg_interval_us",
-        "0,11,9000,11000,10000.46",
+        "0,11,9000,11000,10000.456",
         ""
-      ]
-    },
-    {
-      "name": "distribution",
+      ],
       "input": [
         {
-          "value": 10,
-          "count": 2,
-          "percentage": 66.66666
-        },
-        {
-          "value": 255,
-          "count": 1,
-          "percentage": 33.33333
+          "avg_interval_us": 10000.456,
+          "bucket_start_us": 0,
+          "frame_count": 11,
+          "max_interval_us": 11000,
+          "min_interval_us": 9000
         }
       ],
+      "name": "frequency"
+    },
+    {
       "expected": [
         "value,count,percentage",
-        "0x0A,2,66.67",
-        "0xFF,1,33.33",
+        "0x0A,2,66.66666",
+        "0xFF,1,33.33333",
         ""
-      ]
-    },
-    {
-      "name": "gap_analysis",
+      ],
       "input": [
         {
-          "gap_start_us": 1000000,
-          "gap_end_us": 1250500,
-          "duration_ms": 250.5004
+          "count": 2,
+          "percentage": 66.66666,
+          "value": 10
+        },
+        {
+          "count": 1,
+          "percentage": 33.33333,
+          "value": 255
         }
       ],
-      "expected": [
-        "gap_start_us,gap_end_us,duration_ms",
-        "1000000,1250500,250.5",
-        ""
-      ]
+      "name": "distribution"
     },
     {
-      "name": "pattern_search",
+      "expected": [
+        "gap_start_us,gap_end_us,duration_ms",
+        "1000000,1250500,250.5004",
+        ""
+      ],
       "input": [
         {
-          "timestamp_us": 1000000,
+          "duration_ms": 250.5004,
+          "gap_end_us": 1250500,
+          "gap_start_us": 1000000
+        }
+      ],
+      "name": "gap_analysis"
+    },
+    {
+      "expected": [
+        "timestamp_us,frame_id,is_extended,payload,match_positions",
+        "1000000,419361024,true,AA 00 AA 01,0 2",
+        ""
+      ],
+      "input": [
+        {
           "frame_id": 419361024,
           "is_extended": true,
+          "match_positions": [
+            0,
+            2
+          ],
           "payload": [
             170,
             0,
             170,
             1
           ],
-          "match_positions": [
-            0,
-            2
-          ]
+          "timestamp_us": 1000000
         }
       ],
-      "expected": [
-        "timestamp_us,frame_id,is_extended,payload,match_positions",
-        "1000000,419361024,true,AA 00 AA 01,0 2",
-        ""
-      ]
+      "name": "pattern_search"
     },
     {
-      "name": "frame_inventory",
-      "input": [
-        {
-          "protocol": "can",
-          "frame_id": 256,
-          "frame_id_hex": "0x100",
-          "is_extended": false,
-          "count": 10,
-          "first_us": 1,
-          "last_us": 2,
-          "max_dlc": 8
-        },
-        {
-          "protocol": "modbus_rtu",
-          "frame_id": 259,
-          "frame_id_hex": "0x0103",
-          "is_extended": false,
-          "count": 1,
-          "first_us": 3,
-          "last_us": 3,
-          "max_dlc": 7
-        }
-      ],
       "expected": [
         "protocol,frame_id,frame_id_hex,is_extended,count,first_us,last_us,max_dlc",
         "can,256,0x100,false,10,1,2,8",
-        "modbus_rtu,259,0x0103,false,1,3,3,7",
+        "modbus_rtu,259,0x103,false,1,3,3,7",
         ""
-      ]
+      ],
+      "input": [
+        {
+          "count": 10,
+          "first_us": 1,
+          "frame_id": 256,
+          "frame_id_hex": "0x100",
+          "is_extended": false,
+          "last_us": 2,
+          "max_dlc": 8,
+          "protocol": "can"
+        },
+        {
+          "count": 1,
+          "first_us": 3,
+          "frame_id": 259,
+          "frame_id_hex": "0x0103",
+          "is_extended": false,
+          "last_us": 3,
+          "max_dlc": 7,
+          "protocol": "modbus_rtu"
+        }
+      ],
+      "name": "frame_inventory"
     }
   ]
 }

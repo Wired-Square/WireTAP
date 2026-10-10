@@ -965,6 +965,11 @@ pub fn send_transmit_queue(queue: &crate::transmit_queue::TransmitQueue) {
     send_json_to_all(MsgType::TransmitQueue, queue);
 }
 
+/// Push the whole Query queue after a change (global, channel 0).
+pub fn send_query_queue(queue: &crate::query::QueryQueue) {
+    send_json_to_all(MsgType::QueryQueue, queue);
+}
+
 #[derive(serde::Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct AttachToPanelMsg<'a> {

@@ -14,7 +14,9 @@ use once_cell::sync::Lazy;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use wiretap_gateway::{CaptureProtocol, FrameRowFilter, Sql, SqlValue};
 use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_events::CaptureEvent;
@@ -581,7 +583,7 @@ fn get_frames_paginated_filtered_with_conn(
 
 /// Backend captures stored before `2c4fb97e` hold a CAN FD length code in `dlc`, always
 /// below the payload's length; an RTR's `dlc` is its requested length. `row_to_frame` agrees.
-const STORED_LENGTH: &str = "MAX(dlc, length(payload))";
+pub(crate) const STORED_LENGTH: &str = "MAX(dlc, length(payload))";
 
 /// Column list for every `SELECT` feeding `row_to_frame`. Kept in one place because a
 /// column the mapper reads and the query omits is a runtime error, not a build one.
@@ -812,66 +814,6 @@ impl InventoryRow {
     }
 }
 
-/// Per-frame-id rollup for a capture. Optional time bounds in microseconds.
-pub fn frame_inventory(
-    capture_id: &str,
-    start_us: Option<i64>,
-    end_us: Option<i64>,
-) -> Result<Vec<InventoryRow>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    frame_inventory_with_conn(conn, capture_id, start_us, end_us)
-}
-
-fn frame_inventory_with_conn(
-    conn: &Connection,
-    capture_id: &str,
-    start_us: Option<i64>,
-    end_us: Option<i64>,
-) -> Result<Vec<InventoryRow>, String> {
-    let mut sql = format!(
-        "SELECT protocol, frame_id, is_extended, COUNT(*) AS cnt, \
-         MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX({STORED_LENGTH}) AS max_dlc \
-         FROM frames WHERE capture_id = ?1",
-    );
-    let mut bind: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(capture_id.to_string())];
-    let mut idx = 2;
-    if let Some(s) = start_us {
-        sql.push_str(&format!(" AND timestamp_us >= ?{}", idx));
-        bind.push(Box::new(s));
-        idx += 1;
-    }
-    if let Some(e) = end_us {
-        sql.push_str(&format!(" AND timestamp_us < ?{}", idx));
-        bind.push(Box::new(e));
-    }
-    sql.push_str(
-        " GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended",
-    );
-
-    let mut stmt = conn.prepare(&sql).map_err(|e| format!("Failed to prepare: {}", e))?;
-    let refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|b| b.as_ref()).collect();
-    let rows = stmt
-        .query_map(rusqlite::params_from_iter(refs), |row| {
-            Ok(InventoryRow::new(
-                &row.get::<_, String>("protocol")?,
-                row.get::<_, i64>("frame_id")? as u32,
-                row.get::<_, i64>("is_extended")? != 0,
-                row.get::<_, i64>("cnt")?,
-                row.get::<_, i64>("first_us")?,
-                row.get::<_, i64>("last_us")?,
-                row.get::<_, i64>("max_dlc")? as u16,
-            ))
-        })
-        .map_err(|e| format!("Failed to query: {}", e))?;
-
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r.map_err(|e| format!("Failed to read row: {}", e))?);
-    }
-    Ok(out)
-}
-
 /// Pick at most `limit` items spread evenly across `items`.
 ///
 /// Ceiling division on the step, not floor: a step of 1 over 5,001 items with a
@@ -915,26 +857,20 @@ pub fn sample_frame_payloads(
     sample_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, sample_limit)
 }
 
-type Bindings = Vec<Box<dyn rusqlite::types::ToSql>>;
-
-/// The `WHERE` clause and its bindings for one frame's rows in a capture.
+/// One frame's rows in a capture; a protocol the capture cannot store is refused.
 fn frame_filter(
     capture_id: &str,
     protocol: Option<&str>,
     frame_id: u32,
     is_extended: Option<bool>,
-) -> (String, Bindings) {
-    let mut filter = String::from("capture_id = ?1 AND frame_id = ?2");
-    let mut bind: Bindings = vec![Box::new(capture_id.to_string()), Box::new(frame_id as i64)];
-    if let Some(p) = protocol {
-        filter.push_str(&format!(" AND protocol = ?{}", bind.len() + 1));
-        bind.push(Box::new(p.to_string()));
-    }
-    if let Some(ext) = is_extended {
-        filter.push_str(&format!(" AND is_extended = ?{}", bind.len() + 1));
-        bind.push(Box::new(ext as i32));
-    }
-    (filter, bind)
+) -> Result<Sql, String> {
+    let protocols = protocol
+        .map(|p| CaptureProtocol::from_stored(p).ok_or_else(|| format!("Unknown protocol '{p}'")))
+        .transpose()?
+        .into_iter()
+        .collect();
+    let filter = FrameRowFilter { frame_id: Some(frame_id), is_extended, protocols, ..Default::default() };
+    Ok(filter.sql_where(capture_id))
 }
 
 fn sample_frame_payloads_with_conn(
@@ -945,19 +881,9 @@ fn sample_frame_payloads_with_conn(
     is_extended: Option<bool>,
     sample_limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let (filter, bind) = frame_filter(capture_id, protocol, frame_id, is_extended);
-
-    let mut stmt = conn
-        .prepare_cached(&format!("SELECT rowid FROM frames WHERE {filter} ORDER BY rowid"))
-        .map_err(|e| format!("Failed to prepare: {}", e))?;
-    let refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|b| b.as_ref()).collect();
-    let rows = stmt
-        .query_map(rusqlite::params_from_iter(refs), |row| row.get::<_, i64>(0))
-        .map_err(|e| format!("Failed to query: {}", e))?;
-    let mut rowids = Vec::new();
-    for r in rows {
-        rowids.push(r.map_err(|e| format!("Failed to read row: {}", e))?);
-    }
+    let filter = frame_filter(capture_id, protocol, frame_id, is_extended)?;
+    let statement = Sql { sql: format!("SELECT rowid FROM frames WHERE {} ORDER BY rowid", filter.sql), values: filter.values };
+    let rowids = read_rows_with_conn(conn, &statement, |row| row.get::<_, i64>(0))?;
 
     let picked = strided(&rowids, sample_limit);
     if picked.is_empty() {
@@ -997,14 +923,11 @@ fn tail_frame_payloads_with_conn(
     is_extended: Option<bool>,
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let (filter, mut bind) = frame_filter(capture_id, protocol, frame_id, is_extended);
-    let sql = format!(
-        "SELECT payload FROM frames WHERE {filter} ORDER BY rowid DESC LIMIT ?{}",
-        bind.len() + 1
-    );
-    bind.push(Box::new(limit.max(1) as i64));
-    let refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|b| b.as_ref()).collect();
-    let mut payloads = query_payloads_with_conn(conn, &sql, &refs)?;
+    let filter = frame_filter(capture_id, protocol, frame_id, is_extended)?;
+    let mut statement =
+        Sql { sql: format!("SELECT payload FROM frames WHERE {} ORDER BY rowid DESC LIMIT ?", filter.sql), values: filter.values };
+    statement.values.push(SqlValue::Integer(limit.max(1).into()));
+    let mut payloads = read_rows_with_conn(conn, &statement, |row| row.get::<_, Vec<u8>>(0))?;
     payloads.reverse();
     Ok(payloads)
 }
@@ -1560,75 +1483,52 @@ pub fn get_all_bytes(capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
 
 
 // ============================================================================
-// Raw query helpers (for capturequery.rs)
+// Query reads
 // ============================================================================
 
-/// Execute a raw SQL query returning (timestamp_us, prev_payload, payload) tuples.
-/// Used by capture_query_byte_changes and capture_query_frame_changes.
-pub fn query_raw(
-    sql: &str,
-    params: &[&dyn rusqlite::types::ToSql],
-) -> Result<Vec<(i64, Vec<u8>, Vec<u8>)>, String> {
+/// Run a read-only `statement`, one `T` per row. Setting `cancel` aborts it
+/// between SQLite VM steps.
+pub fn read_rows<T>(
+    statement: &Sql,
+    cancel: &Arc<AtomicBool>,
+    map: impl FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
+) -> Result<Vec<T>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
-
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| format!("Failed to prepare query: {}", e))?;
-
-    let rows = stmt
-        .query_map(rusqlite::params_from_iter(params), |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, Vec<u8>>(1)?,
-                row.get::<_, Vec<u8>>(2)?,
-            ))
-        })
-        .map_err(|e| format!("Failed to execute query: {}", e))?;
-
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
-    }
-
-    Ok(results)
+    let cancel = Arc::clone(cancel);
+    conn.progress_handler(1000, Some(move || cancel.load(Ordering::Relaxed)));
+    let rows = read_rows_with_conn(conn, statement, map);
+    conn.progress_handler(0, None::<fn() -> bool>);
+    rows
 }
 
-/// Execute a raw SQL query returning (timestamp_us, payload) tuples.
-/// Used by capture_query_mirror_validation.
-pub fn query_raw_two_col(
-    sql: &str,
-    params: &[&dyn rusqlite::types::ToSql],
-) -> Result<Vec<(i64, Vec<u8>)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-
+pub(crate) fn read_rows_with_conn<T>(
+    conn: &Connection,
+    statement: &Sql,
+    mut map: impl FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
+) -> Result<Vec<T>, String> {
+    let values = statement.values.iter().map(|v| match v {
+        SqlValue::Integer(n) => rusqlite::types::Value::Integer(*n),
+        SqlValue::Text(s) => rusqlite::types::Value::Text(s.clone()),
+    });
     let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| format!("Failed to prepare query: {}", e))?;
-
-    let rows = stmt
-        .query_map(rusqlite::params_from_iter(params), |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
-        })
-        .map_err(|e| format!("Failed to execute query: {}", e))?;
-
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+        .prepare_cached(&statement.sql)
+        .map_err(|e| format!("Failed to prepare query: {e}"))?;
+    let mut rows = stmt
+        .query(rusqlite::params_from_iter(values))
+        .map_err(|e| format!("Failed to execute query: {e}"))?;
+    let mut out = Vec::new();
+    while let Some(row) = rows.next().map_err(read_error)? {
+        out.push(map(row).map_err(read_error)?);
     }
-
-    Ok(results)
+    Ok(out)
 }
 
-/// Query payloads only (single BLOB column) from the capture database.
-pub fn query_payloads(
-    sql: &str,
-    params: &[&dyn rusqlite::types::ToSql],
-) -> Result<Vec<Vec<u8>>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    query_payloads_with_conn(conn, sql, params)
+fn read_error(e: rusqlite::Error) -> String {
+    match e.sqlite_error_code() {
+        Some(rusqlite::ErrorCode::OperationInterrupted) => "Query cancelled".to_string(),
+        _ => format!("Failed to read row: {e}"),
+    }
 }
 
 fn query_payloads_with_conn(
@@ -1643,39 +1543,6 @@ fn query_payloads_with_conn(
     let rows = stmt
         .query_map(rusqlite::params_from_iter(params), |row| {
             row.get::<_, Vec<u8>>(0)
-        })
-        .map_err(|e| format!("Failed to execute query: {}", e))?;
-
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
-    }
-
-    Ok(results)
-}
-
-/// Execute a raw SQL query returning (timestamp_us, frame_id, is_extended, payload) tuples.
-/// Used by capture_query_pattern_search.
-pub fn query_raw_four_col(
-    sql: &str,
-    params: &[&dyn rusqlite::types::ToSql],
-) -> Result<Vec<(i64, i64, bool, Vec<u8>)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| format!("Failed to prepare query: {}", e))?;
-
-    let rows = stmt
-        .query_map(rusqlite::params_from_iter(params), |row| {
-            let is_ext: i32 = row.get(2)?;
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                is_ext != 0,
-                row.get::<_, Vec<u8>>(3)?,
-            ))
         })
         .map_err(|e| format!("Failed to execute query: {}", e))?;
 
@@ -2283,7 +2150,7 @@ mod tests {
     fn inventory_reports_one_row_per_protocol() {
         let conn = multi_protocol_capture();
 
-        let rows = frame_inventory_with_conn(&conn, "c1", None, None).unwrap();
+        let rows = crate::query::capture::inventory_with_conn(&conn, "c1");
 
         let for_256: Vec<(&str, i64)> = rows
             .iter()
@@ -2515,7 +2382,7 @@ mod tests {
         let info = get_frame_info_with_conn(&conn, "c1").unwrap();
         assert_eq!(info.iter().map(|i| (i.max_dlc, i.has_dlc_mismatch)).collect::<Vec<_>>(), [(64, false), (6, false)]);
 
-        let inventory = frame_inventory_with_conn(&conn, "c1", None, None).unwrap();
+        let inventory = crate::query::capture::inventory_with_conn(&conn, "c1");
         assert_eq!(inventory.iter().map(|r| r.max_dlc).collect::<Vec<_>>(), [64, 6]);
     }
 

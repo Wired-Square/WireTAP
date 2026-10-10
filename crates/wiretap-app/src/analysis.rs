@@ -72,12 +72,12 @@ pub struct PayloadQuery<'a> {
 }
 
 /// A store of recorded frames the analysis levers read: what frames it holds and
-/// a sample of each one's payloads. Time bounds are RFC3339.
+/// a sample of each one's payloads. Time bounds are epoch µs.
 pub trait PayloadSource: Sync {
     fn inventory(
         &self,
-        start_time: Option<&str>,
-        end_time: Option<&str>,
+        start_us: Option<i64>,
+        end_us: Option<i64>,
     ) -> impl Future<Output = Result<Vec<InventoryRow>, String>> + Send;
 
     fn payloads(
@@ -468,8 +468,8 @@ pub async fn catalog_coverage(
     catalog: &wiretap_catalog::Catalog,
     include_byte_roles: bool,
     sample_limit: u32,
-    start_time: Option<&str>,
-    end_time: Option<&str>,
+    start_us: Option<i64>,
+    end_us: Option<i64>,
 ) -> Result<CoverageReport, String> {
     // Inventory the data source, keyed the way the catalogue is keyed.
     //
@@ -480,7 +480,7 @@ pub async fn catalog_coverage(
     // full. `decode_by_id` has always masked; this is the same rule applied to
     // the other side of the comparison.
     let mask = wiretap_catalog::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
-    let inventory = source.inventory(start_time, end_time).await?;
+    let inventory = source.inventory(start_us, end_us).await?;
     let data_by_id = roll_up(&inventory, mask);
 
     // Diff + confidence rollup.
@@ -625,11 +625,7 @@ pub(crate) mod memory {
     }
 
     impl PayloadSource for MemorySource {
-        async fn inventory(
-            &self,
-            _: Option<&str>,
-            _: Option<&str>,
-        ) -> Result<Vec<InventoryRow>, String> {
+        async fn inventory(&self, _: Option<i64>, _: Option<i64>) -> Result<Vec<InventoryRow>, String> {
             let mut rows: Vec<InventoryRow> = Vec::new();
             for f in &self.frames {
                 let t = f.timestamp_us as i64;

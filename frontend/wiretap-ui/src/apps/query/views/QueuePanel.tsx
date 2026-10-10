@@ -6,7 +6,9 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Clock, Loader2, CheckCircle2, XCircle, Trash2, ListX } from "lucide-react";
-import { useQueryStore, type QueuedQuery, type QueryStatus } from "../stores/queryStore";
+import { useQueryStore } from "../stores/queryStore";
+import type { QueryItem, QueryStatus } from "../../../api/query";
+import { formatHumanUs } from "../../../utils/timeFormat";
 import { monoBody } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import {
@@ -20,6 +22,7 @@ import {
   textDanger,
 } from "../../../styles/colourTokens";
 import { IconButton } from "../../../components/Button";
+import { useSettingsStore } from "../../settings/stores/settingsStore";
 
 interface Props {
   onSelectQuery: (id: string) => void;
@@ -105,7 +108,7 @@ function StatusIcon({ status }: { status: QueryStatus }) {
 
 // Individual queue item component
 interface QueueItemProps {
-  query: QueuedQuery;
+  query: QueryItem;
   isSelected: boolean;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
@@ -114,6 +117,7 @@ interface QueueItemProps {
 
 function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueItemProps) {
   const { t } = useTranslation("query");
+  const useLocal = useSettingsStore((s) => s.display.timezone) !== "utc";
   const handleClick = useCallback(() => {
     onSelect(query.id);
   }, [query.id, onSelect]);
@@ -127,11 +131,8 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
   );
 
   const isRunning = query.status === "running";
-  const resultCount = query.results
-    ? Array.isArray(query.results)
-      ? query.results.length
-      : (query.results as { cases: unknown[] }).cases?.length ?? 0
-    : 0;
+  const resultCount = query.result_count ?? 0;
+  const { start_us, end_us } = query.spec;
 
   return (
     <div
@@ -146,24 +147,27 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
       {/* Query info */}
       <div className="flex-1 min-w-0">
         <div className={`${monoBody} text-xs ${textPrimary} truncate`}>
-          {query.displayName}
+          {query.label}
         </div>
         <div className={`text-xs ${textMuted} mt-0.5`}>
           {query.status === "completed" && (
             <span className={textDataGreen}>{t("queue.results", { count: resultCount })}</span>
           )}
           {query.status === "error" && (
-            <span className={`${textDanger} truncate`}>{query.errorMessage}</span>
+            <span className={`${textDanger} truncate`}>{query.error}</span>
           )}
           {query.status === "running" && <span className={textDataAmber}>{t("queue.running")}</span>}
-          {query.status === "pending" && <span>{t("queue.queuedAt", { time: formatTime(query.submittedAt) })}</span>}
+          {query.status === "pending" && <span>{t("queue.queuedAt", { time: formatTime(query.submitted_at_ms) })}</span>}
           {query.stats && query.status === "completed" && (
             <span className={textMuted}>{t("queue.executionMs", { ms: query.stats.execution_time_ms.toLocaleString() })}</span>
           )}
         </div>
-        {query.timeBounds && (
+        {(start_us !== null || end_us !== null) && (
           <div className={`text-xs ${textMuted} mt-0.5 truncate`}>
-            {t("queue.boundedBy", { start: query.timeBounds.startTime || "…", end: query.timeBounds.endTime || "…" })}
+            {t("queue.boundedBy", {
+              start: start_us === null ? "…" : formatHumanUs(start_us, useLocal),
+              end: end_us === null ? "…" : formatHumanUs(end_us, useLocal),
+            })}
           </div>
         )}
       </div>

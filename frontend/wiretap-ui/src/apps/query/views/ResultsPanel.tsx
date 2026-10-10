@@ -5,15 +5,12 @@
 
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { PlayCircle, Download, AlertCircle, Database, Flag, FileDown } from "lucide-react";
-import {
-  QUERY_TYPE_INFO,
-  type ByteChangeResult,
-  type FrameChangeResult,
-  type MirrorValidationResult,
-  type QueuedQuery,
-} from "../stores/queryStore";
+import { PlayCircle, Download, AlertCircle, Database, Flag, FileDown, ChevronRight, ChevronDown } from "lucide-react";
+import { QUERY_TYPE_INFO } from "../stores/queryStore";
 import type {
+  ByteChangeResult,
+  FrameChangeResult,
+  MirrorValidationResult,
   MuxStatisticsResult,
   FirstLastResult,
   FrequencyBucket,
@@ -21,7 +18,10 @@ import type {
   GapResult,
   PatternSearchResult,
   InventoryRow,
-} from "../../../api/dbquery";
+  QueryItem,
+  QueryOutcome,
+} from "../../../api/query";
+import { Textarea } from "../../../components/forms";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import MuxStatisticsView from "./MuxStatisticsView";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
@@ -35,7 +35,9 @@ import { pageCount, resolvePageSize, type PageSize } from "../../../utils/pageSi
 import { Button, IconButton } from "../../../components/Button";
 
 interface Props {
-  selectedQuery: QueuedQuery | null;
+  selectedQuery: QueryItem | null;
+  /** The selected query's results, once fetched. */
+  outcome: QueryOutcome | null;
   onIngestEvent: (timestampUs: number) => Promise<void>;
   onIngestAll: () => void;
   onExport: () => void;
@@ -43,8 +45,40 @@ interface Props {
   onAddEvent?: () => void;
 }
 
-export default function ResultsPanel({
+export default function ResultsPanel(props: Props) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 min-h-0">
+        <ResultsBody {...props} />
+      </div>
+      {props.outcome && <SqlThatRan sql={props.outcome.sql} />}
+    </div>
+  );
+}
+
+/** The statements the selected query ran, collapsed by default. */
+function SqlThatRan({ sql }: { sql: string[] }) {
+  const { t } = useTranslation("query");
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`flex-shrink-0 px-4 py-2 ${borderDivider}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-2 text-xs font-medium ${textSecondary} w-full`}
+        aria-expanded={open}
+      >
+        {open ? <ChevronDown className={iconSm} /> : <ChevronRight className={iconSm} />}
+        {t("results.sqlThatRan")}
+      </button>
+      {open && <Textarea readOnly value={sql.join("\n\n")} mono className="mt-2" rows={6} />}
+    </div>
+  );
+}
+
+function ResultsBody({
   selectedQuery,
+  outcome,
   onIngestEvent,
   onIngestAll,
   onExport,
@@ -68,8 +102,8 @@ export default function ResultsPanel({
   const pageSize = resolvePageSize(pageSizeSetting, autoFit.rows);
 
   // Extract data from selected query
-  const queryType = selectedQuery?.queryType ?? "byte_changes";
-  const results = selectedQuery?.results ?? null;
+  const queryType = selectedQuery?.spec.type ?? "byte_changes";
+  const results = outcome?.results ?? null;
   const resultCount = results
     ? Array.isArray(results)
       ? results.length
@@ -79,7 +113,7 @@ export default function ResultsPanel({
     : 0;
   const lastQueryStats = selectedQuery?.stats ?? null;
   const isRunning = selectedQuery?.status === "running";
-  const error = selectedQuery?.errorMessage ?? null;
+  const error = selectedQuery?.error ?? null;
 
   const queryInfo = QUERY_TYPE_INFO[queryType];
 
@@ -242,7 +276,7 @@ export default function ResultsPanel({
       <MuxStatisticsView
         results={results as MuxStatisticsResult}
         stats={lastQueryStats}
-        displayName={selectedQuery.displayName}
+        displayName={selectedQuery.label}
       />
     );
   }
@@ -258,7 +292,7 @@ export default function ResultsPanel({
         <div className={`flex items-center justify-between px-4 py-2 ${borderDivider}`}>
           <div className="flex-1 min-w-0">
             <h2 className={`text-sm font-semibold ${textPrimary} truncate`}>
-              {selectedQuery.displayName}
+              {selectedQuery.label}
             </h2>
             <p className={`text-xs ${textSecondary}`}>
               {t("results.totalFrames", { count: fl.total_count.toLocaleString() })}
@@ -330,7 +364,7 @@ export default function ResultsPanel({
       <div className={`flex items-center justify-between px-4 py-2 ${borderDivider}`}>
         <div className="flex-1 min-w-0">
           <h2 className={`text-sm font-semibold ${textPrimary} truncate`}>
-            {selectedQuery.displayName}
+            {selectedQuery.label}
           </h2>
           <p className={`text-xs ${textSecondary}`}>
             {t("results.foundCount", { count: resultCount.toLocaleString(), label: queryInfo.label.toLowerCase() })}

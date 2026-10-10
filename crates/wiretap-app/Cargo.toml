@@ -72,7 +72,7 @@ rumqttc = "0.24"
 # a local `.cargo/config.toml` paths override covers the dev loop.
 wslib-ai-mcp = { git = "ssh://git@github.com/Wired-Square/wslib-ai-rs.git", tag = "v0.1.1", features = ["http", "dom"] }
 tokio-tungstenite = "0.26"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled", "hooks"] }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # BLE scanning, mDNS discovery, the WiFi-prov GATT service, and the SMP
@@ -164,7 +164,7 @@ git2 = { version = "0.21", default-features = false, features = ["https", "vendo
 nusb = { version = "0.2", features = ["tokio"] }
 
 [dev-dependencies]
-rusqlite = { version = "0.32", features = ["bundled", "trace"] }
+rusqlite = { version = "0.32", features = ["bundled", "hooks", "trace"] }
 tokio = { version = "1", features = ["test-util"] }
 ts-rs = "12"
 wiretap-io = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.4.0", features = ["testing"] }

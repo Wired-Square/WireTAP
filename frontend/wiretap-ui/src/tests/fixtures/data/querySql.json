@@ -1,0 +1,379 @@
+{
+  "cases": [
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/byte-changes",
+        "{",
+        "  \"byte_index\": 2,",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "byte_changes unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/byte-changes",
+        "{",
+        "  \"byte_index\": 2,",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "byte_changes bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/frame-changes",
+        "{",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "frame_changes unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/frame-changes",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "frame_changes bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 257 ORDER BY timestamp_us",
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY timestamp_us"
+      ],
+      "gateway": [
+        "POST /query/mirror-validation",
+        "{",
+        "  \"end_time\": null,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"mirror_frame_id\": 257,",
+        "  \"query_id\": null,",
+        "  \"source_frame_id\": 256,",
+        "  \"start_time\": null,",
+        "  \"tolerance_ms\": 50",
+        "}"
+      ],
+      "name": "mirror_validation unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 257 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY timestamp_us",
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY timestamp_us"
+      ],
+      "gateway": [
+        "POST /query/mirror-validation",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"mirror_frame_id\": 257,",
+        "  \"query_id\": null,",
+        "  \"source_frame_id\": 256,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\",",
+        "  \"tolerance_ms\": 50",
+        "}"
+      ],
+      "name": "mirror_validation bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/mux-statistics",
+        "{",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"include_16bit\": true,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"mux_selector_byte\": 0,",
+        "  \"payload_length\": 8,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "mux_statistics unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/mux-statistics",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"include_16bit\": true,",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"mux_selector_byte\": 0,",
+        "  \"payload_length\": 8,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "mux_statistics bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid ASC LIMIT 1",
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid DESC LIMIT 1",
+        "SELECT COUNT(*) FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256"
+      ],
+      "gateway": [
+        "POST /query/first-last",
+        "{",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "first_last unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid ASC LIMIT 1",
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid DESC LIMIT 1",
+        "SELECT COUNT(*) FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000"
+      ],
+      "gateway": [
+        "POST /query/first-last",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": true,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "first_last bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, x'' FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/frequency",
+        "{",
+        "  \"bucket_size_ms\": 1000,",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "frequency unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, x'' FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/frequency",
+        "{",
+        "  \"bucket_size_ms\": 1000,",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "frequency bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/distribution",
+        "{",
+        "  \"byte_index\": 2,",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "distribution unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/distribution",
+        "{",
+        "  \"byte_index\": 2,",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": true,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "distribution bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, x'' FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/gap-analysis",
+        "{",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"gap_threshold_ms\": 100.0,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "gap_analysis unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, x'' FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND is_extended = 1 AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 ORDER BY rowid"
+      ],
+      "gateway": [
+        "POST /query/gap-analysis",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"frame_id\": 256,",
+        "  \"gap_threshold_ms\": 100.0,",
+        "  \"is_extended\": true,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "gap_analysis bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/pattern-search",
+        "{",
+        "  \"end_time\": null,",
+        "  \"limit\": 5000,",
+        "  \"pattern\": [",
+        "    170,",
+        "    187",
+        "  ],",
+        "  \"pattern_mask\": [",
+        "    255,",
+        "    0",
+        "  ],",
+        "  \"query_id\": null,",
+        "  \"start_time\": null",
+        "}"
+      ],
+      "name": "pattern_search unbounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/pattern-search",
+        "{",
+        "  \"end_time\": \"2026-02-28T23:05:00Z\",",
+        "  \"limit\": 5000,",
+        "  \"pattern\": [",
+        "    170,",
+        "    187",
+        "  ],",
+        "  \"pattern_mask\": [",
+        "    255,",
+        "    0",
+        "  ],",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-02-28T23:00:00Z\"",
+        "}"
+      ],
+      "name": "pattern_search bounded"
+    },
+    {
+      "capture": [
+        "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX(MAX(dlc, length(payload))) FROM frames WHERE capture_id = 'd5-sql-golden' GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended LIMIT 5000"
+      ],
+      "gateway": [
+        "GET /inventory"
+      ],
+      "name": "frame_inventory unbounded"
+    },
+    {
+      "capture": [
+        "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX(MAX(dlc, length(payload))) FROM frames WHERE capture_id = 'd5-sql-golden' AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended LIMIT 5000"
+      ],
+      "gateway": [
+        "GET /inventory?start=2026-02-28T23%3A00%3A00Z&end=2026-02-28T23%3A05%3A00Z"
+      ],
+      "name": "frame_inventory bounded"
+    },
+    {
+      "capture": [
+        "SELECT timestamp_us, frame_id, is_extended, payload, rowid FROM frames WHERE capture_id = 'd5-sql-golden' AND frame_id = 256 AND timestamp_us >= 1772359200000000 AND rowid > 0 ORDER BY rowid LIMIT 50000"
+      ],
+      "gateway": [
+        "POST /query/byte-changes",
+        "{",
+        "  \"byte_index\": 2,",
+        "  \"end_time\": null,",
+        "  \"frame_id\": 256,",
+        "  \"is_extended\": null,",
+        "  \"limit\": 5000,",
+        "  \"query_id\": null,",
+        "  \"start_time\": \"2026-03-01T10:00:00Z\"",
+        "}"
+      ],
+      "name": "byte_changes bounded in UTC"
+    }
+  ],
+  "note": "Each querySpec.json case: the SQLite a capture runs (traced, and equal to its preview), and the request a CAN backend profile is sent."
+}

@@ -1537,11 +1537,10 @@ catalogue interval (else `[meta.can].default_interval`, else 1000 ms) **× 2**;
 outside that the previous verdict stands. Three consecutive failing comparisons
 latch invalid — one differing sample is usually skew on a moving signal.
 
-The offline equivalents (`db_query_mirror_validation`,
-`capture_query_mirror_validation`, and the `apiclient` passthrough) take a
-`compare_byte_indices` argument carrying the same inherited byte set, so the
-Query app agrees with the Decoder's badge. Omitted or empty, they compare the
-whole payload — the right answer for a caller with no catalogue.
+The Query app's mirror validation (`query::run`, a capture or a backend) reads
+the same inherited byte set from the request's `catalog_path`, so it agrees
+with the Decoder's badge; a backend's whole-payload answer is narrowed, then
+limited, on this side. Without a catalogue it compares the whole payload.
 
 Decoding lives entirely in the crate, and so does parsing: the frontend's
 `catalogParser.ts` no longer parses TOML — `loadCatalog` calls `catalog.parse`

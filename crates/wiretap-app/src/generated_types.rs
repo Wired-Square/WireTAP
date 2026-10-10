@@ -141,6 +141,9 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::catalog_share::publish::PublishResult>();
     r.visit::<crate::catalog_share::registry::GitIdentity>();
     r.visit::<crate::capture_db::InventoryRow>();
+    r.visit::<crate::query::QueryQueue>();
+    r.visit::<crate::query::QueryOutcome>();
+    r.visit::<crate::query::QueryRequest>();
     r.visit::<crate::gateway_admin::GatewayDaemon>();
     r.visit::<crate::gateway_admin::AssignmentOutcome>();
     r.visit::<crate::replay::ReplayEstimate>();
@@ -805,4 +808,64 @@ fn byte_note_codes_fixture_is_the_libs_answer() {
         std::env::var_os("WIRETAP_GEN_TYPES").is_some(),
         "byteNoteCodes.json was stale and has been rewritten; commit it"
     );
+}
+
+#[test]
+fn query_shapes_serialise_as_declared() {
+    use crate::query::tests::{fixture, form_specs, results_named};
+    use crate::query::{queue::*, ts, QueryOutcome, QueryRequest};
+
+    for (_, spec) in form_specs() {
+        assert_declared::<ts::QuerySpec>(&serde_json::to_value(&spec).unwrap());
+    }
+    let stats = wiretap_gateway::QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0 };
+    assert_declared::<ts::QueryStats>(&serde_json::to_value(&stats).unwrap());
+    for case in fixture("queryCsv.json")["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let results = results_named(name, case["input"].clone());
+        let json = serde_json::to_value(&results).unwrap();
+        for row in json.as_array().cloned().unwrap_or_else(|| vec![json.clone()]).iter() {
+            match name {
+                "byte_changes" => assert_declared::<ts::ByteChangeResult>(row),
+                "frame_changes" => assert_declared::<ts::FrameChangeResult>(row),
+                "mirror_validation" => assert_declared::<ts::MirrorValidationResult>(row),
+                "mux_statistics" => {
+                    assert_declared::<ts::MuxStatisticsResult>(row);
+                    for c in each(row, "cases") {
+                        assert_declared::<ts::MuxCaseStats>(c);
+                        each(c, "byte_stats").for_each(assert_declared::<ts::BytePositionStats>);
+                        each(c, "word16_stats").for_each(assert_declared::<ts::Word16Stats>);
+                    }
+                }
+                "first_last" => assert_declared::<ts::FirstLastResult>(row),
+                "frequency" => assert_declared::<ts::FrequencyBucket>(row),
+                "distribution" => assert_declared::<ts::DistributionResult>(row),
+                "gap_analysis" => assert_declared::<ts::GapResult>(row),
+                "pattern_search" => assert_declared::<ts::PatternSearchResult>(row),
+                _ => assert_declared::<crate::capture_db::InventoryRow>(row),
+            }
+        }
+        assert_serialises_as_declared(&[QueryOutcome { results, stats: Some(stats.clone()), sql: vec!["SELECT 1".into()] }]);
+    }
+    let (_, spec) = form_specs().remove(0);
+    let request = QueryRequest {
+        source: crate::payload_source::QuerySource::Capture("c".into()),
+        spec,
+        catalog_path: Some("x.toml".into()),
+    };
+    assert_serialises_as_declared(std::slice::from_ref(&request));
+    let item = QueryItem {
+        id: "q".into(),
+        label: "Byte Changes".into(),
+        request,
+        status: QueryStatus::Completed,
+        submitted_at_ms: 1,
+        started_at_ms: Some(2),
+        completed_at_ms: None,
+        error: None,
+        result_count: Some(3),
+        stats: None,
+    };
+    assert_serialises_as_declared(&[QueryQueue { revision: 1, items: vec![item] }]);
+    assert_serialises_as_declared(&[QueryStatus::Pending, QueryStatus::Running, QueryStatus::Error]);
 }

@@ -1,0 +1,21 @@
+[meta]
+name = "masked"
+[meta.can]
+frame_id_mask = 0xFFF
+[frame.can."0x705"]
+length = 8
+[[frame.can."0x705".signals]]
+name = "current"
+start_bit = 0
+bit_length = 16
+[[frame.can."0x705".signals]]
+name = "end_stop"
+start_bit = 16
+bit_length = 8
+[frame.can."0x005"]
+length = 8
+mirror_of = "0x705"
+[[frame.can."0x005".signals]]
+name = "local_end_stop"
+start_bit = 16
+bit_length = 8

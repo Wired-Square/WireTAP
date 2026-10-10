@@ -134,6 +134,8 @@ wire_enum! {
         // A session's frame inventory as JSON (`FrameInventoryMsg`): every identity on
         // subscribe or clear (`reset`), then only the rows that changed, on the frame cadence.
         FrameInventory   = 0x22,
+        // The whole Query queue as JSON (`QueryQueue`) after every change.
+        QueryQueue       = 0x23,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
         BridgeRequest    = 0x30,
         BridgeResponse   = 0x31,

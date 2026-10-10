@@ -10,7 +10,6 @@ mod app_registry;
 mod ble_provision;
 mod capture_db;
 mod capture_events;
-mod capturequery;
 mod capture_inventory;
 mod capture_store;
 mod captures;
@@ -24,7 +23,7 @@ mod checksum_discovery;
 mod checksums;
 mod credentials;
 mod dbquery;
-mod queryresults;
+mod query;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
 mod flashers;
@@ -1457,17 +1456,13 @@ pub fn run() {
             store_manager::store_delete,
             store_manager::store_has,
             store_manager::store_keys,
-            // Database Query API (Query app)
-            dbquery::db_query_byte_changes,
-            dbquery::db_query_frame_changes,
-            dbquery::db_query_mirror_validation,
-            dbquery::db_query_mux_statistics,
-            dbquery::db_query_first_last,
-            dbquery::db_query_frequency,
-            dbquery::db_query_distribution,
-            dbquery::db_query_gap_analysis,
-            dbquery::db_query_pattern_search,
-            dbquery::db_cancel_query,
+            // Query app: one query path, its queue, and the backend's Stats tab
+            query::queue::query_enqueue,
+            query::queue::query_queue_get,
+            query::queue::query_remove,
+            query::queue::query_result,
+            query::queue::query_preview,
+            query::queue::query_export_csv,
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
@@ -1475,7 +1470,6 @@ pub fn run() {
             apiclient::api_list_databases,
             apiclient::api_test_connection,
             apiclient::api_probe_backend,
-            payload_source::query_frame_inventory,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
             gateway_admin::gateway_list_daemons,
@@ -1486,15 +1480,6 @@ pub fn run() {
             capture_events::capture_events_add,
             capture_events::capture_events_update,
             capture_events::capture_events_delete,
-            capturequery::capture_query_byte_changes,
-            capturequery::capture_query_frame_changes,
-            capturequery::capture_query_mirror_validation,
-            capturequery::capture_query_mux_statistics,
-            capturequery::capture_query_first_last,
-            capturequery::capture_query_frequency,
-            capturequery::capture_query_distribution,
-            capturequery::capture_query_gap_analysis,
-            capturequery::capture_query_pattern_search,
                         // Unified Device Scan API
                         device_scan::device_scan_start,
                         device_scan::device_scan_stop,

@@ -27,7 +27,8 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 use super::types::*;
 use super::McpRunningConfig;
 use crate::analysis::PayloadSource;
-use crate::payload_source::{resolve, Capture, QuerySource};
+use crate::payload_source::{resolve, Capture};
+use wiretap_gateway::{QuerySpec, RowWindow};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -88,14 +89,12 @@ impl WireTapTools {
     }
 }
 
-/// Convert an optional RFC3339 time bound to capture-timeline microseconds.
-fn us(s: &Option<String>) -> Option<i64> {
-    s.as_deref().and_then(crate::payload_source::iso_to_micros)
+fn bound(s: &Option<String>) -> Result<Option<i64>, McpError> {
+    s.as_deref().map(crate::payload_source::parse_bound).transpose().map_err(err)
 }
 
-/// Widen an optional row limit to the i64 the capture engines take.
-fn lim(l: Option<u32>) -> Option<i64> {
-    l.map(|v| v as i64)
+fn window(start_time: &Option<String>, end_time: &Option<String>) -> Result<RowWindow, McpError> {
+    Ok(RowWindow { protocol: None, start_us: bound(start_time)?, end_us: bound(end_time)? })
 }
 
 /// Resolve a catalog filename to an absolute path under the decoder directory.
@@ -833,7 +832,7 @@ impl WireTapTools {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let rows = src
             .reader(&self.app)
-            .inventory(p.start_time.as_deref(), p.end_time.as_deref())
+            .inventory(bound(&p.start_time)?, bound(&p.end_time)?)
             .await
             .map_err(err)?;
         ok_json(json!({ "frames": rows.len(), "inventory": rows }))
@@ -898,33 +897,29 @@ impl WireTapTools {
             &catalog,
             p.include_byte_roles,
             p.sample_limit,
-            p.start_time.as_deref(),
-            p.end_time.as_deref(),
+            bound(&p.start_time)?,
+            bound(&p.end_time)?,
         )
         .await
         .map_err(err)?;
         ok_json(report)
     }
 
-    // ── Exposed analytical engines (dispatch capture vs WireTAP backend) ────────────
+    // ── Exposed analytical engines (a capture or a WireTAP backend) ─────────────────
 
     #[tool(description = "Find timestamps where one payload byte of a frame changed value. Source: capture_id or profile_id.")]
     async fn query_byte_changes(
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_byte_changes(
-                    self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended,
-                    p.start_time, p.end_time, p.limit, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_byte_changes(
-                cid, p.frame_id, p.byte_index, p.is_extended, us(&p.start_time), us(&p.end_time), lim(p.limit),
-            ),
+        let spec = QuerySpec::ByteChanges {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            byte_index: p.byte_index,
+            limit: p.limit,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "Find timestamps where a frame's full payload changed (with the changed byte indices). Source: capture_id or profile_id.")]
@@ -932,17 +927,13 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_frame_changes(
-                    self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, p.limit, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_frame_changes(
-                cid, p.frame_id, p.is_extended, us(&p.start_time), us(&p.end_time), lim(p.limit),
-            ),
+        let spec = QuerySpec::FrameChanges {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            limit: p.limit,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "Histogram of values at one byte index of a frame (value → count, percentage). Source: capture_id or profile_id.")]
@@ -950,17 +941,13 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ByteQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_distribution(
-                    self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended, p.start_time, p.end_time, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_distribution(
-                cid, p.frame_id, p.byte_index, p.is_extended, us(&p.start_time), us(&p.end_time),
-            ),
+        let spec = QuerySpec::Distribution {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            byte_index: p.byte_index,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "Find gaps longer than gap_threshold_ms in a frame's arrival times. Source: capture_id or profile_id.")]
@@ -968,18 +955,14 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<GapQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_gap_analysis(
-                    self.app.clone(), pid, p.frame_id, p.is_extended, p.gap_threshold_ms,
-                    p.start_time, p.end_time, p.limit, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_gap_analysis(
-                cid, p.frame_id, p.is_extended, p.gap_threshold_ms, us(&p.start_time), us(&p.end_time), lim(p.limit),
-            ),
+        let spec = QuerySpec::GapAnalysis {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            gap_threshold_ms: p.gap_threshold_ms,
+            limit: p.limit,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "Frame arrival frequency bucketed by bucket_size_ms (min/max/avg interval per bucket). Source: capture_id or profile_id.")]
@@ -987,18 +970,14 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrequencyQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_frequency(
-                    self.app.clone(), pid, p.frame_id, p.is_extended, p.bucket_size_ms,
-                    p.start_time, p.end_time, p.limit, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_frequency(
-                cid, p.frame_id, p.is_extended, p.bucket_size_ms, us(&p.start_time), us(&p.end_time), lim(p.limit),
-            ),
+        let spec = QuerySpec::Frequency {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            bucket_size_ms: p.bucket_size_ms,
+            limit: p.limit,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "First and last occurrence (timestamp + payload) and total count for a frame. Source: capture_id or profile_id.")]
@@ -1006,17 +985,12 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<FrameQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_first_last(
-                    self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_first_last(
-                cid, p.frame_id, p.is_extended, us(&p.start_time), us(&p.end_time),
-            ),
+        let spec = QuerySpec::FirstLast {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
     }
 
     #[tool(description = "Group a frame's payloads by a mux selector byte and compute per-byte (and optional 16-bit word) statistics per mux case. Source: capture_id or profile_id.")]
@@ -1024,19 +998,30 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<MuxQueryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let r = match resolve(p.capture_id, p.profile_id).map_err(err)? {
-            QuerySource::Backend(pid) => {
-                crate::dbquery::db_query_mux_statistics(
-                    self.app.clone(), pid, p.frame_id, p.mux_selector_byte, p.is_extended,
-                    p.include_16bit, p.payload_length, p.start_time, p.end_time, p.limit, None,
-                ).await
-            }
-            QuerySource::Capture(cid) => crate::capturequery::capture_query_mux_statistics(
-                cid, p.frame_id, p.mux_selector_byte, p.is_extended, p.include_16bit, p.payload_length,
-                us(&p.start_time), us(&p.end_time), lim(p.limit),
-            ),
+        let spec = QuerySpec::MuxStatistics {
+            frame_id: p.frame_id,
+            is_extended: p.is_extended,
+            window: window(&p.start_time, &p.end_time)?,
+            mux_selector_byte: p.mux_selector_byte,
+            include_16bit: p.include_16bit,
+            payload_length: p.payload_length,
+            limit: p.limit,
         };
-        ok_json(r.map_err(err)?)
+        self.query(p.capture_id, p.profile_id, spec).await
+    }
+}
+
+impl WireTapTools {
+    async fn query(
+        &self,
+        capture_id: Option<String>,
+        profile_id: Option<String>,
+        spec: QuerySpec,
+    ) -> Result<CallToolResult, McpError> {
+        let source = resolve(capture_id, profile_id).map_err(err)?;
+        let request = crate::query::QueryRequest { source, spec, catalog_path: None };
+        let id = crate::query::new_query_id();
+        ok_json(crate::query::run(&self.app, &request, &id, &Default::default()).await.map_err(err)?)
     }
 }
 
