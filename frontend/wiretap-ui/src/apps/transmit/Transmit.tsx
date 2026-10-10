@@ -64,23 +64,16 @@ function TransmitInner() {
   // Dialog state
   const dialogs = useDialogManager(['ioSessionPicker'] as const);
 
-  const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
-
   // Error handler for session errors
   const handleError = useCallback((error: string) => {
     console.error("[Transmit] Session error:", error);
   }, []);
-
-  // Callback before starting a watch session - stop all repeats
-  const handleBeforeWatch = useCallback(() => stopAllRepeats(), [stopAllRepeats]);
 
   // Use centralized IO session manager
   const manager = useIOSessionManager({
     appName: "transmit",
     ioProfiles: transmitProfiles,
     onError: handleError,
-    onBeforeWatch: handleBeforeWatch,
-    onBeforeMultiWatch: handleBeforeWatch,
   });
 
   // Destructure manager state
