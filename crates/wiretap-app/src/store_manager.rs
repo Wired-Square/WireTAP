@@ -10,10 +10,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
 // ============================================================================
@@ -102,20 +102,6 @@ static SAVE_CHANNEL: Lazy<mpsc::UnboundedSender<()>> = Lazy::new(|| {
 // Internal Functions
 // ============================================================================
 
-/// Get the store file path for the app
-fn get_store_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-
-    // Ensure directory exists
-    fs::create_dir_all(&app_data_dir)
-        .map_err(|e| format!("Failed to create app data dir: {}", e))?;
-
-    Ok(app_data_dir.join("ui-state.json"))
-}
-
 /// Load store data from disk
 fn load_from_disk(path: &PathBuf) -> Result<StoreData, String> {
     if !path.exists() {
@@ -177,10 +163,12 @@ fn schedule_save() {
 // Public API
 // ============================================================================
 
-/// Initialise the store manager with the app handle.
+/// Initialise the store manager from the app data dir.
 /// Call this once during app setup.
-pub fn initialise(app: &AppHandle) -> Result<(), String> {
-    initialise_at(get_store_path(app)?)
+pub fn initialise(app_data_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(app_data_dir)
+        .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    initialise_at(app_data_dir.join("ui-state.json"))
 }
 
 fn initialise_at(path: PathBuf) -> Result<(), String> {

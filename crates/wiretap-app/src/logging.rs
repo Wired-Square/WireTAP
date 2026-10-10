@@ -112,3 +112,40 @@ macro_rules! tlog {
         }
     }};
 }
+
+pub(crate) mod commands {
+    use tauri::{AppHandle, Manager};
+
+    /// Write a frontend log message to the backend log file.
+    /// The message is filtered by the current log level threshold.
+    #[tauri::command]
+    pub fn log_from_frontend(level: String, message: String) {
+        let msg_level: u8 = match level.as_str() {
+            "info" => 1,
+            "debug" => 2,
+            "verbose" => 3,
+            _ => 1,
+        };
+        if msg_level <= super::get_log_level() {
+            tlog!("[frontend:{}] {}", level, message);
+        }
+    }
+
+    /// Set the log level and start/stop file logging accordingly.
+    #[tauri::command]
+    pub async fn set_log_level(app: AppHandle, level: String) -> Result<(), String> {
+        super::set_log_level(&level);
+        if level != "off" {
+            let reports_dir = app
+                .path()
+                .document_dir()
+                .map_err(|e| format!("Failed to get documents dir: {}", e))?
+                .join("WireTAP")
+                .join("Reports");
+            super::init_file_logging(&reports_dir)?;
+        } else {
+            super::stop_file_logging();
+        }
+        Ok(())
+    }
+}

@@ -1210,7 +1210,7 @@ operation on that session, and no other session waits on it.
 ## 5. WebSocket transport
 
 Frame delivery and most session events flow over a local WebSocket, not
-Tauri events. The server is started during Tauri `setup()` in [lib.rs:945](../crates/wiretap-app/src/lib.rs#L945)
+Tauri events. The server is started during Tauri `setup()` in `boot_desktop` ([boot.rs](../crates/wiretap-app/src/boot.rs))
 and binds to `127.0.0.1:0` (ephemeral port). The frontend fetches the port
 and auth token via the Tauri command `get_ws_config` and connects once at
 startup through [src/services/wsTransport.ts](../frontend/wiretap-ui/src/services/wsTransport.ts).

@@ -8,6 +8,7 @@
 //! (`open_app`, `dom.*`) reach the page via [`bridge`].
 
 pub mod bridge;
+pub mod commands;
 pub(crate) mod session;
 mod tools;
 mod types;

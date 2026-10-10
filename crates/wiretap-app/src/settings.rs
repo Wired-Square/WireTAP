@@ -539,8 +539,11 @@ fn get_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_config_dir()
         .map_err(|e| format!("Failed to get app config dir: {}", e))?;
+    settings_path_in(&app_dir)
+}
 
-    std::fs::create_dir_all(&app_dir)
+fn settings_path_in(app_dir: &Path) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(app_dir)
         .map_err(|e| format!("Failed to create app config dir: {}", e))?;
 
     Ok(app_dir.join("settings.json"))
@@ -782,7 +785,7 @@ fn announce_retired(retired: &[IOProfile]) {
         names.join(", ")
     );
     tlog!("[settings] {}", notice);
-    crate::record_startup_notice(notice);
+    crate::boot::record_startup_notice(notice);
 }
 
 fn ensure_install_id(settings: &mut AppSettings) -> bool {
@@ -837,6 +840,15 @@ pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
     announce_retired(&retired);
     crate::io::ephemeral::overlay(&mut settings.io_profiles);
     Ok(settings)
+}
+
+/// `load_settings_sync` without the announcement a rewrite makes, for a boot
+/// with no `AppHandle` yet; the flag says whether the file was rewritten.
+pub(crate) fn load_settings_at(config_dir: &Path, documents: Option<&Path>) -> Result<(AppSettings, bool), String> {
+    let Loaded { mut settings, retired, written } = load_from(&settings_path_in(config_dir)?, documents)?;
+    announce_retired(&retired);
+    crate::io::ephemeral::overlay(&mut settings.io_profiles);
+    Ok((settings, written))
 }
 
 /// Fold the legacy kind spellings the settings file has carried onto their
@@ -942,7 +954,7 @@ pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<
     Ok(())
 }
 
-fn announce_saved(app: &AppHandle, settings: &AppSettings) {
+pub(crate) fn announce_saved(app: &AppHandle, settings: &AppSettings) {
     // Rebuild the catalogue cache + re-point the watcher if the decoder dir moved.
     crate::catalog::handle_decoder_dir_change(app, &settings.decoder_dir);
 

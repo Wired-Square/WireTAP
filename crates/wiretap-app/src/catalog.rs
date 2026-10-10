@@ -490,7 +490,7 @@ pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
 /// The provenance registry, snapshotted for the scan's join.
 ///
 /// `try_state` rather than `state`: this runs from `start_catalog_cache` inside the
-/// setup hook, and `lib.rs` registers some state on the builder and some inside that
+/// setup hook, and `run()` registers some state on the builder and some inside that
 /// hook. Builder state does land first today, but degrading to "nothing is tracked"
 /// costs nothing and does not make catalogue listing depend on that ordering.
 fn sync_index(app: &AppHandle) -> SyncIndex {

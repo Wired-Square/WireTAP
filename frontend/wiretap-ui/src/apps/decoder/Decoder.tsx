@@ -860,7 +860,7 @@ function DecoderInner() {
     watchSource,
   });
 
-  // Window close is handled by Rust (lib.rs on_window_event) to prevent crashes
+  // Window close is handled by Rust (windows.rs on_window_event) to prevent crashes
   // on macOS 26.2+ (Tahoe). The Rust handler stops the session and waits for
   // WebKit to settle before destroying the window.
 

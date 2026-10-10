@@ -24,6 +24,21 @@ pub fn ws_server() -> Option<&'static WsServer> {
     WS_SERVER.get()
 }
 
+#[derive(serde::Serialize)]
+pub struct WsConfig {
+    pub port: u16,
+    pub token: String,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_ws_config() -> Result<WsConfig, String> {
+    let server = ws_server().ok_or_else(|| "WebSocket server not started".to_string())?;
+    Ok(WsConfig {
+        port: server.port(),
+        token: server.token().to_string(),
+    })
+}
+
 static NEXT_CONN_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// Count of currently-authenticated connections. Lets the MCP bridge fast-fail
