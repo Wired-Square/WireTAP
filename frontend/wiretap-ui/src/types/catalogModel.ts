@@ -62,6 +62,8 @@ export interface Mux {
   notes?: string[];
   /** Case key (`"0"`, `"0-3"`, `"1,2,5"`) → its signals/nested mux. */
   cases: Record<string, MuxCase>;
+  /** The keys of `cases` in display order. */
+  caseOrder: string[];
 }
 
 /** A per-frame checksum definition (`[[frame.<proto>.<key>.checksum]]`). */

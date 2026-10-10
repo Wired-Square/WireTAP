@@ -1141,7 +1141,7 @@ mod tests {
         }
     }
 
-    /// The `rust` column of the table `muxCaseMatch.ts` is checked against.
+    /// Which keys the crate reads as mux cases.
     #[test]
     fn mux_case_keys_match_the_rule_table() {
         let table: serde_json::Value = serde_json::from_str(&fixture("catalog/muxCaseKeys.json")).expect("table");

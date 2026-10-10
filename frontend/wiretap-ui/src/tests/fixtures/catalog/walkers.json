@@ -1,33 +1,6 @@
 {
   "cases": [
     {
-      "name": "mux case key order",
-      "input": [
-        "10",
-        "2",
-        "0-3",
-        "1,2",
-        "abc",
-        "-1",
-        "B",
-        "a",
-        "0x10",
-        "2-5"
-      ],
-      "expected": [
-        "-1",
-        "0-3",
-        "0x10",
-        "1,2",
-        "2",
-        "2-5",
-        "10",
-        "a",
-        "abc",
-        "B"
-      ]
-    },
-    {
       "name": "id parsing and the editor's id formatting",
       "input": [
         "0x7FF",

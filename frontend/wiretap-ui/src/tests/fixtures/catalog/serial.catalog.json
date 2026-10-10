@@ -54,6 +54,10 @@
       "length": 16,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "1",
+          "2-3"
+        ],
         "cases": {
           "1": {
             "signals": [

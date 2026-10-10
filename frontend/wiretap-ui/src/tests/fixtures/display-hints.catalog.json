@@ -18,6 +18,9 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "1"
+        ],
         "cases": {
           "1": {
             "signals": [
@@ -93,6 +96,9 @@
       "mirrorOf": "0x100",
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "1"
+        ],
         "cases": {
           "1": {
             "signals": [

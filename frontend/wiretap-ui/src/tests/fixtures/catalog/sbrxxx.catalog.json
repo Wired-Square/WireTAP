@@ -475,6 +475,10 @@
       "mirrorOf": "0x708",
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -556,6 +560,10 @@
       "mirrorOf": "0x70a",
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -1425,6 +1433,10 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -1475,6 +1487,10 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -1525,6 +1541,10 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -2652,6 +2672,10 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -2716,6 +2740,10 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -2825,6 +2853,16 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
         "cases": {
           "0": {
             "signals": [
@@ -3662,10 +3700,25 @@
       "length": 8,
       "mux": {
         "bitLength": 8,
+        "caseOrder": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
         "cases": {
           "1": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3709,6 +3762,11 @@
           "2": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3752,6 +3810,11 @@
           "3": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3795,6 +3858,11 @@
           "4": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3838,6 +3906,11 @@
           "5": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3881,6 +3954,11 @@
           "6": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3924,6 +4002,11 @@
           "7": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
@@ -3967,6 +4050,11 @@
           "8": {
             "mux": {
               "bitLength": 8,
+              "caseOrder": [
+                "1",
+                "2",
+                "3"
+              ],
               "cases": {
                 "1": {
                   "signals": [
