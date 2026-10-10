@@ -35,12 +35,6 @@ interface McpStatus {
 
 const STOPPED_STATUS: McpStatus = { running: false, port: null, restartPending: false };
 
-function generateToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 export default function McpServerView() {
   const serverEnabled = useSettingsStore((s) => s.mcp.serverEnabled);
   const allowControl = useSettingsStore((s) => s.mcp.allowControl);
@@ -308,8 +302,8 @@ export default function McpServerView() {
           />
           <Button
             title="Generate a new token"
-            onClick={() => {
-              setServerToken(generateToken());
+            onClick={async () => {
+              setServerToken(await invoke<string>("generate_mcp_token"));
               stageChange();
             }}
           >

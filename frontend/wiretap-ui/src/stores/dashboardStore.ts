@@ -21,6 +21,7 @@ import { WIDGET_META } from '../apps/dashboard/widgets/widgetMeta';
 import type { WidgetConfig } from '../apps/dashboard/widgets/configTypes';
 import { widgetForSignal } from '../apps/dashboard/widgets/autoWidget';
 import type { DashboardFileContent } from '../utils/dashboards';
+import { SETTING_RANGES } from '../generated/settingRanges';
 
 // ─────────────────────────────────────────
 // Types
@@ -358,8 +359,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setIoProfile: (profile) => set({ ioProfile: profile }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setBufferCapacity: (capacity) => {
-    const clamped = Math.max(1_000, Math.min(100_000, capacity));
-    timeseriesCapacity = clamped;
+    const { min, max } = SETTING_RANGES.graph_buffer_size;
+    timeseriesCapacity = Math.max(min, Math.min(max, capacity));
   },
 
   // ── Panel management ──

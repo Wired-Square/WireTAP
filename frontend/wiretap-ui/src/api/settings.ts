@@ -27,13 +27,6 @@ export async function validateDirectory(path: string): Promise<DirectoryValidati
 }
 
 /**
- * Create a directory at the given path
- */
-export async function createDirectory(path: string): Promise<void> {
-  await invoke("create_directory", { path });
-}
-
-/**
  * Get the application version
  */
 export async function getAppVersion(): Promise<string> {

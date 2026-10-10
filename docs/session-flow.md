@@ -616,8 +616,8 @@ WireTAP rename sit under `com.candor.io-profiles`. `get_credential` falls back t
 that namespace, copies the value into the live one and deletes the old entry, so
 a secret migrates on its way to being used; `migrate_legacy_io_profile_credentials`
 additionally sweeps entries nothing ever reads, called via `spawn_blocking` from
-`setup` — deliberately **off** the pre-first-paint path, because `setup` already
-`block_on`s `load_settings` and keyring access is OS IPC that can block or prompt.
+`setup` — deliberately **off** the pre-first-paint path, because `setup` reads
+settings synchronously and keyring access is OS IPC that can block or prompt.
 Deletes clear both namespaces, or the fallback would resurrect a deleted secret.
 `credentials.rs`'s module doc names the deletable unit; remove it once 0.10 is
 well established.

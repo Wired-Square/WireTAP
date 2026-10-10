@@ -50,6 +50,10 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<wiretap_decode::PayloadField>(), byte_names()),
             ),
             (
+                PathBuf::from("settingRanges.ts"),
+                (TypeId::of::<crate::settings::AppSettings>(), setting_ranges()),
+            ),
+            (
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
@@ -214,6 +218,15 @@ fn byte_names() -> String {
         .map(|i| format!("  \"{}\",\n", wiretap_decode::byte_name(i, 8, wiretap_decode::Endianness::Little)))
         .collect();
     format!("{HEADER}\nexport const BYTE_NAMES = [\n{names}] as const;\n")
+}
+
+/// The numeric settings `clamp_settings` bounds, by field.
+fn setting_ranges() -> String {
+    let rows: String = crate::settings::SETTING_RANGES
+        .iter()
+        .map(|(field, min, max)| format!("  {field}: {{ min: {min}, max: {max} }},\n"))
+        .collect();
+    format!("{HEADER}\nexport const SETTING_RANGES = {{\n{rows}}} as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {

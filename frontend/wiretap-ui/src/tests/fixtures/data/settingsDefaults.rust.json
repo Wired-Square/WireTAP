@@ -18,7 +18,6 @@
   "display_time_format": "human",
   "display_timezone": "local",
   "dump_dir": "",
-  "enable_file_logging": false,
   "frame_editor_colours": [
     "#22d3ee",
     "#4ade80",

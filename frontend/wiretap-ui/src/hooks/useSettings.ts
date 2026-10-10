@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { loadSettings as loadSettingsApi, tlog } from '../api/settings';
-import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
 import { normalizeSettings, type AppSettings } from '../settings/appSettings';
 
@@ -43,20 +42,7 @@ export function useSettings(): UseSettingsReturn {
     setLoading(true);
     setError(null);
     try {
-      const rawSettings = await loadSettingsApi();
-
-      // Get default directories for empty paths
-      let defaultDirs: { decoders: string; dumps: string; reports: string } | null = null;
-      if (!rawSettings.decoder_dir || !rawSettings.dump_dir || !rawSettings.report_dir) {
-        try {
-          defaultDirs = await getOrCreateDefaultDirs();
-        } catch (err) {
-          tlog.info(`[useSettings] Could not get/create default directories: ${err}`);
-        }
-      }
-
-      const normalized = normalizeSettings(rawSettings, defaultDirs);
-      setSettings(normalized);
+      setSettings(normalizeSettings(await loadSettingsApi()));
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);

@@ -6,7 +6,6 @@ export {
   loadSettings,
   saveSettings,
   validateDirectory,
-  createDirectory,
   getAppVersion,
   settingsPanelClosed,
   openSettingsPanel,

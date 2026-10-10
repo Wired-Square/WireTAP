@@ -980,6 +980,14 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
     Ok(McpStatus::current(&app))
 }
 
+/// A fresh bearer token for the MCP server: 24 random bytes as hex.
+#[tauri::command]
+fn generate_mcp_token() -> Result<String, String> {
+    let mut bytes = [0u8; 24];
+    getrandom::fill(&mut bytes).map_err(|e| format!("No randomness for a token: {e}"))?;
+    Ok(hex::encode(bytes))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Pipe `tracing` events from framelink (and any other crate that
@@ -1009,33 +1017,21 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_safe_area_insets_css::init());
 
     let builder = builder.setup(|app| {
-            // Start file logging as early as possible (before anything else logs).
-            // Read the settings file synchronously to check the log level.
-            if let Ok(settings_dir) = app.path().app_config_dir() {
-                let settings_path = settings_dir.join("settings.json");
-                if settings_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&settings_path) {
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                            // Read log_level, falling back to enable_file_logging for backward compat
-                            let level = json.get("log_level")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| {
-                                    if json.get("enable_file_logging").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                        "info".to_string()
-                                    } else {
-                                        "off".to_string()
-                                    }
-                                });
-                            logging::set_log_level(&level);
-                            if level != "off" {
-                                if let Ok(doc_dir) = app.path().document_dir() {
-                                    let reports_dir = doc_dir.join("WireTAP").join("Reports");
-                                    if let Err(e) = logging::init_file_logging(&reports_dir) {
-                                        tlog!("[setup] Failed to init file logging: {}", e);
-                                    }
-                                }
-                            }
+            // One read serves setup: it migrates and writes the file if it needs
+            // it, and on first run creates the directories the catalogue cache scans.
+            let startup_settings = settings::load_settings_sync(app.handle());
+            if let Err(e) = &startup_settings {
+                tlog!("[setup] Failed to load settings during startup: {}", e);
+            }
+
+            // Start file logging as early as possible.
+            if let Ok(s) = &startup_settings {
+                logging::set_log_level(&s.log_level);
+                if s.log_level != "off" {
+                    if let Ok(doc_dir) = app.path().document_dir() {
+                        let reports_dir = doc_dir.join("WireTAP").join("Reports");
+                        if let Err(e) = logging::init_file_logging(&reports_dir) {
+                            tlog!("[setup] Failed to init file logging: {}", e);
                         }
                     }
                 }
@@ -1048,9 +1044,7 @@ pub fn run() {
 
             // Initialise the SQLite-backed capture database
             if let Ok(data_dir) = app.path().app_data_dir() {
-                let clear_on_start = settings::load_settings_sync(app.handle())
-                    .map(|s| s.clear_captures_on_start)
-                    .unwrap_or(true);
+                let clear_on_start = startup_settings.as_ref().map_or(true, |s| s.clear_captures_on_start);
                 if let Err(e) = capture_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise capture database: {}", e);
                     record_startup_error(format!(
@@ -1122,40 +1116,28 @@ pub fn run() {
 
             // Start MCP server if enabled in settings (opt-in; port conflict must
             // not crash the app, so failures are logged and swallowed).
-            match settings::load_settings_sync(app.handle()) {
+            match &startup_settings {
                 Ok(s) if s.mcp_server_enabled => {
                     if let Err(e) = mcp::start(
                         app.handle().clone(),
-                        mcp::McpRunningConfig::from_settings(&s),
+                        mcp::McpRunningConfig::from_settings(s),
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);
                     }
                 }
-                Ok(_) => {}
-                Err(e) => tlog!("[mcp] Could not load settings to start server: {}", e),
+                _ => {}
             }
 
-            // Resolve settings synchronously, before the catalogue cache warms below —
-            // the cache scans decoder_dir, so that directory has to exist and be known
-            // by then.
-            //
-            // load_settings (not load_settings_sync) is required: on first run it
-            // resolves decoder_dir via with_defaults(), creates the directory, and
-            // persists settings.json. Its only .await is save_settings, whose body is
-            // plain synchronous file IO, so block_on does no real async work.
-            match tauri::async_runtime::block_on(settings::load_settings(app.handle().clone())) {
-                Ok(app_settings) => {
-                    // Drain pre-rebrand keyring entries into the current namespace.
-                    // Deliberately off this blocking path: keyring access is OS IPC
-                    // (and can prompt), while nothing needs it before first paint —
-                    // get_credential migrates any secret on its way to being used.
-                    let profiles = app_settings.io_profiles;
-                    tauri::async_runtime::spawn_blocking(move || {
-                        credentials::migrate_legacy_io_profile_credentials(&profiles);
-                    });
-                }
-                Err(e) => tlog!("[setup] Failed to load settings during startup: {}", e),
+            // Drain pre-rebrand keyring entries into the current namespace.
+            // Deliberately off this blocking path: keyring access is OS IPC
+            // (and can prompt), while nothing needs it before first paint —
+            // get_credential migrates any secret on its way to being used.
+            if let Ok(s) = startup_settings {
+                let profiles = s.io_profiles;
+                tauri::async_runtime::spawn_blocking(move || {
+                    credentials::migrate_legacy_io_profile_credentials(&profiles);
+                });
             }
 
             // Warm the backend-owned catalogue cache (and start watching the
@@ -1241,7 +1223,6 @@ pub fn run() {
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,
-            settings::create_directory,
             settings::get_app_version,
             settings::check_for_updates,
             // Session-based reader API
@@ -1533,6 +1514,7 @@ pub fn run() {
                         // MCP server control
                         get_mcp_status,
                         toggle_mcp_server,
+                        generate_mcp_token,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

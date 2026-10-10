@@ -343,7 +343,7 @@ export interface AppSettings {
   telemetry_consent_given?: boolean;
   usage_analytics_enabled?: boolean;
   usage_analytics_consent_given?: boolean;
-  /** Random anonymous per-install id (generated once by the frontend) */
+  /** Random anonymous per-install id (generated once by the backend) */
   install_id?: string;
   // Buffer persistence
   clear_captures_on_start?: boolean;
@@ -375,8 +375,8 @@ export interface AppSettings {
 }
 
 // ============================================================================
-// Defaults — the single source of truth for the frontend, kept in step with
-// the Rust `AppSettings` defaults in crates/wiretap-app/src/settings.rs.
+// Defaults for the store's state before the first load, kept in step with the
+// Rust `AppSettings` defaults in crates/wiretap-app/src/settings.rs.
 // ============================================================================
 
 export const DEFAULT_BUFFER_STORAGE = "sqlite";
@@ -431,116 +431,12 @@ export const defaultThemeColours: ThemeColours = {
 // ============================================================================
 
 /**
- * Normalise a (possibly partial) settings payload from the backend into a
- * complete `AppSettings`, filling any missing field with its default. The
- * single normalise routine used by both the settings store and the read-only
- * `useSettings()` hook, so both agree on every field.
+ * The settings the store and `useSettings()` hold. Rust serves them migrated,
+ * defaulted and clamped; what is left here is dropping this run's ad-hoc
+ * devices, which the backend overlays onto `io_profiles` for its own readers.
  */
-export function normalizeSettings(
-  settings: Partial<AppSettings>,
-  defaultDirs?: { decoders: string; dumps: string; reports: string } | null,
-): AppSettings {
-  const frameEditorColours =
-    settings.frame_editor_colours?.length === 8
-      ? settings.frame_editor_colours
-      : defaultFrameEditorColours();
-
-  return {
-    config_path: settings.config_path || "",
-    decoder_dir: settings.decoder_dir || defaultDirs?.decoders || "",
-    dump_dir: settings.dump_dir || defaultDirs?.dumps || "",
-    report_dir: settings.report_dir || defaultDirs?.reports || "",
-    // Ad-hoc devices arrive here because the backend overlays them onto
-    // io_profiles for every profile consumer. Drop them so the settings store,
-    // its dirty-tracking baseline and the save payload stay to what is on disk.
-    io_profiles: (settings.io_profiles || []).filter((p) => !p.ephemeral),
-    default_read_profile: settings.default_read_profile ?? null,
-    default_write_profiles: settings.default_write_profiles ?? [],
-    display_frame_id_format: settings.display_frame_id_format === "decimal" ? "decimal" : "hex",
-    save_frame_id_format: settings.save_frame_id_format === "decimal" ? "decimal" : "hex",
-    display_time_format: settings.display_time_format ?? "human",
-    display_timezone: settings.display_timezone ?? "local",
-    default_frame_type: settings.default_frame_type ?? "can",
-    signal_colour_none: settings.signal_colour_none || defaultSignalColours.none,
-    signal_colour_low: settings.signal_colour_low || defaultSignalColours.low,
-    signal_colour_medium: settings.signal_colour_medium || defaultSignalColours.medium,
-    signal_colour_high: settings.signal_colour_high || defaultSignalColours.high,
-    binary_one_colour: settings.binary_one_colour || "#14b8a6",
-    binary_zero_colour: settings.binary_zero_colour || "#94a3b8",
-    binary_unused_colour: settings.binary_unused_colour || "#64748b",
-    frame_editor_colours: frameEditorColours,
-    discovery_history_buffer: settings.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
-    query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
-    session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
-    graph_buffer_size: settings.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
-    decoder_max_unmatched_frames:
-      settings.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-    decoder_max_filtered_frames:
-      settings.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-    decoder_max_decoded_frames:
-      settings.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
-    decoder_max_decoded_per_source:
-      settings.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-    transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
-    // Theme settings
-    theme_mode: settings.theme_mode ?? "auto",
-    theme_bg_primary_light: settings.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
-    theme_bg_surface_light: settings.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
-    theme_text_primary_light:
-      settings.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
-    theme_text_secondary_light:
-      settings.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
-    theme_border_default_light:
-      settings.theme_border_default_light || defaultThemeColours.borderDefaultLight,
-    theme_data_bg_light: settings.theme_data_bg_light || defaultThemeColours.dataBgLight,
-    theme_data_text_primary_light:
-      settings.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
-    theme_bg_primary_dark: settings.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
-    theme_bg_surface_dark: settings.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
-    theme_text_primary_dark: settings.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
-    theme_text_secondary_dark:
-      settings.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
-    theme_border_default_dark:
-      settings.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
-    theme_data_bg_dark: settings.theme_data_bg_dark || defaultThemeColours.dataBgDark,
-    theme_data_text_primary_dark:
-      settings.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
-    theme_accent_primary: settings.theme_accent_primary || defaultThemeColours.accentPrimary,
-    theme_accent_success: settings.theme_accent_success || defaultThemeColours.accentSuccess,
-    theme_accent_danger: settings.theme_accent_danger || defaultThemeColours.accentDanger,
-    theme_accent_warning: settings.theme_accent_warning || defaultThemeColours.accentWarning,
-    // Power management
-    prevent_idle_sleep: settings.prevent_idle_sleep ?? true,
-    keep_display_awake: settings.keep_display_awake ?? false,
-    // Diagnostics
-    log_level: settings.log_level ?? "off",
-    // Privacy / telemetry
-    telemetry_enabled: settings.telemetry_enabled ?? false,
-    telemetry_consent_given: settings.telemetry_consent_given ?? false,
-    usage_analytics_enabled: settings.usage_analytics_enabled ?? false,
-    usage_analytics_consent_given: settings.usage_analytics_consent_given ?? false,
-    install_id: settings.install_id ?? "",
-    // Buffer persistence
-    clear_captures_on_start: settings.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
-    buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
-    // Modbus
-    modbus_max_register_errors:
-      settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-    // Networking
-    smp_port: settings.smp_port ?? 1337,
-    // Localisation
-    language: settings.language ?? "en-AU",
-    // MCP server (all gates off by default)
-    mcp_server_enabled: settings.mcp_server_enabled ?? false,
-    mcp_allow_control: settings.mcp_allow_control ?? false,
-    mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
-    mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
-    mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
-    mcp_allow_dashboard_write: settings.mcp_allow_dashboard_write ?? false,
-    mcp_allow_ui_control: settings.mcp_allow_ui_control ?? false,
-    mcp_server_port: settings.mcp_server_port ?? 8787,
-    mcp_server_token: settings.mcp_server_token ?? "",
-  };
+export function normalizeSettings(settings: AppSettings): AppSettings {
+  return { ...settings, io_profiles: settings.io_profiles.filter((p) => !p.ephemeral) };
 }
 
 /** Helper: get display frame ID format from settings */
