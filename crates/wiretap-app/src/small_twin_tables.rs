@@ -1,7 +1,7 @@
 //! The `rust` column of P5's small-twin rule tables, which the TypeScript's
 //! `smallTwinsRuleTables.test.tsx` checks its own column of.
 
-use framelink::protocol::{frame_def, next_free_id, types::interface_name};
+use framelink::protocol::{frame_def, types::interface_name};
 use serde_json::Value;
 use wiretap_decode::{extract_field, BitOrder, Endianness};
 use wiretap_protocol::dlc::{dlc_to_len, len_to_dlc};
@@ -32,21 +32,6 @@ fn framelink_bit_positions_match_the_rule_table() {
         );
         let expected: Vec<u16> = row["positions"].as_array().unwrap().iter().map(|p| uint(p) as u16).collect();
         assert_eq!(positions, expected, "{row}");
-    }
-}
-
-#[test]
-fn framelink_next_id_matches_the_rule_table() {
-    for row in rows("framelinkNextId.json") {
-        let used = row["used"].as_array().unwrap().iter().map(|id| uint(id) as u16);
-        assert_eq!(u64::from(next_free_id(used)), uint(&row["rust"]), "{row}");
-    }
-}
-
-#[test]
-fn framelink_value_type_names_match_the_rule_table() {
-    for row in rows("framelinkValueTypes.json") {
-        assert_eq!(frame_def::value_type_name(uint(&row["value_type"]) as u8), row["crate"], "{row}");
     }
 }
 

@@ -167,6 +167,10 @@ pub struct TestConfig {
 }
 
 impl TestConfig {
+    fn send_rate_hz(&self) -> f64 {
+        if self.rate_hz > 0.0 { self.rate_hz } else { 100.0 }
+    }
+
     /// One CAN frame, ready to hand to the session.
     fn can(&self, frame_id: u32, data: Vec<u8>, is_extended: bool, is_fd: bool) -> TransmitPayload {
         TransmitPayload::CanFrame(CanTransmitFrame {
@@ -321,6 +325,9 @@ pub struct IOTestState {
     pub peer: Option<PeerInfo>,
     /// Per-length-code results, for a Sweep run.
     pub sweep: Option<Vec<SweepRow>>,
+    /// The frames this run will send, for the TX gauge's scale; `None` when
+    /// unpaced (throughput) or not an initiator's run.
+    pub expected_tx: Option<u64>,
     /// Phase results for Auto mode.
     pub auto_results: Option<Vec<AutoPhaseResult>>,
     /// Current phase label for Auto mode (e.g. "Echo (1/5)").
@@ -580,6 +587,7 @@ impl RunStats {
             remote: self.remote.clone(),
             peer: self.peer.clone(),
             sweep: (!self.sweep.is_empty()).then(|| self.sweep.clone()),
+            expected_tx: None,
             auto_results: publish.auto.as_ref().map(|a| a.done.to_vec()),
             auto_phase: publish.auto.as_ref().map(|a| a.label.clone()),
         }
@@ -708,7 +716,10 @@ impl<'a> Run<'a> {
     }
 
     fn state(&self, status: TestStatus) -> IOTestState {
-        self.stats.state(self.publish, status, &self.tracker)
+        IOTestState {
+            expected_tx: expected_tx(self.config),
+            ..self.stats.state(self.publish, status, &self.tracker)
+        }
     }
 
     fn emit(&self, status: TestStatus) {
@@ -928,11 +939,7 @@ impl<'a> Run<'a> {
     /// link. Returns whether it gave up on a session that stopped transmitting.
     async fn stream(&mut self) -> bool {
         let config = self.config;
-        let interval = if config.rate_hz > 0.0 {
-            Duration::from_secs_f64(1.0 / config.rate_hz)
-        } else {
-            Duration::from_millis(10)
-        };
+        let interval = Duration::from_secs_f64(1.0 / config.send_rate_hz());
         let duration = Duration::from_secs_f64(config.duration_sec);
         let drain_secs = drain_secs(config.duration_sec);
         let send_deadline = Duration::from_secs_f64(config.duration_sec - drain_secs);
@@ -1049,6 +1056,17 @@ fn drain_secs(duration_sec: f64) -> f64 {
     if duration_sec >= 3.0 { 1.0 } else { duration_sec / 3.0 }
 }
 
+fn expected_tx(config: &TestConfig) -> Option<u64> {
+    match config.mode {
+        TestMode::Throughput | TestMode::Auto => None,
+        TestMode::Sweep => Some(tp::sweep_codes(config.use_fd).count() as u64),
+        _ => Some(
+            (config.send_rate_hz() * (config.duration_sec - drain_secs(config.duration_sec))).ceil()
+                as u64,
+        ),
+    }
+}
+
 fn suite_status(cancelled: bool, phases_passed: &[bool], total: usize) -> TestStatus {
     if cancelled {
         TestStatus::Stopped
@@ -1160,6 +1178,7 @@ async fn run_auto(session_id: &str, test_id: &str, config: &TestConfig, cancel: 
         remote: results.iter().rev().find_map(|r| r.remote.clone()),
         peer,
         sweep: results.iter().find_map(|r| r.sweep.clone()),
+        expected_tx: None,
         auto_results: Some(results),
         auto_phase: None,
     };
@@ -1522,13 +1541,18 @@ pub(crate) mod tests {
         assert!(started.elapsed() < Duration::from_secs(3), "gave up before the send phase ended");
     }
 
-    /// The `rust` columns of `testPatternGauge.json` and `testPatternSuite.json`.
+    /// `testPatternGauge.json`'s `expected_tx` and `testPatternSuite.json`'s `rust` column.
     #[test]
-    fn the_send_window_and_suite_status_match_the_rule_tables() {
+    fn expected_tx_and_suite_status_match_the_rule_tables() {
         for row in crate::small_twin_tables::rows("testPatternGauge.json") {
-            let Some(max_tx) = row["rust"]["max_tx"].as_f64() else { continue };
-            let (rate, duration) = (row["rate_hz"].as_f64().unwrap(), row["duration_sec"].as_f64().unwrap());
-            assert_eq!((rate * (duration - drain_secs(duration))).ceil(), max_tx, "{row}");
+            let config = TestConfig {
+                mode: serde_json::from_value(row["mode"].clone()).unwrap(),
+                rate_hz: row["rate_hz"].as_f64().unwrap(),
+                duration_sec: row["duration_sec"].as_f64().unwrap(),
+                use_fd: row["use_fd"].as_bool().unwrap(),
+                ..config(TestMode::Echo, false)
+            };
+            assert_eq!(expected_tx(&config), row["expected_tx"].as_u64(), "{row}");
         }
         for row in crate::small_twin_tables::rows("testPatternSuite.json") {
             let passed: Vec<bool> =
@@ -1538,21 +1562,17 @@ pub(crate) mod tests {
         }
     }
 
-    /// The TX gauge's scale is `rate × duration`; the run stops sending a drain
-    /// window early, so the needle cannot reach it.
+    /// The TX gauge's scale is the run's own `expected_tx`, so an answered run
+    /// fills it.
     #[tokio::test]
-    async fn an_echo_run_sends_fewer_frames_than_the_gauge_expects() {
+    async fn an_echo_run_reaches_its_expected_tx() {
         let mut config = config(TestMode::Echo, false);
         config.duration_sec = 1.0;
         let state = run("test_echo_gauge", Wire::Peer(Responder::new(0, 0)), &config).await;
 
-        let row = crate::small_twin_tables::rows("testPatternGauge.json")
-            .into_iter()
-            .find(|r| r["mode"] == "echo" && r["rate_hz"] == 200 && r["duration_sec"] == 1)
-            .expect("the echo 200 Hz × 1 s row");
-        assert!(state.tx_count > 0);
-        assert!(state.tx_count <= row["rust"]["max_tx"].as_u64().unwrap(), "{}", state.tx_count);
-        assert!(state.tx_count < row["ts"]["expected_tx"].as_u64().unwrap());
+        let expected = state.expected_tx.expect("a paced run has an expected count");
+        assert!(state.tx_count <= expected, "{} > {expected}", state.tx_count);
+        assert!(state.tx_count * 10 >= expected * 9, "{} of {expected}", state.tx_count);
     }
 
     /// Two taps on one session are independent. Dropping every tap for the

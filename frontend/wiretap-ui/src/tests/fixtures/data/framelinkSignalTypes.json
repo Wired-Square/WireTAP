@@ -1,0 +1,50 @@
+{
+  "note": "The signal value-type rule: rules.rs check_signal_type refuses a frame def with an `error` signal (the gate any caller meets), and bitGrid.ts validateSignalType shows the same message as the user edits.",
+  "rows": [
+    {
+      "bit_length": 1,
+      "value_type": 3,
+      "error": null
+    },
+    {
+      "bit_length": 8,
+      "value_type": 3,
+      "error": "Bool requires exactly 1 bit"
+    },
+    {
+      "bit_length": 32,
+      "value_type": 2,
+      "error": null
+    },
+    {
+      "bit_length": 16,
+      "value_type": 2,
+      "error": "Float requires exactly 32 bits"
+    },
+    {
+      "bit_length": 24,
+      "value_type": 4,
+      "error": null
+    },
+    {
+      "bit_length": 12,
+      "value_type": 4,
+      "error": "Array requires a multiple of 8 bits"
+    },
+    {
+      "bit_length": 64,
+      "value_type": 0,
+      "error": null
+    },
+    {
+      "bit_length": 65,
+      "value_type": 1,
+      "error": "Maximum 64 bits for integer signals"
+    },
+    {
+      "bit_length": 65,
+      "value_type": 0,
+      "error": "Maximum 64 bits for integer signals"
+    }
+  ]
+}

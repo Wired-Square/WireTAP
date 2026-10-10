@@ -57,6 +57,14 @@ fn render() -> BTreeMap<PathBuf, String> {
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
+            (
+                PathBuf::from("canFdLengths.ts"),
+                (TypeId::of::<crate::io::CanTransmitFrame>(), can_fd_lengths()),
+            ),
+            (
+                PathBuf::from("framelinkNames.ts"),
+                (TypeId::of::<framelink::protocol::frame_def::FrameSignalDef>(), framelink_names()),
+            ),
         ]),
     };
     r.visit::<crate::io::GvretDeviceInfo>();
@@ -105,6 +113,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::capture_store::TailResponse>();
     r.visit::<crate::io::CsvColumnMapping>();
     r.visit::<crate::io::CsvPreview>();
+    r.visit::<crate::io::CsvTimestampPreview>();
     r.visit::<crate::framing::BackendFramingConfig>();
     r.visit::<crate::framing::FramingResult>();
     r.visit::<crate::framing::SerialIds>();
@@ -149,6 +158,8 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::framelink::rules::FrameDefDescriptor>();
     r.visit::<crate::io::framelink::rules::GeneratorDescriptor>();
     r.visit::<crate::io::framelink::rules::TransformerDescriptor>();
+    r.visit::<crate::io::framelink::rules::SignalPlacement>();
+    r.visit::<crate::io::framelink::rules::FrameLinkIdKind>();
     r.visit::<crate::io_test::IOTestState>();
     r.visit::<crate::io_test::TestConfig>();
     r.visit::<crate::flashers::DetectedChip>();
@@ -209,6 +220,25 @@ fn checksum_algorithms() -> String {
         .map(|a| format!("  {}: {},\n", a.as_str(), a.output_bytes()))
         .collect();
     format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
+}
+
+/// The payload lengths a CAN FD frame can carry, one per length code.
+fn can_fd_lengths() -> String {
+    format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wiretap_protocol::FD_DLC_LEN)
+}
+
+/// FrameLink's interface and signal value-type names, by their wire codes.
+fn framelink_names() -> String {
+    use framelink::protocol::{frame_def::value_type_name, types::interface_name};
+    let interfaces: String = (0..=u8::MAX)
+        .map(|code| (code, interface_name(code)))
+        .filter(|(_, name)| *name != "Unknown")
+        .map(|(code, name)| format!("  {code}: {name:?},\n"))
+        .collect();
+    let value_types: Vec<_> = (0..=u8::MAX).map(value_type_name).take_while(|name| *name != "unknown").collect();
+    format!(
+        "{HEADER}\nexport const INTERFACE_TYPE_NAMES: Record<number, string> = {{\n{interfaces}}};\n\nexport const VALUE_TYPE_NAMES = {value_types:?} as const;\n"
+    )
 }
 
 /// Each byte of the longest payload as `wiretap_decode::byte_name` spells a

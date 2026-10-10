@@ -18,8 +18,6 @@ interface TestPatternState {
   testId: string | null;
   isRunning: boolean;
   testState: IOTestState | null;
-  /** Expected TX count, set at test start from config (rate × duration). Used for gauge scale. */
-  expectedTxCount: number;
 
   // Actions
   setSessionId: (id: string | null) => void;
@@ -32,7 +30,6 @@ interface TestPatternState {
   setUseExtended: (ext: boolean) => void;
   setTestId: (id: string | null) => void;
   setIsRunning: (running: boolean) => void;
-  setExpectedTxCount: (count: number) => void;
   updateTestState: (state: IOTestState) => void;
   clearTestState: () => void;
 }
@@ -50,7 +47,6 @@ export const useTestPatternStore = create<TestPatternState>((set) => ({
   testId: null,
   isRunning: false,
   testState: null,
-  expectedTxCount: 0,
 
   setSessionId: (id) => set({ sessionId: id }),
   setMode: (mode) => set({ mode }),
@@ -62,10 +58,9 @@ export const useTestPatternStore = create<TestPatternState>((set) => ({
   setUseExtended: (ext) => set({ useExtended: ext }),
   setTestId: (id) => set({ testId: id }),
   setIsRunning: (running) => set({ isRunning: running }),
-  setExpectedTxCount: (count) => set({ expectedTxCount: count }),
   updateTestState: (state) => {
     const isTerminal = state.status === "completed" || state.status === "stopped" || state.status === "failed";
     set({ testState: state, isRunning: !isTerminal });
   },
-  clearTestState: () => set({ testState: null, testId: null, isRunning: false, expectedTxCount: 0 }),
+  clearTestState: () => set({ testState: null, testId: null, isRunning: false }),
 }));

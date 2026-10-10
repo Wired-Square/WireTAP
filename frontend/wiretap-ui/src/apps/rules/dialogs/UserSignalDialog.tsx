@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
@@ -8,6 +8,7 @@ import { labelDefault } from "../../../styles/typography";
 import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
+import { useNextFrameLinkId } from "../hooks/useFrameLinkAnswers";
 import { Button, IconButton } from "../../../components/Button";
 import { SecondaryButton, PrimaryButton, Input, Select } from "../../../components/forms";
 
@@ -66,15 +67,6 @@ function parseHexSignalId(hex: string): number | null {
   return value;
 }
 
-/** Find the lowest unused signal ID starting from 1. */
-function nextAvailableId(usedIds: Set<number>): string {
-  for (let id = 1; id <= MAX_USER_SIGNAL_ID; id++) {
-    if (!usedIds.has(id)) {
-      return id.toString(16).toUpperCase().padStart(4, "0");
-    }
-  }
-  return "";
-}
 
 // ============================================================================
 // Component
@@ -87,7 +79,13 @@ export default function UserSignalDialog({
   usedSignalIds,
 }: UserSignalDialogProps) {
   const { t } = useTranslation("rules");
-  const [signalIdHex, setSignalIdHex] = useState(() => nextAvailableId(usedSignalIds));
+  const nextId = useNextFrameLinkId(usedSignalIds, "signal");
+  const nextIdHex =
+    nextId !== null && nextId <= MAX_USER_SIGNAL_ID ? nextId.toString(16).toUpperCase().padStart(4, "0") : "";
+  const [signalIdHex, setSignalIdHex] = useState("");
+  useEffect(() => {
+    if (isOpen) setSignalIdHex(nextIdHex);
+  }, [isOpen, nextIdHex]);
   const [name, setName] = useState("");
   const [group, setGroup] = useState(DEFAULT_GROUP);
   const [format, setFormat] = useState("number");
@@ -96,14 +94,14 @@ export default function UserSignalDialog({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const resetForm = useCallback(() => {
-    setSignalIdHex(nextAvailableId(usedSignalIds));
+    setSignalIdHex(nextIdHex);
     setName("");
     setGroup(DEFAULT_GROUP);
     setFormat("number");
     setUnit("");
     setEnumRows([]);
     setValidationError(null);
-  }, [usedSignalIds]);
+  }, [nextIdHex]);
 
   const handleClose = useCallback(() => {
     resetForm();

@@ -1,5 +1,5 @@
 {
-  "note": "`rust` is io_test.rs suite_status(cancelled, phases_passed, 5). `ts` is the verdict TestPattern.tsx's AutoSummary prints for that status and those phase results (null: no summary is shown).",
+  "note": "`rust` is io_test.rs suite_status(cancelled, phases_passed, 5). `ts` is the verdict TestPattern.tsx's AutoSummary prints for that status (null: no summary is shown).",
   "phases": [
     "Echo",
     "Sweep",
@@ -29,7 +29,7 @@
         true
       ],
       "rust": "stopped",
-      "ts": "ALL PASS"
+      "ts": "STOPPED"
     },
     {
       "name": "stopped during Echo",
@@ -38,7 +38,7 @@
         false
       ],
       "rust": "stopped",
-      "ts": "FAILURES DETECTED"
+      "ts": "STOPPED"
     },
     {
       "name": "stopped before any phase",

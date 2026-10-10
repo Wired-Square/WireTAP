@@ -23,6 +23,11 @@ peer: PeerInfo | null,
  */
 sweep: Array<SweepRow> | null, 
 /**
+ * The frames this run will send, for the TX gauge's scale; `None` when
+ * unpaced (throughput) or not an initiator's run.
+ */
+expected_tx: number | null, 
+/**
  * Phase results for Auto mode.
  */
 auto_results: Array<AutoPhaseResult> | null, 

@@ -1,24 +1,24 @@
 {
-  "note": "`ts` is framelinkConstants.ts nextAvailableId (and bitGrid.ts nextSignalId, UserSignalDialog's copy); `rust` is framelink protocol::next_free_id, behind every next_available_id (frame defs, bridges, transformers, counters).",
+  "note": "rules.rs next_id, served as framelink.next_id: `rule` (frame defs, bridges, transformers, generators) is framelink protocol::next_free_id, from 0 as the crate and the FrameLink TUI allocate them; `signal` (frame def and user signals) starts at 1, as the TUI's frame signal editor does.",
   "rows": [
     {
       "used": [],
-      "ts": 1,
-      "rust": 0
+      "rule": 0,
+      "signal": 1
     },
     {
       "used": [
         0
       ],
-      "ts": 1,
-      "rust": 1
+      "rule": 1,
+      "signal": 1
     },
     {
       "used": [
         1
       ],
-      "ts": 2,
-      "rust": 0
+      "rule": 0,
+      "signal": 2
     },
     {
       "used": [
@@ -26,8 +26,8 @@
         2,
         3
       ],
-      "ts": 4,
-      "rust": 0
+      "rule": 0,
+      "signal": 4
     },
     {
       "used": [
@@ -35,16 +35,16 @@
         1,
         3
       ],
-      "ts": 2,
-      "rust": 2
+      "rule": 2,
+      "signal": 2
     },
     {
       "used": [
         2,
         5
       ],
-      "ts": 1,
-      "rust": 0
+      "rule": 0,
+      "signal": 1
     }
   ]
 }

@@ -128,6 +128,15 @@ pub async fn preview_csv(
     io::preview_csv_file(&file_path, max, delimiter)
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub fn preview_csv_timestamps(
+    cells: Vec<String>,
+    timestamp_unit: io::TimestampUnit,
+    negate_timestamps: bool,
+) -> io::CsvTimestampPreview {
+    io::preview_timestamps(&cells, timestamp_unit, negate_timestamps)
+}
+
 /// Import a data file with user-provided column mappings
 #[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]

@@ -27,8 +27,8 @@ describe('interpretRegister', () => {
     expect(interpretRegister([0x09, 0x38]).u16).toBe(2360);
   });
 
-  it('treats a missing second byte as zero rather than NaN', () => {
-    expect(interpretRegister([0x01]).u16).toBe(256);
+  it('reads a one-byte register as the bits it has, as wiretap-decode does', () => {
+    expect(interpretRegister([0x01]).u16).toBe(1);
   });
 });
 

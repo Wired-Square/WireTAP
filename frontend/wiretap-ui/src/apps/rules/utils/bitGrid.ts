@@ -1,5 +1,8 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+import { VALUE_TYPE_NAMES } from "../../../generated/framelinkNames";
+import { useSettingsStore } from "../../settings/stores/settingsStore";
+
 export const BYTE_ORDER_LE = 0;
 export const BYTE_ORDER_BE = 1;
 
@@ -9,15 +12,10 @@ export const VALUE_TYPE_FLOAT = 2;
 export const VALUE_TYPE_BOOL = 3;
 export const VALUE_TYPE_ARRAY = 4;
 
-export const VALUE_TYPES = [
-  { value: VALUE_TYPE_UNSIGNED, label: "Unsigned" },
-  { value: VALUE_TYPE_SIGNED, label: "Signed" },
-  { value: VALUE_TYPE_FLOAT, label: "Float" },
-  { value: VALUE_TYPE_BOOL, label: "Bool" },
-  { value: VALUE_TYPE_ARRAY, label: "Array" },
-];
-
-import { useSettingsStore } from "../../settings/stores/settingsStore";
+export const VALUE_TYPES = VALUE_TYPE_NAMES.map((name, value) => ({
+  value,
+  label: name.charAt(0).toUpperCase() + name.slice(1),
+}));
 
 export function getSignalColours(): string[] {
   return useSettingsStore.getState().display.frameEditorColours;
@@ -38,72 +36,6 @@ export interface PlacedSignal {
 export type FrameHeader =
   | { type: "can"; canId: number; dlc: number; extended: boolean }
   | { type: "serial"; framingMode: number };
-
-// Ported from framelink-rs/src/protocol/frame_def.rs — Motorola bit snaking:
-// within a byte bits descend 7→0, then jump to bit 7 of the next byte.
-export function motorolaBitPositions(startBit: number, bitLength: number): number[] {
-  const positions: number[] = [];
-  let bit = startBit;
-  for (let i = 0; i < bitLength; i++) {
-    positions.push(bit);
-    const bitInByte = bit % 8;
-    if (bitInByte === 0) {
-      bit += 15;
-    } else {
-      bit -= 1;
-    }
-  }
-  return positions;
-}
-
-export function signalBitPositions(startBit: number, bitLength: number, byteOrder: number): number[] {
-  if (byteOrder === BYTE_ORDER_BE) {
-    return motorolaBitPositions(startBit, bitLength);
-  }
-  return Array.from({ length: bitLength }, (_, i) => startBit + i);
-}
-
-export function buildBitOwnerMap(
-  signals: PlacedSignal[],
-  payloadBytes: number,
-): (number | null)[] {
-  const totalBits = payloadBytes * 8;
-  const map: (number | null)[] = new Array(totalBits).fill(null);
-  for (let i = 0; i < signals.length; i++) {
-    const positions = signalBitPositions(
-      signals[i].startBit,
-      signals[i].bitLength,
-      signals[i].byteOrder,
-    );
-    for (const pos of positions) {
-      if (pos < totalBits) {
-        map[pos] = i;
-      }
-    }
-  }
-  return map;
-}
-
-export function checkOverlap(
-  startBit: number,
-  bitLength: number,
-  byteOrder: number,
-  existingSignals: PlacedSignal[],
-  payloadBytes: number,
-): boolean {
-  const ownerMap = buildBitOwnerMap(existingSignals, payloadBytes);
-  const positions = signalBitPositions(startBit, bitLength, byteOrder);
-  return positions.some((pos) => pos < ownerMap.length && ownerMap[pos] !== null);
-}
-
-// Signal ID 0 is not used; IDs start at 1 (matching the TUI convention)
-export function nextSignalId(signals: PlacedSignal[]): number {
-  let id = 1;
-  while (signals.some((s) => s.signalId === id)) {
-    id++;
-  }
-  return id;
-}
 
 export function nextSignalColour(signals: PlacedSignal[]): string {
   const colours = getSignalColours();

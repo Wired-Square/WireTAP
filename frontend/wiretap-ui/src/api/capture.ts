@@ -17,6 +17,7 @@ import type { CsvColumnMapping } from "../generated/CsvColumnMapping";
 import type { CsvColumnRole } from "../generated/CsvColumnRole";
 import type { CsvImportResult } from "../generated/CsvImportResult";
 import type { CsvPreview } from "../generated/CsvPreview";
+import type { CsvTimestampPreview } from "../generated/CsvTimestampPreview";
 import type { Delimiter } from "../generated/Delimiter";
 import type { FrameIdConfig } from "../generated/FrameIdConfig";
 import type { FramingResult } from "../generated/FramingResult";
@@ -43,6 +44,7 @@ export type {
   CsvColumnRole,
   CsvImportResult,
   CsvPreview,
+  CsvTimestampPreview,
   Delimiter,
   FrameIdConfig,
   FramingResult,
@@ -89,6 +91,19 @@ export async function previewCsv(
     file_path: filePath,
     max_rows: maxRows ?? null,
     delimiter: delimiter ?? null,
+  });
+}
+
+/** The stamps the importer would give these timestamp cells, rebased over them. */
+export async function previewCsvTimestamps(
+  cells: string[],
+  timestampUnit: TimestampUnit,
+  negateTimestamps: boolean,
+): Promise<CsvTimestampPreview> {
+  return invoke("preview_csv_timestamps", {
+    cells,
+    timestamp_unit: timestampUnit,
+    negate_timestamps: negateTimestamps,
   });
 }
 

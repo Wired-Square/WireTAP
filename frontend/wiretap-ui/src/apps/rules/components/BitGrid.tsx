@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
 import { textPrimary, textSecondary } from "../../../styles";
-import { type PlacedSignal, buildBitOwnerMap } from "../utils/bitGrid";
+import type { PlacedSignal } from "../utils/bitGrid";
 import { Button } from "../../../components/Button";
 import { Input } from "../../../components/forms";
 
@@ -16,6 +16,7 @@ const COLUMN_HEADERS = [7, 6, 5, 4, 3, 2, 1, 0] as const;
 interface BitGridProps {
   payloadBytes: number;
   signals: PlacedSignal[];
+  ownerMap: (number | null)[];
   selectionAnchor: number | null;
   selectedSignalIndex: number | null;
   onBitClick: (bit: number) => void;
@@ -26,6 +27,7 @@ interface BitGridProps {
 export default function BitGrid({
   payloadBytes,
   signals,
+  ownerMap,
   selectionAnchor,
   selectedSignalIndex,
   onBitClick,
@@ -37,11 +39,6 @@ export default function BitGrid({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-
-  const ownerMap = useMemo(
-    () => buildBitOwnerMap(signals, payloadBytes),
-    [signals, payloadBytes],
-  );
 
   // Pending selection range when anchor is set and hovering
   const pendingRange = useMemo(() => {

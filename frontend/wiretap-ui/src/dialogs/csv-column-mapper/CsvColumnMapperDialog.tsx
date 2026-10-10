@@ -11,9 +11,11 @@ import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import PreviewTable from "./PreviewTable";
 import {
   previewCsv,
+  previewCsvTimestamps,
   importCsvWithMapping,
   importCsvBatchWithMapping,
   type CsvPreview,
+  type CsvTimestampPreview,
   type CsvColumnMapping,
   type CsvColumnRole,
   type TimestampUnit,
@@ -83,28 +85,6 @@ export type CsvColumnMapperDialogProps = {
   onImportComplete: (metadata: CaptureMetadata) => void;
 };
 
-/** The span of the readable stamps in seconds, read as integers in `unit`; `null` with fewer than two. */
-export function estimateDurationSecs(cells: (string | undefined)[], unit: TimestampUnit): number | null {
-  const timestamps = cells
-    .filter(Boolean)
-    .map((s) => parseInt(s as string, 10))
-    .filter((n) => !isNaN(n));
-
-  if (timestamps.length < 2) return null;
-
-  const range = Math.abs(Math.max(...timestamps) - Math.min(...timestamps));
-  switch (unit) {
-    case "seconds":
-      return range;
-    case "milliseconds":
-      return range / 1_000;
-    case "microseconds":
-      return range / 1_000_000;
-    case "nanoseconds":
-      return range / 1_000_000_000;
-  }
-}
-
 export default function CsvColumnMapperDialog({
   isOpen,
   filePath,
@@ -126,6 +106,7 @@ export default function CsvColumnMapperDialog({
   const [timestampUnit, setTimestampUnit] = useState<TimestampUnit>("microseconds");
   const [negateTimestamps, setNegateTimestamps] = useState(false);
   const [showImportedTs, setShowImportedTs] = useState(false);
+  const [timestampPreview, setTimestampPreview] = useState<CsvTimestampPreview | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<CsvImportResult | null>(null);
   const [copied, setCopied] = useState(false);
@@ -319,22 +300,34 @@ export default function CsvColumnMapperDialog({
   const hasTimestamp = mappings.some((m) => m.role === "timestamp");
   const canImport = hasFrameId && !isLoading && !isImporting;
 
-  // Estimated capture duration based on selected timestamp unit and preview data
+  const tsColIndex = mappings.find((m) => m.role === "timestamp")?.column_index;
+
+  useEffect(() => {
+    setTimestampPreview(null);
+    if (!preview || tsColIndex === undefined) return;
+    let cancelled = false;
+    previewCsvTimestamps(preview.rows.map((row) => row[tsColIndex] ?? ""), timestampUnit, negateTimestamps)
+      .then((result) => {
+        if (!cancelled) setTimestampPreview(result);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preview, tsColIndex, timestampUnit, negateTimestamps]);
+
   const estimatedDuration = useMemo(() => {
-    if (!hasTimestamp || !preview || preview.rows.length < 2) return null;
-
-    const tsColIndex = mappings.find((m) => m.role === "timestamp")?.column_index;
-    if (tsColIndex === undefined) return null;
-
-    const durationSecs = estimateDurationSecs(preview.rows.map((row) => row[tsColIndex]), timestampUnit);
-    if (durationSecs === null) return null;
+    if (!timestampPreview || timestampPreview.timestamps_us.length < 2) return null;
+    const durationSecs = timestampPreview.span_us / 1_000_000;
 
     if (durationSecs < 1) return t("csvColumnMapper.duration.ms", { ms: Math.round(durationSecs * 1000) });
     if (durationSecs < 60) return t("csvColumnMapper.duration.s", { s: durationSecs.toFixed(1) });
     if (durationSecs < 3600) return t("csvColumnMapper.duration.min", { min: (durationSecs / 60).toFixed(1) });
     if (durationSecs < 86400) return t("csvColumnMapper.duration.h", { h: (durationSecs / 3600).toFixed(1) });
     return t("csvColumnMapper.duration.d", { d: (durationSecs / 86400).toFixed(1) });
-  }, [hasTimestamp, preview, mappings, timestampUnit, t]);
+  }, [timestampPreview, t]);
 
   return (
     <Dialog
@@ -409,9 +402,7 @@ export default function CsvColumnMapperDialog({
               mappings={mappings}
               hasHeader={hasHeader}
               onMappingChange={handleMappingChange}
-              timestampUnit={timestampUnit}
-              negateTimestamps={negateTimestamps}
-              showImportedTs={showImportedTs}
+              importedTimestampsUs={showImportedTs ? timestampPreview?.timestamps_us ?? null : null}
             />
 
             {/* Timestamp options */}

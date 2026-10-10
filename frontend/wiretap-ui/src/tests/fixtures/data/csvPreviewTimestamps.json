@@ -1,5 +1,5 @@
 {
-  "note": "`ts_*` from PreviewTable.tsx previewOffsetSecs/formatOffset and CsvColumnMapperDialog.tsx estimateDurationSecs (offsets in input order; null is a cell shown as —); `rust_*` from csv.rs parse_csv_with_mapping (frame timestamp_us per input row, as strings) and suggest_timestamp_unit. `npx vitest run -u` rewrites the ts columns, WRITE_DATA_FIXTURES=1 the rust ones.",
+  "note": "`preview_us` and `span_us` are what the column mapper's preview reads (csv.rs preview_timestamps over the cells, offsets in input order); `rust_us` is parse_csv_with_mapping's frame timestamp_us per input row, and must equal `preview_us`; `rust_suggested_unit` is suggest_timestamp_unit. `ts_preview` is PreviewTable.tsx formatOffset of `preview_us`. `npx vitest run -u` rewrites the ts column, WRITE_DATA_FIXTURES=1 the others.",
   "rows": [
     {
       "cells": [
@@ -9,22 +9,22 @@
       ],
       "name": "integer microseconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "1000",
+        "2500"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "1000",
         "2500"
       ],
-      "ts_duration_secs": 0.0025,
+      "span_us": "2500",
       "ts_preview": [
         "0.000,000 s",
         "0.001,000 s",
         "0.002,500 s"
-      ],
-      "ts_us": [
-        0,
-        1000,
-        2500
       ],
       "unit": "microseconds"
     },
@@ -36,22 +36,22 @@
       ],
       "name": "integer milliseconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "150000",
+        "1000000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "150000",
         "1000000"
       ],
-      "ts_duration_secs": 1,
+      "span_us": "1000000",
       "ts_preview": [
         "0.000,000 s",
         "0.150,000 s",
         "1.000,000 s"
-      ],
-      "ts_us": [
-        0,
-        150000,
-        1000000
       ],
       "unit": "milliseconds"
     },
@@ -63,22 +63,22 @@
       ],
       "name": "integer seconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "2000000",
+        "60000000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "2000000",
         "60000000"
       ],
-      "ts_duration_secs": 60,
+      "span_us": "60000000",
       "ts_preview": [
         "0.000,000 s",
         "2.000,000 s",
         "1.000 min"
-      ],
-      "ts_us": [
-        0,
-        2000000,
-        60000000
       ],
       "unit": "seconds"
     },
@@ -90,22 +90,22 @@
       ],
       "name": "integer nanoseconds below a microsecond",
       "negate": false,
+      "preview_us": [
+        "0",
+        "1",
+        "999"
+      ],
       "rust_suggested_unit": "nanoseconds",
       "rust_us": [
         "0",
         "1",
         "999"
       ],
-      "ts_duration_secs": 0.000999999,
+      "span_us": "999",
       "ts_preview": [
         "0.000,000 s",
-        "0.000,002 s",
-        "0.001,000 s"
-      ],
-      "ts_us": [
-        0,
-        2,
-        1000
+        "0.000,001 s",
+        "0.000,999 s"
       ],
       "unit": "nanoseconds"
     },
@@ -116,19 +116,19 @@
       ],
       "name": "epoch microseconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "1000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "1000"
       ],
-      "ts_duration_secs": 0.001,
+      "span_us": "1000",
       "ts_preview": [
         "0.000,000 s",
         "0.001,000 s"
-      ],
-      "ts_us": [
-        0,
-        1000
       ],
       "unit": "microseconds"
     },
@@ -139,19 +139,19 @@
       ],
       "name": "epoch nanoseconds past f64 precision",
       "negate": false,
+      "preview_us": [
+        "0",
+        "1"
+      ],
       "rust_suggested_unit": "nanoseconds",
       "rust_us": [
         "0",
         "1"
       ],
-      "ts_duration_secs": 0.000001536,
+      "span_us": "1",
       "ts_preview": [
         "0.000,000 s",
-        "0.000,002 s"
-      ],
-      "ts_us": [
-        0,
-        2
+        "0.000,001 s"
       ],
       "unit": "nanoseconds"
     },
@@ -162,19 +162,19 @@
       ],
       "name": "candump parenthesised float seconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "10250"
+      ],
       "rust_suggested_unit": "seconds",
       "rust_us": [
         "0",
         "10250"
       ],
-      "ts_duration_secs": null,
+      "span_us": "10250",
       "ts_preview": [
-        "—",
-        "—"
-      ],
-      "ts_us": [
-        null,
-        null
+        "0.000,000 s",
+        "0.010,250 s"
       ],
       "unit": "seconds"
     },
@@ -186,22 +186,22 @@
       ],
       "name": "float seconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
       "rust_suggested_unit": "seconds",
       "rust_us": [
         "0",
         "10250",
         "995001"
       ],
-      "ts_duration_secs": 1,
+      "span_us": "995001",
       "ts_preview": [
         "0.000,000 s",
         "0.010,250 s",
         "0.995,001 s"
-      ],
-      "ts_us": [
-        0,
-        10250,
-        995001
       ],
       "unit": "seconds"
     },
@@ -213,22 +213,22 @@
       ],
       "name": "float seconds with milliseconds chosen",
       "negate": false,
+      "preview_us": [
+        "0",
+        "10250",
+        "995001"
+      ],
       "rust_suggested_unit": "seconds",
       "rust_us": [
         "0",
         "10250",
         "995001"
       ],
-      "ts_duration_secs": 0.001,
+      "span_us": "995001",
       "ts_preview": [
         "0.000,000 s",
-        "0.000,010 s",
-        "0.000,995 s"
-      ],
-      "ts_us": [
-        0,
-        10,
-        995
+        "0.010,250 s",
+        "0.995,001 s"
       ],
       "unit": "milliseconds"
     },
@@ -240,22 +240,22 @@
       ],
       "name": "integer first row then floats",
       "negate": false,
+      "preview_us": [
+        "0",
+        "0",
+        "1000000"
+      ],
       "rust_suggested_unit": "seconds",
       "rust_us": [
         "0",
         "0",
         "1000000"
       ],
-      "ts_duration_secs": 1,
+      "span_us": "1000000",
       "ts_preview": [
         "0.000,000 s",
-        "0.500,000 s",
-        "1.250,000 s"
-      ],
-      "ts_us": [
-        0,
-        500000,
-        1250000
+        "0.000,000 s",
+        "1.000,000 s"
       ],
       "unit": "seconds"
     },
@@ -266,19 +266,19 @@
       ],
       "name": "negated integer epoch microseconds",
       "negate": true,
+      "preview_us": [
+        "1700000000000000",
+        "1700000000001000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "1700000000000000",
         "1700000000001000"
       ],
-      "ts_duration_secs": 0.001,
+      "span_us": "1000",
       "ts_preview": [
-        "0.000,000 s",
-        "0.001,000 s"
-      ],
-      "ts_us": [
-        0,
-        1000
+        "19675.926 d",
+        "19675.926 d"
       ],
       "unit": "microseconds"
     },
@@ -290,22 +290,22 @@
       ],
       "name": "negated float seconds",
       "negate": true,
-      "rust_suggested_unit": "seconds",
-      "rust_us": [
-        "0",
-        "0",
+      "preview_us": [
+        "1250000",
+        "750000",
         "0"
       ],
-      "ts_duration_secs": 1,
+      "rust_suggested_unit": "seconds",
+      "rust_us": [
+        "1250000",
+        "750000",
+        "0"
+      ],
+      "span_us": "1250000",
       "ts_preview": [
         "1.250,000 s",
         "0.750,000 s",
         "0.000,000 s"
-      ],
-      "ts_us": [
-        1250000,
-        750000,
-        0
       ],
       "unit": "seconds"
     },
@@ -317,22 +317,22 @@
       ],
       "name": "negative integers not negated",
       "negate": false,
+      "preview_us": [
+        "0",
+        "100",
+        "200"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "100",
         "200"
       ],
-      "ts_duration_secs": 0.0002,
+      "span_us": "200",
       "ts_preview": [
         "0.000,000 s",
         "0.000,100 s",
         "0.000,200 s"
-      ],
-      "ts_us": [
-        0,
-        100,
-        200
       ],
       "unit": "microseconds"
     },
@@ -345,6 +345,12 @@
       ],
       "name": "blank and unreadable cells",
       "negate": false,
+      "preview_us": [
+        "0",
+        "0",
+        "1000",
+        "2000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
@@ -352,18 +358,12 @@
         "1000",
         "2000"
       ],
-      "ts_duration_secs": 0.002,
+      "span_us": "2000",
       "ts_preview": [
         "0.000,000 s",
-        "—",
-        "—",
+        "0.000,000 s",
+        "0.001,000 s",
         "0.002,000 s"
-      ],
-      "ts_us": [
-        0,
-        null,
-        null,
-        2000
       ],
       "unit": "microseconds"
     },
@@ -375,22 +375,22 @@
       ],
       "name": "rows out of order",
       "negate": false,
+      "preview_us": [
+        "2000",
+        "0",
+        "1000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "2000",
         "0",
         "1000"
       ],
-      "ts_duration_secs": 0.002,
+      "span_us": "2000",
       "ts_preview": [
         "0.002,000 s",
         "0.000,000 s",
         "0.001,000 s"
-      ],
-      "ts_us": [
-        2000,
-        0,
-        1000
       ],
       "unit": "microseconds"
     },
@@ -401,19 +401,19 @@
       ],
       "name": "hex stamps",
       "negate": false,
+      "preview_us": [
+        "0",
+        "1000"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "1000"
       ],
-      "ts_duration_secs": 0,
+      "span_us": "1000",
       "ts_preview": [
         "0.000,000 s",
-        "0.000,016 s"
-      ],
-      "ts_us": [
-        0,
-        16
+        "0.001,000 s"
       ],
       "unit": "microseconds"
     },
@@ -424,19 +424,19 @@
       ],
       "name": "seconds past u64 microseconds",
       "negate": false,
+      "preview_us": [
+        "0",
+        "18446744073709551615"
+      ],
       "rust_suggested_unit": "microseconds",
       "rust_us": [
         "0",
         "18446744073709551615"
       ],
-      "ts_duration_secs": 18446744073710,
+      "span_us": "18446744073709551615",
       "ts_preview": [
         "0.000,000 s",
         "213503982.335 d"
-      ],
-      "ts_us": [
-        0,
-        18446744073710000000
       ],
       "unit": "seconds"
     }

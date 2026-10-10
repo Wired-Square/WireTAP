@@ -39,7 +39,6 @@ import type {
   AutoPhaseResult,
   PeerInfo,
   SweepRow,
-  TestMode,
   TestStatus,
 } from "../../api/testPattern";
 import { wsTransport } from "../../services/wsTransport";
@@ -156,8 +155,6 @@ export default function TestPattern() {
     return unsub;
   }, [updateTestState]);
 
-  const setExpectedTxCount = useTestPatternStore((s) => s.setExpectedTxCount);
-
   const handleStart = useCallback(async () => {
     if (!effectiveSessionId) return;
     setError(null);
@@ -173,8 +170,6 @@ export default function TestPattern() {
       use_extended: useExtended,
     };
 
-    setExpectedTxCount(gaugeExpectedTx(mode, rateHz, durationSec));
-
     try {
       setTestId(id);
       setIsRunning(true);
@@ -185,7 +180,7 @@ export default function TestPattern() {
       setTestId(null);
     }
   }, [effectiveSessionId, mode, role, durationSec, rateHz, bus, useFd, useExtended,
-      setTestId, setIsRunning, setExpectedTxCount]);
+      setTestId, setIsRunning]);
 
   const handleStop = useCallback(async () => {
     if (!testId) return;
@@ -346,9 +341,9 @@ function formatGaugeMax(v: number): string {
   return String(v);
 }
 
-/** The TX gauge's scale, fixed at start; 0 (throughput) auto-scales from the live value. */
-export function gaugeExpectedTx(mode: TestMode, rateHz: number, durationSec: number): number {
-  return mode === "throughput" ? 0 : Math.ceil(rateHz * durationSec);
+/** The run's own expected count, so a full run fills the gauge; an unpaced run auto-scales. */
+export function txGaugeMax(state: Pick<IOTestState, "expected_tx" | "tx_count">): number {
+  return state.expected_tx ?? Math.max(100, nearestRound(state.tx_count * 1.2));
 }
 
 /** Round up to a "nice" gauge maximum. */
@@ -577,8 +572,6 @@ function SweepResults({ state }: { state: IOTestState }) {
 }
 
 function TestResults({ state }: { state: IOTestState }) {
-  const expectedTxCount = useTestPatternStore((s) => s.expectedTxCount);
-
   const isThroughput = state.mode === "throughput";
   // Detect loopback echo — if we received frames during throughput, the
   // interface echoes transmitted frames and we can show bus delivery metrics.
@@ -586,12 +579,8 @@ function TestResults({ state }: { state: IOTestState }) {
   const passed = state.status === "completed";
 
   const fpsMax = Math.max(100, nearestRound(state.frames_per_sec * 1.2));
-  // Use pre-calculated expected TX count for gauge scale (fixed at test start).
-  // For throughput mode (expectedTxCount === 0), auto-scale from the live value.
-  const txMax = expectedTxCount > 0
-    ? nearestRound(expectedTxCount)
-    : Math.max(100, nearestRound(state.tx_count * 1.2));
-  const dropMax = Math.max(10, expectedTxCount > 0 ? expectedTxCount : (state.tx_count || 10));
+  const txMax = txGaugeMax(state);
+  const dropMax = Math.max(10, state.expected_tx ?? state.tx_count);
   const latMax = state.latency_us
     ? Math.max(100, nearestRound(state.latency_us.p99_us * 1.2))
     : 1000;
@@ -871,15 +860,16 @@ function AutoResults({ state }: { state: IOTestState }) {
       {/* Plain English summary */}
       {settled && results.length > 0 && (
         <div className={`text-sm ${textSecondary} border-t border-default pt-2 mt-1`}>
-          <AutoSummary results={results} elapsed={state.elapsed_sec} />
+          <AutoSummary results={results} status={state.status} elapsed={state.elapsed_sec} />
         </div>
       )}
     </div>
   );
 }
 
-export function AutoSummary({ results, elapsed }: { results: AutoPhaseResult[]; elapsed: number }) {
-  const allPassed = results.every((r) => r.passed);
+export function AutoSummary({ results, status, elapsed }: { results: AutoPhaseResult[]; status: TestStatus; elapsed: number }) {
+  const stopped = status === "stopped";
+  const outcome = status === "completed" ? "ALL PASS" : stopped ? "STOPPED" : "FAILURES DETECTED";
   const echoResult = results.find((r) => r.phase === "Echo");
   const latResult = results.find((r) => r.phase === "Latency");
   const tpResult = results.find((r) => r.phase === "Throughput");
@@ -887,7 +877,7 @@ export function AutoSummary({ results, elapsed }: { results: AutoPhaseResult[]; 
 
   const parts: string[] = [];
 
-  parts.push(`Full test suite completed in ${elapsed.toFixed(0)}s — ${allPassed ? "ALL PASS" : "FAILURES DETECTED"}.`);
+  parts.push(`Full test suite ${stopped ? "stopped after" : "completed in"} ${elapsed.toFixed(0)}s — ${outcome}.`);
 
   if (echoResult) {
     parts.push(echoResult.passed

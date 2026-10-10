@@ -1,5 +1,5 @@
 {
-  "note": "bitGrid.ts signalBitPositions and framelink frame_def::signal_bit_positions must both return `positions` (byte_order 1 = BE/Motorola).",
+  "note": "framelink frame_def::signal_bit_positions must return `positions` (byte_order 1 = BE/Motorola); the frame def editor reads bit owners from it through framelink.bit_owners.",
   "rows": [
     {
       "start_bit": 7,

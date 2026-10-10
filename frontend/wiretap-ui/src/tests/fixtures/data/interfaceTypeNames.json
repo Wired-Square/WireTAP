@@ -1,5 +1,5 @@
 {
-  "note": "`ts` is FrameDefEditor.tsx INTERFACE_TYPE_NAMES (null falls to the i18n frameDefEditor.interfaceTypeFmt); `rust` is framelink protocol::types::interface_name, served as interface_type_name.",
+  "note": "`ts` is the generated INTERFACE_TYPE_NAMES (framelink protocol::types::interface_name without its \"Unknown\"; null falls to the i18n frameDefEditor.interfaceTypeFmt); `rust` is interface_name, also served as interface_type_name.",
   "rows": [
     {
       "interface_type": 0,

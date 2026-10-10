@@ -170,6 +170,75 @@ impl TimestampUnit {
     }
 }
 
+/// A file's timestamp cells as the importer reads them: a candump `(…)`
+/// stripped, and an unreadable or missing cell given a synthetic stamp 1000
+/// raw units after the last one. The first readable cell decides whether the
+/// file is float seconds.
+#[derive(Default)]
+struct RawTimestamps {
+    values: Vec<f64>,
+    synthetic: u64,
+    is_float: Option<bool>,
+}
+
+impl RawTimestamps {
+    fn push(&mut self, cell: Option<&str>) {
+        let cleaned = cell.map(|raw| {
+            let raw = raw.trim();
+            raw.strip_prefix('(').and_then(|s| s.strip_suffix(')')).unwrap_or(raw)
+        });
+        let value = match cleaned.and_then(|c| Some((c, parse_timestamp_string(c)?))) {
+            Some((c, v)) => {
+                self.is_float.get_or_insert(c.contains('.'));
+                v
+            }
+            None => {
+                self.synthetic += 1000;
+                self.synthetic as f64
+            }
+        };
+        self.values.push(value);
+    }
+
+    /// Float seconds and non-negated integers are rebased so the earliest is
+    /// zero; negated integers keep their absolute epoch.
+    fn into_microseconds(self, unit: TimestampUnit, negate: bool) -> Vec<u64> {
+        let is_float = self.is_float == Some(true);
+        let values: Vec<f64> = self.values.into_iter().map(|v| if negate { v.abs() } else { v }).collect();
+        let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+        values
+            .iter()
+            .map(|&v| {
+                if is_float {
+                    ((v - min) * 1_000_000.0).round() as u64
+                } else {
+                    let raw = if negate { v } else { v - min };
+                    unit.to_microseconds(raw as u64).unwrap_or(u64::MAX)
+                }
+            })
+            .collect()
+    }
+}
+
+/// The column mapper's timestamp preview: what the importer would stamp each
+/// cell with, rebased over these cells rather than the whole file.
+#[derive(Clone, Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct CsvTimestampPreview {
+    pub timestamps_us: Vec<u64>,
+    pub span_us: u64,
+}
+
+pub fn preview_timestamps(cells: &[String], unit: TimestampUnit, negate: bool) -> CsvTimestampPreview {
+    let mut raw = RawTimestamps::default();
+    for cell in cells {
+        raw.push(Some(cell));
+    }
+    let timestamps_us = raw.into_microseconds(unit, negate);
+    let span_us = timestamps_us.iter().max().zip(timestamps_us.iter().min()).map_or(0, |(max, min)| max - min);
+    CsvTimestampPreview { timestamps_us, span_us }
+}
+
 /// Result of previewing a CSV file
 #[derive(Clone, Debug, serde::Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -290,12 +359,12 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize, delimiter: Option<Deli
     // Detect whether sample timestamps are all negative
     let has_negative_timestamps = ts_col
         .map(|col| {
-            let parsed: Vec<i64> = preview_rows
+            let parsed: Vec<f64> = preview_rows
                 .iter()
                 .filter_map(|row| row.get(col))
-                .filter_map(|s| parse_timestamp_string(s).map(|f| f as i64))
+                .filter_map(|s| parse_timestamp_string(s))
                 .collect();
-            !parsed.is_empty() && parsed.iter().all(|&v| v < 0)
+            !parsed.is_empty() && parsed.iter().all(|&v| v < 0.0)
         })
         .unwrap_or(false);
 
@@ -378,16 +447,11 @@ pub fn parse_csv_with_mapping(
 
     let mut frames: Vec<FrameMessage> = Vec::new();
     let mut line_number = 0usize;
-    let mut synthetic_timestamp: u64 = 0;
-    // Collect raw f64 timestamps so we can normalise after the loop (supports float seconds)
-    let mut raw_f64_timestamps: Vec<f64> = Vec::new();
+    let mut raw_timestamps = RawTimestamps::default();
     // Collect raw sequence numbers for sort ordering (handles wraparound)
     let mut raw_sequences: Vec<Option<u64>> = Vec::new();
     // Track CSV line numbers per frame (for gap reporting)
     let mut frame_line_numbers: Vec<usize> = Vec::new();
-    // Whether timestamps are float seconds (auto-detected from first parsed timestamp)
-    let mut ts_is_float = false;
-    let mut ts_float_detected = false;
 
     for line_result in reader.lines() {
         line_number += 1;
@@ -423,32 +487,7 @@ pub fn parse_csv_with_mapping(
             }
         };
 
-        // Parse timestamp — supports both integer and float (e.g., candump seconds with decimals).
-        // Strip surrounding parentheses for candump format: (0000000000.005000)
-        let raw_timestamp = if let Some(ts_col) = timestamp_col {
-            let raw_str = parts.get(ts_col).map(|s| s.trim()).unwrap_or("");
-            // Strip parentheses: "(1234.567)" -> "1234.567"
-            let cleaned = raw_str
-                .strip_prefix('(')
-                .and_then(|s| s.strip_suffix(')'))
-                .unwrap_or(raw_str);
-
-            if let Some(ts) = parse_timestamp_string(cleaned) {
-                // Detect if this is a float timestamp on first successful parse
-                if !ts_float_detected {
-                    ts_is_float = cleaned.contains('.');
-                    ts_float_detected = true;
-                }
-                ts
-            } else {
-                synthetic_timestamp += 1000;
-                synthetic_timestamp as f64
-            }
-        } else {
-            synthetic_timestamp += 1000;
-            synthetic_timestamp as f64
-        };
-        raw_f64_timestamps.push(raw_timestamp);
+        raw_timestamps.push(timestamp_col.and_then(|col| parts.get(col).copied()));
         // Parse sequence number (used for sort ordering only)
         let seq_value = sequence_col
             .and_then(|col| parts.get(col))
@@ -535,37 +574,9 @@ pub fn parse_csv_with_mapping(
         });
     }
 
-    // Normalise timestamps, then convert to microseconds.
-    if !raw_f64_timestamps.is_empty() && frames.len() == raw_f64_timestamps.len() {
-        if ts_is_float {
-            // Float seconds (e.g., candump format: 0000000000.005000)
-            // Offset so minimum becomes 0, then convert to microseconds.
-            let min_ts = raw_f64_timestamps.iter().cloned().fold(f64::INFINITY, f64::min);
-            for (frame, &raw_ts) in frames.iter_mut().zip(raw_f64_timestamps.iter()) {
-                let offset_secs = if negate_timestamps {
-                    raw_ts.abs() - min_ts.abs()
-                } else {
-                    raw_ts - min_ts
-                };
-                frame.timestamp_us = (offset_secs * 1_000_000.0).round() as u64;
-            }
-        } else if negate_timestamps {
-            // Negative integer timestamps: take the absolute value to recover the real epoch time.
-            for (i, frame) in frames.iter_mut().enumerate() {
-                let raw_us = (raw_f64_timestamps[i].abs()) as u64;
-                frame.timestamp_us = timestamp_unit
-                    .to_microseconds(raw_us)
-                    .unwrap_or(u64::MAX);
-            }
-        } else {
-            // Positive/mixed integer timestamps: offset so the minimum becomes 0.
-            let min_ts = raw_f64_timestamps.iter().cloned().fold(f64::INFINITY, f64::min);
-            for (frame, &raw_ts) in frames.iter_mut().zip(raw_f64_timestamps.iter()) {
-                let normalised = (raw_ts - min_ts) as u64;
-                frame.timestamp_us = timestamp_unit
-                    .to_microseconds(normalised)
-                    .unwrap_or(u64::MAX);
-            }
+    if !frames.is_empty() {
+        for (frame, us) in frames.iter_mut().zip(raw_timestamps.into_microseconds(timestamp_unit, negate_timestamps)) {
+            frame.timestamp_us = us;
         }
 
         // Sort frames to ensure correct order in the capture.
@@ -1264,7 +1275,20 @@ mod tests {
         assert_eq!(seeded("serial-trace.csv"), Protocol::Can);
     }
 
-    /// The `rust_*` columns of the table the column mapper's preview is checked against.
+    #[test]
+    fn negated_float_seconds_import_as_offsets_from_the_earliest() {
+        let preview = preview_timestamps(&["-1.25".into(), "-0.75".into(), "-0.5".into()], TimestampUnit::Seconds, true);
+        assert_eq!(preview.timestamps_us, [750_000, 250_000, 0]);
+        assert_eq!(preview.span_us, 750_000);
+    }
+
+    #[test]
+    fn sub_second_negative_stamps_suggest_negating() {
+        let path = temp_csv("negative.csv", "ID,Time\n1,-0.5\n2,-0.25\n");
+        assert!(preview_csv_file(path.to_str().unwrap(), 20, None).unwrap().has_negative_timestamps);
+    }
+
+    /// The `rust_*`, `preview_us` and `span_us` columns of the table the column mapper's preview is checked against.
     #[test]
     fn the_importer_matches_the_preview_table() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures/data/csvPreviewTimestamps.json");
@@ -1296,8 +1320,11 @@ mod tests {
                 by_row[frame.frame_id as usize - 1] = frame.timestamp_us.to_string();
             }
             let samples: Vec<Vec<String>> = cells.iter().map(|cell| vec![String::new(), cell.clone()]).collect();
+            let preview = preview_timestamps(&cells, unit, row["negate"].as_bool().unwrap());
             let rust = serde_json::json!({
                 "rust_us": by_row,
+                "preview_us": preview.timestamps_us.iter().map(u64::to_string).collect::<Vec<_>>(),
+                "span_us": preview.span_us.to_string(),
                 "rust_suggested_unit": suggest_timestamp_unit(&samples, Some(1)),
             });
             if write {
@@ -1305,8 +1332,10 @@ mod tests {
                     row[key] = value.clone();
                 }
             }
-            assert_eq!(row["rust_us"], rust["rust_us"], "{name}");
-            assert_eq!(row["rust_suggested_unit"], rust["rust_suggested_unit"], "{name}");
+            for key in ["rust_us", "preview_us", "span_us", "rust_suggested_unit"] {
+                assert_eq!(row[key], rust[key], "{name}: {key}");
+            }
+            assert_eq!(rust["preview_us"], rust["rust_us"], "{name}: the preview is the importer");
         }
         if write {
             std::fs::write(path, serde_json::to_string_pretty(&table).unwrap() + "\n").unwrap();

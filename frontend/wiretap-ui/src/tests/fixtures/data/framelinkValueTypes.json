@@ -1,41 +1,35 @@
 {
-  "note": "`ts` is bitGrid.ts VALUE_TYPES' label (the editor sends the number); `crate` is framelink frame_def::value_type_name; `rust` is rules.rs editable_value_type, what cmd_frame_def_add writes into the device's board TOML.",
+  "note": "`ts` is the label the frame def editor offers for the value type (from the generated VALUE_TYPE_NAMES); `toml` is what rules.rs cmd_frame_def_add writes into the device's board TOML (framelink frame_def::value_type_name), null where check_signal_type refuses the type.",
   "rows": [
     {
       "value_type": 0,
       "ts": "Unsigned",
-      "crate": "unsigned",
-      "rust": "unsigned"
+      "toml": "unsigned"
     },
     {
       "value_type": 1,
       "ts": "Signed",
-      "crate": "signed",
-      "rust": "signed"
+      "toml": "signed"
     },
     {
       "value_type": 2,
       "ts": "Float",
-      "crate": "float",
-      "rust": "signed"
+      "toml": "float"
     },
     {
       "value_type": 3,
       "ts": "Bool",
-      "crate": "bool",
-      "rust": "signed"
+      "toml": "bool"
     },
     {
       "value_type": 4,
       "ts": "Array",
-      "crate": "array",
-      "rust": "signed"
+      "toml": "array"
     },
     {
       "value_type": 5,
       "ts": null,
-      "crate": "unknown",
-      "rust": "signed"
+      "toml": null
     }
   ]
 }

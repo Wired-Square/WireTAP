@@ -9,30 +9,28 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 
-import { AutoSummary, gaugeExpectedTx, nearestRound } from "../apps/test-pattern/TestPattern";
-import { INTERFACE_TYPE_NAMES } from "../apps/rules/views/FrameDefEditor";
-import { VALUE_TYPES, nextSignalId, signalBitPositions, type PlacedSignal } from "../apps/rules/utils/bitGrid";
-import { nextAvailableId } from "../apps/rules/utils/framelinkConstants";
+import { AutoSummary, txGaugeMax } from "../apps/test-pattern/TestPattern";
+import { INTERFACE_TYPE_NAMES } from "../generated/framelinkNames";
+import { VALUE_TYPES, validateSignalType } from "../apps/rules/utils/bitGrid";
 import { interpretPair, interpretRegister, type WordOrder } from "../utils/modbusValues";
 import { CAN_FD_DLC_VALUES } from "../constants";
-import type { AutoPhaseResult, TestMode } from "../api/testPattern";
+import type { AutoPhaseResult, TestMode, TestStatus } from "../api/testPattern";
 import { fixtureJson } from "./catalogGoldens";
 
 const table = <Row,>(file: string) => fixtureJson<{ rows: Row[] }>(`data/${file}`).rows;
 const named = <Row,>(rows: Row[], name: (row: Row) => unknown) => rows.map((row) => [JSON.stringify(name(row)), row] as const);
 
 describe("test pattern TX gauge scale", () => {
-  type Row = { mode: TestMode; rate_hz: number; duration_sec: number; ts: { expected_tx: number; gauge_max: number | null } };
-  it.each(named(table<Row>("testPatternGauge.json"), (r) => [r.mode, r.rate_hz, r.duration_sec]))("%s", (_, row) => {
-    const expected = gaugeExpectedTx(row.mode, row.rate_hz, row.duration_sec);
-    expect({ expected_tx: expected, gauge_max: expected > 0 ? nearestRound(expected) : null }).toEqual(row.ts);
+  type Row = { mode: TestMode; rate_hz: number; duration_sec: number; use_fd: boolean; expected_tx: number | null; gauge_max: number };
+  it.each(named(table<Row>("testPatternGauge.json"), (r) => [r.mode, r.rate_hz, r.duration_sec, r.use_fd]))("%s", (_, row) => {
+    expect(txGaugeMax({ expected_tx: row.expected_tx, tx_count: 0 })).toBe(row.gauge_max);
   });
 });
 
 describe("test pattern suite verdict", () => {
   const { phases, rows } = fixtureJson<{
     phases: string[];
-    rows: { name: string; phases_passed: boolean[]; rust: "completed" | "stopped" | "failed"; ts: string | null }[];
+    rows: { name: string; phases_passed: boolean[]; rust: TestStatus; ts: string | null }[];
   }>("data/testPatternSuite.json");
 
   const phase = (name: string, passed: boolean): AutoPhaseResult => ({
@@ -41,10 +39,10 @@ describe("test pattern suite verdict", () => {
   });
 
   // AutoResults shows the summary only once the status is settled and a phase has reported.
-  const summaryVerdict = (status: string, results: AutoPhaseResult[]) => {
+  const summaryVerdict = (status: TestStatus, results: AutoPhaseResult[]) => {
     if (status === "running" || results.length === 0) return null;
-    const text = renderToStaticMarkup(createElement(AutoSummary, { results, elapsed: 1 }));
-    return text.includes("ALL PASS") ? "ALL PASS" : "FAILURES DETECTED";
+    const text = renderToStaticMarkup(createElement(AutoSummary, { results, status, elapsed: 1 }));
+    return ["ALL PASS", "STOPPED", "FAILURES DETECTED"].find((v) => text.includes(v));
   };
 
   it.each(rows.map((row) => [row.name, row] as const))("%s", (_, row) => {
@@ -60,19 +58,10 @@ describe("FrameLink value types", () => {
   });
 });
 
-describe("FrameLink bit positions", () => {
-  type Row = { start_bit: number; bit_length: number; byte_order: number; positions: number[] };
-  it.each(named(table<Row>("framelinkBitPositions.json"), (r) => [r.start_bit, r.bit_length, r.byte_order]))("%s", (_, row) => {
-    expect(signalBitPositions(row.start_bit, row.bit_length, row.byte_order)).toEqual(row.positions);
-  });
-});
-
-describe("FrameLink next id", () => {
-  type Row = { used: number[]; ts: number };
-  const placed = (signalId: number) => ({ signalId }) as PlacedSignal;
-  it.each(named(table<Row>("framelinkNextId.json"), (r) => r.used))("%s", (_, row) => {
-    expect(nextAvailableId(new Set(row.used))).toBe(row.ts);
-    expect(nextSignalId(row.used.map(placed))).toBe(row.ts);
+describe("FrameLink signal value-type checks", () => {
+  type Row = { bit_length: number; value_type: number; error: string | null };
+  it.each(named(table<Row>("framelinkSignalTypes.json"), (r) => [r.bit_length, r.value_type]))("%s", (_, row) => {
+    expect(validateSignalType(row.bit_length, row.value_type)).toBe(row.error);
   });
 });
 

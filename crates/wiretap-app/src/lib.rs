@@ -1300,6 +1300,7 @@ pub fn run() {
             captures::detect_candump,
             captures::import_candump,
             captures::preview_csv,
+            captures::preview_csv_timestamps,
             captures::import_csv_with_mapping,
             captures::import_csv_batch_with_mapping,
             captures::get_capture_metadata,

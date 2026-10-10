@@ -7,11 +7,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-  CsvColumnRole,
-  CsvColumnMapping,
-  TimestampUnit,
-} from "../../api/capture";
+import type { CsvColumnRole, CsvColumnMapping } from "../../api/capture";
 import {
   textMuted,
   textDataGreen,
@@ -80,38 +76,14 @@ export function formatOffset(secs: number): string {
   return `${(secs / 86400).toFixed(3)} d`;
 }
 
-const UNIT_DIVISORS: Record<TimestampUnit, number> = {
-  seconds: 1,
-  milliseconds: 1_000,
-  microseconds: 1_000_000,
-  nanoseconds: 1_000_000_000,
-};
-
-/** Each cell's offset in seconds from the smallest readable stamp; `null` for a blank or unreadable cell. */
-export function previewOffsetSecs(
-  cells: (string | undefined)[],
-  unit: TimestampUnit,
-  negate: boolean,
-): (number | null)[] {
-  const rawValues = cells.map((s) => {
-    if (!s) return NaN;
-    const v = Number(s);
-    return negate ? Math.abs(v) : v;
-  });
-  const validValues = rawValues.filter((v) => !isNaN(v));
-  const minVal = Math.min(...validValues);
-  return rawValues.map((v) => (isNaN(v) ? null : (v - minVal) / UNIT_DIVISORS[unit]));
-}
-
 type Props = {
   headers: string[] | null;
   rows: string[][];
   mappings: CsvColumnMapping[];
   hasHeader: boolean;
   onMappingChange: (columnIndex: number, role: CsvColumnRole) => void;
-  timestampUnit: TimestampUnit;
-  negateTimestamps: boolean;
-  showImportedTs: boolean;
+  /** The importer's stamp for each row, shown in the timestamp column when set. */
+  importedTimestampsUs: number[] | null;
 };
 
 /** Max data rows to display in the preview */
@@ -123,9 +95,7 @@ export default function PreviewTable({
   mappings,
   hasHeader,
   onMappingChange,
-  timestampUnit,
-  negateTimestamps,
-  showImportedTs,
+  importedTimestampsUs,
 }: Props) {
   const { t } = useTranslation("dialogs");
   const numColumns = mappings.length;
@@ -156,18 +126,11 @@ export default function PreviewTable({
   const tsColIndex = mappings.find((m) => m.role === "timestamp")
     ?.column_index;
 
-  // Compute interpreted offsets for each visible row when preview is active
-  const interpretedOffsets: string[] = (() => {
-    if (!showImportedTs || tsColIndex === undefined) return [];
-    const offsets = previewOffsetSecs(visibleRows.map((row) => row[tsColIndex]), timestampUnit, negateTimestamps);
-    return offsets.map((offset) => (offset === null ? "—" : formatOffset(offset)));
-  })();
+  const showImportedTs = importedTimestampsUs !== null && tsColIndex !== undefined;
 
-  /** Get the display value for a cell, substituting timestamp preview when active */
   const getCellValue = (row: string[], colIdx: number, rowIdx: number): string => {
-    if (showImportedTs && colIdx === tsColIndex && interpretedOffsets[rowIdx]) {
-      return interpretedOffsets[rowIdx];
-    }
+    const us = importedTimestampsUs?.[rowIdx];
+    if (showImportedTs && colIdx === tsColIndex && us !== undefined) return formatOffset(us / 1_000_000);
     return row[colIdx] ?? "";
   };
 

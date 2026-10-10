@@ -12,8 +12,8 @@ export const CAN_MAX_BYTES = 8;
 /** Maximum data bytes for CAN FD frames */
 export const CAN_FD_MAX_BYTES = 64;
 
-/** Valid DLC values for CAN FD frames (standard CAN uses 0-8) */
-export const CAN_FD_DLC_VALUES = [8, 12, 16, 20, 24, 32, 48, 64] as const;
+/** The payload lengths a CAN FD frame can carry (standard CAN uses 0-8) */
+export { CAN_FD_DLC_VALUES } from "./generated/canFdLengths";
 
 // =============================================================================
 // UI Timing Constants
