@@ -5,7 +5,9 @@
 
 mod commands;
 mod ids;
+mod live;
 mod open;
+mod scan;
 mod source_config;
 mod tracking;
 pub use commands::*;

@@ -195,6 +195,44 @@ pub async fn import_csv_batch_with_mapping(
     delimiter: io::Delimiter,
     protocol: Option<io::Protocol>,
 ) -> Result<CsvImportResult, String> {
+    let layout = CsvLayout {
+        mappings: &mappings,
+        timestamp_unit,
+        negate_timestamps,
+        delimiter,
+        protocol: protocol.unwrap_or_default(),
+    };
+    import_csv_batch(&session_id, &file_paths, &skip_first_row_per_file, &layout, |progress| {
+        let _ = app_handle.emit("csv-import-progress", progress);
+    })
+}
+
+/// How every file of a batch is read.
+pub struct CsvLayout<'a> {
+    pub mappings: &'a [io::CsvColumnMapping],
+    pub timestamp_unit: io::TimestampUnit,
+    pub negate_timestamps: bool,
+    pub delimiter: io::Delimiter,
+    pub protocol: io::Protocol,
+}
+
+/// The file of a batch about to be parsed.
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct CsvImportProgress {
+    pub file_index: usize,
+    pub total_files: usize,
+    pub filename: String,
+}
+
+/// Import `file_paths` into one capture owned by `session_id`, in order.
+/// A file's header flag falls back to false when `skip_first_row_per_file` is shorter.
+pub fn import_csv_batch(
+    session_id: &str,
+    file_paths: &[String],
+    skip_first_row_per_file: &[bool],
+    layout: &CsvLayout,
+    progress: impl Fn(CsvImportProgress),
+) -> Result<CsvImportResult, String> {
     if file_paths.is_empty() {
         return Err("No files provided".to_string());
     }
@@ -203,11 +241,11 @@ pub async fn import_csv_batch_with_mapping(
     let name = if file_paths.len() == 1 {
         extract_filename(&file_paths[0])
     } else {
-        build_batch_name(&file_paths)
+        build_batch_name(file_paths)
     };
 
     // Create a single capture for all files, owned by the session
-    let capture_id = capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, name);
+    let capture_id = capture_store::create_session_capture(session_id, capture_store::CaptureKind::Frames, name);
 
     let total_files = file_paths.len();
     let mut total_frames: usize = 0;
@@ -218,22 +256,13 @@ pub async fn import_csv_batch_with_mapping(
     for (i, file_path) in file_paths.iter().enumerate() {
         let fname = extract_filename(file_path);
 
-        // Emit progress event for frontend
-        let _ = app_handle.emit(
-            "csv-import-progress",
-            serde_json::json!({
-                "file_index": i,
-                "total_files": total_files,
-                "filename": fname,
-            }),
-        );
+        progress(CsvImportProgress { file_index: i, total_files, filename: fname.clone() });
 
-        // Per-file header flag; falls back to false if array is shorter
         let skip_row = skip_first_row_per_file.get(i).copied().unwrap_or(false);
 
         let result = io::parse_csv_with_mapping(
-            file_path, &mappings, skip_row, timestamp_unit, negate_timestamps, delimiter,
-            protocol.unwrap_or_default(),
+            file_path, layout.mappings, skip_row, layout.timestamp_unit, layout.negate_timestamps,
+            layout.delimiter, layout.protocol,
         )?;
 
         total_frames += result.frames.len();
@@ -267,7 +296,7 @@ pub async fn import_csv_batch_with_mapping(
             prev_file_name = Some(fname);
         }
 
-        capture_store::append_frames_to_session(&session_id, result.frames);
+        capture_store::append_frames_to_session(session_id, result.frames);
     }
 
     if total_frames == 0 {
@@ -283,7 +312,7 @@ pub async fn import_csv_batch_with_mapping(
     let total_dropped = all_sequence_gaps.iter().map(|g| g.dropped).sum();
     let wrap_points = detect_wrap_points(&all_sequence_gaps);
 
-    let finalized = capture_store::finalize_session_captures(&session_id);
+    let finalized = capture_store::finalize_session_captures(session_id);
     let metadata = finalized.into_iter().next()
         .ok_or_else(|| "Failed to finalise capture".to_string())?;
 
@@ -716,5 +745,91 @@ mod tests {
     fn no_gap_means_no_chunks() {
         let bytes = [TimestampedByte { byte: 0, timestamp_us: 0, bus: 0 }];
         assert!(chunk_starts(&bytes, None).is_empty());
+    }
+
+    fn csv_batch(name: &str, files: &[(&str, &str)]) -> Vec<String> {
+        let dir = std::env::temp_dir().join(format!("wiretap-csv-batch-{}-{name}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        files
+            .iter()
+            .map(|(file, body)| {
+                let path = dir.join(file);
+                std::fs::write(&path, body).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect()
+    }
+
+    fn layout(mappings: &[io::CsvColumnMapping]) -> CsvLayout<'_> {
+        CsvLayout {
+            mappings,
+            timestamp_unit: io::TimestampUnit::Microseconds,
+            negate_timestamps: false,
+            delimiter: io::Delimiter::Comma,
+            protocol: io::Protocol::Can,
+        }
+    }
+
+    fn sequenced() -> Vec<io::CsvColumnMapping> {
+        let roles = ["timestamp", "sequence", "frame_id", "data_bytes"];
+        let mappings = roles.iter().enumerate().map(|(i, role)| serde_json::json!({ "column_index": i, "role": role }));
+        serde_json::from_value(mappings.collect()).expect("mappings")
+    }
+
+    #[test]
+    fn a_batch_lands_in_one_capture_with_its_gaps_named_by_file() {
+        crate::capture_db::use_in_memory_database();
+        let mappings = sequenced();
+        let paths = csv_batch(
+            "gaps",
+            &[
+                ("run_a.csv", "100,1,123,01\n200,2,123,02\n300,4,123,03\n"),
+                ("run_b.csv", "ts,seq,id,data\n400,7,123,04\n500,8,123,05\n"),
+            ],
+        );
+        let seen = std::cell::RefCell::new(Vec::new());
+
+        let result = import_csv_batch("f_csv_batch_gaps", &paths, &[false, true], &layout(&mappings), |p| seen.borrow_mut().push(p))
+            .expect("imported");
+
+        let progress = |file_index, filename: &str| CsvImportProgress { file_index, total_files: 2, filename: filename.into() };
+        assert_eq!(*seen.borrow(), [progress(0, "run_a.csv"), progress(1, "run_b.csv")]);
+        assert_eq!(result.metadata.count, 5);
+        assert_eq!(result.metadata.name, "run (2 files)");
+        let gaps: Vec<_> = result.sequence_gaps.iter().map(|g| (g.from_seq, g.to_seq, g.dropped, g.filename.clone())).collect();
+        assert_eq!(
+            gaps,
+            [(2, 4, 1, Some("run_a.csv".into())), (4, 7, 2, Some("run_a.csv → run_b.csv".into()))]
+        );
+        assert_eq!(result.total_dropped, 3);
+        assert!(result.wrap_points.is_empty());
+    }
+
+    #[test]
+    fn a_missing_header_flag_reads_the_first_row_as_data() {
+        crate::capture_db::use_in_memory_database();
+        let mappings = sequenced();
+        let paths = csv_batch("flags", &[("one.csv", "100,1,123,01\n"), ("two.csv", "200,2,123,02\n")]);
+        let result = import_csv_batch("f_csv_batch_flags", &paths, &[], &layout(&mappings), |_| {}).expect("imported");
+        assert_eq!(result.metadata.count, 2);
+    }
+
+    #[test]
+    fn a_batch_with_no_frames_leaves_no_capture() {
+        crate::capture_db::use_in_memory_database();
+        let mappings = sequenced();
+        let paths = csv_batch("empty", &[("csv-batch-empty.csv", "")]);
+        assert_eq!(
+            import_csv_batch("f_csv_batch_empty", &paths, &[false], &layout(&mappings), |_| {}).err(),
+            Some("No valid frames found in any of the selected files".into())
+        );
+        assert!(!capture_store::list_captures().iter().any(|c| c.name == "csv-batch-empty.csv"));
+
+        let called = std::cell::Cell::new(false);
+        assert_eq!(
+            import_csv_batch("f_csv_batch_none", &[], &[], &layout(&mappings), |_| called.set(true)).err(),
+            Some("No files provided".into())
+        );
+        assert!(!called.get());
     }
 }

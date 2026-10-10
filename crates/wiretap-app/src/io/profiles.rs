@@ -109,7 +109,7 @@ async fn put(app: AppHandle, mut settings: AppSettings, profile: IOProfile) -> R
         None => settings.io_profiles.push(profile),
     }
     crate::settings::save_settings(app, settings).await?;
-    crate::sessions::clear_probe_cache(&id);
+    crate::io::probe::clear_probe_cache(&id);
     Ok(())
 }
 

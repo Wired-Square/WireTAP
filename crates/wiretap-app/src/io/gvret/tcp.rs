@@ -114,7 +114,7 @@ pub async fn run_source(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
@@ -181,7 +181,7 @@ mod tests {
     /// bus count, then three frames 10 ms and 20 ms apart by its clock, and
     /// passes on every command it hears. With `hang_up` it closes its end after
     /// them.
-    async fn fake_gvret(
+    pub(crate) async fn fake_gvret(
         keepalives: usize,
         hang_up: bool,
     ) -> (u16, mpsc::UnboundedReceiver<ClientCommand>) {

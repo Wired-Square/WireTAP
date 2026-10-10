@@ -62,13 +62,13 @@ pub fn scan_holding(endpoint: &str) -> Option<String> {
         .map(|(sid, _)| sid.clone())
 }
 
-fn register_scan(session_id: &str, endpoint: &str) {
+pub(crate) fn register_scan(session_id: &str, endpoint: &str) {
     if let Ok(mut scans) = ACTIVE_SCANS.write() {
         scans.insert(session_id.to_string(), endpoint.to_string());
     }
 }
 
-fn unregister_scan(session_id: &str) {
+pub(crate) fn unregister_scan(session_id: &str) {
     if let Ok(mut scans) = ACTIVE_SCANS.write() {
         scans.remove(session_id);
     }

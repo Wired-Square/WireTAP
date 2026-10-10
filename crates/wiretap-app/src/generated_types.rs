@@ -89,8 +89,8 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::modbus_tcp::scanner::ScanProgressPayload>();
     r.visit::<crate::io::post_session::SourceInfo>();
     r.visit::<crate::io::post_session::StreamEndedInfo>();
+    r.visit::<crate::io::probe::DeviceProbeResult>();
     r.visit::<crate::captures::BytesTailResponse>();
-    r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
     r.visit::<crate::sessions::OpenSessionOptions>();
     r.visit::<crate::sessions::OpenedSession>();

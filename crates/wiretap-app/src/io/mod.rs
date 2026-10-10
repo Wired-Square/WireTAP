@@ -11,6 +11,7 @@ pub mod profiles; // Profile lifecycle: reconfigure a device and reconnect it
 mod error;
 pub mod lifecycle; // Terminal state left behind by a detached source task
 pub mod net; // Shared host/port resolution for TCP transports
+pub mod probe;
 pub(crate) mod periodic; // Shared cadence primitive for interval-driven loops
 mod signal_throttle;
 pub use signal_throttle::SignalThrottle;
