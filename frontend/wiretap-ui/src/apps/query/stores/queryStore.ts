@@ -24,7 +24,8 @@ import {
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { datetimeLocalToMicros } from "../../../utils/timeFormat";
-import type { Catalog } from "../../../types/catalogModel";
+import type { Catalog, Frame } from "../../../types/catalogModel";
+import { framesById } from "../../../utils/catalogFrames";
 
 export type { DatabaseActivity };
 
@@ -372,7 +373,15 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     set({ catalogPath: path });
   },
   setCatalog: (catalog: Catalog | null) => {
-    set({ catalog, selectedSignal: null });
+    const frames = catalog ? framesById(catalog) : new Map<number, Frame>();
+    const { queryParams } = get();
+    const lowestId = Math.min(...frames.keys());
+    const frame = frames.has(queryParams.frameId) ? undefined : frames.get(lowestId);
+    set({
+      catalog,
+      selectedSignal: null,
+      ...(frame && { queryParams: { ...queryParams, frameId: lowestId, isExtended: frame.isExtended ?? false } }),
+    });
   },
 
   setSelectedSignal: (signal: SelectedSignal | null) => {
