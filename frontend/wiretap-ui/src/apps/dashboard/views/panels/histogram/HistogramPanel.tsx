@@ -5,7 +5,7 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { emptyStateText } from "../../../../../styles/typography";
-import { readHistograms, type HistogramBins } from "../../../../../api/dashboardHistory";
+import { readHistograms, type HistogramBin } from "../../../../../api/dashboardHistory";
 import { useHistoryQuery } from "../../../widgets/useHistoryQuery";
 import { getCssVar } from "../useUPlotPanel";
 
@@ -21,7 +21,7 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 /** Each signal's bins on one x of every bin centre, a count where a signal has that bin. */
-function histogramData(perSignal: HistogramBins[]): uPlot.AlignedData {
+function histogramData(perSignal: HistogramBin[][]): uPlot.AlignedData {
   const centres = [...new Set(perSignal.flat().map((b) => b.centre))].sort((a, b) => a - b);
   if (centres.length === 0) return [[]];
   return [

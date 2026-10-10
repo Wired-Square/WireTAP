@@ -324,13 +324,6 @@ pub struct HeatmapCounts {
     frames: u64,
 }
 
-/// One signal's bins: values in `[min, max)`, the last bin closed.
-#[derive(Debug, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct HistogramBins(
-    #[cfg_attr(test, ts(type = "Array<{ min: number, max: number, centre: number, count: number }>"))] Vec<HistogramBin>,
-);
-
 type Shared = Arc<Mutex<History>>;
 
 static HISTORIES: Lazy<RwLock<HashMap<String, Shared>>> = Lazy::new(|| RwLock::new(HashMap::new()));
@@ -384,9 +377,7 @@ pub fn dispatch(op_name: &str, params: serde_json::Value) -> Result<serde_json::
         let value = match op_name {
             "dashboard.series" => serde_json::to_value(p.signals.iter().map(|r| h.series(r, p.last)).collect::<Vec<_>>()),
             "dashboard.aligned" => serde_json::to_value(h.aligned(&p.signals)),
-            "dashboard.histogram" => serde_json::to_value(
-                p.signals.iter().map(|r| HistogramBins(h.histogram(r, p.bins))).collect::<Vec<_>>(),
-            ),
+            "dashboard.histogram" => serde_json::to_value(p.signals.iter().map(|r| h.histogram(r, p.bins)).collect::<Vec<_>>()),
             "dashboard.csv" => serde_json::to_value(h.csv(&p.signals, &p.headers)),
             "dashboard.bitChanges" => {
                 let mut ids: Vec<u32> = p.frame_id.map_or_else(|| h.toggles.keys().copied().collect(), |id| vec![id]);

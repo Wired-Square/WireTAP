@@ -8,8 +8,6 @@ pub mod capture;
 mod csv;
 mod gateway;
 pub mod queue;
-#[cfg(test)]
-pub(crate) mod ts;
 
 use std::collections::BTreeSet;
 use std::sync::atomic::AtomicBool;
@@ -36,7 +34,6 @@ pub use queue::QueryQueue;
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct QueryRequest {
     pub source: QuerySource,
-    #[cfg_attr(test, ts(as = "ts::QuerySpec"))]
     pub spec: QuerySpec,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
@@ -45,6 +42,7 @@ pub struct QueryRequest {
 
 /// A query's results; which variant follows from the spec's type.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(untagged)]
 pub enum QueryResults {
     ByteChanges(Vec<ByteChangeResult>),
@@ -81,9 +79,7 @@ impl QueryResults {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct QueryOutcome {
-    #[cfg_attr(test, ts(as = "ts::QueryResults"))]
     pub results: QueryResults,
-    #[cfg_attr(test, ts(as = "Option<ts::QueryStats>"))]
     pub stats: Option<QueryStats>,
     pub sql: Vec<String>,
 }

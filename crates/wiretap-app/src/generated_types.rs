@@ -102,7 +102,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::dashboard_history::SignalRef>();
     r.visit::<crate::dashboard_history::SeriesWindow>();
     r.visit::<crate::dashboard_history::AlignedSeries>();
-    r.visit::<crate::dashboard_history::HistogramBins>();
+    r.visit::<wiretap_analysis::dashboard::HistogramBin>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.visit::<crate::settings::DirectoryValidation>();
@@ -505,6 +505,12 @@ fn ws_json_bodies_serialise_as_declared() {
     };
     query("dashboard.series").as_array().unwrap().iter().for_each(assert_declared::<crate::dashboard_history::SeriesWindow>);
     assert_declared::<crate::dashboard_history::AlignedSeries>(&query("dashboard.aligned"));
+    query("dashboard.histogram")
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|bins| bins.as_array().unwrap())
+        .for_each(assert_declared::<wiretap_analysis::dashboard::HistogramBin>);
     crate::adhoc::forget_session(session);
 
     use crate::io::modbus_tcp::scanner::ModbusScanState;
@@ -827,35 +833,40 @@ fn byte_note_codes_fixture_is_the_libs_answer() {
 #[test]
 fn query_shapes_serialise_as_declared() {
     use crate::query::tests::{fixture, form_specs, results_named};
-    use crate::query::{queue::*, ts, QueryOutcome, QueryRequest};
+    use crate::query::{queue::*, QueryOutcome, QueryRequest};
+    use wiretap_gateway::{
+        ByteChangeResult, BytePositionStats, DistributionResult, FirstLastResult, FrameChangeResult, FrequencyBucket,
+        GapResult, MirrorValidationResult, MuxCaseStats, MuxStatisticsResult, PatternSearchResult, QuerySpec, QueryStats,
+        Word16Stats,
+    };
 
     for (_, spec) in form_specs() {
-        assert_declared::<ts::QuerySpec>(&serde_json::to_value(&spec).unwrap());
+        assert_declared::<QuerySpec>(&serde_json::to_value(&spec).unwrap());
     }
-    let stats = wiretap_gateway::QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0 };
-    assert_declared::<ts::QueryStats>(&serde_json::to_value(&stats).unwrap());
+    let stats = QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0 };
+    assert_declared::<QueryStats>(&serde_json::to_value(&stats).unwrap());
     for case in fixture("queryCsv.json")["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let results = results_named(name, case["input"].clone());
         let json = serde_json::to_value(&results).unwrap();
         for row in json.as_array().cloned().unwrap_or_else(|| vec![json.clone()]).iter() {
             match name {
-                "byte_changes" => assert_declared::<ts::ByteChangeResult>(row),
-                "frame_changes" => assert_declared::<ts::FrameChangeResult>(row),
-                "mirror_validation" => assert_declared::<ts::MirrorValidationResult>(row),
+                "byte_changes" => assert_declared::<ByteChangeResult>(row),
+                "frame_changes" => assert_declared::<FrameChangeResult>(row),
+                "mirror_validation" => assert_declared::<MirrorValidationResult>(row),
                 "mux_statistics" => {
-                    assert_declared::<ts::MuxStatisticsResult>(row);
+                    assert_declared::<MuxStatisticsResult>(row);
                     for c in each(row, "cases") {
-                        assert_declared::<ts::MuxCaseStats>(c);
-                        each(c, "byte_stats").for_each(assert_declared::<ts::BytePositionStats>);
-                        each(c, "word16_stats").for_each(assert_declared::<ts::Word16Stats>);
+                        assert_declared::<MuxCaseStats>(c);
+                        each(c, "byte_stats").for_each(assert_declared::<BytePositionStats>);
+                        each(c, "word16_stats").for_each(assert_declared::<Word16Stats>);
                     }
                 }
-                "first_last" => assert_declared::<ts::FirstLastResult>(row),
-                "frequency" => assert_declared::<ts::FrequencyBucket>(row),
-                "distribution" => assert_declared::<ts::DistributionResult>(row),
-                "gap_analysis" => assert_declared::<ts::GapResult>(row),
-                "pattern_search" => assert_declared::<ts::PatternSearchResult>(row),
+                "first_last" => assert_declared::<FirstLastResult>(row),
+                "frequency" => assert_declared::<FrequencyBucket>(row),
+                "distribution" => assert_declared::<DistributionResult>(row),
+                "gap_analysis" => assert_declared::<GapResult>(row),
+                "pattern_search" => assert_declared::<PatternSearchResult>(row),
                 _ => assert_declared::<crate::capture_db::InventoryRow>(row),
             }
         }

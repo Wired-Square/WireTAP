@@ -10,4 +10,7 @@ import type { MirrorValidationResult } from "./MirrorValidationResult";
 import type { MuxStatisticsResult } from "./MuxStatisticsResult";
 import type { PatternSearchResult } from "./PatternSearchResult";
 
+/**
+ * A query's results; which variant follows from the spec's type.
+ */
 export type QueryResults = Array<ByteChangeResult> | Array<FrameChangeResult> | Array<MirrorValidationResult> | MuxStatisticsResult | FirstLastResult | Array<FrequencyBucket> | Array<DistributionResult> | Array<GapResult> | Array<PatternSearchResult> | Array<InventoryRow>;

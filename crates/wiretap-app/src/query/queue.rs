@@ -38,7 +38,6 @@ pub struct QueryItem {
     pub completed_at_ms: Option<i64>,
     pub error: Option<String>,
     pub result_count: Option<u64>,
-    #[cfg_attr(test, ts(as = "Option<super::ts::QueryStats>"))]
     pub stats: Option<QueryStats>,
 }
 

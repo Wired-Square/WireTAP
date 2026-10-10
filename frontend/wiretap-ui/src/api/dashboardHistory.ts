@@ -4,11 +4,11 @@
 
 import { wsTransport } from "../services/wsTransport";
 import type { AlignedSeries } from "../generated/AlignedSeries";
-import type { HistogramBins } from "../generated/HistogramBins";
+import type { HistogramBin } from "../generated/HistogramBin";
 import type { HistorySignal } from "../generated/HistorySignal";
 import type { SeriesWindow } from "../generated/SeriesWindow";
 
-export type { AlignedSeries, HistogramBins, SeriesWindow };
+export type { AlignedSeries, HistogramBin, SeriesWindow };
 export type { WindowStats } from "../generated/WindowStats";
 
 const historySignals = (signals: { frameId: number; signalName: string }[]): HistorySignal[] =>
@@ -25,7 +25,7 @@ export function readAligned(sessionId: string, signals: Signals): Promise<Aligne
   return wsTransport.command("dashboard.aligned", { session_id: sessionId, signals: historySignals(signals) });
 }
 
-export function readHistograms(sessionId: string, signals: Signals, bins: number): Promise<HistogramBins[]> {
+export function readHistograms(sessionId: string, signals: Signals, bins: number): Promise<HistogramBin[][]> {
   return wsTransport.command("dashboard.histogram", { session_id: sessionId, signals: historySignals(signals), bins });
 }
 

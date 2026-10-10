@@ -8614,6 +8614,7 @@ source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.4.0#
 dependencies = [
  "rayon",
  "serde",
+ "ts-rs",
  "wiretap-catalog",
  "wiretap-checksum",
  "wiretap-decode",
@@ -8675,6 +8676,7 @@ version = "0.4.0"
 source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.4.0#731bd497427b115c3a8caccfe87e36577a4662b0"
 dependencies = [
  "serde",
+ "ts-rs",
 ]
 
 [[package]]
